@@ -89,6 +89,8 @@ class BaseSource(ABC):
         self._next_sampling_cursor: dict[str, Any] | None = None
         self._partial_coverage: bool = False
         self._partial_coverage_reason: str = ""
+        self._listing_complete: bool = False
+        self._listing_errors: int = 0
         self._sampling_cursor_lock = threading.Lock()
         self._apply_initial_sampling_override(normalized_recipe)
         recipe.clear()
@@ -190,6 +192,34 @@ class BaseSource(ABC):
         self._partial_coverage = True
         if reason and not self._partial_coverage_reason:
             self._partial_coverage_reason = str(reason)
+
+    def note_listing_error(self) -> None:
+        """Record that part of the catalog could not be listed this run.
+
+        A listing that skipped a schema, a folder or a label cannot say that
+        what it did not list is gone, so it forfeits :meth:`declare_listing_complete`.
+        """
+        self._listing_errors = getattr(self, "_listing_errors", 0) + 1
+
+    def declare_listing_complete(self) -> None:
+        """Say that discovery named every object of the configured scope.
+
+        Sampling decides how much of each asset is read, not which assets
+        exist. A catalog connector (tables, node labels) lists its whole scope
+        on every run whatever the strategy, so an asset missing from that list
+        is gone and can be retired -- without this, only strategy=ALL ever
+        retired anything and every other source kept deleted tables, moved
+        databases and renamed labels as "unchanged" forever.
+
+        Ignored when any part of the listing failed or the run declared partial
+        coverage.
+        """
+        if getattr(self, "_listing_errors", 0) == 0:
+            self._listing_complete = True
+
+    @property
+    def listing_complete(self) -> bool:
+        return bool(getattr(self, "_listing_complete", False)) and not self.partial_coverage
 
     @property
     def partial_coverage(self) -> bool:

@@ -855,7 +855,7 @@ export class AssetsApi extends runtime.BaseAPI {
     }
 
     /**
-     * Finalizes ingest run. For sources with sampling strategy ALL, marks assets absent from seenHashes as DELETED and auto-resolves their open findings. For RANDOM/LATEST strategies this is a no-op since absence does not imply deletion.
+     * Finalizes ingest run. For sources with sampling strategy ALL, or a run that declares discoveryComplete, marks assets absent from seenHashes as DELETED and auto-resolves their open findings. For other RANDOM/LATEST/AUTOMATIC runs this is a no-op since absence does not imply deletion.
      * Finalize ingest run
      */
     async sourceAssetsControllerFinalizeIngestRaw(requestParameters: SourceAssetsControllerFinalizeIngestRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
@@ -895,7 +895,7 @@ export class AssetsApi extends runtime.BaseAPI {
     }
 
     /**
-     * Finalizes ingest run. For sources with sampling strategy ALL, marks assets absent from seenHashes as DELETED and auto-resolves their open findings. For RANDOM/LATEST strategies this is a no-op since absence does not imply deletion.
+     * Finalizes ingest run. For sources with sampling strategy ALL, or a run that declares discoveryComplete, marks assets absent from seenHashes as DELETED and auto-resolves their open findings. For other RANDOM/LATEST/AUTOMATIC runs this is a no-op since absence does not imply deletion.
      * Finalize ingest run
      */
     async sourceAssetsControllerFinalizeIngest(requestParameters: SourceAssetsControllerFinalizeIngestRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {

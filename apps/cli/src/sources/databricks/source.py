@@ -605,6 +605,7 @@ class DatabricksSource(BaseTabularSource):
         try:
             schemas = self._list_schemas_for_catalog(database)
         except Exception as exc:
+            self.note_listing_error()
             logger.warning("Skipping catalog %s due to schema listing error: %s", database, exc)
             return tables
         for schema in schemas:
@@ -613,6 +614,7 @@ class DatabricksSource(BaseTabularSource):
             try:
                 tables.extend(self._list_tables_for_schema(database, schema))
             except Exception as exc:
+                self.note_listing_error()
                 logger.warning(
                     "Skipping schema %s.%s due to table listing error: %s",
                     database,
@@ -814,6 +816,7 @@ class DatabricksSource(BaseTabularSource):
                     "get", "/api/2.0/workspace/list", params={"path": path}
                 )
             except Exception as exc:
+                self.note_listing_error()
                 logger.warning("Skipping workspace path %s due to listing error: %s", path, exc)
                 continue
             objects = payload.get("objects")
@@ -893,6 +896,7 @@ class DatabricksSource(BaseTabularSource):
             try:
                 payload = self._request_json("get", "/api/2.0/pipelines", params=params)
             except Exception as exc:
+                self.note_listing_error()
                 logger.warning("Could not list Databricks pipelines: %s", exc)
                 break
             values: list[dict[str, Any]] = []
@@ -1036,6 +1040,7 @@ class DatabricksSource(BaseTabularSource):
                 batch = []
         if pipeline_count:
             logger.info("Discovered %d pipeline(s)", pipeline_count)
+        self._declare_listing_if_whole()
 
         if batch:
             yield batch

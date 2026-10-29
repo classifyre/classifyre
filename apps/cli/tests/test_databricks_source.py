@@ -485,3 +485,23 @@ def test_databricks_lineage_edge_names_the_notebook_that_wrote_it(
     edges = {edge.from_hash: edge for edge in source.drain_edges()}
     assert edges["h-orders"].via_id == "h-notebook"
     assert edges["h-payments"].via_id is None
+
+
+def test_databricks_unlistable_schema_forfeits_the_complete_declaration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # A schema whose tables could not be listed must not read as "now empty".
+    source = DatabricksSource(_pat_recipe())
+    monkeypatch.setattr(source, "_list_schemas_for_catalog", lambda _c: ["good", "bad"])
+
+    def _tables(catalog: str, schema: str) -> list[TableRef]:
+        if schema == "bad":
+            raise RuntimeError("permission denied")
+        return [TableRef(database=catalog, schema=schema, table="t", object_type="TABLE")]
+
+    monkeypatch.setattr(source, "_list_tables_for_schema", _tables)
+
+    assert len(source._list_tables_for_database("main")) == 1
+    source._declare_listing_if_whole()
+
+    assert source.listing_complete is False

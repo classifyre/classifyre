@@ -18,6 +18,7 @@ Name | Type
 `relationshipsDropped` | number
 `relationshipErrors` | Array&lt;string&gt;
 `partialCoverage` | boolean
+`discoveryComplete` | boolean
 `cohortStats` | object
 `detectorsDegraded` | Array&lt;string&gt;
 
@@ -40,6 +41,7 @@ const example = {
   "relationshipsDropped": null,
   "relationshipErrors": null,
   "partialCoverage": null,
+  "discoveryComplete": null,
   "cohortStats": null,
   "detectorsDegraded": null,
 } satisfies FinalizeIngestRunDto

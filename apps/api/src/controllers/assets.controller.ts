@@ -521,7 +521,7 @@ export class SourceAssetsController {
   @ApiOperation({
     summary: 'Finalize ingest run',
     description:
-      'Finalizes ingest run. For sources with sampling strategy ALL, marks assets absent from seenHashes as DELETED and auto-resolves their open findings. For RANDOM/LATEST strategies this is a no-op since absence does not imply deletion.',
+      'Finalizes ingest run. For sources with sampling strategy ALL, or a run that declares discoveryComplete, marks assets absent from seenHashes as DELETED and auto-resolves their open findings. For other RANDOM/LATEST/AUTOMATIC runs this is a no-op since absence does not imply deletion.',
   })
   @ApiParam({
     name: 'sourceId',
@@ -545,6 +545,7 @@ export class SourceAssetsController {
       relationshipsDropped,
       relationshipErrors,
       partialCoverage,
+      discoveryComplete,
       cohortStats,
       detectorsDegraded,
     } = finalizeDto;
@@ -581,7 +582,13 @@ export class SourceAssetsController {
     // gone. Did it visit every asset of the source? Only if the connector did
     // not declare partial coverage, and only then is an absent asset gone.
     const scannedAssetsComplete = samplingStrategy === 'ALL';
-    const isFullScan = scannedAssetsComplete && partialCoverage !== true;
+    // A catalog connector that listed its whole scope proves absence too, under
+    // any strategy: sampling narrows what is read inside an asset, not which
+    // assets exist. It only retires assets; finding resolution still needs the
+    // assets to have been read whole.
+    const isFullScan =
+      (scannedAssetsComplete || discoveryComplete === true) &&
+      partialCoverage !== true;
 
     // A detector the breaker disabled mid-run never evaluated the assets it
     // skipped, but the sweep keeps advancing anyway: dropping the cursor on

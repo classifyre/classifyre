@@ -319,8 +319,22 @@ class BaseTabularSource(BaseSource):
             try:
                 tables.extend(self._list_tables_for_database(database))
             except Exception as exc:
+                self.note_listing_error()
                 logger.warning("Skipping database %s due to listing error: %s", database, exc)
         return tables
+
+    def _listing_is_limited(self) -> bool:
+        """Whether a configured cap can have cut the table list short."""
+        scope_options = getattr(self, "_scope_options", None)
+        scope = scope_options() if callable(scope_options) else None
+        return bool(
+            getattr(scope, "table_limit", None) or getattr(scope, "table_limit_per_schema", None)
+        )
+
+    def _declare_listing_if_whole(self) -> None:
+        """Offer this run's table list as the whole scope, when it plausibly is."""
+        if not self._aborted and not self._listing_is_limited():
+            self.declare_listing_complete()
 
     # ── Primary keys ─────────────────────────────────────────────────────
 
@@ -1097,6 +1111,7 @@ class BaseTabularSource(BaseSource):
         table_hash_by_key: dict[tuple[str, ...], str] = {
             t.table_key: self.generate_hash_id(t.raw_id) for t in tables
         }
+        self._declare_listing_if_whole()
         fk_links = self._collect_foreign_key_links(tables)
         self._emit_relationship_edges(tables, table_hash_by_key, fk_links)
 
