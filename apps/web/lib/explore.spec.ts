@@ -11,6 +11,7 @@ import {
   sharedValues,
   toExploreGraph,
   VIEW_KINDS,
+  viewCount,
 } from "./explore";
 
 const t = (key: string, values?: Record<string, string | number>) =>
@@ -289,5 +290,25 @@ describe("a term the canvas is about", () => {
     const shown = visibleGraph(graph, new Set(["lineage"]));
     expect(shown.terms).toEqual([]);
     expect(shown.assets.map((a) => a.id).sort()).toEqual(["a", "b", "d"]);
+  });
+});
+
+describe("how many neighbours a view has", () => {
+  const response = (nodes: ReturnType<typeof node>[], edges: ExploreEdgeDto[]) =>
+    ({ nodes, edges, terms: [], seeds: [], counts: {} }) as unknown as ExploreNeighbourhoodResponseDto;
+
+  it("counts a starting point another one is linked to", () => {
+    // A small source: every asset is a starting point, so nothing is a "neighbour".
+    const res = response(
+      [node("a", "seed", ["links"], 0), node("b", "seed", ["links"], 0), node("c", "seed", [], 0)],
+      [edge({ id: "e1", fromId: "a", toId: "b" })],
+    );
+    expect(viewCount("connected", res)).toBe(2);
+    expect(viewCount("duplicates", res)).toBe(0);
+  });
+
+  it("still counts only the far end for a single starting point", () => {
+    const res = response([node("s", "seed", [], 0), node("b", "side", ["links"])], [edge({ id: "e1", fromId: "s", toId: "b" })]);
+    expect(viewCount("connected", res)).toBe(1);
   });
 });

@@ -267,6 +267,33 @@ describe('mergeNeighbourhood', () => {
   });
 });
 
+describe('counts for a source whose assets are all starting points', () => {
+  it('counts a starting point another is linked to, so the links are not "none"', () => {
+    const view = mergeNeighbourhood({
+      ...empty,
+      seeds: [asset('a'), asset('b'), asset('c')],
+      walks: [
+        {
+          kind: 'links',
+          result: {
+            nodes: [
+              node('a', 'seed', 0),
+              node('b', 'seed', 0),
+              node('c', 'seed', 0),
+            ],
+            edges: [edge('e1', 'a', 'b', 'links')],
+            truncated: false,
+          },
+        },
+      ],
+    });
+
+    // a and b are each other's neighbour; c has none.
+    expect(view.counts.links).toBe(2);
+    expect(view.edges.map((e) => e.id)).toEqual(['e1']);
+  });
+});
+
 describe('withScope', () => {
   // s is the starting point in source A; b is in A too, c in source B.
   const view = () =>
