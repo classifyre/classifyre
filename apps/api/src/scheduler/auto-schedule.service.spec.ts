@@ -3,6 +3,7 @@ import { AutoScheduleService } from './auto-schedule.service';
 import {
   BACKOFF_BASE_SECONDS,
   CATCH_UP_COOLDOWN_SECONDS,
+  CHURN_MAX_SECONDS,
   CIRCUIT_BREAK_FAILURES,
   MAX_CONSECUTIVE_CATCH_UP_RUNS,
   MIN_AGENT_INTERVAL_SECONDS,
@@ -117,6 +118,102 @@ describe('AutoScheduleService', () => {
       expect(data.autoPhase).toBe('CATCH_UP');
       expect(data.autoNoProgressStreak).toBe(0);
       expect(delayOf(data, now)).toBe(CATCH_UP_COOLDOWN_SECONDS);
+    });
+
+    /**
+     * A cursor that wraps moves on every run for good. Measured on a live
+     * instance: a Neo4j label of exactly one page flipped its offset 0 -> 100 ->
+     * 0 on consecutive scans that ingested nothing, so every run was filed as
+     * progress ("continuing the sweep, run 18") and the source was re-scanned
+     * every few minutes indefinitely. Once the connector says every unit has
+     * been covered once, that movement is the same ground read again.
+     */
+    it('does not count a wrapping cursor as progress once the sweep has gone round', async () => {
+      prisma.source.findUnique.mockResolvedValue(autoSource());
+      prisma.runner.findUnique.mockResolvedValue(
+        runner({
+          sweepComplete: true,
+          samplingCursor: { 'label:Chart': 100 },
+        }),
+      );
+      prisma.runner.findFirst.mockResolvedValue({
+        samplingCursor: { 'label:Chart': 0 },
+      });
+
+      await service.recordRunOutcome('s1', 'r1');
+
+      expect(written().autoNoProgressStreak).toBe(1);
+    });
+
+    it('still follows the cursor while the sweep has not gone round', async () => {
+      const now = Date.now();
+      prisma.source.findUnique.mockResolvedValue(autoSource());
+      prisma.runner.findUnique.mockResolvedValue(
+        runner({
+          sweepComplete: false,
+          samplingCursor: { 'label:Chart': 100 },
+        }),
+      );
+      prisma.runner.findFirst.mockResolvedValue({
+        samplingCursor: { 'label:Chart': 0 },
+      });
+
+      await service.recordRunOutcome('s1', 'r1');
+
+      const data = written();
+      expect(data.autoPhase).toBe('CATCH_UP');
+      expect(delayOf(data, now)).toBe(CATCH_UP_COOLDOWN_SECONDS);
+    });
+
+    /**
+     * The other live loop: a Postgres source whose sweep was long finished kept
+     * creating one to four findings a run because a staging table carries a
+     * timestamp that is the moment it was read. Content that differs on every
+     * scan is not ground left to cover, so it must not hold the source at the
+     * one-minute cadence.
+     */
+    it('settles a finished sweep whose content still changes, and backs off', async () => {
+      const now = Date.now();
+      prisma.source.findUnique.mockResolvedValue(autoSource());
+      prisma.runner.findUnique.mockResolvedValue(
+        runner({ sweepComplete: true, findingsCreated: 3 }),
+      );
+
+      await service.recordRunOutcome('s1', 'r1');
+
+      let data = written();
+      expect(data.autoPhase).toBe('STEADY');
+      expect(data.autoCatchUpRuns).toBe(0);
+      expect(delayOf(data, now)).toBe(STEADY_MIN_SECONDS);
+
+      // The next scan changed again: the interval doubles ...
+      prisma.source.findUnique.mockResolvedValue(
+        autoSource({
+          autoPhase: 'STEADY',
+          autoIntervalSeconds: STEADY_MIN_SECONDS,
+          autoLastRunnerId: 'r1',
+        }),
+      );
+      prisma.runner.findUnique.mockResolvedValue(
+        runner({ id: 'r2', sweepComplete: true, findingsCreated: 2 }),
+      );
+      await service.recordRunOutcome('s1', 'r2');
+      data = written();
+      expect(data.autoIntervalSeconds).toBe(STEADY_MIN_SECONDS * 2);
+
+      // ... but never past the churn ceiling.
+      prisma.source.findUnique.mockResolvedValue(
+        autoSource({
+          autoPhase: 'STEADY',
+          autoIntervalSeconds: CHURN_MAX_SECONDS,
+          autoLastRunnerId: 'r2',
+        }),
+      );
+      prisma.runner.findUnique.mockResolvedValue(
+        runner({ id: 'r3', sweepComplete: true, findingsCreated: 1 }),
+      );
+      await service.recordRunOutcome('s1', 'r3');
+      expect(written().autoIntervalSeconds).toBe(CHURN_MAX_SECONDS);
     });
 
     it('converges once the cursor stops moving', async () => {

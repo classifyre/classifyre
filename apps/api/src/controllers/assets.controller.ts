@@ -546,6 +546,7 @@ export class SourceAssetsController {
       relationshipErrors,
       partialCoverage,
       discoveryComplete,
+      sweepComplete,
       cohortStats,
       detectorsDegraded,
     } = finalizeDto;
@@ -654,7 +655,7 @@ export class SourceAssetsController {
       // ground it had already covered". Best-effort: a run must never fail
       // because a scheduling hint could not be recorded.
       await this.assetService
-        .recordRunSamplingCursor(runnerId, samplingCursor)
+        .recordRunSamplingCursor(runnerId, samplingCursor, sweepComplete)
         .catch(() => undefined);
     }
 

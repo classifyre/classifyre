@@ -334,6 +334,7 @@ describe('SourceAssetsController', () => {
     expect(assetService.recordRunSamplingCursor).toHaveBeenCalledWith(
       'runner-1',
       cursor,
+      undefined,
     );
     // AUTOMATIC ingests one slice per run → absence never implies deletion.
     expect(assetService.finalizeIngestRun).toHaveBeenCalledWith(
@@ -342,6 +343,29 @@ describe('SourceAssetsController', () => {
       ['h1'],
       false,
       false,
+    );
+  });
+
+  it('hands the scheduler whether a wrapping sweep has gone round once', async () => {
+    sourceService.source.mockResolvedValue({
+      id: 'source-1',
+      type: 'NEO4J',
+      config: { sampling: { strategy: 'AUTOMATIC' } },
+    });
+    assetService.finalizeIngestRun.mockResolvedValue({ deleted: 0 });
+
+    const cursor = { 'label:Chart': 0, _lapped: ['label:Chart'] };
+    await controller.finalizeIngest('source-1', {
+      runnerId: 'runner-1',
+      seenHashes: [],
+      samplingCursor: cursor,
+      sweepComplete: true,
+    });
+
+    expect(assetService.recordRunSamplingCursor).toHaveBeenCalledWith(
+      'runner-1',
+      cursor,
+      true,
     );
   });
 

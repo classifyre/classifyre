@@ -378,7 +378,7 @@ def test_mongodb_wraps_when_ids_do_not_order_by_age(monkeypatch: pytest.MonkeyPa
     assert cursor == {"collection:app.events": 10}
     second, cursor = _mongo_run(monkeypatch, collection, cursor)
     assert len(first) == 10 and len(second) == 5
-    assert cursor == {"collection:app.events": 0}
+    assert cursor == {"collection:app.events": 0, "_lapped": ["collection:app.events"]}
     # Round again: with nothing to tell new from old, this is how new ones are seen.
     assert len(_mongo_run(monkeypatch, collection, cursor)[0]) == 10
 

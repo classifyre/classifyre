@@ -242,7 +242,7 @@ def test_opensearch_automatic_strategy_resumes_and_wraps_on_underfill(
     body = _patch_requests["search_body"]
     assert body["from"] == 10
     assert len(docs) == 2
-    assert src.current_sampling_cursor() == {"index:logs-app": 0}
+    assert src.current_sampling_cursor() == {"index:logs-app": 0, "_lapped": ["index:logs-app"]}
 
 
 async def test_opensearch_all_strategy_scrolls_the_whole_index(

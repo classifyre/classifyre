@@ -204,6 +204,9 @@ class FinalizeIngestRunRequest(BaseModel):
     # from a cohort run is not evidence that an asset is gone.
     partial_coverage: bool | None = Field(None, serialization_alias="partialCoverage")
     discovery_complete: bool | None = Field(None, serialization_alias="discoveryComplete")
+    # Whether every unit of an AUTOMATIC sweep that wraps has been covered once.
+    # Only sent by a run with a wrapping unit; see BaseSource.sweep_complete.
+    sweep_complete: bool | None = Field(None, serialization_alias="sweepComplete")
     # Per ctx.cohort(): keys each band visited, and the weights it ran with.
     cohort_stats: dict[str, Any] | None = Field(None, serialization_alias="cohortStats")
     # Detectors the circuit breaker disabled mid-run (scan-cache identity
@@ -263,6 +266,7 @@ class RestOutputSink:
         self._partial_coverage: bool = False
         self._partial_coverage_reason: str = ""
         self._listing_complete: bool = False
+        self._sweep_complete: bool | None = None
         self._detectors_degraded: list[str] = []
         self._cohort_stats: dict[str, Any] | None = None
         self.relationship_report = RelationshipReport()
@@ -284,6 +288,10 @@ class RestOutputSink:
     def set_listing_complete(self) -> None:
         """Mark that discovery named every object of the configured scope."""
         self._listing_complete = True
+
+    def set_sweep_complete(self, complete: bool | None) -> None:
+        """Record whether the wrapping sweep has covered all its ground once."""
+        self._sweep_complete = complete
 
     def set_detectors_degraded(self, keys: list[str]) -> None:
         """Record detectors the breaker disabled mid-run, for the next run's sweep."""
@@ -422,6 +430,7 @@ class RestOutputSink:
             relationship_errors=lineage.errors or None,
             partial_coverage=True if self._partial_coverage else None,
             discovery_complete=True if self._listing_complete else None,
+            sweep_complete=self._sweep_complete,
             cohort_stats=self._cohort_stats,
             detectors_degraded=self._detectors_degraded or None,
         )

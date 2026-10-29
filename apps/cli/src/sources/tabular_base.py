@@ -703,6 +703,18 @@ class BaseTabularSource(BaseSource):
             nxt["tables"] = tables
             self._next_sampling_cursor = nxt
             self._automatic_advanced.add(key)
+            self._note_table_sweep(key, state)
+
+    def _note_table_sweep(self, key: str, state: dict[str, Any] | None) -> None:
+        """Tell the sweep tracker whether this table has been covered once."""
+        if state is None:
+            self.note_sweep_frontier(key, done=True)
+        elif state.get("mode") == self._WRAP_MODE:
+            # Walked and wrapped: covered once the walk has reached the end.
+            self._sweep_wraps = True
+            self._sweep_units[key] = bool(state.get("lapped"))
+        else:
+            self.note_sweep_frontier(key, done=bool(state.get("done")) or not state.get("head"))
 
     def _fetch_page_key_range(
         self,
@@ -850,6 +862,7 @@ class BaseTabularSource(BaseSource):
             )
             # Exhausted (or a key that cannot be stored, e.g. binary) leaves no
             # position, so the next run starts the walk again.
+            exhausted = len(rows) < rows_per_page
             if rows and len(rows) >= rows_per_page:
                 last_row = rows[-1]
                 position = [
@@ -860,8 +873,13 @@ class BaseTabularSource(BaseSource):
         else:
             offset = int(saved.get("offset") or 0)
             rows, column_names = self._fetch_one_page(table_ref, base_query, rows_per_page, offset)
+            exhausted = len(rows) < rows_per_page
             if rows and len(rows) >= rows_per_page:
                 next_state["offset"] = offset + len(rows)
+        # Sticky: once the walk has reached the end, the table counts as
+        # covered however many times it is walked again.
+        if exhausted or saved.get("lapped"):
+            next_state["lapped"] = True
 
         self._record_table_cursor(key, next_state)
 

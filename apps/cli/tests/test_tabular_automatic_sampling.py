@@ -89,14 +89,14 @@ _TABLE = TableRef(database="app_db", schema=None, table="users")
 _KEY = _TABLE.raw_id  # "app_db_#_users"
 
 
-def _run(
+def _scan(
     monkeypatch: pytest.MonkeyPatch,
     table: _Table,
     cursor: dict[str, Any] | None,
     *,
     pk: list[str] | None = None,
-) -> tuple[list[tuple[Any, ...]], dict[str, Any] | None]:
-    """One scan of the table: what it read, and the cursor it leaves."""
+) -> tuple[MySQLSource, list[tuple[Any, ...]]]:
+    """One scan of the table: the source that ran it, and what it read."""
     if cursor is None:
         monkeypatch.delenv(CURSOR_ENV, raising=False)
     else:
@@ -111,6 +111,18 @@ def _run(
     assert result is not None
     rows, columns = result
     assert columns == ["id", "name"]
+    return source, rows
+
+
+def _run(
+    monkeypatch: pytest.MonkeyPatch,
+    table: _Table,
+    cursor: dict[str, Any] | None,
+    *,
+    pk: list[str] | None = None,
+) -> tuple[list[tuple[Any, ...]], dict[str, Any] | None]:
+    """One scan of the table: what it read, and the cursor it leaves."""
+    source, rows = _scan(monkeypatch, table, cursor, pk=pk)
     next_cursor = source.current_sampling_cursor()
     return rows, next_cursor if next_cursor is not None else cursor
 
@@ -231,7 +243,7 @@ def test_a_string_key_is_walked_and_wrapped(monkeypatch: pytest.MonkeyPatch) -> 
     assert _ids(rows) == [f"u{i:03d}" for i in range(20, 25)]
     # Exhausted: no position is kept, so the next run starts the walk again --
     # and it stays a walk, without asking the table what kind of key it has.
-    assert cursor == {"tables": {_KEY: {"mode": "wrap"}}}
+    assert cursor == {"tables": {_KEY: {"mode": "wrap", "lapped": True}}}
 
     queries_before = len(table.log)
     rows, _ = _run(monkeypatch, table, cursor)
@@ -251,7 +263,42 @@ def test_a_table_without_a_key_is_paged_by_offset_and_wraps(
 
     rows, cursor = _run(monkeypatch, table, cursor, pk=[])
     assert _ids(rows) == list(range(11, 16))
-    assert cursor == {"tables": {_KEY: {"mode": "wrap"}}}
+    assert cursor == {"tables": {_KEY: {"mode": "wrap", "lapped": True}}}
+
+
+def test_a_walked_table_is_covered_once_it_reaches_the_end(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    table = _Table([(f"u{i:03d}", f"n{i}") for i in range(25)])
+
+    source, _ = _scan(monkeypatch, table, None)
+    cursor = source.current_sampling_cursor()
+    assert source.sweep_complete is False
+
+    source, _ = _scan(monkeypatch, table, cursor)
+    cursor = source.current_sampling_cursor()
+    assert source.sweep_complete is False
+
+    source, _ = _scan(monkeypatch, table, cursor)
+    cursor = source.current_sampling_cursor()
+    assert source.sweep_complete is True
+
+    # The next lap is mid-walk again, and the table stays covered: it is the
+    # same rows read a second time, which is not ground left to reach.
+    source, _ = _scan(monkeypatch, table, cursor)
+    assert source.current_sampling_cursor() == {
+        "tables": {_KEY: {"mode": "wrap", "pk": ["u009"], "lapped": True}}
+    }
+    assert source.sweep_complete is True
+
+
+def test_a_table_that_orders_by_age_never_reports_a_wrapping_sweep(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    table = _Table(_users(1, 25))
+    source, _ = _scan(monkeypatch, table, None)
+    # Its frontier stops moving by itself once done; nothing to add.
+    assert source.sweep_complete is None
 
 
 def test_the_old_cursor_format_starts_fresh(monkeypatch: pytest.MonkeyPatch) -> None:

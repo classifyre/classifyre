@@ -507,6 +507,7 @@ class MongoDBSource(BaseSource):
                 if next_state.get(name) is not None:
                     next_state[name] = self._encode_id(next_state[name])
             self._record_cursor_key(key, next_state)
+        self.note_sweep_frontier(key, done=frontier.done or frontier.fresh)
         return documents
 
     def _sample_collection_documents(self, collection_ref: CollectionRef) -> list[dict[str, Any]]:

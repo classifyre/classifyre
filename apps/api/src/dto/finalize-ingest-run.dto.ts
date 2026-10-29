@@ -156,6 +156,18 @@ export class FinalizeIngestRunDto {
   discoveryComplete?: boolean;
 
   @ApiPropertyOptional({
+    description:
+      'True when every unit of an AUTOMATIC sweep that wraps (an offset that ' +
+      'returns to 0, a table walked again from the top) has been covered at ' +
+      'least once. A wrapping cursor never stops moving, so the adaptive ' +
+      'scheduler uses this to tell a sweep going round again from one still ' +
+      'reaching new ground. Omitted when no unit of the run wraps.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  sweepComplete?: boolean;
+
+  @ApiPropertyOptional({
     type: Object,
     description:
       'Per ctx.cohort() of the run: keys each band visited and the weights used. ' +
