@@ -411,3 +411,53 @@ def test_mysql_include_views_false_lists_only_base_tables(
     tables = source._list_tables_for_database("app_db")
 
     assert [(t.table, t.object_type) for t in tables] == [("orders", "TABLE")]
+
+
+class _ViewsCursor:
+    def __init__(self) -> None:
+        self._rows: list[tuple[Any, ...]] = []
+
+    def execute(self, query: str, _params: Any = None) -> None:
+        assert "information_schema.VIEWS" in query
+        self._rows = [
+            (
+                "v_orders_with_manager",
+                "select `app_db`.`o`.`order_id` AS `order_id`,`e`.`full_name` AS `manager` "
+                "from (`app_db`.`orders` `o` left join `hr_db`.`employees` `e` "
+                "on((`e`.`employee_id` = `o`.`account_manager_id`)))",
+            )
+        ]
+
+    def fetchall(self) -> list[tuple[Any, ...]]:
+        return list(self._rows)
+
+    def __enter__(self) -> _ViewsCursor:
+        return self
+
+    def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
+        return None
+
+
+class _ViewsConnection:
+    def cursor(self) -> _ViewsCursor:
+        return _ViewsCursor()
+
+
+def test_mysql_view_upstreams_are_database_and_table_keys(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Keys of any other shape name no asset, so every edge of the view would be
+    # left unresolved instead of pointing at the table that was scanned.
+    source = MySQLSource(_recipe())
+    monkeypatch.setattr(source, "_get_cached_connection", lambda _db=None: _ViewsConnection())
+    tables = [
+        TableRef(database="app_db", schema=None, table="orders", object_type="TABLE"),
+        TableRef(database="app_db", schema=None, table="v_orders_with_manager", object_type="VIEW"),
+        TableRef(database="hr_db", schema=None, table="employees", object_type="TABLE"),
+    ]
+
+    lineage = source._collect_view_lineage(tables)
+
+    assert len(lineage) == 1
+    assert lineage[0].view == ("app_db", "v_orders_with_manager")
+    assert set(lineage[0].upstreams) == {("app_db", "orders"), ("hr_db", "employees")}

@@ -293,7 +293,10 @@ class HiveSource(BaseTabularSource):
             upstreams = [
                 key
                 for key in upstream_tables_from_sql(
-                    definition, dialect="hive", default_database=view.database
+                    definition,
+                    dialect="hive",
+                    default_database=view.database,
+                    two_level=True,
                 )
                 if key != view.table_key and key in scoped
             ]

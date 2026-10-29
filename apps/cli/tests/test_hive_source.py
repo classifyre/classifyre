@@ -314,3 +314,26 @@ async def test_hive_fetch_content_pages_batches_for_all_strategy(
     assert len(pages) == 12
     assert "item1" in pages[0]
     assert "item12" in pages[11]
+
+
+def test_hive_view_upstreams_are_database_and_table_keys(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Hive stores view text with database-qualified names; the key must stay
+    # ``(database, table)`` to match an asset, not grow a third part.
+    source = HiveSource(_recipe())
+    monkeypatch.setattr(
+        source,
+        "_view_definition",
+        lambda _ref: "SELECT `o`.`id` FROM `sales`.`orders` `o` JOIN `crm`.`accounts` `a` ON 1=1",
+    )
+    tables = [
+        TableRef(database="reporting", schema=None, table="v_orders", object_type="VIEW"),
+        TableRef(database="sales", schema=None, table="orders", object_type="TABLE"),
+        TableRef(database="crm", schema=None, table="accounts", object_type="TABLE"),
+    ]
+
+    lineage = source._collect_view_lineage(tables)
+
+    assert len(lineage) == 1
+    assert set(lineage[0].upstreams) == {("sales", "orders"), ("crm", "accounts")}
