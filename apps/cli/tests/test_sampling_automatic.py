@@ -262,7 +262,7 @@ def test_record_automatic_offset_advances_and_wraps(monkeypatch: pytest.MonkeyPa
 
     # An underfilled page means the backing store is exhausted → wrap to 0.
     source.record_automatic_offset("c", prev_offset=5, fetched=2)
-    assert source.current_sampling_cursor() == {"c": 0}
+    assert source.current_sampling_cursor() == {"c": 0, "_lapped": ["c"]}
 
 
 def test_automatic_offset_reads_saved_value(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -270,3 +270,86 @@ def test_automatic_offset_reads_saved_value(monkeypatch: pytest.MonkeyPatch) -> 
     source = _src()
     assert source.automatic_offset("c") == 7
     assert source.automatic_offset("missing") == 0
+
+
+# ── sweep_complete: has a wrapping sweep gone round once? ───────────────────
+
+
+def _next_cursor(source: BaseSource) -> dict[str, Any]:
+    cursor = source.current_sampling_cursor()
+    assert cursor is not None
+    return cursor
+
+
+def test_sweep_complete_is_silent_without_a_wrapping_unit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv(CURSOR_ENV, raising=False)
+    source = _src(rows=3)
+    list(source.automatic_window(range(10), order=_order))
+    # A frontier says nothing the cursor does not already say.
+    assert source.sweep_complete is None
+
+
+def test_offset_walk_is_open_until_it_wraps_then_stays_covered(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv(CURSOR_ENV, raising=False)
+    first = _src(rows=100)
+    first.record_automatic_offset("label:A", prev_offset=0, fetched=100)
+    assert first.sweep_complete is False
+    assert _next_cursor(first) == {"label:A": 100}
+
+    # The page after a full one comes back empty: the walk wrapped.
+    monkeypatch.setenv(CURSOR_ENV, _encode(_next_cursor(first)))
+    second = _src(rows=100)
+    second.record_automatic_offset("label:A", prev_offset=100, fetched=0)
+    assert second.sweep_complete is True
+    assert _next_cursor(second) == {"label:A": 0, "_lapped": ["label:A"]}
+
+    # The next lap moves the offset again but the unit stays covered, and the
+    # cursor carries the marker forward.
+    monkeypatch.setenv(CURSOR_ENV, _encode(_next_cursor(second)))
+    third = _src(rows=100)
+    third.record_automatic_offset("label:A", prev_offset=0, fetched=100)
+    assert third.sweep_complete is True
+    assert _next_cursor(third) == {"label:A": 100, "_lapped": ["label:A"]}
+
+
+def test_short_first_page_covers_a_small_unit_in_one_run(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv(CURSOR_ENV, raising=False)
+    source = _src(rows=100)
+    source.record_automatic_offset("label:A", prev_offset=0, fetched=7)
+    assert source.sweep_complete is True
+
+
+def test_one_unfinished_unit_keeps_the_sweep_open(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv(CURSOR_ENV, raising=False)
+    source = _src(rows=100)
+    source.record_automatic_offset("label:small", prev_offset=0, fetched=7)
+    source.record_automatic_offset("label:big", prev_offset=0, fetched=100)
+    assert source.sweep_complete is False
+
+
+def test_untracked_offset_never_claims_completion(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv(CURSOR_ENV, raising=False)
+    source = _src(rows=100)
+    source.record_automatic_offset("assets", prev_offset=0, fetched=3, track=False)
+    assert source.sweep_complete is None
+    assert "_lapped" not in _next_cursor(source)
+
+
+def test_unfinished_frontier_keeps_a_wrapping_sweep_open(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv(CURSOR_ENV, raising=False)
+    source = _src(rows=3)
+    list(source.automatic_window(range(10), order=_order, key="ranked"))
+    source.record_automatic_offset("label:A", prev_offset=0, fetched=1)
+    assert source.sweep_complete is False

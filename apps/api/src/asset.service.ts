@@ -535,10 +535,15 @@ export class AssetService {
    * so comparing consecutive runs — the one thing that says whether a sweep
    * advanced — needs a per-run copy. Opaque and source-defined; stored for
    * equality comparison, never interpreted.
+   *
+   * `sweepComplete` is the one thing a connector can say about a cursor that
+   * wraps: every unit of it has been covered once, so further movement is the
+   * same ground read again.
    */
   async recordRunSamplingCursor(
     runnerId: string,
     samplingCursor: Record<string, unknown> | null,
+    sweepComplete?: boolean,
   ): Promise<void> {
     await this.prisma.runner.update({
       where: { id: runnerId },
@@ -547,6 +552,7 @@ export class AssetService {
           samplingCursor === null
             ? Prisma.DbNull
             : (samplingCursor as Prisma.InputJsonValue),
+        ...(typeof sweepComplete === 'boolean' ? { sweepComplete } : {}),
       },
     });
   }

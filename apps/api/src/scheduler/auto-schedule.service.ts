@@ -29,6 +29,7 @@ import {
   BACKOFF_BASE_SECONDS,
   BACKOFF_MAX_SECONDS,
   CATCH_UP_COOLDOWN_SECONDS,
+  CHURN_MAX_SECONDS,
   CIRCUIT_BREAK_FAILURES,
   MAX_CONSECUTIVE_CATCH_UP_RUNS,
   MAX_DUE_SOURCES_PER_TICK,
@@ -64,7 +65,7 @@ export interface AutoScheduleStatus {
 }
 
 /** The outcome of one run, as the state machine sees it. */
-type RunOutcome = 'PROGRESS' | 'NO_PROGRESS' | 'FAILED';
+type RunOutcome = 'PROGRESS' | 'CHANGED' | 'NO_PROGRESS' | 'FAILED';
 
 /** The runner columns the state machine reads. */
 interface ResolvedRun {
@@ -78,6 +79,8 @@ interface ResolvedRun {
   findingsCreated: number;
   /** Opaque AUTOMATIC sampling position this run finished at, if any. */
   samplingCursor: unknown;
+  /** Every wrapping unit of the sweep has been covered once; null: not reported. */
+  sweepComplete?: boolean | null;
   completedAt: Date | null;
   errorMessage?: string | null;
 }
@@ -290,6 +293,33 @@ export class AutoScheduleService {
       return;
     }
 
+    if (outcome === 'CHANGED') {
+      // Everything has been read once; what the run found is content that
+      // differs between scans, not ground left to cover. Chasing it at the
+      // catch-up cadence never ends (the cursor wraps, so there is always a
+      // "next" window), so it is checked at a steady pace that backs off while
+      // the changes keep coming.
+      const previous = source.autoIntervalSeconds ?? STEADY_MIN_SECONDS;
+      const interval =
+        source.autoPhase === AutoSchedulePhase.STEADY
+          ? clamp(
+              previous * STEADY_GROWTH_FACTOR,
+              STEADY_MIN_SECONDS,
+              CHURN_MAX_SECONDS,
+            )
+          : STEADY_MIN_SECONDS;
+      await this.write(source.id, {
+        ...seen,
+        autoPhase: AutoSchedulePhase.STEADY,
+        autoIntervalSeconds: interval,
+        autoNoProgressStreak: 0,
+        autoCatchUpRuns: 0,
+        scheduleNextAt: addSeconds(now, interval),
+        autoReason: `Sweep complete — content still changes between scans, checking every ${humanize(interval)}.`,
+      });
+      return;
+    }
+
     // NO_PROGRESS.
     const streak = source.autoNoProgressStreak + 1;
     if (streak < NO_PROGRESS_RUNS_TO_CONVERGE) {
@@ -343,6 +373,7 @@ export class AutoScheduleService {
       assetsDeleted: true,
       findingsCreated: true,
       samplingCursor: true,
+      sweepComplete: true,
       errorMessage: true,
       completedAt: true,
     };
@@ -425,10 +456,6 @@ export class AutoScheduleService {
     }
     if (runner.status === RunnerStatus.ERROR) return 'FAILED';
 
-    if (cursorAdvanced(previousCursor, runner.samplingCursor)) {
-      return 'PROGRESS';
-    }
-
     // Summed with explicit defaults: one missing count would make the whole
     // sum NaN, and `NaN > 0` is false — silently converging a source that is
     // still producing, which is the exact failure this method exists to avoid.
@@ -437,6 +464,21 @@ export class AutoScheduleService {
       (runner.assetsUpdated ?? 0) +
       (runner.assetsDeleted ?? 0) +
       (runner.findingsCreated ?? 0);
+
+    // A cursor that wraps (an offset back to 0, a table walked again) moves on
+    // every run for as long as the source exists, so once the connector says
+    // every unit has been covered once, movement is the same ground read again
+    // and says nothing. Counted as progress it kept two live sources on the
+    // one-minute cadence indefinitely, each run "continuing the sweep" over
+    // data it had already read. What the run touched still counts, but as a
+    // change to watch, not a sweep to finish.
+    if (runner.sweepComplete === true) {
+      return touched > 0 ? 'CHANGED' : 'NO_PROGRESS';
+    }
+
+    if (cursorAdvanced(previousCursor, runner.samplingCursor)) {
+      return 'PROGRESS';
+    }
     return touched > 0 ? 'PROGRESS' : 'NO_PROGRESS';
   }
 

@@ -245,7 +245,7 @@ def test_elasticsearch_automatic_strategy_resumes_and_wraps_on_underfill(
     assert body["from"] == 10
     # Only 2 of 12 docs remain from offset 10 → underfilled page → wraps to 0.
     assert len(docs) == 2
-    assert src.current_sampling_cursor() == {"index:orders": 0}
+    assert src.current_sampling_cursor() == {"index:orders": 0, "_lapped": ["index:orders"]}
 
 
 async def test_elasticsearch_all_strategy_scrolls_the_whole_index(

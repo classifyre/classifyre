@@ -622,7 +622,7 @@ class CustomSource(BaseSource):
         # P15). The offset is merged in, never substituted.
         self.set_next_sampling_cursor({k: v for k, v in self._sampling_cursor.items() if k != key})
         self.record_automatic_offset(
-            key, prev_offset=offset, fetched=int(frame.get("produced") or 0)
+            key, prev_offset=offset, fetched=int(frame.get("produced") or 0), track=False
         )
 
     def _handled_offset(self, frame: dict[str, Any]) -> bool:

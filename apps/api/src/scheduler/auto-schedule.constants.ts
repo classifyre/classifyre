@@ -36,6 +36,14 @@ export const STEADY_MAX_SECONDS = 24 * 60 * 60;
 /** The steady interval multiplies by this after each no-progress run. */
 export const STEADY_GROWTH_FACTOR = 2;
 /**
+ * Ceiling for the interval of a source whose sweep is complete but whose content
+ * still differs on every scan -- a table with a `loaded_at` column, a statistics
+ * view. Quiet sources go on to {@link STEADY_MAX_SECONDS}; one that keeps
+ * changing is looked at more often than that, but never faster than this
+ * allows once the changes have repeated.
+ */
+export const CHURN_MAX_SECONDS = 6 * 60 * 60;
+/**
  * Consecutive no-progress runs before CATCH_UP is promoted to STEADY.
  *
  * Two, not one: a single empty run is a weak signal. A paginating source can

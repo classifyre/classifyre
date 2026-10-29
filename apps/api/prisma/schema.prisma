@@ -861,6 +861,13 @@ model Runner {
   // at 900 of 9600 objects. Opaque and source-defined; compared for equality
   // only, never interpreted.
   samplingCursor       Json?                @map("sampling_cursor") @db.JsonB
+  // Whether every wrapping unit of the sweep (an offset that returns to 0, a
+  // table walked again from the top) had been covered once when this run
+  // finished. A wrapping cursor never stops moving, so for such a source
+  // "the cursor moved" is not progress once everything has been read; the
+  // scheduler reads this instead. Null: the run had nothing to say, and the
+  // cursor itself is the signal.
+  sweepComplete        Boolean?             @map("sweep_complete")
   /// Per ctx.cohort() of the run: keys each band visited, how many of them
   /// produced a new HIGH/CRITICAL finding, and the weights the run used. Read
   /// to set the next run's split (cohort/cohort-weights.ts).

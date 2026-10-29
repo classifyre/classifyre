@@ -976,6 +976,9 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                     ):
                         sink.set_listing_complete()
 
+                    if hasattr(sink, "set_sweep_complete"):
+                        sink.set_sweep_complete(getattr(source, "sweep_complete", None))
+
                     # Relationships go *before* finish(): finish() finalizes the
                     # run and marks it COMPLETED, and edges that land after that
                     # belong to a run that already claimed to be done.

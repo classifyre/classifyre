@@ -19570,6 +19570,10 @@
             "type": "boolean",
             "description": "Discovery named every object of the configured scope, whatever the sampling strategy. A catalog connector (tables, node labels) lists its whole scope on every run and samples only inside each asset, so an asset missing from seenHashes is gone and is retired like under strategy=ALL. Findings are still only resolved for absence when assets are read whole (ALL). Ignored when partialCoverage is set."
           },
+          "sweepComplete": {
+            "type": "boolean",
+            "description": "True when every unit of an AUTOMATIC sweep that wraps (an offset that returns to 0, a table walked again from the top) has been covered at least once. A wrapping cursor never stops moving, so the adaptive scheduler uses this to tell a sweep going round again from one still reaching new ground. Omitted when no unit of the run wraps."
+          },
           "cohortStats": {
             "type": "object",
             "description": "Per ctx.cohort() of the run: keys each band visited and the weights used. The API adds how many of those keys produced a new HIGH/CRITICAL finding."

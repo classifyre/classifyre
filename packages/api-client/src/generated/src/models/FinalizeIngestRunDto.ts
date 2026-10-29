@@ -98,6 +98,12 @@ export interface FinalizeIngestRunDto {
      */
     discoveryComplete?: boolean;
     /**
+     * True when every unit of an AUTOMATIC sweep that wraps (an offset that returns to 0, a table walked again from the top) has been covered at least once. A wrapping cursor never stops moving, so the adaptive scheduler uses this to tell a sweep going round again from one still reaching new ground. Omitted when no unit of the run wraps.
+     * @type {boolean}
+     * @memberof FinalizeIngestRunDto
+     */
+    sweepComplete?: boolean;
+    /**
      * Per ctx.cohort() of the run: keys each band visited and the weights used. The API adds how many of those keys produced a new HIGH/CRITICAL finding.
      * @type {object}
      * @memberof FinalizeIngestRunDto
@@ -143,6 +149,7 @@ export function FinalizeIngestRunDtoFromJSONTyped(json: any, ignoreDiscriminator
         'relationshipErrors': json['relationshipErrors'] == null ? undefined : json['relationshipErrors'],
         'partialCoverage': json['partialCoverage'] == null ? undefined : json['partialCoverage'],
         'discoveryComplete': json['discoveryComplete'] == null ? undefined : json['discoveryComplete'],
+        'sweepComplete': json['sweepComplete'] == null ? undefined : json['sweepComplete'],
         'cohortStats': json['cohortStats'] == null ? undefined : json['cohortStats'],
         'detectorsDegraded': json['detectorsDegraded'] == null ? undefined : json['detectorsDegraded'],
     };
@@ -172,6 +179,7 @@ export function FinalizeIngestRunDtoToJSONTyped(value?: FinalizeIngestRunDto | n
         'relationshipErrors': value['relationshipErrors'],
         'partialCoverage': value['partialCoverage'],
         'discoveryComplete': value['discoveryComplete'],
+        'sweepComplete': value['sweepComplete'],
         'cohortStats': value['cohortStats'],
         'detectorsDegraded': value['detectorsDegraded'],
     };

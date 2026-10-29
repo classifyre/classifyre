@@ -91,6 +91,10 @@ class BaseSource(ABC):
         self._partial_coverage_reason: str = ""
         self._listing_complete: bool = False
         self._listing_errors: int = 0
+        # Ground an AUTOMATIC sweep has to cover, by cursor key, and whether
+        # each unit has been covered once (see ``sweep_complete``).
+        self._sweep_units: dict[str, bool] = {}
+        self._sweep_wraps: bool = False
         self._sampling_cursor_lock = threading.Lock()
         self._apply_initial_sampling_override(normalized_recipe)
         recipe.clear()
@@ -179,6 +183,72 @@ class BaseSource(ABC):
         """
         return self._next_sampling_cursor
 
+    # ── Has the sweep gone round once? ───────────────────────────────────
+    #
+    # A cursor that wraps (an offset that returns to 0 at the end, a walk that
+    # starts over) never stops moving, by design: walking again is the only way
+    # a store that cannot be ordered by age shows its new rows. So "the cursor
+    # moved" cannot tell a sweep that is still reaching new ground from one that
+    # is going round for the second time, and a scheduler that reads it that way
+    # re-runs such a source every minute for good.
+    #
+    # Each unit of ground therefore records, once, that it has been covered: a
+    # frontier says so itself (``done``); a wrapping unit says so by wrapping
+    # (kept in the cursor under ``LAPPED_KEY``, which only ever grows). The run
+    # reports ``sweep_complete`` when every unit it touched has been covered and
+    # at least one of them wraps -- the only case the cursor cannot speak for.
+
+    #: Cursor key listing the wrapping units that have been covered once.
+    LAPPED_KEY = "_lapped"
+
+    def _lapped_keys(self) -> set[str]:
+        """Wrapping units known to have been covered once, as of this run.
+
+        Callers hold ``_sampling_cursor_lock`` when they mean to write back.
+        """
+        keys: set[str] = set()
+        for cursor in (self._sampling_cursor, self._next_sampling_cursor):
+            raw = cursor.get(self.LAPPED_KEY) if isinstance(cursor, dict) else None
+            if isinstance(raw, list):
+                keys.update(str(k) for k in raw)
+        return keys
+
+    def note_sweep_frontier(self, key: str, *, done: bool) -> None:
+        """Record whether the frontier under ``key`` has covered its ground."""
+        self._sweep_units[key] = bool(done)
+
+    def note_sweep_wrap(self, key: str, *, wrapped: bool) -> None:
+        """Record that the wrapping unit ``key`` was read this run.
+
+        ``wrapped`` says this run reached its end and starts over. That is
+        remembered in the cursor from then on, so a later run that is
+        mid-walk still counts the unit as covered.
+        """
+        with self._sampling_cursor_lock:
+            self._sweep_wraps = True
+            lapped = self._lapped_keys()
+            if wrapped and key not in lapped:
+                lapped.add(key)
+                nxt = (
+                    self._next_sampling_cursor
+                    if isinstance(self._next_sampling_cursor, dict)
+                    else dict(self._sampling_cursor)
+                )
+                self._next_sampling_cursor = {**nxt, self.LAPPED_KEY: sorted(lapped)}
+            self._sweep_units[key] = key in lapped
+
+    @property
+    def sweep_complete(self) -> bool | None:
+        """Whether every unit this run read has been covered at least once.
+
+        None when the run has nothing to say: no unit of it wraps, so the
+        cursor itself already tells a finished sweep (it stops moving).
+        """
+        units = getattr(self, "_sweep_units", None)
+        if not getattr(self, "_sweep_wraps", False) or not units:
+            return None
+        return all(units.values())
+
     def declare_partial_coverage(self, reason: str = "") -> None:
         """Say that this run looked at only part of the source.
 
@@ -261,16 +331,24 @@ class BaseSource(ABC):
         saved = self._sampling_cursor.get(key)
         return saved if isinstance(saved, int) and not isinstance(saved, bool) and saved >= 0 else 0
 
-    def record_automatic_offset(self, key: str, *, prev_offset: int, fetched: int) -> None:
+    def record_automatic_offset(
+        self, key: str, *, prev_offset: int, fetched: int, track: bool = True
+    ) -> None:
         """Advance a keyed offset cursor; wrap to 0 once a page underfills.
 
         For a store that can only be paged by position (``skip``/``OFFSET``)
         and offers nothing to order by, so new rows cannot be told from old
         ones. Wrapping is how such a source ever sees them.
+
+        ``track=False`` keeps the unit out of ``sweep_complete``, for a caller
+        whose cursor holds state this offset knows nothing about.
         """
         size = self.sampling_window_size()
-        next_offset = 0 if fetched < size else prev_offset + fetched
+        wrapped = fetched < size
+        next_offset = 0 if wrapped else prev_offset + fetched
         self._record_cursor_key(key, next_offset)
+        if track:
+            self.note_sweep_wrap(key, wrapped=wrapped)
 
     def automatic_window(
         self,
@@ -344,7 +422,9 @@ class BaseSource(ABC):
         )
         window = items[offset : offset + size]
         next_offset = offset + len(window)
-        self._record_cursor_key(key, 0 if next_offset >= len(items) else next_offset)
+        wrapped = next_offset >= len(items)
+        self._record_cursor_key(key, 0 if wrapped else next_offset)
+        self.note_sweep_wrap(key, wrapped=wrapped)
         return [item for _, item in window]
 
     def automatic_ranged_window(
@@ -411,6 +491,7 @@ class BaseSource(ABC):
         state = frontier.to_state()
         if state is not None:
             self._record_cursor_key(key, state)
+        self.note_sweep_frontier(key, done=frontier.done or frontier.fresh)
         return window
 
     def automatic_frontier(self, key: str) -> ListFrontier:
@@ -426,6 +507,7 @@ class BaseSource(ABC):
         state = frontier.to_state()
         if state is not None:
             self._record_cursor_key(key, state)
+        self.note_sweep_frontier(key, done=frontier.done or frontier.fresh)
 
     @staticmethod
     def _read_bool_env(name: str) -> bool | None:

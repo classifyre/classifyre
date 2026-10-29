@@ -234,7 +234,7 @@ def test_meilisearch_automatic_strategy_resumes_and_wraps_on_underfill(
     body = _patch_requests["search_body"]
     assert body["offset"] == 10
     assert len(docs) == 2
-    assert src.current_sampling_cursor() == {"index:products": 0}
+    assert src.current_sampling_cursor() == {"index:products": 0, "_lapped": ["index:products"]}
 
 
 async def test_meilisearch_all_strategy_batches_and_stops_on_underfill(
