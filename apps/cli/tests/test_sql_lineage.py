@@ -3,7 +3,12 @@
 from __future__ import annotations
 
 from src.graph.edges import FieldMapping, FieldTransform
-from src.utils.sql_lineage import NO_UPSTREAM, column_mappings_by_table, fields_for_table
+from src.utils.sql_lineage import (
+    NO_UPSTREAM,
+    column_mappings_by_table,
+    fields_for_table,
+    upstream_tables_from_sql,
+)
 
 
 def _by_downstream(mappings: list[FieldMapping]) -> dict[str | None, FieldMapping]:
@@ -276,3 +281,39 @@ def test_fields_for_table_matches_a_bare_name_by_table() -> None:
 
     assert [m.downstream for m in fields_for_table(by_table, ("db", "public", "orders"))] == ["id"]
     assert fields_for_table(by_table, ("db", "public", "refunds")) == []
+
+
+_MYSQL_STORED_VIEW = (
+    "select `lab_shop`.`o`.`order_id` AS `order_id`,`e`.`full_name` AS `manager` "
+    "from (`lab_shop`.`orders` `o` left join `lab_hr`.`employees` `e` "
+    "on((`e`.`employee_id` = `o`.`account_manager_id`)))"
+)
+
+
+def test_two_level_names_are_database_and_table_not_a_third_part() -> None:
+    # MySQL and Hive name a table ``database.table``; sqlglot files the first
+    # part as ``db``, so the default database must not be put in front of it.
+    keys = upstream_tables_from_sql(
+        _MYSQL_STORED_VIEW, dialect="mysql", default_database="lab_audit", two_level=True
+    )
+
+    assert keys == [("lab_hr", "employees"), ("lab_shop", "orders")]
+
+
+def test_two_level_bare_name_takes_the_views_own_database() -> None:
+    keys = upstream_tables_from_sql(
+        "select id from orders", dialect="mysql", default_database="shop", two_level=True
+    )
+
+    assert keys == [("shop", "orders")]
+
+
+def test_three_level_names_still_get_catalog_schema_and_table() -> None:
+    keys = upstream_tables_from_sql(
+        "select a from raw.orders",
+        dialect="snowflake",
+        default_database="PROD",
+        default_schema="MART",
+    )
+
+    assert keys == [("PROD", "raw", "orders")]

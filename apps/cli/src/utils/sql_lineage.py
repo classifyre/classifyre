@@ -444,6 +444,7 @@ def upstream_tables_from_sql(
     dialect: str | None = None,
     default_database: str | None = None,
     default_schema: str | None = None,
+    two_level: bool = False,
 ) -> list[tuple[str, ...]]:
     """Table keys a statement reads from, for catalogs with no dependency view.
 
@@ -452,6 +453,11 @@ def upstream_tables_from_sql(
     the text is a weaker answer than the catalog's own — a name resolved against
     the wrong default schema points at nothing — so callers should prefer the
     catalog wherever it exists and treat these edges as SQL_PARSED.
+
+    ``two_level`` is for engines whose tables are named ``database.table`` (MySQL,
+    Hive). sqlglot files the first part under ``db``, so without it a qualified
+    name came back as ``(default_database, database, table)`` -- a key no asset
+    has, which turned every such view's edges into unresolved ones.
 
     CTE names are excluded: a ``WITH`` alias is not a table, and emitting it
     would create lineage to an object that does not exist.
@@ -480,6 +486,11 @@ def upstream_tables_from_sql(
     for table in statement.find_all(exp.Table):
         name = table.name
         if not name or name.lower() in cte_names:
+            continue
+        if two_level:
+            namespace = table.text("db") or default_database
+            if namespace:
+                keys.add((namespace, name))
             continue
         schema = table.text("db") or default_schema
         database = table.text("catalog") or default_database

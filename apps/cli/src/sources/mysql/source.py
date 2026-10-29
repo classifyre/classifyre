@@ -322,7 +322,7 @@ class MySQLSource(BaseTabularSource):
                 upstreams = [
                     key
                     for key in upstream_tables_from_sql(
-                        definition, dialect="mysql", default_database=database
+                        definition, dialect="mysql", default_database=database, two_level=True
                     )
                     if key != view_key
                 ]
