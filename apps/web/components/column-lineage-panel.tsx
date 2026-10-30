@@ -47,7 +47,7 @@ export function ColumnLineagePanel({
     setLoading(true);
     api.graph
       .graphControllerColumnLineage({
-        columnLineageDto: { assetId, column, depth: 3 },
+        columnLineageDto: { assetId, column, depth: 5 },
       })
       .then((result) => {
         if (!active) return;
@@ -203,7 +203,8 @@ function StepRow({ step }: { step: ColumnLineageStepDto }) {
             <span>
               {upstreams.length > 0 ? upstreams.join(", ") : "constant"}
             </span>
-            {(step.steps ?? []).map((name, index) => (
+            {/* Stored outermost first; the value meets the innermost first. */}
+            {[...(step.steps ?? [])].reverse().map((name, index) => (
               <React.Fragment key={`${name}:${index}`}>
                 <ArrowRight className="h-3 w-3 text-muted-foreground" />
                 <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
