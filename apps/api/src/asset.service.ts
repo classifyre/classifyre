@@ -3080,6 +3080,10 @@ export class AssetService {
           id: string;
           metadata: Prisma.InputJsonValue;
         }[] = [];
+        // Nor is the URN. It names the connection as well as the object, so a
+        // source moved to another host or port renames every asset without
+        // changing one of them, and another source's lineage would never bind.
+        const unchangedUrnUpdates: { id: string; urn: string }[] = [];
         // Same reasoning for scan-cache state: an asset can be UNCHANGED and
         // still owe a fresh fingerprint map, because a detector that re-ran
         // (its config changed) has a new fingerprint to record even though the
@@ -3193,6 +3197,9 @@ export class AssetService {
             if (metadata !== undefined) {
               unchangedMetadataUpdates.push({ id: existingAsset.id, metadata });
             }
+            if (urn && existingAsset.urn !== urn) {
+              unchangedUrnUpdates.push({ id: existingAsset.id, urn });
+            }
             if (scanCache !== undefined) {
               unchangedScanCacheUpdates.push({
                 id: existingAsset.id,
@@ -3256,6 +3263,10 @@ export class AssetService {
         // Backfill metadata on UNCHANGED assets (per-asset, since values differ).
         for (const { id, metadata } of unchangedMetadataUpdates) {
           await tx.asset.update({ where: { id }, data: { metadata } });
+        }
+
+        for (const { id, urn } of unchangedUrnUpdates) {
+          await tx.asset.update({ where: { id }, data: { urn } });
         }
 
         // Same for scan-cache state on UNCHANGED assets.
