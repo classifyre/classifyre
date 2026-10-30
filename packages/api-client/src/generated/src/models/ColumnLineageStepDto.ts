@@ -62,7 +62,7 @@ export interface ColumnLineageStepDto {
      */
     steps: Array<string>;
     /**
-     * IDENTITY | TRANSFORMED | AGGREGATED | INDIRECT
+     * IDENTITY | TRANSFORMED | AGGREGATED | MAPPED | INDIRECT
      * @type {string}
      * @memberof ColumnLineageStepDto
      */

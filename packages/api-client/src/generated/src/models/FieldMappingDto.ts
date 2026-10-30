@@ -44,7 +44,7 @@ export interface FieldMappingDto {
      */
     steps?: Array<string>;
     /**
-     * IDENTITY | TRANSFORMED | AGGREGATED | INDIRECT
+     * IDENTITY | TRANSFORMED | AGGREGATED | MAPPED | INDIRECT
      * @type {string}
      * @memberof FieldMappingDto
      */

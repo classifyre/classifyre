@@ -68,6 +68,20 @@ product.
   recorded by name, and if that catalog is scanned later the edge completes
   itself.
 
+A table built from a **foreign catalog** (Lakehouse Federation) is traced to the
+database behind it, not to the foreign catalog: its upstream is named the way the
+PostgreSQL, MySQL, SQL Server, Oracle or Snowflake source names that table, so
+the path continues there once that source is scanned. The host in the
+connection and in the other source must be the same.
+
+The scanning identity needs two grants on top of what it reads:
+
+- `BROWSE` on the foreign catalog. Without it Unity Catalog hides the upstream
+  altogether, and the table looks as if it came from nowhere. The scan log says
+  so.
+- `USE CONNECTION` on the connection. Without it the upstream keeps its
+  Databricks name and does not reach the database behind it.
+
 See [Lineage & Relationships](/sources/lineage/).
 
 </LineageNote>

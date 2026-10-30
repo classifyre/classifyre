@@ -131,6 +131,7 @@ class FieldTransform(StrEnum):
     IDENTITY = "IDENTITY"  # copied through unchanged
     TRANSFORMED = "TRANSFORMED"  # an expression combined the upstreams
     AGGREGATED = "AGGREGATED"  # SUM/COUNT/... over a group
+    MAPPED = "MAPPED"  # the platform says it feeds this column, not how
     INDIRECT = "INDIRECT"  # influenced the rows, not the values
 
 
