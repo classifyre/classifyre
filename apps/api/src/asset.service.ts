@@ -96,6 +96,9 @@ const CHANGE_TYPE_TO_ASSET_STATUS: Record<RunnerAssetChangeType, AssetStatus> =
  */
 const EXISTING_FINDING_LOOKUP_CHUNK = 1000;
 
+/** Findings per update when the system resolves many at once (see call site). */
+const FINDING_RESOLVE_CHUNK = 5000;
+
 /** Rows per `createMany` when inserting new findings (see call site). */
 const FINDING_CREATE_CHUNK = 500;
 
@@ -2481,6 +2484,7 @@ export class AssetService {
                   assetId: { in: missingAssetIds },
                   status: FindingStatus.OPEN,
                 },
+                select: { id: true, history: true },
               })
             : [];
 
@@ -2488,35 +2492,12 @@ export class AssetService {
           (f) => !this.findingHasManualStatusOverride(f),
         );
 
-        const now = new Date();
-        for (const finding of findingsToResolve) {
-          const currentHistory = Array.isArray(finding.history)
-            ? finding.history
-            : [];
-          await tx.finding.update({
-            where: { id: finding.id },
-            data: {
-              status: FindingStatus.RESOLVED,
-              runnerId,
-              resolvedAt: now,
-              resolutionReason: 'Asset deleted from source (full scan)',
-              history: historyColumn([
-                ...currentHistory,
-                // RESOLVED, not STATUS_CHANGED: a status change is what an
-                // operator's resolve records, and it pins the finding against
-                // re-opening. The system retiring it must not: an asset that
-                // comes back with the same detection re-opens it.
-                historyEntryForStorage({
-                  timestamp: now,
-                  runnerId,
-                  eventType: HistoryEventType.RESOLVED,
-                  status: FindingStatus.RESOLVED,
-                  changeReason: 'Asset deleted from source (full scan)',
-                }),
-              ]),
-            },
-          });
-        }
+        await this.resolveFindings(
+          tx,
+          findingsToResolve.map((f) => f.id),
+          runnerId,
+          'Asset deleted from source (full scan)',
+        );
 
         // A run that listed everything but read each asset only in part (a
         // sampled catalog) can retire an asset, yet a finding missing from the
@@ -2607,32 +2588,57 @@ export class AssetService {
       );
     }
 
-    const now = new Date();
-    for (const finding of resolvable) {
-      const currentHistory = Array.isArray(finding.history)
-        ? finding.history
-        : [];
-      await tx.finding.update({
-        where: { id: finding.id },
-        data: {
-          status: FindingStatus.RESOLVED,
-          runnerId,
-          resolvedAt: now,
-          resolutionReason: 'Detection no longer present in scan',
-          history: historyColumn([
-            ...currentHistory,
-            historyEntryForStorage({
-              timestamp: now,
-              runnerId,
-              eventType: HistoryEventType.RESOLVED,
-              status: FindingStatus.RESOLVED,
-              changeReason: 'Detection no longer present in scan',
-            }),
-          ]),
-        },
-      });
-    }
+    await this.resolveFindings(
+      tx,
+      resolvable.map((f) => f.id),
+      runnerId,
+      'Detection no longer present in scan',
+    );
     return resolvable.length;
+  }
+
+  /**
+   * Resolve findings as the system, appending to each one's history.
+   *
+   * In batches, not row by row. These run inside finalize's 60 s transaction,
+   * and a source whose scope moved can retire tens of thousands of findings at
+   * once: one update each outlives the transaction, it rolls back, the run
+   * retries the same work and never finishes.
+   *
+   * RESOLVED, not STATUS_CHANGED: a status change is what an operator's resolve
+   * records, and it pins the finding against re-opening. The system retiring it
+   * must not: an asset that comes back with the same detection re-opens it.
+   */
+  private async resolveFindings(
+    tx: Prisma.TransactionClient,
+    ids: string[],
+    runnerId: string,
+    reason: string,
+  ): Promise<void> {
+    if (ids.length === 0) return;
+    const now = new Date();
+    const entry = JSON.stringify([
+      historyEntryForStorage({
+        timestamp: now,
+        runnerId,
+        eventType: HistoryEventType.RESOLVED,
+        status: FindingStatus.RESOLVED,
+        changeReason: reason,
+      }),
+    ]);
+    for (let i = 0; i < ids.length; i += FINDING_RESOLVE_CHUNK) {
+      const chunk = ids.slice(i, i + FINDING_RESOLVE_CHUNK);
+      await tx.$executeRaw`
+        UPDATE "findings" SET
+          "status" = 'RESOLVED'::"FindingStatus",
+          "runner_id" = ${runnerId},
+          "resolved_at" = ${now},
+          "resolution_reason" = ${reason},
+          "history" = "history" || ${entry}::jsonb,
+          "updated_at" = ${now}
+        WHERE "id" = ANY(${chunk}::text[])
+      `;
+    }
   }
 
   /**
