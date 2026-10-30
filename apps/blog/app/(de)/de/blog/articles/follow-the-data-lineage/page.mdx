@@ -1,0 +1,407 @@
+---
+title: "Den Daten folgen: Was Lineage ist und wie man sie liest"
+description: Eine Erklärung in einfachen Worten zu Data Lineage. Warum die meisten Lineage-Graphen unlesbar sind, was Flow bedeutet, wie Spalten-Lineage funktioniert, wie weit man einem Pfeil trauen kann, wie Lineage Systemgrenzen überschreitet, und eine echte Spalte, die von einem Warehouse zurück in eine Datenbank verfolgt wird.
+date: 2026-10-30T00:00:00.000Z
+tags:
+  - lineage
+  - column-lineage
+  - data-governance
+  - privacy
+  - investigations
+  - explainer
+categories:
+  - Guides
+author: Classifyre Team
+image: /blog/assets/images/follow-the-data-lineage-thumbnail.jpg
+keywords:
+  - was ist Data Lineage
+  - Spalten-Lineage
+  - Tabellen-Lineage und Spalten-Lineage
+  - Auswirkungsanalyse
+  - Upstream und Downstream
+  - Fremdschlüssel und Lineage
+  - systemübergreifende Lineage
+  - Foreign Catalog Lineage
+  - sensible Daten nachverfolgen
+  - Classifyre
+alternates:
+  canonical: /de/blog/articles/follow-the-data-lineage
+  languages:
+    en: /blog/articles/follow-the-data-lineage/
+    de: /de/blog/articles/follow-the-data-lineage/
+    x-default: /blog/articles/follow-the-data-lineage/
+openGraph:
+  type: article
+  title: "Den Daten folgen: Was Lineage ist und wie man sie liest"
+  description: Woher ein Wert kommt und was bricht, wenn man ihn ändert. Fünf Arten von Verbindungen, Spalten-Lineage in einfachen Worten und eine echte Spalte über Systeme hinweg.
+  url: /de/blog/articles/follow-the-data-lineage
+  siteName: Classifyre
+  publishedTime: 2026-10-30T00:00:00.000Z
+  modifiedTime: 2026-10-30T00:00:00.000Z
+  authors:
+    - Classifyre Team
+  section: Guides
+  tags:
+    - lineage
+    - column lineage
+    - data governance
+    - privacy
+  images:
+    - /blog/assets/images/follow-the-data-lineage-thumbnail.jpg
+twitter:
+  card: summary_large_image
+  title: "Den Daten folgen: Was Lineage ist und wie man sie liest"
+  description: Warum Lineage-Graphen zu Knäueln werden, was Spalten-Lineage ergänzt und woran man einen Pfeil erkennt, dem man trauen kann.
+  images:
+    - /blog/assets/images/follow-the-data-lineage-thumbnail.jpg
+---
+
+<ArticleHero
+  image="/blog/assets/images/follow-the-data-lineage.jpg"
+  eyebrow="Erklärt"
+  title="Den Daten folgen: Was Lineage ist und wie man sie liest"
+  description="Woher ein Wert kommt, was bricht, wenn man ihn ändert, und woran man einen Pfeil erkennt, dem man trauen kann."
+/>
+
+<ArticleJsonLd
+  headline="Den Daten folgen: Was Lineage ist und wie man sie liest"
+  description="Eine Erklärung in einfachen Worten zu Data Lineage. Warum die meisten Lineage-Graphen unlesbar sind, was Flow bedeutet, wie Spalten-Lineage funktioniert, wie weit man einem Pfeil trauen kann, wie Lineage Systemgrenzen überschreitet, und eine echte Spalte, die von einem Warehouse zurück in eine Datenbank verfolgt wird."
+  path="/de/blog/articles/follow-the-data-lineage"
+  datePublished="2026-10-30T00:00:00.000Z"
+  dateModified="2026-10-30T00:00:00.000Z"
+  authorName="Classifyre Team"
+  articleSection="Guides"
+  about={[
+    "Data Lineage",
+    "Spalten-Lineage",
+    "Auswirkungsanalyse",
+    "Datenherkunft",
+    "Datenschutz",
+  ]}
+  mentions={[
+    {
+      "@type": "SoftwareApplication",
+      name: "Classifyre",
+      url: "https://www.classifyre.com",
+      applicationCategory: "Data classification software",
+    },
+  ]}
+/>
+
+<ArticleSideRail
+  title="Den Daten folgen: Was Lineage ist und wie man sie liest"
+  path="/de/blog/articles/follow-the-data-lineage/"
+  tags={["lineage", "column-lineage", "privacy", "explainer"]}
+  backHref="/de/blog/articles"
+  backLabel="Alle Artikel"
+/>
+
+<iframe
+  className="my-6 aspect-video w-full border-2 border-border"
+  src="https://www.youtube.com/embed/Z_mOCAxN4qg"
+  title="Den Daten folgen: Was Lineage ist und wie man sie liest"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
+Ein Partner schreibt Ihnen an einem Dienstag. Die wöchentliche Datei, die Sie ihm
+schicken, enthält die Kontonummern Ihrer Kunden.
+
+Sie brauchen heute zwei Antworten. Woher kommt diese Spalte? Und was bricht, wenn
+Sie sie entfernen? Niemand im Raum weiß es. Die Datei stammt aus einer Tabelle,
+die aus einer View stammt, die aus einer Datenbank drei Teams weiter stammt.
+
+Diese zwei Fragen haben einen Namen: Lineage.
+
+![Die Notiz eines Partners und der wöchentliche Export auf einem schwarzen Tisch, die Spalte iban in Lime markiert, dazu zwei Stempel: woher, was bricht](/blog/assets/images/lineage-two-questions.webp)
+
+<Alert>
+  <AlertTitle>Was erfunden ist und was echt</AlertTitle>
+  <AlertDescription>
+    Die Menschen, Kontodaten und Zahlen sind erfunden. Die Datenbanken, die Scans
+    und die Lineage sind echt: drei laufende Systeme in einem öffentlichen
+    Test-Arbeitsbereich, am 30. Oktober 2026. Die Bildschirme stammen von dort,
+    außer dem wartenden Pfeil, der vor dem Binden auf einer Testkopie entstand.
+    Die Grafiken stammen von uns, aus einem kurzen Film zu diesem Beitrag.
+  </AlertDescription>
+</Alert>
+
+## Stromaufwärts und stromabwärts
+
+Lineage hält fest, woher Werte stammen. Denken Sie an einen Fluss: Stromaufwärts
+ist, woher das Wasser kommt, stromabwärts alles, was es erreicht.
+
+Ein guter Graph hält sich an eine Regel. Pfeile zeigen in die Richtung, in die die
+Daten fließen, also steht stromaufwärts links und stromabwärts rechts. Gehen Sie
+nach innen, erfahren Sie, woher etwas kommt. Gehen Sie nach außen, erfahren Sie,
+was bricht, wenn es sich ändert.
+
+## Warum Lineage-Graphen zu Knäueln werden
+
+Weil alles zu einer einzigen Art von Verbindung plattgedrückt wird. Ein Anhang, ein
+Fremdschlüssel, eine doppelte Datei und eine aus einer anderen gebaute Tabelle sind
+vier verschiedene Dinge, und nur eines beantwortet: *Was bricht?*
+
+![Ein Knäuel aus Straßenkabeln neben vier Karten: ein Anhang, ein Fremdschlüssel, eine doppelte Datei und eine aus einer Tabelle gebaute Tabelle, nur diese ist lime](/blog/assets/images/lineage-one-kind-of-link.webp)
+
+Fragen Sie also jede Verbindung nach einem: Haben sich Werte bewegt?
+
+| Klasse | Bedeutet | Beispiel | Ein Schritt im Pfad? |
+|---|---|---|---|
+| **Lineage** (Flow) | Die Werte des einen stammen aus dem anderen | Eine View über ihren Tabellen | Ja. Das ist der Lineage-Graph |
+| **Enthält** | Das eine ist Teil des anderen | Ein Diagramm in einem Dashboard | Nein. Es faltet das Bild |
+| **Dasselbe wie** | Ein echtes Ding, zweimal gesehen | Eine Datei in zwei Buckets | Nein. Es führt zwei Knoten zusammen |
+| **Referenziert** | Das eine verweist auf das andere | Ein Fremdschlüssel | Nein. Ein Hinweis, der nichts trägt |
+| **Genutzt von** | Jemand hat es angefasst | Wer eine Datei geöffnet hat | Nein. Ein Gewicht, kein Pfad |
+
+Der Fremdschlüssel überrascht die meisten. Er ist ein guter Hinweis darauf, wo
+Lineage liegen könnte, aber es wurden keine Daten bewegt, also ist er nie ein
+Schritt. Was ein System nicht sicher weiß, gehört an denselben Ort: eine
+Verbindung, die nichts trägt. So bleibt ein Graph lesbar. Die
+[fünf Klassen](https://docs.classifyre.com/sources/lineage/#not-every-connection-is-lineage)
+stehen in der Dokumentation, mit ihrer Bedeutung beim Traversieren.
+
+![Fünf Karten auf einem Tisch unter der Frage, ob sich Werte bewegt haben: nur Lineage ist lime](/blog/assets/images/lineage-five-classes.webp)
+
+## Welche Art von Bewegung
+
+Innerhalb von Flow sagt die Art der Bewegung, was Sie am anderen Ende erwartet.
+
+- **Kopie von.** Dieselben Werte, verschoben. Ist die Quelle sensibel, ist es die
+  Kopie auch.
+- **View von.** Eine gespeicherte Abfrage. Sie hält nichts Eigenes, also erreicht
+  sie jede Änderung darunter sofort.
+- **Abgeleitet.** Echte Logik dazwischen. Die Werte können überleben oder nicht,
+  also müssen Sie genauer hinsehen.
+- **Geschrieben von.** Ein Job hat das erzeugt.
+- **Exportiert nach, gesendet an.** Es hat das System verlassen. Dort hört eine
+  Datenschutzfrage auf, intern zu sein.
+
+![Sechs Arten von Bewegung entlang eines Pfeils, mit einer gestrichelten Linie vor exported to und sent to](/blog/assets/images/lineage-kinds-of-move.webp)
+
+## Spalten-Lineage
+
+Tabellen-Lineage sagt, eine View ist aus zwei Tabellen gebaut. Das stimmt, und es
+reicht nicht, um zu handeln. Bevor Sie eine Spalte löschen, müssen Sie wissen, ob
+*diese* Spalte etwas speist.
+
+Spalten-Lineage hält für jede Ausgabespalte fest, was sie gespeist hat und jede
+Funktion auf dem Weg. Das liest sich wie ein Satz: `customer` ist `name`, durch
+`LOWER`. `income` ist `amount`, durch ein `CASE`, dann durch eine `SUM`.
+
+Die Funktionen sind der nützliche Teil, denn sie zeigen, ob das Sensible die Reise
+überlebt hat. Ein kleingeschriebener Name bleibt ein Name. Eine Summe über viele
+Zeilen enthält nicht mehr den Betrag einer Person, außer die Gruppe besteht aus
+einer Person. Jede Zuordnung sagt also eines von dreien: unverändert kopiert,
+umgeformt oder aggregiert.
+
+![Dieselbe Grafik mit den drei Wörtern daneben und dem Stempel: Hat das Sensible überlebt?](/blog/assets/images/column-lineage-did-it-survive.webp)
+
+## Wo und warum
+
+Eine ältere Idee hilft hier. 2001 teilten Datenbankforscher die Frage, woher Daten
+kommen, in zwei.
+
+- **Wo** ist der Ort, von dem ein Wert kopiert wurde.
+- **Warum** sind die Daten, wegen derer diese Zeile überhaupt erscheint.
+
+![Ein altes Kontobuch, das Jahr 2001 und zwei Karten: where und why](/blog/assets/images/lineage-where-and-why.webp)
+
+Sehen Sie sich einen Filter an. Ein `WHERE country <> 'CH'` speist keine
+Ausgabespalte und entscheidet doch, wer im Ergebnis steht. Das tut auch ein
+Join-Schlüssel. Zeichnete man das als Pfeile in Spalten, schiene jede Spalte von
+allem abzuhängen. Darum werden sie getrennt geführt, in einer eigenen Liste:
+Spalten, die bestimmt haben, welche Zeilen herauskamen.
+
+Verfolgen Sie einen Wert, können Sie diese Liste überspringen. Löschen Sie eine
+Spalte, nicht: Entfernen Sie die Filterspalte, bricht die View.
+
+![Die Grafik mit einem Rahmen um country, das keinen Pfeil hat, dazu die Liste der Spalten, die die Zeilen bestimmt haben](/blog/assets/images/lineage-columns-that-shaped-the-rows.webp)
+
+## Woher ein Werkzeug das weiß
+
+Die meisten Datenbanken sagen, von welchen Tabellen eine View abhängt, nicht von
+welchen Spalten. Also liest ein Werkzeug das SQL der View selbst und folgt jeder
+Ausgabespalte zurück: in Common Table Expressions, jeden Zweig eines `UNION`
+entlang, durch Views von Views.
+
+Manche Plattformen melden Spalten aus ihrem eigenen Katalog. Sie nennen die
+Spalten, nicht die Funktionen dazwischen, die beiden Quellen können also
+Verschiedenes gut.
+
+![Zwei Karten: Das SQL nennt Spalten und Funktionen, der Katalog nennt die Spalten und schweigt zu den Funktionen](/blog/assets/images/lineage-sql-and-catalog.webp)
+
+Und manchmal ist die ehrliche Antwort: nichts. `SELECT *` nennt keine Spalten. Eine
+nackte Spalte in einem Join könnte zu jeder der beiden Tabellen gehören. Eine
+fehlende Antwort schickt Sie nachsehen. Eine selbstsichere falsche schickt Sie in
+die Produktion.
+
+![Zwei Abfragen mit Stempeln: keine Spalten genannt, welche Tabelle? Darunter: Keine Antwort schlägt eine falsche](/blog/assets/images/lineage-no-answer-beats-a-wrong-one.webp)
+
+[Column-Level Lineage](https://docs.classifyre.com/sources/lineage/column-level/)
+behandelt jeden Fall, auch wie man das Panel Zeile für Zeile liest.
+
+## Wie weit man einem Pfeil trauen kann
+
+Nicht jeder Pfeil ist gleich sicher, also sollte jeder sagen, woher er bekannt ist.
+
+| Woher bekannt | Bedeutet |
+|---|---|
+| **Zur Laufzeit beobachtet** | Etwas hat die Daten fließen sehen |
+| **Systemkatalog** | Die Plattform hat es gesagt |
+| **SQL gelesen** | Aus der Abfrage gelesen |
+| **Heuristik** | Erschlossen. Eine Vermutung, mehr nicht |
+| **Manuell** | Ein Mensch hat es gezeichnet |
+
+![Fünf Arten, wie ein Pfeil bekannt sein kann, und das SQL daneben](/blog/assets/images/lineage-how-was-it-known.webp)
+
+Stammt ein Pfeil aus SQL, bleibt das SQL daneben, damit Sie die Herleitung lesen
+können, statt einem Etikett zu vertrauen.
+
+## Über Systemgrenzen
+
+Die wertvollste Lineage überschreitet eine Grenze: zwei Systeme, zwei Scans,
+manchmal Monate auseinander. Der Trick ist ein Name. Keine ID aus dem Scan, sondern
+wie die Plattform selbst das Objekt nennt: Host, Datenbank, Schema, Tabelle. Zwei
+Scanner, die sich nie begegnet sind, schreiben dieselbe Zeichenfolge.
+
+![Zwei Blätter, eines aus dem März und eines aus dem Oktober, mit derselben Adresse für eine Tabelle, dazu Etiketten für Host, Datenbank, Schema und Tabelle](/blog/assets/images/lineage-same-name.webp)
+
+Ein Scan kann also auf eine Tabelle zeigen, die noch niemand gescannt hat. Der
+Pfeil bleibt und endet an einem umrissenen Knoten: ein Name, in dem nichts steckt.
+Das ist schon für sich ein Befund, denn er zeigt, wohin Ihre Daten gehen, ohne dass
+Sie hinsehen.
+
+![Ein gestrichelter Knoten customers, noch nicht gescannt, mit einem Pfeil zu einer Warehouse-Tabelle](/blog/assets/images/lineage-arrow-waits.webp)
+
+Schließen Sie dieses System später an, erkennen sich die zwei Hälften. Die Lineage
+vervollständigt sich selbst, rückwirkend. So sah das echt aus, in einem Test vor und
+direkt nach dem Hinzufügen eines Schemas zum Scan:
+
+![Die Ansicht davor: vendor_feed in Postgres als gestrichelter Knoten, ein Pfeil derived zu supplier_costs](/blog/assets/images/classifyre-lineage-waiting.webp)
+
+![Die Ansicht danach: derselbe Pfeil, nun vom echten Asset lab_ext.vendor_feed](/blog/assets/images/classifyre-lineage-bound.webp)
+
+Der Name enthält Host und Port, beide Scanner müssen die Datenbank also auf demselben
+Weg erreichen. Das wäre uns fast selbst passiert: Eine Verbindung lief über einen
+Pooler auf Port 6543, die andere über 5432, also hätten beide dieselbe Tabelle
+verschieden benannt, und der Pfeil hätte sich nie geschlossen. Beide auf denselben
+Port zu stellen, hat es gelöst.
+
+## Eine zweite Aufgabe: Dubletten
+
+Zwei Tabellen sehen fast gleich aus. Die Frage ist nicht, wie ähnlich, sondern
+warum.
+
+| Was Lineage sagt | Liest sich als | Priorität |
+|---|---|---|
+| Ein Pfad verbindet sie | **Gemeinsamer Ursprung**: eine aus der anderen gebaut, oder beide aus einer Quelle | Niedrig |
+| Beide haben Lineage, kein Pfad verbindet sie | **Kein Pfad**: Zwei Teams haben dasselbe gebaut | Der Alarm |
+| Eine Seite hat keine Lineage | **Lineage unbekannt**: eine Lücke, keine Antwort | Werte beurteilen |
+
+![Drei Zeilen mit je zwei Tabellen: ein Pfad, niedrige Priorität; kein Pfad, Alarm; eine Seite unbekannt, Werte beurteilen](/blog/assets/images/lineage-duplicates-verdicts.webp)
+
+Inhalte und Lineage stammen aus verschiedenen Belegen. Genau deshalb sagt ihre
+Kombination etwas aus. Die
+[Dublettenprüfung](https://docs.classifyre.com/sources/lineage/#lineage-as-evidence-in-duplicate-review)
+baut darauf auf.
+
+## Eine echte Spalte
+
+Zurück zur Datei. Dies ist ein [Test-Arbeitsbereich](https://showcase.classifyre.com/all-sources-test/sources/)
+mit drei echten Systemen: [Postgres](https://showcase.classifyre.com/all-sources-test/sources/6fb22b2a-6c2a-4964-b6d3-36138c448666/),
+[MySQL](https://showcase.classifyre.com/all-sources-test/sources/cc0accc8-3f10-43c1-94b2-582633add046/)
+und ein [Databricks-Warehouse](https://showcase.classifyre.com/all-sources-test/sources/97b0b309-28f7-41d4-8687-71de2dd4d2fe/).
+Alles Folgende ist offen: Sie können sich selbst durchklicken.
+
+Der [Export](https://showcase.classifyre.com/all-sources-test/assets/1df5dabc-468c-488c-8fce-9e22a38ab48a/?tab=connections) enthält fünf Kontonummern, und jede davon taucht in zehn
+Tabellen auf, über zwei Systeme.
+
+Zehn Verdächtige. Die naheliegende ist eine CRM-Kontaktliste. Eine Wertsuche kann
+das nicht klären, denn der Wert ist in allen zehn gleich. Lineage kann es.
+
+Gehen Sie stromaufwärts. Der Export liest eine Abrechnung, die Abrechnung liest eine
+Staging-Tabelle, und dann verlässt der Pfad das Warehouse. Das Warehouse liest die
+Datenbank über einen [Foreign Catalog](https://docs.classifyre.com/sources/databricks/#lineage)
+und meldet den Zugriff, und zwei Scans, die sich nie begegnet sind, schrieben
+denselben Namen.
+
+![Die Lineage-Ansicht, vom Export stromaufwärts: rechts ein Warehouse, in der Mitte Postgres, links MySQL, jeder Knoten mit seiner Quelle beschriftet](/blog/assets/images/classifyre-lineage-three-systems.webp)
+
+Nehmen Sie eine einzelne Spalte. Die IBAN kommt aus [`customers`](https://showcase.classifyre.com/all-sources-test/assets/399156f1-ce3a-4a76-84e1-4da8ac229aaf/?tab=connections), in
+drei Schritten, und nicht aus der [CRM-Liste](https://showcase.classifyre.com/all-sources-test/assets/94993165-a6e0-4872-ae5a-17af1ca6547a/?tab=connections). Diese Idee ist erledigt.
+
+![Das Spalten-Lineage-Panel für iban: drei Zeilen zurück über partner_statement und staged.customers bis postgres.lab_core.customers](/blog/assets/images/classifyre-column-three-steps.webp)
+
+`value_band` geht weiter: fünf Schritte, über die Grenze, durch zwei Postgres-Views,
+bis zu Menge mal Preis. Lesen Sie die Zeilen. Im Warehouse steht *catalog, 95%,
+mapped*: Es kennt die Verbindung, nicht die Logik. In Postgres steht *SQL parsed,
+80%*, mit den Funktionen.
+
+![Das Spalten-Lineage-Panel für value_band: fünf Zeilen, drei mit catalog 95% mapped, zwei mit SQL parsed 80% samt SUM, CAST und Multiplikation](/blog/assets/images/classifyre-column-five-steps.webp)
+
+Gehen Sie nun von [dieser Staging-Tabelle](https://showcase.classifyre.com/all-sources-test/assets/ebd69191-1f6b-4bc9-924e-ab0e2ce7f28d/?tab=connections) abwärts. Eine Abrechnung, ein
+Export, sonst nichts. Die Lösung ist eine Spalte in einem `SELECT`.
+
+![Die Ansicht stromabwärts von staged.customers: eine Abrechnung, ein Export, sonst nichts](/blog/assets/images/classifyre-lineage-downstream.webp)
+
+Ein Pfeil, den niemand gemeldet hat. Ein nächtlicher Job kopiert Account Manager von
+[MySQL](https://showcase.classifyre.com/all-sources-test/assets/df18467d-febc-41a5-8d87-83750ad09ea5/?tab=connections) nach [Postgres](https://showcase.classifyre.com/all-sources-test/assets/8bed4d9b-c39a-486b-b0fd-faa723d75884/?tab=connections), und keine der Datenbanken weiß
+davon. Also ist er [von Hand gezeichnet](https://docs.classifyre.com/how-it-works/explore/),
+in Bernstein, damit niemand ihn für etwas hält, das eine Plattform gesagt hat.
+
+![Dieselbe Ansicht näher: ein bernsteinfarbener Pfeil von lab_hr.employees in MySQL zu account_managers in Postgres, beschriftet mit nightly copy](/blog/assets/images/classifyre-hand-drawn-link.webp)
+
+Ein Pfad, drei Arten von Beleg. Der [Fall](https://showcase.classifyre.com/all-sources-test/investigations/527b21f7-1a31-479d-b3eb-c2a4c0250800/) hält die Urteile fest: die
+CRM-Idee widerlegt, `customers` gestützt, die Lösung bemessen.
+
+![Das Fall-Board: die CRM-Hypothese rot widerlegt, die customers-Hypothese und der Umfang der Lösung grün gestützt, unten der bernsteinfarbene Link](/blog/assets/images/classifyre-lineage-case-board.webp)
+
+## Was sie Ihnen nicht sagt
+
+- **Nur, was eine Plattform sagt.** Gespeicherte Prozeduren, Trigger und externe Jobs
+  hinterlassen keinen Pfeil, solange ihn niemand erklärt.
+- **Wie Daten fließen können, nicht, dass eine bestimmte Zeile es tat.** Ein Pfeil ist
+  eine Aussage über die Struktur.
+- **Namen müssen passen.** Erreichen Sie eine Datenbank über zwei Hostnamen, treffen
+  sich die Hälften nie.
+
+Ein fehlender Pfeil heißt, dass niemand einen gemeldet hat. Er heißt nicht, dass sich
+nichts bewegt hat.
+
+![Drei Stempel zu dem, was Lineage nicht sagt, darunter: Kein Pfeil heißt nicht keine Bewegung](/blog/assets/images/lineage-what-it-will-not-say.webp)
+
+Wenn Sie wissen, wie Daten fließen, und kein System es sagt, kann ein
+[Custom Connector](https://docs.classifyre.com/sources/custom-connectors/) es
+erklären, samt Spaltendetail.
+
+Stellen Sie die zwei Fragen einer Spalte, nicht einer Tabelle, und prüfen Sie, woher
+jeder Pfeil bekannt war.
+
+## Selbst öffnen
+
+Alles aus dem Fall ist im
+[Arbeitsbereich all-sources-test](https://showcase.classifyre.com/all-sources-test/sources/)
+live.
+
+| Hier anfangen | Worauf achten |
+|---|---|
+| [`partner_export`](https://showcase.classifyre.com/all-sources-test/assets/1df5dabc-468c-488c-8fce-9e22a38ab48a/?tab=connections) | Tab Connections, View, Upstream, ∞: der ganze Pfad. Im Spalten-Panel `value_band` wählen |
+| [`lab_core.customers`](https://showcase.classifyre.com/all-sources-test/assets/399156f1-ce3a-4a76-84e1-4da8ac229aaf/?tab=connections) | Stromabwärts gehen: alles, was sie liest, in beiden Systemen |
+| [`lab_hr.employees`](https://showcase.classifyre.com/all-sources-test/assets/df18467d-febc-41a5-8d87-83750ad09ea5/?tab=connections) | Der von Hand gezeichnete Pfeil aus MySQL |
+| [`supplier_costs`](https://showcase.classifyre.com/all-sources-test/assets/43c1a59c-44c7-4d04-86a7-c135fab634f4/?tab=connections) | Der Pfeil, der auf ein Schema wartete und sich selbst band |
+| [Der Fall](https://showcase.classifyre.com/all-sources-test/investigations/527b21f7-1a31-479d-b3eb-c2a4c0250800/) | Die Hypothesen, ihre Urteile und die Belege |
+
+Der vollständige Leitfaden steht in der Dokumentation: [Lineage &
+Relationships](https://docs.classifyre.com/sources/lineage/), [Column-Level
+Lineage](https://docs.classifyre.com/sources/lineage/column-level/) und die Quellenseiten zu
+[Databricks](https://docs.classifyre.com/sources/databricks/),
+[PostgreSQL](https://docs.classifyre.com/sources/postgresql/) und
+[MySQL](https://docs.classifyre.com/sources/mysql/). Fälle behandelt
+[Links on the board](https://docs.classifyre.com/investigations/cases/links/).
+
+<RelatedCasePosts
+  section="articles"
+  currentPath="/de/blog/articles/follow-the-data-lineage"
+  heading="Mehr aus dem Blog"
+/>
