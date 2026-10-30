@@ -487,6 +487,150 @@ def test_databricks_lineage_edge_names_the_notebook_that_wrote_it(
     assert edges["h-payments"].via_id is None
 
 
+def _foreign_catalogs(path: str) -> dict[str, Any]:
+    return {
+        "/api/2.1/unity-catalog/catalogs/app_db": {
+            "catalog_type": "FOREIGN_CATALOG",
+            "connection_name": "app_conn",
+            "options": {"database": "shop"},
+        },
+        "/api/2.1/unity-catalog/connections/app_conn": {
+            "connection_type": "POSTGRESQL",
+            "options": {"host": "pg.example.test", "port": "5432"},
+        },
+        "/api/2.1/unity-catalog/catalogs/hr_db": {
+            "catalog_type": "FOREIGN_CATALOG",
+            "connection_name": "hr_conn",
+        },
+        "/api/2.1/unity-catalog/connections/hr_conn": {
+            "connection_type": "MYSQL",
+            "options": {"host": "my.example.test", "port": "10218"},
+        },
+        "/api/2.1/unity-catalog/catalogs/main": {"catalog_type": "MANAGED_CATALOG"},
+    }[path]
+
+
+def test_databricks_foreign_catalog_upstream_is_named_by_its_real_system(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = DatabricksSource(_pat_recipe())
+    monkeypatch.setattr(source, "_request_json", lambda _m, path, **_k: _foreign_catalogs(path))
+    downstream = TableRef(database="main", schema="mart", table="daily", object_type="TABLE")
+
+    source._emit_table_lineage(
+        downstream,
+        {("app_db", "core", "customers"), ("hr_db", "people", "Staff")},
+        {downstream.table_key: "h-daily"},
+    )
+
+    urns = {edge.from_urn: edge for edge in source.drain_edges()}
+    # What the PostgreSQL and MySQL connectors write for the same tables.
+    assert set(urns) == {
+        "postgres://pg.example.test/shop/core/customers",
+        "mysql://my.example.test:10218/people/staff",
+    }
+    evidence = urns["postgres://pg.example.test/shop/core/customers"].evidence
+    assert evidence["foreign_catalog"] == "app_db"
+    assert evidence["connection"] == "app_conn"
+
+
+def test_databricks_scanned_foreign_table_is_tied_to_the_table_it_mirrors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = DatabricksSource(_pat_recipe())
+    monkeypatch.setattr(source, "_request_json", lambda _m, path, **_k: _foreign_catalogs(path))
+    downstream = TableRef(database="main", schema="mart", table="daily", object_type="TABLE")
+    foreign = TableRef(database="app_db", schema="core", table="orders", object_type="TABLE")
+
+    source._emit_table_lineage(
+        downstream,
+        {foreign.table_key},
+        {downstream.table_key: "h-daily", foreign.table_key: "h-foreign"},
+    )
+    source._emit_foreign_identity(foreign, "h-foreign")
+
+    edges = source.drain_edges()
+    # Lineage goes straight to the real table, and the mirror is the same thing.
+    assert [(e.relation_class, e.from_urn) for e in edges if e.relation_class == "FLOW"] == [
+        ("FLOW", "postgres://pg.example.test/shop/core/orders")
+    ]
+    same = [e for e in edges if e.relation_class == "IDENTITY"]
+    assert [(e.from_hash, e.to_urn) for e in same] == [
+        ("h-foreign", "postgres://pg.example.test/shop/core/orders")
+    ]
+
+
+def test_databricks_foreign_catalog_it_cannot_read_stays_a_databricks_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # No USE CONNECTION for the scan principal: the edge must survive unbound.
+    source = DatabricksSource(_pat_recipe())
+
+    def _denied(_method: str, path: str, **_k: Any) -> dict[str, Any]:
+        if "/connections/" in path:
+            raise RuntimeError("PERMISSION_DENIED")
+        return _foreign_catalogs(path)
+
+    monkeypatch.setattr(source, "_request_json", _denied)
+    downstream = TableRef(database="main", schema="mart", table="daily", object_type="TABLE")
+
+    source._emit_table_lineage(
+        downstream, {("app_db", "core", "customers")}, {downstream.table_key: "h-daily"}
+    )
+
+    assert [edge.from_urn for edge in source.drain_edges()] == [
+        "databricks://adb-123410678901234106.7.azuredatabricks.net/app_db/core/customers"
+    ]
+
+
+def test_databricks_column_lineage_does_not_claim_a_copy_from_a_matching_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = DatabricksSource(
+        _pat_recipe(
+            optional={"extraction": {"include_table_lineage": True, "include_column_lineage": True}}
+        )
+    )
+    downstream = TableRef(database="main", schema="mart", table="daily", object_type="TABLE")
+    monkeypatch.setattr(source, "_cached_columns", lambda _t: ["email"])
+    monkeypatch.setattr(
+        source,
+        "_request_json",
+        lambda *_a, **_k: {
+            "upstream_cols": [
+                {
+                    "catalog_name": "main",
+                    "schema_name": "raw",
+                    "table_name": "users",
+                    "name": "email",
+                }
+            ]
+        },
+    )
+
+    mappings = source._column_mappings_for_table(downstream)
+
+    assert [m.type.value for m in mappings[("main", "raw", "users")]] == ["MAPPED"]
+
+
+def test_databricks_upstream_hidden_by_permissions_is_reported(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    source = DatabricksSource(_pat_recipe())
+    downstream = TableRef(database="main", schema="mart", table="daily", object_type="TABLE")
+    monkeypatch.setattr(
+        source,
+        "_request_json",
+        lambda *_a, **_k: {"upstreams": [{"tableInfo": {"has_permission": False}}]},
+    )
+
+    with caplog.at_level("WARNING"):
+        refs = source._lineage_refs_for_table(downstream)
+
+    assert refs == set()
+    assert "grant it BROWSE" in caplog.text
+
+
 def test_databricks_unlistable_schema_forfeits_the_complete_declaration(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

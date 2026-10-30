@@ -7,7 +7,7 @@ from collections.abc import AsyncGenerator, Generator
 from contextlib import closing
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, ClassVar
 from urllib.parse import urlparse
 
 import requests
@@ -19,6 +19,7 @@ from ...graph.edges import (
     Method,
     Ref,
     flow,
+    same_as,
 )
 from ...models.generated_input import (
     AzureServicePrincipal,
@@ -68,6 +69,16 @@ class PipelineRef:
     state: str | None
 
 
+@dataclass(frozen=True)
+class _ForeignSystem:
+    """The database behind a foreign catalog, as its own connector names it."""
+
+    platform: str
+    authority: str
+    database: str | None
+    connection: str
+
+
 def _quote_identifier(identifier: str) -> str:
     return f"`{identifier.replace('`', '``')}`"
 
@@ -112,6 +123,7 @@ class DatabricksSource(BaseTabularSource):
         # table_key -> upstream table -> ids of the notebooks Unity Catalog saw
         # move data between the two. Filled by _lineage_refs_for_table.
         self._lineage_notebook_ids: dict[tuple[str, ...], dict[tuple[str, str, str], set[str]]] = {}
+        self._foreign_systems: dict[str, _ForeignSystem | None] = {}
         self._access_token: str | None = None
         self._access_token_expiry: datetime | None = None
 
@@ -668,6 +680,15 @@ class DatabricksSource(BaseTabularSource):
             if isinstance(entries, list):
                 for entry in entries:
                     if isinstance(entry, dict):
+                        if (entry.get("tableInfo") or {}).get("has_permission") is False:
+                            # Unity Catalog knows the upstream and will not name
+                            # it to this identity, so the table looks sourceless.
+                            logger.warning(
+                                "%s has an upstream this identity may not see; "
+                                "grant it BROWSE on that catalog",
+                                table_ref.display_name,
+                            )
+                            continue
                         parsed = self._lineage_table_ref_from_payload(entry)
                         if parsed:
                             refs.add(parsed)
@@ -709,9 +730,14 @@ class DatabricksSource(BaseTabularSource):
         notebook_ids = self._lineage_notebook_ids.get(table_ref.table_key, {})
         for upstream in sorted(upstream_refs):
             upstream_hash = table_hash_by_key.get(upstream)
-            upstream_ref = (
-                Ref.asset(upstream_hash) if upstream_hash else self._urn_ref_for_key(upstream)
-            )
+            foreign_urn = self._foreign_urn(upstream)
+            upstream_ref: Ref | None
+            if foreign_urn:
+                upstream_ref = Ref.urn(foreign_urn)
+            elif upstream_hash:
+                upstream_ref = Ref.asset(upstream_hash)
+            else:
+                upstream_ref = self._urn_ref_for_key(upstream)
             if upstream_ref is None:
                 continue
             via_hash = next(
@@ -730,8 +756,22 @@ class DatabricksSource(BaseTabularSource):
                     fields=column_mappings.get(upstream, []),
                     via=Ref.asset(via_hash) if via_hash else None,
                     method=Method.SYSTEM_CATALOG,
+                    evidence=self._foreign_evidence(upstream) if foreign_urn else None,
                 )
             )
+
+    def _emit_foreign_identity(self, table_ref: TableRef, asset_hash: str) -> None:
+        """A scanned table of a foreign catalog is a mirror of the real table."""
+        foreign_urn = self._foreign_urn(table_ref.table_key)
+        if not foreign_urn:
+            return
+        self.add_edge(
+            same_as(
+                Ref.asset(asset_hash),
+                Ref.urn(foreign_urn),
+                evidence=self._foreign_evidence(table_ref.table_key),
+            )
+        )
 
     def _column_mappings_for_table(
         self, table_ref: TableRef
@@ -774,14 +814,12 @@ class DatabricksSource(BaseTabularSource):
 
         return {
             upstream: [
+                # Unity Catalog names the columns and nothing between them, so a
+                # matching name proves nothing: `lower(email) AS email` matches.
                 FieldMapping(
                     downstream=downstream,
                     upstreams=sorted(sources),
-                    type=(
-                        FieldTransform.IDENTITY
-                        if sources == {downstream}
-                        else FieldTransform.TRANSFORMED
-                    ),
+                    type=FieldTransform.MAPPED,
                 )
                 for downstream, sources in sorted(columns.items())
             ]
@@ -796,6 +834,86 @@ class DatabricksSource(BaseTabularSource):
             return Ref.urn(Urn.of(self.source_type, authority, *table_key))
         except UrnError:
             return None
+
+    # ── Foreign catalogs (Lakehouse Federation) ──────────────────────────
+    #
+    # A foreign catalog is Databricks' name for tables that live in another
+    # database. Unity Catalog records lineage through it like any other catalog,
+    # so without this the upstream is `databricks://.../app_db/core/customers`,
+    # a name no PostgreSQL scan will ever write, and the path stops at the
+    # boundary it was most worth crossing.
+
+    #: UC connection type -> (URN platform, catalog option naming the database).
+    #: None where the schema level already is the database, as in MySQL.
+    _FOREIGN_PLATFORMS: ClassVar[dict[str, tuple[str, str | None]]] = {
+        "POSTGRESQL": ("postgres", "database"),
+        "MYSQL": ("mysql", None),
+        "SQLSERVER": ("mssql", "database"),
+        "ORACLE": ("oracle", "service_name"),
+        "SNOWFLAKE": ("snowflake", "database"),
+    }
+
+    def _foreign_system(self, catalog: str) -> _ForeignSystem | None:
+        if catalog in self._foreign_systems:
+            return self._foreign_systems[catalog]
+        system: _ForeignSystem | None = None
+        try:
+            system = self._read_foreign_system(catalog)
+        except Exception as exc:
+            # USE CONNECTION is a separate grant. The edge keeps its Databricks
+            # name, which is true if not useful, rather than the scan failing.
+            logger.warning("Could not read the connection of catalog %s: %s", catalog, exc)
+        self._foreign_systems[catalog] = system
+        return system
+
+    def _read_foreign_system(self, catalog: str) -> _ForeignSystem | None:
+        info = self._request_json("get", f"/api/2.1/unity-catalog/catalogs/{catalog}")
+        connection_name = info.get("connection_name")
+        if info.get("catalog_type") != "FOREIGN_CATALOG" or not connection_name:
+            return None
+        connection = self._request_json(
+            "get", f"/api/2.1/unity-catalog/connections/{connection_name}"
+        )
+        mapping = self._FOREIGN_PLATFORMS.get(str(connection.get("connection_type")))
+        if mapping is None:
+            return None
+        platform, database_option = mapping
+
+        options = connection.get("options") or {}
+        host = str(options.get("host") or "").strip()
+        if not host:
+            # A URN scoped to the wrong host would stitch two unrelated systems.
+            return None
+        if platform == "snowflake":
+            authority = host.removesuffix(".snowflakecomputing.com")
+        else:
+            port = options.get("port")
+            authority = f"{host}:{port}" if port else host
+
+        database = None
+        if database_option:
+            database = str((info.get("options") or {}).get(database_option) or "").strip()
+            if not database:
+                return None
+        return _ForeignSystem(platform, authority, database, str(connection_name))
+
+    def _foreign_urn(self, table_key: tuple[str, ...]) -> str | None:
+        """The URN the underlying system's own connector writes for this table."""
+        system = self._foreign_system(table_key[0])
+        if system is None:
+            return None
+        name = (system.database, *table_key[1:]) if system.database else table_key[1:]
+        try:
+            return str(Urn.of(system.platform, system.authority, *name))
+        except UrnError:
+            return None
+
+    def _foreign_evidence(self, table_key: tuple[str, ...]) -> dict[str, Any]:
+        system = self._foreign_system(table_key[0])
+        return {
+            "foreign_catalog": table_key[0],
+            "connection": system.connection if system else None,
+        }
 
     # ── Notebooks ────────────────────────────────────────────────────────
 
@@ -1010,6 +1128,8 @@ class DatabricksSource(BaseTabularSource):
             self._table_lookup[asset.hash] = table_ref
             batch.append(asset)
             emitted_tables += 1
+            if include_lineage:
+                self._emit_foreign_identity(table_ref, asset.hash)
 
             if len(batch) >= self.BATCH_SIZE:
                 yield batch

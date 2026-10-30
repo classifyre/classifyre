@@ -23884,7 +23884,7 @@
           },
           "type": {
             "type": "string",
-            "description": "IDENTITY | TRANSFORMED | AGGREGATED | INDIRECT"
+            "description": "IDENTITY | TRANSFORMED | AGGREGATED | MAPPED | INDIRECT"
           }
         },
         "required": [
@@ -27008,7 +27008,7 @@
           },
           "type": {
             "type": "string",
-            "description": "IDENTITY | TRANSFORMED | AGGREGATED | INDIRECT"
+            "description": "IDENTITY | TRANSFORMED | AGGREGATED | MAPPED | INDIRECT"
           },
           "depth": {
             "type": "number",

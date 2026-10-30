@@ -182,7 +182,7 @@ export class FieldMappingDto {
   steps?: string[];
 
   @ApiPropertyOptional({
-    description: 'IDENTITY | TRANSFORMED | AGGREGATED | INDIRECT',
+    description: 'IDENTITY | TRANSFORMED | AGGREGATED | MAPPED | INDIRECT',
   })
   type?: string;
 }
@@ -652,7 +652,7 @@ export class ColumnLineageStepDto {
   steps!: string[];
 
   @ApiProperty({
-    description: 'IDENTITY | TRANSFORMED | AGGREGATED | INDIRECT',
+    description: 'IDENTITY | TRANSFORMED | AGGREGATED | MAPPED | INDIRECT',
   })
   type!: string;
 
