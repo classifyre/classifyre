@@ -569,6 +569,37 @@ the fault.
   that made seven pairs "perfect" is a lesson about weights; the same screen
   showing a raw key or a broken link is a bug to fix first.
 
+## Learnt on the sixth film
+
+"Follow the data" (lineage, October 2026) ran 8:44, and building its real case
+found ten faults in the product. Like the fifth, it was a test of the feature
+before it was a film.
+
+- **Read a sentence you are about to speak as a claim.** "Follow one column
+  across three systems" sounded right; a column crossed two, and the third hop
+  was a table-level link. The chain in the docs read backwards until it had to
+  be said aloud.
+- **When a line loses words on a check, ask the audio model outright.** "Mr.
+  Astral Fire" looked like the checker's usual mishearing of a brand name. Asked
+  directly, it was in the audio. `film/ask.ts` is the two-line way to ask.
+- **`stops.ts` says TOO FEW PAUSES and a list inside one sentence has no
+  sentences to hang on.** A `within(id, share)` in `timeline.ts`, the share of
+  the characters so far, puts each item on its word.
+- **Trimming a script moves pictures.** A cue on `sentence(id, 3)` of a line cut
+  to two sentences fires at the wrong moment and nothing fails. After the last
+  edit, compare every `sentence()` call with the line it names.
+- **A scene without its voice cannot render** until `Voice` is skipped for
+  lines not yet spoken. `spoken()` in `video.tsx` lets the picture be finished
+  first.
+- **A key can have budget and its account none.** OpenRouter answers 402 with
+  `weight_exceeds_budget` when the most a request could cost exceeds the
+  account's credits, however cheap the line. Retrying does nothing; check
+  `/api/v1/credits` before a long voice run.
+- **In a background Bash call, use absolute paths.** The session's folder is not
+  the repo root, and `... | tail` hides the failure behind exit code 0.
+- **zsh does not split an unquoted `$list`.** A `for f in $batch` ran once with
+  the whole list as one name.
+
 ## Still to do
 
 - Extract the drawing parts of the sources table, findings table, inquiry
