@@ -86,8 +86,7 @@ precise enough to act on — before you drop a column you need to know whether
 Where the information exists, Classifyre records the mapping **per column**:
 which upstream columns feed each output column, and every function the value
 passes through on the way — `customers.name → LOWER → customer`. Open an asset
-with columns and pick one to see exactly what feeds it, as many views back as
-there are.
+with columns and pick one to see exactly what feeds it, up to five steps back.
 
 A column can also matter *without* feeding any output column — a date used in a
 `WHERE`, a join key, a sort. Those shape which rows came out but no particular
@@ -112,9 +111,11 @@ derived**. The app shows this next to the relationship when you select it:
 | **Heuristic** | Inferred — a reasonable guess, no more |
 | **Manual** | A person drew it |
 
-Two sources are allowed to disagree about the same pair of assets; both edges
-are kept with their own provenance rather than one silently overwriting the
-other. Where an edge came from SQL, the SQL itself is kept with it, so you can
+A pair of assets can hold several relationships at once, each of its own kind
+and with its own provenance: a view of a table and a foreign key to it are two
+edges. A second report of the *same* kind refreshes that edge, so its
+provenance is that of the latest scan, and a link a person drew stays marked as
+theirs. Where an edge came from SQL, the SQL itself is kept with it, so you can
 read the derivation instead of trusting a label.
 
 ---
@@ -122,9 +123,9 @@ read the derivation instead of trusting a label.
 ## Lineage across systems
 
 The most valuable lineage crosses a boundary — a Tableau data source reading a
-Snowflake table, a Databricks table loaded from an S3 path. The awkward part is
-that the two halves are usually scanned by different connectors, sometimes
-months apart.
+Snowflake table, a Databricks table built from a PostgreSQL database through a
+foreign catalog. The awkward part is that the two halves are usually scanned by
+different connectors, sometimes months apart.
 
 Classifyre handles this by naming objects the way **their own platform** names
 them, independently of who scanned them. A Tableau scan can point at a Snowflake
@@ -147,6 +148,10 @@ Until the other system is connected, those endpoints appear in the lineage view
 as **not yet scanned** — outlined nodes with a name but no content. They're a
 useful finding in themselves: they tell you which systems your data flows
 through that Classifyre isn't watching yet.
+
+The name has to match exactly, and part of it is the host. If one connector
+reaches a database as `db.internal` and another through a pooler or an alias,
+the two halves name different things and stay apart.
 
 ---
 
