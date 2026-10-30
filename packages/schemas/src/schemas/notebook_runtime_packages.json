@@ -13,7 +13,7 @@
     },
     {
       "name": "azure-storage-blob",
-      "version": "12.31.0",
+      "version": "12.31.1",
       "modules": [
         "azure.storage.blob"
       ],
@@ -30,7 +30,7 @@
     },
     {
       "name": "boto3",
-      "version": "1.43.121",
+      "version": "1.43.122",
       "modules": [
         "boto3"
       ],
@@ -306,7 +306,7 @@
     },
     {
       "name": "pydantic",
-      "version": "2.14.1",
+      "version": "2.14.2",
       "modules": [
         "pydantic"
       ],
@@ -394,7 +394,7 @@
     },
     {
       "name": "slack-sdk",
-      "version": "3.45.0",
+      "version": "3.46.0",
       "modules": [
         "slack_sdk"
       ],
@@ -412,7 +412,7 @@
     },
     {
       "name": "sqlglot",
-      "version": "30.25.0",
+      "version": "30.26.0",
       "modules": [
         "sqlglot"
       ],
