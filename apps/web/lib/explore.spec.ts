@@ -113,6 +113,11 @@ describe("the view Explore opens on", () => {
 });
 
 describe("the reason on a link", () => {
+  it("reads a lineage arrow in plain words", () => {
+    expect(linkReason(edge({ kind: "lineage", relationType: "TRANSFORM" }), t)).toBe("derived");
+    expect(linkReason(edge({ kind: "lineage", relationType: "VIEW" }), t)).toBe("view of");
+  });
+
   it("names the values two assets share, most first", () => {
     expect(sharedValues({ email: 1, person: 2, iban_code: 0 })).toBe("person ×2, email ×1");
     expect(linkReason(edge({ kind: "similar", sharedByLabel: { person: 2 } }), t)).toBe(

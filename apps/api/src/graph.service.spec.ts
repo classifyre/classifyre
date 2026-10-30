@@ -10,7 +10,11 @@ describe('GraphService', () => {
     $executeRaw: jest.fn(),
     asset: { findMany: jest.fn(), findUnique: jest.fn() },
     finding: { findMany: jest.fn() },
-    edge: { createMany: jest.fn(), count: jest.fn() },
+    edge: {
+      createMany: jest.fn(),
+      count: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
     caseEvidence: { findMany: jest.fn() },
     caseThreadSupport: { findMany: jest.fn() },
   };
@@ -47,6 +51,20 @@ describe('GraphService', () => {
       expect(sql).toContain('s.links ? m.hash');
       expect(sql).toContain("'REFERENCES'");
       expect(values).toEqual(['src', ['h1', 'h2']]);
+    });
+
+    it('adds no plain reference next to lineage or a foreign key', async () => {
+      mockPrisma.$executeRaw.mockResolvedValueOnce(0);
+
+      await service.linkReferences('src', ['h1']);
+
+      const [strings] = mockPrisma.$executeRaw.mock.calls[0] as unknown as [
+        TemplateStringsArray,
+      ];
+      const sql = strings.join('?');
+      expect(sql).toContain('NOT EXISTS');
+      expect(sql).toContain("'FLOW'");
+      expect(sql).toContain("'FOREIGN_KEY'");
     });
   });
 
@@ -128,6 +146,27 @@ describe('GraphService', () => {
 
       expect(result.nodes).toHaveLength(200);
       expect(result.truncated).toBe(true);
+    });
+  });
+
+  describe('inferEdgesForAssets', () => {
+    it('adds no reference beside an arrow that is already there', async () => {
+      mockPrisma.asset.findMany
+        .mockResolvedValueOnce([{ id: 'down', links: ['h-up', 'h-other'] }])
+        .mockResolvedValueOnce([
+          { id: 'up', hash: 'h-up', externalUrl: null },
+          { id: 'other', hash: 'h-other', externalUrl: null },
+        ]);
+      mockPrisma.edge.findMany.mockResolvedValueOnce([
+        { fromId: 'up', toId: 'down' },
+      ]);
+
+      await service.inferEdgesForAssets(['down'], { contains: false });
+
+      const { data } = mockPrisma.edge.createMany.mock.calls[0][0] as {
+        data: { fromId: string; toId: string }[];
+      };
+      expect(data.map((r) => r.toId)).toEqual(['other']);
     });
   });
 
@@ -363,6 +402,39 @@ describe('GraphService', () => {
       expect(sql.values).toContain(0.5);
       expect(sql.values).not.toContain(1);
       expect(result.dropped).toBe(0);
+    });
+
+    // The arrow is what the pair is. A leftover REFERENCES edge between the same
+    // two assets drew a second line, backwards, over every lineage arrow.
+    it('drops the plain reference a lineage edge makes redundant', async () => {
+      mockPrisma.asset.findMany.mockResolvedValue([
+        { id: 'a1', hash: 'h1', updatedAt: new Date() },
+        { id: 'a2', hash: 'h2', updatedAt: new Date() },
+      ]);
+      mockPrisma.$executeRaw.mockResolvedValue(1);
+
+      await service.upsertEdges({
+        sourceId: 's1',
+        edges: [
+          {
+            fromType: 'asset',
+            fromHash: 'h1',
+            toType: 'asset',
+            toHash: 'h2',
+            relationType: 'VIEW',
+            relationClass: 'FLOW',
+          },
+        ],
+      });
+
+      expect(mockPrisma.$executeRaw).toHaveBeenCalledTimes(2);
+      const cleanup = mockPrisma.$executeRaw.mock.calls[1][0] as {
+        strings: string[];
+        values: unknown[];
+      };
+      expect(cleanup.strings.join('?')).toContain('DELETE FROM "edges"');
+      expect(cleanup.strings.join('?')).toContain("'INFERRED'");
+      expect(cleanup.values).toEqual(['a1', 'a2']);
     });
   });
 });
