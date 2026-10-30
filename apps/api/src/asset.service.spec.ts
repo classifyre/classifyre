@@ -32,6 +32,34 @@ import { InquiryMatchingService } from './matching/inquiry-matching.service';
 import { CorrelationJobScheduler } from './correlation/correlation-job-scheduler.service';
 import { FindingStatsScheduler } from './stats/finding-stats-scheduler.service';
 
+/**
+ * The batched resolve of findings, as the per-finding update it replaced: what
+ * a test asserts is which findings were resolved and why, not the SQL.
+ */
+const resolvedInBulk =
+  (update: jest.Mock) =>
+  (
+    _sql: TemplateStringsArray,
+    _runnerId: string,
+    _at: Date,
+    resolutionReason: string,
+    entry: string,
+    _updatedAt: Date,
+    ids: string[],
+  ) => {
+    for (const id of ids) {
+      update({
+        where: { id },
+        data: {
+          status: FindingStatus.RESOLVED,
+          resolutionReason,
+          history: JSON.parse(entry),
+        },
+      });
+    }
+    return Promise.resolve(ids.length);
+  };
+
 describe('AssetService', () => {
   let service: AssetService;
 
@@ -2255,6 +2283,7 @@ describe('AssetService', () => {
               asset: {
                 updateMany: jest.fn().mockResolvedValue({}),
               },
+              $executeRaw: resolvedInBulk(findingUpdate),
               finding: {
                 findMany: jest.fn().mockImplementation(() => {
                   findManyCallCount++;
@@ -2631,6 +2660,7 @@ describe('AssetService', () => {
         mockPrismaService.$transaction.mockImplementation((callback: any) =>
           callback({
             asset: { updateMany: assetUpdateMany },
+            $executeRaw: resolvedInBulk(findingUpdate),
             finding: {
               findMany: jest
                 .fn()
@@ -2860,6 +2890,7 @@ describe('AssetService', () => {
         mockPrismaService.$transaction.mockImplementation((callback: any) =>
           callback({
             asset: { updateMany: jest.fn().mockResolvedValue({}) },
+            $executeRaw: resolvedInBulk(findingUpdate),
             finding: {
               findMany: jest.fn().mockResolvedValue(staleFindings),
               update: findingUpdate,
