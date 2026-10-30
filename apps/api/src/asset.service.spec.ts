@@ -1494,6 +1494,68 @@ describe('AssetService', () => {
       expect(result.deleted).toBe(0);
     });
 
+    it('renames an unchanged asset when its connection moved', async () => {
+      const existingAsset = {
+        id: 'db-table-1',
+        hash: 'table-1',
+        checksum: 'same-checksum',
+        urn: 'postgres://db.example.test:6543/shop/core/customers',
+        name: 'customers',
+        externalUrl: 'https://example.com/customers',
+        links: [],
+        assetType: 'TABLE',
+        sourceType: AssetType.WORDPRESS,
+        status: AssetStatus.NEW,
+        runnerId: 'old-runner',
+        sourceId,
+        lastScannedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      mockPrismaService.asset.findMany.mockResolvedValue([existingAsset]);
+
+      const txUpdate = jest.fn().mockResolvedValue({});
+      mockPrismaService.$transaction.mockImplementation((callback: any) =>
+        callback({
+          asset: {
+            createMany: jest.fn().mockResolvedValue({}),
+            update: txUpdate,
+            updateMany: jest.fn().mockResolvedValue({}),
+            findMany: jest.fn().mockResolvedValue([]),
+          },
+          finding: {
+            findMany: jest.fn().mockResolvedValue([]),
+            createMany: jest.fn().mockResolvedValue({}),
+            update: jest.fn().mockResolvedValue({}),
+          },
+          runner: { update: jest.fn().mockResolvedValue({}) },
+          runnerAsset: {
+            createMany: jest.fn().mockResolvedValue({ count: 0 }),
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          },
+        }),
+      );
+
+      const result = await service.bulkIngest(sourceId, runnerId, [
+        {
+          hash: 'table-1',
+          checksum: 'same-checksum',
+          urn: 'postgres://db.example.test/shop/core/customers',
+          name: 'customers',
+          external_url: 'https://example.com/customers',
+          links: [],
+          asset_type: 'TABLE',
+          findings: [],
+        },
+      ]);
+
+      expect(result.unchanged).toBe(1);
+      expect(txUpdate).toHaveBeenCalledWith({
+        where: { id: 'db-table-1' },
+        data: { urn: 'postgres://db.example.test/shop/core/customers' },
+      });
+    });
+
     it('should append to existing links instead of removing them on update', async () => {
       const existingAsset = {
         id: 'db-parent-1',
