@@ -38,7 +38,7 @@ through.
 ```mermaid
 graph LR
     A["customers.name"] -->|LOWER| B["order_summary.customer"]
-    C["orders.amount"] -->|"SUM → CASE"| D["customer_income.income"]
+    C["orders.amount"] -->|"CASE → SUM"| D["customer_income.income"]
     D -->|ROUND| E["top_customers.income"]
 ```
 
@@ -51,20 +51,20 @@ Open any table or view, choose the **Connections** tab, and pick a column in the
 to right in the direction the data moves:
 
 > `customer_income` · `income → ROUND → income`
-> ↳ `orders` · `amount → SUM → CASE → income`
+> ↳ `orders` · `amount → CASE → SUM → income`
 
 The first row says that `top_customers.income` is `ROUND(income)` from the
 `customer_income` view. The indented row goes one step further back: that
-`income` is a `SUM` over a `CASE` on `orders.amount`. The panel follows
-columns up to three steps back, through as many views as there are.
+`income` is a `CASE` on `orders.amount`, summed. The panel follows columns up to
+five steps back, across views and across systems.
 
 Each row shows:
 
 | Part | What it tells you |
 |---|---|
 | **Table** | Where the upstream columns live. Indented rows are further upstream. |
-| **Chain** | The source columns, the functions applied in order, and the column they produce |
-| **Type** | **Identity** (copied as-is), **Transformed** (an expression changed it) or **Aggregated** (`SUM`, `COUNT` and the like over many rows) |
+| **Chain** | The source columns, the functions in the order the value meets them, and the column they produce |
+| **Type** | **Identity** (copied as-is), **Transformed** (an expression changed it), **Aggregated** (`SUM`, `COUNT` and the like over many rows) or **Mapped** (the platform says this column feeds that one, but not how) |
 | **Source and confidence** | How the mapping was learned, for example *SQL parsed · 80%* |
 | **SQL** | Opens the exact expression, and the full view definition it was read from |
 
@@ -108,14 +108,15 @@ follows each output column back to the base tables:
 - **Through `UNION`s.** Each branch is followed separately, so
   `SELECT amount FROM orders UNION ALL SELECT -amount FROM refunds` shows
   `orders.amount` copied as-is and `refunds.amount` negated.
-- **Across views of views.** Each view's mapping is stored once, so the panel
-  can chain them together however deep the stack is.
+- **Across views of views.** Each view's mapping is stored once, and the panel
+  chains them together, so a stack of views reads as one trace.
 - **Per table.** In a view that joins `orders` and `customers`, each column is
   tied to the table it actually comes from, never to both.
 
 Where the platform itself reports column lineage, as Databricks Unity Catalog
 does, that is used instead of the SQL. It names the columns but not the
-functions between them, so those rows have no chain of steps.
+functions between them, so those rows read **Mapped** and have no chain of
+steps: a matching name does not prove the value was copied unchanged.
 
 <Callout type="info">
 **When the answer would be a guess, there is no answer.** A `SELECT *` view
@@ -196,9 +197,10 @@ unquoted names in upper case, PostgreSQL in lower case. Matching ignores case,
 so a column is followed back either way.
 
 **Does column lineage follow data across systems?**
-Yes, wherever the table-level link crosses systems: a Databricks table read by
-a Tableau data source, or a view reading a table in a schema you scan later.
-See [Lineage across systems](/sources/lineage/#lineage-across-systems).
+Yes, wherever the table-level link crosses systems and carries column detail: a
+Databricks table built through a foreign catalog from a PostgreSQL table, or a
+view reading a table in a schema you scan later. See
+[Lineage across systems](/sources/lineage/#lineage-across-systems).
 
 **Does it read stored procedures or ETL jobs?**
 Not yet. Column lineage comes from view definitions and platform catalogs.
