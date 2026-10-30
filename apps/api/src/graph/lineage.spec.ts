@@ -32,10 +32,11 @@ describe('GraphService lineage ingest', () => {
     jest.clearAllMocks();
     mockPrisma.$queryRaw.mockResolvedValue([]);
     mockPrisma.$executeRaw.mockImplementation((query: any) => {
-      executed.push({
-        sql: String(query?.sql ?? ''),
-        values: query?.values ?? [],
-      });
+      // The upsert is what these read; the clean-up after it has its own test.
+      const sql = String(query?.sql ?? '');
+      if (!sql.includes('DELETE FROM')) {
+        executed.push({ sql, values: query?.values ?? [] });
+      }
       return Promise.resolve(1);
     });
 

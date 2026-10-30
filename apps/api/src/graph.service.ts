@@ -425,8 +425,41 @@ export class GraphService {
       SELECT gen_random_uuid(), 'asset', from_id, 'asset', to_id, 'REFERENCES', 1, 'INFERRED'::"EdgeOrigin", now()
       FROM pairs
       WHERE from_id <> to_id
+        AND NOT EXISTS (
+          SELECT 1 FROM edges typed
+          WHERE typed.from_type = 'asset' AND typed.to_type = 'asset'
+            AND (typed.relation_class = 'FLOW'::"EdgeClass"
+                 OR typed.relation_type = 'FOREIGN_KEY')
+            AND ((typed.from_id = pairs.from_id AND typed.to_id = pairs.to_id)
+              OR (typed.from_id = pairs.to_id AND typed.to_id = pairs.from_id))
+        )
       ON CONFLICT (from_type, from_id, to_type, to_id, relation_type) DO NOTHING
     `;
+  }
+
+  /**
+   * A connector that reports a pair as `Asset.links` as well leaves a plain
+   * REFERENCES edge behind the typed one, drawn as a second line (backwards,
+   * for lineage) over the arrow that says what the pair really is. Links and
+   * typed edges land in either order, so `linkReferences` guards one side and
+   * this the other.
+   */
+  private async dropReferencesShadowedBy(
+    pairs: { from: string; to: string }[],
+  ): Promise<void> {
+    if (pairs.length === 0) return;
+    const rows = Prisma.join(
+      pairs.map((p) => Prisma.sql`(${p.from}::text, ${p.to}::text)`),
+    );
+    await this.prisma.$executeRaw(Prisma.sql`
+      DELETE FROM "edges" e
+      USING (VALUES ${rows}) AS p(a, b)
+      WHERE e."relation_type" = 'REFERENCES'
+        AND e."origin" = 'INFERRED'::"EdgeOrigin"
+        AND e."from_type" = 'asset' AND e."to_type" = 'asset'
+        AND ((e."from_id" = p.a AND e."to_id" = p.b)
+          OR (e."from_id" = p.b AND e."to_id" = p.a))
+    `);
   }
 
   private async insertContainsEdges(): Promise<void> {
@@ -512,8 +545,30 @@ export class GraphService {
         });
       }
     }
-    if (rows.length > 0) {
-      await this.prisma.edge.createMany({ data: rows, skipDuplicates: true });
+    if (rows.length === 0) return;
+
+    // Opening a case comes through here, long after the scan: a pair that
+    // already has an arrow gets no plain reference beside it.
+    const endpoints = [...new Set(rows.flatMap((r) => [r.fromId, r.toId]))];
+    const typed = await this.prisma.edge.findMany({
+      where: {
+        fromType: 'asset',
+        toType: 'asset',
+        fromId: { in: endpoints },
+        toId: { in: endpoints },
+        OR: [{ relationClass: 'FLOW' }, { relationType: 'FOREIGN_KEY' }],
+      },
+      select: { fromId: true, toId: true },
+    });
+    const covered = new Set(
+      typed.flatMap((e) => [
+        `${e.fromId}->${e.toId}`,
+        `${e.toId}->${e.fromId}`,
+      ]),
+    );
+    const data = rows.filter((r) => !covered.has(`${r.fromId}->${r.toId}`));
+    if (data.length > 0) {
+      await this.prisma.edge.createMany({ data, skipDuplicates: true });
     }
   }
 
@@ -606,6 +661,7 @@ export class GraphService {
     // batch used to lose every other edge in that batch. The last occurrence
     // wins, matching the re-ingest semantics of the upsert itself.
     const rows = new Map<string, Prisma.Sql>();
+    const typedPairs: { from: string; to: string }[] = [];
     let external = 0;
     let dropped = 0;
     let duplicates = 0;
@@ -637,6 +693,13 @@ export class GraphService {
       // would too.
       const conflictKey = `${from.type}\u0000${from.id}\u0000${to.type}\u0000${to.id}\u0000${e.relationType}`;
       if (rows.has(conflictKey)) duplicates += 1;
+      if (
+        from.type === 'asset' &&
+        to.type === 'asset' &&
+        (relationClass === 'FLOW' || e.relationType === 'FOREIGN_KEY')
+      ) {
+        typedPairs.push({ from: from.id, to: to.id });
+      }
       rows.set(
         conflictKey,
         Prisma.sql`(
@@ -695,6 +758,8 @@ export class GraphService {
           ELSE EXCLUDED."origin"
         END
     `);
+
+    await this.dropReferencesShadowedBy(typedPairs);
 
     return { upserted, external, dropped };
   }
@@ -1282,13 +1347,14 @@ export class GraphService {
     // A class or a note given replaces the old one; left out, the old one stays.
     const rows = await db.$queryRaw<RawEdgeRow[]>`
       INSERT INTO edges (id, from_type, from_id, to_type, to_id, relation_type,
-                         confidence, origin, relation_class, metadata, created_at)
+                         confidence, origin, method, relation_class, metadata, created_at)
       VALUES (gen_random_uuid(), ${dto.fromType}, ${dto.fromId}, ${dto.toType}, ${dto.toId},
-              ${relationType}, ${confidence}, 'MANUAL'::"EdgeOrigin",
+              ${relationType}, ${confidence}, 'MANUAL'::"EdgeOrigin", 'MANUAL'::"EdgeMethod",
               COALESCE(${relationClass}::"EdgeClass", 'REFERENCE'::"EdgeClass"),
               ${metadata}::jsonb, now())
       ON CONFLICT (from_type, from_id, to_type, to_id, relation_type) DO UPDATE
         SET origin = EXCLUDED.origin,
+            method = EXCLUDED.method,
             relation_class = COALESCE(${relationClass}::"EdgeClass", edges.relation_class),
             metadata = COALESCE(EXCLUDED.metadata, edges.metadata)
       RETURNING id, from_type, from_id, to_type, to_id, relation_type,

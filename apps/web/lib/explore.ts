@@ -8,6 +8,7 @@ import {
   type ExploreGraph,
   type ExploreKind,
 } from "@workspace/case-board/explore/model";
+import { FLOW_SUBTYPE_LABEL } from "@/components/graph-explorer/graph-types";
 import type { TranslationKey } from "@/i18n";
 
 /**
@@ -215,6 +216,8 @@ function scoredReason(e: ExploreEdgeDto, t: Translate): string {
     case "meaning":
       // The term itself sits at the end of the line and says it.
       return "";
+    case "lineage":
+      return FLOW_SUBTYPE_LABEL[e.relationType] ?? humanize(e.relationType);
     default:
       return humanize(e.relationType);
   }
