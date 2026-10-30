@@ -1,0 +1,380 @@
+---
+title: "Follow the Data: What Lineage Is and How to Read It"
+description: A plain-language explainer on data lineage. Why most lineage graphs are unreadable, what flow means, how column lineage works, how far to trust an arrow, how lineage crosses systems, and one real column followed from a warehouse back into a database.
+date: 2026-10-30T00:00:00.000Z
+tags:
+  - lineage
+  - column-lineage
+  - data-governance
+  - privacy
+  - investigations
+  - explainer
+categories:
+  - Guides
+author: Classifyre Team
+image: /blog/assets/images/follow-the-data-lineage-thumbnail.jpg
+keywords:
+  - what is data lineage
+  - column level lineage
+  - table lineage vs column lineage
+  - impact analysis
+  - upstream and downstream data
+  - foreign key vs lineage
+  - why provenance where provenance
+  - cross system lineage
+  - foreign catalog lineage
+  - tracing sensitive data
+  - Classifyre
+alternates:
+  canonical: /blog/articles/follow-the-data-lineage
+  languages:
+    en: /blog/articles/follow-the-data-lineage/
+    de: /de/blog/articles/follow-the-data-lineage/
+    x-default: /blog/articles/follow-the-data-lineage/
+openGraph:
+  type: article
+  title: "Follow the Data: What Lineage Is and How to Read It"
+  description: Where a value came from and what breaks if you change it. Five kinds of link, column lineage in plain words, and one real column followed across systems.
+  url: /blog/articles/follow-the-data-lineage
+  siteName: Classifyre
+  publishedTime: 2026-10-30T00:00:00.000Z
+  modifiedTime: 2026-10-30T00:00:00.000Z
+  authors:
+    - Classifyre Team
+  section: Guides
+  tags:
+    - lineage
+    - column lineage
+    - data governance
+    - privacy
+  images:
+    - /blog/assets/images/follow-the-data-lineage-thumbnail.jpg
+twitter:
+  card: summary_large_image
+  title: "Follow the Data: What Lineage Is and How to Read It"
+  description: Why lineage graphs turn into hairballs, what column lineage adds, and how to tell an arrow you can trust from one you cannot.
+  images:
+    - /blog/assets/images/follow-the-data-lineage-thumbnail.jpg
+---
+
+<ArticleHero
+  image="/blog/assets/images/follow-the-data-lineage.jpg"
+  eyebrow="Explainer"
+  title="Follow the Data: What Lineage Is and How to Read It"
+  description="Where a value came from, what breaks if you change it, and how to tell an arrow you can trust from one you cannot."
+/>
+
+<ArticleJsonLd
+  headline="Follow the Data: What Lineage Is and How to Read It"
+  description="A plain-language explainer on data lineage. Why most lineage graphs are unreadable, what flow means, how column lineage works, how far to trust an arrow, how lineage crosses systems, and one real column followed from a warehouse back into a database."
+  path="/blog/articles/follow-the-data-lineage"
+  datePublished="2026-10-30T00:00:00.000Z"
+  dateModified="2026-10-30T00:00:00.000Z"
+  authorName="Classifyre Team"
+  articleSection="Guides"
+  about={[
+    "Data lineage",
+    "Column-level lineage",
+    "Impact analysis",
+    "Data provenance",
+    "Privacy",
+  ]}
+  mentions={[
+    {
+      "@type": "SoftwareApplication",
+      name: "Classifyre",
+      url: "https://www.classifyre.com",
+      applicationCategory: "Data classification software",
+    },
+  ]}
+/>
+
+<ArticleSideRail
+  title="Follow the Data: What Lineage Is and How to Read It"
+  path="/blog/articles/follow-the-data-lineage/"
+  tags={["lineage", "column-lineage", "privacy", "explainer"]}
+  backHref="/blog/articles"
+  backLabel="All articles"
+/>
+
+<iframe
+  className="my-6 aspect-video w-full border-2 border-border"
+  src="https://www.youtube.com/embed/Z_mOCAxN4qg"
+  title="Follow the data: what lineage is and how to read it"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
+A partner writes to you on a Tuesday. The weekly file you send them has your
+customers' bank account numbers in it.
+
+You need two answers today. Where did that column come from? And what breaks
+if you take it out? Nobody in the room knows. The file comes from a table,
+which comes from a view, which comes from a database three teams away.
+
+Those two questions have one name: lineage.
+
+![A partner's note and the weekly export on a black table, the iban column marked in lime, and two stamps: where from, what breaks](/blog/assets/images/lineage-two-questions.webp)
+
+<Alert>
+  <AlertTitle>What is invented and what is real</AlertTitle>
+  <AlertDescription>
+    The people, bank details and numbers are invented. The databases, the scans
+    and the lineage are real: three live systems in a public test workspace, on
+    30 October 2026. The screens are from that workspace, except the arrow that
+    waits, which was taken on a test copy before it bound. The diagrams are ours,
+    from a short film made alongside this post.
+  </AlertDescription>
+</Alert>
+
+## Upstream and downstream
+
+Lineage is a record of where values came from. Think of a river: upstream is
+where the water came from, downstream is everything it reaches.
+
+A good graph keeps one rule. Arrows point the way the data moves, so upstream
+stands on the left and downstream on the right. Walk inward and you learn where
+something came from. Walk outward and you learn what breaks if it changes.
+
+## Why lineage graphs turn into hairballs
+
+Because everything gets flattened into one kind of link. An attachment, a
+foreign key, a duplicate file and a table built from another table are four
+different things, and only one of them answers *what breaks?*
+
+![A knot of street wires beside four cards: an attachment, a foreign key, a duplicate file, and a table built from a table, the only one in lime](/blog/assets/images/lineage-one-kind-of-link.webp)
+
+So ask one thing of every link: did values move?
+
+| Class | Means | Example | Is it a step in the path? |
+|---|---|---|---|
+| **Lineage** (flow) | The values in one came from the other | A view over its tables | Yes. This is the lineage graph |
+| **Contains** | One is a part of the other | A chart in a dashboard | No. It folds the picture |
+| **Same as** | One real thing, seen twice | One file in two buckets | No. It merges two nodes |
+| **References** | One points at the other | A foreign key | No. A hint that carries nothing |
+| **Used by** | Somebody touched it | Who opened a file | No. A weight, not a path |
+
+A foreign key is the one that surprises people. It is a good hint about where
+lineage might be, but no data moved, so it is never a step. Whatever a system is
+unsure about belongs in the same place: a link that carries nothing. That is how
+a graph stays readable. The [five classes](https://docs.classifyre.com/sources/lineage/#not-every-connection-is-lineage)
+are in the docs, with what each one means for a traversal.
+
+![Five cards on a table under the question did values move: only lineage is lime](/blog/assets/images/lineage-five-classes.webp)
+
+## Which kind of move
+
+Inside flow, the kind of move tells you what to expect at the far end.
+
+- **Copy of.** The same values, moved. If the source is sensitive, so is the
+  copy.
+- **View of.** A saved query. It holds nothing of its own, so a change underneath
+  reaches it at once.
+- **Derived.** Real logic in between. The values may or may not survive, so you
+  have to look closer.
+- **Written by.** A job produced this.
+- **Exported to, sent to.** It left the system. That is where a privacy question
+  stops being internal.
+
+![Six kinds of move along one arrow, with a dashed line before exported to and sent to: past this line it is not internal](/blog/assets/images/lineage-kinds-of-move.webp)
+
+## Column lineage
+
+Table lineage says a view is built from two tables. That is true, and it is not
+enough to act on. Before you drop a column you need to know if *this* column
+feeds anything.
+
+Column lineage records, for every output column, what fed it and every function
+on the way. It reads as a sentence: `customer` is `name`, through `LOWER`.
+`income` is `amount`, through a `CASE`, then through a `SUM`.
+
+The functions are the useful part, because they tell you if the sensitive thing
+survived the trip. A lowered name is still a name. A sum over many rows no
+longer holds one person's amount, unless the group has one person in it. So each
+mapping says one of three things: copied as it is, transformed, or aggregated.
+
+![The same diagram with the three words beside it, copied as it is, transformed, aggregated, and a stamp: did the sensitive thing survive?](/blog/assets/images/column-lineage-did-it-survive.webp)
+
+## Where, and why
+
+One older idea helps here. In 2001, database researchers split the question of
+where data came from in two.
+
+- **Where** is the place a value was copied from.
+- **Why** is the data that made this row appear at all.
+
+![An old ledger, the year 2001, and two cards: where, the place this value was copied from, and why, the data that made this row appear at all](/blog/assets/images/lineage-where-and-why.webp)
+
+Look at a filter. A `WHERE country <> 'CH'` feeds no output column, and yet it
+decides who is in the result. So does a join key. If you drew those as arrows
+into columns, every column would seem to depend on everything. So they are kept
+apart, in a separate list: columns that shaped which rows came out.
+
+Tracing a value, you can skip that list. Dropping a column, you cannot: remove
+the filter column and the view breaks.
+
+![The diagram with a box round country, which has no arrow, a sheet listing the columns that shaped which rows came out, and two stamps: tracing a value, skip it; dropping a column, read it](/blog/assets/images/lineage-columns-that-shaped-the-rows.webp)
+
+## How a tool knows
+
+Most databases say which tables a view depends on, not which columns. So a tool
+reads the view's own SQL and follows each output column back: into common table
+expressions, down each branch of a `UNION`, through views of views.
+
+Some platforms report columns from their own catalog. They name the columns, not
+the functions between them, so the two sources are good at different things.
+
+![Two cards: the SQL names the columns and the functions, the catalog names the columns and is silent on the functions](/blog/assets/images/lineage-sql-and-catalog.webp)
+
+And sometimes the honest answer is nothing. `SELECT *` names no columns. A bare
+column in a join could belong to either table. A missing answer sends you to go
+and look. A confident wrong one sends you to production.
+
+![Two queries: SELECT star, stamped no columns named, and a bare amount in a join, stamped which table? Under them: no answer beats a wrong one](/blog/assets/images/lineage-no-answer-beats-a-wrong-one.webp)
+
+[Column-Level Lineage](https://docs.classifyre.com/sources/lineage/column-level/)
+has every case, including how to read the panel row by row.
+
+## How far to trust an arrow
+
+Not every arrow is equally certain, so each one should say how it was known.
+
+![Five ways an arrow can be known, from runtime observed to manual, and the SQL kept beside it](/blog/assets/images/lineage-how-was-it-known.webp)
+
+Where an arrow came from SQL, keep the SQL beside it, so you can read the
+derivation instead of trusting a label.
+
+## Across systems
+
+The most valuable lineage crosses a boundary: two systems, two scans, sometimes
+months apart. The trick is a name. Not an ID from the scan, but what the platform
+itself calls the object: host, database, schema, table. Two scanners that never
+met write the same string.
+
+![Two sheets, one from March and one from October, carrying the same address for one table, with tags for host, database, schema and table](/blog/assets/images/lineage-same-name.webp)
+
+So a scan can point at a table nobody has scanned yet. The arrow is kept, and it
+ends on an outlined node: a name with nothing inside. That is a finding in
+itself, because it shows where your data goes that you are not watching.
+
+![A dashed node named customers, not yet scanned, with an arrow to a warehouse table, and a stamp: where your data goes that you are not watching](/blog/assets/images/lineage-arrow-waits.webp)
+
+Connect that system later and the two halves recognise each other. The lineage
+completes itself, backwards in time. Here is that happening for real, in a test
+we ran before adding a schema to the scan, and straight after:
+
+![The canvas before: vendor_feed in Postgres as a dashed node, with nothing to open, and an arrow labelled derived into supplier_costs](/blog/assets/images/classifyre-lineage-waiting.webp)
+
+![The canvas after the schema was scanned: the same arrow, now from the real lab_ext.vendor_feed asset](/blog/assets/images/classifyre-lineage-bound.webp)
+
+The name includes the host and port, so both scanners have to reach the database
+the same way. We nearly tripped on this ourselves: one connection used a pooler on
+port 6543 and the other port 5432, so the two would have named one table twice and
+the arrow would never have joined. Pointing both at the same port fixed it.
+
+## A second job: duplicates
+
+Two tables look nearly identical. The question is not how similar, but why.
+
+![Three rows, each with two tables: a path joins them, shared upstream, low priority; no path, the alarm; one side unknown, judge the values](/blog/assets/images/lineage-duplicates-verdicts.webp)
+
+Contents and lineage come from different evidence, which is why putting them
+together tells you something. [Duplicate review](https://docs.classifyre.com/sources/lineage/#lineage-as-evidence-in-duplicate-review)
+is built on this.
+
+## One real column
+
+Back to the file. This is a [test workspace](https://showcase.classifyre.com/all-sources-test/sources/)
+with three real systems: [Postgres](https://showcase.classifyre.com/all-sources-test/sources/6fb22b2a-6c2a-4964-b6d3-36138c448666/),
+[MySQL](https://showcase.classifyre.com/all-sources-test/sources/cc0accc8-3f10-43c1-94b2-582633add046/)
+and a [Databricks warehouse](https://showcase.classifyre.com/all-sources-test/sources/97b0b309-28f7-41d4-8687-71de2dd4d2fe/).
+Everything below is open: you can click through it yourself.
+
+The [export](https://showcase.classifyre.com/all-sources-test/assets/1df5dabc-468c-488c-8fce-9e22a38ab48a/?tab=connections) carries five bank account numbers, and each of them turns
+up in ten tables, across two systems.
+
+Ten suspects. The obvious one is a CRM contact list. A value search cannot settle
+it, because the value is the same in all ten. Lineage can.
+
+Walk upstream. The export reads a statement, the statement reads a staged table,
+and then the path leaves the warehouse. The warehouse reads the database through
+a [foreign catalog](https://docs.classifyre.com/sources/databricks/#lineage) and
+reports the read, and two scans that never met wrote the same name.
+
+![The lineage canvas walked upstream from the export: a warehouse on the right, Postgres in the middle, MySQL on the left, each node labelled with its source](/blog/assets/images/classifyre-lineage-three-systems.webp)
+
+Pick a single column. The IBAN comes from [`customers`](https://showcase.classifyre.com/all-sources-test/assets/399156f1-ce3a-4a76-84e1-4da8ac229aaf/?tab=connections), in three
+steps, and not from the [CRM list](https://showcase.classifyre.com/all-sources-test/assets/94993165-a6e0-4872-ae5a-17af1ca6547a/?tab=connections). That idea is closed.
+
+![The column lineage panel for iban: three rows, back through partner_statement and staged.customers to postgres.lab_core.customers](/blog/assets/images/classifyre-column-three-steps.webp)
+
+`value_band` goes further: five steps, across the boundary, through two Postgres
+views, down to quantity times price. Read the rows. Inside the warehouse they say
+*catalog, 95%, mapped*: it knows the link, not the logic. Inside Postgres they say
+*SQL parsed, 80%*, with the functions.
+
+![The column lineage panel for value_band: five rows, three reading catalog 95% mapped, two reading SQL parsed 80% with SUM, CAST and the multiplication](/blog/assets/images/classifyre-column-five-steps.webp)
+
+Now walk down from [that staged table](https://showcase.classifyre.com/all-sources-test/assets/ebd69191-1f6b-4bc9-924e-ab0e2ce7f28d/?tab=connections). One statement, one export,
+nothing else. The fix is one column in one `SELECT`.
+
+![The canvas walked downstream from staged.customers: one statement, one export, nothing else](/blog/assets/images/classifyre-lineage-downstream.webp)
+
+One arrow nobody reported. A nightly job copies account managers from
+[MySQL](https://showcase.classifyre.com/all-sources-test/assets/df18467d-febc-41a5-8d87-83750ad09ea5/?tab=connections) into [Postgres](https://showcase.classifyre.com/all-sources-test/assets/8bed4d9b-c39a-486b-b0fd-faa723d75884/?tab=connections), and neither database knows.
+So it is [drawn by hand](https://docs.classifyre.com/how-it-works/explore/), in
+amber, so that nobody mistakes it for something a platform said.
+
+![The same canvas closer in: an amber arrow from lab_hr.employees in MySQL to account_managers in Postgres, labelled nightly copy](/blog/assets/images/classifyre-hand-drawn-link.webp)
+
+One path, three kinds of evidence. The [case](https://showcase.classifyre.com/all-sources-test/investigations/527b21f7-1a31-479d-b3eb-c2a4c0250800/) keeps the verdicts: the
+CRM idea refuted, `customers` supported, the fix sized.
+
+![The case board: the CRM hypothesis refuted in red, the customers hypothesis and the size of the fix supported in green, the amber link along the bottom](/blog/assets/images/classifyre-lineage-case-board.webp)
+
+## What it will not tell you
+
+- **Only what a platform says.** Stored procedures, triggers and outside jobs
+  leave no arrow unless someone declares one.
+- **How data can flow, not that a given row did.** An arrow is a statement about
+  structure.
+- **Names have to match.** Reach one database by two host names and the halves
+  never meet.
+
+A missing arrow means nobody reported one. It does not mean nothing moved.
+
+![Three stamps, procedures, triggers and outside jobs; how it can flow, not which row did; two host names, two tables. Under them: no arrow is not no movement](/blog/assets/images/lineage-what-it-will-not-say.webp)
+
+If you know how data moves and no system will say, a
+[custom connector](https://docs.classifyre.com/sources/custom-connectors/) can
+declare it, column detail included.
+
+Ask the two questions of a column, not a table, and check how each arrow was
+known to be there.
+
+## Open it yourself
+
+Everything in the case is live in the
+[all-sources-test workspace](https://showcase.classifyre.com/all-sources-test/sources/).
+
+| Start here | What to look at |
+|---|---|
+| [`partner_export`](https://showcase.classifyre.com/all-sources-test/assets/1df5dabc-468c-488c-8fce-9e22a38ab48a/?tab=connections) | Connections tab, View, Upstream, ∞: the whole path. Pick `value_band` in the column panel |
+| [`lab_core.customers`](https://showcase.classifyre.com/all-sources-test/assets/399156f1-ce3a-4a76-84e1-4da8ac229aaf/?tab=connections) | Walk downstream: everything that reads it, in both systems |
+| [`lab_hr.employees`](https://showcase.classifyre.com/all-sources-test/assets/df18467d-febc-41a5-8d87-83750ad09ea5/?tab=connections) | The hand-drawn arrow out of MySQL |
+| [`supplier_costs`](https://showcase.classifyre.com/all-sources-test/assets/43c1a59c-44c7-4d04-86a7-c135fab634f4/?tab=connections) | The arrow that waited for a schema, and bound itself |
+| [The case](https://showcase.classifyre.com/all-sources-test/investigations/527b21f7-1a31-479d-b3eb-c2a4c0250800/) | The hypotheses, their verdicts and the evidence |
+
+The full guide is in the docs: [Lineage &
+Relationships](https://docs.classifyre.com/sources/lineage/), [Column-Level
+Lineage](https://docs.classifyre.com/sources/lineage/column-level/) and the source pages for
+[Databricks](https://docs.classifyre.com/sources/databricks/),
+[PostgreSQL](https://docs.classifyre.com/sources/postgresql/) and
+[MySQL](https://docs.classifyre.com/sources/mysql/). Cases are covered in
+[Links on the board](https://docs.classifyre.com/investigations/cases/links/).
+
+<RelatedCasePosts
+  section="articles"
+  currentPath="/blog/articles/follow-the-data-lineage"
+  heading="More from the blog"
+/>
