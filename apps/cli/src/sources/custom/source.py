@@ -30,7 +30,7 @@ from collections.abc import AsyncGenerator, Mapping
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 import requests
 
@@ -136,6 +136,8 @@ class CustomSource(BaseSource):
         #: What each ctx.cohort() band visited this run, reported on finalize.
         self.cohort_stats: dict[str, Any] = {}
         self._stats = {"produced": 0, "seen": 0}
+        #: What augment_sources() reported at the end of the run, if it ran.
+        self.augmentation: dict[str, Any] = {}
         self._packages_installed = False
 
         logger.info(
@@ -388,24 +390,39 @@ class CustomSource(BaseSource):
         """
         request_id = frame.get("id")
         try:
-            if frame.get("op") != "query_assets":
-                raise CustomSourceError(f"Unsupported request {frame.get('op')!r}")
-            value = self._relay_asset_query(frame.get("args") or {})
+            value = self._relay(str(frame.get("op")), frame.get("args") or {})
         except Exception as exc:  # reported to the notebook, which raises it
             self._send({"type": "provide", "id": request_id, "error": str(exc)})
             return
         self._send({"type": "provide", "id": request_id, "value": value})
 
-    def _relay_asset_query(self, args: dict[str, Any]) -> Any:
-        """``ctx.query_assets()``, performed with this process's credentials.
+    #: What a notebook may ask of the namespace, and the API route that answers
+    #: it. Anything else is refused here, before the internal key is attached.
+    _RELAYED_OPS: ClassVar[dict[str, str]] = {
+        "query_assets": "assets/query",
+        "query_sources": "sources/query",
+        "query_findings": "findings/query",
+        "query_detectors": "detectors/query",
+        "augment_tags": "augmentations/tags",
+        "augment_edges": "augmentations/edges",
+        "augment_finish": "augmentations/finish",
+    }
 
-        The API scopes the read to this run: it must be RUNNING, and the
-        namespace comes from the callback URL the job was given.
+    def _relay(self, op: str, args: dict[str, Any]) -> Any:
+        """A notebook's read or write, performed with this process's credentials.
+
+        The API scopes each call to this run: it must be RUNNING, the namespace
+        comes from the callback URL the job was given, and writes are stamped
+        with this run's source. The notebook sends arguments only, never a
+        source or author.
         """
+        route = self._RELAYED_OPS.get(op)
+        if route is None:
+            raise CustomSourceError(f"Unsupported request {op!r}")
         if not self.runner_id:
-            raise CustomSourceError("ctx.query_assets() needs a scan run")
+            raise CustomSourceError(f"{op} needs a scan run")
         response = requests.post(
-            f"{api_base_url()}/runners/{self.runner_id}/assets/query",
+            f"{api_base_url()}/runners/{self.runner_id}/{route}",
             json=args,
             headers={**internal_key_headers(), "Connection": "close"},
             timeout=(10, ASSET_QUERY_TIMEOUT_SECONDS),
@@ -417,8 +434,7 @@ class CustomSource(BaseSource):
                 detail = None
             raise CustomSourceError(
                 self._safe(
-                    f"ctx.query_assets() was refused ({response.status_code}): "
-                    f"{detail or response.text[:500]}"
+                    f"{op} was refused ({response.status_code}): {detail or response.text[:500]}"
                 )
             )
         return response.json()
@@ -532,6 +548,21 @@ class CustomSource(BaseSource):
             yield batch
 
         logger.info("Notebook produced %d asset(s)", produced)
+        if not self._aborted and self._notebook_defines("augment_sources"):
+            self._augment()
+
+    def _augment(self) -> None:
+        """Run the notebook's ``augment_sources()`` after its assets are scanned."""
+        outcome = self._call("augment") or {}
+        self.augmentation = outcome
+        logger.info(
+            "Notebook augmentation wrote %s tag(s) and %s link(s) on other sources "
+            "(%s left as they were); retired %s",
+            outcome.get("tags", 0),
+            outcome.get("edges", 0),
+            outcome.get("skipped", 0),
+            outcome.get("retired") or outcome.get("retireSkippedReason") or "nothing",
+        )
 
     def _warn_if_windowed(
         self, cursor_key: str | None, skip: int, limit: int | None, produced: int

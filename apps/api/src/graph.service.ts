@@ -580,8 +580,15 @@ export class GraphService {
    * Hash references are resolved to UUIDs before insertion; unresolvable hashes are skipped.
    * Idempotent via the unique constraint on edges.
    */
+  /**
+   * `assertedBy` is set only for edges a notebook wrote onto assets it does
+   * not own (ctx.link(), ctx.means()). Such a row records its author so the
+   * author can retire it later; it never takes over a row a connector, a
+   * person or another source already owns.
+   */
   async upsertEdges(
     dto: BulkIngestEdgesDto,
+    assertedBy?: { sourceId: string; runnerId: string },
   ): Promise<BulkIngestEdgesResponseDto> {
     const edges = dto.edges ?? [];
     if (edges.length === 0) return { upserted: 0, external: 0, dropped: 0 };
@@ -713,7 +720,8 @@ export class GraphService {
         ${mappings ? JSON.stringify(mappings) : null}::jsonb,
         ${e.evidence ? JSON.stringify(e.evidence) : null}::jsonb,
         ${via ? 'asset' : null}::text, ${via ?? null}::text,
-        now()::timestamp(3)
+        now()::timestamp(3),
+        ${assertedBy?.sourceId ?? null}::text, ${assertedBy?.runnerId ?? null}::text
       )`,
       );
     }
@@ -739,7 +747,8 @@ export class GraphService {
         "id", "from_type", "from_id", "to_type", "to_id",
         "relation_type", "confidence", "origin",
         "relation_class", "granularity", "method",
-        "field_mappings", "evidence", "via_type", "via_id", "last_seen_at"
+        "field_mappings", "evidence", "via_type", "via_id", "last_seen_at",
+        "asserted_by_source_id", "asserted_by_runner_id"
       )
       SELECT gen_random_uuid(), v.* FROM (VALUES ${Prisma.join([...rows.values()])}) AS v
       ON CONFLICT ("from_type", "from_id", "to_type", "to_id", "relation_type")
@@ -756,7 +765,13 @@ export class GraphService {
         "origin"         = CASE
           WHEN "edges"."origin" = 'MANUAL'::"EdgeOrigin" THEN "edges"."origin"
           ELSE EXCLUDED."origin"
-        END
+        END,
+        -- A connector re-deriving an edge takes it over (null author); a
+        -- notebook's assertion refreshes only its own row, below.
+        "asserted_by_source_id" = EXCLUDED."asserted_by_source_id",
+        "asserted_by_runner_id" = EXCLUDED."asserted_by_runner_id"
+      WHERE EXCLUDED."asserted_by_source_id" IS NULL
+         OR "edges"."asserted_by_source_id" = EXCLUDED."asserted_by_source_id"
     `);
 
     await this.dropReferencesShadowedBy(typedPairs);

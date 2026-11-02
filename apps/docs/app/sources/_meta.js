@@ -50,6 +50,7 @@ export default {
   sampling: "Sampling Strategies",
   augmentation: "Source Augmentation",
   "custom-connectors": "Custom Connectors",
+  "cross-source": "Query & Augment Other Sources",
   "content-extraction": "OCR & Transcription",
   "file-formats": "File Formats",
   testing: "Testing & Scheduling",

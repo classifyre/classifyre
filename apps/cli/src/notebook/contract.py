@@ -25,7 +25,10 @@ from .serialize import ModuleSource, cell_id_of, to_module_source
 REQUIRED_FUNCTIONS = ("test_connection", "extract")
 
 #: Implemented when the source can support them; absence is not an error.
-OPTIONAL_FUNCTIONS = ("discover", "fetch_content", "relationships")
+OPTIONAL_FUNCTIONS = ("discover", "fetch_content", "relationships", "augment_sources")
+
+#: A notebook that only enriches other sources has nothing to extract.
+AUGMENT_ENTRY_POINT = "augment_sources"
 
 MISSING_FUNCTION = "missing_function"
 SYNTAX_ERROR = "syntax_error"
@@ -216,6 +219,9 @@ def validate_module(
 
     for name in required:
         if name in functions:
+            continue
+        # A notebook that defines augment_sources() may own no assets at all.
+        if name == "extract" and AUGMENT_ENTRY_POINT in functions:
             continue
         if name in names:
             violations.append(

@@ -11,6 +11,12 @@ Name | Type
 `where` | object
 `excludeVisited` | object
 `select` | Array&lt;string&gt;
+`search` | string
+`status` | Array&lt;string&gt;
+`term` | object
+`findings` | object
+`semantic` | object
+`include` | Array&lt;string&gt;
 `limit` | number
 `cursor` | string
 
@@ -26,6 +32,12 @@ const example = {
   "where": null,
   "excludeVisited": null,
   "select": null,
+  "search": null,
+  "status": null,
+  "term": null,
+  "findings": null,
+  "semantic": null,
+  "include": null,
   "limit": null,
   "cursor": null,
 } satisfies RunnerAssetQueryDto

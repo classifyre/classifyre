@@ -858,7 +858,11 @@ def _page(*fns: str, cursor: str | None = None) -> _FakeResponse:
         {
             "items": [
                 {
+                    "id": f"id-{fn}",
                     "assetHash": f"h-{fn}",
+                    "urn": None,
+                    "sourceId": "src-register",
+                    "sourceName": "Firmenbuch Register",
                     "externalId": f"company:{fn}",
                     "name": fn,
                     "kind": "record",
@@ -868,7 +872,6 @@ def _page(*fns: str, cursor: str | None = None) -> _FakeResponse:
                 for fn in fns
             ],
             "nextCursor": cursor,
-            "callsRemaining": 99,
         },
     )
 
@@ -895,7 +898,7 @@ def test_a_refused_query_reaches_the_notebook_as_an_error_it_can_handle(
         monkeypatch,
         [
             _page("606601k", cursor="c-1"),
-            _FakeResponse(429, {"message": "This run has used its 100 asset queries."}),
+            _FakeResponse(400, {"message": "The asset query ran past 15s."}),
         ],
     )
     recipe = build_recipe(QUERY_NOTEBOOK)
@@ -906,8 +909,90 @@ def test_a_refused_query_reaches_the_notebook_as_an_error_it_can_handle(
     [refused] = [asset for asset in assets if asset.name == "refused"]
     content = asyncio.run(instance.fetch_content(refused.hash))
     assert content is not None
-    assert "refused (429)" in content[1]
-    assert "100 asset queries" in content[1]
+    assert "refused (400)" in content[1]
+    assert "ran past 15s" in content[1]
+
+
+AUGMENT_NOTEBOOK = """from classifyre import ctx
+
+
+def test_connection() -> dict:
+    return {"status": "SUCCESS", "message": "ok"}
+
+
+def augment_sources():
+    for finding in ctx.each_finding(detector="qa-flag"):
+        ctx.tag(finding.asset_id, "reviewed", "yes")
+        ctx.means(finding.asset_id, "invoice")
+"""
+
+_FINDING_PAGE = _FakeResponse(
+    200,
+    {
+        "items": [
+            {
+                "id": "f1",
+                "assetId": "11111111-1111-4111-8111-111111111111",
+                "customDetectorKey": "qa-flag",
+            }
+        ],
+        "nextCursor": None,
+    },
+)
+
+
+def test_an_augment_only_notebook_reads_writes_and_retires_through_the_parent(
+    source, monkeypatch
+) -> None:
+    calls = _fake_api(
+        monkeypatch,
+        [
+            _FINDING_PAGE,
+            _FakeResponse(200, {"written": 1}),
+            _FakeResponse(200, {"written": 1, "skipped": 0}),
+            _FakeResponse(200, {"retiredTags": 3, "retiredEdges": 1}),
+        ],
+    )
+    instance = source(build_recipe(AUGMENT_NOTEBOOK))
+
+    assert collect(instance) == []  # no `extract`: it owns no assets
+
+    assert [call["url"].split("/runners/run-1/")[1] for call in calls] == [
+        "findings/query",
+        "augmentations/tags",
+        "augmentations/edges",
+        "augmentations/finish",
+    ]
+    # The notebook named no source and no author: the parent attached the run.
+    assert calls[1]["json"] == {
+        "tags": [
+            {"assetId": "11111111-1111-4111-8111-111111111111", "key": "reviewed", "value": "yes"}
+        ]
+    }
+    assert all(call["headers"]["X-Classifyre-Internal-Key"] == "internal-key" for call in calls)
+    assert instance.augmentation["retired"] == {"retiredTags": 3, "retiredEdges": 1}
+
+
+def test_a_partial_augmentation_does_not_retire_anything(source, monkeypatch) -> None:
+    calls = _fake_api(
+        monkeypatch,
+        [_FINDING_PAGE, _FakeResponse(200, {"written": 1}), _FakeResponse(200, {"written": 1})],
+    )
+    partial = AUGMENT_NOTEBOOK.replace(
+        "def augment_sources():\n",
+        'def augment_sources():\n    ctx.set_partial_coverage("only the new findings")\n',
+    )
+    instance = source(build_recipe(partial))
+    collect(instance)
+    assert not any(call["url"].endswith("augmentations/finish") for call in calls)
+    assert instance.augmentation["retireSkippedReason"] == "only the new findings"
+
+
+def test_the_parent_refuses_operations_it_does_not_relay(source, monkeypatch) -> None:
+    _fake_api(monkeypatch, [])
+    instance = source(build_recipe())
+    with pytest.raises(Exception, match="Unsupported request"):
+        instance._relay("delete_everything", {})
 
 
 def test_a_local_run_has_no_runner_id_so_the_scan_run_guard_fires(request) -> None:
@@ -917,7 +1002,7 @@ def test_a_local_run_has_no_runner_id_so_the_scan_run_guard_fires(request) -> No
     request.addfinalizer(instance.cleanup)
     assert instance.runner_id is None
     with pytest.raises(CustomSourceError, match="needs a scan run"):
-        instance._relay_asset_query({"source": "Firmenbuch Register"})
+        instance._relay("query_assets", {"source": "Firmenbuch Register"})
 
 
 def test_a_silent_notebook_trips_the_read_timeout() -> None:

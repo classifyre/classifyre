@@ -39,12 +39,6 @@ export interface RunnerAssetQueryResponseDto {
      * @memberof RunnerAssetQueryResponseDto
      */
     nextCursor: string | null;
-    /**
-     * Asset queries this run has left.
-     * @type {number}
-     * @memberof RunnerAssetQueryResponseDto
-     */
-    callsRemaining: number;
 }
 
 /**
@@ -53,7 +47,6 @@ export interface RunnerAssetQueryResponseDto {
 export function instanceOfRunnerAssetQueryResponseDto(value: object): value is RunnerAssetQueryResponseDto {
     if (!('items' in value) || value['items'] === undefined) return false;
     if (!('nextCursor' in value) || value['nextCursor'] === undefined) return false;
-    if (!('callsRemaining' in value) || value['callsRemaining'] === undefined) return false;
     return true;
 }
 
@@ -69,7 +62,6 @@ export function RunnerAssetQueryResponseDtoFromJSONTyped(json: any, ignoreDiscri
         
         'items': ((json['items'] as Array<any>).map(RunnerAssetQueryItemDtoFromJSON)),
         'nextCursor': json['nextCursor'],
-        'callsRemaining': json['callsRemaining'],
     };
 }
 
@@ -86,7 +78,6 @@ export function RunnerAssetQueryResponseDtoToJSONTyped(value?: RunnerAssetQueryR
         
         'items': ((value['items'] as Array<any>).map(RunnerAssetQueryItemDtoToJSON)),
         'nextCursor': value['nextCursor'],
-        'callsRemaining': value['callsRemaining'],
     };
 }
 

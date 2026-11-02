@@ -113,6 +113,13 @@
       "type": "Context",
       "members": [
         {
+          "label": "augmentation_stats",
+          "kind": "property",
+          "detail": "dict[str, int]",
+          "documentation": "What this run has written so far: ``tags``, ``edges`` and ``skipped``.",
+          "insertText": "augmentation_stats"
+        },
+        {
           "label": "cohort",
           "kind": "method",
           "detail": "(name: 'str', universe: 'Iterable[Any]', *, bands: 'Mapping[str, float] | None' = None, size: 'int', min_share: 'float | None' = None) -> 'list[CohortItem]'",
@@ -141,6 +148,34 @@
           "insertText": "cursor"
         },
         {
+          "label": "each_asset",
+          "kind": "method",
+          "detail": "(source: 'str | None' = None, **query: 'Any') -> 'Iterator[QueriedAsset]'",
+          "documentation": "Every asset matching :meth:`query_assets`, page after page.",
+          "insertText": "each_asset()"
+        },
+        {
+          "label": "each_detector",
+          "kind": "method",
+          "detail": "(**query: 'Any') -> 'Iterator[QueriedDetector]'",
+          "documentation": "Every detector matching :meth:`query_detectors`, page after page.",
+          "insertText": "each_detector()"
+        },
+        {
+          "label": "each_finding",
+          "kind": "method",
+          "detail": "(**query: 'Any') -> 'Iterator[QueriedFinding]'",
+          "documentation": "Every finding matching :meth:`query_findings`, page after page.",
+          "insertText": "each_finding()"
+        },
+        {
+          "label": "each_source",
+          "kind": "method",
+          "detail": "(**query: 'Any') -> 'Iterator[QueriedSource]'",
+          "documentation": "Every source matching :meth:`query_sources`, page after page.",
+          "insertText": "each_source()"
+        },
+        {
           "label": "file",
           "kind": "method",
           "detail": "(name: 'str') -> 'NotebookFile'",
@@ -153,6 +188,13 @@
           "detail": "list[NotebookFile]",
           "documentation": "Files uploaded to this source, already downloaded and on local disk.\n\nEmpty is a normal state, not an error -- a connector that talks to an API\nhas no files. Order is by name, so a notebook that pairs files with each\nother gets the same pairing every run::\n\n    for file in ctx.files:\n        yield Asset(id=file.name, content=file.parse().text)",
           "insertText": "files"
+        },
+        {
+          "label": "flush_augmentations",
+          "kind": "method",
+          "detail": "() -> 'dict[str, int]'",
+          "documentation": "Send buffered tags and links now. Done for you at the end of ``augment_sources()``.",
+          "insertText": "flush_augmentations()"
         },
         {
           "label": "folder",
@@ -190,11 +232,25 @@
           "insertText": "limit"
         },
         {
+          "label": "link",
+          "kind": "method",
+          "detail": "(source: 'QueriedAsset | str', target: 'QueriedAsset | str', relation: 'str' = 'REFERENCES', *, relation_class: 'str | None' = None, method: 'str | None' = None, confidence: 'float | None' = None, evidence: 'Mapping[str, Any] | None' = None) -> 'None'",
+          "documentation": "Draw a link between two assets of any source: ``source`` --relation--> ``target``.\n\nEither end is a queried asset, an asset id, or a URN. ``relation`` is\ne.g. REFERENCES, SAME_AS, DERIVED_FROM, USES. The edge records this\nsource as its author; one that a connector or a person already holds\nis left as it is.",
+          "insertText": "link(${1:source}, ${2:target})"
+        },
+        {
           "label": "log",
           "kind": "method",
           "detail": "(*parts: 'Any', level: 'str | None' = None) -> 'None'",
           "documentation": "Write a line to the run log. ``level`` (\"warning\", \"error\", \u2026) sets its level there.",
           "insertText": "log()"
+        },
+        {
+          "label": "means",
+          "kind": "method",
+          "detail": "(asset: 'QueriedAsset | str', term: 'str', *, confidence: 'float | None' = None, evidence: 'Mapping[str, Any] | None' = None) -> 'None'",
+          "documentation": "Link an asset to a glossary term by key: \"this asset means that term\".\n\nA term that does not exist yet is held pending and links once defined.",
+          "insertText": "means(${1:asset}, ${2:term})"
         },
         {
           "label": "newest_first",
@@ -227,9 +283,30 @@
         {
           "label": "query_assets",
           "kind": "method",
-          "detail": "(source: 'str', *, kind: 'str | None' = None, where: 'Mapping[str, Mapping[str, Any]] | None' = None, exclude_visited: 'Mapping[str, Any] | None' = None, select: 'Iterable[str]' = (), limit: 'int' = 1000, cursor: 'str | None' = None, cohort: 'bool' = True) -> 'AssetQueryPage'",
-          "documentation": "Read assets another source in this namespace already wrote.\n\nWork the queue of things already known to be interesting instead of\nsweeping an external universe::\n\n    page = ctx.query_assets(\n        \"Firmenbuch Register\",\n        kind=\"record\",\n        where={\"filing_count\": {\"gt\": 0},\n               \"legal_form_code\": {\"in\": [\"GES\", \"AG\", \"SE\", \"FKG\"]}},\n        exclude_visited={\"key\": \"firmenbuchnummer\", \"since_days\": 90},\n        select=[\"firmenbuchnummer\", \"legal_form_code\"],\n        limit=1200,\n    )\n    for company in page.items:\n        fn = company.metadata[\"firmenbuchnummer\"]\n\n``source`` is a source's id or exact name. ``where`` filters metadata\nwith ``eq``, ``in``, ``exists``, ``gt``, ``gte``, ``lt`` and ``lte``;\nvalues compare as JSON, so ``{\"eq\": 5}`` matches the number 5 and not\nthe string \"5\". ``exclude_visited`` leaves out every asset whose\n``metadata[key]`` matches an asset *this* source scanned in the last\n``since_days``. Page with ``cursor=page.next_cursor``.\n\nRead-only, and bounded: at most 5,000 assets a page and 100 calls a run.\nCalling it declares this run's coverage partial, since a connector that\npicks its cohort from a query never sees the rest of its source.\nAvailable during scans only, not when running a cell in the editor.\n\nPass ``cohort=False`` when the query only supplies *inputs* and this run\nstill yields its whole universe -- e.g. Land aggregates computed from\nevery district profile. Coverage then stays complete, so an asset the\nnotebook stops yielding is retired. Without it such a source could never\nretire anything (GENESIS field report P5). Fail the run rather than\nyield a partial universe if the input is incomplete.",
-          "insertText": "query_assets(${1:source})"
+          "detail": "(source: 'str | None' = None, *, kind: 'str | None' = None, where: 'Mapping[str, Mapping[str, Any]] | None' = None, exclude_visited: 'Mapping[str, Any] | None' = None, search: 'str | None' = None, status: 'Iterable[str] | None' = None, term: 'str | Iterable[str] | None' = None, include_narrower: 'bool' = False, findings: 'Mapping[str, Any] | None' = None, semantic: 'str | None' = None, semantic_mode: 'str' = 'hybrid', include: 'Iterable[str]' = (), select: 'Iterable[str]' = (), limit: 'int' = 1000, cursor: 'str | None' = None, cohort: 'bool | None' = None) -> 'AssetQueryPage'",
+          "documentation": "Read assets another source in this namespace already wrote.\n\nWork the queue of things already known to be interesting instead of\nsweeping an external universe::\n\n    page = ctx.query_assets(\n        \"Firmenbuch Register\",\n        kind=\"record\",\n        where={\"filing_count\": {\"gt\": 0},\n               \"legal_form_code\": {\"in\": [\"GES\", \"AG\", \"SE\", \"FKG\"]}},\n        exclude_visited={\"key\": \"firmenbuchnummer\", \"since_days\": 90},\n        select=[\"firmenbuchnummer\", \"legal_form_code\"],\n        limit=1200,\n    )\n    for company in page.items:\n        fn = company.metadata[\"firmenbuchnummer\"]\n\n``source`` is a source's id or exact name; leave it out to read every\nsource in the namespace. Filters combine (all must hold):\n\n- ``where`` filters metadata with ``eq``, ``in``, ``exists``, ``gt``,\n  ``gte``, ``lt`` and ``lte``; values compare as JSON, so\n  ``{\"eq\": 5}`` matches the number 5 and not the string \"5\".\n- ``exclude_visited`` leaves out every asset whose ``metadata[key]``\n  matches an asset *this* source scanned in the last ``since_days``.\n- ``search`` matches the name, case-insensitively; ``semantic`` ranks\n  by meaning (``semantic_mode`` is \"hybrid\" or \"vector\"), best first,\n  over at most 200 assets.\n- ``term`` keeps assets currently linked to glossary term keys (with\n  ``include_narrower``, to their narrower terms too).\n- ``findings`` keeps assets that have findings matching, e.g.\n  ``{\"detector\": \"pii-email\", \"severity\": [\"HIGH\", \"CRITICAL\"]}``;\n  see :meth:`query_findings` for the keys. Open findings unless\n  ``status`` is given there.\n- ``include=(\"findings\",)`` returns each asset's first open findings.\n\nAlways paged: at most 5,000 assets a page, as many pages as you need;\n``cursor=page.next_cursor`` continues the *same* query. Read-only.\nAvailable during scans only, not when running a cell in the editor.\n\nCalling it from ``extract()`` declares this run's coverage partial,\nsince a connector that picks its cohort from a query never sees the\nrest of its source. Pass ``cohort=False`` when the query only supplies\n*inputs* and this run still yields its whole universe -- e.g. Land\naggregates computed from every district profile. Coverage then stays\ncomplete, so an asset the notebook stops yielding is retired. Inside\n``augment_sources()`` the default is ``cohort=False``: an augmentation\nowns no cohort. Fail the run rather than yield a partial universe if\nthe input is incomplete.",
+          "insertText": "query_assets()"
+        },
+        {
+          "label": "query_detectors",
+          "kind": "method",
+          "detail": "(*, type: 'str | Iterable[str] | None' = None, include_inactive: 'bool' = False, limit: 'int' = 1000, cursor: 'str | None' = None) -> 'DetectorPage'",
+          "documentation": "The namespace's custom detectors: key, name, type. Never the pipeline.",
+          "insertText": "query_detectors()"
+        },
+        {
+          "label": "query_findings",
+          "kind": "method",
+          "detail": "(*, detector: 'str | Iterable[str] | None' = None, detector_type: 'str | Iterable[str] | None' = None, finding_type: 'str | Iterable[str] | None' = None, severity: 'str | Iterable[str] | None' = None, status: 'str | Iterable[str] | None' = None, source: 'str | Iterable[str] | None' = None, asset: 'str | Iterable[str] | None' = None, asserted_by: 'str | Iterable[str] | None' = None, limit: 'int' = 1000, cursor: 'str | None' = None) -> 'FindingPage'",
+          "documentation": "Findings of the namespace, from a detector, or of a source or asset.\n\n``detector`` is a custom detector's key (see :meth:`query_detectors`),\n``detector_type`` a built-in type such as \"PII\"; ``source`` and\n``asset`` take ids. Only OPEN findings unless ``status`` says otherwise.\n``asserted_by`` keeps what another source's notebook tagged. Walk from\na detector to its assets with ``ctx.query_assets(findings={\"detector\":\nkey})``. Always paged; see :meth:`query_assets` for the cursor.",
+          "insertText": "query_findings()"
+        },
+        {
+          "label": "query_sources",
+          "kind": "method",
+          "detail": "(*, search: 'str | None' = None, type: 'str | Iterable[str] | None' = None, status: 'str | Iterable[str] | None' = None, limit: 'int' = 1000, cursor: 'str | None' = None) -> 'SourcePage'",
+          "documentation": "List the namespace's sources, not scan them.\n\n``type`` is a source type such as \"POSTGRESQL\" and ``status`` the status\nof the source's latest run. The result never carries configuration or\ncredentials. Always paged; see :meth:`query_assets` for the cursor.",
+          "insertText": "query_sources()"
         },
         {
           "label": "sampling",
@@ -267,6 +344,13 @@
           "insertText": "set_partial_coverage()"
         },
         {
+          "label": "set_phase",
+          "kind": "method",
+          "detail": "(phase: 'str') -> 'None'",
+          "documentation": "Runtime-only: which entry point is running (\"extract\" or \"augment\").",
+          "insertText": "set_phase(${1:phase})"
+        },
+        {
           "label": "should_abort",
           "kind": "property",
           "detail": "bool",
@@ -279,6 +363,27 @@
           "detail": "str",
           "documentation": "",
           "insertText": "strategy"
+        },
+        {
+          "label": "swap_partial_coverage",
+          "kind": "method",
+          "detail": "(flag: 'bool', reason: 'str' = '') -> 'tuple[bool, str]'",
+          "documentation": "Runtime-only: replace the partial-coverage verdict, returning the old one.\n\nLets the runtime judge ``augment_sources()`` on its own: what ``extract()``\ndeclared about its assets says nothing about whether the augmentation\ncovered everything it meant to.",
+          "insertText": "swap_partial_coverage(${1:flag})"
+        },
+        {
+          "label": "tag",
+          "kind": "method",
+          "detail": "(asset: 'QueriedAsset | str', key: 'str', value: 'Any', severity: 'str | None' = None) -> 'None'",
+          "documentation": "Tag an asset of another source.\n\n``key`` is an active Tag detector's key (``ctx.query_detectors(type=\"TAG\")``)\nand ``value`` what to assert, or a ``Tag(value, severity)``. The tag is\nrecorded as asserted by *this* source, so it never overwrites the asset's\nown tags or another source's, and is retired when a later complete run\nof this source stops asserting it. Several values under one key are\njoined with \", \", as in ``Asset(tags=...)``. Buffered; sent in batches\nand at the end of ``augment_sources()``.",
+          "insertText": "tag(${1:asset}, ${2:key}, ${3:value})"
+        },
+        {
+          "label": "tags",
+          "kind": "method",
+          "detail": "(asset: 'QueriedAsset | str', tags: 'Mapping[str, Any]') -> 'None'",
+          "documentation": "``ctx.tag()`` for several keys at once: ``ctx.tags(asset, {\"qa\": \"reviewed\"})``.",
+          "insertText": "tags(${1:asset}, ${2:tags})"
         },
         {
           "label": "var",
@@ -986,7 +1091,8 @@
     "optional": [
       "discover",
       "fetch_content",
-      "relationships"
+      "relationships",
+      "augment_sources"
     ],
     "augmentation": {
       "required": [

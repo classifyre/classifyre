@@ -277,6 +277,11 @@ describe('NotebookService', () => {
       for (const template of service.templates()) {
         const code = template.cells.map((cell) => cell.source).join('\n');
         for (const name of REQUIRED_FUNCTIONS) {
+          // A notebook that only augments other sources owns no assets, so it
+          // may define augment_sources() instead of extract().
+          if (name === 'extract' && code.includes('def augment_sources(')) {
+            continue;
+          }
           expect(code).toContain(`def ${name}(`);
         }
       }

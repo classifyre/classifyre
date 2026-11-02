@@ -723,9 +723,11 @@ export class RunnerQueuePositionDto {
 /** `ctx.query_assets()` from a CUSTOM notebook, relayed by the CLI. */
 export class RunnerAssetQueryDto {
   @ApiProperty({
-    description: 'Id or exact name of the source whose assets to read.',
+    required: false,
+    description:
+      'Id or exact name of the source whose assets to read. Leave out to read every source in the namespace.',
   })
-  source!: string;
+  source?: string;
 
   @ApiProperty({
     required: false,
@@ -757,23 +759,88 @@ export class RunnerAssetQueryDto {
   })
   select?: string[];
 
+  @ApiProperty({
+    required: false,
+    description: 'Case-insensitive match on the asset name.',
+  })
+  search?: string;
+
+  @ApiProperty({
+    required: false,
+    type: [String],
+    description:
+      'Asset statuses (NEW, UPDATED, UNCHANGED, DELETED). Default: all but DELETED.',
+  })
+  status?: string[];
+
+  @ApiProperty({
+    required: false,
+    type: Object,
+    description:
+      'Assets with a current link to glossary terms: {"keys": ["pii"], "includeNarrower": true, "methods": ["DECLARED"]}.',
+  })
+  term?: { keys: string[]; includeNarrower?: boolean; methods?: string[] };
+
+  @ApiProperty({
+    required: false,
+    type: Object,
+    description:
+      'Assets that have findings matching: {"detectorType": [...], "customDetectorKey": [...], "findingType": [...], "severity": [...], "status": [...] (default OPEN), "assertedBySourceId": [...]}.',
+  })
+  findings?: Record<string, string[]>;
+
+  @ApiProperty({
+    required: false,
+    type: Object,
+    description:
+      'Meaning search, best match first: {"query": "...", "mode": "hybrid" | "vector"}. Ranks at most 200 assets; page with the returned cursor.',
+  })
+  semantic?: { query: string; mode?: string };
+
+  @ApiProperty({
+    required: false,
+    type: [String],
+    description: 'Extras per asset. "findings": its first 50 open findings.',
+  })
+  include?: string[];
+
   @ApiProperty({ required: false, default: 1000, maximum: 5000 })
   limit?: number;
 
   @ApiProperty({
     required: false,
-    description: 'nextCursor from the previous page.',
+    description: 'nextCursor from the previous page of the same query.',
   })
   cursor?: string;
 }
 
+export class RunnerAssetFindingSummaryDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() detectorType!: string;
+  @ApiProperty({ nullable: true, type: String }) customDetectorKey!:
+    | string
+    | null;
+  @ApiProperty() findingType!: string;
+  @ApiProperty() severity!: string;
+  @ApiProperty() status!: string;
+  @ApiProperty({ nullable: true, type: String }) assertedBySourceId!:
+    | string
+    | null;
+}
+
 export class RunnerAssetQueryItemDto {
+  @ApiProperty() id!: string;
   @ApiProperty() assetHash!: string;
+  @ApiProperty({ nullable: true, type: String }) urn!: string | null;
+  @ApiProperty() sourceId!: string;
+  @ApiProperty() sourceName!: string;
   @ApiProperty({ nullable: true, type: String }) externalId!: string | null;
   @ApiProperty() name!: string;
   @ApiProperty() kind!: string;
   @ApiProperty() url!: string;
   @ApiProperty({ type: Object }) metadata!: Record<string, unknown>;
+  @ApiProperty({ required: false, type: [RunnerAssetFindingSummaryDto] })
+  findings?: RunnerAssetFindingSummaryDto[];
 }
 
 export class RunnerAssetQueryResponseDto {
@@ -782,7 +849,187 @@ export class RunnerAssetQueryResponseDto {
 
   @ApiProperty({ nullable: true, type: String })
   nextCursor!: string | null;
+}
 
-  @ApiProperty({ description: 'Asset queries this run has left.' })
-  callsRemaining!: number;
+/** `ctx.query_sources()`: which sources exist. Never returns configuration. */
+export class RunnerSourceQueryDto {
+  @ApiProperty({ required: false }) search?: string;
+  @ApiProperty({
+    required: false,
+    type: [String],
+    description: 'Source types, e.g. POSTGRESQL.',
+  })
+  type?: string[];
+  @ApiProperty({
+    required: false,
+    type: [String],
+    description: 'Latest run status.',
+  })
+  status?: string[];
+  @ApiProperty({ required: false, default: 1000, maximum: 5000 })
+  limit?: number;
+  @ApiProperty({ required: false }) cursor?: string;
+}
+
+export class RunnerSourceItemDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() name!: string;
+  @ApiProperty() type!: string;
+  @ApiProperty({ nullable: true, type: String }) description!: string | null;
+  @ApiProperty({ nullable: true, type: String }) runnerStatus!: string | null;
+  @ApiProperty() createdAt!: string;
+  @ApiProperty() updatedAt!: string;
+}
+
+export class RunnerSourceQueryResponseDto {
+  @ApiProperty({ type: [RunnerSourceItemDto] }) items!: RunnerSourceItemDto[];
+  @ApiProperty({ nullable: true, type: String }) nextCursor!: string | null;
+}
+
+/** `ctx.query_findings()`: findings by detector, type, severity, source or asset. */
+export class RunnerFindingQueryDto {
+  @ApiProperty({ required: false, type: [String] }) detectorType?: string[];
+  @ApiProperty({ required: false, type: [String] })
+  customDetectorKey?: string[];
+  @ApiProperty({ required: false, type: [String] }) findingType?: string[];
+  @ApiProperty({ required: false, type: [String] }) severity?: string[];
+  @ApiProperty({
+    required: false,
+    type: [String],
+    description: 'Default: OPEN.',
+  })
+  status?: string[];
+  @ApiProperty({ required: false, type: [String] }) sourceId?: string[];
+  @ApiProperty({ required: false, type: [String] }) assetId?: string[];
+  @ApiProperty({ required: false, type: [String] })
+  assertedBySourceId?: string[];
+  @ApiProperty({ required: false, default: 1000, maximum: 5000 })
+  limit?: number;
+  @ApiProperty({ required: false }) cursor?: string;
+}
+
+export class RunnerFindingItemDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() assetId!: string;
+  @ApiProperty() sourceId!: string;
+  @ApiProperty() detectorType!: string;
+  @ApiProperty({ nullable: true, type: String }) customDetectorKey!:
+    | string
+    | null;
+  @ApiProperty({ nullable: true, type: String }) customDetectorName!:
+    | string
+    | null;
+  @ApiProperty() findingType!: string;
+  @ApiProperty() category!: string;
+  @ApiProperty() severity!: string;
+  @ApiProperty() status!: string;
+  @ApiProperty() confidence!: number;
+  @ApiProperty({ nullable: true, type: String }) content!: string | null;
+  @ApiProperty({ nullable: true, type: Object }) metadata!: Record<
+    string,
+    unknown
+  > | null;
+  @ApiProperty({ nullable: true, type: String }) assertedBySourceId!:
+    | string
+    | null;
+  @ApiProperty({ nullable: true, type: String }) firstDetectedAt!:
+    | string
+    | null;
+  @ApiProperty({ nullable: true, type: String }) lastDetectedAt!: string | null;
+}
+
+export class RunnerFindingQueryResponseDto {
+  @ApiProperty({ type: [RunnerFindingItemDto] }) items!: RunnerFindingItemDto[];
+  @ApiProperty({ nullable: true, type: String }) nextCursor!: string | null;
+}
+
+/** `ctx.query_detectors()`: custom detectors, without their pipelines. */
+export class RunnerDetectorQueryDto {
+  @ApiProperty({
+    required: false,
+    type: [String],
+    description: 'Detector types, e.g. TAG, REGEX.',
+  })
+  type?: string[];
+  @ApiProperty({ required: false }) includeInactive?: boolean;
+  @ApiProperty({ required: false, default: 1000, maximum: 5000 })
+  limit?: number;
+  @ApiProperty({ required: false }) cursor?: string;
+}
+
+export class RunnerDetectorItemDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() key!: string;
+  @ApiProperty() name!: string;
+  @ApiProperty({ nullable: true, type: String }) description!: string | null;
+  @ApiProperty() type!: string;
+  @ApiProperty() isActive!: boolean;
+  @ApiProperty() version!: number;
+}
+
+export class RunnerDetectorQueryResponseDto {
+  @ApiProperty({ type: [RunnerDetectorItemDto] })
+  items!: RunnerDetectorItemDto[];
+  @ApiProperty({ nullable: true, type: String }) nextCursor!: string | null;
+}
+
+export class RunnerAugmentationTagDto {
+  @ApiProperty({ description: 'Platform id of the asset (QueriedAsset.id).' })
+  assetId!: string;
+  @ApiProperty({ description: 'Key of an active Tag detector.' }) key!: string;
+  @ApiProperty() value!: string;
+  @ApiProperty({
+    required: false,
+    description: 'Lowered to the Tag detector severity when it asks for more.',
+  })
+  severity?: string;
+}
+
+/** `ctx.tag()` / `ctx.tags()` from a CUSTOM notebook: tags on assets of other sources. */
+export class RunnerAugmentationTagsDto {
+  @ApiProperty({ type: [RunnerAugmentationTagDto] })
+  tags!: RunnerAugmentationTagDto[];
+}
+
+export class RunnerAugmentationEdgeDto {
+  @ApiProperty({ required: false }) fromId?: string;
+  @ApiProperty({ required: false }) toId?: string;
+  @ApiProperty({
+    required: false,
+    description: 'URN, or term://glossary/<key>.',
+  })
+  fromUrn?: string;
+  @ApiProperty({
+    required: false,
+    description: 'URN, or term://glossary/<key>.',
+  })
+  toUrn?: string;
+  @ApiProperty() relationType!: string;
+  @ApiProperty({ required: false }) relationClass?: string;
+  @ApiProperty({ required: false }) method?: string;
+  @ApiProperty({ required: false }) confidence?: number;
+  @ApiProperty({ required: false, type: Object }) evidence?: Record<
+    string,
+    unknown
+  >;
+}
+
+/** `ctx.link()` / `ctx.means()` from a CUSTOM notebook. */
+export class RunnerAugmentationEdgesDto {
+  @ApiProperty({ type: [RunnerAugmentationEdgeDto] })
+  edges!: RunnerAugmentationEdgeDto[];
+}
+
+export class RunnerAugmentationResultDto {
+  @ApiProperty() written!: number;
+  @ApiProperty({
+    required: false,
+    description: 'Rows owned by someone else, left as they were.',
+  })
+  skipped?: number;
+}
+
+export class RunnerAugmentationFinishDto {
+  @ApiProperty() retiredTags!: number;
+  @ApiProperty() retiredEdges!: number;
 }

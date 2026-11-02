@@ -52,9 +52,21 @@ import {
   RunnerAssetProgressDto,
   RunnerQueuePositionDto,
   RunnerAssetQueryDto,
+  RunnerAugmentationEdgesDto,
+  RunnerAugmentationFinishDto,
+  RunnerAugmentationResultDto,
+  RunnerAugmentationTagsDto,
+  RunnerDetectorQueryDto,
+  RunnerDetectorQueryResponseDto,
+  RunnerFindingQueryDto,
+  RunnerFindingQueryResponseDto,
+  RunnerSourceQueryDto,
+  RunnerSourceQueryResponseDto,
   RunnerAssetQueryResponseDto,
 } from './dto';
 import { RunnerAssetQueryService } from './runner-asset-query.service';
+import { RunnerCatalogQueryService } from './runner-catalog-query.service';
+import { RunnerAugmentationService } from './runner-augmentation.service';
 import {
   BulkStopRunnersDto,
   BulkDeleteRunnersDto,
@@ -76,6 +88,8 @@ export class CliRunnerController {
   constructor(
     private cliRunnerService: CliRunnerService,
     private readonly runnerAssetQuery: RunnerAssetQueryService,
+    private readonly runnerCatalogQuery: RunnerCatalogQueryService,
+    private readonly runnerAugmentation: RunnerAugmentationService,
   ) {}
 
   @BlockWhenPaused()
@@ -289,7 +303,7 @@ export class CliRunnerController {
     description:
       'Backs ctx.query_assets() in CUSTOM notebooks. Internal: the CLI relays the ' +
       'call so the notebook never holds API credentials. Only while the run is ' +
-      'RUNNING; at most 100 calls per run, 5,000 assets per page, 15 s per query.',
+      'RUNNING; every read pages by cursor, at most 5,000 assets per page, 15 s per query.',
   })
   @ApiBody({ type: RunnerAssetQueryDto })
   @ApiResponse({ status: 200, type: RunnerAssetQueryResponseDto })
@@ -298,6 +312,112 @@ export class CliRunnerController {
     @Body() body: RunnerAssetQueryDto,
   ): Promise<RunnerAssetQueryResponseDto> {
     return this.runnerAssetQuery.query(runnerId, body);
+  }
+
+  @UseGuards(CliBackpressureGuard)
+  @InternalOnly()
+  @Post('runners/:runnerId/sources/query')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'List sources of this namespace, for a running connector',
+    description:
+      'Backs ctx.query_sources() in CUSTOM notebooks. Internal. Never returns a source configuration. Pages by cursor, at most 5,000 per page.',
+  })
+  @ApiBody({ type: RunnerSourceQueryDto })
+  @ApiResponse({ status: 200, type: RunnerSourceQueryResponseDto })
+  async querySources(
+    @Param('runnerId') runnerId: string,
+    @Body() body: RunnerSourceQueryDto,
+  ): Promise<RunnerSourceQueryResponseDto> {
+    return this.runnerCatalogQuery.sources(runnerId, body);
+  }
+
+  @UseGuards(CliBackpressureGuard)
+  @InternalOnly()
+  @Post('runners/:runnerId/findings/query')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Read findings of this namespace, for a running connector',
+    description:
+      'Backs ctx.query_findings(). Internal. Filter by detector, type, severity, status, source or asset; pages by cursor, at most 5,000 per page.',
+  })
+  @ApiBody({ type: RunnerFindingQueryDto })
+  @ApiResponse({ status: 200, type: RunnerFindingQueryResponseDto })
+  async queryFindings(
+    @Param('runnerId') runnerId: string,
+    @Body() body: RunnerFindingQueryDto,
+  ): Promise<RunnerFindingQueryResponseDto> {
+    return this.runnerCatalogQuery.findings(runnerId, body);
+  }
+
+  @UseGuards(CliBackpressureGuard)
+  @InternalOnly()
+  @Post('runners/:runnerId/detectors/query')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'List custom detectors, for a running connector',
+    description:
+      'Backs ctx.query_detectors(). Internal. Never returns a detector pipeline or its secrets.',
+  })
+  @ApiBody({ type: RunnerDetectorQueryDto })
+  @ApiResponse({ status: 200, type: RunnerDetectorQueryResponseDto })
+  async queryDetectors(
+    @Param('runnerId') runnerId: string,
+    @Body() body: RunnerDetectorQueryDto,
+  ): Promise<RunnerDetectorQueryResponseDto> {
+    return this.runnerCatalogQuery.detectors(runnerId, body);
+  }
+
+  @UseGuards(CliBackpressureGuard)
+  @InternalOnly()
+  @Post('runners/:runnerId/augmentations/tags')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Tag assets of other sources, for a running connector',
+    description:
+      'Backs ctx.tag(). Internal. Each tag is a finding of an active Tag detector, stamped with the calling source and run so the same source can retire it later.',
+  })
+  @ApiBody({ type: RunnerAugmentationTagsDto })
+  @ApiResponse({ status: 200, type: RunnerAugmentationResultDto })
+  async augmentTags(
+    @Param('runnerId') runnerId: string,
+    @Body() body: RunnerAugmentationTagsDto,
+  ): Promise<RunnerAugmentationResultDto> {
+    return this.runnerAugmentation.tags(runnerId, body);
+  }
+
+  @UseGuards(CliBackpressureGuard)
+  @InternalOnly()
+  @Post('runners/:runnerId/augmentations/edges')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Link assets and glossary terms, for a running connector',
+    description:
+      'Backs ctx.link() and ctx.means(). Internal. Edges are stamped with the calling source and run; an edge another owner already holds is left alone.',
+  })
+  @ApiBody({ type: RunnerAugmentationEdgesDto })
+  @ApiResponse({ status: 200, type: RunnerAugmentationResultDto })
+  async augmentEdges(
+    @Param('runnerId') runnerId: string,
+    @Body() body: RunnerAugmentationEdgesDto,
+  ): Promise<RunnerAugmentationResultDto> {
+    return this.runnerAugmentation.edges(runnerId, body);
+  }
+
+  @UseGuards(CliBackpressureGuard)
+  @InternalOnly()
+  @Post('runners/:runnerId/augmentations/finish')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Retire what this source stopped asserting',
+    description:
+      'Called after a notebook finished augmenting without error: resolves tags and removes edges this source wrote in earlier runs and did not write in this one. Never touches rows written by anyone else.',
+  })
+  @ApiResponse({ status: 200, type: RunnerAugmentationFinishDto })
+  async finishAugmentation(
+    @Param('runnerId') runnerId: string,
+  ): Promise<RunnerAugmentationFinishDto> {
+    return this.runnerAugmentation.finish(runnerId);
   }
 
   @AllowInDemoMode()

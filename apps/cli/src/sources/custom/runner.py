@@ -104,8 +104,9 @@ def _need(op: str, args: dict[str, Any]) -> Any:
     return frame.get("value")
 
 
-def _query_assets(args: dict[str, Any]) -> Any:
-    return _need("query_assets", args)
+def _relay(op: str, args: dict[str, Any]) -> Any:
+    """Every read and write a notebook makes of the namespace goes through here."""
+    return _need(op, args)
 
 
 def _error_payload(exc: BaseException) -> dict[str, Any]:
@@ -159,7 +160,7 @@ class NotebookRuntime:
             folders=local_folders(recipe),
             logger=self._log,
             should_abort=_aborted,
-            query_assets=_query_assets,
+            relay=_relay,
             cohort_weights=cohort_weights if isinstance(cohort_weights, dict) else None,
             config_changed=config_changed,
         )
@@ -239,6 +240,17 @@ class NotebookRuntime:
         # The window belongs to this run, not to the process, so it is set here
         # rather than at construction.
         self.context.set_offset(offset)
+        if not callable(self.globals.get("extract")):
+            # An augmentation-only notebook: it owns no assets.
+            return {
+                "produced": 0,
+                "seen": 0,
+                "aborted": False,
+                "cursor": self.context.next_cursor,
+                "partialCoverage": False,
+                "partialCoverageReason": "",
+                "cohortStats": self.context.cohort_stats,
+            }
         if sampling == "reservoir" and limit:
             return self._extract_reservoir(limit)
         return self._extract_window(skip=skip, limit=limit)
@@ -313,6 +325,50 @@ class NotebookRuntime:
             "cohortStats": self.context.cohort_stats,
         }
 
+    def augment(self) -> dict[str, Any]:
+        """Run ``augment_sources()``: tag and link assets of other sources.
+
+        Writes are buffered by ``ctx.tag()`` / ``ctx.link()`` and flushed here.
+        What this source asserted in earlier runs and did not assert now is
+        retired only when the notebook finished the whole job: not aborted, and
+        not declared partial -- an interrupted or partial run says nothing about
+        what should still hold.
+        """
+        function = self.globals.get("augment_sources")
+        if not callable(function):
+            return {"ran": False}
+        self.context.set_phase("augment")
+        extract_verdict = self.context.swap_partial_coverage(False)
+        try:
+            result = function()
+            if result is not None and hasattr(result, "__next__"):
+                for _ in result:  # a generator is allowed, its yields ignored
+                    if _aborted():
+                        break
+            stats = self.context.flush_augmentations()
+        finally:
+            self.context.set_phase("extract")
+            augment_partial = self.context.swap_partial_coverage(*extract_verdict)
+        finished = not _aborted() and not augment_partial[0]
+        retired: dict[str, Any] = {}
+        if finished:
+            retired = _need("augment_finish", {}) or {}
+        return {
+            "ran": True,
+            "aborted": _aborted(),
+            "tags": stats["tags"],
+            "edges": stats["edges"],
+            "skipped": stats["skipped"],
+            "retired": retired,
+            "retireSkippedReason": (
+                None
+                if finished
+                else "stopped early"
+                if _aborted()
+                else augment_partial[1] or "partial coverage"
+            ),
+        }
+
     def relationships(self) -> list[dict[str, Any]]:
         """Typed relationships the notebook declared, if it declared any.
 
@@ -365,6 +421,8 @@ def _handle(runtime: NotebookRuntime, request: dict[str, Any]) -> dict[str, Any]
             sampling=str(request.get("sampling") or "window"),
             offset=int(request.get("offset") or 0),
         )
+    if command == "augment":
+        return {"result": runtime.augment()}
     if command == "relationships":
         return {"result": runtime.relationships()}
     if command == "fetch_content":

@@ -459,7 +459,15 @@ export const TRANSFER_TABLES: readonly TransferTableSpec[] = [
   // ── Findings and their evidence ───────────────────────────────────────────
   {
     model: 'finding',
-    idRefs: ['id', 'assetId', 'sourceId', 'customDetectorId', 'runnerId'],
+    idRefs: [
+      'id',
+      'assetId',
+      'sourceId',
+      'customDetectorId',
+      'runnerId',
+      'assertedBySourceId',
+      'assertedByRunnerId',
+    ],
     scope: 'findings',
     order: 300,
     keys: ['id'],
@@ -558,7 +566,13 @@ export const TRANSFER_TABLES: readonly TransferTableSpec[] = [
     scope: 'fingerprints',
     order: 450,
     keys: ['id'],
-    idRefs: ['id', 'fromId', 'toId'],
+    idRefs: [
+      'id',
+      'fromId',
+      'toId',
+      'assertedBySourceId',
+      'assertedByRunnerId',
+    ],
   },
 
   // ── Investigations ────────────────────────────────────────────────────────

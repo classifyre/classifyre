@@ -4366,7 +4366,8 @@
         "Author code detectors (CODE_DETECTOR): create/update needs this group, preview detect() on a real asset, manage the files the rule reads",
         "Read and edit notebook cells, packages, and local folders",
         "Upload input files and manage declared dependencies",
-        "Run a single cell, a connection test, or the whole notebook, then poll for output and errors"
+        "Run a single cell, a connection test, or the whole notebook, then poll for output and errors",
+        "Query other sources from a notebook and tag/link their assets (augment_sources), inspect or retract what a source wrote"
       ],
       "tools": [
         {
@@ -4724,6 +4725,72 @@
               "name": "maxAssets",
               "type": "integer",
               "required": false
+            }
+          ]
+        },
+        {
+          "name": "describe_notebook_cross_source",
+          "title": "Describe Cross-Source Notebook SDK",
+          "description": "Reference for writing a CUSTOM notebook that queries other sources and tags/links their assets: the ctx.query_* reads, ctx.tag/ctx.link/ctx.means writes, provenance and retire rules. Read it before authoring augment_sources(). Starter examples: get_source_schema type=CUSTOM -> \"Query other sources\" and \"Augment other sources\".",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": []
+        },
+        {
+          "name": "list_source_augmentations",
+          "title": "List Source Augmentations",
+          "description": "What a source's notebooks put onto assets of OTHER sources: kind \"tags\" (findings with the target asset, tag key and value) or kind \"edges\" (links and glossary links). Paged by cursor.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "source_id",
+              "type": "string",
+              "required": true,
+              "description": "The augmenting (writing) source"
+            },
+            {
+              "name": "kind",
+              "type": "enum",
+              "required": true,
+              "enumValues": [
+                "tags",
+                "edges"
+              ]
+            },
+            {
+              "name": "limit",
+              "type": "integer",
+              "required": false
+            },
+            {
+              "name": "cursor",
+              "type": "string",
+              "required": false,
+              "description": "nextCursor of the previous page"
+            }
+          ]
+        },
+        {
+          "name": "retract_source_augmentations",
+          "title": "Retract Source Augmentations",
+          "description": "Take back everything a source's notebooks put onto other sources' assets: its tags resolve and its links are removed. Anything a connector, a person or another source wrote is untouched. The source asserts again on its next run if its notebook still means it.",
+          "readOnly": false,
+          "destructive": true,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "source_id",
+              "type": "string",
+              "required": true
+            },
+            {
+              "name": "confirm",
+              "type": "boolean",
+              "required": true,
+              "description": "Must be true — acknowledges the retraction"
             }
           ]
         },

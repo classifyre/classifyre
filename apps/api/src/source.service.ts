@@ -329,6 +329,10 @@ export class SourceService {
         DELETE FROM edges e USING assets a
          WHERE a.source_id = ${sourceId}
            AND e.to_type = 'asset' AND e.to_id = a.id`;
+      // What this source's notebooks linked on other sources' assets goes with
+      // it; its tags are findings and cascade through their own foreign key.
+      await tx.$executeRaw`
+        DELETE FROM edges WHERE asserted_by_source_id = ${sourceId}`;
       return tx.source.delete({ where });
     });
     await this.correlationJobs.scheduleFull('source deleted');
@@ -362,6 +366,83 @@ export class SourceService {
     await this.correlationJobs.scheduleFull('source findings purged');
 
     return { purgedFindings: result.count };
+  }
+
+  /**
+   * What a source's notebooks put onto assets of other sources: tags (kind
+   * "tags") or links (kind "edges"), one page by cursor.
+   */
+  async listAugmentations(
+    sourceId: string,
+    kind: 'tags' | 'edges',
+    limit = 100,
+    cursor?: string,
+  ): Promise<{
+    items: Array<Record<string, unknown>>;
+    nextCursor: string | null;
+  }> {
+    const take = Math.min(Math.max(Math.trunc(limit) || 100, 1), 1000);
+    const after = cursor ?? '';
+    const rows =
+      kind === 'tags'
+        ? await this.prisma.$queryRaw<
+            Array<Record<string, unknown> & { id: string }>
+          >`
+            SELECT f.id, f.asset_id AS "assetId", a.name AS "assetName",
+                   f.source_id AS "targetSourceId", s.name AS "targetSourceName",
+                   f.custom_detector_key AS "tagKey",
+                   f.metadata ->> 'tag_value' AS value,
+                   f.severity::text AS severity, f.status::text AS status,
+                   f.asserted_by_runner_id AS "runnerId"
+            FROM findings f
+            JOIN assets a ON a.id = f.asset_id
+            JOIN sources s ON s.id = f.source_id
+            WHERE f.asserted_by_source_id = ${sourceId} AND f.id > ${after}
+            ORDER BY f.id LIMIT ${take + 1}`
+        : await this.prisma.$queryRaw<
+            Array<Record<string, unknown> & { id: string }>
+          >`
+            SELECT e.id, e.from_type AS "fromType", e.from_id AS "fromId",
+                   e.to_type AS "toType", e.to_id AS "toId",
+                   e.relation_type AS "relationType",
+                   e.asserted_by_runner_id AS "runnerId",
+                   e.last_seen_at AS "lastSeenAt"
+            FROM edges e
+            WHERE e.asserted_by_source_id = ${sourceId} AND e.id > ${after}
+            ORDER BY e.id LIMIT ${take + 1}`;
+    const page = rows.slice(0, take);
+    return {
+      items: page,
+      nextCursor:
+        rows.length > take ? (page[page.length - 1]?.id ?? null) : null,
+    };
+  }
+
+  /**
+   * Take back everything a source's notebooks put onto other sources' assets:
+   * its tags resolve, its links go. Anything a connector or a person wrote is
+   * untouched. The source's next augmenting run asserts again what it still
+   * means.
+   */
+  async retractAugmentations(
+    sourceId: string,
+  ): Promise<{ retiredTags: number; retiredEdges: number }> {
+    const source = await this.prisma.source.findUnique({
+      where: { id: sourceId },
+      select: { id: true },
+    });
+    if (!source) {
+      throw new NotFoundException(`Source with ID ${sourceId} not found`);
+    }
+    const retiredTags = await this.prisma.$executeRaw`
+      UPDATE findings SET status = 'RESOLVED'::"FindingStatus", resolved_at = now(),
+             resolution_reason = 'Retracted: the source that tagged it was asked to take its tags back',
+             updated_at = now()
+       WHERE asserted_by_source_id = ${sourceId} AND status = 'OPEN'::"FindingStatus"`;
+    const retiredEdges = await this.prisma.$executeRaw`
+      DELETE FROM edges WHERE asserted_by_source_id = ${sourceId}
+        AND origin <> 'MANUAL'::"EdgeOrigin"`;
+    return { retiredTags, retiredEdges };
   }
 
   /**

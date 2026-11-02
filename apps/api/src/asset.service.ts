@@ -2560,6 +2560,9 @@ export class AssetService {
         sourceId,
         status: FindingStatus.OPEN,
         runnerId: { not: runnerId },
+        // A tag another source's notebook put here (ctx.tag()) is that
+        // source's to retire, not this scan's: its silence says nothing.
+        assertedBySourceId: null,
         asset: {
           runnerId,
           status: { not: AssetStatus.DELETED },
@@ -2675,6 +2678,7 @@ export class AssetService {
       where: {
         sourceId: source.id,
         status: FindingStatus.OPEN,
+        assertedBySourceId: null,
         OR: orphanedDetectorWhere(configuredKeys),
       },
       _count: { _all: true },
@@ -2746,6 +2750,7 @@ export class AssetService {
         where: {
           sourceId: source.id,
           status: FindingStatus.OPEN,
+          assertedBySourceId: null,
           OR: identityWhere,
           ...(cursor ? { id: { gt: cursor } } : {}),
         },

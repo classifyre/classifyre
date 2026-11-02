@@ -1,20 +1,19 @@
 import {
   BadRequestException,
   ConflictException,
-  HttpException,
   NotFoundException,
 } from '@nestjs/common';
 import { RunnerStatus } from '@prisma/client';
 
 import type { PrismaService } from '../prisma.service';
-import {
-  ASSET_QUERY_CALLS_PER_RUN,
-  RunnerAssetQueryService,
-} from './runner-asset-query.service';
+import { RunnerAssetQueryService } from './runner-asset-query.service';
 
 type Row = {
   id: string;
   hash: string;
+  urn: string | null;
+  sourceId: string;
+  sourceName: string;
   name: string;
   kind: string;
   url: string;
@@ -29,6 +28,9 @@ const UUID_C = '33333333-3333-4333-8333-333333333333';
 const row = (id: string): Row => ({
   id,
   hash: `hash-${id}`,
+  urn: `urn:test:${id}`,
+  sourceId: 'src-register',
+  sourceName: 'Firmenbuch Register',
   name: `Company ${id}`,
   kind: 'record',
   url: `https://example.com/${id}`,
@@ -38,10 +40,9 @@ const row = (id: string): Row => ({
 
 describe('RunnerAssetQueryService', () => {
   let rows: Row[];
-  let queryCalls: number;
   let tx: { $executeRaw: jest.Mock; $queryRaw: jest.Mock };
   let prisma: {
-    runner: { findUnique: jest.Mock; update: jest.Mock };
+    runner: { findUnique: jest.Mock };
     source: { findMany: jest.Mock };
     $transaction: jest.Mock;
   };
@@ -81,7 +82,6 @@ describe('RunnerAssetQueryService', () => {
 
   beforeEach(() => {
     rows = [row(UUID_A), row(UUID_B), row(UUID_C)];
-    queryCalls = 0;
     tx = {
       $executeRaw: jest.fn().mockResolvedValue(0),
       $queryRaw: jest.fn(() => Promise.resolve(rows)),
@@ -92,11 +92,6 @@ describe('RunnerAssetQueryService', () => {
           id: 'run-fin',
           status: RunnerStatus.RUNNING,
           sourceId: 'src-financials',
-        }),
-        // The persisted budget: one atomic increment per call.
-        update: jest.fn().mockImplementation(() => {
-          queryCalls += 1;
-          return Promise.resolve({ assetQueryCalls: queryCalls });
         }),
       },
       source: {
@@ -110,7 +105,11 @@ describe('RunnerAssetQueryService', () => {
         callback(tx),
       ),
     };
-    service = new RunnerAssetQueryService(prisma as unknown as PrismaService);
+    service = new RunnerAssetQueryService(
+      prisma as unknown as PrismaService,
+      {} as never,
+      {} as never,
+    );
   });
 
   it('pages a cohort: limit rows, a cursor while more remain', async () => {
@@ -118,7 +117,11 @@ describe('RunnerAssetQueryService', () => {
 
     expect(page.items).toEqual([
       {
+        id: UUID_A,
         assetHash: `hash-${UUID_A}`,
+        urn: `urn:test:${UUID_A}`,
+        sourceId: 'src-register',
+        sourceName: 'Firmenbuch Register',
         externalId: `FN-${UUID_A}`,
         name: `Company ${UUID_A}`,
         kind: 'record',
@@ -128,7 +131,6 @@ describe('RunnerAssetQueryService', () => {
       expect.objectContaining({ assetHash: `hash-${UUID_B}` }),
     ]);
     expect(page.nextCursor).toBe(UUID_B);
-    expect(page.callsRemaining).toBe(ASSET_QUERY_CALLS_PER_RUN - 1);
 
     rows = [row(UUID_C)];
     const last = await service.query('run-fin', body({ cursor: UUID_B }));
@@ -165,7 +167,13 @@ describe('RunnerAssetQueryService', () => {
       '(v.metadata #> ?::text[]) = (a.metadata #> ?::text[])',
     );
     expect(sql).toContain('ORDER BY a.id');
-    const values = tx.$queryRaw.mock.calls[0].slice(1);
+    const values = tx.$queryRaw.mock.calls[0]
+      .slice(1)
+      .flatMap((value: unknown) =>
+        value && typeof value === 'object' && 'values' in value
+          ? (value as { values: unknown[] }).values
+          : [value],
+      );
     expect(values).toContain(3); // limit + 1, to know whether more remain
   });
 
@@ -183,33 +191,24 @@ describe('RunnerAssetQueryService', () => {
       NotFoundException,
     );
     expect(tx.$queryRaw).not.toHaveBeenCalled();
-    expect(prisma.runner.update).not.toHaveBeenCalled();
   });
 
-  it('stops a run at its call budget, counted in the database', async () => {
-    for (let call = 0; call < ASSET_QUERY_CALLS_PER_RUN; call += 1) {
+  it('has no per-run call budget: many pages keep working', async () => {
+    for (let call = 0; call < 150; call += 1) {
       await service.query('run-fin', body());
     }
-    expect(prisma.runner.update).toHaveBeenCalledTimes(
-      ASSET_QUERY_CALLS_PER_RUN,
-    );
-    await expect(service.query('run-fin', body())).rejects.toMatchObject({
-      status: 429,
-    } as Partial<HttpException>);
-    // The refused call counted too: the budget never refunds.
-    expect(queryCalls).toBe(ASSET_QUERY_CALLS_PER_RUN + 1);
+    expect(tx.$queryRaw).toHaveBeenCalledTimes(150);
   });
 
-  it('burns no budget on a 404 source name, but burns one on a slow query', async () => {
+  it('404s an unknown source name before running the heavy query', async () => {
     prisma.source.findMany.mockResolvedValue([]);
     await expect(
       service.query('run-fin', body({ source: 'Missing Register' })),
     ).rejects.toBeInstanceOf(NotFoundException);
-    expect(prisma.runner.update).not.toHaveBeenCalled();
+    expect(tx.$queryRaw).not.toHaveBeenCalled();
+  });
 
-    prisma.source.findMany.mockResolvedValue([
-      { id: 'src-register', name: 'Firmenbuch Register' },
-    ]);
+  it('reports a slow query as a 400', async () => {
     tx.$queryRaw.mockRejectedValue(
       Object.assign(new Error('canceling statement due to statement timeout'), {
         meta: { code: '57014' },
@@ -218,7 +217,12 @@ describe('RunnerAssetQueryService', () => {
     await expect(service.query('run-fin', body())).rejects.toBeInstanceOf(
       BadRequestException,
     );
-    expect(prisma.runner.update).toHaveBeenCalledTimes(1);
+  });
+
+  it('reads every source in the namespace when no source is named', async () => {
+    await service.query('run-fin', body({ source: undefined }));
+    expect(prisma.source.findMany).not.toHaveBeenCalled();
+    expect(querySql()).not.toContain('a.source_id =');
   });
 
   it('rejects a non-uuid cursor as a 400, never a Postgres 22P02 500', async () => {
@@ -239,7 +243,7 @@ describe('RunnerAssetQueryService', () => {
   });
 
   it.each([
-    [{ source: '' }, /source is required/],
+    [{ source: '' }, /source must be the id or exact name/],
     [{ limit: 5001 }, /limit must be/],
     [{ select: Array.from({ length: 21 }, (_, i) => `k${i}`) }, /select/],
     [{ excludeVisited: { key: 'fn', sinceDays: 0 } }, /excludeVisited/],
