@@ -34,13 +34,17 @@ if (isTelemetryEnabled()) {
       'service.instance.id': process.env.CLASSIFYRE_INSTANCE_ID ?? '',
     }),
     traceExporter: new OTLPTraceExporter(),
-    metricReader: new PeriodicExportingMetricReader({
-      exporter: new OTLPMetricExporter(),
-      exportIntervalMillis: 15_000,
-    }),
-    logRecordProcessor: new BatchLogRecordProcessor({
-      exporter: new OTLPLogExporter(),
-    }),
+    metricReaders: [
+      new PeriodicExportingMetricReader({
+        exporter: new OTLPMetricExporter(),
+        exportIntervalMillis: 15_000,
+      }),
+    ],
+    logRecordProcessors: [
+      new BatchLogRecordProcessor({
+        exporter: new OTLPLogExporter(),
+      }),
+    ],
     instrumentations: [
       getNodeAutoInstrumentations({
         // fs instrumentation is too noisy in production

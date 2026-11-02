@@ -30,7 +30,7 @@
     },
     {
       "name": "boto3",
-      "version": "1.43.122",
+      "version": "1.43.123",
       "modules": [
         "boto3"
       ],
@@ -225,7 +225,7 @@
     },
     {
       "name": "oracledb",
-      "version": "4.0.2",
+      "version": "26.1.0",
       "modules": [
         "oracledb"
       ],
@@ -403,7 +403,7 @@
     },
     {
       "name": "snowflake-connector-python",
-      "version": "4.8.1",
+      "version": "5.1.0",
       "modules": [
         "snowflake.connector"
       ],
@@ -412,7 +412,7 @@
     },
     {
       "name": "sqlglot",
-      "version": "30.26.0",
+      "version": "30.27.0",
       "modules": [
         "sqlglot"
       ],
