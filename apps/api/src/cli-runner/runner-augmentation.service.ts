@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 
 import { GraphService } from '../graph.service';
+import { tryNormalizeUrn } from '../graph/urn';
 import { PrismaService } from '../prisma.service';
 import { generateDetectionIdentity } from '../utils/detection-identity';
 import {
@@ -38,6 +39,8 @@ export interface AugmentationResult {
   written: number;
   /** Rows a connector, a person or another source already owns; left alone. */
   skipped?: number;
+  /** Rows that could not be placed, e.g. an asset linked to itself. */
+  dropped?: number;
 }
 
 export interface AugmentationFinishResult {
@@ -201,6 +204,16 @@ export class RunnerAugmentationService {
     const list = batch(raw(body).edges, 'edges');
     if (list.length === 0) return { written: 0 };
     const edges = list.map(parseEdge);
+    // A URN that cannot be read would be dropped by the graph and look, in the
+    // counts, like a row someone else owns. Say so up front instead.
+    const badUrns = edges
+      .flatMap((e) => [e.fromUrn, e.toUrn])
+      .filter((urn): urn is string => Boolean(urn) && !tryNormalizeUrn(urn));
+    if (badUrns.length > 0) {
+      throw new BadRequestException(
+        `Not a valid URN: ${[...new Set(badUrns)].slice(0, 5).join(', ')}. Use an asset's urn, or term://glossary/<key>.`,
+      );
+    }
 
     const ids = [
       ...new Set(
@@ -236,7 +249,13 @@ export class RunnerAugmentationService {
     );
     return {
       written: result.upserted,
-      skipped: edges.length - result.upserted,
+      // Rows another owner holds: sent, valid, and left as they were.
+      skipped: Math.max(
+        0,
+        edges.length - result.upserted - (result.dropped ?? 0),
+      ),
+      // Rows the graph could not place (an asset linked to itself).
+      dropped: result.dropped ?? 0,
     };
   }
 

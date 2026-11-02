@@ -264,3 +264,24 @@ def test_a_notebook_that_only_augments_needs_no_extract() -> None:
     # Without augment_sources, extract is still required.
     report = validate_notebook(cells("def test_connection():\n    return {}\n"))
     assert [v.kind for v in report.violations] == ["missing_function"]
+
+
+def test_every_read_that_picks_a_cohort_in_extract_declares_partial_coverage() -> None:
+    relay, _ = recording()
+    reads = {
+        "query_sources": lambda ctx, **kw: ctx.query_sources(**kw),
+        "query_findings": lambda ctx, **kw: ctx.query_findings(**kw),
+        "query_detectors": lambda ctx, **kw: ctx.query_detectors(**kw),
+    }
+    for name, read in reads.items():
+        ctx = Context(relay=relay)
+        read(ctx)
+        assert ctx.partial_coverage is True, name
+        # An input-only read opts out, and augment_sources() owns no cohort.
+        fresh = Context(relay=relay)
+        read(fresh, cohort=False)
+        assert fresh.partial_coverage is False, name
+        augmenting = Context(relay=relay)
+        augmenting.set_phase("augment")
+        read(augmenting)
+        assert augmenting.partial_coverage is False, name

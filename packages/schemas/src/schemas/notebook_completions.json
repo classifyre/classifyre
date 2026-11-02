@@ -290,22 +290,22 @@
         {
           "label": "query_detectors",
           "kind": "method",
-          "detail": "(*, type: 'str | Iterable[str] | None' = None, include_inactive: 'bool' = False, limit: 'int' = 1000, cursor: 'str | None' = None) -> 'DetectorPage'",
+          "detail": "(*, type: 'str | Iterable[str] | None' = None, include_inactive: 'bool' = False, limit: 'int' = 1000, cursor: 'str | None' = None, cohort: 'bool | None' = None) -> 'DetectorPage'",
           "documentation": "The namespace's custom detectors: key, name, type. Never the pipeline.",
           "insertText": "query_detectors()"
         },
         {
           "label": "query_findings",
           "kind": "method",
-          "detail": "(*, detector: 'str | Iterable[str] | None' = None, detector_type: 'str | Iterable[str] | None' = None, finding_type: 'str | Iterable[str] | None' = None, severity: 'str | Iterable[str] | None' = None, status: 'str | Iterable[str] | None' = None, source: 'str | Iterable[str] | None' = None, asset: 'str | Iterable[str] | None' = None, asserted_by: 'str | Iterable[str] | None' = None, limit: 'int' = 1000, cursor: 'str | None' = None) -> 'FindingPage'",
+          "detail": "(*, detector: 'str | Iterable[str] | None' = None, detector_type: 'str | Iterable[str] | None' = None, finding_type: 'str | Iterable[str] | None' = None, severity: 'str | Iterable[str] | None' = None, status: 'str | Iterable[str] | None' = None, source: 'str | Iterable[str] | None' = None, asset: 'str | Iterable[str] | None' = None, asserted_by: 'str | Iterable[str] | None' = None, limit: 'int' = 1000, cursor: 'str | None' = None, cohort: 'bool | None' = None) -> 'FindingPage'",
           "documentation": "Findings of the namespace, from a detector, or of a source or asset.\n\n``detector`` is a custom detector's key (see :meth:`query_detectors`),\n``detector_type`` a built-in type such as \"PII\"; ``source`` and\n``asset`` take ids. Only OPEN findings unless ``status`` says otherwise.\n``asserted_by`` keeps what another source's notebook tagged. Walk from\na detector to its assets with ``ctx.query_assets(findings={\"detector\":\nkey})``. Always paged; see :meth:`query_assets` for the cursor.",
           "insertText": "query_findings()"
         },
         {
           "label": "query_sources",
           "kind": "method",
-          "detail": "(*, search: 'str | None' = None, type: 'str | Iterable[str] | None' = None, status: 'str | Iterable[str] | None' = None, limit: 'int' = 1000, cursor: 'str | None' = None) -> 'SourcePage'",
-          "documentation": "List the namespace's sources, not scan them.\n\n``type`` is a source type such as \"POSTGRESQL\" and ``status`` the status\nof the source's latest run. The result never carries configuration or\ncredentials. Always paged; see :meth:`query_assets` for the cursor.",
+          "detail": "(*, search: 'str | None' = None, type: 'str | Iterable[str] | None' = None, status: 'str | Iterable[str] | None' = None, limit: 'int' = 1000, cursor: 'str | None' = None, cohort: 'bool | None' = None) -> 'SourcePage'",
+          "documentation": "List the namespace's sources, not scan them.\n\n``type`` is a source type such as \"POSTGRESQL\" and ``status`` the status\nof the source's latest run. The result never carries configuration or\ncredentials. Always paged; see :meth:`query_assets` for the cursor and for\n``cohort``: from ``extract()``, choosing what to yield by this read declares\nthe run's coverage partial unless you pass ``cohort=False``.",
           "insertText": "query_sources()"
         },
         {

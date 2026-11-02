@@ -678,9 +678,9 @@ cursor; there is no per-run call limit.
 | `ctx.each_asset(...)`, `each_source`, `each_finding`, `each_detector` | Walk every page. |
 | `ctx.tag(asset, key, value)`, `ctx.link(a, b, relation)`, `ctx.means(asset, term)` | Write onto other sources' assets from `augment_sources()`. |
 
-Called from `extract()`, `query_assets` declares the run's coverage partial,
-since a connector that picks its cohort from a query never sees the rest of its
-source; pass `cohort=False` when the query only supplies inputs. Inside
+Called from `extract()`, any `ctx.query_*` read declares the run's coverage
+partial, since a connector that picks its cohort from a query never sees the rest
+of its source; pass `cohort=False` when the read only supplies inputs. Inside
 `augment_sources()` it does not. The full guide, with what a write records and
 when it is retired, is [Query and augment other sources](/sources/cross-source/).
 

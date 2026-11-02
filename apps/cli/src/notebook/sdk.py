@@ -1017,6 +1017,17 @@ class Context:
 
     # -- reading the rest of the namespace -----------------------------------
 
+    def _declare_cohort(self, name: str, cohort: bool | None) -> None:
+        """Mark coverage partial after a successful read, unless this read owns no cohort.
+
+        Only on success: a refused read saw nothing, so the run still covers what
+        it covers. Never over the notebook's own reason. In ``augment_sources()``
+        the default is no cohort: an augmentation owns no assets to retire.
+        """
+        owns_cohort = self._phase != "augment" if cohort is None else bool(cohort)
+        if owns_cohort and not self._partial_coverage:
+            self.set_partial_coverage(f"the notebook chose its cohort with ctx.{name}()")
+
     def _call(self, name: str, op: str, payload: dict[str, Any], error: type[Exception]) -> Any:
         if self._relay is None:
             raise error(
@@ -1150,11 +1161,7 @@ class Context:
             payload["cursor"] = str(cursor)
 
         response = self._call("query_assets", "query_assets", payload, AssetQueryError)
-        owns_cohort = self._phase != "augment" if cohort is None else bool(cohort)
-        if owns_cohort and not self._partial_coverage:
-            # Only on success: a refused query read nothing, so the run still
-            # covers what it covers. Never over the notebook's own reason.
-            self.set_partial_coverage("the notebook chose its cohort with ctx.query_assets()")
+        self._declare_cohort("query_assets", cohort)
         return AssetQueryPage(
             items=[
                 QueriedAsset(
@@ -1194,12 +1201,15 @@ class Context:
         status: str | Iterable[str] | None = None,
         limit: int = 1000,
         cursor: str | None = None,
+        cohort: bool | None = None,
     ) -> SourcePage:
         """List the namespace's sources, not scan them.
 
         ``type`` is a source type such as "POSTGRESQL" and ``status`` the status
         of the source's latest run. The result never carries configuration or
-        credentials. Always paged; see :meth:`query_assets` for the cursor.
+        credentials. Always paged; see :meth:`query_assets` for the cursor and for
+        ``cohort``: from ``extract()``, choosing what to yield by this read declares
+        the run's coverage partial unless you pass ``cohort=False``.
         """
         payload: dict[str, Any] = {"limit": int(limit)}
         if search is not None:
@@ -1211,6 +1221,7 @@ class Context:
         if cursor is not None:
             payload["cursor"] = str(cursor)
         response = self._call("query_sources", "query_sources", payload, AssetQueryError)
+        self._declare_cohort("query_sources", cohort)
         return SourcePage(
             items=[
                 QueriedSource(
@@ -1240,6 +1251,7 @@ class Context:
         asserted_by: str | Iterable[str] | None = None,
         limit: int = 1000,
         cursor: str | None = None,
+        cohort: bool | None = None,
     ) -> FindingPage:
         """Findings of the namespace, from a detector, or of a source or asset.
 
@@ -1267,6 +1279,7 @@ class Context:
         if cursor is not None:
             payload["cursor"] = str(cursor)
         response = self._call("query_findings", "query_findings", payload, AssetQueryError)
+        self._declare_cohort("query_findings", cohort)
         return FindingPage(
             items=[
                 QueriedFinding(
@@ -1299,6 +1312,7 @@ class Context:
         include_inactive: bool = False,
         limit: int = 1000,
         cursor: str | None = None,
+        cohort: bool | None = None,
     ) -> DetectorPage:
         """The namespace's custom detectors: key, name, type. Never the pipeline."""
         payload: dict[str, Any] = {"limit": int(limit), "includeInactive": bool(include_inactive)}
@@ -1307,6 +1321,7 @@ class Context:
         if cursor is not None:
             payload["cursor"] = str(cursor)
         response = self._call("query_detectors", "query_detectors", payload, AssetQueryError)
+        self._declare_cohort("query_detectors", cohort)
         return DetectorPage(
             items=[
                 QueriedDetector(

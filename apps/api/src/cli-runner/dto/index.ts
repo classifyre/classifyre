@@ -1027,6 +1027,12 @@ export class RunnerAugmentationResultDto {
     description: 'Rows owned by someone else, left as they were.',
   })
   skipped?: number;
+  @ApiProperty({
+    required: false,
+    description:
+      'Rows that could not be placed, e.g. an asset linked to itself.',
+  })
+  dropped?: number;
 }
 
 export class RunnerAugmentationFinishDto {

@@ -31061,6 +31061,10 @@
           "skipped": {
             "type": "number",
             "description": "Rows owned by someone else, left as they were."
+          },
+          "dropped": {
+            "type": "number",
+            "description": "Rows that could not be placed, e.g. an asset linked to itself."
           }
         },
         "required": [
