@@ -151,6 +151,9 @@ class PIIDetector(BaseDetector):
         "fax": {"PHONE_NUMBER"},
         "name": {"PERSON"},
         "person": {"PERSON"},
+        # A "contact" column holds whoever to reach and how: a name, an e-mail
+        # address or a phone number, often one of each across rows.
+        "contact": {"PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER"},
         "address": {"LOCATION"},
         "location": {"LOCATION"},
         "city": {"LOCATION"},

@@ -1,7 +1,7 @@
 ---
 title: Supported File Formats
 sidebarTitle: File Formats
-description: Every file type Classifyre can read — PDFs and Office documents, spreadsheets, CSV, Parquet and Arrow tables, source code and configuration, images, audio, video, email, and archives — and which connected sources those files come from.
+description: Every file type Classifyre can read — PDFs and Office documents, spreadsheets, CSV, JSON Lines, Parquet, Avro and ORC tables, SQLite and DuckDB database files, geospatial files, source code and configuration, images, audio, video, email, and archives — and which connected sources those files come from.
 ---
 
 # Supported File Formats
@@ -35,8 +35,10 @@ storage tends to label almost everything as generic binary data.
 | Content type          | File types                                                 | What Classifyre gets out of it                                        |
 | --------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------- |
 | **Documents**         | PDF, DOCX, PPTX, RTF, ODT, ODP, and legacy DOC / XLS / PPT | The full text, including tables — with OCR for pages that are scans   |
-| **Spreadsheets**      | XLSX, ODS                                                  | Every sheet, row by row                                               |
-| **Tables & datasets** | CSV, TSV, Parquet, Arrow, Feather, IPC                     | Every row, with columns labelled so a finding points at a real record |
+| **Spreadsheets**      | XLSX, ODS                                                  | Every sheet, row by row — the header is found even under a title row  |
+| **Tables & datasets** | CSV, TSV, JSON Lines (JSONL / NDJSON), Parquet, Arrow, Feather, IPC, Avro, ORC, Vortex | Every row, with columns labelled so a finding points at a real record |
+| **Database files**    | SQLite (`.sqlite`, `.db`), DuckDB, GeoPackage              | Every table, row by row — a database someone left in a bucket is read like one |
+| **Geospatial**        | GeoJSON, FlatGeobuf, Shapefile attribute tables (`.dbf`); KML, GPX and GML as XML | Every feature's attributes, with its coordinates as text              |
 | **Text & data**       | TXT, Markdown, JSON, XML, HTML, log files                  | The content as written, with encoding detected automatically          |
 | **Code & config**     | Python, JavaScript / TypeScript, Java, Go, Rust, C / C++, C#, Ruby, PHP, Swift, Kotlin, shell, SQL, Terraform, YAML, TOML, INI, `.env`, Dockerfile, Makefile | Every line, exactly as written — including the comments |
 | **Email**             | EML, MSG                                                   | Sender, recipients, subject, body, and attachment names               |
@@ -49,6 +51,56 @@ Images, audio, and video go through [OCR and transcription](/sources/content-ext
 automatically — no switch needed. They cost more time per item than reading
 text, so exclude paths or extensions you don't need searched in the source's
 configuration.
+
+---
+
+## Tables, whatever they were saved as
+
+Every format with rows reaches your detectors the same way: one record at a
+time, each value labelled with its column. A phone number found in row 4,812 of
+an Avro file reads exactly like one found in a CSV or a database table, so
+column-aware detectors and the findings they produce look alike across formats.
+
+A few things are worked out for you rather than assumed:
+
+- **Delimiter, quoting and header.** A TSV, a `;`-separated export from a
+  European locale, a pipe-delimited dump — each is split on its own delimiter.
+  Lines above the header, such as `Report generated on 2026-01-01`, are
+  recognised as a preamble rather than taken for the header.
+- **Values stay as written.** Cells are read as text, so `06641234567` stays a
+  phone number and `00123` stays an ID, instead of losing their leading zeros.
+- **Ragged rows keep every value.** A short row is padded; a long one keeps its
+  extra values in an `extra_values` column instead of dropping them.
+- **Any text encoding.** UTF-8, UTF-16, Latin-1, Windows code pages — the
+  encoding is detected and the file read in it.
+- **Records with different fields.** In a JSON Lines file every field is read,
+  including one that only appears in the very last record. Nested objects are
+  shown as JSON.
+- **Spreadsheet headers under title rows.** The header row is found even when a
+  title or a blank line sits above it, and every sheet is read. Columns are
+  labelled `Sheet.column`.
+- **Every table in a database file.** SQLite, DuckDB and GeoPackage files are
+  read table by table, with columns labelled `table.column`. Only tables are
+  read — never views — and engine bookkeeping such as SQLite's catalog or
+  GeoPackage's index tables is left out.
+- **Coordinates as text.** In geospatial files the geometry is written out as
+  text (`POINT (16.37 48.21)`), so a location is something a detector can see.
+
+---
+
+## Lakehouse tables in a bucket
+
+A Delta Lake or Apache Iceberg table is a folder of files, but no single file is
+the table. Deleted rows can still sit in files the table no longer uses, older
+snapshots keep their own files, and a renamed column keeps its old name in every
+file written before the rename.
+
+So when a cloud-storage or folder scan meets a Delta table (a `_delta_log/`
+folder) or an Iceberg table (`metadata/*.metadata.json`), it **leaves that
+table's files alone** and says so in the run log. Scan those tables with the
+[Delta Lake](/sources/delta-lake/) or [Apache Iceberg](/sources/iceberg/) source,
+which reads each one as a single table: current rows only, deletions applied,
+renamed columns as one column.
 
 ---
 
@@ -86,6 +138,7 @@ its own detectors, findings, and link back to the file it came from.
 | ----------------------------- | ------------------------------------------------------------------ |
 | **Inside an archive**         | A ZIP in cloud storage holding 40 customer spreadsheets            |
 | **Inside a dataset's rows**   | An ML dataset whose `image` or `document` column holds whole files |
+| **Inside a database file**    | A SQLite file whose `BLOB` column stores scanned contracts         |
 | **Inside an Office document** | Screenshots embedded in a slide deck or a spreadsheet              |
 
 In the row text, an embedded file shows up as a compact placeholder such as
@@ -109,7 +162,8 @@ Two things worth knowing:
 Big files aren't truncated, and they aren't loaded into memory whole. Classifyre
 streams them, so a multi-gigabyte export is read the same way a small one is.
 
-For anything with rows — CSV, Parquet, Arrow, spreadsheets, database tables —
+For anything with rows — CSV, JSON Lines, Parquet, Arrow, Avro, ORC,
+spreadsheets, database files, database tables —
 your [sampling strategy](/sources/sampling/) also governs _how much of each file_
 a single run reads:
 
@@ -206,6 +260,21 @@ recursively.
 Yes, row by row, including columns that hold whole files such as images or
 documents. Large shards in cloud storage are read in place rather than
 downloaded.
+
+**Does it read Avro, ORC or JSON Lines?**
+Yes, all three, row by row, with the same column labels as any other table.
+Columns holding whole files, such as an Avro field with image bytes, become
+assets of their own.
+
+**What about a SQLite or DuckDB file someone uploaded?**
+It's opened read-only and every table in it is scanned. Views and macros inside
+the file are never run, so a crafted database can't make the scan read anything
+else.
+
+**My bucket holds Delta or Iceberg tables. Why weren't their Parquet files scanned?**
+Because a table's files include rows the table has deleted. The scan leaves them
+to the [Delta Lake](/sources/delta-lake/) and [Iceberg](/sources/iceberg/)
+sources, which read the table as it is now.
 
 **Does it read source code?**
 Yes — around eighty languages and configuration formats, plus extension-less

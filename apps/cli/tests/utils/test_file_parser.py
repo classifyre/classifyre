@@ -553,13 +553,11 @@ class TestDoclingConverterSingleton:
     def test_native_document_formats_do_not_need_an_ocr_engine(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """An .odt has no pixels to read; a missing OCR engine must not cost its text."""
+        """A .msg has no pixels to read; a missing OCR engine must not cost its text."""
         self._install_fake_docling(monkeypatch, [])
         selections = self._install_fake_ocr_selection(monkeypatch, engine=None)
 
-        text, error = extract_text(
-            b"odt-bytes", "application/vnd.oasis.opendocument.text", file_name="doc.odt"
-        )
+        text, error = extract_text(b"msg-bytes", "application/vnd.ms-outlook", file_name="mail.msg")
         assert (text, error) == ("ocr output", None)
         assert selections == []
 
@@ -917,18 +915,38 @@ class TestEmlExtraction:
         assert "<p>" not in text
 
 
+def _odf_package() -> bytes:
+    import io
+    import zipfile
+
+    content = (
+        '<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" '
+        'xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" '
+        'xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:text>'
+        "<text:h>Memo</text:h><text:p>Pip Marlow, <text:span>pip@example.com</text:span></text:p>"
+        '<table:table table:name="Accounts"><table:table-row>'
+        "<table:table-cell><text:p>IBAN</text:p></table:table-cell>"
+        "<table:table-cell><text:p>AT61</text:p></table:table-cell>"
+        "<table:table-cell/></table:table-row><table:table-row><table:table-cell/></table:table-row>"
+        "</table:table></office:text></office:body></office:document-content>"
+    )
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr("mimetype", "application/vnd.oasis.opendocument.text")
+        archive.writestr("content.xml", content)
+    return buffer.getvalue()
+
+
 class TestDoclingNativeFormats:
-    def test_odt_routes_to_docling(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        calls: list[str] = []
-        monkeypatch.setattr(
-            "src.utils.file_parser._extract_docling_markdown",
-            lambda *_args, **kwargs: (calls.append(kwargs["mime_type"]), ("odt text", None))[1],
-        )
-        text, error = extract_text(
-            b"odt-bytes", "application/vnd.oasis.opendocument.text", file_name="doc.odt"
-        )
-        assert (text, error) == ("odt text", None)
-        assert calls == ["application/vnd.oasis.opendocument.text"]
+    def test_odt_is_read_from_content_xml(self) -> None:
+        text, error = extract_text(_odf_package(), "application/vnd.oasis.opendocument.text")
+        assert error is None
+        assert text.splitlines() == [
+            "Memo",
+            "Pip Marlow, pip@example.com",
+            "[Accounts]",
+            "IBAN\tAT61",
+        ]
 
     def test_msg_routes_to_docling(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(

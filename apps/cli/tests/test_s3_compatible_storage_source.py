@@ -579,3 +579,56 @@ def test_s3_storage_download_object_leaves_normal_object_unchanged(monkeypatch, 
 
     assert file_bytes == small_bytes
     assert not any("Truncated" in record.message for record in caplog.records)
+
+
+@pytest.mark.asyncio
+async def test_s3_automatic_keeps_returning_to_a_table_until_its_rows_are_swept(monkeypatch):
+    """The object window hands an object out once; a part-read table comes back.
+
+    Carries the source cursor between runs the way the API does. Without the
+    sweeping list, run two found the object backfill complete, discovered
+    nothing, and the table's rows past the first window were never read.
+    """
+    pytest.importorskip("PIL")
+    from src.pipeline.payload_window import PayloadCursor, PayloadWindowStore
+
+    recipe = _recipe(strategy="AUTOMATIC", rows_per_page=10)
+    # One unchanged object across all three runs.
+    ref = _ref("exports/dataset.parquet", days_ago=1)
+
+    def source_for_run() -> S3CompatibleStorageSource:
+        source = _parquet_source(monkeypatch, recipe, rows=25)
+        monkeypatch.setattr(source, "_list_objects", lambda: [ref])
+        return source
+
+    first = source_for_run()
+    first_store = PayloadWindowStore.from_recipe(recipe)
+    first.attach_payload_windows(first_store)
+    parent = next(a for a in await _collect(first) if a.asset_type == OutputAssetType.TABLE)
+    # The detector pass of run one read rows 1-10 of 25.
+    first_store.record(parent.hash, PayloadCursor(offset=10, strategy="AUTOMATIC"))
+    # The pipeline releases each asset's cache once it is done, before the
+    # cursor is read at the end of the run.
+    first.evict_asset_cache(parent.hash)
+    cursor = first.current_sampling_cursor() or {}
+    assert cursor[first.SWEEPING_CURSOR_KEY] == ["exports/dataset.parquet"]
+    first.cleanup()
+
+    second = source_for_run()
+    second._sampling_cursor = cursor
+    second_store = PayloadWindowStore.from_recipe(recipe)
+    second.attach_payload_windows(second_store)
+    second_assets = await _collect(second)
+    assert any(a.hash == parent.hash for a in second_assets)
+    # This run's window reaches the end of the table.
+    second_store.record(parent.hash, PayloadCursor(offset=0, passes=1, exhausted=True))
+    second.evict_asset_cache(parent.hash)
+    cursor = second.current_sampling_cursor() or {}
+    assert cursor[second.SWEEPING_CURSOR_KEY] == []
+    second.cleanup()
+
+    third = source_for_run()
+    third._sampling_cursor = cursor
+    third.attach_payload_windows(PayloadWindowStore.from_recipe(recipe))
+    assert not any(a.hash == parent.hash for a in await _collect(third))
+    third.cleanup()

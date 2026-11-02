@@ -7,7 +7,9 @@ import duckdb
 import pytest
 
 from src.sources.delta_lake.source import DeltaLakeSource
-from tests._lakehouse_fakes import FakeS3Client, write_parquet
+from tests._lakehouse_fakes import FakeS3Client
+
+_FIXTURE = Path(__file__).parent / "fixtures" / "lakehouse" / "delta_orders"
 
 
 def _recipe(**overrides: Any) -> dict[str, Any]:
@@ -26,8 +28,15 @@ def _recipe(**overrides: Any) -> dict[str, Any]:
 
 
 class FakeDeltaTable:
+    """deltalake's DeltaTable, over the committed fixture table.
+
+    Rows come from DuckDB's delta_scan of the real fixture; only the metadata
+    accessors the source reads for asset metadata are faked.
+    """
+
     def __init__(self, files: list[str]) -> None:
         self._files = files
+        self.table_uri = _FIXTURE.as_posix()
 
     def file_uris(self) -> list[str]:
         return self._files
@@ -58,12 +67,10 @@ class FakeDeltaTable:
 
 def _build(
     monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
     recipe: dict[str, Any] | None = None,
     keys: list[str] | None = None,
 ) -> DeltaLakeSource:
-    parquet = write_parquet(tmp_path / "orders" / "part-0.parquet", rows=12)
-    handle = FakeDeltaTable([parquet.as_posix()])
+    handle = FakeDeltaTable(["part-0.parquet"])
 
     monkeypatch.setattr(
         "src.sources.lakehouse_base.build_s3_client",
@@ -86,30 +93,26 @@ def _build(
     return src
 
 
-def test_delta_discovers_table_roots_from_delta_log_marker(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    src = _build(monkeypatch, tmp_path)
+def test_delta_discovers_table_roots_from_delta_log_marker(monkeypatch: pytest.MonkeyPatch) -> None:
+    src = _build(monkeypatch)
     tables = src._list_tables_for_database("lake")
     assert [t.table for t in tables] == ["warehouse/sales/orders"]
     assert tables[0].database == "lake"
 
 
-def test_delta_explicit_table_paths_skip_discovery(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_delta_explicit_table_paths_skip_discovery(monkeypatch: pytest.MonkeyPatch) -> None:
     recipe = _recipe(
         optional={"scope": {"table_paths": ["s3://lake/warehouse/crm/customers/", "raw/events"]}}
     )
-    src = _build(monkeypatch, tmp_path, recipe=recipe)
+    src = _build(monkeypatch, recipe=recipe)
     tables = src._list_tables_for_database("lake")
     assert [t.table for t in tables] == ["warehouse/crm/customers", "raw/events"]
 
 
 async def test_delta_extract_emits_table_assets_with_metadata(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    src = _build(monkeypatch, tmp_path)
+    src = _build(monkeypatch)
     assets = [a async for batch in src.extract_raw() for a in batch]
     assert len(assets) == 1
     asset = assets[0]
@@ -124,29 +127,36 @@ async def test_delta_extract_emits_table_assets_with_metadata(
     assert meta["history_length"] == 2
 
 
-async def test_delta_fetch_content_samples_rows_via_duckdb(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    src = _build(monkeypatch, tmp_path)
+async def test_delta_fetch_content_samples_rows_via_duckdb(monkeypatch: pytest.MonkeyPatch) -> None:
+    src = _build(monkeypatch)
     assets = [a async for batch in src.extract_raw() for a in batch]
     result = await src.fetch_content(assets[0].hash)
     assert result is not None
     _raw, text = result
-    # capped at rows_per_page (10), even though 12 rows exist
+    # capped at rows_per_page (10), even though 11 rows exist
     assert text.count("row_") == 10
     assert "@example.com" in text
 
 
-def test_delta_storage_options_wire_s3_config(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+async def test_delta_reads_the_table_not_its_files(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A deleted row is gone even though the file that held it is still there."""
+    src = _build(monkeypatch, recipe=_recipe(sampling={"strategy": "ALL"}))
+    assets = [a async for batch in src.extract_raw() for a in batch]
+    pages = [text async for _raw, text in src.fetch_content_pages(assets[0].hash)]
+    text = "\n".join(pages)
+    assert text.count("row_") == 11
+    assert "ada.ferrow2@example.com" not in text
+    assert "ada.ferrow12@example.com" in text
+
+
+def test_delta_storage_options_wire_s3_config(monkeypatch: pytest.MonkeyPatch) -> None:
     recipe = _recipe(
         optional={
             "connection": {"endpoint_url": "http://minio:9000", "region_name": "us-east-1"},
             "scope": {"prefix": "warehouse/"},
         }
     )
-    src = _build(monkeypatch, tmp_path, recipe=recipe)
+    src = _build(monkeypatch, recipe=recipe)
     options = src._storage_options()
     assert options["AWS_ACCESS_KEY_ID"] == "key"
     assert options["AWS_SECRET_ACCESS_KEY"] == "secret"
@@ -156,10 +166,8 @@ def test_delta_storage_options_wire_s3_config(
     assert options["AWS_VIRTUAL_HOSTED_STYLE_REQUEST"] == "false"
 
 
-def test_delta_test_connection_reports_discovered_tables(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    src = _build(monkeypatch, tmp_path)
+def test_delta_test_connection_reports_discovered_tables(monkeypatch: pytest.MonkeyPatch) -> None:
+    src = _build(monkeypatch)
     result = src.test_connection()
     assert result["status"] == "SUCCESS"
     assert "Discovered tables: 1" in result["message"]

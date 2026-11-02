@@ -509,3 +509,16 @@ async def test_pii_detector_on_pdf_content() -> None:
     ), (
         f"Expected 'Natalie Webber' in PERSON findings, got: {[r.matched_content for r in person_findings]}"
     )
+
+
+async def test_contact_column_keeps_emails() -> None:
+    """A "contact" column is not a name column: it holds how to reach someone.
+
+    Treated as one, an e-mail address in it was dropped as "not a PERSON".
+    """
+    detector = PIIDetector()
+    page = "row_1:\n  contact: pip.marlow@example.com\n\nrow_2:\n  contact: Zephyr Quill\n"
+    results = await detector.detect(page)
+    found = {(r.finding_type, r.matched_content) for r in results}
+    assert ("EMAIL_ADDRESS", "pip.marlow@example.com") in found
+    assert ("PERSON", "Zephyr Quill") in found

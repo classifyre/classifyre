@@ -537,6 +537,12 @@ class PayloadWindowStore:
                 cursor = replace(cursor, checksum=checksum)
             self._next[key] = cursor
 
+    def advanced_cursor(self, asset_id: str) -> PayloadCursor | None:
+        """The cursor this run advanced an asset to, or None if it read none."""
+        key = self._key(str(asset_id or ""))
+        with self._lock:
+            return self._next.get(key)
+
     def cursor_payload_for(self, asset: Any) -> dict[str, Any] | None:
         """The cursor to send back on this asset's ingest payload, if any."""
         if not self.persists_cursor:

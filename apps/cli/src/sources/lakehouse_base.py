@@ -13,11 +13,18 @@ The moving parts:
 * **Metadata** — the format's native Python reader (``deltalake`` /
   ``pyiceberg``) resolves schema, snapshot/version info, and the current data
   file list. No Spark, no JVM.
-* **Sampling** — DuckDB provides a DBAPI-style connection with SQL views over
-  each table's Parquet files (httpfs), so the whole
-  :class:`BaseTabularSource` machinery — sampling strategies, ``LIMIT``/
+* **Sampling** — DuckDB provides a DBAPI-style connection with one SQL view per
+  table over the format's own scan (``delta_scan`` / ``iceberg_scan``), so the
+  whole :class:`BaseTabularSource` machinery — sampling strategies, ``LIMIT``/
   ``OFFSET`` pagination, ``fetch_content_pages`` streaming — is reused
   unchanged.
+
+  The view reads the *table*, not its Parquet files. A table is more than its
+  current files: Delta deletion vectors and Iceberg delete files remove rows
+  without rewriting the files that hold them, and a renamed column keeps its old
+  name in every file written before the rename (Delta column mapping, Iceberg
+  field ids). Reading the files directly scanned deleted rows and split a renamed
+  column into two half-empty ones.
 """
 
 from __future__ import annotations
@@ -30,6 +37,8 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from ..models.generated_input import SamplingConfig
+from ..utils.duckdb_engine import connect as duckdb_connect
+from ..utils.duckdb_engine import load_extension
 from ..utils.hashing import hash_id
 from .s3_client import build_s3_client
 from .tabular_base import BaseTabularSource
@@ -74,8 +83,18 @@ class BaseLakehouseSource(BaseTabularSource):
         """Open the format's native table handle for a table root key."""
 
     @abstractmethod
-    def _table_data_files(self, handle: Any) -> list[str]:
-        """Absolute (``s3://``) Parquet data file URIs for the current snapshot."""
+    def _table_has_data(self, handle: Any) -> bool:
+        """Whether the current snapshot holds any data files.
+
+        Answered from table metadata alone. The scan itself is DuckDB's; this
+        only decides between it and a typed empty view, so it must not follow
+        data-file paths the way a file listing would — a table copied to
+        another bucket still names the location it was written at.
+        """
+
+    @abstractmethod
+    def _table_scan(self, handle: Any) -> tuple[str, str]:
+        """``(DuckDB extension, table function)`` reading the current snapshot."""
 
     @abstractmethod
     def _table_columns(self, handle: Any) -> dict[str, str]:
@@ -259,12 +278,11 @@ class BaseLakehouseSource(BaseTabularSource):
     def _duck_connection(self) -> Any:
         with self._duck_lock:
             if self._duck is None:
-                duckdb = self._require_duckdb()
-                conn = duckdb.connect()
+                conn = duckdb_connect(self._require_duckdb())
                 try:
-                    conn.execute("INSTALL httpfs; LOAD httpfs;")
+                    load_extension(conn, "httpfs")
                 except Exception as exc:
-                    logger.warning("Could not install/load duckdb httpfs: %s", exc)
+                    logger.warning("Could not load duckdb httpfs: %s", exc)
                 self._configure_duck_secret(conn)
                 self._duck = conn
             return self._duck
@@ -342,12 +360,12 @@ class BaseLakehouseSource(BaseTabularSource):
 
         view = "lake_" + hash_id(self.source_type, root)[:16]
         conn = self._duck_connection()
-        files = self._table_data_files(self._handle(table_ref))
-        if files:
-            file_list = ", ".join(self._sql_literal(f) for f in files)
+        handle = self._handle(table_ref)
+        if self._table_has_data(handle):
+            extension, scan = self._table_scan(handle)
+            load_extension(conn, extension)
             conn.execute(
-                f"CREATE OR REPLACE VIEW {self._quote_identifier(view)} AS "
-                f"SELECT * FROM read_parquet([{file_list}], union_by_name=true)"
+                f"CREATE OR REPLACE VIEW {self._quote_identifier(view)} AS SELECT * FROM {scan}"
             )
         else:
             # Table with no data files yet: typed empty view from the metadata schema.

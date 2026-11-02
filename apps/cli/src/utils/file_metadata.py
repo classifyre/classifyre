@@ -14,7 +14,6 @@ lazily so this module is importable even when they are absent.
 
 from __future__ import annotations
 
-import csv
 import io
 import json
 import logging
@@ -84,10 +83,8 @@ def extract_file_metadata(
             metadata.update(_parquet_metadata(file_bytes))
         elif _is_arrow(normalized, extension):
             metadata.update(_arrow_metadata(file_bytes))
-        elif _is_xlsx(normalized, extension):
-            metadata.update(_xlsx_metadata(file_bytes))
-        elif _is_delimited(normalized, extension):
-            metadata.update(_csv_metadata(file_bytes, extension))
+        elif (table_mime := _table_mime(normalized, file_name)) is not None:
+            metadata.update(_table_metadata(file_bytes, table_mime))
         elif normalized.startswith("image/") or extension in _IMAGE_EXTENSIONS:
             metadata.update(_image_metadata(file_bytes))
         elif _is_json(normalized, extension):
@@ -127,13 +124,6 @@ def _is_arrow(mime: str, extension: str) -> bool:
     return "arrow" in mime or "feather" in mime or extension in _ARROW_EXTENSIONS
 
 
-def _is_xlsx(mime: str, extension: str) -> bool:
-    return (
-        mime == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        or extension == ".xlsx"
-    )
-
-
 def _is_docx(mime: str, extension: str) -> bool:
     return (
         mime == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -141,8 +131,16 @@ def _is_docx(mime: str, extension: str) -> bool:
     )
 
 
-def _is_delimited(mime: str, extension: str) -> bool:
-    return mime in ("text/csv", "text/tab-separated-values") or extension in (".csv", ".tsv")
+def _table_mime(mime: str, file_name: str) -> str | None:
+    """The ``utils.table_files`` format a payload is in, by type or else by name."""
+    from .file_parser import infer_mime_type_from_file_name, normalize_mime_type
+    from .table_files import TABLE_FILE_MIME_TYPES
+
+    normalized = normalize_mime_type(mime)
+    if normalized in TABLE_FILE_MIME_TYPES:
+        return normalized
+    inferred = infer_mime_type_from_file_name(file_name)
+    return inferred if inferred in TABLE_FILE_MIME_TYPES else None
 
 
 def _is_json(mime: str, extension: str) -> bool:
@@ -214,44 +212,36 @@ def _arrow_metadata(file_bytes: bytes) -> dict[str, Any]:
     }
 
 
-def _xlsx_metadata(file_bytes: bytes) -> dict[str, Any]:
-    import openpyxl  # type: ignore[import-untyped]
+def _table_metadata(file_bytes: bytes, mime_type: str) -> dict[str, Any]:
+    """Columns and row count, read by the same reader the page iterator uses.
 
-    workbook = openpyxl.load_workbook(io.BytesIO(file_bytes), read_only=True, data_only=True)
-    try:
-        sheet = workbook.worksheets[0]
-        header_row = next(sheet.iter_rows(values_only=True), None)
-        column_names = [str(cell) for cell in header_row if cell is not None] if header_row else []
-        # max_row/max_column are reliable on read-only sheets after dimension scan.
-        row_count = (sheet.max_row or 1) - 1  # exclude header row
-        result: dict[str, Any] = {"row_count": max(row_count, 0)}
-        if column_names:
-            result["columns"] = build_columns(column_names)
-        return result
-    finally:
-        workbook.close()
+    So a CSV's columns are the sniffed ones (a ``;`` export has its real columns,
+    not one), a workbook's are ``Sheet.column`` with the header found under any
+    title rows, and a database file's are ``table.column``.
+    """
+    from .table_files import (
+        DELIMITED_MIME_TYPES,
+        GEOPACKAGE_MIME_TYPE,
+        SQLITE_MIME_TYPE,
+        XLSX_MIME_TYPE,
+        table_schema,
+    )
 
-
-def _csv_metadata(file_bytes: bytes, extension: str) -> dict[str, Any]:
-    encoding_meta = _encoding_metadata(file_bytes)
-    encoding = encoding_meta.get("encoding") or "utf-8"
-    delimiter = "\t" if extension == ".tsv" else ","
-    # Wrap bytes in a TextIOWrapper so csv.reader decodes lazily line-by-line,
-    # counting every row in the file without building one large decoded string.
-    # This also handles multi-line quoted fields correctly across chunk boundaries.
-    stream = io.TextIOWrapper(io.BytesIO(file_bytes), encoding=encoding, errors="replace")
-    reader = csv.reader(stream, delimiter=delimiter)
-    column_names: list[str] = []
-    row_count = 0
-    for index, row in enumerate(reader):
-        if index == 0:
-            column_names = [cell.strip() for cell in row]
-            continue
-        row_count += 1
-    result: dict[str, Any] = {"row_count": row_count}
-    if column_names:
-        result["columns"] = build_columns(column_names)
-    result.update(encoding_meta)
+    columns, row_count = table_schema(file_bytes, mime_type)
+    # CSV, XLSX and SQLite cells are read as text (SQLite types each value, not
+    # each column), so the type the reader reports says nothing about the data.
+    untyped = mime_type in DELIMITED_MIME_TYPES or mime_type in (
+        XLSX_MIME_TYPE,
+        SQLITE_MIME_TYPE,
+        GEOPACKAGE_MIME_TYPE,
+    )
+    result: dict[str, Any] = {"row_count": row_count or 0}
+    if columns:
+        result["columns"] = build_columns(
+            [name for name, _ in columns], None if untyped else dict(columns)
+        )
+    if mime_type in DELIMITED_MIME_TYPES:
+        result.update(_encoding_metadata(file_bytes))
     return result
 
 

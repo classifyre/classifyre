@@ -116,7 +116,7 @@ Three volumes, and you want all three:
 | --- | --- | --- |
 | `/var/lib/postgresql/data` | the database | everything is lost |
 | `/var/lib/classifyre` | scan logs, the credential encryption key, the model cache | stored credentials become unreadable |
-| `/cache/uv` | optional Python dependencies installed on first use | they are downloaded again after every upgrade |
+| `/cache/uv` | optional Python dependencies and file-format readers, installed on first use | they are downloaded again after every upgrade |
 
 ## Configuration
 
@@ -184,6 +184,22 @@ See [embeddings](/settings/embeddings/) for what changing the model costs.
   variables. They are per-workspace settings configured in the UI under
   **Settings → AI providers**, with their keys encrypted at rest.
 </Callout>
+
+### File-format readers
+
+Readers for some table formats — Avro, Vortex, the geospatial formats, and the
+Delta Lake and Iceberg table readers — are downloaded the first time a scan
+needs one, into `/cache/uv`, and reused after that. A host without internet
+access needs a mirror of the extension repository, or the readers copied into
+the cache directory ahead of time.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `CLASSIFYRE_DUCKDB_EXTENSION_REPOSITORY` | the public repository | Where readers are downloaded from — an internal mirror for offline hosts. |
+| `CLASSIFYRE_DUCKDB_EXTENSION_DIR` | `/cache/uv/duckdb-extensions` | Where they are kept. |
+
+When a reader can't be downloaded, the run reports it as unavailable for that
+file, rather than as a file that failed to parse.
 
 ### Resources
 

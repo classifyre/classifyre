@@ -10,10 +10,10 @@ Rows are sampled through DuckDB over the table's Parquet files.
 from __future__ import annotations
 
 import logging
-import re
 from typing import Any
 
 from ...models.generated_input import IcebergInput
+from ...utils.lakehouse_layout import iceberg_table_root
 from ..dependencies import require_module
 from ..lakehouse_base import BaseLakehouseSource
 from ..tabular_utils import TableRef
@@ -21,7 +21,19 @@ from ..tabular_utils import TableRef
 logger = logging.getLogger(__name__)
 
 # Iceberg metadata files: <root>/metadata/00003-<uuid>.metadata.json or v3.metadata.json
-_METADATA_KEY_RE = re.compile(r"^(?P<root>.*?)/?metadata/[^/]+\.metadata\.json$")
+
+
+def _summary_value(snapshot: Any, key: str) -> Any:
+    """One entry of a snapshot summary.
+
+    PyIceberg's ``Summary`` answers ``summary[key]`` but not ``dict(summary)``:
+    iterating it yields pydantic field pairs, which its own ``__getitem__``
+    then rejects.
+    """
+    try:
+        return snapshot.summary[key]
+    except (KeyError, TypeError):
+        return None
 
 
 class IcebergSource(BaseLakehouseSource):
@@ -62,10 +74,7 @@ class IcebergSource(BaseLakehouseSource):
     # ── Discovery: table roots by their metadata/ marker ────────────────
 
     def _table_root_from_key(self, key: str) -> str | None:
-        match = _METADATA_KEY_RE.match(key)
-        if not match:
-            return None
-        return match.group("root") or None
+        return iceberg_table_root(key)
 
     # ── Table handle: StaticTable from the latest metadata file ─────────
 
@@ -106,8 +115,33 @@ class IcebergSource(BaseLakehouseSource):
             properties=self._pyiceberg_properties(),
         )
 
-    def _table_data_files(self, handle: Any) -> list[str]:
-        return [task.file.file_path for task in handle.scan().plan_files()]
+    def _table_has_data(self, handle: Any) -> bool:
+        # From the snapshot summary, not plan_files(): planning reads the
+        # manifests at the absolute paths the table was written with, which is
+        # exactly what fails for a table that has since been copied elsewhere.
+        snapshot = handle.current_snapshot()
+        if snapshot is None:
+            return False
+        total = _summary_value(snapshot, "total-data-files")
+        return total is None or int(total) > 0
+
+    def _table_scan(self, handle: Any) -> tuple[str, str]:
+        # iceberg_scan applies delete files and resolves columns by field id, so
+        # a renamed column reads as one column across old and new data files.
+        #
+        # The scan is addressed as table root + metadata version rather than by
+        # the metadata file's path, because only that form takes
+        # allow_moved_paths: a table copied to another bucket or prefix keeps the
+        # absolute paths it was written with, and they are resolved against the
+        # root it is read from instead.
+        location = str(handle.metadata_location)
+        root, _, file_name = location.rpartition("/metadata/")
+        version = file_name.removesuffix(".metadata.json")
+        return "iceberg", (
+            f"iceberg_scan({self._sql_literal(root)}, allow_moved_paths = true, "
+            f"version = {self._sql_literal(version)}, "
+            "version_name_format = '%s%s.metadata.json')"
+        )
 
     def _table_columns(self, handle: Any) -> dict[str, str]:
         return {field.name: str(field.field_type) for field in handle.schema().fields}
@@ -119,7 +153,7 @@ class IcebergSource(BaseLakehouseSource):
             snapshot = self._handle(table_ref).current_snapshot()
             if snapshot is None:
                 return 0
-            total = dict(snapshot.summary).get("total-records")
+            total = _summary_value(snapshot, "total-records")
             return int(total) if total is not None else None
         except Exception:
             return None
@@ -139,7 +173,7 @@ class IcebergSource(BaseLakehouseSource):
             snapshot = handle.current_snapshot()
             if snapshot is not None:
                 meta["snapshot_id"] = str(snapshot.snapshot_id)
-                total_files = dict(snapshot.summary).get("total-data-files")
+                total_files = _summary_value(snapshot, "total-data-files")
                 if total_files is not None:
                     meta["num_files"] = int(total_files)
         except Exception:

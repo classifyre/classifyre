@@ -416,7 +416,7 @@ The chart provisions PVCs depending on configuration:
 
 | PVC | Purpose | Default size | Access mode |
 |---|---|---|---|
-| `uv-cache` | Python package cache shared across CLI job pods | 10 Gi | ReadWriteOnce |
+| `uv-cache` | Python packages and file-format readers shared across CLI job pods | 10 Gi | ReadWriteOnce |
 | `postgres` (embedded mode only) | PostgreSQL data directory | 20 Gi | ReadWriteOnce |
 
 Run logs are persisted to S3-compatible object storage (when configured) or streamed live, there is no filesystem PVC for runner logs.
@@ -429,6 +429,25 @@ api:
     uvCache:
       storageClassName: nfs-client
 ```
+
+### File-format readers on clusters without internet access
+
+Readers for some table formats (Avro, Vortex, geospatial files, and the Delta
+Lake and Iceberg table readers) are downloaded the first time a scan needs one
+and kept in the `uv-cache` volume under `duckdb-extensions/`. Without outbound
+access, point CLI jobs at an internal mirror of the extension repository:
+
+```yaml
+api:
+  cliJobs:
+    extraEnv:
+      - name: CLASSIFYRE_DUCKDB_EXTENSION_REPOSITORY
+        value: https://mirror.internal.example/duckdb-extensions
+```
+
+`CLASSIFYRE_DUCKDB_EXTENSION_DIR` moves the directory they are kept in. When a
+reader can't be downloaded, the run reports it as unavailable for that file,
+rather than as a file that failed to parse.
 
 ---
 

@@ -281,15 +281,15 @@ reddit = [
 ]
 delta-lake = [
     # Pure-Python/Rust Delta reader (delta-rs) — no Spark, no JVM. Table metadata
-    # and data-file lists come from deltalake; rows are sampled through DuckDB
-    # (file-processing group) over the table's Parquet files.
+    # and data-file lists come from deltalake; rows are read through DuckDB's
+    # delta_scan (file-processing group), which applies deletion vectors.
     { include-group = "file-processing" },
     "deltalake>=0.25.0",
     "boto3>=1.43.10,<2.0.0",
 ]
 iceberg = [
-    # PyIceberg resolves table metadata and finds Parquet files without Spark;
-    # DuckDB (file-processing group) samples rows from those files.
+    # PyIceberg resolves table metadata without Spark; rows are read through
+    # DuckDB's iceberg_scan (file-processing group), which applies delete files.
     { include-group = "file-processing" },
     "boto3>=1.43.10,<2.0.0",
 ]
