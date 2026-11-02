@@ -4,17 +4,23 @@ All URIs are relative to *http://localhost*
 
 | Method | HTTP request | Description |
 |------------- | ------------- | -------------|
+| [**cliRunnerControllerAugmentEdges**](RunnersApi.md#clirunnercontrolleraugmentedges) | **POST** /runners/{runnerId}/augmentations/edges | Link assets and glossary terms, for a running connector |
+| [**cliRunnerControllerAugmentTags**](RunnersApi.md#clirunnercontrolleraugmenttags) | **POST** /runners/{runnerId}/augmentations/tags | Tag assets of other sources, for a running connector |
 | [**cliRunnerControllerBulkDeleteRunners**](RunnersApi.md#clirunnercontrollerbulkdeleterunners) | **POST** /runners/bulk-delete | Delete many scan records at once |
 | [**cliRunnerControllerBulkRerunScans**](RunnersApi.md#clirunnercontrollerbulkrerunscans) | **POST** /runners/bulk-rerun | Start a fresh scan for many runs at once |
 | [**cliRunnerControllerBulkStopRunners**](RunnersApi.md#clirunnercontrollerbulkstoprunners) | **POST** /runners/bulk-stop | Stop many scans at once |
 | [**cliRunnerControllerCreateExternalRunner**](RunnersApi.md#clirunnercontrollercreateexternalrunner) | **POST** /sources/{sourceId}/runners/external | Create runner record for external CLI REST ingestion |
 | [**cliRunnerControllerDeleteRunner**](RunnersApi.md#clirunnercontrollerdeleterunner) | **DELETE** /runners/{runnerId} | Delete runner metadata and cleanup filesystem logs for this runner |
+| [**cliRunnerControllerFinishAugmentation**](RunnersApi.md#clirunnercontrollerfinishaugmentation) | **POST** /runners/{runnerId}/augmentations/finish | Retire what this source stopped asserting |
 | [**cliRunnerControllerGetRunner**](RunnersApi.md#clirunnercontrollergetrunner) | **GET** /runners/{runnerId} | Get runner status and details |
 | [**cliRunnerControllerGetRunnerAssetProgress**](RunnersApi.md#clirunnercontrollergetrunnerassetprogress) | **GET** /runners/{runnerId}/assets/progress | Get runner asset processing progress |
 | [**cliRunnerControllerGetRunnerQueuePosition**](RunnersApi.md#clirunnercontrollergetrunnerqueueposition) | **GET** /runners/{runnerId}/queue-position | Why a queued run has not started yet |
 | [**cliRunnerControllerListRunners**](RunnersApi.md#clirunnercontrollerlistrunners) | **GET** /runners | List all runners |
 | [**cliRunnerControllerListSourceRunners**](RunnersApi.md#clirunnercontrollerlistsourcerunners) | **GET** /sources/{sourceId}/runners | List runners for source |
 | [**cliRunnerControllerQueryAssets**](RunnersApi.md#clirunnercontrollerqueryassets) | **POST** /runners/{runnerId}/assets/query | Read assets of a source in this namespace, for a running connector |
+| [**cliRunnerControllerQueryDetectors**](RunnersApi.md#clirunnercontrollerquerydetectors) | **POST** /runners/{runnerId}/detectors/query | List custom detectors, for a running connector |
+| [**cliRunnerControllerQueryFindings**](RunnersApi.md#clirunnercontrollerqueryfindings) | **POST** /runners/{runnerId}/findings/query | Read findings of this namespace, for a running connector |
+| [**cliRunnerControllerQuerySources**](RunnersApi.md#clirunnercontrollerquerysources) | **POST** /runners/{runnerId}/sources/query | List sources of this namespace, for a running connector |
 | [**cliRunnerControllerRegisterDiscoveredAssets**](RunnersApi.md#clirunnercontrollerregisterdiscoveredassets) | **POST** /runners/{runnerId}/assets/discover | Register discovered asset hashes for a runner |
 | [**cliRunnerControllerSearchRunnerLogs**](RunnersApi.md#clirunnercontrollersearchrunnerlogs) | **POST** /runners/{runnerId}/logs | Search runner logs with server-side filtering, full-text search, and sort |
 | [**cliRunnerControllerStartRunner**](RunnersApi.md#clirunnercontrollerstartrunner) | **POST** /sources/{sourceId}/run | Start CLI runner for source |
@@ -27,6 +33,146 @@ All URIs are relative to *http://localhost*
 | [**searchRunnersControllerSearchRunners**](RunnersApi.md#searchrunnerscontrollersearchrunners) | **POST** /search/runners | Search runners |
 | [**searchRunnersControllerSearchRunnersCharts**](RunnersApi.md#searchrunnerscontrollersearchrunnerscharts) | **POST** /search/runners/charts | Runners charts overview |
 
+
+
+## cliRunnerControllerAugmentEdges
+
+> RunnerAugmentationResultDto cliRunnerControllerAugmentEdges(runnerId, runnerAugmentationEdgesDto)
+
+Link assets and glossary terms, for a running connector
+
+Backs ctx.link() and ctx.means(). Internal. Edges are stamped with the calling source and run; an edge another owner already holds is left alone.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  RunnersApi,
+} from '@workspace/api-client';
+import type { CliRunnerControllerAugmentEdgesRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new RunnersApi();
+
+  const body = {
+    // string
+    runnerId: runnerId_example,
+    // RunnerAugmentationEdgesDto
+    runnerAugmentationEdgesDto: ...,
+  } satisfies CliRunnerControllerAugmentEdgesRequest;
+
+  try {
+    const data = await api.cliRunnerControllerAugmentEdges(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **runnerId** | `string` |  | [Defaults to `undefined`] |
+| **runnerAugmentationEdgesDto** | [RunnerAugmentationEdgesDto](RunnerAugmentationEdgesDto.md) |  | |
+
+### Return type
+
+[**RunnerAugmentationResultDto**](RunnerAugmentationResultDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## cliRunnerControllerAugmentTags
+
+> RunnerAugmentationResultDto cliRunnerControllerAugmentTags(runnerId, runnerAugmentationTagsDto)
+
+Tag assets of other sources, for a running connector
+
+Backs ctx.tag(). Internal. Each tag is a finding of an active Tag detector, stamped with the calling source and run so the same source can retire it later.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  RunnersApi,
+} from '@workspace/api-client';
+import type { CliRunnerControllerAugmentTagsRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new RunnersApi();
+
+  const body = {
+    // string
+    runnerId: runnerId_example,
+    // RunnerAugmentationTagsDto
+    runnerAugmentationTagsDto: ...,
+  } satisfies CliRunnerControllerAugmentTagsRequest;
+
+  try {
+    const data = await api.cliRunnerControllerAugmentTags(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **runnerId** | `string` |  | [Defaults to `undefined`] |
+| **runnerAugmentationTagsDto** | [RunnerAugmentationTagsDto](RunnerAugmentationTagsDto.md) |  | |
+
+### Return type
+
+[**RunnerAugmentationResultDto**](RunnerAugmentationResultDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
 
 ## cliRunnerControllerBulkDeleteRunners
@@ -344,6 +490,73 @@ example().catch(console.error);
 ### Return type
 
 [**DeleteRunnerResponseDto**](DeleteRunnerResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## cliRunnerControllerFinishAugmentation
+
+> RunnerAugmentationFinishDto cliRunnerControllerFinishAugmentation(runnerId)
+
+Retire what this source stopped asserting
+
+Called after a notebook finished augmenting without error: resolves tags and removes edges this source wrote in earlier runs and did not write in this one. Never touches rows written by anyone else.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  RunnersApi,
+} from '@workspace/api-client';
+import type { CliRunnerControllerFinishAugmentationRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new RunnersApi();
+
+  const body = {
+    // string
+    runnerId: runnerId_example,
+  } satisfies CliRunnerControllerFinishAugmentationRequest;
+
+  try {
+    const data = await api.cliRunnerControllerFinishAugmentation(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **runnerId** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+[**RunnerAugmentationFinishDto**](RunnerAugmentationFinishDto.md)
 
 ### Authorization
 
@@ -717,7 +930,7 @@ No authorization required
 
 Read assets of a source in this namespace, for a running connector
 
-Backs ctx.query_assets() in CUSTOM notebooks. Internal: the CLI relays the call so the notebook never holds API credentials. Only while the run is RUNNING; at most 100 calls per run, 5,000 assets per page, 15 s per query.
+Backs ctx.query_assets() in CUSTOM notebooks. Internal: the CLI relays the call so the notebook never holds API credentials. Only while the run is RUNNING; every read pages by cursor, at most 5,000 assets per page, 15 s per query.
 
 ### Example
 
@@ -762,6 +975,216 @@ example().catch(console.error);
 ### Return type
 
 [**RunnerAssetQueryResponseDto**](RunnerAssetQueryResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## cliRunnerControllerQueryDetectors
+
+> RunnerDetectorQueryResponseDto cliRunnerControllerQueryDetectors(runnerId, runnerDetectorQueryDto)
+
+List custom detectors, for a running connector
+
+Backs ctx.query_detectors(). Internal. Never returns a detector pipeline or its secrets.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  RunnersApi,
+} from '@workspace/api-client';
+import type { CliRunnerControllerQueryDetectorsRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new RunnersApi();
+
+  const body = {
+    // string
+    runnerId: runnerId_example,
+    // RunnerDetectorQueryDto
+    runnerDetectorQueryDto: ...,
+  } satisfies CliRunnerControllerQueryDetectorsRequest;
+
+  try {
+    const data = await api.cliRunnerControllerQueryDetectors(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **runnerId** | `string` |  | [Defaults to `undefined`] |
+| **runnerDetectorQueryDto** | [RunnerDetectorQueryDto](RunnerDetectorQueryDto.md) |  | |
+
+### Return type
+
+[**RunnerDetectorQueryResponseDto**](RunnerDetectorQueryResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## cliRunnerControllerQueryFindings
+
+> RunnerFindingQueryResponseDto cliRunnerControllerQueryFindings(runnerId, runnerFindingQueryDto)
+
+Read findings of this namespace, for a running connector
+
+Backs ctx.query_findings(). Internal. Filter by detector, type, severity, status, source or asset; pages by cursor, at most 5,000 per page.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  RunnersApi,
+} from '@workspace/api-client';
+import type { CliRunnerControllerQueryFindingsRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new RunnersApi();
+
+  const body = {
+    // string
+    runnerId: runnerId_example,
+    // RunnerFindingQueryDto
+    runnerFindingQueryDto: ...,
+  } satisfies CliRunnerControllerQueryFindingsRequest;
+
+  try {
+    const data = await api.cliRunnerControllerQueryFindings(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **runnerId** | `string` |  | [Defaults to `undefined`] |
+| **runnerFindingQueryDto** | [RunnerFindingQueryDto](RunnerFindingQueryDto.md) |  | |
+
+### Return type
+
+[**RunnerFindingQueryResponseDto**](RunnerFindingQueryResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## cliRunnerControllerQuerySources
+
+> RunnerSourceQueryResponseDto cliRunnerControllerQuerySources(runnerId, runnerSourceQueryDto)
+
+List sources of this namespace, for a running connector
+
+Backs ctx.query_sources() in CUSTOM notebooks. Internal. Never returns a source configuration. Pages by cursor, at most 5,000 per page.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  RunnersApi,
+} from '@workspace/api-client';
+import type { CliRunnerControllerQuerySourcesRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new RunnersApi();
+
+  const body = {
+    // string
+    runnerId: runnerId_example,
+    // RunnerSourceQueryDto
+    runnerSourceQueryDto: ...,
+  } satisfies CliRunnerControllerQuerySourcesRequest;
+
+  try {
+    const data = await api.cliRunnerControllerQuerySources(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **runnerId** | `string` |  | [Defaults to `undefined`] |
+| **runnerSourceQueryDto** | [RunnerSourceQueryDto](RunnerSourceQueryDto.md) |  | |
+
+### Return type
+
+[**RunnerSourceQueryResponseDto**](RunnerSourceQueryResponseDto.md)
 
 ### Authorization
 

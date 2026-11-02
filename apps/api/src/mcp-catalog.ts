@@ -273,6 +273,9 @@ export const MCP_CAPABILITY_GROUPS: McpCapabilityGroupDto[] = [
       'list_notebook_files',
       'delete_notebook_file',
       'run_notebook',
+      'describe_notebook_cross_source',
+      'list_source_augmentations',
+      'retract_source_augmentations',
       'get_notebook_execution',
       'list_notebook_executions',
       'cancel_notebook_execution',
@@ -286,6 +289,7 @@ export const MCP_CAPABILITY_GROUPS: McpCapabilityGroupDto[] = [
       'Read and edit notebook cells, packages, and local folders',
       'Upload input files and manage declared dependencies',
       'Run a single cell, a connection test, or the whole notebook, then poll for output and errors',
+      'Query other sources from a notebook and tag/link their assets (augment_sources), inspect or retract what a source wrote',
     ],
   },
   {

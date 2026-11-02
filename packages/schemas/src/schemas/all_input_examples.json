@@ -4074,7 +4074,101 @@
           "rows_per_page": 100
         }
       }
-    }
+    },
+      {
+        "name": "Query other sources",
+        "description": "Reads the namespace without scanning it: sources, assets with their metadata and findings, and findings by detector. Paged by cursor; never returns another source's credentials.",
+        "config": {
+          "type": "CUSTOM",
+          "required": {
+            "notebook": {
+              "revision": 1,
+              "cells": [
+                {
+                  "id": "intro",
+                  "type": "markdown",
+                  "source": "# Query other sources\n\nA notebook can look at the rest of the namespace without scanning it: which\nsources exist, which assets they hold (with their metadata and findings), which\nfindings a detector raised, and which assets those findings sit on.\n\nEvery read pages by cursor, up to 5,000 rows a page. Use `ctx.each_*` to walk\nall pages, or `ctx.query_*` for one page at a time. Nothing here returns another\nsource's credentials or configuration, and reads stay inside this namespace.\n\nThis starter only *reads* and logs a summary. To write tags and links back onto\nthose assets, see **Augment other sources**.\n\nReads work during a scan only; running a cell in the editor has no scan to read\nthe namespace for.\n"
+                },
+                {
+                  "id": "imports",
+                  "type": "code",
+                  "source": "from classifyre import Asset, ctx\n"
+                },
+                {
+                  "id": "test-connection",
+                  "type": "code",
+                  "source": "def test_connection() -> dict:\n    return {\"status\": \"SUCCESS\", \"message\": \"Reads this workspace; nothing external to connect to.\"}\n"
+                },
+                {
+                  "id": "augment-sources",
+                  "type": "code",
+                  "source": "def augment_sources():\n    \"\"\"Runs after extract (here there is no extract: this notebook owns no assets).\"\"\"\n    # 1. Which sources exist? (No configuration is returned, ever.)\n    for source in ctx.each_source():\n        ctx.log(f\"source {source.name} [{source.type}] last run: {source.run_status}\")\n\n    # 2. Which Tag detectors are there to find findings by?\n    detectors = [d.key for d in ctx.each_detector(type=\"TAG\")]\n    ctx.log(f\"tag detectors: {detectors}\")\n\n    # 3. Assets with their metadata and open findings. Filters combine:\n    #    search by name, a glossary term, a detector, or meaning.\n    seen = 0\n    for asset in ctx.each_asset(\n        findings={\"severity\": [\"HIGH\", \"CRITICAL\"]},\n        include=[\"findings\"],\n        limit=500,\n    ):\n        seen += 1\n        keys = {f.detector or f.detector_type for f in asset.findings}\n        ctx.log(f\"{asset.source_name} / {asset.name}: {sorted(keys)}\")\n    ctx.log(f\"{seen} assets carry a high or critical finding\")\n\n    # 4. From a detector to its findings, then to the assets they are on.\n    if detectors:\n        for finding in ctx.each_finding(detector=detectors[0]):\n            ctx.log(f\"{detectors[0]} -> asset {finding.asset_id}\")\n"
+                }
+              ]
+            }
+          },
+          "masked": {
+            "secrets": {}
+          },
+          "optional": {
+            "variables": {},
+            "limits": {
+              "timeout_seconds": 900
+            }
+          },
+          "sampling": {
+            "strategy": "ALL",
+            "rows_per_page": 100
+          }
+        }
+      },
+      {
+        "name": "Augment other sources",
+        "description": "Tags, links and glossary-links assets of other sources from what the namespace already knows. Everything written is attributed to this source and retired when a later complete run stops asserting it.",
+        "config": {
+          "type": "CUSTOM",
+          "required": {
+            "notebook": {
+              "revision": 1,
+              "cells": [
+                {
+                  "id": "intro",
+                  "type": "markdown",
+                  "source": "# Augment other sources\n\nCompute something from what the namespace already knows, and write it back onto\nthe assets of **other sources**: tags, links, glossary meanings. Nothing here\nscans anything external, and nothing here changes how the other sources scan.\n\nThree write calls, all inside `augment_sources()`:\n\n    ctx.tag(asset, \"reviewed\", \"yes\")          # a tag; the key is a Tag detector's key\n    ctx.link(asset, other_asset, \"REFERENCES\")  # a link between two assets\n    ctx.means(asset, \"invoice\")                # the asset means a glossary term\n\n**Whose is it?** Everything written here is recorded as asserted by *this*\nsource and run. It is never mixed into the asset's own tags, and it never\noverwrites a tag or link that a connector, a person or another source holds.\nThe finding or link shows where it came from.\n\n**It follows the data.** When this source finishes `augment_sources()` without\nerror, whatever *this source* wrote in an earlier run and did not write now is\nretired: a tag you stop asserting resolves, a link you stop drawing goes. If you\nonly look at part of the namespace in a run, say so, and nothing is retired:\n\n    ctx.set_partial_coverage(\"only the new findings\")\n\n**Before this runs**, create the Tag detector (*Detectors -> New -> Tag*); a tag\nwhose key matches none is refused with the list of valid keys.\n\nWrites are buffered and sent in batches, so a notebook can tag a million assets.\n"
+                },
+                {
+                  "id": "imports",
+                  "type": "code",
+                  "source": "from classifyre import Asset, ctx\n"
+                },
+                {
+                  "id": "test-connection",
+                  "type": "code",
+                  "source": "def test_connection() -> dict:\n    return {\"status\": \"SUCCESS\", \"message\": \"Works on this workspace; nothing external to connect to.\"}\n"
+                },
+                {
+                  "id": "augment-sources",
+                  "type": "code",
+                  "source": "def augment_sources():\n    \"\"\"Tag, link and give meaning to assets other sources scanned.\"\"\"\n    # Variables are the notebook's settings: change them in the source form.\n    detector = ctx.var(\"when_detector\", \"pii-email\")  # a detector that already raised findings\n    tag_key = ctx.var(\"tag_key\", \"needs-review\")      # an existing Tag detector's key\n    term = ctx.var(\"term\", \"personal-data\")           # a glossary term key\n\n    # Every asset, in any source, with an open finding from that detector.\n    for asset in ctx.each_asset(findings={\"detector\": detector}, include=[\"findings\"]):\n        ctx.tag(asset, tag_key, f\"{detector} found in {asset.source_name}\")\n        ctx.means(asset, term)\n\n        # The same document stored in another source? Link the two.\n        for twin in ctx.each_asset(search=asset.name, limit=20):\n            if twin.id != asset.id and twin.name == asset.name:\n                ctx.link(asset, twin, \"SAME_AS\", evidence={\"rule\": \"same name\"})\n\n    # Nothing to flush by hand: buffered writes are sent at the end.\n    ctx.log(f\"asserted so far: {ctx.augmentation_stats}\")\n"
+                }
+              ]
+            }
+          },
+          "masked": {
+            "secrets": {}
+          },
+          "optional": {
+            "variables": {},
+            "limits": {
+              "timeout_seconds": 900
+            }
+          },
+          "sampling": {
+            "strategy": "ALL",
+            "rows_per_page": 100
+          }
+        }
+      }
   ],
   "AUGMENTATION":   [
     {

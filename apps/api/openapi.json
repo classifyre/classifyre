@@ -9469,7 +9469,7 @@
     },
     "/runners/{runnerId}/assets/query": {
       "post": {
-        "description": "Backs ctx.query_assets() in CUSTOM notebooks. Internal: the CLI relays the call so the notebook never holds API credentials. Only while the run is RUNNING; at most 100 calls per run, 5,000 assets per page, 15 s per query.",
+        "description": "Backs ctx.query_assets() in CUSTOM notebooks. Internal: the CLI relays the call so the notebook never holds API credentials. Only while the run is RUNNING; every read pages by cursor, at most 5,000 assets per page, 15 s per query.",
         "operationId": "CliRunnerController_queryAssets",
         "parameters": [
           {
@@ -9504,6 +9504,248 @@
           }
         },
         "summary": "Read assets of a source in this namespace, for a running connector",
+        "tags": [
+          "Runners"
+        ]
+      }
+    },
+    "/runners/{runnerId}/sources/query": {
+      "post": {
+        "description": "Backs ctx.query_sources() in CUSTOM notebooks. Internal. Never returns a source configuration. Pages by cursor, at most 5,000 per page.",
+        "operationId": "CliRunnerController_querySources",
+        "parameters": [
+          {
+            "name": "runnerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunnerSourceQueryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunnerSourceQueryResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List sources of this namespace, for a running connector",
+        "tags": [
+          "Runners"
+        ]
+      }
+    },
+    "/runners/{runnerId}/findings/query": {
+      "post": {
+        "description": "Backs ctx.query_findings(). Internal. Filter by detector, type, severity, status, source or asset; pages by cursor, at most 5,000 per page.",
+        "operationId": "CliRunnerController_queryFindings",
+        "parameters": [
+          {
+            "name": "runnerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunnerFindingQueryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunnerFindingQueryResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Read findings of this namespace, for a running connector",
+        "tags": [
+          "Runners"
+        ]
+      }
+    },
+    "/runners/{runnerId}/detectors/query": {
+      "post": {
+        "description": "Backs ctx.query_detectors(). Internal. Never returns a detector pipeline or its secrets.",
+        "operationId": "CliRunnerController_queryDetectors",
+        "parameters": [
+          {
+            "name": "runnerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunnerDetectorQueryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunnerDetectorQueryResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List custom detectors, for a running connector",
+        "tags": [
+          "Runners"
+        ]
+      }
+    },
+    "/runners/{runnerId}/augmentations/tags": {
+      "post": {
+        "description": "Backs ctx.tag(). Internal. Each tag is a finding of an active Tag detector, stamped with the calling source and run so the same source can retire it later.",
+        "operationId": "CliRunnerController_augmentTags",
+        "parameters": [
+          {
+            "name": "runnerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunnerAugmentationTagsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunnerAugmentationResultDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Tag assets of other sources, for a running connector",
+        "tags": [
+          "Runners"
+        ]
+      }
+    },
+    "/runners/{runnerId}/augmentations/edges": {
+      "post": {
+        "description": "Backs ctx.link() and ctx.means(). Internal. Edges are stamped with the calling source and run; an edge another owner already holds is left alone.",
+        "operationId": "CliRunnerController_augmentEdges",
+        "parameters": [
+          {
+            "name": "runnerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunnerAugmentationEdgesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunnerAugmentationResultDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Link assets and glossary terms, for a running connector",
+        "tags": [
+          "Runners"
+        ]
+      }
+    },
+    "/runners/{runnerId}/augmentations/finish": {
+      "post": {
+        "description": "Called after a notebook finished augmenting without error: resolves tags and removes edges this source wrote in earlier runs and did not write in this one. Never touches rows written by anyone else.",
+        "operationId": "CliRunnerController_finishAugmentation",
+        "parameters": [
+          {
+            "name": "runnerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunnerAugmentationFinishDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Retire what this source stopped asserting",
         "tags": [
           "Runners"
         ]
@@ -10018,6 +10260,389 @@
         "summary": "Preview the band split of a source's cohorts for its next run",
         "tags": [
           "Sources"
+        ]
+      }
+    },
+    "/embeddings/settings": {
+      "get": {
+        "operationId": "EmbeddingController_getSettings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmbeddingSettingsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Embedding configuration for this workspace, the deployment defaults behind it, and corpus size",
+        "tags": [
+          "embeddings"
+        ]
+      },
+      "put": {
+        "operationId": "EmbeddingController_updateSettings",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateEmbeddingSettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateEmbeddingSettingsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Change embedding configuration; redefining the vector space purges the corpus and re-embeds it",
+        "tags": [
+          "embeddings"
+        ]
+      }
+    },
+    "/embeddings/rebuild": {
+      "post": {
+        "operationId": "EmbeddingController_rebuild",
+        "parameters": [],
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmbeddingRebuildResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Embeddings are turned off"
+          }
+        },
+        "summary": "Purge every stored vector for this workspace and re-embed the corpus from scratch",
+        "tags": [
+          "embeddings"
+        ]
+      }
+    },
+    "/embeddings/status": {
+      "get": {
+        "operationId": "EmbeddingController_status",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmbeddingStatusResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get semantic storage and search capability",
+        "tags": [
+          "embeddings"
+        ]
+      }
+    },
+    "/embeddings/reindex": {
+      "post": {
+        "operationId": "EmbeddingController_reindex",
+        "parameters": [],
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmbeddingReindexResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Embeddings are turned off"
+          }
+        },
+        "summary": "Reconcile stored findings and asset chunks into the configured embedding space",
+        "tags": [
+          "embeddings"
+        ]
+      }
+    },
+    "/sources/{sourceId}/embeddings/chunks": {
+      "post": {
+        "operationId": "EmbeddingController_chunks",
+        "parameters": [
+          {
+            "name": "sourceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PutAssetChunksDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Store asset chunk-to-content mappings",
+        "tags": [
+          "embeddings"
+        ]
+      }
+    },
+    "/embeddings/collection": {
+      "get": {
+        "operationId": "EmbeddingController_collection",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmbeddingCollectionPlanDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "What a scan should prepare for embedding in this workspace: text chunks, and which media in what form",
+        "tags": [
+          "embeddings"
+        ]
+      }
+    },
+    "/findings/{findingId}/similar": {
+      "get": {
+        "operationId": "EmbeddingController_similar",
+        "parameters": [
+          {
+            "name": "findingId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SimilarFindingDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Find semantically similar findings with ranking evidence",
+        "tags": [
+          "embeddings"
+        ]
+      }
+    },
+    "/embeddings/boilerplate-clusters": {
+      "get": {
+        "operationId": "EmbeddingController_boilerplateGlobal",
+        "parameters": [
+          {
+            "name": "threshold",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 0.8,
+              "maximum": 1,
+              "default": 0.95,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 50,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "sourceIds",
+            "required": false,
+            "in": "query",
+            "description": "Restrict clusters to findings from these sources; omit for the whole corpus",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BoilerplateClusterDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Near-duplicate finding clusters across the corpus, optionally filtered to specific sources",
+        "tags": [
+          "embeddings"
+        ]
+      }
+    },
+    "/embeddings/recalibrate": {
+      "post": {
+        "operationId": "EmbeddingController_recalibrate",
+        "parameters": [],
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmbeddingRecalibrateResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Embeddings are turned off"
+          }
+        },
+        "summary": "Schedule a full evidence-ranking recalibration pass (importance scores, outliers, near-duplicate groups)",
+        "tags": [
+          "embeddings"
+        ]
+      }
+    },
+    "/sources/{sourceId}/boilerplate-clusters": {
+      "get": {
+        "operationId": "EmbeddingController_boilerplate",
+        "parameters": [
+          {
+            "name": "sourceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "threshold",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 0.8,
+              "maximum": 1,
+              "default": 0.95,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 50,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BoilerplateClusterDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Near-duplicate finding clusters in a source (repeated boilerplate)",
+        "tags": [
+          "embeddings"
         ]
       }
     },
@@ -15506,389 +16131,6 @@
         "summary": "Merge this entity into another: values, references and watches move, and it redirects",
         "tags": [
           "entities"
-        ]
-      }
-    },
-    "/embeddings/settings": {
-      "get": {
-        "operationId": "EmbeddingController_getSettings",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/EmbeddingSettingsResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Embedding configuration for this workspace, the deployment defaults behind it, and corpus size",
-        "tags": [
-          "embeddings"
-        ]
-      },
-      "put": {
-        "operationId": "EmbeddingController_updateSettings",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateEmbeddingSettingsDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UpdateEmbeddingSettingsResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Change embedding configuration; redefining the vector space purges the corpus and re-embeds it",
-        "tags": [
-          "embeddings"
-        ]
-      }
-    },
-    "/embeddings/rebuild": {
-      "post": {
-        "operationId": "EmbeddingController_rebuild",
-        "parameters": [],
-        "responses": {
-          "202": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/EmbeddingRebuildResponseDto"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Embeddings are turned off"
-          }
-        },
-        "summary": "Purge every stored vector for this workspace and re-embed the corpus from scratch",
-        "tags": [
-          "embeddings"
-        ]
-      }
-    },
-    "/embeddings/status": {
-      "get": {
-        "operationId": "EmbeddingController_status",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/EmbeddingStatusResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Get semantic storage and search capability",
-        "tags": [
-          "embeddings"
-        ]
-      }
-    },
-    "/embeddings/reindex": {
-      "post": {
-        "operationId": "EmbeddingController_reindex",
-        "parameters": [],
-        "responses": {
-          "202": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/EmbeddingReindexResponseDto"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Embeddings are turned off"
-          }
-        },
-        "summary": "Reconcile stored findings and asset chunks into the configured embedding space",
-        "tags": [
-          "embeddings"
-        ]
-      }
-    },
-    "/sources/{sourceId}/embeddings/chunks": {
-      "post": {
-        "operationId": "EmbeddingController_chunks",
-        "parameters": [
-          {
-            "name": "sourceId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PutAssetChunksDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "summary": "Store asset chunk-to-content mappings",
-        "tags": [
-          "embeddings"
-        ]
-      }
-    },
-    "/embeddings/collection": {
-      "get": {
-        "operationId": "EmbeddingController_collection",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/EmbeddingCollectionPlanDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "What a scan should prepare for embedding in this workspace: text chunks, and which media in what form",
-        "tags": [
-          "embeddings"
-        ]
-      }
-    },
-    "/findings/{findingId}/similar": {
-      "get": {
-        "operationId": "EmbeddingController_similar",
-        "parameters": [
-          {
-            "name": "findingId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "maximum": 100,
-              "default": 20,
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/Object"
-                }
-              ]
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/SimilarFindingDto"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "summary": "Find semantically similar findings with ranking evidence",
-        "tags": [
-          "embeddings"
-        ]
-      }
-    },
-    "/embeddings/boilerplate-clusters": {
-      "get": {
-        "operationId": "EmbeddingController_boilerplateGlobal",
-        "parameters": [
-          {
-            "name": "threshold",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 0.8,
-              "maximum": 1,
-              "default": 0.95,
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/Object"
-                }
-              ]
-            }
-          },
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "maximum": 100,
-              "default": 50,
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/Object"
-                }
-              ]
-            }
-          },
-          {
-            "name": "sourceIds",
-            "required": false,
-            "in": "query",
-            "description": "Restrict clusters to findings from these sources; omit for the whole corpus",
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/BoilerplateClusterDto"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "summary": "Near-duplicate finding clusters across the corpus, optionally filtered to specific sources",
-        "tags": [
-          "embeddings"
-        ]
-      }
-    },
-    "/embeddings/recalibrate": {
-      "post": {
-        "operationId": "EmbeddingController_recalibrate",
-        "parameters": [],
-        "responses": {
-          "202": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/EmbeddingRecalibrateResponseDto"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Embeddings are turned off"
-          }
-        },
-        "summary": "Schedule a full evidence-ranking recalibration pass (importance scores, outliers, near-duplicate groups)",
-        "tags": [
-          "embeddings"
-        ]
-      }
-    },
-    "/sources/{sourceId}/boilerplate-clusters": {
-      "get": {
-        "operationId": "EmbeddingController_boilerplate",
-        "parameters": [
-          {
-            "name": "sourceId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "threshold",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 0.8,
-              "maximum": 1,
-              "default": 0.95,
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/Object"
-                }
-              ]
-            }
-          },
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "maximum": 100,
-              "default": 50,
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/Object"
-                }
-              ]
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/BoilerplateClusterDto"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "summary": "Near-duplicate finding clusters in a source (repeated boilerplate)",
-        "tags": [
-          "embeddings"
         ]
       }
     },
@@ -30275,7 +30517,7 @@
         "properties": {
           "source": {
             "type": "string",
-            "description": "Id or exact name of the source whose assets to read."
+            "description": "Id or exact name of the source whose assets to read. Leave out to read every source in the namespace."
           },
           "kind": {
             "type": "string",
@@ -30296,6 +30538,36 @@
               "type": "string"
             }
           },
+          "search": {
+            "type": "string",
+            "description": "Case-insensitive match on the asset name."
+          },
+          "status": {
+            "description": "Asset statuses (NEW, UPDATED, UNCHANGED, DELETED). Default: all but DELETED.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "term": {
+            "type": "object",
+            "description": "Assets with a current link to glossary terms: {\"keys\": [\"pii\"], \"includeNarrower\": true, \"methods\": [\"DECLARED\"]}."
+          },
+          "findings": {
+            "type": "object",
+            "description": "Assets that have findings matching: {\"detectorType\": [...], \"customDetectorKey\": [...], \"findingType\": [...], \"severity\": [...], \"status\": [...] (default OPEN), \"assertedBySourceId\": [...]}."
+          },
+          "semantic": {
+            "type": "object",
+            "description": "Meaning search, best match first: {\"query\": \"...\", \"mode\": \"hybrid\" | \"vector\"}. Ranks at most 200 assets; page with the returned cursor."
+          },
+          "include": {
+            "description": "Extras per asset. \"findings\": its first 50 open findings.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "limit": {
             "type": "number",
             "default": 1000,
@@ -30303,17 +30575,64 @@
           },
           "cursor": {
             "type": "string",
-            "description": "nextCursor from the previous page."
+            "description": "nextCursor from the previous page of the same query."
+          }
+        }
+      },
+      "RunnerAssetFindingSummaryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "detectorType": {
+            "type": "string"
+          },
+          "customDetectorKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "findingType": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "assertedBySourceId": {
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [
-          "source"
+          "id",
+          "detectorType",
+          "customDetectorKey",
+          "findingType",
+          "severity",
+          "status",
+          "assertedBySourceId"
         ]
       },
       "RunnerAssetQueryItemDto": {
         "type": "object",
         "properties": {
+          "id": {
+            "type": "string"
+          },
           "assetHash": {
+            "type": "string"
+          },
+          "urn": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourceId": {
+            "type": "string"
+          },
+          "sourceName": {
             "type": "string"
           },
           "externalId": {
@@ -30331,10 +30650,20 @@
           },
           "metadata": {
             "type": "object"
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RunnerAssetFindingSummaryDto"
+            }
           }
         },
         "required": [
+          "id",
           "assetHash",
+          "urn",
+          "sourceId",
+          "sourceName",
           "externalId",
           "name",
           "kind",
@@ -30354,16 +30683,454 @@
           "nextCursor": {
             "type": "string",
             "nullable": true
-          },
-          "callsRemaining": {
-            "type": "number",
-            "description": "Asset queries this run has left."
           }
         },
         "required": [
           "items",
-          "nextCursor",
-          "callsRemaining"
+          "nextCursor"
+        ]
+      },
+      "RunnerSourceQueryDto": {
+        "type": "object",
+        "properties": {
+          "search": {
+            "type": "string"
+          },
+          "type": {
+            "description": "Source types, e.g. POSTGRESQL.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "description": "Latest run status.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "limit": {
+            "type": "number",
+            "default": 1000,
+            "maximum": 5000
+          },
+          "cursor": {
+            "type": "string"
+          }
+        }
+      },
+      "RunnerSourceItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "runnerStatus": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "type",
+          "description",
+          "runnerStatus",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "RunnerSourceQueryResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RunnerSourceItemDto"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      },
+      "RunnerFindingQueryDto": {
+        "type": "object",
+        "properties": {
+          "detectorType": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "customDetectorKey": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "findingType": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "severity": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "description": "Default: OPEN.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sourceId": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "assetId": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "assertedBySourceId": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "limit": {
+            "type": "number",
+            "default": 1000,
+            "maximum": 5000
+          },
+          "cursor": {
+            "type": "string"
+          }
+        }
+      },
+      "RunnerFindingItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "assetId": {
+            "type": "string"
+          },
+          "sourceId": {
+            "type": "string"
+          },
+          "detectorType": {
+            "type": "string"
+          },
+          "customDetectorKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "customDetectorName": {
+            "type": "string",
+            "nullable": true
+          },
+          "findingType": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "number"
+          },
+          "content": {
+            "type": "string",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "nullable": true
+          },
+          "assertedBySourceId": {
+            "type": "string",
+            "nullable": true
+          },
+          "firstDetectedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastDetectedAt": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "assetId",
+          "sourceId",
+          "detectorType",
+          "customDetectorKey",
+          "customDetectorName",
+          "findingType",
+          "category",
+          "severity",
+          "status",
+          "confidence",
+          "content",
+          "metadata",
+          "assertedBySourceId",
+          "firstDetectedAt",
+          "lastDetectedAt"
+        ]
+      },
+      "RunnerFindingQueryResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RunnerFindingItemDto"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      },
+      "RunnerDetectorQueryDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "description": "Detector types, e.g. TAG, REGEX.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "includeInactive": {
+            "type": "boolean"
+          },
+          "limit": {
+            "type": "number",
+            "default": 1000,
+            "maximum": 5000
+          },
+          "cursor": {
+            "type": "string"
+          }
+        }
+      },
+      "RunnerDetectorItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "type": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "name",
+          "description",
+          "type",
+          "isActive",
+          "version"
+        ]
+      },
+      "RunnerDetectorQueryResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RunnerDetectorItemDto"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      },
+      "RunnerAugmentationTagDto": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "description": "Platform id of the asset (QueriedAsset.id)."
+          },
+          "key": {
+            "type": "string",
+            "description": "Key of an active Tag detector."
+          },
+          "value": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string",
+            "description": "Lowered to the Tag detector severity when it asks for more."
+          }
+        },
+        "required": [
+          "assetId",
+          "key",
+          "value"
+        ]
+      },
+      "RunnerAugmentationTagsDto": {
+        "type": "object",
+        "properties": {
+          "tags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RunnerAugmentationTagDto"
+            }
+          }
+        },
+        "required": [
+          "tags"
+        ]
+      },
+      "RunnerAugmentationResultDto": {
+        "type": "object",
+        "properties": {
+          "written": {
+            "type": "number"
+          },
+          "skipped": {
+            "type": "number",
+            "description": "Rows owned by someone else, left as they were."
+          }
+        },
+        "required": [
+          "written"
+        ]
+      },
+      "RunnerAugmentationEdgeDto": {
+        "type": "object",
+        "properties": {
+          "fromId": {
+            "type": "string"
+          },
+          "toId": {
+            "type": "string"
+          },
+          "fromUrn": {
+            "type": "string",
+            "description": "URN, or term://glossary/<key>."
+          },
+          "toUrn": {
+            "type": "string",
+            "description": "URN, or term://glossary/<key>."
+          },
+          "relationType": {
+            "type": "string"
+          },
+          "relationClass": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "number"
+          },
+          "evidence": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "relationType"
+        ]
+      },
+      "RunnerAugmentationEdgesDto": {
+        "type": "object",
+        "properties": {
+          "edges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RunnerAugmentationEdgeDto"
+            }
+          }
+        },
+        "required": [
+          "edges"
+        ]
+      },
+      "RunnerAugmentationFinishDto": {
+        "type": "object",
+        "properties": {
+          "retiredTags": {
+            "type": "number"
+          },
+          "retiredEdges": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "retiredTags",
+          "retiredEdges"
         ]
       },
       "RunnerAssetProgressDto": {
@@ -31287,6 +32054,1152 @@
           "reason",
           "derivation",
           "runs"
+        ]
+      },
+      "EmbeddingSettingValueDto": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "object",
+            "description": "Value currently in force for this workspace"
+          },
+          "deploymentDefault": {
+            "type": "object",
+            "description": "What the deployment configured (Helm values, or the image defaults)"
+          },
+          "overridden": {
+            "type": "boolean",
+            "description": "Whether this workspace overrides the default"
+          }
+        },
+        "required": [
+          "value",
+          "deploymentDefault",
+          "overridden"
+        ]
+      },
+      "EmbeddingLocalModelDownloadDto": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "number"
+          },
+          "image": {
+            "type": "number"
+          },
+          "audio": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "text"
+        ]
+      },
+      "EmbeddingLocalModelDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Hugging Face repository holding the ONNX files"
+          },
+          "label": {
+            "type": "string"
+          },
+          "dimensions": {
+            "type": "number"
+          },
+          "pooling": {
+            "type": "string",
+            "enum": [
+              "mean",
+              "cls",
+              "last_token",
+              "none"
+            ],
+            "description": "How the model is pooled. Picking the model resets pooling to this."
+          },
+          "mediaModalities": {
+            "type": "array",
+            "description": "What it embeds besides text. Empty for a text-only model.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "image",
+                "audio"
+              ]
+            }
+          },
+          "aliases": {
+            "description": "Other names accepted for it, such as the repository of the original (non-ONNX) weights",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "downloadMb": {
+            "nullable": true,
+            "description": "Megabytes fetched on first use at q8, where stated",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EmbeddingLocalModelDownloadDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "dimensions",
+          "pooling",
+          "mediaModalities",
+          "aliases"
+        ]
+      },
+      "EmbeddingAiProviderOptionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "baseUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "hasApiKey": {
+            "type": "boolean",
+            "description": "Whether an API key is stored for it"
+          },
+          "supportsEmbedding": {
+            "type": "boolean",
+            "description": "Whether the provider is marked as serving an embeddings endpoint"
+          },
+          "embeddingModalities": {
+            "type": "array",
+            "description": "What its embedding model takes besides text",
+            "items": {
+              "type": "string",
+              "enum": [
+                "image",
+                "audio"
+              ]
+            }
+          },
+          "embeddingMediaFormat": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "llama-cpp",
+              "gemini",
+              "openrouter"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "provider",
+          "hasApiKey",
+          "supportsEmbedding",
+          "embeddingModalities"
+        ]
+      },
+      "EmbeddingSpaceStatsDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "string"
+          },
+          "dimensions": {
+            "type": "number"
+          },
+          "pooling": {
+            "type": "string"
+          },
+          "normalized": {
+            "type": "boolean"
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Whether new vectors and searches use this space"
+          },
+          "vectors": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "lastRecalibratedAt": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "provider",
+          "model",
+          "revision",
+          "dimensions",
+          "pooling",
+          "normalized",
+          "isActive",
+          "vectors",
+          "createdAt"
+        ]
+      },
+      "EmbeddingStatsDto": {
+        "type": "object",
+        "properties": {
+          "spaces": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EmbeddingSpaceStatsDto"
+            }
+          },
+          "vectors": {
+            "type": "number",
+            "description": "Vectors stored in the active space"
+          },
+          "vectorsAllSpaces": {
+            "type": "number",
+            "description": "Vectors across every space — what actually occupies disk"
+          },
+          "storageBytes": {
+            "type": "number",
+            "nullable": true,
+            "description": "Bytes held by the vector table and its HNSW indexes"
+          },
+          "mediaChunks": {
+            "type": "number",
+            "description": "Pictures and sound clips stored for embedding, of every modality"
+          },
+          "mediaBytes": {
+            "type": "number",
+            "description": "Bytes those prepared media items occupy"
+          },
+          "analysisStorageBytes": {
+            "type": "number",
+            "nullable": true,
+            "description": "Bytes held by the evidence-ranking table derived from vectors"
+          },
+          "chunks": {
+            "type": "number",
+            "description": "Text chunks eligible for embedding (media is counted apart)"
+          },
+          "embeddableFindings": {
+            "type": "number",
+            "description": "Findings carrying embeddable evidence text"
+          },
+          "rankedFindings": {
+            "type": "number",
+            "description": "Findings ranked from the active space"
+          }
+        },
+        "required": [
+          "spaces",
+          "vectors",
+          "vectorsAllSpaces",
+          "mediaChunks",
+          "mediaBytes",
+          "chunks",
+          "embeddableFindings",
+          "rankedFindings"
+        ]
+      },
+      "EmbeddingSettingsResponseDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Semantic embedding is on for this workspace. Read-only here: it is turned on or off in Settings → Cleanup › Features (PUT /maintenance/features/embeddings)."
+          },
+          "disabledMode": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "kept",
+              "deleted"
+            ],
+            "description": "How embeddings were turned off: \"kept\" is a pause (vectors, rankings and text chunks stay, and scans keep saving chunks), \"deleted\" purged all of it. Null while on."
+          },
+          "provider": {
+            "type": "string",
+            "description": "transformers-js (local inference) or openai-compatible"
+          },
+          "model": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "string"
+          },
+          "dimensions": {
+            "type": "number"
+          },
+          "pooling": {
+            "type": "string"
+          },
+          "normalize": {
+            "type": "boolean"
+          },
+          "batchSize": {
+            "type": "number"
+          },
+          "workerConcurrency": {
+            "type": "number"
+          },
+          "maxParallelCalls": {
+            "type": "number"
+          },
+          "intraOpThreads": {
+            "type": "number"
+          },
+          "dtype": {
+            "type": "string"
+          },
+          "device": {
+            "type": "string"
+          },
+          "autoBackfill": {
+            "type": "boolean"
+          },
+          "hnswM": {
+            "type": "number"
+          },
+          "hnswEfConstruction": {
+            "type": "number"
+          },
+          "hnswEfSearch": {
+            "type": "number"
+          },
+          "embedImages": {
+            "type": "boolean",
+            "description": "Whether this workspace wants pictures embedded as pictures. Takes effect only on a model that can (see supportedMedia)."
+          },
+          "embedAudio": {
+            "type": "boolean",
+            "description": "Whether this workspace wants sound embedded as sound. Takes effect only on a model that can."
+          },
+          "supportedMedia": {
+            "type": "array",
+            "description": "What the model in use can embed besides text, in the same vector space",
+            "items": {
+              "type": "string",
+              "enum": [
+                "image",
+                "audio"
+              ]
+            }
+          },
+          "mediaModalities": {
+            "type": "array",
+            "description": "What is embedded besides text right now: wanted by the workspace and supported by the model",
+            "items": {
+              "type": "string",
+              "enum": [
+                "image",
+                "audio"
+              ]
+            }
+          },
+          "mediaFormat": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "llama-cpp",
+              "gemini",
+              "openrouter"
+            ],
+            "description": "Request shape the bound remote provider takes media in"
+          },
+          "localModels": {
+            "description": "Models the built-in provider is known to run",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EmbeddingLocalModelDto"
+            }
+          },
+          "aiProviderConfigId": {
+            "type": "string",
+            "nullable": true,
+            "description": "AI provider supplying the remote embedding endpoint and key"
+          },
+          "allowRemoteModels": {
+            "type": "boolean",
+            "description": "Whether this deployment may download models from Hugging Face. False by default in the all-in-one Docker image, which bakes in one pinned model so it works offline — a different local model cannot be fetched there unless EMBEDDING_ALLOW_REMOTE_MODELS is turned on."
+          },
+          "fields": {
+            "type": "object",
+            "description": "Per-field deployment defaults and whether this workspace overrides them",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/EmbeddingSettingValueDto"
+            }
+          },
+          "aiProviders": {
+            "description": "AI providers available to serve embeddings",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EmbeddingAiProviderOptionDto"
+            }
+          },
+          "rebuildTriggerFields": {
+            "description": "Fields that redefine the vector space, so changing them forces a rebuild",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "stats": {
+            "$ref": "#/components/schemas/EmbeddingStatsDto"
+          },
+          "rebuildRunning": {
+            "type": "boolean",
+            "description": "A rebuild is in flight right now"
+          },
+          "rebuildStartedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "rebuildCompletedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "rebuildError": {
+            "type": "string",
+            "nullable": true
+          },
+          "rebuildReason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "enabled",
+          "provider",
+          "model",
+          "revision",
+          "dimensions",
+          "pooling",
+          "normalize",
+          "batchSize",
+          "workerConcurrency",
+          "maxParallelCalls",
+          "intraOpThreads",
+          "dtype",
+          "device",
+          "autoBackfill",
+          "hnswM",
+          "hnswEfConstruction",
+          "hnswEfSearch",
+          "embedImages",
+          "embedAudio",
+          "supportedMedia",
+          "mediaModalities",
+          "localModels",
+          "allowRemoteModels",
+          "fields",
+          "aiProviders",
+          "rebuildTriggerFields",
+          "stats",
+          "rebuildRunning"
+        ]
+      },
+      "UpdateEmbeddingSettingsDto": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "transformers-js",
+              "openai-compatible"
+            ]
+          },
+          "model": {
+            "type": "string",
+            "nullable": true
+          },
+          "revision": {
+            "type": "string",
+            "nullable": true
+          },
+          "dimensions": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "maximum": 2000
+          },
+          "pooling": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "mean",
+              "cls",
+              "last_token",
+              "none"
+            ]
+          },
+          "normalize": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "aiProviderConfigId": {
+            "type": "string",
+            "nullable": true
+          },
+          "batchSize": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "maximum": 256
+          },
+          "workerConcurrency": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "maximum": 32
+          },
+          "maxParallelCalls": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "maximum": 32
+          },
+          "intraOpThreads": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "maximum": 16
+          },
+          "dtype": {
+            "type": "string",
+            "nullable": true
+          },
+          "device": {
+            "type": "string",
+            "nullable": true
+          },
+          "autoBackfill": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "embedImages": {
+            "type": "boolean",
+            "nullable": true,
+            "description": "Embed pictures as pictures when the model can. Turning it off deletes the stored pictures and their vectors."
+          },
+          "embedAudio": {
+            "type": "boolean",
+            "nullable": true,
+            "description": "Embed sound as sound when the model can. Turning it off deletes the stored clips and their vectors."
+          },
+          "hnswM": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 2,
+            "maximum": 100
+          },
+          "hnswEfConstruction": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 4,
+            "maximum": 2000
+          },
+          "hnswEfSearch": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "maximum": 2000
+          }
+        }
+      },
+      "UpdateEmbeddingSettingsResponseDto": {
+        "type": "object",
+        "properties": {
+          "settings": {
+            "$ref": "#/components/schemas/EmbeddingSettingsResponseDto"
+          },
+          "rebuildStarted": {
+            "type": "boolean",
+            "description": "The change redefined the vector space, so a rebuild was started"
+          },
+          "changedFields": {
+            "description": "Fields whose value changed",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "settings",
+          "rebuildStarted",
+          "changedFields"
+        ]
+      },
+      "EmbeddingRebuildResponseDto": {
+        "type": "object",
+        "properties": {
+          "started": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "started"
+        ]
+      },
+      "EmbeddingProviderHealthDto": {
+        "type": "object",
+        "properties": {
+          "workerDisabled": {
+            "type": "boolean",
+            "description": "The local inference worker is paused after repeated native failures"
+          },
+          "workerRetryAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "When the paused worker is probed again"
+          },
+          "requestErrorCount": {
+            "type": "number"
+          },
+          "lastRequestError": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastRequestErrorAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "workerCrashCount": {
+            "type": "number",
+            "description": "Native aborts of the forked inference child since this process started. onnxruntime can abort natively when an allocation fails under memory pressure; the fork contains that (the batch fails and is retried) but leaves nothing visible in the product, so it is counted here.",
+            "example": 0
+          },
+          "lastWorkerCrashAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "consecutiveWorkerFailures": {
+            "type": "number",
+            "description": "Native aborts since the last successful embed. The breaker opens when this reaches its threshold.",
+            "example": 0
+          },
+          "breakerTrips": {
+            "type": "number",
+            "description": "How many times the breaker has opened. Drives the cooldown backoff and resets on a successful embed.",
+            "example": 0
+          }
+        },
+        "required": [
+          "workerDisabled",
+          "requestErrorCount",
+          "workerCrashCount",
+          "consecutiveWorkerFailures",
+          "breakerTrips"
+        ]
+      },
+      "EmbeddingStatusResponseDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "pgvector": {
+            "type": "boolean"
+          },
+          "pgvectorVersion": {
+            "type": "string",
+            "nullable": true
+          },
+          "searchStrategy": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "dimensions": {
+            "type": "number"
+          },
+          "spaceId": {
+            "type": "string",
+            "nullable": true
+          },
+          "persistentQueue": {
+            "type": "boolean"
+          },
+          "pendingQueueWrites": {
+            "type": "number"
+          },
+          "workerRegistered": {
+            "type": "boolean"
+          },
+          "autoBackfill": {
+            "type": "boolean"
+          },
+          "backfillRunning": {
+            "type": "boolean"
+          },
+          "backfillStartedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "backfillCompletedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "backfillError": {
+            "type": "string",
+            "nullable": true
+          },
+          "recalibrationScheduled": {
+            "type": "boolean",
+            "description": "A recalibration pass is queued (debounced) but not yet running"
+          },
+          "recalibrationRunning": {
+            "type": "boolean"
+          },
+          "lastRecalibratedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastRecalibrationError": {
+            "type": "string",
+            "nullable": true
+          },
+          "embeddedRows": {
+            "type": "number",
+            "nullable": true,
+            "description": "Vectors stored in the active space"
+          },
+          "pendingEmbedJobs": {
+            "type": "number",
+            "nullable": true,
+            "description": "Embedding batches queued, active or deferred"
+          },
+          "embedJobFailureCount": {
+            "type": "number",
+            "description": "Embedding batches that failed since startup"
+          },
+          "lastEmbedJobError": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastEmbedJobErrorAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastEmbedSuccessAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "providerHealth": {
+            "description": "Inference worker health and circuit-breaker state",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EmbeddingProviderHealthDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "enabled",
+          "pgvector",
+          "searchStrategy",
+          "provider",
+          "model",
+          "dimensions",
+          "persistentQueue",
+          "pendingQueueWrites",
+          "workerRegistered",
+          "autoBackfill",
+          "backfillRunning",
+          "recalibrationScheduled",
+          "recalibrationRunning",
+          "embedJobFailureCount",
+          "providerHealth"
+        ]
+      },
+      "EmbeddingReindexResponseDto": {
+        "type": "object",
+        "properties": {
+          "started": {
+            "type": "boolean"
+          },
+          "spaceId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "started",
+          "spaceId"
+        ]
+      },
+      "AssetChunkDto": {
+        "type": "object",
+        "properties": {
+          "ordinal": {
+            "type": "number"
+          },
+          "page": {
+            "type": "number"
+          },
+          "charOffset": {
+            "type": "number"
+          },
+          "charLength": {
+            "type": "number"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ordinal",
+          "charOffset",
+          "charLength",
+          "text"
+        ]
+      },
+      "AssetMediaChunkDto": {
+        "type": "object",
+        "properties": {
+          "modality": {
+            "type": "string",
+            "enum": [
+              "image",
+              "audio"
+            ]
+          },
+          "mimeType": {
+            "type": "string",
+            "example": "image/jpeg"
+          },
+          "data": {
+            "type": "string",
+            "description": "The prepared bytes, base64-encoded"
+          },
+          "page": {
+            "type": "number",
+            "description": "Page, frame or clip number within the asset, from 1"
+          }
+        },
+        "required": [
+          "modality",
+          "mimeType",
+          "data"
+        ]
+      },
+      "PutAssetChunksDto": {
+        "type": "object",
+        "properties": {
+          "assetHash": {
+            "type": "string"
+          },
+          "chunks": {
+            "maxItems": 5000,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssetChunkDto"
+            }
+          },
+          "media": {
+            "maxItems": 64,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssetMediaChunkDto"
+            }
+          }
+        },
+        "required": [
+          "assetHash",
+          "chunks"
+        ]
+      },
+      "EmbeddingCollectionMediaDto": {
+        "type": "object",
+        "properties": {
+          "modality": {
+            "type": "string",
+            "enum": [
+              "image",
+              "audio"
+            ]
+          },
+          "mimeType": {
+            "type": "string",
+            "example": "image/jpeg"
+          },
+          "maxItems": {
+            "type": "number",
+            "description": "Most items taken from one asset"
+          },
+          "cacheKey": {
+            "type": "string",
+            "description": "Key the scan records in the asset scan-cache state, with `fingerprint` as its value, once this media was sent",
+            "example": "EMBED_MEDIA::image"
+          },
+          "fingerprint": {
+            "type": "string",
+            "description": "Changes whenever the way this kind of media is prepared changes; an asset recorded under another value sends its media again"
+          },
+          "maxEdge": {
+            "type": "number",
+            "description": "Pictures: longest edge, in pixels"
+          },
+          "quality": {
+            "type": "number",
+            "description": "Pictures: JPEG quality, 1-100"
+          },
+          "sampleRate": {
+            "type": "number",
+            "description": "Sound: sample rate, in Hz"
+          },
+          "clipSeconds": {
+            "type": "number",
+            "description": "Sound: length of one clip, in seconds"
+          }
+        },
+        "required": [
+          "modality",
+          "mimeType",
+          "maxItems",
+          "cacheKey",
+          "fingerprint"
+        ]
+      },
+      "EmbeddingCollectionPlanDto": {
+        "type": "object",
+        "properties": {
+          "chunks": {
+            "type": "boolean",
+            "description": "Whether text chunks are stored at all (false after embeddings were turned off and deleted)"
+          },
+          "media": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EmbeddingCollectionMediaDto"
+            }
+          }
+        },
+        "required": [
+          "chunks",
+          "media"
+        ]
+      },
+      "Object": {
+        "type": "object",
+        "properties": {}
+      },
+      "SimilarFindingAssetDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "SimilarFindingSourceDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "SimilarFindingEvidenceAnalysisDto": {
+        "type": "object",
+        "properties": {
+          "importanceScore": {
+            "type": "number"
+          },
+          "qualityScore": {
+            "type": "number"
+          },
+          "similarCount": {
+            "type": "number"
+          },
+          "duplicateGroupHash": {
+            "type": "string",
+            "nullable": true
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
+        },
+        "required": [
+          "importanceScore",
+          "qualityScore",
+          "similarCount",
+          "reasons"
+        ]
+      },
+      "SimilarFindingDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "findingType": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "matchedContent": {
+            "type": "string"
+          },
+          "similarity": {
+            "type": "number",
+            "minimum": -1,
+            "maximum": 1
+          },
+          "confidence": {
+            "type": "number"
+          },
+          "assetId": {
+            "type": "string"
+          },
+          "sourceId": {
+            "type": "string"
+          },
+          "asset": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SimilarFindingAssetDto"
+              }
+            ]
+          },
+          "source": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SimilarFindingSourceDto"
+              }
+            ]
+          },
+          "evidenceAnalysis": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SimilarFindingEvidenceAnalysisDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "findingType",
+          "severity",
+          "status",
+          "matchedContent",
+          "similarity",
+          "confidence",
+          "assetId",
+          "sourceId"
+        ]
+      },
+      "BoilerplateClusterDto": {
+        "type": "object",
+        "properties": {
+          "groupHash": {
+            "type": "string"
+          },
+          "findingCount": {
+            "type": "number"
+          },
+          "findingIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "meanImportance": {
+            "type": "number"
+          },
+          "sourceCount": {
+            "type": "number",
+            "description": "Distinct sources the cluster spans (>1 = cross-source)"
+          },
+          "sourceIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "assetIds": {
+            "description": "Assets containing the clustered findings (up to 50)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "threshold": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "groupHash",
+          "findingCount",
+          "findingIds",
+          "meanImportance",
+          "sourceCount",
+          "sourceIds",
+          "assetIds",
+          "threshold"
+        ]
+      },
+      "EmbeddingRecalibrateResponseDto": {
+        "type": "object",
+        "properties": {
+          "scheduled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "scheduled"
         ]
       },
       "NotebookCellDto": {
@@ -36958,1152 +38871,6 @@
         "required": [
           "deleted",
           "id"
-        ]
-      },
-      "EmbeddingSettingValueDto": {
-        "type": "object",
-        "properties": {
-          "value": {
-            "type": "object",
-            "description": "Value currently in force for this workspace"
-          },
-          "deploymentDefault": {
-            "type": "object",
-            "description": "What the deployment configured (Helm values, or the image defaults)"
-          },
-          "overridden": {
-            "type": "boolean",
-            "description": "Whether this workspace overrides the default"
-          }
-        },
-        "required": [
-          "value",
-          "deploymentDefault",
-          "overridden"
-        ]
-      },
-      "EmbeddingLocalModelDownloadDto": {
-        "type": "object",
-        "properties": {
-          "text": {
-            "type": "number"
-          },
-          "image": {
-            "type": "number"
-          },
-          "audio": {
-            "type": "number"
-          }
-        },
-        "required": [
-          "text"
-        ]
-      },
-      "EmbeddingLocalModelDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "description": "Hugging Face repository holding the ONNX files"
-          },
-          "label": {
-            "type": "string"
-          },
-          "dimensions": {
-            "type": "number"
-          },
-          "pooling": {
-            "type": "string",
-            "enum": [
-              "mean",
-              "cls",
-              "last_token",
-              "none"
-            ],
-            "description": "How the model is pooled. Picking the model resets pooling to this."
-          },
-          "mediaModalities": {
-            "type": "array",
-            "description": "What it embeds besides text. Empty for a text-only model.",
-            "items": {
-              "type": "string",
-              "enum": [
-                "image",
-                "audio"
-              ]
-            }
-          },
-          "aliases": {
-            "description": "Other names accepted for it, such as the repository of the original (non-ONNX) weights",
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "downloadMb": {
-            "nullable": true,
-            "description": "Megabytes fetched on first use at q8, where stated",
-            "type": "object",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/EmbeddingLocalModelDownloadDto"
-              }
-            ]
-          }
-        },
-        "required": [
-          "id",
-          "label",
-          "dimensions",
-          "pooling",
-          "mediaModalities",
-          "aliases"
-        ]
-      },
-      "EmbeddingAiProviderOptionDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "provider": {
-            "type": "string"
-          },
-          "baseUrl": {
-            "type": "string",
-            "nullable": true
-          },
-          "hasApiKey": {
-            "type": "boolean",
-            "description": "Whether an API key is stored for it"
-          },
-          "supportsEmbedding": {
-            "type": "boolean",
-            "description": "Whether the provider is marked as serving an embeddings endpoint"
-          },
-          "embeddingModalities": {
-            "type": "array",
-            "description": "What its embedding model takes besides text",
-            "items": {
-              "type": "string",
-              "enum": [
-                "image",
-                "audio"
-              ]
-            }
-          },
-          "embeddingMediaFormat": {
-            "type": "string",
-            "nullable": true,
-            "enum": [
-              "llama-cpp",
-              "gemini",
-              "openrouter"
-            ]
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "provider",
-          "hasApiKey",
-          "supportsEmbedding",
-          "embeddingModalities"
-        ]
-      },
-      "EmbeddingSpaceStatsDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "provider": {
-            "type": "string"
-          },
-          "model": {
-            "type": "string"
-          },
-          "revision": {
-            "type": "string"
-          },
-          "dimensions": {
-            "type": "number"
-          },
-          "pooling": {
-            "type": "string"
-          },
-          "normalized": {
-            "type": "boolean"
-          },
-          "isActive": {
-            "type": "boolean",
-            "description": "Whether new vectors and searches use this space"
-          },
-          "vectors": {
-            "type": "number"
-          },
-          "createdAt": {
-            "type": "string"
-          },
-          "lastRecalibratedAt": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "required": [
-          "id",
-          "provider",
-          "model",
-          "revision",
-          "dimensions",
-          "pooling",
-          "normalized",
-          "isActive",
-          "vectors",
-          "createdAt"
-        ]
-      },
-      "EmbeddingStatsDto": {
-        "type": "object",
-        "properties": {
-          "spaces": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/EmbeddingSpaceStatsDto"
-            }
-          },
-          "vectors": {
-            "type": "number",
-            "description": "Vectors stored in the active space"
-          },
-          "vectorsAllSpaces": {
-            "type": "number",
-            "description": "Vectors across every space — what actually occupies disk"
-          },
-          "storageBytes": {
-            "type": "number",
-            "nullable": true,
-            "description": "Bytes held by the vector table and its HNSW indexes"
-          },
-          "mediaChunks": {
-            "type": "number",
-            "description": "Pictures and sound clips stored for embedding, of every modality"
-          },
-          "mediaBytes": {
-            "type": "number",
-            "description": "Bytes those prepared media items occupy"
-          },
-          "analysisStorageBytes": {
-            "type": "number",
-            "nullable": true,
-            "description": "Bytes held by the evidence-ranking table derived from vectors"
-          },
-          "chunks": {
-            "type": "number",
-            "description": "Text chunks eligible for embedding (media is counted apart)"
-          },
-          "embeddableFindings": {
-            "type": "number",
-            "description": "Findings carrying embeddable evidence text"
-          },
-          "rankedFindings": {
-            "type": "number",
-            "description": "Findings ranked from the active space"
-          }
-        },
-        "required": [
-          "spaces",
-          "vectors",
-          "vectorsAllSpaces",
-          "mediaChunks",
-          "mediaBytes",
-          "chunks",
-          "embeddableFindings",
-          "rankedFindings"
-        ]
-      },
-      "EmbeddingSettingsResponseDto": {
-        "type": "object",
-        "properties": {
-          "enabled": {
-            "type": "boolean",
-            "description": "Semantic embedding is on for this workspace. Read-only here: it is turned on or off in Settings → Cleanup › Features (PUT /maintenance/features/embeddings)."
-          },
-          "disabledMode": {
-            "type": "string",
-            "nullable": true,
-            "enum": [
-              "kept",
-              "deleted"
-            ],
-            "description": "How embeddings were turned off: \"kept\" is a pause (vectors, rankings and text chunks stay, and scans keep saving chunks), \"deleted\" purged all of it. Null while on."
-          },
-          "provider": {
-            "type": "string",
-            "description": "transformers-js (local inference) or openai-compatible"
-          },
-          "model": {
-            "type": "string"
-          },
-          "revision": {
-            "type": "string"
-          },
-          "dimensions": {
-            "type": "number"
-          },
-          "pooling": {
-            "type": "string"
-          },
-          "normalize": {
-            "type": "boolean"
-          },
-          "batchSize": {
-            "type": "number"
-          },
-          "workerConcurrency": {
-            "type": "number"
-          },
-          "maxParallelCalls": {
-            "type": "number"
-          },
-          "intraOpThreads": {
-            "type": "number"
-          },
-          "dtype": {
-            "type": "string"
-          },
-          "device": {
-            "type": "string"
-          },
-          "autoBackfill": {
-            "type": "boolean"
-          },
-          "hnswM": {
-            "type": "number"
-          },
-          "hnswEfConstruction": {
-            "type": "number"
-          },
-          "hnswEfSearch": {
-            "type": "number"
-          },
-          "embedImages": {
-            "type": "boolean",
-            "description": "Whether this workspace wants pictures embedded as pictures. Takes effect only on a model that can (see supportedMedia)."
-          },
-          "embedAudio": {
-            "type": "boolean",
-            "description": "Whether this workspace wants sound embedded as sound. Takes effect only on a model that can."
-          },
-          "supportedMedia": {
-            "type": "array",
-            "description": "What the model in use can embed besides text, in the same vector space",
-            "items": {
-              "type": "string",
-              "enum": [
-                "image",
-                "audio"
-              ]
-            }
-          },
-          "mediaModalities": {
-            "type": "array",
-            "description": "What is embedded besides text right now: wanted by the workspace and supported by the model",
-            "items": {
-              "type": "string",
-              "enum": [
-                "image",
-                "audio"
-              ]
-            }
-          },
-          "mediaFormat": {
-            "type": "string",
-            "nullable": true,
-            "enum": [
-              "llama-cpp",
-              "gemini",
-              "openrouter"
-            ],
-            "description": "Request shape the bound remote provider takes media in"
-          },
-          "localModels": {
-            "description": "Models the built-in provider is known to run",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/EmbeddingLocalModelDto"
-            }
-          },
-          "aiProviderConfigId": {
-            "type": "string",
-            "nullable": true,
-            "description": "AI provider supplying the remote embedding endpoint and key"
-          },
-          "allowRemoteModels": {
-            "type": "boolean",
-            "description": "Whether this deployment may download models from Hugging Face. False by default in the all-in-one Docker image, which bakes in one pinned model so it works offline — a different local model cannot be fetched there unless EMBEDDING_ALLOW_REMOTE_MODELS is turned on."
-          },
-          "fields": {
-            "type": "object",
-            "description": "Per-field deployment defaults and whether this workspace overrides them",
-            "additionalProperties": {
-              "$ref": "#/components/schemas/EmbeddingSettingValueDto"
-            }
-          },
-          "aiProviders": {
-            "description": "AI providers available to serve embeddings",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/EmbeddingAiProviderOptionDto"
-            }
-          },
-          "rebuildTriggerFields": {
-            "description": "Fields that redefine the vector space, so changing them forces a rebuild",
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "stats": {
-            "$ref": "#/components/schemas/EmbeddingStatsDto"
-          },
-          "rebuildRunning": {
-            "type": "boolean",
-            "description": "A rebuild is in flight right now"
-          },
-          "rebuildStartedAt": {
-            "type": "string",
-            "nullable": true
-          },
-          "rebuildCompletedAt": {
-            "type": "string",
-            "nullable": true
-          },
-          "rebuildError": {
-            "type": "string",
-            "nullable": true
-          },
-          "rebuildReason": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "required": [
-          "enabled",
-          "provider",
-          "model",
-          "revision",
-          "dimensions",
-          "pooling",
-          "normalize",
-          "batchSize",
-          "workerConcurrency",
-          "maxParallelCalls",
-          "intraOpThreads",
-          "dtype",
-          "device",
-          "autoBackfill",
-          "hnswM",
-          "hnswEfConstruction",
-          "hnswEfSearch",
-          "embedImages",
-          "embedAudio",
-          "supportedMedia",
-          "mediaModalities",
-          "localModels",
-          "allowRemoteModels",
-          "fields",
-          "aiProviders",
-          "rebuildTriggerFields",
-          "stats",
-          "rebuildRunning"
-        ]
-      },
-      "UpdateEmbeddingSettingsDto": {
-        "type": "object",
-        "properties": {
-          "provider": {
-            "type": "string",
-            "nullable": true,
-            "enum": [
-              "transformers-js",
-              "openai-compatible"
-            ]
-          },
-          "model": {
-            "type": "string",
-            "nullable": true
-          },
-          "revision": {
-            "type": "string",
-            "nullable": true
-          },
-          "dimensions": {
-            "type": "number",
-            "nullable": true,
-            "minimum": 1,
-            "maximum": 2000
-          },
-          "pooling": {
-            "type": "string",
-            "nullable": true,
-            "enum": [
-              "mean",
-              "cls",
-              "last_token",
-              "none"
-            ]
-          },
-          "normalize": {
-            "type": "boolean",
-            "nullable": true
-          },
-          "aiProviderConfigId": {
-            "type": "string",
-            "nullable": true
-          },
-          "batchSize": {
-            "type": "number",
-            "nullable": true,
-            "minimum": 1,
-            "maximum": 256
-          },
-          "workerConcurrency": {
-            "type": "number",
-            "nullable": true,
-            "minimum": 1,
-            "maximum": 32
-          },
-          "maxParallelCalls": {
-            "type": "number",
-            "nullable": true,
-            "minimum": 1,
-            "maximum": 32
-          },
-          "intraOpThreads": {
-            "type": "number",
-            "nullable": true,
-            "minimum": 1,
-            "maximum": 16
-          },
-          "dtype": {
-            "type": "string",
-            "nullable": true
-          },
-          "device": {
-            "type": "string",
-            "nullable": true
-          },
-          "autoBackfill": {
-            "type": "boolean",
-            "nullable": true
-          },
-          "embedImages": {
-            "type": "boolean",
-            "nullable": true,
-            "description": "Embed pictures as pictures when the model can. Turning it off deletes the stored pictures and their vectors."
-          },
-          "embedAudio": {
-            "type": "boolean",
-            "nullable": true,
-            "description": "Embed sound as sound when the model can. Turning it off deletes the stored clips and their vectors."
-          },
-          "hnswM": {
-            "type": "number",
-            "nullable": true,
-            "minimum": 2,
-            "maximum": 100
-          },
-          "hnswEfConstruction": {
-            "type": "number",
-            "nullable": true,
-            "minimum": 4,
-            "maximum": 2000
-          },
-          "hnswEfSearch": {
-            "type": "number",
-            "nullable": true,
-            "minimum": 1,
-            "maximum": 2000
-          }
-        }
-      },
-      "UpdateEmbeddingSettingsResponseDto": {
-        "type": "object",
-        "properties": {
-          "settings": {
-            "$ref": "#/components/schemas/EmbeddingSettingsResponseDto"
-          },
-          "rebuildStarted": {
-            "type": "boolean",
-            "description": "The change redefined the vector space, so a rebuild was started"
-          },
-          "changedFields": {
-            "description": "Fields whose value changed",
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        },
-        "required": [
-          "settings",
-          "rebuildStarted",
-          "changedFields"
-        ]
-      },
-      "EmbeddingRebuildResponseDto": {
-        "type": "object",
-        "properties": {
-          "started": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "started"
-        ]
-      },
-      "EmbeddingProviderHealthDto": {
-        "type": "object",
-        "properties": {
-          "workerDisabled": {
-            "type": "boolean",
-            "description": "The local inference worker is paused after repeated native failures"
-          },
-          "workerRetryAt": {
-            "type": "string",
-            "nullable": true,
-            "description": "When the paused worker is probed again"
-          },
-          "requestErrorCount": {
-            "type": "number"
-          },
-          "lastRequestError": {
-            "type": "string",
-            "nullable": true
-          },
-          "lastRequestErrorAt": {
-            "type": "string",
-            "nullable": true
-          },
-          "workerCrashCount": {
-            "type": "number",
-            "description": "Native aborts of the forked inference child since this process started. onnxruntime can abort natively when an allocation fails under memory pressure; the fork contains that (the batch fails and is retried) but leaves nothing visible in the product, so it is counted here.",
-            "example": 0
-          },
-          "lastWorkerCrashAt": {
-            "type": "string",
-            "nullable": true
-          },
-          "consecutiveWorkerFailures": {
-            "type": "number",
-            "description": "Native aborts since the last successful embed. The breaker opens when this reaches its threshold.",
-            "example": 0
-          },
-          "breakerTrips": {
-            "type": "number",
-            "description": "How many times the breaker has opened. Drives the cooldown backoff and resets on a successful embed.",
-            "example": 0
-          }
-        },
-        "required": [
-          "workerDisabled",
-          "requestErrorCount",
-          "workerCrashCount",
-          "consecutiveWorkerFailures",
-          "breakerTrips"
-        ]
-      },
-      "EmbeddingStatusResponseDto": {
-        "type": "object",
-        "properties": {
-          "enabled": {
-            "type": "boolean"
-          },
-          "pgvector": {
-            "type": "boolean"
-          },
-          "pgvectorVersion": {
-            "type": "string",
-            "nullable": true
-          },
-          "searchStrategy": {
-            "type": "string"
-          },
-          "provider": {
-            "type": "string"
-          },
-          "model": {
-            "type": "string"
-          },
-          "dimensions": {
-            "type": "number"
-          },
-          "spaceId": {
-            "type": "string",
-            "nullable": true
-          },
-          "persistentQueue": {
-            "type": "boolean"
-          },
-          "pendingQueueWrites": {
-            "type": "number"
-          },
-          "workerRegistered": {
-            "type": "boolean"
-          },
-          "autoBackfill": {
-            "type": "boolean"
-          },
-          "backfillRunning": {
-            "type": "boolean"
-          },
-          "backfillStartedAt": {
-            "type": "string",
-            "nullable": true
-          },
-          "backfillCompletedAt": {
-            "type": "string",
-            "nullable": true
-          },
-          "backfillError": {
-            "type": "string",
-            "nullable": true
-          },
-          "recalibrationScheduled": {
-            "type": "boolean",
-            "description": "A recalibration pass is queued (debounced) but not yet running"
-          },
-          "recalibrationRunning": {
-            "type": "boolean"
-          },
-          "lastRecalibratedAt": {
-            "type": "string",
-            "nullable": true
-          },
-          "lastRecalibrationError": {
-            "type": "string",
-            "nullable": true
-          },
-          "embeddedRows": {
-            "type": "number",
-            "nullable": true,
-            "description": "Vectors stored in the active space"
-          },
-          "pendingEmbedJobs": {
-            "type": "number",
-            "nullable": true,
-            "description": "Embedding batches queued, active or deferred"
-          },
-          "embedJobFailureCount": {
-            "type": "number",
-            "description": "Embedding batches that failed since startup"
-          },
-          "lastEmbedJobError": {
-            "type": "string",
-            "nullable": true
-          },
-          "lastEmbedJobErrorAt": {
-            "type": "string",
-            "nullable": true
-          },
-          "lastEmbedSuccessAt": {
-            "type": "string",
-            "nullable": true
-          },
-          "providerHealth": {
-            "description": "Inference worker health and circuit-breaker state",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/EmbeddingProviderHealthDto"
-              }
-            ]
-          }
-        },
-        "required": [
-          "enabled",
-          "pgvector",
-          "searchStrategy",
-          "provider",
-          "model",
-          "dimensions",
-          "persistentQueue",
-          "pendingQueueWrites",
-          "workerRegistered",
-          "autoBackfill",
-          "backfillRunning",
-          "recalibrationScheduled",
-          "recalibrationRunning",
-          "embedJobFailureCount",
-          "providerHealth"
-        ]
-      },
-      "EmbeddingReindexResponseDto": {
-        "type": "object",
-        "properties": {
-          "started": {
-            "type": "boolean"
-          },
-          "spaceId": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "started",
-          "spaceId"
-        ]
-      },
-      "AssetChunkDto": {
-        "type": "object",
-        "properties": {
-          "ordinal": {
-            "type": "number"
-          },
-          "page": {
-            "type": "number"
-          },
-          "charOffset": {
-            "type": "number"
-          },
-          "charLength": {
-            "type": "number"
-          },
-          "text": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "ordinal",
-          "charOffset",
-          "charLength",
-          "text"
-        ]
-      },
-      "AssetMediaChunkDto": {
-        "type": "object",
-        "properties": {
-          "modality": {
-            "type": "string",
-            "enum": [
-              "image",
-              "audio"
-            ]
-          },
-          "mimeType": {
-            "type": "string",
-            "example": "image/jpeg"
-          },
-          "data": {
-            "type": "string",
-            "description": "The prepared bytes, base64-encoded"
-          },
-          "page": {
-            "type": "number",
-            "description": "Page, frame or clip number within the asset, from 1"
-          }
-        },
-        "required": [
-          "modality",
-          "mimeType",
-          "data"
-        ]
-      },
-      "PutAssetChunksDto": {
-        "type": "object",
-        "properties": {
-          "assetHash": {
-            "type": "string"
-          },
-          "chunks": {
-            "maxItems": 5000,
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/AssetChunkDto"
-            }
-          },
-          "media": {
-            "maxItems": 64,
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/AssetMediaChunkDto"
-            }
-          }
-        },
-        "required": [
-          "assetHash",
-          "chunks"
-        ]
-      },
-      "EmbeddingCollectionMediaDto": {
-        "type": "object",
-        "properties": {
-          "modality": {
-            "type": "string",
-            "enum": [
-              "image",
-              "audio"
-            ]
-          },
-          "mimeType": {
-            "type": "string",
-            "example": "image/jpeg"
-          },
-          "maxItems": {
-            "type": "number",
-            "description": "Most items taken from one asset"
-          },
-          "cacheKey": {
-            "type": "string",
-            "description": "Key the scan records in the asset scan-cache state, with `fingerprint` as its value, once this media was sent",
-            "example": "EMBED_MEDIA::image"
-          },
-          "fingerprint": {
-            "type": "string",
-            "description": "Changes whenever the way this kind of media is prepared changes; an asset recorded under another value sends its media again"
-          },
-          "maxEdge": {
-            "type": "number",
-            "description": "Pictures: longest edge, in pixels"
-          },
-          "quality": {
-            "type": "number",
-            "description": "Pictures: JPEG quality, 1-100"
-          },
-          "sampleRate": {
-            "type": "number",
-            "description": "Sound: sample rate, in Hz"
-          },
-          "clipSeconds": {
-            "type": "number",
-            "description": "Sound: length of one clip, in seconds"
-          }
-        },
-        "required": [
-          "modality",
-          "mimeType",
-          "maxItems",
-          "cacheKey",
-          "fingerprint"
-        ]
-      },
-      "EmbeddingCollectionPlanDto": {
-        "type": "object",
-        "properties": {
-          "chunks": {
-            "type": "boolean",
-            "description": "Whether text chunks are stored at all (false after embeddings were turned off and deleted)"
-          },
-          "media": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/EmbeddingCollectionMediaDto"
-            }
-          }
-        },
-        "required": [
-          "chunks",
-          "media"
-        ]
-      },
-      "Object": {
-        "type": "object",
-        "properties": {}
-      },
-      "SimilarFindingAssetDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "name"
-        ]
-      },
-      "SimilarFindingSourceDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "name"
-        ]
-      },
-      "SimilarFindingEvidenceAnalysisDto": {
-        "type": "object",
-        "properties": {
-          "importanceScore": {
-            "type": "number"
-          },
-          "qualityScore": {
-            "type": "number"
-          },
-          "similarCount": {
-            "type": "number"
-          },
-          "duplicateGroupHash": {
-            "type": "string",
-            "nullable": true
-          },
-          "reasons": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "additionalProperties": true
-            }
-          }
-        },
-        "required": [
-          "importanceScore",
-          "qualityScore",
-          "similarCount",
-          "reasons"
-        ]
-      },
-      "SimilarFindingDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "findingType": {
-            "type": "string"
-          },
-          "severity": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string"
-          },
-          "matchedContent": {
-            "type": "string"
-          },
-          "similarity": {
-            "type": "number",
-            "minimum": -1,
-            "maximum": 1
-          },
-          "confidence": {
-            "type": "number"
-          },
-          "assetId": {
-            "type": "string"
-          },
-          "sourceId": {
-            "type": "string"
-          },
-          "asset": {
-            "nullable": true,
-            "type": "object",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/SimilarFindingAssetDto"
-              }
-            ]
-          },
-          "source": {
-            "nullable": true,
-            "type": "object",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/SimilarFindingSourceDto"
-              }
-            ]
-          },
-          "evidenceAnalysis": {
-            "nullable": true,
-            "type": "object",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/SimilarFindingEvidenceAnalysisDto"
-              }
-            ]
-          }
-        },
-        "required": [
-          "id",
-          "findingType",
-          "severity",
-          "status",
-          "matchedContent",
-          "similarity",
-          "confidence",
-          "assetId",
-          "sourceId"
-        ]
-      },
-      "BoilerplateClusterDto": {
-        "type": "object",
-        "properties": {
-          "groupHash": {
-            "type": "string"
-          },
-          "findingCount": {
-            "type": "number"
-          },
-          "findingIds": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "meanImportance": {
-            "type": "number"
-          },
-          "sourceCount": {
-            "type": "number",
-            "description": "Distinct sources the cluster spans (>1 = cross-source)"
-          },
-          "sourceIds": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "assetIds": {
-            "description": "Assets containing the clustered findings (up to 50)",
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "threshold": {
-            "type": "number"
-          }
-        },
-        "required": [
-          "groupHash",
-          "findingCount",
-          "findingIds",
-          "meanImportance",
-          "sourceCount",
-          "sourceIds",
-          "assetIds",
-          "threshold"
-        ]
-      },
-      "EmbeddingRecalibrateResponseDto": {
-        "type": "object",
-        "properties": {
-          "scheduled": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "scheduled"
         ]
       },
       "TransferScopeDto": {

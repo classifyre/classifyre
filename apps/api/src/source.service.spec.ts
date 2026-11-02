@@ -280,15 +280,17 @@ describe('SourceService', () => {
 
     await service.deleteSource({ id: 'source-1' });
 
-    // Both endpoint sides, inside the transaction that deletes the source.
+    // Both endpoint sides, then what its notebooks linked elsewhere, inside
+    // the transaction that deletes the source.
     const statements = prisma.$executeRaw.mock.calls.map((call: any[]) =>
       (call[0] as string[]).join('?').replace(/\s+/g, ' '),
     );
-    expect(statements).toHaveLength(2);
+    expect(statements).toHaveLength(3);
     expect(statements[0]).toContain(
       "e.from_type = 'asset' AND e.from_id = a.id",
     );
     expect(statements[1]).toContain("e.to_type = 'asset' AND e.to_id = a.id");
+    expect(statements[2]).toContain('asserted_by_source_id = ?');
     expect(prisma.$executeRaw.mock.calls[0][1]).toBe('source-1');
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   });

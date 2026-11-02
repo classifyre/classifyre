@@ -663,6 +663,27 @@ client = ApiClient(
   paging still works — just less efficiently.
 </Callout>
 
+### Reading other sources
+
+A notebook can read what Classifyre already holds, in the same workspace, and
+write tags and links back onto other sources' assets. Every read is paged by
+cursor; there is no per-run call limit.
+
+| Call | Does |
+| --- | --- |
+| `ctx.query_assets(source=None, kind=, where=, search=, status=, term=, findings=, semantic=, include=, select=, exclude_visited=, limit=, cursor=, cohort=)` | A page of assets: `id`, `urn`, `source_id`, `source_name`, `name`, `kind`, `url`, `metadata`, and open `findings` when asked. Leave `source` out to read every source. |
+| `ctx.query_sources(search=, type=, status=)` | Sources, without configuration. |
+| `ctx.query_findings(detector=, detector_type=, finding_type=, severity=, status=, source=, asset=, asserted_by=)` | Findings, open unless you say otherwise. |
+| `ctx.query_detectors(type=)` | Custom detectors: key, name, type. |
+| `ctx.each_asset(...)`, `each_source`, `each_finding`, `each_detector` | Walk every page. |
+| `ctx.tag(asset, key, value)`, `ctx.link(a, b, relation)`, `ctx.means(asset, term)` | Write onto other sources' assets from `augment_sources()`. |
+
+Called from `extract()`, `query_assets` declares the run's coverage partial,
+since a connector that picks its cohort from a query never sees the rest of its
+source; pass `cohort=False` when the query only supplies inputs. Inside
+`augment_sources()` it does not. The full guide, with what a write records and
+when it is retired, is [Query and augment other sources](/sources/cross-source/).
+
 ### Resuming with your own cursor
 
 If your system pages by something other than a count — a token, a timestamp —

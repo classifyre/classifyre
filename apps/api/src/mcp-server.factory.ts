@@ -228,6 +228,31 @@ const DECISION_GUIDANCE =
   'Findings: a yes_no question yields finding type <name> when the probability reaches its threshold (default 0.5); choice and score yield <name>:<option label> with the model confidence, unless that option has report: false. Severity resolves option -> question -> detector. ' +
   'Ask about something observable, one thing per question, and give choice questions a catch-all option with report: false.';
 
+const CROSS_SOURCE_REFERENCE = `A CUSTOM source's notebook can read the whole namespace and write tags, links and glossary links onto assets of OTHER sources. Same namespace only; another source's credentials and configuration are never readable.
+
+Entry point: define \`def augment_sources():\` (no arguments; \`ctx\` is global). It runs after extract(). A notebook that defines it needs no extract(): it may own no assets.
+
+READ (scan only; every read is paged, at most 5000 per page; no call quota):
+  ctx.query_sources(search=, type=, status=, limit=, cursor=) -> SourcePage(items: QueriedSource, next_cursor)
+  ctx.query_assets(source=None|id|name, kind=, where=, search=, status=, term=, include_narrower=, findings={detector, detector_type, finding_type, severity, status, asserted_by, source, asset}, semantic="text", semantic_mode="hybrid"|"vector", include=("findings",), select=[metadata keys], exclude_visited=, limit=, cursor=, cohort=) -> AssetQueryPage
+      QueriedAsset: id, asset_hash, urn, source_id, source_name, external_id, name, kind, url, metadata, findings
+  ctx.query_findings(detector=, detector_type=, finding_type=, severity=, status= (default OPEN), source=, asset=, asserted_by=, limit=, cursor=) -> FindingPage
+  ctx.query_detectors(type=, include_inactive=, limit=, cursor=) -> DetectorPage (key, name, type; never the pipeline)
+  ctx.each_asset / each_source / each_finding / each_detector(**same filters) -> iterators over every page
+  detector -> findings: query_findings(detector=key). detector -> assets: query_assets(findings={"detector": key}).
+
+WRITE (buffered, sent in batches, flushed at the end of augment_sources()):
+  ctx.tag(asset, key, value, severity=None)   key = an ACTIVE Tag detector's key; unknown keys are refused with the valid list. Not for this source's own assets (use Asset(tags=...)).
+  ctx.tags(asset, {key: value, ...})
+  ctx.link(source, target, relation="REFERENCES", relation_class=, method=, confidence=, evidence=)   ends: QueriedAsset | asset id | URN
+  ctx.means(asset, "glossary-term-key")       glossary link (MEANS); a term that does not exist yet links once defined.
+  asset arguments are QueriedAsset objects or their ids.
+
+PROVENANCE: every tag/link records the writing source and run. It never overwrites the asset's own tags or another author's; an edge a connector, person or another source holds is left alone (counted as skipped).
+RETIRE: after augment_sources() completes without error/abort and without ctx.set_partial_coverage(), what this source wrote in earlier runs and did not write now is retired (tags resolve, links removed). Never touches anything it did not write.
+
+Read inputs with cohort=False semantics inside augment_sources() (the default there); in extract() a query_assets() call declares partial coverage unless cohort=False.`;
+
 function jsonResult(payload: unknown) {
   let bounded = payload;
   let truncated = false;
@@ -1708,6 +1733,71 @@ export class McpServerFactoryService {
         this.mcpToolExecutor.assertNotDemoMode();
         await this.sourceFilesService.delete(sourceId, fileId);
         return jsonResult({ deleted: true, fileId });
+      },
+    );
+
+    server.registerTool(
+      'describe_notebook_cross_source',
+      {
+        title: 'Describe Cross-Source Notebook SDK',
+        description:
+          'Reference for writing a CUSTOM notebook that queries other sources and tags/links their assets: the ctx.query_* reads, ctx.tag/ctx.link/ctx.means writes, provenance and retire rules. Read it before authoring augment_sources(). Starter examples: get_source_schema type=CUSTOM -> "Query other sources" and "Augment other sources".',
+        inputSchema: {},
+        annotations: { readOnlyHint: true, idempotentHint: true },
+      },
+      () =>
+        Promise.resolve({
+          content: [{ type: 'text' as const, text: CROSS_SOURCE_REFERENCE }],
+        }),
+    );
+
+    server.registerTool(
+      'list_source_augmentations',
+      {
+        title: 'List Source Augmentations',
+        description:
+          'What a source\'s notebooks put onto assets of OTHER sources: kind "tags" (findings with the target asset, tag key and value) or kind "edges" (links and glossary links). Paged by cursor.',
+        inputSchema: {
+          source_id: z.string().describe('The augmenting (writing) source'),
+          kind: z.enum(['tags', 'edges']),
+          limit: z.number().int().min(1).max(1000).optional(),
+          cursor: z
+            .string()
+            .optional()
+            .describe('nextCursor of the previous page'),
+        },
+        annotations: { readOnlyHint: true, idempotentHint: true },
+      },
+      async ({ source_id, kind, limit, cursor }) =>
+        jsonResult(
+          await this.sourceService.listAugmentations(
+            source_id,
+            kind,
+            limit,
+            cursor,
+          ),
+        ),
+    );
+
+    server.registerTool(
+      'retract_source_augmentations',
+      {
+        title: 'Retract Source Augmentations',
+        description:
+          "Take back everything a source's notebooks put onto other sources' assets: its tags resolve and its links are removed. Anything a connector, a person or another source wrote is untouched. The source asserts again on its next run if its notebook still means it.",
+        inputSchema: z.strictObject({
+          source_id: z.string(),
+          confirm: z
+            .literal(true)
+            .describe('Must be true — acknowledges the retraction'),
+        }),
+        annotations: { readOnlyHint: false, destructiveHint: true },
+      },
+      async ({ source_id }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        return jsonResult(
+          await this.sourceService.retractAugmentations(source_id),
+        );
       },
     );
 

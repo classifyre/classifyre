@@ -13,6 +13,14 @@
  */
 
 import { mapValues } from '../runtime';
+import type { RunnerAssetFindingSummaryDto } from './RunnerAssetFindingSummaryDto';
+import {
+    RunnerAssetFindingSummaryDtoFromJSON,
+    RunnerAssetFindingSummaryDtoFromJSONTyped,
+    RunnerAssetFindingSummaryDtoToJSON,
+    RunnerAssetFindingSummaryDtoToJSONTyped,
+} from './RunnerAssetFindingSummaryDto';
+
 /**
  * 
  * @export
@@ -24,7 +32,31 @@ export interface RunnerAssetQueryItemDto {
      * @type {string}
      * @memberof RunnerAssetQueryItemDto
      */
+    id: string;
+    /**
+     * 
+     * @type {string}
+     * @memberof RunnerAssetQueryItemDto
+     */
     assetHash: string;
+    /**
+     * 
+     * @type {string}
+     * @memberof RunnerAssetQueryItemDto
+     */
+    urn: string | null;
+    /**
+     * 
+     * @type {string}
+     * @memberof RunnerAssetQueryItemDto
+     */
+    sourceId: string;
+    /**
+     * 
+     * @type {string}
+     * @memberof RunnerAssetQueryItemDto
+     */
+    sourceName: string;
     /**
      * 
      * @type {string}
@@ -55,13 +87,23 @@ export interface RunnerAssetQueryItemDto {
      * @memberof RunnerAssetQueryItemDto
      */
     metadata: object;
+    /**
+     * 
+     * @type {Array<RunnerAssetFindingSummaryDto>}
+     * @memberof RunnerAssetQueryItemDto
+     */
+    findings?: Array<RunnerAssetFindingSummaryDto>;
 }
 
 /**
  * Check if a given object implements the RunnerAssetQueryItemDto interface.
  */
 export function instanceOfRunnerAssetQueryItemDto(value: object): value is RunnerAssetQueryItemDto {
+    if (!('id' in value) || value['id'] === undefined) return false;
     if (!('assetHash' in value) || value['assetHash'] === undefined) return false;
+    if (!('urn' in value) || value['urn'] === undefined) return false;
+    if (!('sourceId' in value) || value['sourceId'] === undefined) return false;
+    if (!('sourceName' in value) || value['sourceName'] === undefined) return false;
     if (!('externalId' in value) || value['externalId'] === undefined) return false;
     if (!('name' in value) || value['name'] === undefined) return false;
     if (!('kind' in value) || value['kind'] === undefined) return false;
@@ -80,12 +122,17 @@ export function RunnerAssetQueryItemDtoFromJSONTyped(json: any, ignoreDiscrimina
     }
     return {
         
+        'id': json['id'],
         'assetHash': json['assetHash'],
+        'urn': json['urn'],
+        'sourceId': json['sourceId'],
+        'sourceName': json['sourceName'],
         'externalId': json['externalId'],
         'name': json['name'],
         'kind': json['kind'],
         'url': json['url'],
         'metadata': json['metadata'],
+        'findings': json['findings'] == null ? undefined : ((json['findings'] as Array<any>).map(RunnerAssetFindingSummaryDtoFromJSON)),
     };
 }
 
@@ -100,12 +147,17 @@ export function RunnerAssetQueryItemDtoToJSONTyped(value?: RunnerAssetQueryItemD
 
     return {
         
+        'id': value['id'],
         'assetHash': value['assetHash'],
+        'urn': value['urn'],
+        'sourceId': value['sourceId'],
+        'sourceName': value['sourceName'],
         'externalId': value['externalId'],
         'name': value['name'],
         'kind': value['kind'],
         'url': value['url'],
         'metadata': value['metadata'],
+        'findings': value['findings'] == null ? undefined : ((value['findings'] as Array<any>).map(RunnerAssetFindingSummaryDtoToJSON)),
     };
 }
 

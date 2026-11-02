@@ -16,11 +16,15 @@ import { DemoModeService } from '../demo-mode.service';
 import { InternalApiKeyService } from '../internal-api-key.service';
 import { ExportModule } from '../export/export.module';
 import { RunnerAssetQueryService } from './runner-asset-query.service';
+import { RunnerCatalogQueryService } from './runner-catalog-query.service';
+import { RunnerAugmentationService } from './runner-augmentation.service';
+import { GraphService } from '../graph.service';
+import { EmbeddingModule } from '../embedding/embedding.module';
 import { CohortWeightsService } from '../cohort/cohort-weights.service';
 import { CohortController } from '../cohort/cohort.controller';
 
 @Module({
-  imports: [ExportModule],
+  imports: [ExportModule, EmbeddingModule],
   providers: [
     CliRunnerService,
     PrismaService,
@@ -34,6 +38,9 @@ import { CohortController } from '../cohort/cohort.controller';
     InternalApiKeyService,
     RunnerLogStorageService,
     RunnerAssetQueryService,
+    RunnerCatalogQueryService,
+    RunnerAugmentationService,
+    GraphService,
     CohortWeightsService,
   ],
   controllers: [CliRunnerController, SearchRunnersController, CohortController],

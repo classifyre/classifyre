@@ -20,11 +20,11 @@ import { mapValues } from '../runtime';
  */
 export interface RunnerAssetQueryDto {
     /**
-     * Id or exact name of the source whose assets to read.
+     * Id or exact name of the source whose assets to read. Leave out to read every source in the namespace.
      * @type {string}
      * @memberof RunnerAssetQueryDto
      */
-    source: string;
+    source?: string;
     /**
      * Asset kind, e.g. "record".
      * @type {string}
@@ -50,13 +50,49 @@ export interface RunnerAssetQueryDto {
      */
     select?: Array<string>;
     /**
+     * Case-insensitive match on the asset name.
+     * @type {string}
+     * @memberof RunnerAssetQueryDto
+     */
+    search?: string;
+    /**
+     * Asset statuses (NEW, UPDATED, UNCHANGED, DELETED). Default: all but DELETED.
+     * @type {Array<string>}
+     * @memberof RunnerAssetQueryDto
+     */
+    status?: Array<string>;
+    /**
+     * Assets with a current link to glossary terms: {"keys": ["pii"], "includeNarrower": true, "methods": ["DECLARED"]}.
+     * @type {object}
+     * @memberof RunnerAssetQueryDto
+     */
+    term?: object;
+    /**
+     * Assets that have findings matching: {"detectorType": [...], "customDetectorKey": [...], "findingType": [...], "severity": [...], "status": [...] (default OPEN), "assertedBySourceId": [...]}.
+     * @type {object}
+     * @memberof RunnerAssetQueryDto
+     */
+    findings?: object;
+    /**
+     * Meaning search, best match first: {"query": "...", "mode": "hybrid" | "vector"}. Ranks at most 200 assets; page with the returned cursor.
+     * @type {object}
+     * @memberof RunnerAssetQueryDto
+     */
+    semantic?: object;
+    /**
+     * Extras per asset. "findings": its first 50 open findings.
+     * @type {Array<string>}
+     * @memberof RunnerAssetQueryDto
+     */
+    include?: Array<string>;
+    /**
      * 
      * @type {number}
      * @memberof RunnerAssetQueryDto
      */
     limit?: number;
     /**
-     * nextCursor from the previous page.
+     * nextCursor from the previous page of the same query.
      * @type {string}
      * @memberof RunnerAssetQueryDto
      */
@@ -67,7 +103,6 @@ export interface RunnerAssetQueryDto {
  * Check if a given object implements the RunnerAssetQueryDto interface.
  */
 export function instanceOfRunnerAssetQueryDto(value: object): value is RunnerAssetQueryDto {
-    if (!('source' in value) || value['source'] === undefined) return false;
     return true;
 }
 
@@ -81,11 +116,17 @@ export function RunnerAssetQueryDtoFromJSONTyped(json: any, ignoreDiscriminator:
     }
     return {
         
-        'source': json['source'],
+        'source': json['source'] == null ? undefined : json['source'],
         'kind': json['kind'] == null ? undefined : json['kind'],
         'where': json['where'] == null ? undefined : json['where'],
         'excludeVisited': json['excludeVisited'] == null ? undefined : json['excludeVisited'],
         'select': json['select'] == null ? undefined : json['select'],
+        'search': json['search'] == null ? undefined : json['search'],
+        'status': json['status'] == null ? undefined : json['status'],
+        'term': json['term'] == null ? undefined : json['term'],
+        'findings': json['findings'] == null ? undefined : json['findings'],
+        'semantic': json['semantic'] == null ? undefined : json['semantic'],
+        'include': json['include'] == null ? undefined : json['include'],
         'limit': json['limit'] == null ? undefined : json['limit'],
         'cursor': json['cursor'] == null ? undefined : json['cursor'],
     };
@@ -107,6 +148,12 @@ export function RunnerAssetQueryDtoToJSONTyped(value?: RunnerAssetQueryDto | nul
         'where': value['where'],
         'excludeVisited': value['excludeVisited'],
         'select': value['select'],
+        'search': value['search'],
+        'status': value['status'],
+        'term': value['term'],
+        'findings': value['findings'],
+        'semantic': value['semantic'],
+        'include': value['include'],
         'limit': value['limit'],
         'cursor': value['cursor'],
     };

@@ -91,6 +91,7 @@ model Source {
   autopilotDirtyAt           DateTime?                   @map("autopilot_dirty_at")
   assets                     Asset[]
   findings                   Finding[]
+  assertedFindings           Finding[]                   @relation("FindingAssertedBy")
   customDetectorFeedback     CustomDetectorFeedback[]
   customDetectorTrainingRuns CustomDetectorTrainingRun[]
   runners                    Runner[]
@@ -345,6 +346,11 @@ model Finding {
   assetId            String       @map("asset_id")
   sourceId           String       @map("source_id")
   runnerId           String?      @map("runner_id")
+  // Set only on a tag another source's notebook put on this asset
+  // (ctx.tag()): the source that asserted it and the run that last did. Null
+  // for everything a detector found. A run retires only what it asserted.
+  assertedBySourceId String?      @map("asserted_by_source_id")
+  assertedByRunnerId String?      @map("asserted_by_runner_id")
   detectorType       DetectorType @map("detector_type")
   findingType        String       @map("finding_type")
   category           String
@@ -387,6 +393,7 @@ model Finding {
 
   asset                  Asset                     @relation(fields: [assetId], references: [id], onDelete: Cascade)
   source                 Source                    @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  assertedBy             Source?                   @relation("FindingAssertedBy", fields: [assertedBySourceId], references: [id], onDelete: Cascade)
   customDetector         CustomDetector?           @relation(fields: [customDetectorId], references: [id], onDelete: SetNull)
   customDetectorFeedback CustomDetectorFeedback[]
   notifications          Notification[]
@@ -399,6 +406,7 @@ model Finding {
   // carrying a third 509 MB copy of the same column only competes for cache.
   @@index([sourceId])
   @@index([runnerId])
+  @@index([assertedBySourceId, assertedByRunnerId])
   @@index([detectorType])
   // Detector usage stats group by detector and count distinct sources; the
   // trailing sourceId keeps that an index-only scan. Supersedes the
@@ -872,10 +880,6 @@ model Runner {
   /// produced a new HIGH/CRITICAL finding, and the weights the run used. Read
   /// to set the next run's split (cohort/cohort-weights.ts).
   cohortYield          Json?                @map("cohort_yield") @db.JsonB
-  // ctx.query_assets() calls this run has made, against
-  // ASSET_QUERY_CALLS_PER_RUN. A column, not memory: API replicas do not share
-  // a Map, and a restart must not refund the budget.
-  assetQueryCalls      Int                  @default(0) @map("asset_query_calls")
   errorMessage         String?              @map("error_message")
   errorDetails         Json?                @map("error_details")
   jobName              String?              @map("job_name")
@@ -1574,10 +1578,17 @@ model Edge {
   // accumulating a decade of dead links — the failure mode of long-lived
   // catalogs. Manual edges are never expired automatically.
   lastSeenAt    DateTime        @default(now()) @map("last_seen_at")
+  // The source whose notebook asserted this edge on assets it does not own
+  // (ctx.link(), ctx.means()), and the run that last did. Null for edges a
+  // connector or a person wrote. No foreign key: edges name their endpoints by
+  // (type, id) too, and source deletion removes these rows explicitly.
+  assertedBySourceId String? @map("asserted_by_source_id")
+  assertedByRunnerId String? @map("asserted_by_runner_id")
 
   @@unique([fromType, fromId, toType, toId, relationType])
   @@index([fromType, fromId])
   @@index([toType, toId])
+  @@index([assertedBySourceId, assertedByRunnerId])
   // No index on relationType alone. It holds seven values across millions of
   // rows, and every query that filters on it also pins an endpoint — so the
   // planner reaches for [fromType, fromId] or [toType, toId] instead. Measured

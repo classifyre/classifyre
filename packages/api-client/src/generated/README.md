@@ -375,17 +375,23 @@ All URIs are relative to *http://localhost*
 *NotificationsApi* | [**notificationsControllerMarkAllRead**](docs/NotificationsApi.md#notificationscontrollermarkallread) | **PATCH** /notifications/mark-all-read | Mark all notifications as read
 *NotificationsApi* | [**notificationsControllerMarkRead**](docs/NotificationsApi.md#notificationscontrollermarkread) | **PATCH** /notifications/{id}/read | Mark a notification as read
 *NotificationsApi* | [**notificationsControllerSetImportant**](docs/NotificationsApi.md#notificationscontrollersetimportant) | **PATCH** /notifications/{id}/important | Set notification importance
+*RunnersApi* | [**cliRunnerControllerAugmentEdges**](docs/RunnersApi.md#clirunnercontrolleraugmentedges) | **POST** /runners/{runnerId}/augmentations/edges | Link assets and glossary terms, for a running connector
+*RunnersApi* | [**cliRunnerControllerAugmentTags**](docs/RunnersApi.md#clirunnercontrolleraugmenttags) | **POST** /runners/{runnerId}/augmentations/tags | Tag assets of other sources, for a running connector
 *RunnersApi* | [**cliRunnerControllerBulkDeleteRunners**](docs/RunnersApi.md#clirunnercontrollerbulkdeleterunners) | **POST** /runners/bulk-delete | Delete many scan records at once
 *RunnersApi* | [**cliRunnerControllerBulkRerunScans**](docs/RunnersApi.md#clirunnercontrollerbulkrerunscans) | **POST** /runners/bulk-rerun | Start a fresh scan for many runs at once
 *RunnersApi* | [**cliRunnerControllerBulkStopRunners**](docs/RunnersApi.md#clirunnercontrollerbulkstoprunners) | **POST** /runners/bulk-stop | Stop many scans at once
 *RunnersApi* | [**cliRunnerControllerCreateExternalRunner**](docs/RunnersApi.md#clirunnercontrollercreateexternalrunner) | **POST** /sources/{sourceId}/runners/external | Create runner record for external CLI REST ingestion
 *RunnersApi* | [**cliRunnerControllerDeleteRunner**](docs/RunnersApi.md#clirunnercontrollerdeleterunner) | **DELETE** /runners/{runnerId} | Delete runner metadata and cleanup filesystem logs for this runner
+*RunnersApi* | [**cliRunnerControllerFinishAugmentation**](docs/RunnersApi.md#clirunnercontrollerfinishaugmentation) | **POST** /runners/{runnerId}/augmentations/finish | Retire what this source stopped asserting
 *RunnersApi* | [**cliRunnerControllerGetRunner**](docs/RunnersApi.md#clirunnercontrollergetrunner) | **GET** /runners/{runnerId} | Get runner status and details
 *RunnersApi* | [**cliRunnerControllerGetRunnerAssetProgress**](docs/RunnersApi.md#clirunnercontrollergetrunnerassetprogress) | **GET** /runners/{runnerId}/assets/progress | Get runner asset processing progress
 *RunnersApi* | [**cliRunnerControllerGetRunnerQueuePosition**](docs/RunnersApi.md#clirunnercontrollergetrunnerqueueposition) | **GET** /runners/{runnerId}/queue-position | Why a queued run has not started yet
 *RunnersApi* | [**cliRunnerControllerListRunners**](docs/RunnersApi.md#clirunnercontrollerlistrunners) | **GET** /runners | List all runners
 *RunnersApi* | [**cliRunnerControllerListSourceRunners**](docs/RunnersApi.md#clirunnercontrollerlistsourcerunners) | **GET** /sources/{sourceId}/runners | List runners for source
 *RunnersApi* | [**cliRunnerControllerQueryAssets**](docs/RunnersApi.md#clirunnercontrollerqueryassets) | **POST** /runners/{runnerId}/assets/query | Read assets of a source in this namespace, for a running connector
+*RunnersApi* | [**cliRunnerControllerQueryDetectors**](docs/RunnersApi.md#clirunnercontrollerquerydetectors) | **POST** /runners/{runnerId}/detectors/query | List custom detectors, for a running connector
+*RunnersApi* | [**cliRunnerControllerQueryFindings**](docs/RunnersApi.md#clirunnercontrollerqueryfindings) | **POST** /runners/{runnerId}/findings/query | Read findings of this namespace, for a running connector
+*RunnersApi* | [**cliRunnerControllerQuerySources**](docs/RunnersApi.md#clirunnercontrollerquerysources) | **POST** /runners/{runnerId}/sources/query | List sources of this namespace, for a running connector
 *RunnersApi* | [**cliRunnerControllerRegisterDiscoveredAssets**](docs/RunnersApi.md#clirunnercontrollerregisterdiscoveredassets) | **POST** /runners/{runnerId}/assets/discover | Register discovered asset hashes for a runner
 *RunnersApi* | [**cliRunnerControllerSearchRunnerLogs**](docs/RunnersApi.md#clirunnercontrollersearchrunnerlogs) | **POST** /runners/{runnerId}/logs | Search runner logs with server-side filtering, full-text search, and sort
 *RunnersApi* | [**cliRunnerControllerStartRunner**](docs/RunnersApi.md#clirunnercontrollerstartrunner) | **POST** /sources/{sourceId}/run | Start CLI runner for source
@@ -862,16 +868,32 @@ All URIs are relative to *http://localhost*
 - [ReviewSourceNodeDto](docs/ReviewSourceNodeDto.md)
 - [ReviewWaterfallDto](docs/ReviewWaterfallDto.md)
 - [ReviewWaterfallRowDto](docs/ReviewWaterfallRowDto.md)
+- [RunnerAssetFindingSummaryDto](docs/RunnerAssetFindingSummaryDto.md)
 - [RunnerAssetItemDto](docs/RunnerAssetItemDto.md)
 - [RunnerAssetProgressDto](docs/RunnerAssetProgressDto.md)
 - [RunnerAssetQueryDto](docs/RunnerAssetQueryDto.md)
 - [RunnerAssetQueryItemDto](docs/RunnerAssetQueryItemDto.md)
 - [RunnerAssetQueryResponseDto](docs/RunnerAssetQueryResponseDto.md)
 - [RunnerAssetStatusUpdateItem](docs/RunnerAssetStatusUpdateItem.md)
+- [RunnerAugmentationEdgeDto](docs/RunnerAugmentationEdgeDto.md)
+- [RunnerAugmentationEdgesDto](docs/RunnerAugmentationEdgesDto.md)
+- [RunnerAugmentationFinishDto](docs/RunnerAugmentationFinishDto.md)
+- [RunnerAugmentationResultDto](docs/RunnerAugmentationResultDto.md)
+- [RunnerAugmentationTagDto](docs/RunnerAugmentationTagDto.md)
+- [RunnerAugmentationTagsDto](docs/RunnerAugmentationTagsDto.md)
+- [RunnerDetectorItemDto](docs/RunnerDetectorItemDto.md)
+- [RunnerDetectorQueryDto](docs/RunnerDetectorQueryDto.md)
+- [RunnerDetectorQueryResponseDto](docs/RunnerDetectorQueryResponseDto.md)
 - [RunnerDto](docs/RunnerDto.md)
+- [RunnerFindingItemDto](docs/RunnerFindingItemDto.md)
+- [RunnerFindingQueryDto](docs/RunnerFindingQueryDto.md)
+- [RunnerFindingQueryResponseDto](docs/RunnerFindingQueryResponseDto.md)
 - [RunnerLogEntryDto](docs/RunnerLogEntryDto.md)
 - [RunnerLogsResponseDto](docs/RunnerLogsResponseDto.md)
 - [RunnerQueuePositionDto](docs/RunnerQueuePositionDto.md)
+- [RunnerSourceItemDto](docs/RunnerSourceItemDto.md)
+- [RunnerSourceQueryDto](docs/RunnerSourceQueryDto.md)
+- [RunnerSourceQueryResponseDto](docs/RunnerSourceQueryResponseDto.md)
 - [RunnersChartsTimelineBucketDto](docs/RunnersChartsTimelineBucketDto.md)
 - [RunnersChartsTopSourceDto](docs/RunnersChartsTopSourceDto.md)
 - [RunnersChartsTotalsDto](docs/RunnersChartsTotalsDto.md)

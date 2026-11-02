@@ -6,12 +6,17 @@
 
 Name | Type
 ------------ | -------------
+`id` | string
 `assetHash` | string
+`urn` | string
+`sourceId` | string
+`sourceName` | string
 `externalId` | string
 `name` | string
 `kind` | string
 `url` | string
 `metadata` | object
+`findings` | [Array&lt;RunnerAssetFindingSummaryDto&gt;](RunnerAssetFindingSummaryDto.md)
 
 ## Example
 
@@ -20,12 +25,17 @@ import type { RunnerAssetQueryItemDto } from '@workspace/api-client'
 
 // TODO: Update the object below with actual values
 const example = {
+  "id": null,
   "assetHash": null,
+  "urn": null,
+  "sourceId": null,
+  "sourceName": null,
   "externalId": null,
   "name": null,
   "kind": null,
   "url": null,
   "metadata": null,
+  "findings": null,
 } satisfies RunnerAssetQueryItemDto
 
 console.log(example)

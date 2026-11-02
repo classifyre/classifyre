@@ -22,9 +22,10 @@ into the machine that runs the scan.
 
 from __future__ import annotations
 
+import re
 import sys
 import types
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -426,11 +427,33 @@ def urn_for(platform: str, authority: str, *path: str) -> str:
 
 
 @dataclass(frozen=True)
+class AssetFinding:
+    """One open finding of a queried asset (``include=("findings",)``)."""
+
+    id: str
+    detector_type: str
+    #: The custom detector's key, for CUSTOM findings (a Tag detector's tags too).
+    detector: str | None
+    finding_type: str
+    severity: str
+    status: str
+    #: The source whose notebook asserted it (``ctx.tag()``); None for a detector's.
+    asserted_by_source_id: str | None
+
+
+@dataclass(frozen=True)
 class QueriedAsset:
     """An asset already in the namespace, as ``ctx.query_assets()`` returns it."""
 
-    #: The platform's id for the asset.
+    #: The platform's id for the asset: what ``ctx.tag()`` and ``ctx.link()`` take.
+    id: str
+    #: The asset's hash, unique within its source only.
     asset_hash: str
+    #: The asset's URN, when its connector gave it one.
+    urn: str | None
+    #: The source the asset belongs to.
+    source_id: str
+    source_name: str
     #: The id the writing connector gave it (``Asset.id``), when it had one.
     external_id: str | None
     name: str
@@ -438,6 +461,8 @@ class QueriedAsset:
     url: str
     #: Only the keys you asked for with ``select``.
     metadata: dict[str, Any]
+    #: Its first open findings, when asked for with ``include=("findings",)``.
+    findings: list[AssetFinding] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -447,12 +472,88 @@ class AssetQueryPage:
     items: list[QueriedAsset]
     #: None once there is nothing more to read.
     next_cursor: str | None
-    #: Queries this run has left; each call counts, whatever its size.
-    calls_remaining: int
 
 
 class AssetQueryError(RuntimeError):
-    """``ctx.query_assets()`` was refused; the message says why and what to change."""
+    """A ``ctx.query_*()`` read was refused; the message says why and what to change."""
+
+
+class AugmentationError(RuntimeError):
+    """A ``ctx.tag()`` / ``ctx.link()`` write was refused; the message says why."""
+
+
+@dataclass(frozen=True)
+class QueriedSource:
+    """A source of the namespace, as ``ctx.query_sources()`` returns it.
+
+    Deliberately without configuration: a notebook never reads another
+    source's credentials, variables or code.
+    """
+
+    id: str
+    name: str
+    type: str
+    description: str | None
+    #: Status of its latest run, None when it never ran.
+    run_status: str | None
+    created_at: str
+    updated_at: str
+
+
+@dataclass(frozen=True)
+class SourcePage:
+    items: list[QueriedSource]
+    next_cursor: str | None
+
+
+@dataclass(frozen=True)
+class QueriedFinding:
+    """A finding, as ``ctx.query_findings()`` returns it."""
+
+    id: str
+    asset_id: str
+    source_id: str
+    detector_type: str
+    #: The custom detector's key, for CUSTOM findings.
+    detector: str | None
+    detector_name: str | None
+    finding_type: str
+    category: str
+    severity: str
+    status: str
+    confidence: float
+    #: Redacted where the detector redacts; never the raw match.
+    content: str | None
+    metadata: dict[str, Any]
+    asserted_by_source_id: str | None
+    first_detected_at: str | None
+    last_detected_at: str | None
+
+
+@dataclass(frozen=True)
+class FindingPage:
+    items: list[QueriedFinding]
+    next_cursor: str | None
+
+
+@dataclass(frozen=True)
+class QueriedDetector:
+    """A custom detector, as ``ctx.query_detectors()`` returns it (no pipeline)."""
+
+    id: str
+    key: str
+    name: str
+    description: str | None
+    #: TAG, REGEX, GLINER2, LLM, CODE_DETECTOR, ...
+    type: str
+    is_active: bool
+    version: int
+
+
+@dataclass(frozen=True)
+class DetectorPage:
+    items: list[QueriedDetector]
+    next_cursor: str | None
 
 
 @dataclass(frozen=True)
@@ -510,7 +611,7 @@ class Context:
         folders: Mapping[str, str] | None = None,
         logger: Callable[[str], None] | None = None,
         should_abort: Callable[[], bool] | None = None,
-        query_assets: Callable[[dict[str, Any]], Any] | None = None,
+        relay: Callable[[str, dict[str, Any]], Any] | None = None,
         cohort_weights: Mapping[str, Mapping[str, float]] | None = None,
         config_changed: bool = False,
     ) -> None:
@@ -527,9 +628,15 @@ class Context:
         self._partial_coverage_reason: str = ""
         self._logger = logger or print
         self._should_abort = should_abort or (lambda: False)
-        # Wired only for a scan: the runtime relays the call through the parent
-        # process, which holds the credentials the notebook never sees.
-        self._query_assets = query_assets
+        # Wired only for a scan: the runtime relays reads and writes through
+        # the parent process, which holds the credentials the notebook never
+        # sees. ``relay(op, payload)`` returns the API's answer or raises.
+        self._relay = relay
+        # Which entry point is running; reads default their cohort by it.
+        self._phase = "extract"
+        self._tags: dict[tuple[str, str], dict[str, Any]] = {}
+        self._edges: list[dict[str, Any]] = []
+        self._augmentation_stats = {"tags": 0, "edges": 0, "skipped": 0}
         # Band weights the platform measured for each named cohort, when the
         # source leaves the split to it. Absent: the notebook's declared bands.
         self._cohort_weights = {
@@ -908,17 +1015,35 @@ class Context:
     def partial_coverage_reason(self) -> str:
         return self._partial_coverage_reason
 
+    # -- reading the rest of the namespace -----------------------------------
+
+    def _call(self, name: str, op: str, payload: dict[str, Any], error: type[Exception]) -> Any:
+        if self._relay is None:
+            raise error(
+                f"ctx.{name}() is available during scans only; running a cell in the "
+                "editor has no scan to read the namespace for"
+            )
+        return self._relay(op, payload) or {}
+
     def query_assets(
         self,
-        source: str,
+        source: str | None = None,
         *,
         kind: str | None = None,
         where: Mapping[str, Mapping[str, Any]] | None = None,
         exclude_visited: Mapping[str, Any] | None = None,
+        search: str | None = None,
+        status: Iterable[str] | None = None,
+        term: str | Iterable[str] | None = None,
+        include_narrower: bool = False,
+        findings: Mapping[str, Any] | None = None,
+        semantic: str | None = None,
+        semantic_mode: str = "hybrid",
+        include: Iterable[str] = (),
         select: Iterable[str] = (),
         limit: int = 1000,
         cursor: str | None = None,
-        cohort: bool = True,
+        cohort: bool | None = None,
     ) -> AssetQueryPage:
         """Read assets another source in this namespace already wrote.
 
@@ -937,31 +1062,42 @@ class Context:
             for company in page.items:
                 fn = company.metadata["firmenbuchnummer"]
 
-        ``source`` is a source's id or exact name. ``where`` filters metadata
-        with ``eq``, ``in``, ``exists``, ``gt``, ``gte``, ``lt`` and ``lte``;
-        values compare as JSON, so ``{"eq": 5}`` matches the number 5 and not
-        the string "5". ``exclude_visited`` leaves out every asset whose
-        ``metadata[key]`` matches an asset *this* source scanned in the last
-        ``since_days``. Page with ``cursor=page.next_cursor``.
+        ``source`` is a source's id or exact name; leave it out to read every
+        source in the namespace. Filters combine (all must hold):
 
-        Read-only, and bounded: at most 5,000 assets a page and 100 calls a run.
-        Calling it declares this run's coverage partial, since a connector that
-        picks its cohort from a query never sees the rest of its source.
+        - ``where`` filters metadata with ``eq``, ``in``, ``exists``, ``gt``,
+          ``gte``, ``lt`` and ``lte``; values compare as JSON, so
+          ``{"eq": 5}`` matches the number 5 and not the string "5".
+        - ``exclude_visited`` leaves out every asset whose ``metadata[key]``
+          matches an asset *this* source scanned in the last ``since_days``.
+        - ``search`` matches the name, case-insensitively; ``semantic`` ranks
+          by meaning (``semantic_mode`` is "hybrid" or "vector"), best first,
+          over at most 200 assets.
+        - ``term`` keeps assets currently linked to glossary term keys (with
+          ``include_narrower``, to their narrower terms too).
+        - ``findings`` keeps assets that have findings matching, e.g.
+          ``{"detector": "pii-email", "severity": ["HIGH", "CRITICAL"]}``;
+          see :meth:`query_findings` for the keys. Open findings unless
+          ``status`` is given there.
+        - ``include=("findings",)`` returns each asset's first open findings.
+
+        Always paged: at most 5,000 assets a page, as many pages as you need;
+        ``cursor=page.next_cursor`` continues the *same* query. Read-only.
         Available during scans only, not when running a cell in the editor.
 
-        Pass ``cohort=False`` when the query only supplies *inputs* and this run
-        still yields its whole universe -- e.g. Land aggregates computed from
-        every district profile. Coverage then stays complete, so an asset the
-        notebook stops yielding is retired. Without it such a source could never
-        retire anything (GENESIS field report P5). Fail the run rather than
-        yield a partial universe if the input is incomplete.
+        Calling it from ``extract()`` declares this run's coverage partial,
+        since a connector that picks its cohort from a query never sees the
+        rest of its source. Pass ``cohort=False`` when the query only supplies
+        *inputs* and this run still yields its whole universe -- e.g. Land
+        aggregates computed from every district profile. Coverage then stays
+        complete, so an asset the notebook stops yielding is retired. Inside
+        ``augment_sources()`` the default is ``cohort=False``: an augmentation
+        owns no cohort. Fail the run rather than yield a partial universe if
+        the input is incomplete.
         """
-        if self._query_assets is None:
-            raise AssetQueryError(
-                "ctx.query_assets() is available during scans only; running a "
-                "cell in the editor has no scan to read the namespace for"
-            )
-        payload: dict[str, Any] = {"source": str(source), "limit": int(limit)}
+        payload: dict[str, Any] = {"limit": int(limit)}
+        if source is not None:
+            payload["source"] = str(source)
         if kind is not None:
             payload["kind"] = str(kind)
         if where:
@@ -994,29 +1130,365 @@ class Context:
         selected = [str(key) for key in select]
         if selected:
             payload["select"] = selected
+        if search is not None:
+            payload["search"] = str(search)
+        if status is not None:
+            payload["status"] = _strings(status)
+        if term is not None:
+            payload["term"] = {
+                "keys": _strings(term),
+                "includeNarrower": bool(include_narrower),
+            }
+        if findings:
+            payload["findings"] = _finding_filter("query_assets", findings)
+        if semantic is not None:
+            payload["semantic"] = {"query": str(semantic), "mode": str(semantic_mode)}
+        wanted = _strings(include) if include else []
+        if wanted:
+            payload["include"] = wanted
         if cursor is not None:
             payload["cursor"] = str(cursor)
 
-        response = self._query_assets(payload) or {}
-        if cohort and not self._partial_coverage:
+        response = self._call("query_assets", "query_assets", payload, AssetQueryError)
+        owns_cohort = self._phase != "augment" if cohort is None else bool(cohort)
+        if owns_cohort and not self._partial_coverage:
             # Only on success: a refused query read nothing, so the run still
             # covers what it covers. Never over the notebook's own reason.
             self.set_partial_coverage("the notebook chose its cohort with ctx.query_assets()")
         return AssetQueryPage(
             items=[
                 QueriedAsset(
+                    id=str(item.get("id") or ""),
                     asset_hash=str(item.get("assetHash") or ""),
+                    urn=item.get("urn"),
+                    source_id=str(item.get("sourceId") or ""),
+                    source_name=str(item.get("sourceName") or ""),
                     external_id=item.get("externalId"),
                     name=str(item.get("name") or ""),
                     kind=str(item.get("kind") or ""),
                     url=str(item.get("url") or ""),
                     metadata=dict(item.get("metadata") or {}),
+                    findings=[
+                        AssetFinding(
+                            id=str(f.get("id") or ""),
+                            detector_type=str(f.get("detectorType") or ""),
+                            detector=f.get("customDetectorKey"),
+                            finding_type=str(f.get("findingType") or ""),
+                            severity=str(f.get("severity") or ""),
+                            status=str(f.get("status") or ""),
+                            asserted_by_source_id=f.get("assertedBySourceId"),
+                        )
+                        for f in item.get("findings") or []
+                    ],
                 )
                 for item in response.get("items") or []
             ],
             next_cursor=response.get("nextCursor"),
-            calls_remaining=int(response.get("callsRemaining") or 0),
         )
+
+    def query_sources(
+        self,
+        *,
+        search: str | None = None,
+        type: str | Iterable[str] | None = None,
+        status: str | Iterable[str] | None = None,
+        limit: int = 1000,
+        cursor: str | None = None,
+    ) -> SourcePage:
+        """List the namespace's sources, not scan them.
+
+        ``type`` is a source type such as "POSTGRESQL" and ``status`` the status
+        of the source's latest run. The result never carries configuration or
+        credentials. Always paged; see :meth:`query_assets` for the cursor.
+        """
+        payload: dict[str, Any] = {"limit": int(limit)}
+        if search is not None:
+            payload["search"] = str(search)
+        if type is not None:
+            payload["type"] = _strings(type)
+        if status is not None:
+            payload["status"] = _strings(status)
+        if cursor is not None:
+            payload["cursor"] = str(cursor)
+        response = self._call("query_sources", "query_sources", payload, AssetQueryError)
+        return SourcePage(
+            items=[
+                QueriedSource(
+                    id=str(item.get("id") or ""),
+                    name=str(item.get("name") or ""),
+                    type=str(item.get("type") or ""),
+                    description=item.get("description"),
+                    run_status=item.get("runnerStatus"),
+                    created_at=str(item.get("createdAt") or ""),
+                    updated_at=str(item.get("updatedAt") or ""),
+                )
+                for item in response.get("items") or []
+            ],
+            next_cursor=response.get("nextCursor"),
+        )
+
+    def query_findings(
+        self,
+        *,
+        detector: str | Iterable[str] | None = None,
+        detector_type: str | Iterable[str] | None = None,
+        finding_type: str | Iterable[str] | None = None,
+        severity: str | Iterable[str] | None = None,
+        status: str | Iterable[str] | None = None,
+        source: str | Iterable[str] | None = None,
+        asset: str | Iterable[str] | None = None,
+        asserted_by: str | Iterable[str] | None = None,
+        limit: int = 1000,
+        cursor: str | None = None,
+    ) -> FindingPage:
+        """Findings of the namespace, from a detector, or of a source or asset.
+
+        ``detector`` is a custom detector's key (see :meth:`query_detectors`),
+        ``detector_type`` a built-in type such as "PII"; ``source`` and
+        ``asset`` take ids. Only OPEN findings unless ``status`` says otherwise.
+        ``asserted_by`` keeps what another source's notebook tagged. Walk from
+        a detector to its assets with ``ctx.query_assets(findings={"detector":
+        key})``. Always paged; see :meth:`query_assets` for the cursor.
+        """
+        payload = _finding_filter(
+            "query_findings",
+            {
+                "detector": detector,
+                "detector_type": detector_type,
+                "finding_type": finding_type,
+                "severity": severity,
+                "status": status,
+                "source": source,
+                "asset": asset,
+                "asserted_by": asserted_by,
+            },
+        )
+        payload["limit"] = int(limit)
+        if cursor is not None:
+            payload["cursor"] = str(cursor)
+        response = self._call("query_findings", "query_findings", payload, AssetQueryError)
+        return FindingPage(
+            items=[
+                QueriedFinding(
+                    id=str(item.get("id") or ""),
+                    asset_id=str(item.get("assetId") or ""),
+                    source_id=str(item.get("sourceId") or ""),
+                    detector_type=str(item.get("detectorType") or ""),
+                    detector=item.get("customDetectorKey"),
+                    detector_name=item.get("customDetectorName"),
+                    finding_type=str(item.get("findingType") or ""),
+                    category=str(item.get("category") or ""),
+                    severity=str(item.get("severity") or ""),
+                    status=str(item.get("status") or ""),
+                    confidence=float(item.get("confidence") or 0),
+                    content=item.get("content"),
+                    metadata=dict(item.get("metadata") or {}),
+                    asserted_by_source_id=item.get("assertedBySourceId"),
+                    first_detected_at=item.get("firstDetectedAt"),
+                    last_detected_at=item.get("lastDetectedAt"),
+                )
+                for item in response.get("items") or []
+            ],
+            next_cursor=response.get("nextCursor"),
+        )
+
+    def query_detectors(
+        self,
+        *,
+        type: str | Iterable[str] | None = None,
+        include_inactive: bool = False,
+        limit: int = 1000,
+        cursor: str | None = None,
+    ) -> DetectorPage:
+        """The namespace's custom detectors: key, name, type. Never the pipeline."""
+        payload: dict[str, Any] = {"limit": int(limit), "includeInactive": bool(include_inactive)}
+        if type is not None:
+            payload["type"] = _strings(type)
+        if cursor is not None:
+            payload["cursor"] = str(cursor)
+        response = self._call("query_detectors", "query_detectors", payload, AssetQueryError)
+        return DetectorPage(
+            items=[
+                QueriedDetector(
+                    id=str(item.get("id") or ""),
+                    key=str(item.get("key") or ""),
+                    name=str(item.get("name") or ""),
+                    description=item.get("description"),
+                    type=str(item.get("type") or ""),
+                    is_active=bool(item.get("isActive")),
+                    version=int(item.get("version") or 0),
+                )
+                for item in response.get("items") or []
+            ],
+            next_cursor=response.get("nextCursor"),
+        )
+
+    def each_asset(self, source: str | None = None, **query: Any) -> Iterator[QueriedAsset]:
+        """Every asset matching :meth:`query_assets`, page after page."""
+        return _each(lambda cursor: self.query_assets(source, cursor=cursor, **query))
+
+    def each_source(self, **query: Any) -> Iterator[QueriedSource]:
+        """Every source matching :meth:`query_sources`, page after page."""
+        return _each(lambda cursor: self.query_sources(cursor=cursor, **query))
+
+    def each_finding(self, **query: Any) -> Iterator[QueriedFinding]:
+        """Every finding matching :meth:`query_findings`, page after page."""
+        return _each(lambda cursor: self.query_findings(cursor=cursor, **query))
+
+    def each_detector(self, **query: Any) -> Iterator[QueriedDetector]:
+        """Every detector matching :meth:`query_detectors`, page after page."""
+        return _each(lambda cursor: self.query_detectors(cursor=cursor, **query))
+
+    # -- writing onto other sources' assets ----------------------------------
+
+    def tag(
+        self, asset: QueriedAsset | str, key: str, value: Any, severity: str | None = None
+    ) -> None:
+        """Tag an asset of another source.
+
+        ``key`` is an active Tag detector's key (``ctx.query_detectors(type="TAG")``)
+        and ``value`` what to assert, or a ``Tag(value, severity)``. The tag is
+        recorded as asserted by *this* source, so it never overwrites the asset's
+        own tags or another source's, and is retired when a later complete run
+        of this source stops asserting it. Several values under one key are
+        joined with ", ", as in ``Asset(tags=...)``. Buffered; sent in batches
+        and at the end of ``augment_sources()``.
+        """
+        if isinstance(value, Tag):
+            value, severity = value.value, value.severity if severity is None else severity
+        asset_id = _asset_id("tag", asset)
+        text = str(value).strip()
+        if not str(key).strip() or not text:
+            raise AugmentationError("ctx.tag() needs a tag key and a non-empty value")
+        slot = self._tags.setdefault((asset_id, str(key).strip()), {"values": [], "severity": None})
+        if text not in slot["values"]:
+            slot["values"].append(text)
+        if severity is not None:
+            slot["severity"] = str(severity)
+        if len(self._tags) >= AUGMENTATION_FLUSH_SIZE:
+            self.flush_augmentations()
+
+    def tags(self, asset: QueriedAsset | str, tags: Mapping[str, Any]) -> None:
+        """``ctx.tag()`` for several keys at once: ``ctx.tags(asset, {"qa": "reviewed"})``."""
+        for key, value in tags.items():
+            self.tag(asset, key, value)
+
+    def link(
+        self,
+        source: QueriedAsset | str,
+        target: QueriedAsset | str,
+        relation: str = "REFERENCES",
+        *,
+        relation_class: str | None = None,
+        method: str | None = None,
+        confidence: float | None = None,
+        evidence: Mapping[str, Any] | None = None,
+    ) -> None:
+        """Draw a link between two assets of any source: ``source`` --relation--> ``target``.
+
+        Either end is a queried asset, an asset id, or a URN. ``relation`` is
+        e.g. REFERENCES, SAME_AS, DERIVED_FROM, USES. The edge records this
+        source as its author; one that a connector or a person already holds
+        is left as it is.
+        """
+        edge: dict[str, Any] = {"relationType": str(relation).upper()}
+        edge.update(_endpoint("from", source))
+        edge.update(_endpoint("to", target))
+        if relation_class is not None:
+            edge["relationClass"] = str(relation_class).upper()
+        if method is not None:
+            edge["method"] = str(method).upper()
+        if confidence is not None:
+            edge["confidence"] = float(confidence)
+        if evidence:
+            edge["evidence"] = dict(evidence)
+        self._edges.append(edge)
+        if len(self._edges) >= AUGMENTATION_FLUSH_SIZE:
+            self.flush_augmentations()
+
+    def means(
+        self,
+        asset: QueriedAsset | str,
+        term: str,
+        *,
+        confidence: float | None = None,
+        evidence: Mapping[str, Any] | None = None,
+    ) -> None:
+        """Link an asset to a glossary term by key: "this asset means that term".
+
+        A term that does not exist yet is held pending and links once defined.
+        """
+        self.link(
+            asset,
+            f"term://glossary/{str(term).strip().lower()}",
+            "MEANS",
+            relation_class="REFERENCE",
+            confidence=confidence,
+            evidence=evidence,
+        )
+
+    def flush_augmentations(self) -> dict[str, int]:
+        """Send buffered tags and links now. Done for you at the end of ``augment_sources()``."""
+        if not self._tags and not self._edges:
+            return dict(self._augmentation_stats)
+        if self._relay is None:
+            raise AugmentationError(
+                "ctx.tag() and ctx.link() work during scans only; running a cell in the "
+                "editor has no scan to write for"
+            )
+        if self._tags:
+            batch = [
+                {
+                    "assetId": asset_id,
+                    "key": key,
+                    "value": ", ".join(slot["values"]),
+                    **({"severity": slot["severity"]} if slot["severity"] else {}),
+                }
+                for (asset_id, key), slot in self._tags.items()
+            ]
+            self._tags = {}
+            for start in range(0, len(batch), AUGMENTATION_FLUSH_SIZE):
+                self._send(
+                    "augment_tags", {"tags": batch[start : start + AUGMENTATION_FLUSH_SIZE]}, "tags"
+                )
+        if self._edges:
+            edges, self._edges = self._edges, []
+            for start in range(0, len(edges), AUGMENTATION_FLUSH_SIZE):
+                self._send(
+                    "augment_edges",
+                    {"edges": edges[start : start + AUGMENTATION_FLUSH_SIZE]},
+                    "edges",
+                )
+        return dict(self._augmentation_stats)
+
+    def _send(self, op: str, payload: dict[str, Any], kind: str) -> None:
+        assert self._relay is not None
+        try:
+            result = self._relay(op, payload) or {}
+        except AssetQueryError as exc:
+            raise AugmentationError(str(exc)) from exc
+        self._augmentation_stats[kind] += int(result.get("written") or 0)
+        self._augmentation_stats["skipped"] += int(result.get("skipped") or 0)
+
+    @property
+    def augmentation_stats(self) -> dict[str, int]:
+        """What this run has written so far: ``tags``, ``edges`` and ``skipped``."""
+        return dict(self._augmentation_stats)
+
+    def swap_partial_coverage(self, flag: bool, reason: str = "") -> tuple[bool, str]:
+        """Runtime-only: replace the partial-coverage verdict, returning the old one.
+
+        Lets the runtime judge ``augment_sources()`` on its own: what ``extract()``
+        declared about its assets says nothing about whether the augmentation
+        covered everything it meant to.
+        """
+        previous = (self._partial_coverage, self._partial_coverage_reason)
+        self._partial_coverage, self._partial_coverage_reason = flag, reason
+        return previous
+
+    def set_phase(self, phase: str) -> None:
+        """Runtime-only: which entry point is running ("extract" or "augment")."""
+        self._phase = phase
 
     @property
     def should_abort(self) -> bool:
@@ -1037,6 +1509,77 @@ class Context:
     @staticmethod
     def now() -> datetime:
         return datetime.now(UTC)
+
+
+#: Buffered tags/links sent per call; the API takes up to 5,000.
+AUGMENTATION_FLUSH_SIZE = 1000
+
+_ASSET_ID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
+
+
+def _strings(value: str | Iterable[str]) -> list[str]:
+    """One string or many, as the list the API takes."""
+    if isinstance(value, str):
+        return [value]
+    return [str(item) for item in value]
+
+
+def _finding_filter(caller: str, spec: Mapping[str, Any]) -> dict[str, Any]:
+    """Snake-case finding filters as the API names them. ``None`` means unfiltered."""
+    names = {
+        "detector": "customDetectorKey",
+        "custom_detector_key": "customDetectorKey",
+        "detector_type": "detectorType",
+        "finding_type": "findingType",
+        "severity": "severity",
+        "status": "status",
+        "source": "sourceId",
+        "source_id": "sourceId",
+        "asset": "assetId",
+        "asset_id": "assetId",
+        "asserted_by": "assertedBySourceId",
+        "asserted_by_source_id": "assertedBySourceId",
+    }
+    shaped: dict[str, Any] = {}
+    for key, value in spec.items():
+        if value is None:
+            continue
+        if key not in names:
+            raise AssetQueryError(
+                f"ctx.{caller}() has no finding filter {key!r}. Use one of: "
+                f"{', '.join(sorted(set(names) - {'custom_detector_key', 'source_id', 'asset_id', 'asserted_by_source_id'}))}"
+            )
+        shaped[names[key]] = _strings(value)
+    return shaped
+
+
+def _each(fetch: Callable[[str | None], Any]) -> Iterator[Any]:
+    cursor: str | None = None
+    while True:
+        page = fetch(cursor)
+        yield from page.items
+        cursor = page.next_cursor
+        if not cursor:
+            return
+
+
+def _asset_id(caller: str, asset: QueriedAsset | str) -> str:
+    asset_id = asset.id if isinstance(asset, QueriedAsset) else str(asset)
+    if not _ASSET_ID.match(asset_id):
+        raise AugmentationError(
+            f"ctx.{caller}() needs an asset from ctx.query_assets() (or its id), got {asset_id!r}"
+        )
+    return asset_id
+
+
+def _endpoint(side: str, value: QueriedAsset | str) -> dict[str, str]:
+    """A link end: a queried asset or asset id, or a URN."""
+    text = value.id if isinstance(value, QueriedAsset) else str(value)
+    if _ASSET_ID.match(text):
+        return {f"{side}Id": text}
+    if ":" in text:
+        return {f"{side}Urn": text}
+    raise AugmentationError(f"ctx.link() ends are queried assets, asset ids or URNs; got {text!r}")
 
 
 def build_module(context: Context) -> types.ModuleType:
@@ -1071,6 +1614,14 @@ def build_module(context: Context) -> types.ModuleType:
     module.CohortItem = CohortItem  # type: ignore[attr-defined]
     module.AssetQueryPage = AssetQueryPage  # type: ignore[attr-defined]
     module.AssetQueryError = AssetQueryError  # type: ignore[attr-defined]
+    module.AugmentationError = AugmentationError  # type: ignore[attr-defined]
+    module.AssetFinding = AssetFinding  # type: ignore[attr-defined]
+    module.QueriedSource = QueriedSource  # type: ignore[attr-defined]
+    module.QueriedFinding = QueriedFinding  # type: ignore[attr-defined]
+    module.QueriedDetector = QueriedDetector  # type: ignore[attr-defined]
+    module.SourcePage = SourcePage  # type: ignore[attr-defined]
+    module.FindingPage = FindingPage  # type: ignore[attr-defined]
+    module.DetectorPage = DetectorPage  # type: ignore[attr-defined]
     module.ParsedContent = ParsedContent  # type: ignore[attr-defined]
     module.ctx = context  # type: ignore[attr-defined]
     module.parse = parse  # type: ignore[attr-defined]

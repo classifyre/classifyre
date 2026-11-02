@@ -8,7 +8,6 @@ Name | Type
 ------------ | -------------
 `items` | [Array&lt;RunnerAssetQueryItemDto&gt;](RunnerAssetQueryItemDto.md)
 `nextCursor` | string
-`callsRemaining` | number
 
 ## Example
 
@@ -19,7 +18,6 @@ import type { RunnerAssetQueryResponseDto } from '@workspace/api-client'
 const example = {
   "items": null,
   "nextCursor": null,
-  "callsRemaining": null,
 } satisfies RunnerAssetQueryResponseDto
 
 console.log(example)

@@ -31,9 +31,19 @@ import type {
   RunnerAssetProgressDto,
   RunnerAssetQueryDto,
   RunnerAssetQueryResponseDto,
+  RunnerAugmentationEdgesDto,
+  RunnerAugmentationFinishDto,
+  RunnerAugmentationResultDto,
+  RunnerAugmentationTagsDto,
+  RunnerDetectorQueryDto,
+  RunnerDetectorQueryResponseDto,
   RunnerDto,
+  RunnerFindingQueryDto,
+  RunnerFindingQueryResponseDto,
   RunnerLogsResponseDto,
   RunnerQueuePositionDto,
+  RunnerSourceQueryDto,
+  RunnerSourceQueryResponseDto,
   SearchRunnerLogsBodyDto,
   SearchRunnersAssetsRequestDto,
   SearchRunnersAssetsResponseDto,
@@ -78,12 +88,32 @@ import {
     RunnerAssetQueryDtoToJSON,
     RunnerAssetQueryResponseDtoFromJSON,
     RunnerAssetQueryResponseDtoToJSON,
+    RunnerAugmentationEdgesDtoFromJSON,
+    RunnerAugmentationEdgesDtoToJSON,
+    RunnerAugmentationFinishDtoFromJSON,
+    RunnerAugmentationFinishDtoToJSON,
+    RunnerAugmentationResultDtoFromJSON,
+    RunnerAugmentationResultDtoToJSON,
+    RunnerAugmentationTagsDtoFromJSON,
+    RunnerAugmentationTagsDtoToJSON,
+    RunnerDetectorQueryDtoFromJSON,
+    RunnerDetectorQueryDtoToJSON,
+    RunnerDetectorQueryResponseDtoFromJSON,
+    RunnerDetectorQueryResponseDtoToJSON,
     RunnerDtoFromJSON,
     RunnerDtoToJSON,
+    RunnerFindingQueryDtoFromJSON,
+    RunnerFindingQueryDtoToJSON,
+    RunnerFindingQueryResponseDtoFromJSON,
+    RunnerFindingQueryResponseDtoToJSON,
     RunnerLogsResponseDtoFromJSON,
     RunnerLogsResponseDtoToJSON,
     RunnerQueuePositionDtoFromJSON,
     RunnerQueuePositionDtoToJSON,
+    RunnerSourceQueryDtoFromJSON,
+    RunnerSourceQueryDtoToJSON,
+    RunnerSourceQueryResponseDtoFromJSON,
+    RunnerSourceQueryResponseDtoToJSON,
     SearchRunnerLogsBodyDtoFromJSON,
     SearchRunnerLogsBodyDtoToJSON,
     SearchRunnersAssetsRequestDtoFromJSON,
@@ -106,6 +136,16 @@ import {
     UpdateRunnerAssetStatusDtoToJSON,
 } from '../models/index';
 
+export interface CliRunnerControllerAugmentEdgesRequest {
+    runnerId: string;
+    runnerAugmentationEdgesDto: RunnerAugmentationEdgesDto;
+}
+
+export interface CliRunnerControllerAugmentTagsRequest {
+    runnerId: string;
+    runnerAugmentationTagsDto: RunnerAugmentationTagsDto;
+}
+
 export interface CliRunnerControllerBulkDeleteRunnersRequest {
     bulkDeleteRunnersDto: BulkDeleteRunnersDto;
 }
@@ -124,6 +164,10 @@ export interface CliRunnerControllerCreateExternalRunnerRequest {
 }
 
 export interface CliRunnerControllerDeleteRunnerRequest {
+    runnerId: string;
+}
+
+export interface CliRunnerControllerFinishAugmentationRequest {
     runnerId: string;
 }
 
@@ -157,6 +201,21 @@ export interface CliRunnerControllerListSourceRunnersRequest {
 export interface CliRunnerControllerQueryAssetsRequest {
     runnerId: string;
     runnerAssetQueryDto: RunnerAssetQueryDto;
+}
+
+export interface CliRunnerControllerQueryDetectorsRequest {
+    runnerId: string;
+    runnerDetectorQueryDto: RunnerDetectorQueryDto;
+}
+
+export interface CliRunnerControllerQueryFindingsRequest {
+    runnerId: string;
+    runnerFindingQueryDto: RunnerFindingQueryDto;
+}
+
+export interface CliRunnerControllerQuerySourcesRequest {
+    runnerId: string;
+    runnerSourceQueryDto: RunnerSourceQueryDto;
 }
 
 export interface CliRunnerControllerRegisterDiscoveredAssetsRequest {
@@ -218,6 +277,104 @@ export interface SearchRunnersControllerSearchRunnersChartsRequest {
  * 
  */
 export class RunnersApi extends runtime.BaseAPI {
+
+    /**
+     * Backs ctx.link() and ctx.means(). Internal. Edges are stamped with the calling source and run; an edge another owner already holds is left alone.
+     * Link assets and glossary terms, for a running connector
+     */
+    async cliRunnerControllerAugmentEdgesRaw(requestParameters: CliRunnerControllerAugmentEdgesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<RunnerAugmentationResultDto>> {
+        if (requestParameters['runnerId'] == null) {
+            throw new runtime.RequiredError(
+                'runnerId',
+                'Required parameter "runnerId" was null or undefined when calling cliRunnerControllerAugmentEdges().'
+            );
+        }
+
+        if (requestParameters['runnerAugmentationEdgesDto'] == null) {
+            throw new runtime.RequiredError(
+                'runnerAugmentationEdgesDto',
+                'Required parameter "runnerAugmentationEdgesDto" was null or undefined when calling cliRunnerControllerAugmentEdges().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/runners/{runnerId}/augmentations/edges`;
+        urlPath = urlPath.replace(`{${"runnerId"}}`, encodeURIComponent(String(requestParameters['runnerId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: RunnerAugmentationEdgesDtoToJSON(requestParameters['runnerAugmentationEdgesDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => RunnerAugmentationResultDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Backs ctx.link() and ctx.means(). Internal. Edges are stamped with the calling source and run; an edge another owner already holds is left alone.
+     * Link assets and glossary terms, for a running connector
+     */
+    async cliRunnerControllerAugmentEdges(requestParameters: CliRunnerControllerAugmentEdgesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<RunnerAugmentationResultDto> {
+        const response = await this.cliRunnerControllerAugmentEdgesRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Backs ctx.tag(). Internal. Each tag is a finding of an active Tag detector, stamped with the calling source and run so the same source can retire it later.
+     * Tag assets of other sources, for a running connector
+     */
+    async cliRunnerControllerAugmentTagsRaw(requestParameters: CliRunnerControllerAugmentTagsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<RunnerAugmentationResultDto>> {
+        if (requestParameters['runnerId'] == null) {
+            throw new runtime.RequiredError(
+                'runnerId',
+                'Required parameter "runnerId" was null or undefined when calling cliRunnerControllerAugmentTags().'
+            );
+        }
+
+        if (requestParameters['runnerAugmentationTagsDto'] == null) {
+            throw new runtime.RequiredError(
+                'runnerAugmentationTagsDto',
+                'Required parameter "runnerAugmentationTagsDto" was null or undefined when calling cliRunnerControllerAugmentTags().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/runners/{runnerId}/augmentations/tags`;
+        urlPath = urlPath.replace(`{${"runnerId"}}`, encodeURIComponent(String(requestParameters['runnerId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: RunnerAugmentationTagsDtoToJSON(requestParameters['runnerAugmentationTagsDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => RunnerAugmentationResultDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Backs ctx.tag(). Internal. Each tag is a finding of an active Tag detector, stamped with the calling source and run so the same source can retire it later.
+     * Tag assets of other sources, for a running connector
+     */
+    async cliRunnerControllerAugmentTags(requestParameters: CliRunnerControllerAugmentTagsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<RunnerAugmentationResultDto> {
+        const response = await this.cliRunnerControllerAugmentTagsRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
 
     /**
      * Deletes explicit runner IDs or every runner matching a search filter snapshot, including their stored logs. Runs still in flight are never deleted and are reported as skipped.
@@ -416,6 +573,45 @@ export class RunnersApi extends runtime.BaseAPI {
      */
     async cliRunnerControllerDeleteRunner(requestParameters: CliRunnerControllerDeleteRunnerRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<DeleteRunnerResponseDto> {
         const response = await this.cliRunnerControllerDeleteRunnerRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Called after a notebook finished augmenting without error: resolves tags and removes edges this source wrote in earlier runs and did not write in this one. Never touches rows written by anyone else.
+     * Retire what this source stopped asserting
+     */
+    async cliRunnerControllerFinishAugmentationRaw(requestParameters: CliRunnerControllerFinishAugmentationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<RunnerAugmentationFinishDto>> {
+        if (requestParameters['runnerId'] == null) {
+            throw new runtime.RequiredError(
+                'runnerId',
+                'Required parameter "runnerId" was null or undefined when calling cliRunnerControllerFinishAugmentation().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/runners/{runnerId}/augmentations/finish`;
+        urlPath = urlPath.replace(`{${"runnerId"}}`, encodeURIComponent(String(requestParameters['runnerId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => RunnerAugmentationFinishDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Called after a notebook finished augmenting without error: resolves tags and removes edges this source wrote in earlier runs and did not write in this one. Never touches rows written by anyone else.
+     * Retire what this source stopped asserting
+     */
+    async cliRunnerControllerFinishAugmentation(requestParameters: CliRunnerControllerFinishAugmentationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<RunnerAugmentationFinishDto> {
+        const response = await this.cliRunnerControllerFinishAugmentationRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -631,7 +827,7 @@ export class RunnersApi extends runtime.BaseAPI {
     }
 
     /**
-     * Backs ctx.query_assets() in CUSTOM notebooks. Internal: the CLI relays the call so the notebook never holds API credentials. Only while the run is RUNNING; at most 100 calls per run, 5,000 assets per page, 15 s per query.
+     * Backs ctx.query_assets() in CUSTOM notebooks. Internal: the CLI relays the call so the notebook never holds API credentials. Only while the run is RUNNING; every read pages by cursor, at most 5,000 assets per page, 15 s per query.
      * Read assets of a source in this namespace, for a running connector
      */
     async cliRunnerControllerQueryAssetsRaw(requestParameters: CliRunnerControllerQueryAssetsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<RunnerAssetQueryResponseDto>> {
@@ -671,11 +867,158 @@ export class RunnersApi extends runtime.BaseAPI {
     }
 
     /**
-     * Backs ctx.query_assets() in CUSTOM notebooks. Internal: the CLI relays the call so the notebook never holds API credentials. Only while the run is RUNNING; at most 100 calls per run, 5,000 assets per page, 15 s per query.
+     * Backs ctx.query_assets() in CUSTOM notebooks. Internal: the CLI relays the call so the notebook never holds API credentials. Only while the run is RUNNING; every read pages by cursor, at most 5,000 assets per page, 15 s per query.
      * Read assets of a source in this namespace, for a running connector
      */
     async cliRunnerControllerQueryAssets(requestParameters: CliRunnerControllerQueryAssetsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<RunnerAssetQueryResponseDto> {
         const response = await this.cliRunnerControllerQueryAssetsRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Backs ctx.query_detectors(). Internal. Never returns a detector pipeline or its secrets.
+     * List custom detectors, for a running connector
+     */
+    async cliRunnerControllerQueryDetectorsRaw(requestParameters: CliRunnerControllerQueryDetectorsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<RunnerDetectorQueryResponseDto>> {
+        if (requestParameters['runnerId'] == null) {
+            throw new runtime.RequiredError(
+                'runnerId',
+                'Required parameter "runnerId" was null or undefined when calling cliRunnerControllerQueryDetectors().'
+            );
+        }
+
+        if (requestParameters['runnerDetectorQueryDto'] == null) {
+            throw new runtime.RequiredError(
+                'runnerDetectorQueryDto',
+                'Required parameter "runnerDetectorQueryDto" was null or undefined when calling cliRunnerControllerQueryDetectors().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/runners/{runnerId}/detectors/query`;
+        urlPath = urlPath.replace(`{${"runnerId"}}`, encodeURIComponent(String(requestParameters['runnerId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: RunnerDetectorQueryDtoToJSON(requestParameters['runnerDetectorQueryDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => RunnerDetectorQueryResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Backs ctx.query_detectors(). Internal. Never returns a detector pipeline or its secrets.
+     * List custom detectors, for a running connector
+     */
+    async cliRunnerControllerQueryDetectors(requestParameters: CliRunnerControllerQueryDetectorsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<RunnerDetectorQueryResponseDto> {
+        const response = await this.cliRunnerControllerQueryDetectorsRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Backs ctx.query_findings(). Internal. Filter by detector, type, severity, status, source or asset; pages by cursor, at most 5,000 per page.
+     * Read findings of this namespace, for a running connector
+     */
+    async cliRunnerControllerQueryFindingsRaw(requestParameters: CliRunnerControllerQueryFindingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<RunnerFindingQueryResponseDto>> {
+        if (requestParameters['runnerId'] == null) {
+            throw new runtime.RequiredError(
+                'runnerId',
+                'Required parameter "runnerId" was null or undefined when calling cliRunnerControllerQueryFindings().'
+            );
+        }
+
+        if (requestParameters['runnerFindingQueryDto'] == null) {
+            throw new runtime.RequiredError(
+                'runnerFindingQueryDto',
+                'Required parameter "runnerFindingQueryDto" was null or undefined when calling cliRunnerControllerQueryFindings().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/runners/{runnerId}/findings/query`;
+        urlPath = urlPath.replace(`{${"runnerId"}}`, encodeURIComponent(String(requestParameters['runnerId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: RunnerFindingQueryDtoToJSON(requestParameters['runnerFindingQueryDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => RunnerFindingQueryResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Backs ctx.query_findings(). Internal. Filter by detector, type, severity, status, source or asset; pages by cursor, at most 5,000 per page.
+     * Read findings of this namespace, for a running connector
+     */
+    async cliRunnerControllerQueryFindings(requestParameters: CliRunnerControllerQueryFindingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<RunnerFindingQueryResponseDto> {
+        const response = await this.cliRunnerControllerQueryFindingsRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Backs ctx.query_sources() in CUSTOM notebooks. Internal. Never returns a source configuration. Pages by cursor, at most 5,000 per page.
+     * List sources of this namespace, for a running connector
+     */
+    async cliRunnerControllerQuerySourcesRaw(requestParameters: CliRunnerControllerQuerySourcesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<RunnerSourceQueryResponseDto>> {
+        if (requestParameters['runnerId'] == null) {
+            throw new runtime.RequiredError(
+                'runnerId',
+                'Required parameter "runnerId" was null or undefined when calling cliRunnerControllerQuerySources().'
+            );
+        }
+
+        if (requestParameters['runnerSourceQueryDto'] == null) {
+            throw new runtime.RequiredError(
+                'runnerSourceQueryDto',
+                'Required parameter "runnerSourceQueryDto" was null or undefined when calling cliRunnerControllerQuerySources().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/runners/{runnerId}/sources/query`;
+        urlPath = urlPath.replace(`{${"runnerId"}}`, encodeURIComponent(String(requestParameters['runnerId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: RunnerSourceQueryDtoToJSON(requestParameters['runnerSourceQueryDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => RunnerSourceQueryResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Backs ctx.query_sources() in CUSTOM notebooks. Internal. Never returns a source configuration. Pages by cursor, at most 5,000 per page.
+     * List sources of this namespace, for a running connector
+     */
+    async cliRunnerControllerQuerySources(requestParameters: CliRunnerControllerQuerySourcesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<RunnerSourceQueryResponseDto> {
+        const response = await this.cliRunnerControllerQuerySourcesRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

@@ -22,6 +22,7 @@ export const OPTIONAL_FUNCTIONS = [
   'discover',
   'fetch_content',
   'relationships',
+  'augment_sources',
 ];
 
 export const AUGMENTATION_REQUIRED_FUNCTIONS = ['augment'];

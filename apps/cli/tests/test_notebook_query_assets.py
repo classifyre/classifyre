@@ -18,12 +18,16 @@ def test_outside_a_scan_it_says_so() -> None:
 def test_it_sends_the_api_shape_and_reads_a_page() -> None:
     sent: list[dict[str, Any]] = []
 
-    def relay(payload: dict[str, Any]) -> dict[str, Any]:
+    def relay(_op: str, payload: dict[str, Any]) -> dict[str, Any]:
         sent.append(payload)
         return {
             "items": [
                 {
+                    "id": "a-1",
                     "assetHash": "h1",
+                    "urn": "urn:example:606601k",
+                    "sourceId": "s-1",
+                    "sourceName": "Firmenbuch Register",
                     "externalId": "company:606601k",
                     "name": "Example GmbH",
                     "kind": "record",
@@ -32,10 +36,9 @@ def test_it_sends_the_api_shape_and_reads_a_page() -> None:
                 }
             ],
             "nextCursor": "c-1",
-            "callsRemaining": 99,
         }
 
-    ctx = Context(query_assets=relay)
+    ctx = Context(relay=relay)
     page = ctx.query_assets(
         "Firmenbuch Register",
         kind="record",
@@ -58,13 +61,26 @@ def test_it_sends_the_api_shape_and_reads_a_page() -> None:
     assert [item.metadata["firmenbuchnummer"] for item in page.items] == ["606601k"]
     assert page.items[0].external_id == "company:606601k"
     assert page.next_cursor == "c-1"
-    assert page.calls_remaining == 99
+    assert page.items[0].id == "a-1"
+    assert page.items[0].urn == "urn:example:606601k"
+    assert (page.items[0].source_id, page.items[0].source_name) == ("s-1", "Firmenbuch Register")
+
+
+def test_a_query_without_a_source_reads_every_source() -> None:
+    sent: list[dict[str, Any]] = []
+
+    def relay(_op: str, payload: dict[str, Any]) -> dict[str, Any]:
+        sent.append(payload)
+        return {"items": []}
+
+    Context(relay=relay).query_assets(kind="record", limit=10)
+    assert sent == [{"limit": 10, "kind": "record"}]
 
 
 def test_querying_a_cohort_declares_partial_coverage() -> None:
     # A connector that works from a query never sees the rest of its source;
     # left at "covered everything", the platform would retire what it skipped.
-    ctx = Context(query_assets=lambda _payload: {"items": []})
+    ctx = Context(relay=lambda _op, _payload: {"items": []})
     ctx.query_assets("Firmenbuch Register")
     assert ctx.partial_coverage is True
     assert "query_assets" in ctx.partial_coverage_reason
@@ -73,10 +89,10 @@ def test_querying_a_cohort_declares_partial_coverage() -> None:
 def test_a_refused_query_declares_no_partial_coverage() -> None:
     # A query the API refused read nothing, so the run still covers what it
     # covers; only a successful response narrows the coverage claim.
-    def refused(_payload: dict[str, Any]) -> dict[str, Any]:
+    def refused(_op: str, _payload: dict[str, Any]) -> dict[str, Any]:
         raise AssetQueryError("ctx.query_assets() was refused (429): budget spent")
 
-    ctx = Context(query_assets=refused)
+    ctx = Context(relay=refused)
     with pytest.raises(AssetQueryError):
         ctx.query_assets("Firmenbuch Register")
     assert ctx.partial_coverage is False
@@ -85,13 +101,13 @@ def test_a_refused_query_declares_no_partial_coverage() -> None:
 def test_select_as_a_bare_string_is_rejected() -> None:
     # A string is an iterable of its characters; without this check
     # select="firm" would ask for metadata keys "f", "i", "r", "m".
-    ctx = Context(query_assets=lambda _payload: {"items": []})
+    ctx = Context(relay=lambda _op, _payload: {"items": []})
     with pytest.raises(AssetQueryError, match="must be a list"):
         ctx.query_assets("Firmenbuch Register", select="firmenbuchnummer")  # type: ignore[arg-type]
 
 
 def test_where_must_be_a_mapping_of_mappings() -> None:
-    ctx = Context(query_assets=lambda _payload: {"items": []})
+    ctx = Context(relay=lambda _op, _payload: {"items": []})
     with pytest.raises(AssetQueryError, match="must be a mapping"):
         ctx.query_assets("Firmenbuch Register", where=["legal_form_code"])  # type: ignore[arg-type]
     with pytest.raises(AssetQueryError, match="must be a mapping"):
@@ -99,7 +115,7 @@ def test_where_must_be_a_mapping_of_mappings() -> None:
 
 
 def test_it_keeps_a_reason_the_notebook_already_gave() -> None:
-    ctx = Context(query_assets=lambda _payload: {"items": []})
+    ctx = Context(relay=lambda _op, _payload: {"items": []})
     ctx.set_partial_coverage("weekly change feed")
     ctx.query_assets("Firmenbuch Register")
     assert ctx.partial_coverage_reason == "weekly change feed"
@@ -108,7 +124,7 @@ def test_it_keeps_a_reason_the_notebook_already_gave() -> None:
 def test_an_input_only_query_keeps_coverage_complete() -> None:
     # GENESIS field report P5: Land aggregates read every district profile and
     # yield their whole universe; the query is input, not a cohort.
-    ctx = Context(query_assets=lambda _payload: {"items": [], "nextCursor": None})
+    ctx = Context(relay=lambda _op, _payload: {"items": [], "nextCursor": None})
     ctx.query_assets("GENESIS Kreisprofile", cohort=False)
     assert ctx.partial_coverage is False
     ctx.query_assets("GENESIS Kreisprofile")
