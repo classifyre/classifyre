@@ -31,6 +31,12 @@ export interface RunnerAugmentationResultDto {
      * @memberof RunnerAugmentationResultDto
      */
     skipped?: number;
+    /**
+     * Rows that could not be placed, e.g. an asset linked to itself.
+     * @type {number}
+     * @memberof RunnerAugmentationResultDto
+     */
+    dropped?: number;
 }
 
 /**
@@ -53,6 +59,7 @@ export function RunnerAugmentationResultDtoFromJSONTyped(json: any, ignoreDiscri
         
         'written': json['written'],
         'skipped': json['skipped'] == null ? undefined : json['skipped'],
+        'dropped': json['dropped'] == null ? undefined : json['dropped'],
     };
 }
 
@@ -69,6 +76,7 @@ export function RunnerAugmentationResultDtoToJSONTyped(value?: RunnerAugmentatio
         
         'written': value['written'],
         'skipped': value['skipped'],
+        'dropped': value['dropped'],
     };
 }
 

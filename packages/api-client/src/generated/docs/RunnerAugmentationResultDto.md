@@ -8,6 +8,7 @@ Name | Type
 ------------ | -------------
 `written` | number
 `skipped` | number
+`dropped` | number
 
 ## Example
 
@@ -18,6 +19,7 @@ import type { RunnerAugmentationResultDto } from '@workspace/api-client'
 const example = {
   "written": null,
   "skipped": null,
+  "dropped": null,
 } satisfies RunnerAugmentationResultDto
 
 console.log(example)

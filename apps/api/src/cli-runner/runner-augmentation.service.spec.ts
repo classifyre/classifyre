@@ -128,7 +128,7 @@ describe('RunnerAugmentationService', () => {
         { fromId: 'a1', toUrn: 'term://glossary/pii', relationType: 'means' },
       ],
     });
-    expect(result).toEqual({ written: 1, skipped: 0 });
+    expect(result).toEqual({ written: 1, skipped: 0, dropped: 0 });
     const [dto, author] = graph.upsertEdges.mock.calls[0];
     expect(author).toEqual({ sourceId: AUTHOR, runnerId: 'run-1' });
     expect(dto.edges[0]).toMatchObject({
@@ -142,6 +142,34 @@ describe('RunnerAugmentationService', () => {
         edges: [{ fromId: 'a1', toId: 'a2', relationType: 'REFERENCES' }],
       }),
     ).rejects.toThrow(/No such asset/);
+  });
+
+  it('rejects a link URN it cannot read instead of counting it as skipped', async () => {
+    await expect(
+      service.edges('run-1', {
+        edges: [
+          { fromId: 'a1', toUrn: 'not a urn', relationType: 'REFERENCES' },
+        ],
+      }),
+    ).rejects.toThrow(/Not a valid URN/);
+    expect(graph.upsertEdges).not.toHaveBeenCalled();
+  });
+
+  it('reports a dropped row apart from one another owner holds', async () => {
+    prisma.asset.findMany.mockResolvedValue([{ id: 'a1' }]);
+    graph.upsertEdges.mockResolvedValue({
+      upserted: 1,
+      external: 0,
+      dropped: 1,
+    });
+    const result = await service.edges('run-1', {
+      edges: [
+        { fromId: 'a1', toId: 'a1', relationType: 'REFERENCES' },
+        { fromId: 'a1', toUrn: 'term://glossary/pii', relationType: 'MEANS' },
+        { fromId: 'a1', toUrn: 'term://glossary/gdpr', relationType: 'MEANS' },
+      ],
+    });
+    expect(result).toEqual({ written: 1, skipped: 1, dropped: 1 });
   });
 
   it('retires only what this source asserted in earlier runs', async () => {
