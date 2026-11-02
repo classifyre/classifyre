@@ -189,9 +189,15 @@ export function LakehouseNotes({ format }: { format: string }) {
       <p>
         No Spark, no JVM, and no catalog service is required. {format} table
         metadata is read directly out of the table&apos;s own files in object
-        storage, and rows are sampled from the underlying Parquet — so the only
-        thing you have to provide is object-storage access to the warehouse
-        path.
+        storage, so the only thing you have to provide is object-storage access
+        to the warehouse path.
+      </p>
+      <p>
+        Rows are read from the <strong>table</strong>, not from its Parquet
+        files one by one: deleted rows stay deleted, files from older snapshots
+        are left out, and a renamed column reads as one column across data
+        written before and after the rename. A table copied to another bucket or
+        prefix is still read correctly.
       </p>
       <p>
         Connection details are the same shape as the{" "}

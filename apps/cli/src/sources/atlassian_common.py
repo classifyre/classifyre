@@ -11,34 +11,16 @@ from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import requests
 
-from ..utils.file_parser import ARROW_MIME_TYPES, normalize_mime_type
+from ..utils.file_parser import (
+    TABULAR_FILE_EXTENSIONS,
+    TABULAR_MIME_TYPES,
+    normalize_mime_type,
+)
 from ..utils.hashing import normalize_http_url
 
 logger = logging.getLogger(__name__)
 
 URL_RE = re.compile(r"https?://[\w\-._~:/?#\[\]@!$&'()*+,;=%]+", re.IGNORECASE)
-
-TABULAR_MIME_TYPES = {
-    "text/csv",
-    "text/tab-separated-values",
-    "application/vnd.ms-excel",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    "application/parquet",
-    "application/vnd.apache.parquet",
-    *ARROW_MIME_TYPES,
-}
-
-TABULAR_FILE_EXTENSIONS = {
-    ".csv",
-    ".tsv",
-    ".xls",
-    ".xlsx",
-    ".parquet",
-    ".arrow",
-    ".arrows",
-    ".feather",
-    ".ipc",
-}
 
 
 def normalize_atlassian_base_url(url: str, *, strip_wiki: bool = False) -> str:

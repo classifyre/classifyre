@@ -13,13 +13,12 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from ...models.generated_input import DeltaLakeInput
+from ...utils.lakehouse_layout import delta_table_root
 from ..dependencies import require_module
 from ..lakehouse_base import BaseLakehouseSource
 from ..tabular_utils import TableRef
 
 logger = logging.getLogger(__name__)
-
-_DELTA_LOG_MARKER = "/_delta_log/"
 
 
 class DeltaLakeSource(BaseLakehouseSource):
@@ -60,10 +59,7 @@ class DeltaLakeSource(BaseLakehouseSource):
     # ── Discovery: table roots by their _delta_log/ marker ──────────────
 
     def _table_root_from_key(self, key: str) -> str | None:
-        marker = key.find(_DELTA_LOG_MARKER)
-        if marker < 0:
-            return None
-        return key[:marker] or None
+        return delta_table_root(key)
 
     # ── Table handle ─────────────────────────────────────────────────────
 
@@ -97,8 +93,13 @@ class DeltaLakeSource(BaseLakehouseSource):
             storage_options=self._storage_options(),
         )
 
-    def _table_data_files(self, handle: Any) -> list[str]:
-        return [str(uri) for uri in handle.file_uris()]
+    def _table_has_data(self, handle: Any) -> bool:
+        return bool(handle.file_uris())
+
+    def _table_scan(self, handle: Any) -> tuple[str, str]:
+        # delta_scan applies deletion vectors and column mapping, which a plain
+        # read of file_uris() does not.
+        return "delta", f"delta_scan({self._sql_literal(str(handle.table_uri))})"
 
     def _table_columns(self, handle: Any) -> dict[str, str]:
         columns: dict[str, str] = {}

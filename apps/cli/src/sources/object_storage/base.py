@@ -39,7 +39,8 @@ from ...utils.embedded_files import (
 from ...utils.file_metadata import extract_file_metadata
 from ...utils.file_parser import (
     ARROW_FILE_MIME_TYPE,
-    ARROW_MIME_TYPES,
+    TABULAR_FILE_EXTENSIONS,
+    TABULAR_MIME_TYPES,
     count_tabular_rows,
     infer_mime_type_from_file_name,
     normalize_mime_type,
@@ -47,6 +48,7 @@ from ...utils.file_parser import (
     tabular_mime_type_for_name,
 )
 from ...utils.hashing import hash_id, unhash_id
+from ...utils.lakehouse_layout import DELTA, table_root_of, table_roots
 from ...utils.payload import spool
 from ...utils.sampling_frontier import time_rank
 from ..base import BaseSource
@@ -62,15 +64,7 @@ _TEXT_MIME_TYPES = {
     "application/ld+json",
 }
 
-_TABULAR_MIME_TYPES = {
-    "text/csv",
-    "text/tab-separated-values",
-    "application/vnd.ms-excel",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    "application/parquet",
-    "application/vnd.apache.parquet",
-    *ARROW_MIME_TYPES,
-}
+_TABULAR_MIME_TYPES = TABULAR_MIME_TYPES
 
 
 _FILE_EXTENSION_HINTS: dict[str, OutputAssetType] = {
@@ -125,6 +119,9 @@ _FILE_EXTENSION_HINTS: dict[str, OutputAssetType] = {
     ".md": OutputAssetType.TXT,
     ".html": OutputAssetType.TXT,
     ".htm": OutputAssetType.TXT,
+    # Every other tabular format the parser reads as rows (Avro, ORC, JSON lines,
+    # database files, …) — from the parser's own list, so a new one lands here too.
+    **dict.fromkeys(TABULAR_FILE_EXTENSIONS, OutputAssetType.TABLE),
 }
 
 
@@ -226,6 +223,10 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         self._content_cache: dict[str, tuple[str, str]] = {}
         self._hash_to_uri: dict[str, str] = {}
         self._object_ref_by_hash: dict[str, ObjectRef] = {}
+        # Object key per asset hash for the whole run. Unlike the ref map it is
+        # never evicted: the AUTOMATIC sweeping list is written at the end of
+        # the run, after every asset's cache has been released.
+        self._object_key_by_hash: dict[str, str] = {}
         self._file_processing_deps_checked = False
         # Keyed by both asset_hash and external_url for O(1) lookup from either.
         self._bytes_cache: dict[str, bytes] = {}
@@ -416,15 +417,96 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         materialized.sort(key=lambda ref: ref.last_modified, reverse=True)
         return materialized[:limit]
 
+    def _without_table_files(self, refs: list[ObjectRef]) -> list[ObjectRef]:
+        """Leave out every object that belongs to a Delta Lake or Iceberg table.
+
+        A table's files are not the table: they include files the table has
+        removed, files of older snapshots, and rows its deletion vectors or
+        delete files have struck out, under column names it may have renamed.
+        Scanning them one by one reports data the table no longer holds. The
+        Delta Lake and Apache Iceberg sources read each table as one asset.
+        """
+        roots = table_roots(ref.key for ref in refs)
+        if not roots:
+            return refs
+        kept: list[ObjectRef] = []
+        skipped: dict[str, int] = {}
+        for ref in refs:
+            root = table_root_of(ref.key, roots)
+            if root is None:
+                kept.append(ref)
+            else:
+                skipped[root] = skipped.get(root, 0) + 1
+        for root, count in sorted(skipped.items()):
+            source = "Delta Lake" if roots[root] == DELTA else "Apache Iceberg"
+            logger.info(
+                "Skipped %d object(s) of the %s table at %s/: scan it with the %s source, "
+                "which reads it as one table",
+                count,
+                source,
+                root,
+                source,
+            )
+        return kept
+
     AUTOMATIC_CURSOR_KEY = "objects"
 
+    #: Cursor key listing the objects whose rows are still being swept: a table
+    #: file an earlier run read one window of, with rows left beyond it.
+    SWEEPING_CURSOR_KEY = "objects:sweeping"
+
     def _automatic_refs(self, refs: list[ObjectRef]) -> list[ObjectRef]:
-        """This run's AUTOMATIC slice: new objects first, then the backfill."""
-        return self.automatic_window(
+        """This run's AUTOMATIC slice: new objects first, then the backfill.
+
+        Plus every object still part-way through its rows. The object window
+        hands each object out once and then moves on, but a table file larger
+        than ``rows_per_page`` needs several runs: dropped from the window after
+        its first, its row cursor would never be read again and its remaining
+        rows never scanned.
+        """
+        window = self.automatic_window(
             refs,
             key=self.AUTOMATIC_CURSOR_KEY,
             order=lambda ref: (self._automatic_rank(ref), ref.key),
         )
+        sweeping = self._sweeping_object_keys()
+        if sweeping:
+            chosen = {ref.key for ref in window}
+            window.extend(ref for ref in refs if ref.key in sweeping and ref.key not in chosen)
+        return window
+
+    def _sweeping_object_keys(self) -> set[str]:
+        raw = self._sampling_cursor.get(self.SWEEPING_CURSOR_KEY)
+        return {str(key) for key in raw} if isinstance(raw, list) else set()
+
+    def current_sampling_cursor(self) -> dict[str, Any] | None:
+        self._record_sweeping_objects()
+        return super().current_sampling_cursor()
+
+    def _record_sweeping_objects(self) -> None:
+        """Carry the objects with rows left into the next run's cursor.
+
+        An object this run read keeps its place when its row cursor is not yet
+        exhausted and loses it when it is. One the run did not get to (it
+        failed, or the run stopped short) stays, so its sweep is not forgotten.
+        """
+        store = getattr(self, "_payload_windows", None)
+        if store is None or self.config.sampling.strategy != SamplingStrategy.AUTOMATIC:
+            return
+        sweeping = self._sweeping_object_keys()
+        for asset_hash, key in self._object_key_by_hash.items():
+            cursor = store.advanced_cursor(asset_hash) or store.advanced_cursor(
+                self._external_url(key)
+            )
+            if cursor is None:
+                continue
+            if cursor.exhausted:
+                sweeping.discard(key)
+            else:
+                sweeping.add(key)
+        if sweeping or self.SWEEPING_CURSOR_KEY in self._sampling_cursor:
+            self._record_cursor_key(self.SWEEPING_CURSOR_KEY, sorted(sweeping))
+        self.note_sweep_frontier(self.SWEEPING_CURSOR_KEY, done=not sweeping)
 
     def _automatic_rank(self, ref: ObjectRef) -> int:
         """What makes one object newer than another for AUTOMATIC.
@@ -684,6 +766,7 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         )
         self._hash_to_uri[asset_hash] = external_url
         self._object_ref_by_hash[asset_hash] = ref
+        self._object_key_by_hash[asset_hash] = ref.key
 
         # Files that embed whole other files (parquet image/audio/document columns,
         # office media) yield one child asset per embedded file, so each is parsed
@@ -968,6 +1051,7 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         self._content_cache = {}
         self._hash_to_uri = {}
         self._object_ref_by_hash = {}
+        self._object_key_by_hash = {}
         self._bytes_cache = {}
         self._reset_member_cache()
         self._mime_cache = {}
@@ -975,8 +1059,8 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         self._pending_child_assets = []
         self._pending_containers = []
 
-        refs = self._list_objects()
-        sampled_refs = self._apply_sampling(refs)
+        refs = self._without_table_files(list(self._list_objects()))
+        sampled_refs = self._apply_sampling(iter(refs))
 
         def _admit(candidates: list[SingleAssetScanResults]) -> list[SingleAssetScanResults]:
             admitted = []

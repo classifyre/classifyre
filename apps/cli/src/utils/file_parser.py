@@ -14,6 +14,28 @@ from urllib.parse import urlsplit
 
 from .legacy_office import LEGACY_OFFICE_MIME_TYPES as _LEGACY_OFFICE_MIME_TYPES
 from .payload import BinarySource, as_binary_io, header, payload_size, read_all
+from .table_files import (
+    AVRO_MAGIC,
+    AVRO_MIME_TYPE,
+    DBF_MIME_TYPE,
+    DELIMITED_MIME_TYPES,
+    DUCKDB_MAGIC,
+    DUCKDB_MAGIC_OFFSET,
+    DUCKDB_MIME_TYPE,
+    FLATGEOBUF_MAGIC,
+    FLATGEOBUF_MIME_TYPE,
+    GEOJSON_MIME_TYPE,
+    GEOPACKAGE_MIME_TYPE,
+    NDJSON_MIME_TYPE,
+    ORC_MAGIC,
+    ORC_MIME_TYPE,
+    SQLITE_MAGIC,
+    SQLITE_MIME_TYPE,
+    TABLE_FILE_MIME_TYPES,
+    TEXT_FALLBACK_MIME_TYPES,
+    VORTEX_MAGIC,
+    VORTEX_MIME_TYPE,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -108,6 +130,21 @@ _MIME_TYPE_ALIASES = {
     "application/vnd.apache.arrow": ARROW_FILE_MIME_TYPE,
     "application/x-feather": ARROW_FILE_MIME_TYPE,
     "application/vnd.apache.feather": ARROW_FILE_MIME_TYPE,
+    "application/avro": AVRO_MIME_TYPE,
+    "application/x-avro": AVRO_MIME_TYPE,
+    "avro/binary": AVRO_MIME_TYPE,
+    "application/vnd.apache.avro+binary": AVRO_MIME_TYPE,
+    "application/orc": ORC_MIME_TYPE,
+    "application/x-orc": ORC_MIME_TYPE,
+    "application/jsonl": NDJSON_MIME_TYPE,
+    "application/jsonlines": NDJSON_MIME_TYPE,
+    "application/x-jsonlines": NDJSON_MIME_TYPE,
+    "application/ndjson": NDJSON_MIME_TYPE,
+    "application/x-sqlite3": SQLITE_MIME_TYPE,
+    "application/vnd.sqlite": SQLITE_MIME_TYPE,
+    "application/x-duckdb": DUCKDB_MIME_TYPE,
+    "application/x-dbf": DBF_MIME_TYPE,
+    "application/dbase": DBF_MIME_TYPE,
 }
 
 
@@ -132,14 +169,26 @@ _TEXT_RAW_MIME_TYPES = {
 }
 
 _TABULAR_MIME_TYPES = {
-    "text/csv",
-    "text/tab-separated-values",
     "application/vnd.ms-excel",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "application/parquet",
     "application/vnd.apache.parquet",
     *ARROW_MIME_TYPES,
+    # CSV/TSV, XLSX, JSON lines, Avro, ORC, Vortex, database files and the
+    # single-layer geo formats (see utils/table_files.py).
+    *TABLE_FILE_MIME_TYPES,
 }
+
+# Record-shaped payloads: every page iter_file_pages yields is one row. The rest
+# of the tabular set (legacy .xls) reaches the detectors as extracted text paged
+# in blocks of lines.
+RECORD_SHAPED_MIME_TYPES = frozenset(
+    {
+        "application/parquet",
+        "application/vnd.apache.parquet",
+        *ARROW_MIME_TYPES,
+        *TABLE_FILE_MIME_TYPES,
+    }
+)
 
 _MIME_HINTS_BY_EXTENSION = {
     ".csv": "text/csv",
@@ -149,6 +198,28 @@ _MIME_HINTS_BY_EXTENSION = {
     ".feather": ARROW_FILE_MIME_TYPE,
     ".ipc": ARROW_FILE_MIME_TYPE,
     ".arrows": ARROW_STREAM_MIME_TYPE,
+    ".avro": AVRO_MIME_TYPE,
+    ".orc": ORC_MIME_TYPE,
+    ".jsonl": NDJSON_MIME_TYPE,
+    ".ndjson": NDJSON_MIME_TYPE,
+    ".vortex": VORTEX_MIME_TYPE,
+    # Database files. `.db` is shared with Windows' Thumbs.db and many app caches,
+    # so the name only nominates it: resolve_mime_type keeps the SQLite type only
+    # when the header confirms it (see _confirm_database_header).
+    ".db": SQLITE_MIME_TYPE,
+    ".sqlite": SQLITE_MIME_TYPE,
+    ".sqlite3": SQLITE_MIME_TYPE,
+    ".duckdb": DUCKDB_MIME_TYPE,
+    ".ddb": DUCKDB_MIME_TYPE,
+    # Geospatial vector formats with a single layer (KML/GPX/GML stay XML).
+    ".gpkg": GEOPACKAGE_MIME_TYPE,
+    ".fgb": FLATGEOBUF_MIME_TYPE,
+    # Multi-layer geo formats are XML documents; read as XML, every folder kept.
+    ".kml": "application/xml",
+    ".gpx": "application/xml",
+    ".gml": "application/xml",
+    ".geojson": GEOJSON_MIME_TYPE,
+    ".dbf": DBF_MIME_TYPE,
     ".json": "application/json",
     ".xml": "application/xml",
     ".html": "text/html",
@@ -400,14 +471,21 @@ _DOCLING_EXTENSIONS = {
     ".heif",
 }
 
-# OpenDocument formats and Outlook .msg are parsed natively by docling (no OCR
-# models involved, but the converter lives in the same `ocr` dependency group).
+# Outlook .msg is parsed natively by docling (no OCR models involved, but the
+# converter lives in the same `ocr` dependency group).
 _DOCLING_NATIVE_DOCUMENT_MIME_TYPES = {
-    "application/vnd.oasis.opendocument.text",
-    "application/vnd.oasis.opendocument.spreadsheet",
-    "application/vnd.oasis.opendocument.presentation",
     "application/vnd.ms-outlook",
 }
+
+# OpenDocument formats: a zip whose content.xml holds every paragraph and cell,
+# read here directly (see _extract_odf_text).
+_ODF_MIME_TYPES = frozenset(
+    {
+        "application/vnd.oasis.opendocument.text",
+        "application/vnd.oasis.opendocument.spreadsheet",
+        "application/vnd.oasis.opendocument.presentation",
+    }
+)
 
 # Archive containers: never text-extracted here — object-storage sources expand
 # their members into standalone child assets (see utils/archive_extraction.py).
@@ -686,6 +764,12 @@ def infer_mime_type_from_file_name(file_name: str) -> str:
 TABULAR_MIME_TYPES = frozenset(_TABULAR_MIME_TYPES)
 
 
+# File extensions that name a tabular format, for callers that only have a name.
+TABULAR_FILE_EXTENSIONS = frozenset(
+    extension for extension, mime in _MIME_HINTS_BY_EXTENSION.items() if mime in TABULAR_MIME_TYPES
+)
+
+
 def is_tabular_mime_type(mime_type: str | None) -> bool:
     """Whether this payload has a row axis a sampling window can address."""
     return _normalize_mime_type(mime_type) in TABULAR_MIME_TYPES
@@ -716,6 +800,15 @@ def normalize_detected_mime_type(detected_mime_type: str, file_name: str) -> str
         return inferred_mime
 
     if mime == "text/plain" and inferred_mime in _TABULAR_MIME_TYPES:
+        return inferred_mime
+
+    # JSON lines and GeoJSON open like any JSON document; only the name says the
+    # payload is a stream of records or a feature collection.
+    if mime == "application/json" and inferred_mime in (NDJSON_MIME_TYPE, GEOJSON_MIME_TYPE):
+        return inferred_mime
+
+    # A GeoPackage is a SQLite file by its header; the extension says which.
+    if mime == SQLITE_MIME_TYPE and inferred_mime == GEOPACKAGE_MIME_TYPE:
         return inferred_mime
 
     # Source code, where the name is better evidence than the contents. Content
@@ -762,11 +855,20 @@ def _detect_magic_mime_type(
         # has no magic at all, so it is recognised by name alone.
         (b"ARROW1\x00\x00", ARROW_FILE_MIME_TYPE),
         (b"FEA1", ARROW_FILE_MIME_TYPE),
+        (SQLITE_MAGIC, SQLITE_MIME_TYPE),
+        (AVRO_MAGIC, AVRO_MIME_TYPE),
+        (ORC_MAGIC, ORC_MIME_TYPE),
+        (VORTEX_MAGIC, VORTEX_MIME_TYPE),
+        (FLATGEOBUF_MAGIC, FLATGEOBUF_MIME_TYPE),
     )
 
     for signature, mime_type in signatures:
         if file_bytes.startswith(signature):
             return mime_type
+
+    # DuckDB's header starts with a checksum; its magic sits at byte 8.
+    if file_bytes[DUCKDB_MAGIC_OFFSET : DUCKDB_MAGIC_OFFSET + len(DUCKDB_MAGIC)] == DUCKDB_MAGIC:
+        return DUCKDB_MIME_TYPE
 
     if file_bytes.startswith(b"PK\x03\x04"):
         return _refine_zip_mime(zip_source if zip_source is not None else file_bytes)
@@ -1251,25 +1353,21 @@ def extract_text(
         except Exception as e:
             return "", f"DOCX extraction failed: {e}"
 
-    # XLSX
-    if mime_type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+    # Table files other than CSV/TSV (which stay raw text here, as text/* below):
+    # XLSX, JSON lines, Avro, ORC, Vortex, database and geo files. The rows are
+    # rendered exactly as the page iterator renders them.
+    if mime_type in TABLE_FILE_MIME_TYPES and mime_type not in DELIMITED_MIME_TYPES:
         try:
-            openpyxl = _require_file_processing("openpyxl")
-
-            wb = openpyxl.load_workbook(  # type: ignore[attr-defined]
-                as_binary_io(source), read_only=True, data_only=True
-            )
-            rows: list[str] = []
-            for sheet in wb.worksheets:
-                for row in sheet.iter_rows(values_only=True):
-                    cells = [str(c) if c is not None else "" for c in row]
-                    if any(c.strip() for c in cells):
-                        rows.append("\t".join(cells))
-            return "\n".join(rows), None
+            pages = _iter_table_pages(source, mime_type, True, file_name=file_name)
+            return "\n".join(pages), None
         except Exception as e:
-            return "", f"XLSX extraction failed: {e}"
+            return "", f"{_table_format_label(mime_type)} extraction failed: {e}"
 
-    # ODF (odt/ods/odp) and Outlook .msg — docling parses these natively.
+    # ODF (odt/ods/odp) — read from content.xml.
+    if mime_type in _ODF_MIME_TYPES:
+        return _extract_odf_text(source)
+
+    # Outlook .msg — docling parses it natively.
     if mime_type in _DOCLING_NATIVE_DOCUMENT_MIME_TYPES:
         return _extract_docling_markdown(
             file_bytes(),
@@ -1408,6 +1506,65 @@ def _extract_xml_text(file_bytes: bytes) -> tuple[str, str | None]:
     return "\n".join(lines), None
 
 
+_ODF_TEXT_NS = "urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+_ODF_TABLE_NS = "urn:oasis:names:tc:opendocument:xmlns:table:1.0"
+
+
+def _extract_odf_text(source: BinarySource) -> tuple[str, str | None]:
+    """Text of an OpenDocument file (odt / ods / odp), in document order.
+
+    Everything a reader sees lives in the package's ``content.xml``: paragraphs
+    and headings as ``text:p`` / ``text:h``, sheets and tables as ``table:table``
+    rows of cells. Reading it directly needs no converter. Docling's OpenDocument
+    backend needs a package the scan image does not ship, and spent minutes per
+    file failing to load it.
+
+    A table row becomes one tab-separated line and a sheet is introduced by its
+    name, matching how an XLSX reads in ``extract_text``.
+    """
+    import zipfile
+
+    try:
+        defused_et = _require_file_processing("defusedxml.ElementTree")
+        with zipfile.ZipFile(as_binary_io(source)) as archive:
+            content = archive.read("content.xml")
+        root = defused_et.fromstring(content)  # type: ignore[attr-defined]
+    except Exception as e:
+        return "", f"OpenDocument extraction failed: {e}"
+
+    paragraph_tags = {f"{{{_ODF_TEXT_NS}}}p", f"{{{_ODF_TEXT_NS}}}h"}
+    row_tag = f"{{{_ODF_TABLE_NS}}}table-row"
+    table_tag = f"{{{_ODF_TABLE_NS}}}table"
+    cell_tags = {f"{{{_ODF_TABLE_NS}}}table-cell", f"{{{_ODF_TABLE_NS}}}covered-table-cell"}
+    table_name = f"{{{_ODF_TABLE_NS}}}name"
+
+    lines: list[str] = []
+
+    def walk(element: Any) -> None:
+        tag = element.tag
+        if tag in paragraph_tags:
+            text = "".join(element.itertext()).strip()
+            if text:
+                lines.append(text)
+            return
+        if tag == row_tag:
+            cells = [
+                " ".join("".join(child.itertext()).split())
+                for child in element
+                if child.tag in cell_tags
+            ]
+            if any(cells):
+                lines.append("\t".join(cells).rstrip("\t"))
+            return
+        if tag == table_tag and element.get(table_name):
+            lines.append(f"[{element.get(table_name)}]")
+        for child in element:
+            walk(child)
+
+    walk(root)
+    return "\n".join(lines), None
+
+
 def _extract_legacy_office_text(
     file_bytes: bytes,
     mime_type: str,
@@ -1523,6 +1680,7 @@ def resolve_mime_type(
     mime_type = normalize_detected_mime_type(mime_type, file_name)
     if mime_type == OCTET_STREAM and inferred_mime != OCTET_STREAM:
         mime_type = inferred_mime
+    mime_type = _confirm_database_header(source, mime_type)
 
     # A text-like claim (declared upload header or file extension) must survive
     # content inspection: a binary renamed to .txt otherwise decodes to
@@ -1535,6 +1693,25 @@ def resolve_mime_type(
         return OCTET_STREAM
 
     return mime_type
+
+
+def _confirm_database_header(source: BinarySource, mime_type: str) -> str:
+    """A database type claimed by name or upload header, kept only if the bytes agree.
+
+    ``.db`` names SQLite files and Windows thumbnail caches alike, and a reader
+    pointed at the wrong one reports a parse failure for a file that was never a
+    database. The file header settles it.
+    """
+    if mime_type in (SQLITE_MIME_TYPE, GEOPACKAGE_MIME_TYPE):
+        expected, offset = SQLITE_MAGIC, 0
+    elif mime_type == DUCKDB_MIME_TYPE:
+        expected, offset = DUCKDB_MAGIC, DUCKDB_MAGIC_OFFSET
+    else:
+        return mime_type
+    prefix = header(source, offset + len(expected))
+    if not prefix:
+        return mime_type
+    return mime_type if prefix[offset:] == expected else OCTET_STREAM
 
 
 def parse_bytes(
@@ -1596,9 +1773,10 @@ def iter_file_pages(
     """
     Iterate over file content in pages of up to batch_size rows or lines.
 
-    Parquet / Arrow IPC / CSV / TSV → yields batch_size *rows* per page with
-    labelled columns.
-    All other extractable types (PDF, DOCX, TXT, JSON, XML, XLSX, …) → extracts the
+    Parquet / Arrow IPC and every format in ``utils.table_files`` (CSV, TSV, XLSX,
+    JSON lines, Avro, ORC, Vortex, SQLite/DuckDB/GeoPackage files, FlatGeobuf,
+    Shapefile .dbf, GeoJSON) → yields one page per *row* with labelled columns.
+    All other extractable types (PDF, DOCX, TXT, JSON, XML, …) → extracts the
     full text once via extract_text(), then yields batch_size *lines* per page.
     Audio/video → transcript lines; video also yields distinct-frame OCR.
     Unknown binary types → yield nothing.
@@ -1635,10 +1813,12 @@ def iter_file_pages(
             start_row=start_row,
             max_rows=max_rows,
         )
-    elif normalized in ("text/csv", "text/tab-separated-values"):
-        yield from _iter_csv_pages(
+    elif normalized in TABLE_FILE_MIME_TYPES:
+        yield from _iter_table_pages(
             file_bytes,
+            normalized,
             include_column_names,
+            file_name=file_name,
             start_row=start_row,
             max_rows=max_rows,
         )
@@ -1746,7 +1926,8 @@ def count_tabular_rows(source: bytes | Any, mime_type: str) -> int | None:
     mean a full pass — so this returns None there and the caller uses a strategy
     that needs no total (reservoir sampling). None means "unknown", never "zero".
 
-    Arrow IPC is in the CSV camp despite having a footer: that footer records
+    ORC records its count in the footer too. Arrow IPC is in the CSV camp despite
+    having a footer: that footer records
     where each record batch *starts*, not how many rows it holds, so the only way
     to total them is to read every batch. Paying a full pass to plan a bounded
     one is exactly the trade this function exists to avoid.
@@ -1755,6 +1936,10 @@ def count_tabular_rows(source: bytes | Any, mime_type: str) -> int | None:
     the footer is read — the whole point of the range-reading path.
     """
     normalized = _normalize_mime_type(mime_type)
+    if normalized == ORC_MIME_TYPE:
+        from .table_files import count_table_rows
+
+        return count_table_rows(source, normalized)
     if normalized not in ("application/parquet", "application/vnd.apache.parquet"):
         return None
     is_bytes = isinstance(source, bytes | bytearray)
@@ -1942,6 +2127,8 @@ def _format_record_row(
     abs_row: int,
     payload_columns: dict[str, Any],
     include_column_names: bool,
+    *,
+    part: str | None = None,
 ) -> str:
     """Render one row of an Arrow record batch as a detector-visible page.
 
@@ -1956,6 +2143,13 @@ def _format_record_row(
     Image/Audio structs, file-byte columns) render as a placeholder and are
     scanned separately as child assets; text carried as bytes is decoded into the
     row it belongs to; anything else is summarized rather than spelled out.
+
+    Nested values (structs, lists, maps — a JSON-lines record, an Avro record)
+    render as JSON rather than as a Python repr, so ``{"ssn": "…"}`` reads the
+    same in the row as in the source file.
+
+    ``part`` names the sheet or table a row belongs to in a container format
+    (XLSX, database files); its columns then read as ``part.column``.
     """
     from .embedded_files import CONTENT_FILE, CONTENT_TEXT, extract_embedded_bytes
 
@@ -1972,12 +2166,126 @@ def _format_record_row(
             else:
                 cell_str = _format_embedded_placeholder(raw, OCTET_STREAM)
         else:
-            cell_str = "" if cell is None else str(cell)
+            cell_str = _render_cell(cell)
+        label = f"{part}.{col}" if part else col
         first, *rest = cell_str.splitlines() or [""]
-        lines.append(f"  {col}: {first}" if include_column_names else f"  {first}")
+        lines.append(f"  {label}: {first}" if include_column_names else f"  {first}")
         lines.extend(f"    {c}" for c in rest)
     lines.append("")
     return "\n".join(lines)
+
+
+def _render_cell(cell: Any) -> str:
+    if cell is None:
+        return ""
+    if isinstance(cell, dict | list | tuple):
+        import json
+
+        return json.dumps(cell, ensure_ascii=False, default=json_safe_default)
+    if isinstance(cell, bytes | bytearray | memoryview):
+        return render_bytes_cell(bytes(cell))
+    return str(cell)
+
+
+_TABLE_FORMAT_LABELS = {
+    "text/csv": "CSV",
+    "text/tab-separated-values": "TSV",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "XLSX",
+    NDJSON_MIME_TYPE: "JSON lines",
+    AVRO_MIME_TYPE: "Avro",
+    ORC_MIME_TYPE: "ORC",
+    VORTEX_MIME_TYPE: "Vortex",
+    SQLITE_MIME_TYPE: "SQLite",
+    GEOPACKAGE_MIME_TYPE: "GeoPackage",
+    DUCKDB_MIME_TYPE: "DuckDB",
+    FLATGEOBUF_MIME_TYPE: "FlatGeobuf",
+    GEOJSON_MIME_TYPE: "GeoJSON",
+    DBF_MIME_TYPE: "DBF",
+}
+
+
+def _table_format_label(mime_type: str) -> str:
+    return _TABLE_FORMAT_LABELS.get(mime_type, mime_type)
+
+
+def _iter_table_pages(
+    source: BinarySource,
+    mime_type: str,
+    include_column_names: bool,
+    *,
+    file_name: str = "",
+    start_row: int = 0,
+    max_rows: int | None = None,
+) -> Generator[str, None, None]:
+    """Yield one page per row of a table file read by ``utils.table_files``.
+
+    Rendered by ``_format_record_row``, the Parquet renderer, so a row reads the
+    same whichever format carried it. Columns holding bytes are classified once
+    per sheet or table, as the Parquet reader does.
+
+    A reader that fails before producing a row falls back to text for the formats
+    a detector can still read as text (a malformed CSV is scanned as delimited
+    text, a JSON-lines file with a broken record as lines). Any other failure —
+    and a failure part-way through — raises ``TextExtractionCoverageError``: the
+    sampling cursor would otherwise bank a half-read window as a finished sweep.
+    """
+    from .embedded_files import detect_payload_columns
+    from .table_files import iter_table_batches
+
+    emitted = 0
+    label = _table_format_label(mime_type)
+    try:
+        payload_columns: dict[str | None, dict[str, Any]] = {}
+        for item in iter_table_batches(source, mime_type, start_row=start_row, max_rows=max_rows):
+            columns = payload_columns.get(item.part)
+            if columns is None:
+                columns = detect_payload_columns(item.batch.schema, item.batch)
+                payload_columns[item.part] = columns
+            for local_index in range(item.batch.num_rows):
+                yield _format_record_row(
+                    item.batch,
+                    local_index,
+                    item.first_row + local_index,
+                    columns,
+                    include_column_names,
+                    part=item.part,
+                )
+                emitted += 1
+    except GeneratorExit:
+        raise
+    except TextExtractionCoverageError:
+        raise
+    except Exception as exc:
+        if emitted == 0 and mime_type in TEXT_FALLBACK_MIME_TYPES:
+            logger.warning(
+                "%s reader failed for %s (%s); reading it as text instead",
+                label,
+                file_name or mime_type,
+                # DuckDB errors run to a dozen lines of hints; the first says it.
+                (str(exc).splitlines() or [""])[0],
+            )
+            if mime_type in DELIMITED_MIME_TYPES:
+                yield from _iter_csv_pages(
+                    source,
+                    include_column_names,
+                    tsv=mime_type == "text/tab-separated-values",
+                    start_row=start_row,
+                    max_rows=max_rows,
+                )
+            else:
+                yield from _iter_text_lines(
+                    _decode_bytes(read_all(source)), 1, start_row=start_row, max_rows=max_rows
+                )
+            return
+        unavailable = "unavailable" in str(exc).casefold()
+        raise TextExtractionCoverageError(
+            f"{label} page iteration failed after {emitted} row(s): {exc}",
+            code=(
+                TextExtractionCoverageCode.ENGINE_UNAVAILABLE
+                if unavailable
+                else TextExtractionCoverageCode.FAILED
+            ),
+        ) from exc
 
 
 _ARROW_FILE_MAGIC = b"ARROW1"
@@ -2155,14 +2463,23 @@ def _iter_arrow_pages(
         ) from exc
 
 
+_CSV_EXTRA_COLUMN = "extra_values"
+
+
 def _iter_csv_pages(
     source: BinarySource,
     include_column_names: bool,
     *,
+    tsv: bool = False,
     start_row: int = 0,
     max_rows: int | None = None,
 ) -> Generator[str, None, None]:
     """Yield one page per CSV row, reading the payload incrementally.
+
+    The fallback for delimited text DuckDB could not read (see
+    ``_iter_table_pages``). The delimiter is sniffed from the first lines: a TSV,
+    or a ``;``-separated export from a European locale, read with the default
+    comma is a single column.
 
     Decoded through a ``TextIOWrapper`` rather than into a string: a CSV is the
     one big format with no index, so the whole file is unavoidably *read* — but
@@ -2173,12 +2490,22 @@ def _iter_csv_pages(
     import csv
     import io
 
+    prefix = header(source, 65536)
     handle = as_binary_io(source)
-    encoding = _detect_encoding(header(source, 65536)) or "utf-8"
+    encoding = _detect_encoding(prefix) or "utf-8"
+    delimiter = "\t" if tsv else ","
+    if not tsv:
+        try:
+            sample = prefix.decode(encoding, errors="replace")
+            delimiter = csv.Sniffer().sniff(sample, delimiters=",;\t|").delimiter
+        except csv.Error:
+            pass
     stream = io.TextIOWrapper(handle, encoding=encoding, errors="replace", newline="")
     emitted = 0
     try:
-        reader = csv.DictReader(stream)
+        # Values past the header's width land under the restkey; rendered as one
+        # extra column so a ragged row keeps every value.
+        reader = csv.DictReader(stream, delimiter=delimiter, restkey=_CSV_EXTRA_COLUMN)
         headers = list(reader.fieldnames or [])
 
         begin = max(0, start_row)
@@ -2193,7 +2520,13 @@ def _iter_csv_pages(
             if max_rows is not None and emitted >= max_rows:
                 return
             emitted += 1
-            yield _format_tabular_page([dict(row)], headers, total_seen, include_column_names)
+            record = dict(row)
+            columns = headers
+            extra = record.pop(_CSV_EXTRA_COLUMN, None)
+            if extra:
+                record[_CSV_EXTRA_COLUMN] = delimiter.join(extra)
+                columns = [*headers, _CSV_EXTRA_COLUMN]
+            yield _format_tabular_page([record], columns, total_seen, include_column_names)
     except GeneratorExit:
         raise
     except Exception as exc:

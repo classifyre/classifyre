@@ -41,10 +41,31 @@ from .file_parser import (
     open_arrow_batches,
     resolve_mime_type,
 )
+from .table_files import (
+    AVRO_MIME_TYPE,
+    DUCKDB_MIME_TYPE,
+    GEOPACKAGE_MIME_TYPE,
+    ORC_MIME_TYPE,
+    SQLITE_MIME_TYPE,
+    VORTEX_MIME_TYPE,
+    iter_table_batches,
+)
 
 logger = logging.getLogger(__name__)
 
 _PARQUET_MIME_TYPES = frozenset({"application/parquet", "application/vnd.apache.parquet"})
+# Table files whose columns can hold bytes: a SQLite BLOB of PDFs, an Avro record
+# with an image field. Text formats (CSV, JSON lines) and XLSX cells cannot.
+_BYTE_TABLE_MIME_TYPES = frozenset(
+    {
+        AVRO_MIME_TYPE,
+        ORC_MIME_TYPE,
+        VORTEX_MIME_TYPE,
+        SQLITE_MIME_TYPE,
+        GEOPACKAGE_MIME_TYPE,
+        DUCKDB_MIME_TYPE,
+    }
+)
 _OOXML_MIME_TYPES = frozenset(
     {
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",  # xlsx
@@ -128,6 +149,7 @@ def has_embedded_files(mime_type: str) -> bool:
     return (
         normalized in _PARQUET_MIME_TYPES
         or normalized in ARROW_MIME_TYPES
+        or normalized in _BYTE_TABLE_MIME_TYPES
         or normalized in _OOXML_MIME_TYPES
     )
 
@@ -140,7 +162,7 @@ def iter_embedded_files(
     max_rows: int | None = None,
     max_files: int = DEFAULT_MAX_EMBEDDED_FILES,
 ) -> Iterator[EmbeddedFile]:
-    """Yield the files embedded in a parquet, Arrow IPC, or OOXML container.
+    """Yield the files embedded in a parquet, Arrow IPC, table file or OOXML container.
 
     ``start_row``/``max_rows`` bound a row-shaped walk to one row window and are
     ignored for containers with no row axis.
@@ -164,6 +186,14 @@ def iter_embedded_files(
     elif normalized in ARROW_MIME_TYPES:
         yield from _iter_arrow_files(
             source,
+            start_row=start_row,
+            max_rows=max_rows,
+            max_files=max_files,
+        )
+    elif normalized in _BYTE_TABLE_MIME_TYPES:
+        yield from _iter_table_files(
+            source,
+            normalized,
             start_row=start_row,
             max_rows=max_rows,
             max_files=max_files,
@@ -506,6 +536,67 @@ def _iter_arrow_files(
                 return
     except Exception as exc:
         logger.warning("Arrow embedded-file iteration failed: %s", exc)
+
+
+# ---------------------------------------------------------------------------
+# Other table files (Avro, ORC, Vortex, SQLite, GeoPackage, DuckDB)
+# ---------------------------------------------------------------------------
+
+
+def _iter_table_files(
+    source: bytes | Any,
+    mime_type: str,
+    *,
+    start_row: int,
+    max_rows: int | None,
+    max_files: int,
+) -> Iterator[EmbeddedFile]:
+    """The Arrow walk over a ``utils.table_files`` payload.
+
+    Same rows and window as the page iterator, so the child found in row N of a
+    database file is ``row=N;col=<table>.<column>`` whichever run found it. File
+    columns are classified once per table, from its first batch in the window.
+    """
+    files = 0
+    columns_by_part: dict[str | None, dict[str, EmbeddedColumn]] = {}
+    try:
+        for item in iter_table_batches(source, mime_type, start_row=start_row, max_rows=max_rows):
+            columns = columns_by_part.get(item.part)
+            if columns is None:
+                columns = {
+                    name: column
+                    for name, column in detect_payload_columns(
+                        item.batch.schema, item.batch
+                    ).items()
+                    if column.content == CONTENT_FILE
+                }
+                columns_by_part[item.part] = columns
+            if not columns:
+                continue
+            for local_index in range(item.batch.num_rows):
+                abs_row = item.first_row + local_index
+                for column_name, column in columns.items():
+                    cell = item.batch.column(column_name)[local_index].as_py()
+                    raw = extract_embedded_bytes(cell, column.kind)
+                    if not raw:
+                        continue
+                    mime = resolve_mime_type(raw, file_name=embedded_cell_name(cell, column.kind))
+                    if not is_embeddable_file_mime(mime):
+                        continue
+                    label = f"{item.part}.{column_name}" if item.part else column_name
+                    yield EmbeddedFile(
+                        location=f"row={abs_row + 1};col={label}",
+                        file_bytes=raw,
+                        mime_type=mime,
+                    )
+                    files += 1
+                    if files >= max_files:
+                        logger.info(
+                            "Reached max embedded files (%d); stopping extraction", max_files
+                        )
+                        return
+    except Exception as exc:
+        logger.warning("Table embedded-file iteration failed (%s): %s", mime_type, exc)
 
 
 # ---------------------------------------------------------------------------

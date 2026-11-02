@@ -33,7 +33,8 @@ from ...models.generated_single_asset_scan_results import (
 )
 from ...utils.file_metadata import extract_file_metadata
 from ...utils.file_parser import (
-    ARROW_MIME_TYPES,
+    TABULAR_FILE_EXTENSIONS,
+    TABULAR_MIME_TYPES,
     normalize_mime_type,
     resolve_mime_type,
 )
@@ -51,15 +52,7 @@ _TEXT_MIME_TYPES = {
     "application/x-ndjson",
 }
 
-_TABULAR_MIME_TYPES = {
-    "text/csv",
-    "text/tab-separated-values",
-    "application/vnd.ms-excel",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    "application/parquet",
-    "application/vnd.apache.parquet",
-    *ARROW_MIME_TYPES,
-}
+_TABULAR_MIME_TYPES = TABULAR_MIME_TYPES
 
 _FILE_EXTENSION_HINTS: dict[str, OutputAssetType] = {
     ".png": OutputAssetType.IMAGE,
@@ -95,6 +88,9 @@ _FILE_EXTENSION_HINTS: dict[str, OutputAssetType] = {
     ".md": OutputAssetType.TXT,
     ".html": OutputAssetType.TXT,
     ".htm": OutputAssetType.TXT,
+    # Every other tabular format the parser reads as rows (Avro, ORC, JSON lines,
+    # database files, …) — from the parser's own list, so a new one lands here too.
+    **dict.fromkeys(TABULAR_FILE_EXTENSIONS, OutputAssetType.TABLE),
 }
 
 

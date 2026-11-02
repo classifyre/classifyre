@@ -787,21 +787,15 @@ class BaseSource(ABC):
     def _payload_rows_per_page_unit(mime_type: str, batch_size: int) -> int:
         """How many payload rows one page from ``iter_file_pages`` carries.
 
-        Record-shaped readers (Parquet, Arrow IPC, CSV/TSV) emit a page per row.
-        Spreadsheets reach the detectors as extracted text, which is paged in
-        blocks of ``batch_size`` lines — one line per sheet row.
+        Record-shaped readers (Parquet, Arrow IPC and the ``utils.table_files``
+        formats — CSV/TSV, XLSX, JSON lines, Avro, ORC, database files…) emit a
+        page per row. Legacy ``.xls`` reaches the detectors as extracted text,
+        which is paged in blocks of ``batch_size`` lines — one line per sheet row.
         """
-        from ..utils.file_parser import ARROW_MIME_TYPES, normalize_mime_type
+        from ..utils.file_parser import RECORD_SHAPED_MIME_TYPES, normalize_mime_type
 
         normalized = normalize_mime_type(mime_type)
-        record_shaped = {
-            "application/parquet",
-            "application/vnd.apache.parquet",
-            "text/csv",
-            "text/tab-separated-values",
-            *ARROW_MIME_TYPES,
-        }
-        return 1 if normalized in record_shaped else max(1, batch_size)
+        return 1 if normalized in RECORD_SHAPED_MIME_TYPES else max(1, batch_size)
 
     async def fetch_content_bytes(self, asset_id: str) -> tuple[bytes, str] | None:
         """
