@@ -225,7 +225,7 @@
     },
     {
       "name": "oracledb",
-      "version": "4.0.2",
+      "version": "26.1.0",
       "modules": [
         "oracledb"
       ],
@@ -403,7 +403,7 @@
     },
     {
       "name": "snowflake-connector-python",
-      "version": "4.8.1",
+      "version": "5.1.0",
       "modules": [
         "snowflake.connector"
       ],
