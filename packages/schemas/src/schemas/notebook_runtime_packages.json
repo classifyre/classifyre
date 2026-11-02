@@ -30,7 +30,7 @@
     },
     {
       "name": "boto3",
-      "version": "1.43.122",
+      "version": "1.43.123",
       "modules": [
         "boto3"
       ],
@@ -412,7 +412,7 @@
     },
     {
       "name": "sqlglot",
-      "version": "30.26.0",
+      "version": "30.27.0",
       "modules": [
         "sqlglot"
       ],
