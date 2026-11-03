@@ -1,5 +1,6 @@
 export default {
   index: "All articles",
+  "tables-made-of-files-lakehouse": "Tables made of files: lakehouses",
   "follow-the-data-lineage": "Follow the data: lineage",
   "same-or-not-duplicate-matching": "Same or not? Duplicate matching",
   "search-by-meaning": "Search by meaning",
