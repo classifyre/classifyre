@@ -600,6 +600,27 @@ before it was a film.
 - **zsh does not split an unquoted `$list`.** A `for f in $batch` ran once with
   the whole list as one name.
 
+## Learnt on the seventh film
+
+"Tables made of files" (lakehouses, November 2026) explains four parts of one
+system, then shows the product for forty seconds.
+
+- **Build the example the film argues from.** The lab's test tables proved the
+  readers; they did not tell a story. A small seed script wrote an invented
+  shop's tables with a history (a rename, an erasure), and the film's central
+  figure came from measuring them: 21 rows in the files, 11 in the table.
+- **A map in the corner.** When a film walks through parts of one thing, a small
+  copy of the whole in a corner, with the current part in lime, keeps the viewer
+  placed. Make it compact (names only): at full size it covered half the
+  scenes' right edge.
+- **Projects' own logos, in ink.** simple-icons (now a studio dependency) has
+  some; the rest came from the projects' sites. Drawn grayscale on paper they
+  sit with the cut-outs instead of shouting.
+- **`sentence()` throws on a line `stops.ts` called TOO FEW PAUSES.** Use
+  `at(id, n)` for those lines, or `within`.
+- **A new pose has to read as itself.** A palm held up came out as his wave
+  from two angles and was dropped; `spread` (both hands open, low) stayed.
+
 ## Still to do
 
 - Extract the drawing parts of the sources table, findings table, inquiry

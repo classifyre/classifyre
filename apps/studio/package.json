@@ -24,7 +24,8 @@
     "lucide-react": "^1.7.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "remotion": "4.0.532"
+    "remotion": "4.0.532",
+    "simple-icons": "^16.28.0"
   },
   "devDependencies": {
     "@remotion/eslint-plugin": "4.0.532",

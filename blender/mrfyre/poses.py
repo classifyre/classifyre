@@ -153,6 +153,18 @@ POSES: dict[str, dict] = {
         "body": {"turn": (2, 0, -4)},
         "head": {"turn": (0, -3, 4)},
     },
+    # Both hands open and low, out to the sides: all of it, together.
+    "spread": {
+        "elbow.L": {"at": (-2.2, -0.6, 4.9)},
+        "hand.L": {"at": (-3.4, -1.1, 4.6)},
+        "palm.L": {"back": (-0.1, 0.6, -1)},
+        "elbow.R": {"at": (2.2, -0.6, 4.9)},
+        "hand.R": {"at": (3.4, -1.1, 4.6)},
+        "palm.R": {"back": (0.1, 0.6, -1)},
+        "hands": {"L": "open", "R": "open"},
+        "body": {"turn": (-3, 0, 0)},
+        "head": {"turn": (-2, 0, 0)},
+    },
     # Fist under his chin, the other arm across the body.
     "think": {
         "elbow.L": {"at": (-1.65, -1.0, 4.7)},

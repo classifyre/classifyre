@@ -17,7 +17,7 @@
     },
     "apps/api": {
       "name": "@classifyre/api",
-      "version": "0.7.3-SNAPSHOT",
+      "version": "0.7.4-SNAPSHOT",
       "dependencies": {
         "@ai-sdk/openai-compatible": "^3.0.11",
         "@anthropic-ai/sdk": "^0.137.0",
@@ -105,7 +105,7 @@
     },
     "apps/blog": {
       "name": "@classifyre/blog",
-      "version": "0.7.3-SNAPSHOT",
+      "version": "0.7.4-SNAPSHOT",
       "dependencies": {
         "@workspace/schemas": "workspace:*",
         "@workspace/ui": "workspace:*",
@@ -134,11 +134,11 @@
     },
     "apps/cli": {
       "name": "@classifyre/cli",
-      "version": "0.7.3-SNAPSHOT",
+      "version": "0.7.4-SNAPSHOT",
     },
     "apps/docs": {
       "name": "@classifyre/docs",
-      "version": "0.7.3-SNAPSHOT",
+      "version": "0.7.4-SNAPSHOT",
       "dependencies": {
         "@theguild/remark-mermaid": "^0.3.0",
         "@workspace/case-board": "workspace:*",
@@ -192,6 +192,7 @@
         "react": "^19.2.4",
         "react-dom": "^19.2.4",
         "remotion": "4.0.532",
+        "simple-icons": "^16.28.0",
       },
       "devDependencies": {
         "@remotion/eslint-plugin": "4.0.532",
@@ -207,7 +208,7 @@
     },
     "apps/web": {
       "name": "@classifyre/web",
-      "version": "0.7.3-SNAPSHOT",
+      "version": "0.7.4-SNAPSHOT",
       "dependencies": {
         "@hookform/resolvers": "^5.2.2",
         "@monaco-editor/react": "^4.7.0",
@@ -269,7 +270,7 @@
     },
     "packages/api-client": {
       "name": "@workspace/api-client",
-      "version": "0.7.3-SNAPSHOT",
+      "version": "0.7.4-SNAPSHOT",
       "devDependencies": {
         "@openapitools/openapi-generator-cli": "2.42.0",
         "@types/jest": "^30.0.0",
@@ -301,7 +302,7 @@
     },
     "packages/devops": {
       "name": "@workspace/devops",
-      "version": "0.7.3-SNAPSHOT",
+      "version": "0.7.4-SNAPSHOT",
     },
     "packages/eslint-config": {
       "name": "@workspace/eslint-config",
@@ -325,7 +326,7 @@
     },
     "packages/schemas": {
       "name": "@workspace/schemas",
-      "version": "0.7.3-SNAPSHOT",
+      "version": "0.7.4-SNAPSHOT",
       "dependencies": {
         "zod": "4.5.4",
       },
