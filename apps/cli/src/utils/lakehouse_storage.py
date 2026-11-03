@@ -18,6 +18,7 @@ What each provider supports (see the lakehouse docs page for the tested matrix):
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -118,6 +119,11 @@ def azure_table_storage(
     object_store: dict[str, str] = {"azure_storage_account_name": account}
     if emulated:
         object_store |= {"azure_storage_use_emulator": "true", "allow_http": "true"}
+        # In emulator mode the Rust object_store readers (Lance, Hudi, and the
+        # Delta kernel inside DuckDB, which turns emulator mode on by itself for
+        # the Azurite account) take the endpoint only from this variable, and
+        # otherwise go to 127.0.0.1:10000 whatever account_url says.
+        os.environ["AZURITE_BLOB_STORAGE_URL"] = f"{parsed.scheme}://{parsed.netloc}"
     elif not blob_endpoint.endswith(".blob.core.windows.net"):
         object_store["azure_storage_endpoint"] = blob_endpoint  # OneLake, sovereign clouds
 
