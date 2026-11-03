@@ -221,3 +221,29 @@ def _find_tabular_cell_match(
 
 def _normalize_for_match(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip()
+
+
+def table_format_from(declared: str | None, *, is_view: bool = False) -> str:
+    """Map an engine's word for a table's storage onto the shared vocabulary.
+
+    The vocabulary is the ``table_format`` asset metadata key: ``iceberg``,
+    ``delta``, ``hudi``, ``paimon``, ``view``, ``external`` and ``native`` (the
+    engine's own storage). Engines say it differently — Databricks
+    ``data_source_format`` DELTA, Snowflake ``IS_ICEBERG``, a Hive table's
+    provider, Dremio's dataset format — so each passes what it has.
+    """
+    if is_view:
+        return "view"
+    text = (declared or "").strip().lower()
+    for name, known in (
+        ("iceberg", "iceberg"),
+        ("delta", "delta"),
+        ("hudi", "hudi"),
+        ("hoodie", "hudi"),
+        ("paimon", "paimon"),
+    ):
+        if name in text:
+            return known
+    if text in ("external", "external table", "external_table"):
+        return "external"
+    return "native"

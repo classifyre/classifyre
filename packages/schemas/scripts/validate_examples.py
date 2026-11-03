@@ -10,6 +10,12 @@ import fastjsonschema
 # Map source type to schema definition name
 TYPE_TO_DEFINITION = {
     "SANDBOX": "SandboxInput",
+    "ICEBERG_REST": "IcebergRestInput",
+    "DUCKLAKE": "DuckLakeInput",
+    "TRINO": "TrinoInput",
+    "ATHENA": "AthenaInput",
+    "BIGQUERY": "BigQueryInput",
+    "REDSHIFT": "RedshiftInput",
     "SLACK": "SlackInput",
     "S3_COMPATIBLE_STORAGE": "S3CompatibleStorageInput",
     "AZURE_BLOB_STORAGE": "AzureBlobStorageInput",
@@ -35,8 +41,6 @@ TYPE_TO_DEFINITION = {
     "EMAIL": "EmailInput",
     "YOUTUBE": "YouTubeInput",
     "REDDIT": "RedditInput",
-    "DELTA_LAKE": "DeltaLakeInput",
-    "ICEBERG": "IcebergInput",
     "KAFKA": "KafkaInput",
     "ELASTICSEARCH": "ElasticsearchInput",
     "OPENSEARCH": "OpenSearchInput",

@@ -2294,150 +2294,6 @@
       }
     }
   ],
-  "DELTA_LAKE": [
-    {
-      "name": "Delta warehouse discovery scan",
-      "description": "Auto-discover Delta tables under a warehouse prefix in an S3 bucket and sample rows for governance",
-      "schedule": {
-        "enabled": true,
-        "preset": "nightly",
-        "cron": "23 1 * * *",
-        "timezone": "UTC"
-      },
-      "config": {
-        "type": "DELTA_LAKE",
-        "required": {
-          "bucket": "your-lakehouse-bucket"
-        },
-        "masked": {
-          "aws_access_key_id": "your-access-key-id",
-          "aws_secret_access_key": "your-secret-access-key"
-        },
-        "optional": {
-          "scope": {
-            "prefix": "warehouse/"
-          }
-        },
-        "sampling": {
-          "strategy": "AUTOMATIC",
-          "rows_per_page": 50
-        }
-      }
-    },
-    {
-      "name": "MinIO Delta tables PII scan",
-      "description": "Scan specific Delta tables on a MinIO (S3-compatible) endpoint for PII and secrets",
-      "schedule": {
-        "enabled": true,
-        "preset": "weekday_morning",
-        "cron": "41 6 * * 1-5",
-        "timezone": "UTC"
-      },
-      "config": {
-        "type": "DELTA_LAKE",
-        "required": {
-          "bucket": "your-lakehouse-bucket"
-        },
-        "masked": {
-          "aws_access_key_id": "your-minio-access-key",
-          "aws_secret_access_key": "your-minio-secret-key"
-        },
-        "optional": {
-          "connection": {
-            "endpoint_url": "https://minio.your-company.internal:9000",
-            "region_name": "us-east-1"
-          },
-          "scope": {
-            "table_paths": ["warehouse/sales/orders", "warehouse/crm/customers"]
-          }
-        },
-        "sampling": {
-          "strategy": "AUTOMATIC",
-          "rows_per_page": 30
-        },
-        "detectors": [
-          {
-            "type": "PII",
-            "enabled": true
-          },
-          {
-            "type": "SECRETS",
-            "enabled": true
-          }
-        ]
-      }
-    }
-  ],
-  "ICEBERG": [
-    {
-      "name": "Iceberg warehouse discovery scan",
-      "description": "Auto-discover Iceberg tables under a warehouse prefix in an S3 bucket — no catalog service or Spark required",
-      "schedule": {
-        "enabled": true,
-        "preset": "nightly",
-        "cron": "37 2 * * *",
-        "timezone": "UTC"
-      },
-      "config": {
-        "type": "ICEBERG",
-        "required": {
-          "bucket": "your-lakehouse-bucket"
-        },
-        "masked": {
-          "aws_access_key_id": "your-access-key-id",
-          "aws_secret_access_key": "your-secret-access-key"
-        },
-        "optional": {
-          "scope": {
-            "prefix": "warehouse/"
-          }
-        },
-        "sampling": {
-          "strategy": "AUTOMATIC",
-          "rows_per_page": 50
-        }
-      }
-    },
-    {
-      "name": "MinIO Iceberg tables PII scan",
-      "description": "Scan specific Iceberg tables on a MinIO (S3-compatible) endpoint for PII exposure",
-      "schedule": {
-        "enabled": true,
-        "preset": "weekday_morning",
-        "cron": "19 7 * * 1-5",
-        "timezone": "UTC"
-      },
-      "config": {
-        "type": "ICEBERG",
-        "required": {
-          "bucket": "your-lakehouse-bucket"
-        },
-        "masked": {
-          "aws_access_key_id": "your-minio-access-key",
-          "aws_secret_access_key": "your-minio-secret-key"
-        },
-        "optional": {
-          "connection": {
-            "endpoint_url": "https://minio.your-company.internal:9000",
-            "region_name": "us-east-1"
-          },
-          "scope": {
-            "table_paths": ["warehouse/analytics/events"]
-          }
-        },
-        "sampling": {
-          "strategy": "AUTOMATIC",
-          "rows_per_page": 30
-        },
-        "detectors": [
-          {
-            "type": "PII",
-            "enabled": true
-          }
-        ]
-      }
-    }
-  ],
   "KAFKA": [
     {
       "name": "Topic discovery scan",
@@ -4272,6 +4128,287 @@
             "source": "from classifyre import references\n\n\ndef setup():\n    ctx.state[\"by_order\"] = {}\n\n\ndef augment(asset):\n    \"\"\"Index every asset by its order id for finalize() to pair up.\"\"\"\n    order_id = asset.metadata.get(\"order_id\")\n    if order_id:\n        ctx.state[\"by_order\"].setdefault(str(order_id), []).append(asset.ref)\n\n\ndef finalize():\n    \"\"\"Link invoice and shipment assets sharing an order id.\"\"\"\n    groups = ctx.state.get(\"by_order\", {})\n    for refs in groups.values():\n        if len(refs) > 1:\n            first, *rest = refs\n            for other in rest:\n                yield references(first, other)\n"
           }
         ]
+      }
+    }
+  ],
+  "ICEBERG_REST": [
+    {
+      "name": "Apache Polaris catalog",
+      "description": "Scan every table of a Polaris catalog with a service principal",
+      "config": {
+        "type": "ICEBERG_REST",
+        "required": {
+          "catalog_uri": "https://polaris.example.com/api/catalog",
+          "auth_mode": "oauth2"
+        },
+        "masked": {
+          "client_id": "your-client-id",
+          "client_secret": "your-client-secret"
+        },
+        "optional": {
+          "connection": {
+            "warehouse": "analytics",
+            "oauth2_scope": "PRINCIPAL_ROLE:ALL"
+          }
+        },
+        "sampling": {
+          "strategy": "AUTOMATIC",
+          "rows_per_page": 100
+        }
+      }
+    },
+    {
+      "name": "AWS S3 Tables",
+      "description": "Scan an S3 table bucket through its Iceberg REST endpoint",
+      "config": {
+        "type": "ICEBERG_REST",
+        "required": {
+          "catalog_uri": "https://s3tables.us-east-1.amazonaws.com/iceberg",
+          "auth_mode": "sigv4"
+        },
+        "masked": {
+          "aws_access_key_id": "your-access-key-id",
+          "aws_secret_access_key": "your-secret-access-key"
+        },
+        "optional": {
+          "connection": {
+            "warehouse": "arn:aws:s3tables:us-east-1:111122223333:bucket/analytics",
+            "sigv4_region": "us-east-1",
+            "sigv4_service": "s3tables"
+          }
+        },
+        "sampling": {
+          "strategy": "RANDOM",
+          "rows_per_page": 50
+        }
+      }
+    }
+  ],
+  "DUCKLAKE": [
+    {
+      "name": "DuckLake on Postgres and S3",
+      "description": "Scan a DuckLake whose catalog is in Postgres and whose files are in S3",
+      "config": {
+        "type": "DUCKLAKE",
+        "required": {
+          "catalog": "postgres:dbname=lake host=db.example.com user=reader"
+        },
+        "masked": {
+          "catalog_password": "your-password",
+          "s3_access_key_id": "your-access-key-id",
+          "s3_secret_access_key": "your-secret-access-key"
+        },
+        "optional": {
+          "connection": {
+            "s3_region": "eu-central-1"
+          }
+        },
+        "sampling": {
+          "strategy": "AUTOMATIC",
+          "rows_per_page": 100
+        }
+      }
+    },
+    {
+      "name": "Local DuckLake",
+      "description": "Scan a DuckLake kept in a local DuckDB catalog file",
+      "config": {
+        "type": "DUCKLAKE",
+        "required": {
+          "catalog": "/data/lake/metadata.ducklake"
+        },
+        "masked": {},
+        "sampling": {
+          "strategy": "ALL"
+        }
+      }
+    }
+  ],
+  "TRINO": [
+    {
+      "name": "Starburst Galaxy cluster",
+      "description": "Scan every catalog of a Galaxy cluster",
+      "config": {
+        "type": "TRINO",
+        "required": {
+          "host": "acme-analytics.trino.galaxy.starburst.io",
+          "port": 443
+        },
+        "masked": {
+          "username": "reader@acme.galaxy.starburst.io",
+          "password": "your-password"
+        },
+        "sampling": {
+          "strategy": "AUTOMATIC",
+          "rows_per_page": 100
+        }
+      }
+    },
+    {
+      "name": "Trino lakehouse catalogs",
+      "description": "Scan the Iceberg and Delta catalogs of a self-hosted Trino",
+      "config": {
+        "type": "TRINO",
+        "required": {
+          "host": "trino.internal",
+          "port": 8443
+        },
+        "masked": {
+          "username": "classifyre",
+          "access_token": "your-jwt"
+        },
+        "optional": {
+          "scope": {
+            "include_catalogs": [
+              "iceberg",
+              "delta"
+            ]
+          }
+        },
+        "sampling": {
+          "strategy": "RANDOM",
+          "rows_per_page": 50
+        }
+      }
+    }
+  ],
+  "ATHENA": [
+    {
+      "name": "Athena over the Glue catalog",
+      "description": "Scan every Glue database through Athena",
+      "config": {
+        "type": "ATHENA",
+        "required": {
+          "region": "eu-west-1",
+          "s3_staging_dir": "s3://athena-results-bucket/classifyre/"
+        },
+        "masked": {
+          "aws_access_key_id": "your-access-key-id",
+          "aws_secret_access_key": "your-secret-access-key"
+        },
+        "sampling": {
+          "strategy": "AUTOMATIC",
+          "rows_per_page": 100
+        }
+      }
+    },
+    {
+      "name": "Athena lakehouse databases",
+      "description": "Scan two Glue databases with the instance role",
+      "config": {
+        "type": "ATHENA",
+        "required": {
+          "region": "us-east-1",
+          "s3_staging_dir": "s3://query-results/athena/"
+        },
+        "masked": {},
+        "optional": {
+          "connection": {
+            "work_group": "analytics"
+          },
+          "scope": {
+            "include_databases": [
+              "sales",
+              "crm"
+            ]
+          }
+        },
+        "sampling": {
+          "strategy": "RANDOM",
+          "rows_per_page": 50
+        }
+      }
+    }
+  ],
+  "BIGQUERY": [
+    {
+      "name": "BigQuery project",
+      "description": "Scan every dataset of a project with a service account",
+      "config": {
+        "type": "BIGQUERY",
+        "required": {
+          "project_id": "acme-analytics"
+        },
+        "masked": {
+          "gcp_credentials_json": "{\"type\": \"service_account\", \"project_id\": \"acme-analytics\"}"
+        },
+        "sampling": {
+          "strategy": "AUTOMATIC",
+          "rows_per_page": 100
+        }
+      }
+    },
+    {
+      "name": "BigLake datasets",
+      "description": "Scan the BigLake and Iceberg tables of two datasets",
+      "config": {
+        "type": "BIGQUERY",
+        "required": {
+          "project_id": "acme-lake"
+        },
+        "masked": {},
+        "optional": {
+          "scope": {
+            "include_datasets": [
+              "lake_sales",
+              "lake_crm"
+            ]
+          },
+          "connection": {
+            "maximum_bytes_billed": 10000000000
+          }
+        },
+        "sampling": {
+          "strategy": "RANDOM",
+          "rows_per_page": 50
+        }
+      }
+    }
+  ],
+  "REDSHIFT": [
+    {
+      "name": "Redshift cluster",
+      "description": "Scan a provisioned cluster with a database user",
+      "config": {
+        "type": "REDSHIFT",
+        "required": {
+          "host": "analytics.abc123.eu-west-1.redshift.amazonaws.com",
+          "port": 5439,
+          "database": "dev"
+        },
+        "masked": {
+          "username": "classifyre_reader",
+          "password": "your-password"
+        },
+        "sampling": {
+          "strategy": "AUTOMATIC",
+          "rows_per_page": 100
+        }
+      }
+    },
+    {
+      "name": "Redshift Serverless with IAM",
+      "description": "Scan a serverless workgroup, including Spectrum external schemas",
+      "config": {
+        "type": "REDSHIFT",
+        "required": {
+          "host": "default.111122223333.us-east-1.redshift-serverless.amazonaws.com",
+          "port": 5439,
+          "database": "dev"
+        },
+        "masked": {
+          "username": "classifyre_reader"
+        },
+        "optional": {
+          "connection": {
+            "region": "us-east-1",
+            "workgroup_name": "default"
+          }
+        },
+        "sampling": {
+          "strategy": "RANDOM",
+          "rows_per_page": 50
+        }
       }
     }
   ]

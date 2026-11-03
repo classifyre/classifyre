@@ -49,6 +49,10 @@ _DIALECTS = {
     "dremio": "dremio",
     "hive": "hive",
     "sqlite": "sqlite",
+    "trino": "trino",
+    "athena": "athena",
+    "bigquery": "bigquery",
+    "redshift": "redshift",
 }
 
 

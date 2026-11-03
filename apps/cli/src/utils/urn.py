@@ -93,8 +93,15 @@ _register(_Platform("mssql", path_case=CasePolicy.LOWER, default_port=1433), "sq
 _register(_Platform("databricks", path_case=CasePolicy.LOWER))
 _register(_Platform("dremio", path_case=CasePolicy.LOWER))
 _register(_Platform("hive", path_case=CasePolicy.LOWER, default_port=10000))
-_register(_Platform("iceberg", path_case=CasePolicy.LOWER))
-_register(_Platform("delta", path_case=CasePolicy.LOWER), "delta_lake")
+_register(_Platform("iceberg", path_case=CasePolicy.LOWER), "iceberg_rest")
+_register(_Platform("delta", path_case=CasePolicy.LOWER))
+_register(_Platform("hudi", path_case=CasePolicy.LOWER))
+_register(_Platform("paimon", path_case=CasePolicy.LOWER))
+_register(_Platform("lance", path_case=CasePolicy.LOWER))
+_register(_Platform("ducklake", path_case=CasePolicy.LOWER))
+_register(_Platform("trino", path_case=CasePolicy.LOWER, default_port=8080))
+_register(_Platform("glue", path_case=CasePolicy.LOWER), "athena")
+_register(_Platform("redshift", path_case=CasePolicy.LOWER, default_port=5439))
 _register(_Platform("sqlite", path_case=CasePolicy.LOWER))
 
 # Object stores and the rest: the path is byte-exact.

@@ -6,6 +6,8 @@ from typing import Any
 from urllib.parse import quote
 
 from ...models.generated_input import S3CompatibleStorageInput
+from ...utils.lakehouse_storage import s3_table_storage
+from ...utils.lakehouse_tables import TableStorage
 from ...utils.range_reader import CallableRangeReader, open_buffered
 from ..object_storage.base import ObjectRef, ObjectStorageSourceBase
 from ..s3_client import build_s3_client
@@ -40,6 +42,19 @@ class S3CompatibleStorageSource(ObjectStorageSourceBase):
             verify_ssl=self._verify_ssl(),
             request_timeout_seconds=self._request_timeout_seconds(),
         )
+
+    def _lakehouse_storage(self) -> TableStorage | None:
+        return s3_table_storage(
+            bucket=self._required_bucket(),
+            access_key_id=self._masked_value("aws_access_key_id"),
+            secret_access_key=self._masked_value("aws_secret_access_key"),
+            session_token=self._masked_value("aws_session_token"),
+            region=self._string_or_none(self._connection_option("region_name")),
+            endpoint_url=self._string_or_none(self._connection_option("endpoint_url")),
+        )
+
+    def _lakehouse_authority(self) -> str | None:
+        return self._required_bucket()
 
     def _client(self) -> Any:
         if self._cached_client is None:

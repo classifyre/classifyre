@@ -134,7 +134,7 @@
     },
     "/sources": {
       "post": {
-        "description": "Register a new data source for metadata ingestion (WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, Dremio, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk, Notion, Email, YouTube).",
+        "description": "Register a new data source for metadata ingestion (WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, Dremio, Trino/Starburst, Amazon Athena, Google BigQuery, Amazon Redshift, Iceberg REST catalogs, DuckLake, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk, Notion, Email, YouTube).",
         "operationId": "SourcesController_createSource",
         "parameters": [],
         "requestBody": {
@@ -1713,8 +1713,6 @@
                   "EMAIL",
                   "YOUTUBE",
                   "REDDIT",
-                  "DELTA_LAKE",
-                  "ICEBERG",
                   "KAFKA",
                   "ELASTICSEARCH",
                   "OPENSEARCH",
@@ -1726,6 +1724,12 @@
                   "HUGGING_FACE",
                   "GIT",
                   "SANDBOX",
+                  "ICEBERG_REST",
+                  "DUCKLAKE",
+                  "TRINO",
+                  "ATHENA",
+                  "BIGQUERY",
+                  "REDSHIFT",
                   "CUSTOM"
                 ]
               }
@@ -2071,8 +2075,6 @@
                   "EMAIL",
                   "YOUTUBE",
                   "REDDIT",
-                  "DELTA_LAKE",
-                  "ICEBERG",
                   "KAFKA",
                   "ELASTICSEARCH",
                   "OPENSEARCH",
@@ -2084,6 +2086,12 @@
                   "HUGGING_FACE",
                   "GIT",
                   "SANDBOX",
+                  "ICEBERG_REST",
+                  "DUCKLAKE",
+                  "TRINO",
+                  "ATHENA",
+                  "BIGQUERY",
+                  "REDSHIFT",
                   "CUSTOM"
                 ]
               }
@@ -2451,8 +2459,6 @@
                   "EMAIL",
                   "YOUTUBE",
                   "REDDIT",
-                  "DELTA_LAKE",
-                  "ICEBERG",
                   "KAFKA",
                   "ELASTICSEARCH",
                   "OPENSEARCH",
@@ -2464,6 +2470,12 @@
                   "HUGGING_FACE",
                   "GIT",
                   "SANDBOX",
+                  "ICEBERG_REST",
+                  "DUCKLAKE",
+                  "TRINO",
+                  "ATHENA",
+                  "BIGQUERY",
+                  "REDSHIFT",
                   "CUSTOM"
                 ]
               }
@@ -16530,7 +16542,7 @@
   },
   "info": {
     "title": "Classifyre API",
-    "description": "Metadata ingestion and detection API for unstructured data sources. Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, Dremio, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk, Notion, Email, and YouTube sources. Built-in detectors for secrets, PII, toxic content, image classification, broken links, and security threats.",
+    "description": "Metadata ingestion and detection API for unstructured data sources. Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, Dremio, Trino/Starburst, Amazon Athena, Google BigQuery, Amazon Redshift, Iceberg REST catalogs, DuckLake, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk, Notion, Email, and YouTube sources. Built-in detectors for secrets, PII, toxic content, image classification, broken links, and security threats.",
     "version": "1.0.0",
     "contact": {
       "name": "Classifyre Team",
@@ -16616,8 +16628,6 @@
                 "EMAIL",
                 "YOUTUBE",
                 "REDDIT",
-                "DELTA_LAKE",
-                "ICEBERG",
                 "KAFKA",
                 "ELASTICSEARCH",
                 "OPENSEARCH",
@@ -16629,6 +16639,12 @@
                 "HUGGING_FACE",
                 "GIT",
                 "SANDBOX",
+                "ICEBERG_REST",
+                "DUCKLAKE",
+                "TRINO",
+                "ATHENA",
+                "BIGQUERY",
+                "REDSHIFT",
                 "CUSTOM"
               ]
             }
@@ -16873,8 +16889,6 @@
               "EMAIL",
               "YOUTUBE",
               "REDDIT",
-              "DELTA_LAKE",
-              "ICEBERG",
               "KAFKA",
               "ELASTICSEARCH",
               "OPENSEARCH",
@@ -16885,6 +16899,12 @@
               "DROPBOX",
               "HUGGING_FACE",
               "SANDBOX",
+              "REDSHIFT",
+              "BIGQUERY",
+              "ATHENA",
+              "TRINO",
+              "DUCKLAKE",
+              "ICEBERG_REST",
               "GIT",
               "CUSTOM"
             ],
@@ -17119,8 +17139,6 @@
               "EMAIL",
               "YOUTUBE",
               "REDDIT",
-              "DELTA_LAKE",
-              "ICEBERG",
               "KAFKA",
               "ELASTICSEARCH",
               "OPENSEARCH",
@@ -17131,6 +17149,12 @@
               "DROPBOX",
               "HUGGING_FACE",
               "SANDBOX",
+              "REDSHIFT",
+              "BIGQUERY",
+              "ATHENA",
+              "TRINO",
+              "DUCKLAKE",
+              "ICEBERG_REST",
               "GIT",
               "CUSTOM"
             ],
@@ -17653,8 +17677,6 @@
               "EMAIL",
               "YOUTUBE",
               "REDDIT",
-              "DELTA_LAKE",
-              "ICEBERG",
               "KAFKA",
               "ELASTICSEARCH",
               "OPENSEARCH",
@@ -17666,6 +17688,12 @@
               "HUGGING_FACE",
               "GIT",
               "SANDBOX",
+              "ICEBERG_REST",
+              "DUCKLAKE",
+              "TRINO",
+              "ATHENA",
+              "BIGQUERY",
+              "REDSHIFT",
               "CUSTOM"
             ]
           },
@@ -18176,8 +18204,6 @@
                 "EMAIL",
                 "YOUTUBE",
                 "REDDIT",
-                "DELTA_LAKE",
-                "ICEBERG",
                 "KAFKA",
                 "ELASTICSEARCH",
                 "OPENSEARCH",
@@ -18189,6 +18215,12 @@
                 "HUGGING_FACE",
                 "GIT",
                 "SANDBOX",
+                "ICEBERG_REST",
+                "DUCKLAKE",
+                "TRINO",
+                "ATHENA",
+                "BIGQUERY",
+                "REDSHIFT",
                 "CUSTOM"
               ]
             }
@@ -19241,8 +19273,6 @@
               "EMAIL",
               "YOUTUBE",
               "REDDIT",
-              "DELTA_LAKE",
-              "ICEBERG",
               "KAFKA",
               "ELASTICSEARCH",
               "OPENSEARCH",
@@ -19254,6 +19284,12 @@
               "HUGGING_FACE",
               "GIT",
               "SANDBOX",
+              "ICEBERG_REST",
+              "DUCKLAKE",
+              "TRINO",
+              "ATHENA",
+              "BIGQUERY",
+              "REDSHIFT",
               "CUSTOM"
             ]
           }
@@ -30065,8 +30101,6 @@
                 "EMAIL",
                 "YOUTUBE",
                 "REDDIT",
-                "DELTA_LAKE",
-                "ICEBERG",
                 "KAFKA",
                 "ELASTICSEARCH",
                 "OPENSEARCH",
@@ -30078,6 +30112,12 @@
                 "HUGGING_FACE",
                 "GIT",
                 "SANDBOX",
+                "ICEBERG_REST",
+                "DUCKLAKE",
+                "TRINO",
+                "ATHENA",
+                "BIGQUERY",
+                "REDSHIFT",
                 "CUSTOM"
               ]
             }

@@ -39,6 +39,13 @@ const PLATFORMS: Record<string, PlatformRules> = {
   hive: { authorityCase: 'lower', pathCase: 'lower', defaultPort: 10000 },
   iceberg: { authorityCase: 'lower', pathCase: 'lower' },
   delta: { authorityCase: 'lower', pathCase: 'lower' },
+  hudi: { authorityCase: 'lower', pathCase: 'lower' },
+  paimon: { authorityCase: 'lower', pathCase: 'lower' },
+  lance: { authorityCase: 'lower', pathCase: 'lower' },
+  ducklake: { authorityCase: 'lower', pathCase: 'lower' },
+  trino: { authorityCase: 'lower', pathCase: 'lower', defaultPort: 8080 },
+  glue: { authorityCase: 'lower', pathCase: 'lower' },
+  redshift: { authorityCase: 'lower', pathCase: 'lower', defaultPort: 5439 },
   sqlite: { authorityCase: 'lower', pathCase: 'lower' },
 
   // Object stores and the rest: the path is byte-exact.
@@ -66,6 +73,8 @@ const ALIASES: Record<string, string> = {
   postgresql: 'postgres',
   mariadb: 'mysql',
   sqlserver: 'mssql',
+  iceberg_rest: 'iceberg',
+  athena: 'glue',
 };
 
 /** Conservative fallback: never merges two objects that are actually distinct. */

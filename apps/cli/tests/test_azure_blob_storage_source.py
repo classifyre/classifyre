@@ -6,6 +6,7 @@ import pytest
 
 from src.sources.azure_blob_storage.source import AzureBlobStorageSource
 from src.sources.object_storage.base import ContentSnapshot, ObjectRef
+from src.utils.urn import Urn
 
 
 def _recipe() -> dict:
@@ -151,3 +152,53 @@ def test_azure_blob_storage_download_object_leaves_normal_blob_unchanged(monkeyp
     assert file_bytes == small_bytes
     assert content_type == "text/plain"
     assert not any("Truncated" in record.message for record in caplog.records)
+
+
+def test_azure_listing_passes_the_page_size_to_list_blobs(monkeypatch) -> None:
+    """azure-core's ItemPaged.by_page() takes only a continuation token.
+
+    Handing it the page size raised TypeError, so every Azure listing failed.
+    """
+
+    class _Blob:
+        def __init__(self, name: str) -> None:
+            self.name = name
+            self.size = 10
+            self.last_modified = datetime(2026, 1, 1, tzinfo=UTC)
+            self.etag = "e"
+            self.content_settings = None
+
+    class _Pages:
+        def by_page(self, continuation_token: str | None = None) -> list[list[_Blob]]:
+            assert continuation_token is None
+            return [[_Blob("docs/a.txt"), _Blob("docs/b.txt")]]
+
+    calls: list[dict] = []
+
+    class _Container:
+        def list_blobs(self, **kwargs: object) -> _Pages:
+            calls.append(kwargs)
+            return _Pages()
+
+    class _Service:
+        def get_container_client(self, container: str) -> _Container:
+            return _Container()
+
+    source = AzureBlobStorageSource(_recipe())
+    monkeypatch.setattr(source, "_client", _Service)
+    assert [ref.key for ref in source._list_objects()] == ["docs/a.txt", "docs/b.txt"]
+    assert calls and calls[0]["results_per_page"] == source._max_keys_per_page()
+
+
+def test_azure_lakehouse_table_urn_round_trips() -> None:
+    """The table URN authority is the account, not the account URL.
+
+    The authority used to be the full account URL plus container, so the URN
+    held '://' and slashes and never survived a parse round-trip.
+    """
+    source = AzureBlobStorageSource(_recipe())
+    authority = source._lakehouse_authority()
+    assert authority is not None and "://" not in authority and "/" not in authority
+    urn = Urn.of("delta", authority, *source._lakehouse_prefix(), "warehouse", "orders")
+    assert str(urn) == "delta://acme/documents/warehouse/orders"
+    assert Urn.parse(str(urn)) == urn

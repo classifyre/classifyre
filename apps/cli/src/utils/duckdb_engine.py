@@ -96,8 +96,17 @@ def connect(duckdb_module: Any | None = None) -> Any:
     return conn
 
 
+#: Community extensions (DuckDB's community repository, not its core one).
+COMMUNITY_EXTENSIONS = frozenset({"paimon", "hudi"})
+COMMUNITY_REPOSITORY_ENV = "CLASSIFYRE_DUCKDB_COMMUNITY_REPOSITORY"
+
+
 def load_extension(conn: Any, name: str) -> None:
-    """Load ``name`` into ``conn``, installing it first when it is not on disk."""
+    """Load ``name`` into ``conn``, installing it first when it is not on disk.
+
+    Community extensions install from DuckDB's community repository, or from
+    ``CLASSIFYRE_DUCKDB_COMMUNITY_REPOSITORY`` where a mirror stands in for it.
+    """
     try:
         conn.execute(f"LOAD {name}")
         return
@@ -106,7 +115,12 @@ def load_extension(conn: Any, name: str) -> None:
     with _install_lock:
         try:
             if name not in _installed:
-                conn.execute(f"INSTALL {name}")
+                if name in COMMUNITY_EXTENSIONS:
+                    mirror = os.environ.get(COMMUNITY_REPOSITORY_ENV, "").strip()
+                    repository = sql_literal(mirror) if mirror else "community"
+                    conn.execute(f"INSTALL {name} FROM {repository}")
+                else:
+                    conn.execute(f"INSTALL {name}")
                 _installed.add(name)
             conn.execute(f"LOAD {name}")
             return

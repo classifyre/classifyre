@@ -6,6 +6,8 @@ from collections.abc import Iterator
 from typing import Any
 
 from ...models.generated_input import GoogleCloudStorageInput
+from ...utils.lakehouse_storage import gcs_table_storage
+from ...utils.lakehouse_tables import TableStorage
 from ...utils.range_reader import CallableRangeReader, open_buffered
 from ..dependencies import require_module
 from ..object_storage.base import ObjectRef, ObjectStorageSourceBase
@@ -70,6 +72,17 @@ class GoogleCloudStorageSource(ObjectStorageSourceBase):
         if self._cached_client is None:
             self._cached_client = self._build_client()
         return self._cached_client
+
+    def _lakehouse_storage(self) -> TableStorage | None:
+        return gcs_table_storage(
+            bucket=self._required_bucket(),
+            service_account_json=self._masked_value("gcp_credentials_json"),
+            hmac_key_id=self._masked_value("gcs_hmac_key_id"),
+            hmac_secret=self._masked_value("gcs_hmac_secret"),
+        )
+
+    def _lakehouse_authority(self) -> str | None:
+        return self._required_bucket()
 
     def _list_objects(self) -> Iterator[ObjectRef]:
         client = self._client()

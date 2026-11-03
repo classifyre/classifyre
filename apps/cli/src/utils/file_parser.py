@@ -26,6 +26,7 @@ from .table_files import (
     FLATGEOBUF_MIME_TYPE,
     GEOJSON_MIME_TYPE,
     GEOPACKAGE_MIME_TYPE,
+    LAKEHOUSE_TABLE_MIME_TYPE,
     NDJSON_MIME_TYPE,
     ORC_MAGIC,
     ORC_MIME_TYPE,
@@ -1936,7 +1937,7 @@ def count_tabular_rows(source: bytes | Any, mime_type: str) -> int | None:
     the footer is read — the whole point of the range-reading path.
     """
     normalized = _normalize_mime_type(mime_type)
-    if normalized == ORC_MIME_TYPE:
+    if normalized in (ORC_MIME_TYPE, LAKEHOUSE_TABLE_MIME_TYPE):
         from .table_files import count_table_rows
 
         return count_table_rows(source, normalized)
@@ -2201,6 +2202,7 @@ _TABLE_FORMAT_LABELS = {
     FLATGEOBUF_MIME_TYPE: "FlatGeobuf",
     GEOJSON_MIME_TYPE: "GeoJSON",
     DBF_MIME_TYPE: "DBF",
+    LAKEHOUSE_TABLE_MIME_TYPE: "Lakehouse table",
 }
 
 

@@ -12,7 +12,7 @@ from ...models.generated_input import (
 from ...utils.sql_lineage import upstream_tables_from_sql
 from ..dependencies import require_module
 from ..tabular_base import BaseTabularSource
-from ..tabular_utils import TableRef, ViewLineage
+from ..tabular_utils import TableRef, ViewLineage, table_format_from
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +44,7 @@ class HiveSource(BaseTabularSource):
         self._host = self.config.required.host
         self._port = int(self.config.required.port)
         self._table_type_cache: dict[tuple[str, str], str] = {}
+        self._table_format_cache: dict[tuple[str, str], str] = {}
 
     # ── Identity ─────────────────────────────────────────────────────────
 
@@ -206,16 +207,32 @@ class HiveSource(BaseTabularSource):
             conn = self._get_cached_connection(database)
             with conn.cursor() as cursor:
                 cursor.execute(query)
+                declared: list[str] = []
                 for row in cursor.fetchall():
                     if not isinstance(row, tuple) or not row:
                         continue
-                    field_name = row[0]
-                    details = row[1] if len(row) > 1 else ""
-                    if isinstance(field_name, str) and field_name.strip().lower() == "table type:":
-                        detail_text = str(details).strip().upper()
+                    field_name = str(row[0] or "").strip().lower()
+                    details = str(row[1] if len(row) > 1 else "").strip()
+                    value = str(row[2] if len(row) > 2 else "").strip()
+                    if field_name == "table type:":
+                        detail_text = details.upper()
                         if "VIRTUAL_VIEW" in detail_text or "VIEW" in detail_text:
                             object_type = "VIEW"
-                        break
+                        if "EXTERNAL" in detail_text:
+                            declared.append("external")
+                    elif field_name == "inputformat:":
+                        declared.append(details)  # Hudi and Iceberg name themselves here
+                    elif details.lower() in ("table_type", "spark.sql.sources.provider"):
+                        declared.insert(0, value)  # ICEBERG / delta table parameters
+                self._table_format_cache[cache_key] = table_format_from(
+                    " ".join(declared)
+                    if any(
+                        word in " ".join(declared).lower()
+                        for word in ("iceberg", "delta", "hudi", "hoodie", "paimon")
+                    )
+                    else ("external" if "external" in declared else ""),
+                    is_view=object_type == "VIEW",
+                )
         except Exception:
             object_type = "TABLE"
 
@@ -344,7 +361,13 @@ class HiveSource(BaseTabularSource):
         )
 
     def _extra_asset_metadata(self, table_ref: TableRef) -> dict[str, Any]:
-        return {"object_type": table_ref.object_type}
+        return {
+            "object_type": table_ref.object_type,
+            "table_format": self._table_format_cache.get(
+                (table_ref.database, table_ref.table),
+                "view" if table_ref.object_type == "VIEW" else "native",
+            ),
+        }
 
     # ── Parse table ref from asset ID ────────────────────────────────────
 

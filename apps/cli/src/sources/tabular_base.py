@@ -60,6 +60,7 @@ TABULAR_METADATA_KEYS: frozenset[str] = frozenset(
         "schema",
         "columns",
         "row_count",
+        "table_format",
     }
 )
 
@@ -928,7 +929,7 @@ class BaseTabularSource(BaseSource):
     # shared: derived only from what the platform calls the object.
     #
     # `source_type` doubles as the URN platform — the registry aliases
-    # `postgresql` to `postgres`, `delta_lake` to `delta` and so on — so a
+    # `postgresql` to `postgres`, `sqlserver` to `mssql` and so on — so a
     # dialect only has to say where it connected.
 
     def _urn_authority(self) -> str | None:

@@ -293,19 +293,44 @@ export const SOURCE_TYPE_CATALOG_META: Record<string, SourceCatalogMetaBase> = {
       "threads",
     ],
   },
-  DELTA_LAKE: {
+  ICEBERG_REST: {
     description:
-      "Scan Delta Lake tables in S3-compatible storage — schema, versions, and row sampling, no Spark required.",
-    icon: CreateSourceDtoTypeEnum.DeltaLake,
+      "Scan every table of an Iceberg REST catalog — Polaris, Snowflake Open Catalog, Unity Catalog, Nessie, Gravitino, Lakekeeper, S3 Tables, Glue, BigLake.",
+    icon: CreateSourceDtoTypeEnum.IcebergRest,
     category: "WAREHOUSE_LAKEHOUSE",
-    keywords: ["lakehouse", "delta", "parquet", "tables", "s3"],
+    keywords: ["lakehouse", "iceberg", "catalog", "polaris", "unity", "nessie", "glue", "s3 tables", "biglake"],
   },
-  ICEBERG: {
+  DUCKLAKE: {
     description:
-      "Scan Apache Iceberg tables in S3-compatible storage — schema, snapshots, and row sampling, no Spark required.",
-    icon: CreateSourceDtoTypeEnum.Iceberg,
+      "Scan a DuckLake — its catalog in Postgres, MySQL, SQLite or DuckDB, its data in object storage.",
+    icon: CreateSourceDtoTypeEnum.Ducklake,
     category: "WAREHOUSE_LAKEHOUSE",
-    keywords: ["lakehouse", "iceberg", "snapshots", "tables", "s3"],
+    keywords: ["lakehouse", "ducklake", "duckdb", "parquet", "tables"],
+  },
+  TRINO: {
+    description:
+      "Scan every catalog of a Trino or Starburst cluster — Iceberg, Delta Lake, Hudi, Hive and more.",
+    icon: CreateSourceDtoTypeEnum.Trino,
+    category: "WAREHOUSE_LAKEHOUSE",
+    keywords: ["trino", "starburst", "galaxy", "presto", "lakehouse", "federation"],
+  },
+  ATHENA: {
+    description: "Scan the AWS Glue Data Catalog through Amazon Athena — Iceberg, Delta, Hudi and file tables in S3.",
+    icon: CreateSourceDtoTypeEnum.Athena,
+    category: "WAREHOUSE_LAKEHOUSE",
+    keywords: ["aws", "athena", "glue", "lakehouse", "s3", "iceberg"],
+  },
+  BIGQUERY: {
+    description: "Scan BigQuery datasets, including BigLake and Iceberg tables, without paying for full-table queries.",
+    icon: CreateSourceDtoTypeEnum.Bigquery,
+    category: "WAREHOUSE_LAKEHOUSE",
+    keywords: ["google", "bigquery", "biglake", "warehouse", "gcp"],
+  },
+  REDSHIFT: {
+    description: "Scan Amazon Redshift, including Redshift Spectrum external tables in S3.",
+    icon: CreateSourceDtoTypeEnum.Redshift,
+    category: "WAREHOUSE_LAKEHOUSE",
+    keywords: ["aws", "redshift", "spectrum", "warehouse"],
   },
   KAFKA: {
     description: "Discover Kafka topics and sample messages for detection.",
