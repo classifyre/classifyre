@@ -32,13 +32,15 @@ _SKIPPED_CATALOGS = {"system"}
 _SKIPPED_SCHEMAS = {"information_schema", "system"}
 
 # Trino connector name -> the table format its tables are stored in.
+# A catalog's connector names the format of every table in it. Anything else,
+# Hive's plain tables included, is ``native`` (as the Hive source reports them).
+# The ``lakehouse`` connector mixes formats per table, so it is ``native`` here
+# until its tables' own ``type`` property is read.
 _CONNECTOR_FORMATS = {
     "iceberg": "iceberg",
     "delta_lake": "delta",
     "delta-lake": "delta",
     "hudi": "hudi",
-    "hive": "hive",
-    "lakehouse": "lakehouse",
 }
 
 

@@ -3,7 +3,7 @@ Athena, BigQuery, Redshift.
 
 DuckLake runs against a real local lake (DuckDB's ``ducklake`` extension). The
 others talk to services, so their drivers are faked here and the lab
-(``showcases/lakehouse-lab``) runs them against real Polaris, Gravitino and Trino.
+(``development/lakehouse-lab``) runs them against real Polaris, Gravitino and Trino.
 """
 
 from __future__ import annotations

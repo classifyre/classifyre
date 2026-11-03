@@ -9,6 +9,7 @@ Paimon tables are written per test when their readers are installed (the
 
 from __future__ import annotations
 
+import os
 import shutil
 from pathlib import Path
 
@@ -301,3 +302,41 @@ def test_iceberg_scan_omits_version_when_unknown(monkeypatch: pytest.MonkeyPatch
 
 def test_iceberg_scan_pins_version_when_known(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "version = 'v1'" in _iceberg_scan_sql("v1", monkeypatch)
+
+
+def test_azurite_endpoint_reaches_the_rust_readers(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Emulator mode in object_store ignores account_url; without this the Lance
+    # and Delta readers went to 127.0.0.1:10000 from a pod that names Azurite.
+    from src.utils.lakehouse_storage import azure_table_storage
+
+    monkeypatch.delenv("AZURITE_BLOB_STORAGE_URL", raising=False)
+    storage = azure_table_storage(
+        account_url="http://lab-azurite.example.svc:10000/devstoreaccount1",
+        container="lake",
+        connection_string=None,
+        account_key="a2V5",
+        sas_token=None,
+        client_id=None,
+        client_secret=None,
+        tenant_id=None,
+    )
+    assert storage.object_store_options["azure_storage_use_emulator"] == "true"
+    assert os.environ["AZURITE_BLOB_STORAGE_URL"] == "http://lab-azurite.example.svc:10000"
+
+
+def test_real_azure_leaves_the_emulator_alone(monkeypatch: pytest.MonkeyPatch) -> None:
+    from src.utils.lakehouse_storage import azure_table_storage
+
+    monkeypatch.delenv("AZURITE_BLOB_STORAGE_URL", raising=False)
+    storage = azure_table_storage(
+        account_url="https://acme.blob.core.windows.net",
+        container="lake",
+        connection_string=None,
+        account_key="a2V5",
+        sas_token=None,
+        client_id=None,
+        client_secret=None,
+        tenant_id=None,
+    )
+    assert "azure_storage_use_emulator" not in storage.object_store_options
+    assert "AZURITE_BLOB_STORAGE_URL" not in os.environ
