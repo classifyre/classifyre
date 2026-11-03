@@ -5,6 +5,32 @@ compiled at release time from per-PR fragments in `changelog.d/` (see
 `changelog.d/README.md`). Commit messages and PR titles are never used as
 release notes.
 
+## [0.7.3] - 2026-11-03
+
+### Added
+
+- A custom source's notebook can now read the whole workspace — sources, assets with their metadata and findings, findings by detector, and detectors — and tag, link and give glossary meaning to assets of other sources from a new `augment_sources()` step. Every read is paged by cursor, every write records which source made it, and a later complete run retires what that source stopped asserting. The same is available to agents through new MCP tools, with two starter templates and a new guide.
+- You can now scan lakehouse tables through an Iceberg REST catalog (Polaris, Snowflake Open Catalog, Unity Catalog, Nessie, Gravitino, Lakekeeper, AWS Glue, Amazon S3 Tables and BigLake metastore), a DuckLake, Trino or Starburst, Amazon Athena, Google BigQuery and Amazon Redshift.
+- Scans now read Avro, ORC, Vortex and JSON Lines files row by row, open SQLite, DuckDB and GeoPackage files and scan every table inside them, and read GeoJSON and FlatGeobuf features with their coordinates as text, as well as Shapefile attribute tables.
+- Table assets from Snowflake, Databricks, Hive, Dremio and the new lakehouse sources now show the table's storage format, such as Iceberg, Delta or native.
+
+### Changed
+
+- S3-compatible, Azure Blob Storage, Google Cloud Storage and local-folder scans now read the Delta Lake, Apache Iceberg, Apache Hudi, Apache Paimon and Lance tables they find as single table assets, with deleted rows left out, renamed columns read as one column, and each table read at its current version.
+- `ctx.query_assets()` in a custom source no longer stops after 100 queries per run, can read every source when none is named, and returns each asset's id, URN and source. Every read still pages by cursor.
+
+### Removed
+
+- The Delta Lake and Apache Iceberg source types are gone, because bucket scans and the new Iceberg REST Catalog source read those tables; upgrading deletes any existing sources of these two types along with their assets and findings, so recreate them as a bucket or Iceberg REST Catalog source.
+
+### Fixed
+
+- With Automatic sampling, cloud-storage and folder scans now keep coming back to a table file larger than one slice until all of its rows are read; before, only the first slice of each file was ever scanned.
+- Azure Blob Storage scans list a container's blobs reliably again with current versions of the Azure SDK.
+- TSV files, `;`-separated CSV exports and CSVs with a title line above the header are now split into their real columns instead of being read as a single column, and spreadsheets with a title row above the header keep every column.
+- Cross-system lineage now survives a connection change. Moving a source to another host or port left its existing assets under the old name, so lineage from another source never reached them; the next scan now renames them, and waiting arrows bind.
+- E-mail addresses in a table column named "contact" are now found; the column was treated as holding only people's names.
+
 ## [0.7.2] - 2026-10-30
 
 ### Added
