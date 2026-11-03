@@ -123,8 +123,10 @@ test("member completion hides unrelated language noise", async ({
   const component = await mount(<CellListHarness initialCells={one("")} />);
   const suggestions = await suggestionsFor(component, page, "ctx.");
   // Wait for the member list itself before claiming what is absent from it --
-  // "lambda" is missing from an empty widget too.
-  await expect(suggestions).toContainText("secret");
+  // "lambda" is missing from an empty widget too. Pin `cohort`, not `secret`:
+  // the widget only renders its visible rows, and the member list has grown
+  // past the fold `secret` now sits below.
+  await expect(suggestions).toContainText("cohort");
   await expect(suggestions).not.toContainText("lambda");
 });
 
