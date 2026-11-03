@@ -1,0 +1,106 @@
+---
+title: Lakehouse Tables
+description: Which lakehouse table formats Classifyre reads, on which storage, through which catalogs and engines — and which source to use for each.
+---
+
+# Lakehouse Tables
+
+A lakehouse table is a folder of data files plus the metadata that says which of
+those files, and which rows in them, make up the table right now. Reading the
+data files one by one gives the wrong answer: deleted rows are still in them,
+older snapshots keep their own files, and a renamed column keeps its old name
+in everything written before the rename.
+
+Classifyre always reads the **table**, not its files. Each table becomes one
+asset with its real columns, its current row count where the format records it,
+and a sample of its current rows.
+
+## Which source to use
+
+| Where the table is | Use |
+| --- | --- |
+| Files in S3, MinIO, R2, B2 or another S3-compatible bucket | [S3-Compatible Storage](/sources/s3-compatible-storage/) |
+| Files in Azure Blob Storage, ADLS Gen2 or Fabric OneLake | [Azure Blob Storage](/sources/azure-blob-storage/) |
+| Files in Google Cloud Storage | [Google Cloud Storage](/sources/google-cloud-storage/) |
+| Files on a mounted disk | [Local Folder](/sources/local-folder/) |
+| An Iceberg REST catalog (Polaris, Unity, Glue, S3 Tables, Nessie, …) | [Iceberg REST Catalog](/sources/iceberg-rest/) |
+| A DuckLake | [DuckLake](/sources/ducklake/) |
+| Behind Trino or Starburst | [Trino](/sources/trino/) |
+| Behind Athena and the Glue Data Catalog | [Amazon Athena](/sources/athena/) |
+| BigLake or BigQuery tables for Apache Iceberg | [Google BigQuery](/sources/bigquery/) |
+| Redshift Spectrum external tables | [Amazon Redshift](/sources/redshift/) |
+| Databricks Unity Catalog, Snowflake, Hive, Dremio | Their own sources: [Databricks](/sources/databricks/), [Snowflake](/sources/snowflake/), [Hive](/sources/hive/), [Dremio](/sources/dremio/) |
+
+A bucket scan is the simplest route and needs no catalog at all. A catalog or
+engine source is the right one when access is granted through the catalog, when
+tables are spread across many buckets, or when you want the names people use for
+the tables rather than their paths.
+
+Every table asset, whichever source found it, carries a `table_format` in its
+metadata: `delta`, `iceberg`, `hudi`, `paimon`, `lance`, `ducklake`, `native`
+for the engine's own tables, `view`, or `external` for plain files behind an
+external table.
+
+## Formats in a bucket
+
+What a bucket or folder scan reads, by storage. **Verified** means it was read
+end to end against real or emulated storage during development; **supported**
+means the code path exists but hasn't been run against that service yet.
+
+| Format | S3-compatible | Azure / OneLake | GCS | Local folder |
+| --- | --- | --- | --- | --- |
+| Delta Lake (deletion vectors, column mapping) | Verified | Verified (Azurite); OneLake supported | Supported, needs an HMAC key | Verified |
+| Apache Iceberg v1/v2 (merge-on-read deletes) | Verified | Verified (Azurite) | Supported, needs an HMAC key | Verified |
+| Lance | Verified | Verified (Azurite) | Supported | Verified |
+| Apache Paimon | Verified | Not readable yet | Supported | Verified |
+| Apache Hudi (copy-on-write snapshot) | Supported | Supported | Supported | Supported |
+
+Known limits:
+
+- **Paimon on Azure** isn't readable yet; such tables are logged as skipped.
+- **Delta and Iceberg on GCS** are read through GCS's S3-compatible interface,
+  which needs an HMAC key pair on the source. Without one they are logged as
+  skipped.
+- **Row counts** are reported only where the table's own metadata states them
+  exactly: Delta (deletion vectors subtracted), Iceberg snapshots with no delete
+  files, Paimon append tables and Lance. Otherwise the count is left empty
+  rather than guessed.
+- **An Iceberg table found by path** is read through its newest
+  `metadata.json`. A catalog may already have moved on to a newer one it keeps
+  elsewhere (Gravitino's in-memory store does this); use the
+  [Iceberg REST Catalog](/sources/iceberg-rest/) source for those.
+
+## Catalogs
+
+The [Iceberg REST Catalog](/sources/iceberg-rest/) source works with any catalog
+that speaks the Iceberg REST protocol.
+
+| Catalog | Sign-in | Status |
+| --- | --- | --- |
+| Apache Polaris | OAuth2 client credentials | Verified |
+| Apache Gravitino | None or OAuth2 | Verified |
+| Snowflake Open Catalog | OAuth2 client credentials | Supported |
+| Databricks Unity Catalog (Iceberg endpoint) | Bearer token | Supported |
+| Project Nessie | None or bearer token | Supported |
+| Lakekeeper | OAuth2 or none | Supported |
+| AWS Glue Iceberg endpoint | AWS SigV4 (`glue`) | Supported |
+| Amazon S3 Tables | AWS SigV4 (`s3tables`) | Supported |
+| Google BigLake metastore | Google service account | Supported |
+
+## Engines
+
+| Engine | What it reports | Status |
+| --- | --- | --- |
+| [Trino](/sources/trino/) / Starburst | Every catalog: Iceberg, Delta, Hudi, Hive and the rest | Verified (Trino) |
+| [Amazon Athena](/sources/athena/) | Glue tables: Iceberg, Delta, Hudi, plain files | Supported |
+| [Google BigQuery](/sources/bigquery/) | Native, BigLake Iceberg, external Delta and Iceberg | Supported |
+| [Amazon Redshift](/sources/redshift/) | Local tables and Spectrum external tables | Supported |
+| [Databricks](/sources/databricks/) | Delta and Iceberg in Unity Catalog | Supported |
+| [Snowflake](/sources/snowflake/) | Native and Iceberg tables | Supported |
+| [Hive](/sources/hive/) | Hive, Iceberg, Delta and Hudi tables in the metastore | Supported |
+| [Dremio](/sources/dremio/) | Its datasets and their formats | Supported |
+
+## Next steps
+
+- What a bucket scan reads besides tables — **[File Formats](/sources/file-formats/)**
+- How many rows are read per run — **[Sampling Strategies](/sources/sampling/)**

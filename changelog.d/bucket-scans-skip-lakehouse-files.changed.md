@@ -1,1 +1,0 @@
-Cloud-storage and folder scans now leave the files of Delta Lake and Apache Iceberg tables alone and say so in the run log; scan those tables with the Delta Lake or Apache Iceberg source, which reads each one as a single table.

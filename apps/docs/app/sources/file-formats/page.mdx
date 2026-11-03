@@ -95,12 +95,23 @@ the table. Deleted rows can still sit in files the table no longer uses, older
 snapshots keep their own files, and a renamed column keeps its old name in every
 file written before the rename.
 
-So when a cloud-storage or folder scan meets a Delta table (a `_delta_log/`
-folder) or an Iceberg table (`metadata/*.metadata.json`), it **leaves that
-table's files alone** and says so in the run log. Scan those tables with the
-[Delta Lake](/sources/delta-lake/) or [Apache Iceberg](/sources/iceberg/) source,
-which reads each one as a single table: current rows only, deletions applied,
-renamed columns as one column.
+So when a cloud-storage or folder scan meets a table, it reads it **as one
+table asset**: current rows only, deletions applied, renamed columns as one
+column. Its data files are not scanned again one by one. A table is recognised
+by its own markers:
+
+| Format | Recognised by |
+| --- | --- |
+| Delta Lake | a `_delta_log/` folder |
+| Apache Iceberg | `metadata/*.metadata.json` |
+| Apache Hudi | a `.hoodie/` folder |
+| Apache Paimon | `snapshot/` and `schema/` folders |
+| Lance | a `*.lance` folder with `_versions/` |
+
+A table that carries both Delta and Iceberg metadata (Delta UniForm) is read as
+Delta. Which formats can be read on which storage, and what to use when tables
+sit behind a catalog or an engine, is on
+[Lakehouse Tables](/sources/lakehouse/).
 
 ---
 
@@ -271,10 +282,10 @@ It's opened read-only and every table in it is scanned. Views and macros inside
 the file are never run, so a crafted database can't make the scan read anything
 else.
 
-**My bucket holds Delta or Iceberg tables. Why weren't their Parquet files scanned?**
-Because a table's files include rows the table has deleted. The scan leaves them
-to the [Delta Lake](/sources/delta-lake/) and [Iceberg](/sources/iceberg/)
-sources, which read the table as it is now.
+**My bucket holds Delta or Iceberg tables. Why weren't their Parquet files scanned one by one?**
+Because a table's files include rows the table has deleted. The scan reads each
+table as one asset instead, as it is now — see
+[Lakehouse Tables](/sources/lakehouse/).
 
 **Does it read source code?**
 Yes — around eighty languages and configuration formats, plus extension-less

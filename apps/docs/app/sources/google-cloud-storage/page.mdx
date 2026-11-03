@@ -5,7 +5,7 @@ description: Scan objects in a Google Cloud Storage bucket using Application Def
 ---
 
 import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
-import { ObjectStorageNotes, LineageNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
+import { ObjectStorageNotes, LakehouseNotes, LineageNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
 
 # Google Cloud Storage
 
@@ -35,6 +35,8 @@ narrow it.
 
 <ObjectStorageNotes container="bucket" />
 
+<LakehouseNotes />
+
 <FileHandlingNote what="Objects from this bucket" />
 
 ## Metadata on every asset
@@ -51,6 +53,11 @@ narrow it.
   nothing to store, nothing to rotate.
 - **A project ID override** is available when the credential's default project
   isn't the one holding the bucket.
+- **Delta and Iceberg tables need an HMAC key.** Those two formats are read
+  through GCS's S3-compatible interface, which takes an HMAC key pair rather
+  than a service account. Add one in the HMAC fields; without it those tables
+  are listed in the run log as skipped, and Hudi, Paimon and Lance tables are
+  still read with the service account.
 
 ## Configuration
 

@@ -182,30 +182,23 @@ export function AtlassianNotes({ product }: { product: string }) {
   );
 }
 
-/** Shared behaviour of Delta Lake and Iceberg. */
-export function LakehouseNotes({ format }: { format: string }) {
+/** Lakehouse tables found while scanning a bucket or folder. */
+export function LakehouseNotes() {
   return (
     <Note title="Shared behaviour · Lakehouse tables">
       <p>
-        No Spark, no JVM, and no catalog service is required. {format} table
-        metadata is read directly out of the table&apos;s own files in object
-        storage, so the only thing you have to provide is object-storage access
-        to the warehouse path.
+        A Delta Lake, Apache Iceberg, Apache Hudi, Apache Paimon or Lance table
+        found under the prefix is read as <strong>one table asset</strong>, not
+        as the pile of data files it is made of. Deleted rows stay deleted,
+        files from older snapshots are left out, and a renamed column reads as
+        one column. No Spark, JVM or catalog service is needed: the table is
+        read through its own metadata files with the credentials this source
+        already has.
       </p>
       <p>
-        Rows are read from the <strong>table</strong>, not from its Parquet
-        files one by one: deleted rows stay deleted, files from older snapshots
-        are left out, and a renamed column reads as one column across data
-        written before and after the rename. A table copied to another bucket or
-        prefix is still read correctly.
-      </p>
-      <p>
-        Connection details are the same shape as the{" "}
-        <DocLink href="/sources/s3-compatible-storage/">
-          S3-Compatible Storage
-        </DocLink>{" "}
-        source, which means AWS S3, MinIO, Cloudflare R2 and the rest all work
-        the same way.
+        Which formats can be read on which storage, and what to use when the
+        table lives behind a catalog instead, is on{" "}
+        <DocLink href="/sources/lakehouse/">Lakehouse Tables</DocLink>.
       </p>
     </Note>
   );

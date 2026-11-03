@@ -5,7 +5,7 @@ description: Scan blobs in an Azure Storage container — account key, SAS, conn
 ---
 
 import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
-import { ObjectStorageNotes, LineageNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
+import { ObjectStorageNotes, LakehouseNotes, LineageNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
 
 # Azure Blob Storage
 
@@ -42,6 +42,8 @@ denylists.
 
 <ObjectStorageNotes container="container" />
 
+<LakehouseNotes />
+
 <FileHandlingNote what="Blobs from this container" />
 
 ## Metadata on every asset
@@ -59,6 +61,12 @@ denylists.
 - **Archives and embedded files** are expanded into child assets, under
   configurable caps.
 - Turning off content preview gives you a **blob inventory** with no downloads.
+- **Microsoft Fabric / OneLake** works through this source: set the account URL
+  to `https://onelake.blob.fabric.microsoft.com`, the container to the Fabric
+  workspace, and sign in with a service principal. The Delta tables under
+  `<lakehouse>.Lakehouse/Tables/` are read as tables.
+- **Paimon tables can't be read from Azure yet**; they are listed in the run log
+  as skipped. Every other lakehouse format is.
 
 ## Configuration
 

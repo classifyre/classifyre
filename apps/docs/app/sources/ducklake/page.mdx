@@ -1,0 +1,54 @@
+---
+title: DuckLake
+description: Scan DuckLake tables — catalog in Postgres, MySQL, SQLite or DuckDB, data in object storage — read as tables, with deletions and renames applied.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { SqlSourceNotes, SharedSettingsNote } from "@/components/source-notes";
+
+# DuckLake
+
+<SourceFacts
+  type="DUCKLAKE"
+  vendor={{ label: "DuckLake", href: "https://ducklake.select/" }}
+/>
+
+DuckLake keeps a lakehouse's metadata in an ordinary SQL database and its data
+as Parquet files in a bucket or folder. This source attaches the lake read-only
+and reads every table in it as it is now.
+
+## What you need to connect
+
+The **metadata catalog**: a connection string such as
+`postgres:dbname=lake host=db.example.com user=reader`, a `mysql:` string, a
+`sqlite:` path, or a DuckDB file path. Its password goes in the masked password
+field rather than in the string.
+
+The data files are found where the catalog recorded them. Add storage keys for
+S3, Azure or GCS (HMAC) when the scanning environment can't already read that
+location, and a data path when the files have moved.
+
+## What Classifyre reads
+
+One asset per table, across every schema in the lake or only the ones you list.
+Rows come from the lake's current snapshot: deleted rows are absent and a
+renamed column reads as one column.
+
+<SqlSourceNotes foreignKeys={false} viewLineage={false} />
+
+## Metadata on every asset
+
+<SourceMetadata type="DUCKLAKE" />
+
+## Worth knowing
+
+- **Read-only.** The lake is attached read-only; nothing is written to the
+  catalog or the data path.
+- **No row estimate** is shown: DuckLake's own statistics still count rows that
+  have since been deleted.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="DUCKLAKE" />

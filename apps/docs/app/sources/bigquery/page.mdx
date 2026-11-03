@@ -1,0 +1,64 @@
+---
+title: Google BigQuery
+description: Scan BigQuery datasets, including BigLake and BigQuery tables for Apache Iceberg — rows read without query cost where possible, each table's format, view lineage and every setting.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { SqlSourceNotes, LineageNote, SharedSettingsNote } from "@/components/source-notes";
+
+# Google BigQuery
+
+<SourceFacts
+  type="BIGQUERY"
+  vendor={{ label: "Google BigQuery", href: "https://cloud.google.com/bigquery" }}
+  auth={{ label: "BigQuery access control", href: "https://cloud.google.com/bigquery/docs/access-control" }}
+  links={[{ label: "BigLake tables for Apache Iceberg", href: "https://cloud.google.com/bigquery/docs/iceberg-tables" }]}
+/>
+
+BigQuery is Google Cloud's warehouse and, through BigLake, its lakehouse too.
+This source scans the datasets of one project: native tables, BigLake tables,
+BigQuery tables for Apache Iceberg, external tables over Delta or Iceberg, and
+views.
+
+## What you need to connect
+
+The **project id**, and a service-account key in JSON, or nothing at all to use
+the environment's ambient Google credentials (workload identity). The account
+needs BigQuery Data Viewer on the datasets, and BigQuery Job User on the
+project that is billed for queries.
+
+## What Classifyre reads
+
+Every dataset and its tables and views, or only the ones you list. Each table
+reports its format: `native`, `iceberg`, `delta`, `external` or `view`, plus its
+storage location for external tables.
+
+<SqlSourceNotes foreignKeys={false} />
+
+## Metadata on every asset
+
+<SourceMetadata type="BIGQUERY" />
+
+## Lineage
+
+<LineageNote>
+
+Views and materialised views, and the tables they read, are recorded as
+lineage, parsed from the view SQL. See [Lineage & Relationships](/sources/lineage/).
+
+</LineageNote>
+
+## Worth knowing
+
+- **Most reads cost nothing.** ALL and AUTOMATIC page through tables with the
+  table-listing API rather than a query, so no bytes are billed. RANDOM and
+  LATEST need an `ORDER BY` and run a query; set a maximum bytes billed to cap
+  it.
+- **A separate billing project** can be named when the data and the bill live
+  in different projects.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="BIGQUERY" />

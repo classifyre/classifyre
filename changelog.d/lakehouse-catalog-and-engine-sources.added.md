@@ -1,0 +1,1 @@
+You can now scan lakehouse tables through an Iceberg REST catalog (Polaris, Snowflake Open Catalog, Unity Catalog, Nessie, Gravitino, Lakekeeper, AWS Glue, Amazon S3 Tables and BigLake metastore), a DuckLake, Trino or Starburst, Amazon Athena, Google BigQuery and Amazon Redshift.

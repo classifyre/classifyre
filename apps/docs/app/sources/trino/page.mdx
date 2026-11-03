@@ -1,0 +1,61 @@
+---
+title: Trino
+description: Scan every catalog behind a Trino or Starburst cluster — Iceberg, Delta, Hudi, Hive and the rest — with each table's format, view lineage and every setting.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { SqlSourceNotes, LineageNote, SharedSettingsNote } from "@/components/source-notes";
+
+# Trino
+
+<SourceFacts
+  type="TRINO"
+  vendor={{ label: "Trino", href: "https://trino.io/" }}
+  auth={{ label: "Trino authentication", href: "https://trino.io/docs/current/security/authentication-types.html" }}
+  links={[{ label: "Starburst", href: "https://www.starburst.io/" }]}
+/>
+
+Trino is the query engine in front of many lakehouses, and one connection to it
+reaches every catalog it has configured. Starburst Galaxy and Starburst
+Enterprise connect the same way.
+
+## What you need to connect
+
+Host and port of the coordinator, and a user. Sign in with a password, or with
+a JWT access token; leave both empty for a cluster with no authentication. Use
+HTTPS for anything outside a lab.
+
+## What Classifyre reads
+
+Tables and views in every catalog and schema the user can see, or only the
+catalogs and schemas you list. Trino's own `system` catalog and
+`information_schema` are skipped. Each table reports its format: `iceberg`,
+`delta`, `hudi`, `native` for the engine's own storage, or `external`.
+
+<SqlSourceNotes foreignKeys={false} />
+
+## Metadata on every asset
+
+<SourceMetadata type="TRINO" />
+
+## Lineage
+
+<LineageNote>
+
+Views and the tables they read are recorded as lineage, parsed from the view
+SQL in Trino's dialect. See [Lineage & Relationships](/sources/lineage/).
+
+</LineageNote>
+
+## Worth knowing
+
+- **Each page of rows is one query.** On a busy cluster, a smaller page size or
+  a narrower scope keeps the scan light.
+- **The format comes from the catalog's connector.** A catalog that federates a
+  database, such as PostgreSQL, reports `native`.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="TRINO" />
