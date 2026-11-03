@@ -1,0 +1,30 @@
+{
+  "type": "ICEBERG_REST",
+  "name": "Lab \u00b7 Gravitino (Iceberg REST)",
+  "config": {
+    "type": "ICEBERG_REST",
+    "required": {
+      "catalog_uri": "http://lab-gravitino.classifyre-dev.svc:9001/iceberg",
+      "auth_mode": "none"
+    },
+    "masked": {
+      "storage_access_key_id": "lab-access-key",
+      "storage_secret_access_key": "lab-secret-key-0123456789"
+    },
+    "optional": {
+      "connection": {
+        "storage_s3_endpoint": "http://lab-s3.classifyre-dev.svc:9000",
+        "storage_s3_region": "us-east-1"
+      }
+    },
+    "sampling": {
+      "strategy": "ALL"
+    },
+    "detectors": [
+      {
+        "type": "PII",
+        "enabled": true
+      }
+    ]
+  }
+}

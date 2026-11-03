@@ -1,0 +1,28 @@
+{
+  "type": "TRINO",
+  "name": "Lab \u00b7 Trino",
+  "config": {
+    "type": "TRINO",
+    "required": {
+      "host": "lab-trino.classifyre-dev.svc",
+      "port": 8080
+    },
+    "masked": {
+      "username": "lab"
+    },
+    "optional": {
+      "connection": {
+        "http_scheme": "http"
+      }
+    },
+    "sampling": {
+      "strategy": "ALL"
+    },
+    "detectors": [
+      {
+        "type": "PII",
+        "enabled": true
+      }
+    ]
+  }
+}

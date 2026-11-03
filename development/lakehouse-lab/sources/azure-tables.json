@@ -1,0 +1,28 @@
+{
+  "type": "AZURE_BLOB_STORAGE",
+  "name": "Lab \u00b7 Azure tables",
+  "config": {
+    "type": "AZURE_BLOB_STORAGE",
+    "required": {
+      "account_url": "http://lab-azurite.classifyre-dev.svc:10000/devstoreaccount1",
+      "container": "lake"
+    },
+    "masked": {
+      "azure_connection_string": "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://lab-azurite.classifyre-dev.svc:10000/devstoreaccount1;"
+    },
+    "optional": {
+      "scope": {
+        "prefix": "tables/"
+      }
+    },
+    "sampling": {
+      "strategy": "ALL"
+    },
+    "detectors": [
+      {
+        "type": "PII",
+        "enabled": true
+      }
+    ]
+  }
+}

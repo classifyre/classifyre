@@ -1,0 +1,26 @@
+{
+  "version": 3,
+  "id": 0,
+  "fields": [
+    {
+      "id": 0,
+      "name": "id",
+      "type": "BIGINT NOT NULL"
+    },
+    {
+      "id": 1,
+      "name": "email",
+      "type": "STRING"
+    }
+  ],
+  "highestFieldId": 1,
+  "partitionKeys": [],
+  "primaryKeys": [
+    "id"
+  ],
+  "options": {
+    "bucket": "1"
+  },
+  "comment": null,
+  "timeMillis": 1793649265386
+}

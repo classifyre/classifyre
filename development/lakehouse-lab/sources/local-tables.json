@@ -1,0 +1,19 @@
+{
+  "type": "LOCAL_FOLDER",
+  "name": "Lab \u00b7 Local folder tables",
+  "config": {
+    "type": "LOCAL_FOLDER",
+    "required": {
+      "path": "/mnt/corpora/dumps/lakehouse-lab"
+    },
+    "sampling": {
+      "strategy": "ALL"
+    },
+    "detectors": [
+      {
+        "type": "PII",
+        "enabled": true
+      }
+    ]
+  }
+}

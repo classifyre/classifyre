@@ -1,0 +1,35 @@
+{
+  "type": "ICEBERG_REST",
+  "name": "Lab \u00b7 Polaris (Iceberg REST)",
+  "config": {
+    "type": "ICEBERG_REST",
+    "required": {
+      "catalog_uri": "http://lab-polaris.classifyre-dev.svc:8181/api/catalog",
+      "auth_mode": "oauth2"
+    },
+    "masked": {
+      "client_id": "root",
+      "client_secret": "s3cr3t",
+      "storage_access_key_id": "lab-access-key",
+      "storage_secret_access_key": "lab-secret-key-0123456789"
+    },
+    "optional": {
+      "connection": {
+        "storage_s3_endpoint": "http://lab-s3.classifyre-dev.svc:9000",
+        "storage_s3_region": "us-east-1",
+        "warehouse": "lab_polaris",
+        "oauth2_scope": "PRINCIPAL_ROLE:ALL",
+        "access_delegation": "none"
+      }
+    },
+    "sampling": {
+      "strategy": "ALL"
+    },
+    "detectors": [
+      {
+        "type": "PII",
+        "enabled": true
+      }
+    ]
+  }
+}

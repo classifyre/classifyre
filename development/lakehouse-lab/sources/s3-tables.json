@@ -1,0 +1,32 @@
+{
+  "type": "S3_COMPATIBLE_STORAGE",
+  "name": "Lab \u00b7 S3 tables",
+  "config": {
+    "type": "S3_COMPATIBLE_STORAGE",
+    "required": {
+      "bucket": "lake"
+    },
+    "masked": {
+      "aws_access_key_id": "lab-access-key",
+      "aws_secret_access_key": "lab-secret-key-0123456789"
+    },
+    "optional": {
+      "connection": {
+        "endpoint_url": "http://lab-s3.classifyre-dev.svc:9000",
+        "region_name": "us-east-1"
+      },
+      "scope": {
+        "prefix": "tables/"
+      }
+    },
+    "sampling": {
+      "strategy": "ALL"
+    },
+    "detectors": [
+      {
+        "type": "PII",
+        "enabled": true
+      }
+    ]
+  }
+}
