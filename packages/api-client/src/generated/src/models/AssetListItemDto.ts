@@ -2,7 +2,7 @@
 /* eslint-disable */
 /**
  * Classifyre API
- * Metadata ingestion and detection API for unstructured data sources. Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, Dremio, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk, Notion, Email, and YouTube sources. Built-in detectors for secrets, PII, toxic content, image classification, broken links, and security threats.
+ * Metadata ingestion and detection API for unstructured data sources. Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, Dremio, Trino/Starburst, Amazon Athena, Google BigQuery, Amazon Redshift, Iceberg REST catalogs, DuckLake, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk, Notion, Email, and YouTube sources. Built-in detectors for secrets, PII, toxic content, image classification, broken links, and security threats.
  *
  * The version of the OpenAPI document: 1.0.0
  * Contact: support@example.com
@@ -148,8 +148,6 @@ export const AssetListItemDtoSourceTypeEnum = {
     Email: 'EMAIL',
     Youtube: 'YOUTUBE',
     Reddit: 'REDDIT',
-    DeltaLake: 'DELTA_LAKE',
-    Iceberg: 'ICEBERG',
     Kafka: 'KAFKA',
     Elasticsearch: 'ELASTICSEARCH',
     Opensearch: 'OPENSEARCH',
@@ -161,6 +159,12 @@ export const AssetListItemDtoSourceTypeEnum = {
     HuggingFace: 'HUGGING_FACE',
     Git: 'GIT',
     Sandbox: 'SANDBOX',
+    IcebergRest: 'ICEBERG_REST',
+    Ducklake: 'DUCKLAKE',
+    Trino: 'TRINO',
+    Athena: 'ATHENA',
+    Bigquery: 'BIGQUERY',
+    Redshift: 'REDSHIFT',
     Custom: 'CUSTOM'
 } as const;
 export type AssetListItemDtoSourceTypeEnum = typeof AssetListItemDtoSourceTypeEnum[keyof typeof AssetListItemDtoSourceTypeEnum];

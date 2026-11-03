@@ -170,9 +170,21 @@ file-processing = [
     # when none is installed.
     "py7zr>=1.1.3",
     "rarfile>=4.3",
-    # Table layer: Iceberg metadata resolution + SQL over Parquet without Spark.
-    "pyiceberg>=0.9.0",
+    # Table layer: CSV/TSV, JSON lines, Avro, database files and the Delta and
+    # Iceberg tables bucket sources find (utils/table_files, utils/lakehouse_tables).
     "duckdb>=1.1.0",
+]
+# Lakehouse table formats DuckDB does not read reliably: Lance (pylance applies
+# deletes and takes object_store storage options), Hudi (hudi-rs snapshot reads,
+# copy-on-write and merge-on-read) and Paimon (pypaimon merges primary-key
+# tables; DuckDB's community extension cannot take storage credentials). Delta
+# and Iceberg go through DuckDB in file-processing. Installed on first use, when
+# a bucket scan finds a table in one of these formats.
+lakehouse = [
+    { include-group = "file-processing" },
+    "pylance>=0.30.0",
+    "hudi>=0.5.0",
+    "pypaimon>=2.1.0",
 ]
 transcription = [
     # CPU audio/video transcription. faster-whisper decodes media via bundled
@@ -279,19 +291,29 @@ reddit = [
     "yt-dlp>=2025.1.0",
     "youtube-transcript-api>=1.0.0",
 ]
-delta-lake = [
-    # Pure-Python/Rust Delta reader (delta-rs) — no Spark, no JVM. Table metadata
-    # and data-file lists come from deltalake; rows are read through DuckDB's
-    # delta_scan (file-processing group), which applies deletion vectors.
-    { include-group = "file-processing" },
-    "deltalake>=0.25.0",
+trino = [
+    # Trino's own DB-API client; also Starburst Galaxy and Enterprise.
+    "trino>=0.330.0,<1.0.0",
+]
+athena = [
+    # Athena SQL (pyathena) and the Glue Data Catalog (boto3).
+    "pyathena>=3.9.0,<4.0.0",
     "boto3>=1.43.10,<2.0.0",
 ]
-iceberg = [
-    # PyIceberg resolves table metadata without Spark; rows are read through
-    # DuckDB's iceberg_scan (file-processing group), which applies delete files.
+bigquery = [
+    # BigQuery client: tabledata.list for free row reads, queries only for
+    # RANDOM/LATEST samples.
+    "google-cloud-bigquery>=3.27.0,<4.0.0",
+]
+redshift = [
+    # Amazon's driver: password and IAM sign-in (provisioned and Serverless).
+    "redshift-connector>=2.1.0,<3.0.0",
+]
+iceberg-rest = [
+    # DuckDB attaches the catalog and reads its tables (file-processing);
+    # google-auth mints the access token for the BigLake metastore.
     { include-group = "file-processing" },
-    "boto3>=1.43.10,<2.0.0",
+    "google-auth>=2.40,<3.0",
 ]
 kafka = [
     # librdkafka-based client (bundled wheels, no JVM).
@@ -422,8 +444,9 @@ module = [
     "re2.*",
     "faster_whisper",
     "faster_whisper.*",
-    "pyiceberg.*",
-    "deltalake.*",
+    "lance.*",
+    "hudi.*",
+    "pypaimon.*",
     "duckdb.*",
     "confluent_kafka.*",
     "boto3.*",
@@ -483,6 +506,11 @@ package = true
 # distribution declared by our video and OCR groups. Installing both would
 # overwrite the same cv2 namespace and add GUI libraries to CPU-only containers.
 exclude-dependencies = ["opencv-python"]
+# pypaimon declares pyarrow<20, a pin from before newer pyarrow existed rather
+# than a known break: its reader works on the pyarrow the rest of the CLI uses
+# (the Databricks group needs >=24), which tests/utils/test_lakehouse_tables.py
+# exercises. Without the override no environment can hold both groups.
+override-dependencies = ["pyarrow>=24.0.0"]
 # Two transitive dependencies whose latest release breaks the package that
 # pulls it in, while that package's own requirement still allows it. Both
 # failures were silent in a scan: images and scans came back with no text, and

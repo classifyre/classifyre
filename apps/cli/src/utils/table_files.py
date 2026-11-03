@@ -65,6 +65,10 @@ DUCKDB_MIME_TYPE = "application/vnd.duckdb"
 XLSX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 VORTEX_MIME_TYPE = "application/vnd.vortex"
 GEOPACKAGE_MIME_TYPE = "application/geopackage+sqlite3"
+# Not a file: a whole lakehouse table found in a bucket. Its "payload" is a
+# ``utils.lakehouse_tables.LakehouseTable``; the type exists so the table goes
+# through the same row windows and renderer as every other table here.
+LAKEHOUSE_TABLE_MIME_TYPE = "application/vnd.classifyre.lakehouse-table"
 FLATGEOBUF_MIME_TYPE = "application/vnd.flatgeobuf"
 GEOJSON_MIME_TYPE = "application/geo+json"
 DBF_MIME_TYPE = "application/vnd.dbf"
@@ -95,6 +99,7 @@ TABLE_FILE_MIME_TYPES = frozenset(
         VORTEX_MIME_TYPE,
         *DATABASE_MIME_TYPES,
         *SPATIAL_DRIVERS,
+        LAKEHOUSE_TABLE_MIME_TYPE,
     }
 )
 
@@ -170,6 +175,12 @@ def iter_table_batches(
         yield from _iter_database(source, mime_type, begin, max_rows, batch_rows)
     elif mime_type in SPATIAL_DRIVERS:
         yield from _iter_spatial(source, mime_type, begin, max_rows, batch_rows)
+    elif mime_type == LAKEHOUSE_TABLE_MIME_TYPE:
+        from .lakehouse_tables import iter_lakehouse_batches
+
+        yield from iter_lakehouse_batches(
+            source, start_row=begin, max_rows=max_rows, batch_rows=batch_rows
+        )
     else:
         raise TableFileError(f"Not a table file type: {mime_type}")
 
@@ -177,9 +188,13 @@ def iter_table_batches(
 def count_table_rows(source: BinarySource, mime_type: str) -> int | None:
     """Rows in the payload when the format records it; None means unknown.
 
-    Only ORC qualifies: its footer holds the count. Every other format here would
+    ORC qualifies (its footer holds the count), and so does a lakehouse table
+    whose metadata gives an exact count. Every other format here would
     need a full pass, which is what the caller is trying to plan around.
     """
+    if mime_type == LAKEHOUSE_TABLE_MIME_TYPE:
+        # From the table's own metadata; None where it would not be exact.
+        return getattr(source, "row_count", None)
     if mime_type != ORC_MIME_TYPE:
         return None
     try:

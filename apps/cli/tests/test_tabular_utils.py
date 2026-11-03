@@ -154,3 +154,14 @@ def test_build_tabular_location_normalizes_whitespace_in_match() -> None:
 
     assert location.path == "public.training_set, id=4"
     assert location.description == "column name"
+
+
+def test_engine_table_formats_share_one_vocabulary() -> None:
+    from src.sources.tabular_utils import table_format_from
+
+    assert table_format_from("DELTA") == "delta"
+    assert table_format_from("ICEBERG") == "iceberg"
+    assert table_format_from("org.apache.hudi.hadoop.HoodieParquetInputFormat") == "hudi"
+    assert table_format_from("external") == "external"
+    assert table_format_from("PARQUET") == "native"
+    assert table_format_from("DELTA", is_view=True) == "view"

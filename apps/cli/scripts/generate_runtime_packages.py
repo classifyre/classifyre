@@ -78,8 +78,12 @@ INCLUDED_GROUPS = (
     "youtube",
     "reddit",
     "kafka",
-    "delta-lake",
-    "iceberg",
+    "lakehouse",
+    "iceberg-rest",
+    "trino",
+    "athena",
+    "bigquery",
+    "redshift",
     # sqlglot: pure Python and small, and the thing a connector author reaches
     # for when they want to derive column lineage from a query they already have.
     "lineage",
@@ -125,6 +129,8 @@ MODULE_ALIASES: dict[str, tuple[str, ...]] = {
     "google-api-python-client": ("googleapiclient",),
     "google-auth": ("google.auth",),
     "google-cloud-storage": ("google.cloud.storage",),
+    "google-cloud-bigquery": ("google.cloud.bigquery",),
+    "pylance": ("lance",),
     "msgraph-sdk": ("msgraph",),
     "en-core-web-sm": ("en_core_web_sm",),
     "classifyre-schemas": ("schemas",),

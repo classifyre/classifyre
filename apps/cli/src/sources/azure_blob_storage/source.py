@@ -6,6 +6,8 @@ from typing import Any
 from urllib.parse import quote
 
 from ...models.generated_input import AzureBlobStorageInput
+from ...utils.lakehouse_storage import azure_account_name, azure_table_storage
+from ...utils.lakehouse_tables import TableStorage
 from ...utils.range_reader import CallableRangeReader, open_buffered
 from ..dependencies import require_module
 from ..object_storage.base import ObjectRef, ObjectStorageSourceBase
@@ -77,6 +79,26 @@ class AzureBlobStorageSource(ObjectStorageSourceBase):
 
         return blob_service_client_cls(account_url=account_url, credential=credential)
 
+    def _lakehouse_storage(self) -> TableStorage | None:
+        return azure_table_storage(
+            account_url=self._required_account_url(),
+            container=self._required_container(),
+            connection_string=self._masked_value("azure_connection_string"),
+            account_key=self._masked_value("azure_account_key"),
+            sas_token=self._masked_value("azure_sas_token"),
+            client_id=self._masked_value("azure_client_id"),
+            client_secret=self._masked_value("azure_client_secret"),
+            tenant_id=self._masked_value("azure_tenant_id"),
+        )
+
+    def _lakehouse_authority(self) -> str | None:
+        # The account, as in Urn.abfss: the container goes in the path, since a
+        # URN authority holds a name, never a URL.
+        return azure_account_name(self._required_account_url()) or None
+
+    def _lakehouse_prefix(self) -> list[str]:
+        return [self._required_container()]
+
     def _client(self) -> Any:
         if self._cached_client is None:
             self._cached_client = self._build_client()
@@ -90,9 +112,13 @@ class AzureBlobStorageSource(ObjectStorageSourceBase):
         max_keys = self._max_keys_per_page()
         timeout = self._request_timeout_seconds()
 
-        list_blobs = container_client.list_blobs(name_starts_with=prefix, timeout=timeout)
+        # The page size goes to list_blobs: azure-core's ItemPaged.by_page()
+        # takes only a continuation token, and passing it there raised.
+        list_blobs = container_client.list_blobs(
+            name_starts_with=prefix, results_per_page=max_keys, timeout=timeout
+        )
 
-        for page in list_blobs.by_page(results_per_page=max_keys):
+        for page in list_blobs.by_page():
             for item in page:
                 key = str(getattr(item, "name", "") or "")
                 if not key or key.endswith("/"):

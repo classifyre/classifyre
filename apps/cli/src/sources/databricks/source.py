@@ -45,7 +45,7 @@ from ...utils.file_parser import render_bytes_cell
 from ...utils.urn import Urn, UrnError
 from ..dependencies import require_module
 from ..tabular_base import BaseTabularSource
-from ..tabular_utils import TableRef
+from ..tabular_utils import TableRef, table_format_from
 
 logger = logging.getLogger(__name__)
 
@@ -124,6 +124,8 @@ class DatabricksSource(BaseTabularSource):
         # move data between the two. Filled by _lineage_refs_for_table.
         self._lineage_notebook_ids: dict[tuple[str, ...], dict[tuple[str, str, str], set[str]]] = {}
         self._foreign_systems: dict[str, _ForeignSystem | None] = {}
+        self._table_formats: dict[tuple[str, ...], str] = {}
+        self._table_locations: dict[tuple[str, ...], str] = {}
         self._access_token: str | None = None
         self._access_token_expiry: datetime | None = None
 
@@ -600,6 +602,15 @@ class DatabricksSource(BaseTabularSource):
             )
             if not self._table_allowed(table_ref):
                 continue
+            # DELTA, ICEBERG, PARQUET, ... and where the files are: what a scan of
+            # the same table from its bucket would call it.
+            self._table_formats[table_ref.table_key] = table_format_from(
+                str(entry.get("data_source_format") or "")
+                or ("external" if str(entry.get("table_type", "")).upper() == "EXTERNAL" else ""),
+                is_view=table_ref.object_type == "VIEW",
+            )
+            if entry.get("storage_location"):
+                self._table_locations[table_ref.table_key] = str(entry["storage_location"])
             tables.append(table_ref)
             if limit is not None and len(tables) >= limit:
                 break
@@ -1181,10 +1192,15 @@ class DatabricksSource(BaseTabularSource):
         )
 
     def _extra_asset_metadata(self, table_ref: TableRef) -> dict[str, Any]:
-        return {
+        meta: dict[str, Any] = {
             "catalog": table_ref.database,
             "object_type": table_ref.object_type,
+            "table_format": self._table_formats.get(table_ref.table_key, "native"),
         }
+        location = self._table_locations.get(table_ref.table_key)
+        if location:
+            meta["storage_location"] = location
+        return meta
 
     def _finding_base_path(self, table_ref: TableRef) -> str:
         return f"{table_ref.database}.{table_ref.schema}.{table_ref.table}"

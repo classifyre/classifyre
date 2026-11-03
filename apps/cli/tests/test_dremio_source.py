@@ -497,6 +497,7 @@ async def test_dremio_extract_walks_the_catalog_tree(dremio: FakeDremio) -> None
         "object_type": "PHYSICAL_DATASET",
         "container_type": "SOURCE",
         "source_system": "POSTGRES",
+        "table_format": "native",
     }
 
     view = assets["Marketing.Campaigns.q3_leads"]

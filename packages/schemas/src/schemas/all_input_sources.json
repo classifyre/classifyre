@@ -85,12 +85,6 @@
       "$ref": "#/definitions/RedditInput"
     },
     {
-      "$ref": "#/definitions/DeltaLakeInput"
-    },
-    {
-      "$ref": "#/definitions/IcebergInput"
-    },
-    {
       "$ref": "#/definitions/KafkaInput"
     },
     {
@@ -116,6 +110,24 @@
     },
     {
       "$ref": "#/definitions/GitInput"
+    },
+    {
+      "$ref": "#/definitions/IcebergRestInput"
+    },
+    {
+      "$ref": "#/definitions/DuckLakeInput"
+    },
+    {
+      "$ref": "#/definitions/TrinoInput"
+    },
+    {
+      "$ref": "#/definitions/AthenaInput"
+    },
+    {
+      "$ref": "#/definitions/BigQueryInput"
+    },
+    {
+      "$ref": "#/definitions/RedshiftInput"
     },
     {
       "$ref": "#/definitions/CustomInput"
@@ -277,6 +289,10 @@
           "row_count": {
             "type": "integer",
             "description": "Estimated number of rows"
+          },
+          "table_format": {
+            "type": "string",
+            "description": "Storage format of the table (iceberg, delta, hudi, paimon, lance, native, external, view)"
           }
         },
         "required": [
@@ -284,6 +300,43 @@
           "table_name",
           "table_type"
         ]
+      },
+      "lakehouseTable": {
+        "type": "object",
+        "description": "A lakehouse table (Delta, Iceberg, Hudi, Paimon, Lance) read as one table from a bucket or folder",
+        "properties": {
+          "format_version": {
+            "type": "integer",
+            "description": "Table format version (Delta reader version, Iceberg format version, Hudi table version)"
+          },
+          "table_version": {
+            "type": "string",
+            "description": "Current version the table was read at (Delta version, Iceberg metadata file, Paimon snapshot, Hudi instant, Lance version)"
+          },
+          "snapshot_id": {
+            "type": "string",
+            "description": "Current snapshot id (Iceberg, Paimon)"
+          },
+          "num_files": {
+            "type": "integer",
+            "description": "Number of live data files"
+          },
+          "partition_columns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Partition column names"
+          },
+          "history_length": {
+            "type": "integer",
+            "description": "Number of commits in the table history (Delta)"
+          },
+          "hudi_table_type": {
+            "type": "string",
+            "description": "Hudi table type (COPY_ON_WRITE or MERGE_ON_READ)"
+          }
+        }
       },
       "comments": {
         "type": "object",
@@ -318,6 +371,105 @@
       }
     },
     "sources": {
+      "REDSHIFT": {
+        "table": {
+          "use": [
+            "tabularTable"
+          ],
+          "properties": {
+            "object_type": {
+              "type": "string",
+              "description": "Source object type"
+            },
+            "location": {
+              "type": "string",
+              "description": "External table location (Spectrum)"
+            }
+          }
+        }
+      },
+      "BIGQUERY": {
+        "table": {
+          "use": [
+            "tabularTable"
+          ],
+          "properties": {
+            "object_type": {
+              "type": "string",
+              "description": "Source object type"
+            },
+            "location": {
+              "type": "string",
+              "description": "External data location (BigLake, external tables)"
+            }
+          }
+        }
+      },
+      "ATHENA": {
+        "table": {
+          "use": [
+            "tabularTable"
+          ],
+          "properties": {
+            "object_type": {
+              "type": "string",
+              "description": "Source object type"
+            },
+            "location": {
+              "type": "string",
+              "description": "Table location in S3"
+            }
+          }
+        }
+      },
+      "TRINO": {
+        "table": {
+          "use": [
+            "tabularTable"
+          ],
+          "properties": {
+            "object_type": {
+              "type": "string",
+              "description": "Source object type"
+            },
+            "connector": {
+              "type": "string",
+              "description": "Trino connector behind the catalog (iceberg, delta_lake, hive, ...)"
+            }
+          }
+        }
+      },
+      "DUCKLAKE": {
+        "table": {
+          "use": [
+            "tabularTable",
+            "lakehouseTable"
+          ],
+          "properties": {}
+        }
+      },
+      "ICEBERG_REST": {
+        "table": {
+          "use": [
+            "tabularTable",
+            "lakehouseTable"
+          ],
+          "properties": {
+            "namespace": {
+              "type": "string",
+              "description": "Iceberg namespace"
+            },
+            "location": {
+              "type": "string",
+              "description": "Table location in storage"
+            },
+            "catalog_uri": {
+              "type": "string",
+              "description": "Catalog the table was found in"
+            }
+          }
+        }
+      },
       "SANDBOX": {
         "file": {
           "use": [
@@ -471,6 +623,28 @@
         }
       },
       "S3_COMPATIBLE_STORAGE": {
+        "table": {
+          "use": [
+            "file",
+            "tabularTable",
+            "lakehouseTable"
+          ],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Storage provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "Table root key"
+            }
+          },
+          "required": [
+            "provider",
+            "object_key",
+            "table_format"
+          ]
+        },
         "file": {
           "use": [
             "file",
@@ -623,6 +797,28 @@
         }
       },
       "LOCAL_FOLDER": {
+        "table": {
+          "use": [
+            "file",
+            "tabularTable",
+            "lakehouseTable"
+          ],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Storage provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "Table root relative to the scanned folder"
+            }
+          },
+          "required": [
+            "provider",
+            "object_key",
+            "table_format"
+          ]
+        },
         "file": {
           "use": [
             "file",
@@ -783,6 +979,28 @@
         }
       },
       "AZURE_BLOB_STORAGE": {
+        "table": {
+          "use": [
+            "file",
+            "tabularTable",
+            "lakehouseTable"
+          ],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Storage provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "Table root path in the container"
+            }
+          },
+          "required": [
+            "provider",
+            "object_key",
+            "table_format"
+          ]
+        },
         "file": {
           "use": [
             "file",
@@ -935,6 +1153,28 @@
         }
       },
       "GOOGLE_CLOUD_STORAGE": {
+        "table": {
+          "use": [
+            "file",
+            "tabularTable",
+            "lakehouseTable"
+          ],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Storage provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "Table root key"
+            }
+          },
+          "required": [
+            "provider",
+            "object_key",
+            "table_format"
+          ]
+        },
         "file": {
           "use": [
             "file",
@@ -2355,63 +2595,6 @@
           ]
         }
       },
-      "DELTA_LAKE": {
-        "table": {
-          "use": [
-            "tabularTable"
-          ],
-          "properties": {
-            "format_version": {
-              "type": "integer",
-              "description": "Delta protocol/reader version"
-            },
-            "num_files": {
-              "type": "integer",
-              "description": "Number of data files"
-            },
-            "partition_columns": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "description": "Partition column names"
-            },
-            "history_length": {
-              "type": "integer",
-              "description": "Number of commits in the table history"
-            }
-          }
-        }
-      },
-      "ICEBERG": {
-        "table": {
-          "use": [
-            "tabularTable"
-          ],
-          "properties": {
-            "format_version": {
-              "type": "integer",
-              "description": "Iceberg format version"
-            },
-            "snapshot_id": {
-              "type": "string",
-              "description": "Current snapshot id"
-            },
-            "partition_spec": {
-              "type": "string",
-              "description": "Partition spec summary"
-            },
-            "sort_order": {
-              "type": "string",
-              "description": "Sort order summary"
-            },
-            "num_files": {
-              "type": "integer",
-              "description": "Number of data files in the current snapshot"
-            }
-          }
-        }
-      },
       "KAFKA": {
         "topic": {
           "properties": {
@@ -3807,8 +3990,6 @@
         "EMAIL",
         "YOUTUBE",
         "REDDIT",
-        "DELTA_LAKE",
-        "ICEBERG",
         "KAFKA",
         "ELASTICSEARCH",
         "OPENSEARCH",
@@ -3819,6 +4000,12 @@
         "DROPBOX",
         "HUGGING_FACE",
         "SANDBOX",
+        "REDSHIFT",
+        "BIGQUERY",
+        "ATHENA",
+        "TRINO",
+        "DUCKLAKE",
+        "ICEBERG_REST",
         "GIT",
         "CUSTOM"
       ],
@@ -5415,6 +5602,14 @@
         "gcp_credentials_json": {
           "type": "string",
           "description": "Google service account credentials JSON as inline string"
+        },
+        "gcs_hmac_key_id": {
+          "type": "string",
+          "description": "HMAC access key for reading Delta Lake and Iceberg tables in the bucket (Cloud Storage > Settings > Interoperability). Files and other table formats use the service account."
+        },
+        "gcs_hmac_secret": {
+          "type": "string",
+          "description": "HMAC secret paired with gcs_hmac_key_id"
         }
       },
       "additionalProperties": false
@@ -10117,197 +10312,6 @@
       "default": "PLAIN",
       "description": "SASL mechanism used when security_protocol is SASL_*"
     },
-    "DeltaLakeRequired": {
-      "title": "DeltaLakeRequired",
-      "label": "Delta Lake Settings",
-      "type": "object",
-      "properties": {
-        "bucket": {
-          "type": "string",
-          "description": "Bucket holding the tables \u2014 AWS S3, MinIO, Cloudflare R2, Backblaze B2, Garage, and other S3-compatible endpoints"
-        }
-      },
-      "required": [
-        "bucket"
-      ],
-      "additionalProperties": false
-    },
-    "DeltaLakeOptionalScope": {
-      "title": "DeltaLakeOptionalScope",
-      "label": "Delta Lake Scope",
-      "type": "object",
-      "description": "Delta Lake table selection scope within the bucket.",
-      "properties": {
-        "prefix": {
-          "type": "string",
-          "description": "Key prefix to search for Delta Lake tables (e.g. warehouse/). Tables are auto-discovered by their _delta_log/ directory."
-        },
-        "table_paths": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Explicit Delta Lake table root keys or s3:// URIs. When set, auto-discovery under prefix is skipped."
-        },
-        "table_limit": {
-          "type": "integer",
-          "minimum": 1,
-          "description": "Optional cap on number of table assets"
-        }
-      },
-      "additionalProperties": false
-    },
-    "DeltaLakeOptional": {
-      "title": "DeltaLakeOptional",
-      "label": "Delta Lake Options",
-      "type": "object",
-      "properties": {
-        "connection": {
-          "$ref": "#/definitions/LakehouseStorageConnection"
-        },
-        "scope": {
-          "$ref": "#/definitions/DeltaLakeOptionalScope"
-        }
-      },
-      "additionalProperties": false
-    },
-    "DeltaLakeInput": {
-      "title": "DeltaLakeInput",
-      "label": "Delta Lake",
-      "allOf": [
-        {
-          "$ref": "#/definitions/CoreInput"
-        },
-        {
-          "type": "object",
-          "properties": {
-            "type": {
-              "const": "DELTA_LAKE"
-            },
-            "required": {
-              "$ref": "#/definitions/DeltaLakeRequired"
-            },
-            "masked": {
-              "$ref": "#/definitions/S3CompatibleStorageMasked"
-            },
-            "optional": {
-              "$ref": "#/definitions/DeltaLakeOptional"
-            },
-            "detectors": {
-              "$ref": "#/definitions/Detectors"
-            },
-            "custom_detectors": {
-              "$ref": "#/definitions/CustomDetectorSelections"
-            },
-            "sampling": {
-              "$ref": "#/definitions/SamplingConfig"
-            },
-            "scan_cache": {
-              "$ref": "#/definitions/ScanCacheConfig"
-            },
-            "resources": {
-              "$ref": "#/definitions/ResourceOverrides"
-            },
-            "cleanup_removed_detector_findings": {
-              "type": "boolean",
-              "default": true,
-              "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
-            },
-            "augmentation": {
-              "$ref": "#/definitions/AugmentationConfig"
-            }
-          },
-          "required": [
-            "required",
-            "sampling"
-          ],
-          "additionalProperties": false
-        }
-      ]
-    },
-    "IcebergRequired": {
-      "title": "IcebergRequired",
-      "label": "Apache Iceberg Settings",
-      "type": "object",
-      "properties": {
-        "bucket": {
-          "type": "string",
-          "description": "Bucket holding the tables \u2014 AWS S3, MinIO, Cloudflare R2, Backblaze B2, Garage, and other S3-compatible endpoints"
-        }
-      },
-      "required": [
-        "bucket"
-      ],
-      "additionalProperties": false
-    },
-    "IcebergOptional": {
-      "title": "IcebergOptional",
-      "label": "Apache Iceberg Options",
-      "type": "object",
-      "properties": {
-        "connection": {
-          "$ref": "#/definitions/LakehouseStorageConnection"
-        },
-        "scope": {
-          "$ref": "#/definitions/IcebergOptionalScope"
-        }
-      },
-      "additionalProperties": false
-    },
-    "IcebergInput": {
-      "title": "IcebergInput",
-      "label": "Apache Iceberg",
-      "allOf": [
-        {
-          "$ref": "#/definitions/CoreInput"
-        },
-        {
-          "type": "object",
-          "properties": {
-            "type": {
-              "const": "ICEBERG"
-            },
-            "required": {
-              "$ref": "#/definitions/IcebergRequired"
-            },
-            "masked": {
-              "$ref": "#/definitions/S3CompatibleStorageMasked"
-            },
-            "optional": {
-              "$ref": "#/definitions/IcebergOptional"
-            },
-            "detectors": {
-              "$ref": "#/definitions/Detectors"
-            },
-            "custom_detectors": {
-              "$ref": "#/definitions/CustomDetectorSelections"
-            },
-            "sampling": {
-              "$ref": "#/definitions/SamplingConfig"
-            },
-            "scan_cache": {
-              "$ref": "#/definitions/ScanCacheConfig"
-            },
-            "resources": {
-              "$ref": "#/definitions/ResourceOverrides"
-            },
-            "cleanup_removed_detector_findings": {
-              "type": "boolean",
-              "default": true,
-              "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
-            },
-            "augmentation": {
-              "$ref": "#/definitions/AugmentationConfig"
-            }
-          },
-          "required": [
-            "required",
-            "sampling"
-          ],
-          "additionalProperties": false
-        }
-      ]
-    },
     "KafkaRequiredNone": {
       "title": "No Authentication",
       "type": "object",
@@ -11210,31 +11214,6 @@
           "type": "boolean",
           "default": true,
           "description": "TLS certificate verification toggle"
-        }
-      },
-      "additionalProperties": false
-    },
-    "IcebergOptionalScope": {
-      "title": "IcebergOptionalScope",
-      "label": "Apache Iceberg Scope",
-      "type": "object",
-      "description": "Apache Iceberg table selection scope within the bucket.",
-      "properties": {
-        "prefix": {
-          "type": "string",
-          "description": "Key prefix to search for Apache Iceberg tables (e.g. warehouse/). Tables are auto-discovered by their metadata/ directory."
-        },
-        "table_paths": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Explicit Apache Iceberg table root keys or s3:// URIs. When set, auto-discovery under prefix is skipped."
-        },
-        "table_limit": {
-          "type": "integer",
-          "minimum": 1,
-          "description": "Optional cap on number of table assets"
         }
       },
       "additionalProperties": false
@@ -13292,6 +13271,1256 @@
         }
       },
       "additionalProperties": false
+    },
+    "IcebergRestRequired": {
+      "title": "IcebergRestRequired",
+      "label": "Iceberg REST Catalog",
+      "type": "object",
+      "properties": {
+        "catalog_uri": {
+          "type": "string",
+          "description": "Base URL of the catalog's REST API, e.g. https://polaris.example.com/api/catalog, https://<workspace>/api/2.1/unity-catalog/iceberg-rest, https://glue.eu-west-1.amazonaws.com/iceberg",
+          "format": "uri"
+        },
+        "auth_mode": {
+          "type": "string",
+          "enum": [
+            "oauth2",
+            "token",
+            "sigv4",
+            "google",
+            "none"
+          ],
+          "default": "oauth2",
+          "description": "How to sign in: OAuth2 client credentials (Polaris, Snowflake Open Catalog, Lakekeeper, Gravitino), a bearer token (Unity Catalog, Nessie), AWS SigV4 (S3 Tables, Glue), Google credentials (BigLake metastore) or none (a catalog without auth)"
+        }
+      },
+      "required": [
+        "catalog_uri",
+        "auth_mode"
+      ],
+      "additionalProperties": false
+    },
+    "IcebergRestMasked": {
+      "title": "IcebergRestMasked",
+      "label": "Iceberg REST Credentials",
+      "type": "object",
+      "description": "Only the fields of the chosen auth_mode are used. Storage keys are needed only when the catalog does not hand out credentials for its tables' files.",
+      "properties": {
+        "client_id": {
+          "type": "string",
+          "description": "OAuth2 client id (auth_mode oauth2)"
+        },
+        "client_secret": {
+          "type": "string",
+          "description": "OAuth2 client secret (auth_mode oauth2)"
+        },
+        "token": {
+          "type": "string",
+          "description": "Bearer token (auth_mode token)"
+        },
+        "aws_access_key_id": {
+          "type": "string",
+          "description": "AWS access key for SigV4 (auth_mode sigv4); empty uses the ambient AWS credentials"
+        },
+        "aws_secret_access_key": {
+          "type": "string",
+          "description": "AWS secret key for SigV4"
+        },
+        "aws_session_token": {
+          "type": "string",
+          "description": "AWS session token for SigV4"
+        },
+        "gcp_credentials_json": {
+          "type": "string",
+          "description": "Google service account JSON (auth_mode google); empty uses application default credentials"
+        },
+        "storage_access_key_id": {
+          "type": "string",
+          "description": "S3 access key for table data, when the catalog does not vend credentials"
+        },
+        "storage_secret_access_key": {
+          "type": "string",
+          "description": "S3 secret key for table data"
+        },
+        "storage_azure_connection_string": {
+          "type": "string",
+          "description": "Azure connection string for table data, when the catalog does not vend credentials"
+        }
+      },
+      "additionalProperties": false
+    },
+    "IcebergRestOptionalConnection": {
+      "title": "IcebergRestOptionalConnection",
+      "label": "Iceberg REST Connection",
+      "type": "object",
+      "properties": {
+        "warehouse": {
+          "type": "string",
+          "description": "Warehouse or catalog name the catalog expects (Polaris catalog, Lakekeeper warehouse, Unity catalog, S3 Tables bucket ARN, Glue account id)"
+        },
+        "oauth2_server_uri": {
+          "type": "string",
+          "description": "OAuth2 token endpoint, when it is not <catalog_uri>/v1/oauth/tokens",
+          "format": "uri"
+        },
+        "oauth2_scope": {
+          "type": "string",
+          "description": "OAuth2 scope to request (Polaris and Open Catalog: PRINCIPAL_ROLE:ALL)"
+        },
+        "sigv4_region": {
+          "type": "string",
+          "description": "AWS region for SigV4 signing"
+        },
+        "sigv4_service": {
+          "type": "string",
+          "enum": [
+            "glue",
+            "s3tables",
+            "execute-api"
+          ],
+          "default": "glue",
+          "description": "AWS service name to sign for"
+        },
+        "access_delegation": {
+          "type": "string",
+          "enum": [
+            "vended-credentials",
+            "none"
+          ],
+          "default": "vended-credentials",
+          "description": "Ask the catalog for credentials to read each table's files"
+        },
+        "storage_s3_endpoint": {
+          "type": "string",
+          "description": "S3 endpoint for table data when it is not AWS (MinIO, R2, ...)"
+        },
+        "storage_s3_region": {
+          "type": "string",
+          "description": "S3 region for table data"
+        },
+        "verify_ssl": {
+          "type": "boolean",
+          "default": true,
+          "description": "Verify the catalog's TLS certificate"
+        },
+        "request_timeout_seconds": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 600,
+          "default": 60,
+          "description": "Timeout for one catalog request"
+        }
+      },
+      "additionalProperties": false
+    },
+    "IcebergRestOptionalScope": {
+      "title": "IcebergRestOptionalScope",
+      "label": "Iceberg REST Scope",
+      "type": "object",
+      "properties": {
+        "include_namespaces": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Only these namespaces (dot-separated for nested namespaces)"
+        },
+        "exclude_namespaces": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Skip these namespaces"
+        },
+        "include_objects": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Only these tables (namespace.table)"
+        },
+        "include_views": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include Iceberg views"
+        },
+        "table_limit": {
+          "type": "integer",
+          "description": "Maximum number of tables to scan per run",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "IcebergRestOptional": {
+      "title": "IcebergRestOptional",
+      "label": "Iceberg REST Catalog Options",
+      "type": "object",
+      "properties": {
+        "connection": {
+          "$ref": "#/definitions/IcebergRestOptionalConnection"
+        },
+        "scope": {
+          "$ref": "#/definitions/IcebergRestOptionalScope"
+        }
+      },
+      "additionalProperties": false
+    },
+    "IcebergRestInput": {
+      "title": "IcebergRestInput",
+      "label": "Iceberg REST Catalog",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "ICEBERG_REST"
+            },
+            "required": {
+              "$ref": "#/definitions/IcebergRestRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/IcebergRestMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/IcebergRestOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
+            },
+            "cleanup_removed_detector_findings": {
+              "type": "boolean",
+              "default": true,
+              "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
+            }
+          },
+          "required": [
+            "required",
+            "masked",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "DuckLakeRequired": {
+      "title": "DuckLakeRequired",
+      "label": "DuckLake",
+      "type": "object",
+      "properties": {
+        "catalog": {
+          "type": "string",
+          "description": "DuckLake metadata catalog: postgres:dbname=lake host=db.example.com user=reader, mysql:..., sqlite:/path/meta.sqlite, or a DuckDB file path"
+        }
+      },
+      "required": [
+        "catalog"
+      ],
+      "additionalProperties": false
+    },
+    "DuckLakeMasked": {
+      "title": "DuckLakeMasked",
+      "label": "DuckLake Credentials",
+      "type": "object",
+      "properties": {
+        "catalog_password": {
+          "type": "string",
+          "description": "Password for a Postgres or MySQL metadata catalog"
+        },
+        "s3_access_key_id": {
+          "type": "string",
+          "description": "S3 access key for the data files"
+        },
+        "s3_secret_access_key": {
+          "type": "string",
+          "description": "S3 secret key for the data files"
+        },
+        "s3_session_token": {
+          "type": "string",
+          "description": "S3 session token"
+        },
+        "azure_connection_string": {
+          "type": "string",
+          "description": "Azure connection string for the data files"
+        },
+        "gcs_hmac_key_id": {
+          "type": "string",
+          "description": "GCS HMAC key for the data files"
+        },
+        "gcs_hmac_secret": {
+          "type": "string",
+          "description": "GCS HMAC secret"
+        }
+      },
+      "additionalProperties": false
+    },
+    "DuckLakeOptionalConnection": {
+      "title": "DuckLakeOptionalConnection",
+      "label": "DuckLake Connection",
+      "type": "object",
+      "properties": {
+        "data_path": {
+          "type": "string",
+          "description": "Where the data files are, when it differs from what the catalog recorded"
+        },
+        "metadata_schema": {
+          "type": "string",
+          "description": "Schema of the metadata tables in a Postgres or MySQL catalog"
+        },
+        "s3_endpoint_url": {
+          "type": "string",
+          "description": "S3 endpoint when it is not AWS (MinIO, R2, ...)"
+        },
+        "s3_region": {
+          "type": "string",
+          "description": "S3 region"
+        }
+      },
+      "additionalProperties": false
+    },
+    "DuckLakeOptionalScope": {
+      "title": "DuckLakeOptionalScope",
+      "label": "DuckLake Scope",
+      "type": "object",
+      "properties": {
+        "include_schemas": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Only these schemas"
+        },
+        "exclude_schemas": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Skip these schemas"
+        },
+        "include_objects": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Only these tables (schema.table)"
+        },
+        "table_limit": {
+          "type": "integer",
+          "description": "Maximum number of tables to scan per run",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "DuckLakeOptional": {
+      "title": "DuckLakeOptional",
+      "label": "DuckLake Options",
+      "type": "object",
+      "properties": {
+        "connection": {
+          "$ref": "#/definitions/DuckLakeOptionalConnection"
+        },
+        "scope": {
+          "$ref": "#/definitions/DuckLakeOptionalScope"
+        }
+      },
+      "additionalProperties": false
+    },
+    "DuckLakeInput": {
+      "title": "DuckLakeInput",
+      "label": "DuckLake",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "DUCKLAKE"
+            },
+            "required": {
+              "$ref": "#/definitions/DuckLakeRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/DuckLakeMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/DuckLakeOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
+            },
+            "cleanup_removed_detector_findings": {
+              "type": "boolean",
+              "default": true,
+              "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
+            }
+          },
+          "required": [
+            "required",
+            "masked",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "TrinoRequired": {
+      "title": "TrinoRequired",
+      "label": "Trino",
+      "type": "object",
+      "properties": {
+        "host": {
+          "type": "string",
+          "description": "Coordinator host (Starburst Galaxy: <account>-<cluster>.trino.galaxy.starburst.io)"
+        },
+        "port": {
+          "type": "integer",
+          "description": "Coordinator port (443 for Starburst Galaxy)",
+          "default": 8080,
+          "minimum": 1,
+          "maximum": 65535
+        }
+      },
+      "required": [
+        "host",
+        "port"
+      ],
+      "additionalProperties": false
+    },
+    "TrinoMasked": {
+      "title": "TrinoMasked",
+      "label": "Trino Credentials",
+      "type": "object",
+      "properties": {
+        "username": {
+          "type": "string",
+          "description": "User to run queries as"
+        },
+        "password": {
+          "type": "string",
+          "description": "Password (basic authentication over HTTPS)"
+        },
+        "access_token": {
+          "type": "string",
+          "description": "JWT or OAuth access token, instead of a password"
+        }
+      },
+      "required": [
+        "username"
+      ],
+      "additionalProperties": false
+    },
+    "TrinoOptionalConnection": {
+      "title": "TrinoOptionalConnection",
+      "label": "Trino Connection",
+      "type": "object",
+      "properties": {
+        "http_scheme": {
+          "type": "string",
+          "enum": [
+            "https",
+            "http"
+          ],
+          "default": "https",
+          "description": "http only for a local cluster without authentication"
+        },
+        "verify_ssl": {
+          "type": "boolean",
+          "default": true,
+          "description": "Verify the coordinator's TLS certificate"
+        },
+        "request_timeout_seconds": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 3600,
+          "default": 120,
+          "description": "Timeout for one query"
+        }
+      },
+      "additionalProperties": false
+    },
+    "TrinoOptionalScope": {
+      "title": "TrinoOptionalScope",
+      "label": "Trino Scope",
+      "type": "object",
+      "properties": {
+        "include_catalogs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Only these catalogs"
+        },
+        "exclude_catalogs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Skip these catalogs (system is always skipped)"
+        },
+        "include_schemas": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Only these schemas"
+        },
+        "exclude_schemas": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Skip these schemas"
+        },
+        "include_tables": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include tables"
+        },
+        "include_views": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include views"
+        },
+        "include_objects": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Only these objects (schema.table, or catalog.schema.table)"
+        },
+        "table_limit": {
+          "type": "integer",
+          "description": "Maximum number of tables to scan per run",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "TrinoOptionalExtraction": {
+      "title": "TrinoOptionalExtraction",
+      "label": "Trino Extraction",
+      "type": "object",
+      "properties": {
+        "include_view_lineage": {
+          "type": "boolean",
+          "default": true,
+          "description": "Read view definitions and record what each view selects from"
+        }
+      },
+      "additionalProperties": false
+    },
+    "TrinoOptional": {
+      "title": "TrinoOptional",
+      "label": "Trino / Starburst Options",
+      "type": "object",
+      "properties": {
+        "connection": {
+          "$ref": "#/definitions/TrinoOptionalConnection"
+        },
+        "scope": {
+          "$ref": "#/definitions/TrinoOptionalScope"
+        },
+        "extraction": {
+          "$ref": "#/definitions/TrinoOptionalExtraction"
+        }
+      },
+      "additionalProperties": false
+    },
+    "TrinoInput": {
+      "title": "TrinoInput",
+      "label": "Trino / Starburst",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "TRINO"
+            },
+            "required": {
+              "$ref": "#/definitions/TrinoRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/TrinoMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/TrinoOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
+            },
+            "cleanup_removed_detector_findings": {
+              "type": "boolean",
+              "default": true,
+              "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
+            }
+          },
+          "required": [
+            "required",
+            "masked",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "AthenaRequired": {
+      "title": "AthenaRequired",
+      "label": "Amazon Athena",
+      "type": "object",
+      "properties": {
+        "region": {
+          "type": "string",
+          "description": "AWS region, e.g. eu-west-1"
+        },
+        "s3_staging_dir": {
+          "type": "string",
+          "description": "S3 location Athena writes query results to, e.g. s3://athena-results-bucket/classifyre/"
+        }
+      },
+      "required": [
+        "region",
+        "s3_staging_dir"
+      ],
+      "additionalProperties": false
+    },
+    "AthenaMasked": {
+      "title": "AthenaMasked",
+      "label": "AWS Credentials",
+      "type": "object",
+      "description": "Leave empty to use the scanning environment's AWS credentials (instance role, IRSA).",
+      "properties": {
+        "aws_access_key_id": {
+          "type": "string",
+          "description": "AWS access key; empty uses the ambient AWS credentials"
+        },
+        "aws_secret_access_key": {
+          "type": "string",
+          "description": "AWS secret key"
+        },
+        "aws_session_token": {
+          "type": "string",
+          "description": "AWS session token"
+        }
+      },
+      "additionalProperties": false
+    },
+    "AthenaOptionalConnection": {
+      "title": "AthenaOptionalConnection",
+      "label": "Athena Connection",
+      "type": "object",
+      "properties": {
+        "work_group": {
+          "type": "string",
+          "description": "Athena workgroup",
+          "default": "primary"
+        },
+        "catalog_name": {
+          "type": "string",
+          "description": "Data catalog to scan",
+          "default": "AwsDataCatalog"
+        },
+        "request_timeout_seconds": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 3600,
+          "default": 300,
+          "description": "Timeout for one query"
+        }
+      },
+      "additionalProperties": false
+    },
+    "AthenaOptionalScope": {
+      "title": "AthenaOptionalScope",
+      "label": "Athena Scope",
+      "type": "object",
+      "properties": {
+        "include_databases": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Only these Glue databases"
+        },
+        "exclude_databases": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Skip these Glue databases"
+        },
+        "include_tables": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include tables"
+        },
+        "include_views": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include views"
+        },
+        "include_objects": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Only these objects (schema.table, or catalog.schema.table)"
+        },
+        "table_limit": {
+          "type": "integer",
+          "description": "Maximum number of tables to scan per run",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "AthenaOptionalExtraction": {
+      "title": "AthenaOptionalExtraction",
+      "label": "Athena Extraction",
+      "type": "object",
+      "properties": {
+        "include_view_lineage": {
+          "type": "boolean",
+          "default": true,
+          "description": "Read view definitions and record what each view selects from"
+        }
+      },
+      "additionalProperties": false
+    },
+    "AthenaOptional": {
+      "title": "AthenaOptional",
+      "label": "Amazon Athena Options",
+      "type": "object",
+      "properties": {
+        "connection": {
+          "$ref": "#/definitions/AthenaOptionalConnection"
+        },
+        "scope": {
+          "$ref": "#/definitions/AthenaOptionalScope"
+        },
+        "extraction": {
+          "$ref": "#/definitions/AthenaOptionalExtraction"
+        }
+      },
+      "additionalProperties": false
+    },
+    "AthenaInput": {
+      "title": "AthenaInput",
+      "label": "Amazon Athena",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "ATHENA"
+            },
+            "required": {
+              "$ref": "#/definitions/AthenaRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/AthenaMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/AthenaOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
+            },
+            "cleanup_removed_detector_findings": {
+              "type": "boolean",
+              "default": true,
+              "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
+            }
+          },
+          "required": [
+            "required",
+            "masked",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "BigQueryRequired": {
+      "title": "BigQueryRequired",
+      "label": "Google BigQuery",
+      "type": "object",
+      "properties": {
+        "project_id": {
+          "type": "string",
+          "description": "Project whose datasets are scanned"
+        }
+      },
+      "required": [
+        "project_id"
+      ],
+      "additionalProperties": false
+    },
+    "BigQueryMasked": {
+      "title": "BigQueryMasked",
+      "label": "Google Credentials",
+      "type": "object",
+      "properties": {
+        "gcp_credentials_json": {
+          "type": "string",
+          "description": "Service account JSON; empty uses application default credentials"
+        }
+      },
+      "additionalProperties": false
+    },
+    "BigQueryOptionalConnection": {
+      "title": "BigQueryOptionalConnection",
+      "label": "BigQuery Connection",
+      "type": "object",
+      "properties": {
+        "billing_project_id": {
+          "type": "string",
+          "description": "Project billed for queries, when it differs from project_id"
+        },
+        "location": {
+          "type": "string",
+          "description": "Dataset location, e.g. EU or europe-west4"
+        },
+        "maximum_bytes_billed": {
+          "type": "integer",
+          "description": "Refuse any query that would bill more bytes than this",
+          "minimum": 1
+        },
+        "request_timeout_seconds": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 3600,
+          "default": 300,
+          "description": "Timeout for one request"
+        }
+      },
+      "additionalProperties": false
+    },
+    "BigQueryOptionalScope": {
+      "title": "BigQueryOptionalScope",
+      "label": "BigQuery Scope",
+      "type": "object",
+      "properties": {
+        "include_datasets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Only these datasets"
+        },
+        "exclude_datasets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Skip these datasets"
+        },
+        "include_tables": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include tables"
+        },
+        "include_views": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include views"
+        },
+        "include_objects": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Only these objects (schema.table, or catalog.schema.table)"
+        },
+        "table_limit": {
+          "type": "integer",
+          "description": "Maximum number of tables to scan per run",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "BigQueryOptionalExtraction": {
+      "title": "BigQueryOptionalExtraction",
+      "label": "BigQuery Extraction",
+      "type": "object",
+      "properties": {
+        "include_view_lineage": {
+          "type": "boolean",
+          "default": true,
+          "description": "Read view definitions and record what each view selects from"
+        }
+      },
+      "additionalProperties": false
+    },
+    "BigQueryOptional": {
+      "title": "BigQueryOptional",
+      "label": "Google BigQuery Options",
+      "type": "object",
+      "properties": {
+        "connection": {
+          "$ref": "#/definitions/BigQueryOptionalConnection"
+        },
+        "scope": {
+          "$ref": "#/definitions/BigQueryOptionalScope"
+        },
+        "extraction": {
+          "$ref": "#/definitions/BigQueryOptionalExtraction"
+        }
+      },
+      "additionalProperties": false
+    },
+    "BigQueryInput": {
+      "title": "BigQueryInput",
+      "label": "Google BigQuery",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "BIGQUERY"
+            },
+            "required": {
+              "$ref": "#/definitions/BigQueryRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/BigQueryMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/BigQueryOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
+            },
+            "cleanup_removed_detector_findings": {
+              "type": "boolean",
+              "default": true,
+              "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
+            }
+          },
+          "required": [
+            "required",
+            "masked",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "RedshiftRequired": {
+      "title": "RedshiftRequired",
+      "label": "Amazon Redshift",
+      "type": "object",
+      "properties": {
+        "host": {
+          "type": "string",
+          "description": "Cluster or workgroup endpoint host"
+        },
+        "port": {
+          "type": "integer",
+          "description": "Port",
+          "default": 5439,
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "database": {
+          "type": "string",
+          "description": "Database to connect to"
+        }
+      },
+      "required": [
+        "host",
+        "port",
+        "database"
+      ],
+      "additionalProperties": false
+    },
+    "RedshiftMasked": {
+      "title": "RedshiftMasked",
+      "label": "Redshift Credentials",
+      "type": "object",
+      "properties": {
+        "username": {
+          "type": "string",
+          "description": "Database user (password sign-in), or the user to fetch IAM credentials for"
+        },
+        "password": {
+          "type": "string",
+          "description": "Database password; empty signs in with IAM"
+        },
+        "aws_access_key_id": {
+          "type": "string",
+          "description": "AWS access key for IAM sign-in; empty uses the ambient AWS credentials"
+        },
+        "aws_secret_access_key": {
+          "type": "string",
+          "description": "AWS secret key for IAM sign-in"
+        },
+        "aws_session_token": {
+          "type": "string",
+          "description": "AWS session token"
+        }
+      },
+      "required": [
+        "username"
+      ],
+      "additionalProperties": false
+    },
+    "RedshiftOptionalConnection": {
+      "title": "RedshiftOptionalConnection",
+      "label": "Redshift Connection",
+      "type": "object",
+      "properties": {
+        "region": {
+          "type": "string",
+          "description": "AWS region, for IAM sign-in"
+        },
+        "cluster_identifier": {
+          "type": "string",
+          "description": "Provisioned cluster id, for IAM sign-in"
+        },
+        "workgroup_name": {
+          "type": "string",
+          "description": "Serverless workgroup, for IAM sign-in"
+        },
+        "ssl": {
+          "type": "boolean",
+          "default": true,
+          "description": "Connect over TLS"
+        },
+        "connect_timeout_seconds": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 300,
+          "default": 30,
+          "description": "Connection timeout"
+        }
+      },
+      "additionalProperties": false
+    },
+    "RedshiftOptionalScope": {
+      "title": "RedshiftOptionalScope",
+      "label": "Redshift Scope",
+      "type": "object",
+      "properties": {
+        "include_schemas": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Only these schemas"
+        },
+        "exclude_schemas": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Skip these schemas (pg_catalog and information_schema are always skipped)"
+        },
+        "include_external_schemas": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include Redshift Spectrum external schemas (lakehouse tables in S3)"
+        },
+        "include_tables": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include tables"
+        },
+        "include_views": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include views"
+        },
+        "include_objects": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Only these objects (schema.table, or catalog.schema.table)"
+        },
+        "table_limit": {
+          "type": "integer",
+          "description": "Maximum number of tables to scan per run",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "RedshiftOptionalExtraction": {
+      "title": "RedshiftOptionalExtraction",
+      "label": "Redshift Extraction",
+      "type": "object",
+      "properties": {
+        "include_view_lineage": {
+          "type": "boolean",
+          "default": true,
+          "description": "Read view definitions and record what each view selects from"
+        }
+      },
+      "additionalProperties": false
+    },
+    "RedshiftOptional": {
+      "title": "RedshiftOptional",
+      "label": "Amazon Redshift Options",
+      "type": "object",
+      "properties": {
+        "connection": {
+          "$ref": "#/definitions/RedshiftOptionalConnection"
+        },
+        "scope": {
+          "$ref": "#/definitions/RedshiftOptionalScope"
+        },
+        "extraction": {
+          "$ref": "#/definitions/RedshiftOptionalExtraction"
+        }
+      },
+      "additionalProperties": false
+    },
+    "RedshiftInput": {
+      "title": "RedshiftInput",
+      "label": "Amazon Redshift",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "REDSHIFT"
+            },
+            "required": {
+              "$ref": "#/definitions/RedshiftRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/RedshiftMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/RedshiftOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
+            },
+            "cleanup_removed_detector_findings": {
+              "type": "boolean",
+              "default": true,
+              "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
+            }
+          },
+          "required": [
+            "required",
+            "masked",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
     }
   }
 }

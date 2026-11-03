@@ -48,8 +48,6 @@ class AssetType(StrEnum):
     EMAIL = 'EMAIL'
     YOUTUBE = 'YOUTUBE'
     REDDIT = 'REDDIT'
-    DELTA_LAKE = 'DELTA_LAKE'
-    ICEBERG = 'ICEBERG'
     KAFKA = 'KAFKA'
     ELASTICSEARCH = 'ELASTICSEARCH'
     OPENSEARCH = 'OPENSEARCH'
@@ -60,6 +58,12 @@ class AssetType(StrEnum):
     DROPBOX = 'DROPBOX'
     HUGGING_FACE = 'HUGGING_FACE'
     SANDBOX = 'SANDBOX'
+    REDSHIFT = 'REDSHIFT'
+    BIGQUERY = 'BIGQUERY'
+    ATHENA = 'ATHENA'
+    TRINO = 'TRINO'
+    DUCKLAKE = 'DUCKLAKE'
+    ICEBERG_REST = 'ICEBERG_REST'
     GIT = 'GIT'
     CUSTOM = 'CUSTOM'
 
@@ -382,8 +386,6 @@ class Type(StrEnum):
     EMAIL = 'EMAIL'
     YOUTUBE = 'YOUTUBE'
     REDDIT = 'REDDIT'
-    DELTA_LAKE = 'DELTA_LAKE'
-    ICEBERG = 'ICEBERG'
     KAFKA = 'KAFKA'
     ELASTICSEARCH = 'ELASTICSEARCH'
     OPENSEARCH = 'OPENSEARCH'
@@ -394,6 +396,12 @@ class Type(StrEnum):
     DROPBOX = 'DROPBOX'
     HUGGING_FACE = 'HUGGING_FACE'
     SANDBOX = 'SANDBOX'
+    REDSHIFT = 'REDSHIFT'
+    BIGQUERY = 'BIGQUERY'
+    ATHENA = 'ATHENA'
+    TRINO = 'TRINO'
+    DUCKLAKE = 'DUCKLAKE'
+    ICEBERG_REST = 'ICEBERG_REST'
     GIT = 'GIT'
     CUSTOM = 'CUSTOM'
 
@@ -1219,6 +1227,13 @@ class GoogleCloudStorageMasked(BaseModel):
     )
     gcp_credentials_json: str | None = Field(
         None, description='Google service account credentials JSON as inline string'
+    )
+    gcs_hmac_key_id: str | None = Field(
+        None,
+        description='HMAC access key for reading Delta Lake and Iceberg tables in the bucket (Cloud Storage > Settings > Interoperability). Files and other table formats use the service account.',
+    )
+    gcs_hmac_secret: str | None = Field(
+        None, description='HMAC secret paired with gcs_hmac_key_id'
     )
 
 
@@ -3190,8 +3205,6 @@ class Type23(StrEnum):
     EMAIL = 'EMAIL'
     YOUTUBE = 'YOUTUBE'
     REDDIT = 'REDDIT'
-    DELTA_LAKE = 'DELTA_LAKE'
-    ICEBERG = 'ICEBERG'
     KAFKA = 'KAFKA'
     ELASTICSEARCH = 'ELASTICSEARCH'
     OPENSEARCH = 'OPENSEARCH'
@@ -3202,6 +3215,12 @@ class Type23(StrEnum):
     DROPBOX = 'DROPBOX'
     HUGGING_FACE = 'HUGGING_FACE'
     SANDBOX = 'SANDBOX'
+    REDSHIFT = 'REDSHIFT'
+    BIGQUERY = 'BIGQUERY'
+    ATHENA = 'ATHENA'
+    TRINO = 'TRINO'
+    DUCKLAKE = 'DUCKLAKE'
+    ICEBERG_REST = 'ICEBERG_REST'
     GIT = 'GIT'
     CUSTOM = 'CUSTOM'
 
@@ -3372,47 +3391,6 @@ class KafkaSaslMechanism(StrEnum):
     PLAIN = 'PLAIN'
     SCRAM_SHA_256 = 'SCRAM-SHA-256'
     SCRAM_SHA_512 = 'SCRAM-SHA-512'
-
-
-class DeltaLakeRequired(BaseModel):
-    model_config = ConfigDict(
-        extra='forbid',
-    )
-    bucket: str = Field(
-        ...,
-        description='Bucket holding the tables — AWS S3, MinIO, Cloudflare R2, Backblaze B2, Garage, and other S3-compatible endpoints',
-    )
-
-
-class DeltaLakeOptionalScope(BaseModel):
-    """
-    Delta Lake table selection scope within the bucket.
-    """
-
-    model_config = ConfigDict(
-        extra='forbid',
-    )
-    prefix: str | None = Field(
-        None,
-        description='Key prefix to search for Delta Lake tables (e.g. warehouse/). Tables are auto-discovered by their _delta_log/ directory.',
-    )
-    table_paths: list[str] | None = Field(
-        None,
-        description='Explicit Delta Lake table root keys or s3:// URIs. When set, auto-discovery under prefix is skipped.',
-    )
-    table_limit: int | None = Field(
-        None, description='Optional cap on number of table assets', ge=1
-    )
-
-
-class IcebergRequired(BaseModel):
-    model_config = ConfigDict(
-        extra='forbid',
-    )
-    bucket: str = Field(
-        ...,
-        description='Bucket holding the tables — AWS S3, MinIO, Cloudflare R2, Backblaze B2, Garage, and other S3-compatible endpoints',
-    )
 
 
 class NoAuthentication(BaseModel):
@@ -3779,27 +3757,6 @@ class LakehouseStorageConnection(BaseModel):
     )
     verify_ssl: bool | None = Field(
         True, description='TLS certificate verification toggle'
-    )
-
-
-class IcebergOptionalScope(BaseModel):
-    """
-    Apache Iceberg table selection scope within the bucket.
-    """
-
-    model_config = ConfigDict(
-        extra='forbid',
-    )
-    prefix: str | None = Field(
-        None,
-        description='Key prefix to search for Apache Iceberg tables (e.g. warehouse/). Tables are auto-discovered by their metadata/ directory.',
-    )
-    table_paths: list[str] | None = Field(
-        None,
-        description='Explicit Apache Iceberg table root keys or s3:// URIs. When set, auto-discovery under prefix is skipped.',
-    )
-    table_limit: int | None = Field(
-        None, description='Optional cap on number of table assets', ge=1
     )
 
 
@@ -4957,6 +4914,551 @@ class AugmentationConfig(BaseModel):
     limits: AugmentationLimits | None = None
 
 
+class AuthMode1(StrEnum):
+    """
+    How to sign in: OAuth2 client credentials (Polaris, Snowflake Open Catalog, Lakekeeper, Gravitino), a bearer token (Unity Catalog, Nessie), AWS SigV4 (S3 Tables, Glue), Google credentials (BigLake metastore) or none (a catalog without auth)
+    """
+
+    oauth2 = 'oauth2'
+    token = 'token'
+    sigv4 = 'sigv4'
+    google = 'google'
+    none = 'none'
+
+
+class IcebergRestRequired(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    catalog_uri: AnyUrl = Field(
+        ...,
+        description="Base URL of the catalog's REST API, e.g. https://polaris.example.com/api/catalog, https://<workspace>/api/2.1/unity-catalog/iceberg-rest, https://glue.eu-west-1.amazonaws.com/iceberg",
+    )
+    auth_mode: AuthMode1 = Field(
+        ...,
+        description='How to sign in: OAuth2 client credentials (Polaris, Snowflake Open Catalog, Lakekeeper, Gravitino), a bearer token (Unity Catalog, Nessie), AWS SigV4 (S3 Tables, Glue), Google credentials (BigLake metastore) or none (a catalog without auth)',
+    )
+
+
+class IcebergRestMasked(BaseModel):
+    """
+    Only the fields of the chosen auth_mode are used. Storage keys are needed only when the catalog does not hand out credentials for its tables' files.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    client_id: str | None = Field(
+        None, description='OAuth2 client id (auth_mode oauth2)'
+    )
+    client_secret: str | None = Field(
+        None, description='OAuth2 client secret (auth_mode oauth2)'
+    )
+    token: str | None = Field(None, description='Bearer token (auth_mode token)')
+    aws_access_key_id: str | None = Field(
+        None,
+        description='AWS access key for SigV4 (auth_mode sigv4); empty uses the ambient AWS credentials',
+    )
+    aws_secret_access_key: str | None = Field(
+        None, description='AWS secret key for SigV4'
+    )
+    aws_session_token: str | None = Field(
+        None, description='AWS session token for SigV4'
+    )
+    gcp_credentials_json: str | None = Field(
+        None,
+        description='Google service account JSON (auth_mode google); empty uses application default credentials',
+    )
+    storage_access_key_id: str | None = Field(
+        None,
+        description='S3 access key for table data, when the catalog does not vend credentials',
+    )
+    storage_secret_access_key: str | None = Field(
+        None, description='S3 secret key for table data'
+    )
+    storage_azure_connection_string: str | None = Field(
+        None,
+        description='Azure connection string for table data, when the catalog does not vend credentials',
+    )
+
+
+class Sigv4Service(StrEnum):
+    """
+    AWS service name to sign for
+    """
+
+    glue = 'glue'
+    s3tables = 's3tables'
+    execute_api = 'execute-api'
+
+
+class AccessDelegation(StrEnum):
+    """
+    Ask the catalog for credentials to read each table's files
+    """
+
+    vended_credentials = 'vended-credentials'
+    none = 'none'
+
+
+class IcebergRestOptionalConnection(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    warehouse: str | None = Field(
+        None,
+        description='Warehouse or catalog name the catalog expects (Polaris catalog, Lakekeeper warehouse, Unity catalog, S3 Tables bucket ARN, Glue account id)',
+    )
+    oauth2_server_uri: AnyUrl | None = Field(
+        None,
+        description='OAuth2 token endpoint, when it is not <catalog_uri>/v1/oauth/tokens',
+    )
+    oauth2_scope: str | None = Field(
+        None,
+        description='OAuth2 scope to request (Polaris and Open Catalog: PRINCIPAL_ROLE:ALL)',
+    )
+    sigv4_region: str | None = Field(None, description='AWS region for SigV4 signing')
+    sigv4_service: Sigv4Service | None = Field(
+        'glue', description='AWS service name to sign for'
+    )
+    access_delegation: AccessDelegation | None = Field(
+        'vended-credentials',
+        description="Ask the catalog for credentials to read each table's files",
+    )
+    storage_s3_endpoint: str | None = Field(
+        None,
+        description='S3 endpoint for table data when it is not AWS (MinIO, R2, ...)',
+    )
+    storage_s3_region: str | None = Field(None, description='S3 region for table data')
+    verify_ssl: bool | None = Field(
+        True, description="Verify the catalog's TLS certificate"
+    )
+    request_timeout_seconds: float | None = Field(
+        60, description='Timeout for one catalog request', ge=1.0, le=600.0
+    )
+
+
+class IcebergRestOptionalScope(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    include_namespaces: list[str] | None = Field(
+        None, description='Only these namespaces (dot-separated for nested namespaces)'
+    )
+    exclude_namespaces: list[str] | None = Field(
+        None, description='Skip these namespaces'
+    )
+    include_objects: list[str] | None = Field(
+        None, description='Only these tables (namespace.table)'
+    )
+    include_views: bool | None = Field(True, description='Include Iceberg views')
+    table_limit: int | None = Field(
+        None, description='Maximum number of tables to scan per run', ge=1
+    )
+
+
+class IcebergRestOptional(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    connection: IcebergRestOptionalConnection | None = None
+    scope: IcebergRestOptionalScope | None = None
+
+
+class DuckLakeRequired(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    catalog: str = Field(
+        ...,
+        description='DuckLake metadata catalog: postgres:dbname=lake host=db.example.com user=reader, mysql:..., sqlite:/path/meta.sqlite, or a DuckDB file path',
+    )
+
+
+class DuckLakeMasked(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    catalog_password: str | None = Field(
+        None, description='Password for a Postgres or MySQL metadata catalog'
+    )
+    s3_access_key_id: str | None = Field(
+        None, description='S3 access key for the data files'
+    )
+    s3_secret_access_key: str | None = Field(
+        None, description='S3 secret key for the data files'
+    )
+    s3_session_token: str | None = Field(None, description='S3 session token')
+    azure_connection_string: str | None = Field(
+        None, description='Azure connection string for the data files'
+    )
+    gcs_hmac_key_id: str | None = Field(
+        None, description='GCS HMAC key for the data files'
+    )
+    gcs_hmac_secret: str | None = Field(None, description='GCS HMAC secret')
+
+
+class DuckLakeOptionalConnection(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    data_path: str | None = Field(
+        None,
+        description='Where the data files are, when it differs from what the catalog recorded',
+    )
+    metadata_schema: str | None = Field(
+        None, description='Schema of the metadata tables in a Postgres or MySQL catalog'
+    )
+    s3_endpoint_url: str | None = Field(
+        None, description='S3 endpoint when it is not AWS (MinIO, R2, ...)'
+    )
+    s3_region: str | None = Field(None, description='S3 region')
+
+
+class DuckLakeOptionalScope(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    include_schemas: list[str] | None = Field(None, description='Only these schemas')
+    exclude_schemas: list[str] | None = Field(None, description='Skip these schemas')
+    include_objects: list[str] | None = Field(
+        None, description='Only these tables (schema.table)'
+    )
+    table_limit: int | None = Field(
+        None, description='Maximum number of tables to scan per run', ge=1
+    )
+
+
+class DuckLakeOptional(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    connection: DuckLakeOptionalConnection | None = None
+    scope: DuckLakeOptionalScope | None = None
+
+
+class TrinoRequired(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    host: str = Field(
+        ...,
+        description='Coordinator host (Starburst Galaxy: <account>-<cluster>.trino.galaxy.starburst.io)',
+    )
+    port: int = Field(
+        ..., description='Coordinator port (443 for Starburst Galaxy)', ge=1, le=65535
+    )
+
+
+class TrinoMasked(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    username: str = Field(..., description='User to run queries as')
+    password: str | None = Field(
+        None, description='Password (basic authentication over HTTPS)'
+    )
+    access_token: str | None = Field(
+        None, description='JWT or OAuth access token, instead of a password'
+    )
+
+
+class HttpScheme(StrEnum):
+    """
+    http only for a local cluster without authentication
+    """
+
+    https = 'https'
+    http = 'http'
+
+
+class TrinoOptionalConnection(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    http_scheme: HttpScheme | None = Field(
+        'https', description='http only for a local cluster without authentication'
+    )
+    verify_ssl: bool | None = Field(
+        True, description="Verify the coordinator's TLS certificate"
+    )
+    request_timeout_seconds: float | None = Field(
+        120, description='Timeout for one query', ge=1.0, le=3600.0
+    )
+
+
+class TrinoOptionalScope(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    include_catalogs: list[str] | None = Field(None, description='Only these catalogs')
+    exclude_catalogs: list[str] | None = Field(
+        None, description='Skip these catalogs (system is always skipped)'
+    )
+    include_schemas: list[str] | None = Field(None, description='Only these schemas')
+    exclude_schemas: list[str] | None = Field(None, description='Skip these schemas')
+    include_tables: bool | None = Field(True, description='Include tables')
+    include_views: bool | None = Field(True, description='Include views')
+    include_objects: list[str] | None = Field(
+        None, description='Only these objects (schema.table, or catalog.schema.table)'
+    )
+    table_limit: int | None = Field(
+        None, description='Maximum number of tables to scan per run', ge=1
+    )
+
+
+class TrinoOptionalExtraction(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    include_view_lineage: bool | None = Field(
+        True, description='Read view definitions and record what each view selects from'
+    )
+
+
+class TrinoOptional(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    connection: TrinoOptionalConnection | None = None
+    scope: TrinoOptionalScope | None = None
+    extraction: TrinoOptionalExtraction | None = None
+
+
+class AthenaRequired(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    region: str = Field(..., description='AWS region, e.g. eu-west-1')
+    s3_staging_dir: str = Field(
+        ...,
+        description='S3 location Athena writes query results to, e.g. s3://athena-results-bucket/classifyre/',
+    )
+
+
+class AthenaMasked(BaseModel):
+    """
+    Leave empty to use the scanning environment's AWS credentials (instance role, IRSA).
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    aws_access_key_id: str | None = Field(
+        None, description='AWS access key; empty uses the ambient AWS credentials'
+    )
+    aws_secret_access_key: str | None = Field(None, description='AWS secret key')
+    aws_session_token: str | None = Field(None, description='AWS session token')
+
+
+class AthenaOptionalConnection(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    work_group: str | None = Field('primary', description='Athena workgroup')
+    catalog_name: str | None = Field(
+        'AwsDataCatalog', description='Data catalog to scan'
+    )
+    request_timeout_seconds: float | None = Field(
+        300, description='Timeout for one query', ge=1.0, le=3600.0
+    )
+
+
+class AthenaOptionalScope(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    include_databases: list[str] | None = Field(
+        None, description='Only these Glue databases'
+    )
+    exclude_databases: list[str] | None = Field(
+        None, description='Skip these Glue databases'
+    )
+    include_tables: bool | None = Field(True, description='Include tables')
+    include_views: bool | None = Field(True, description='Include views')
+    include_objects: list[str] | None = Field(
+        None, description='Only these objects (schema.table, or catalog.schema.table)'
+    )
+    table_limit: int | None = Field(
+        None, description='Maximum number of tables to scan per run', ge=1
+    )
+
+
+class AthenaOptionalExtraction(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    include_view_lineage: bool | None = Field(
+        True, description='Read view definitions and record what each view selects from'
+    )
+
+
+class AthenaOptional(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    connection: AthenaOptionalConnection | None = None
+    scope: AthenaOptionalScope | None = None
+    extraction: AthenaOptionalExtraction | None = None
+
+
+class BigQueryRequired(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    project_id: str = Field(..., description='Project whose datasets are scanned')
+
+
+class BigQueryMasked(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    gcp_credentials_json: str | None = Field(
+        None,
+        description='Service account JSON; empty uses application default credentials',
+    )
+
+
+class BigQueryOptionalConnection(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    billing_project_id: str | None = Field(
+        None, description='Project billed for queries, when it differs from project_id'
+    )
+    location: str | None = Field(
+        None, description='Dataset location, e.g. EU or europe-west4'
+    )
+    maximum_bytes_billed: int | None = Field(
+        None, description='Refuse any query that would bill more bytes than this', ge=1
+    )
+    request_timeout_seconds: float | None = Field(
+        300, description='Timeout for one request', ge=1.0, le=3600.0
+    )
+
+
+class BigQueryOptionalScope(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    include_datasets: list[str] | None = Field(None, description='Only these datasets')
+    exclude_datasets: list[str] | None = Field(None, description='Skip these datasets')
+    include_tables: bool | None = Field(True, description='Include tables')
+    include_views: bool | None = Field(True, description='Include views')
+    include_objects: list[str] | None = Field(
+        None, description='Only these objects (schema.table, or catalog.schema.table)'
+    )
+    table_limit: int | None = Field(
+        None, description='Maximum number of tables to scan per run', ge=1
+    )
+
+
+class BigQueryOptionalExtraction(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    include_view_lineage: bool | None = Field(
+        True, description='Read view definitions and record what each view selects from'
+    )
+
+
+class BigQueryOptional(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    connection: BigQueryOptionalConnection | None = None
+    scope: BigQueryOptionalScope | None = None
+    extraction: BigQueryOptionalExtraction | None = None
+
+
+class RedshiftRequired(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    host: str = Field(..., description='Cluster or workgroup endpoint host')
+    port: int = Field(..., description='Port', ge=1, le=65535)
+    database: str = Field(..., description='Database to connect to')
+
+
+class RedshiftMasked(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    username: str = Field(
+        ...,
+        description='Database user (password sign-in), or the user to fetch IAM credentials for',
+    )
+    password: str | None = Field(
+        None, description='Database password; empty signs in with IAM'
+    )
+    aws_access_key_id: str | None = Field(
+        None,
+        description='AWS access key for IAM sign-in; empty uses the ambient AWS credentials',
+    )
+    aws_secret_access_key: str | None = Field(
+        None, description='AWS secret key for IAM sign-in'
+    )
+    aws_session_token: str | None = Field(None, description='AWS session token')
+
+
+class RedshiftOptionalConnection(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    region: str | None = Field(None, description='AWS region, for IAM sign-in')
+    cluster_identifier: str | None = Field(
+        None, description='Provisioned cluster id, for IAM sign-in'
+    )
+    workgroup_name: str | None = Field(
+        None, description='Serverless workgroup, for IAM sign-in'
+    )
+    ssl: bool | None = Field(True, description='Connect over TLS')
+    connect_timeout_seconds: float | None = Field(
+        30, description='Connection timeout', ge=1.0, le=300.0
+    )
+
+
+class RedshiftOptionalScope(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    include_schemas: list[str] | None = Field(None, description='Only these schemas')
+    exclude_schemas: list[str] | None = Field(
+        None,
+        description='Skip these schemas (pg_catalog and information_schema are always skipped)',
+    )
+    include_external_schemas: bool | None = Field(
+        True,
+        description='Include Redshift Spectrum external schemas (lakehouse tables in S3)',
+    )
+    include_tables: bool | None = Field(True, description='Include tables')
+    include_views: bool | None = Field(True, description='Include views')
+    include_objects: list[str] | None = Field(
+        None, description='Only these objects (schema.table, or catalog.schema.table)'
+    )
+    table_limit: int | None = Field(
+        None, description='Maximum number of tables to scan per run', ge=1
+    )
+
+
+class RedshiftOptionalExtraction(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    include_view_lineage: bool | None = Field(
+        True, description='Read view definitions and record what each view selects from'
+    )
+
+
+class RedshiftOptional(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    connection: RedshiftOptionalConnection | None = None
+    scope: RedshiftOptionalScope | None = None
+    extraction: RedshiftOptionalExtraction | None = None
+
+
 class SlackOptional(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -5653,72 +6155,6 @@ class NotionInput(CoreInput):
     augmentation: AugmentationConfig | None = None
 
 
-class DeltaLakeOptional(BaseModel):
-    model_config = ConfigDict(
-        extra='forbid',
-    )
-    connection: LakehouseStorageConnection | None = None
-    scope: DeltaLakeOptionalScope | None = None
-
-
-class DeltaLakeInput(CoreInput):
-    model_config = ConfigDict(
-        extra='forbid',
-    )
-    type: Literal['DELTA_LAKE'] = Field(..., description='Type of the asset or source')
-    required: DeltaLakeRequired
-    masked: S3CompatibleStorageMasked | None = None
-    optional: DeltaLakeOptional | None = None
-    detectors: list[Detector] | None = Field(
-        None, description='Detectors to run on ingested content'
-    )
-    custom_detectors: list[CustomDetectorSelection] | None = Field(
-        None,
-        description='Reusable custom detector IDs selected from the custom detector catalog.',
-    )
-    sampling: SamplingConfig
-    scan_cache: ScanCacheConfig | None = None
-    resources: ResourceOverrides | None = None
-    cleanup_removed_detector_findings: bool | None = Field(
-        True,
-        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
-    )
-    augmentation: AugmentationConfig | None = None
-
-
-class IcebergOptional(BaseModel):
-    model_config = ConfigDict(
-        extra='forbid',
-    )
-    connection: LakehouseStorageConnection | None = None
-    scope: IcebergOptionalScope | None = None
-
-
-class IcebergInput(CoreInput):
-    model_config = ConfigDict(
-        extra='forbid',
-    )
-    type: Literal['ICEBERG'] = Field(..., description='Type of the asset or source')
-    required: IcebergRequired
-    masked: S3CompatibleStorageMasked | None = None
-    optional: IcebergOptional | None = None
-    detectors: list[Detector] | None = Field(
-        None, description='Detectors to run on ingested content'
-    )
-    custom_detectors: list[CustomDetectorSelection] | None = Field(
-        None,
-        description='Reusable custom detector IDs selected from the custom detector catalog.',
-    )
-    sampling: SamplingConfig
-    scan_cache: ScanCacheConfig | None = None
-    resources: ResourceOverrides | None = None
-    cleanup_removed_detector_findings: bool | None = Field(
-        True,
-        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
-    )
-    augmentation: AugmentationConfig | None = None
-
-
 class KafkaInput(CoreInput):
     model_config = ConfigDict(
         extra='forbid',
@@ -6022,6 +6458,158 @@ class CustomCohortWeights(BaseModel):
     )
 
 
+class IcebergRestInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    type: Literal['ICEBERG_REST'] = Field(
+        ..., description='Type of the asset or source'
+    )
+    required: IcebergRestRequired
+    masked: IcebergRestMasked
+    optional: IcebergRestOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
+
+
+class DuckLakeInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    type: Literal['DUCKLAKE'] = Field(..., description='Type of the asset or source')
+    required: DuckLakeRequired
+    masked: DuckLakeMasked
+    optional: DuckLakeOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
+
+
+class TrinoInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    type: Literal['TRINO'] = Field(..., description='Type of the asset or source')
+    required: TrinoRequired
+    masked: TrinoMasked
+    optional: TrinoOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
+
+
+class AthenaInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    type: Literal['ATHENA'] = Field(..., description='Type of the asset or source')
+    required: AthenaRequired
+    masked: AthenaMasked
+    optional: AthenaOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
+
+
+class BigQueryInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    type: Literal['BIGQUERY'] = Field(..., description='Type of the asset or source')
+    required: BigQueryRequired
+    masked: BigQueryMasked
+    optional: BigQueryOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
+
+
+class RedshiftInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    type: Literal['REDSHIFT'] = Field(..., description='Type of the asset or source')
+    required: RedshiftRequired
+    masked: RedshiftMasked
+    optional: RedshiftOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
+
+
 class YouTubeInput(CoreInput):
     model_config = ConfigDict(
         extra='forbid',
@@ -6158,8 +6746,6 @@ class SourceInput(
         | EmailInput
         | YouTubeInput
         | RedditInput
-        | DeltaLakeInput
-        | IcebergInput
         | KafkaInput
         | ElasticsearchInput
         | OpenSearchInput
@@ -6169,6 +6755,12 @@ class SourceInput(
         | DropboxInput
         | HuggingFaceInput
         | GitInput
+        | IcebergRestInput
+        | DuckLakeInput
+        | TrinoInput
+        | AthenaInput
+        | BigQueryInput
+        | RedshiftInput
         | CustomInput
     ]
 ):
@@ -6200,8 +6792,6 @@ class SourceInput(
         | EmailInput
         | YouTubeInput
         | RedditInput
-        | DeltaLakeInput
-        | IcebergInput
         | KafkaInput
         | ElasticsearchInput
         | OpenSearchInput
@@ -6211,6 +6801,12 @@ class SourceInput(
         | DropboxInput
         | HuggingFaceInput
         | GitInput
+        | IcebergRestInput
+        | DuckLakeInput
+        | TrinoInput
+        | AthenaInput
+        | BigQueryInput
+        | RedshiftInput
         | CustomInput
     ) = Field(
         ...,

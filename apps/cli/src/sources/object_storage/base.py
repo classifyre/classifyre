@@ -8,7 +8,7 @@ import random
 import tempfile
 from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator, Callable, Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -48,9 +48,12 @@ from ...utils.file_parser import (
     tabular_mime_type_for_name,
 )
 from ...utils.hashing import hash_id, unhash_id
-from ...utils.lakehouse_layout import DELTA, table_root_of, table_roots
+from ...utils.lakehouse_layout import table_root_of, table_roots
+from ...utils.lakehouse_tables import LakehouseTable, TableStorage, describe_table
 from ...utils.payload import spool
 from ...utils.sampling_frontier import time_rank
+from ...utils.table_files import LAKEHOUSE_TABLE_MIME_TYPE
+from ...utils.urn import Urn, UrnError
 from ..base import BaseSource
 from ..dependencies import require_module
 
@@ -132,6 +135,9 @@ class ObjectRef:
     last_modified: datetime
     etag: str | None = None
     content_type_hint: str | None = None
+    # Set on the one ref that stands for a whole lakehouse table (its key is the
+    # table root, its size the table's files together). Every other ref is a file.
+    table: LakehouseTable | None = field(default=None, compare=False, hash=False)
 
 
 @dataclass(frozen=True)
@@ -417,37 +423,176 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         materialized.sort(key=lambda ref: ref.last_modified, reverse=True)
         return materialized[:limit]
 
-    def _without_table_files(self, refs: list[ObjectRef]) -> list[ObjectRef]:
-        """Leave out every object that belongs to a Delta Lake or Iceberg table.
+    def _split_table_files(self, refs: list[ObjectRef]) -> list[ObjectRef]:
+        """Replace every lakehouse table's files with one ref for the table.
 
         A table's files are not the table: they include files the table has
         removed, files of older snapshots, and rows its deletion vectors or
         delete files have struck out, under column names it may have renamed.
-        Scanning them one by one reports data the table no longer holds. The
-        Delta Lake and Apache Iceberg sources read each table as one asset.
+        Scanned one by one they report data the table no longer holds. So the
+        files are dropped and the table is read as one asset, through its
+        format's own reader (``utils.lakehouse_tables``).
+
+        A provider that cannot hand the readers its storage
+        (``_lakehouse_storage`` returns None) still drops the files, and says so.
         """
         roots = table_roots(ref.key for ref in refs)
         if not roots:
             return refs
         kept: list[ObjectRef] = []
-        skipped: dict[str, int] = {}
+        members: dict[str, list[ObjectRef]] = {root: [] for root in roots}
         for ref in refs:
             root = table_root_of(ref.key, roots)
             if root is None:
                 kept.append(ref)
             else:
-                skipped[root] = skipped.get(root, 0) + 1
-        for root, count in sorted(skipped.items()):
-            source = "Delta Lake" if roots[root] == DELTA else "Apache Iceberg"
+                members[root].append(ref)
+        storage = self._lakehouse_storage()
+        for root, table_format in sorted(roots.items()):
+            files = members[root]
+            if storage is None:
+                logger.info(
+                    "Skipped the %s table at %s/ (%d object(s)): %s cannot read lakehouse "
+                    "tables, and its files on their own are not the table",
+                    table_format,
+                    root,
+                    len(files),
+                    self.provider_label,
+                )
+                continue
+            if table_format in storage.unreadable:
+                logger.warning(
+                    "Skipped the %s table at %s/ (%d object(s)): %s",
+                    table_format,
+                    root,
+                    len(files),
+                    storage.unreadable[table_format],
+                )
+                continue
+            kept.append(
+                ObjectRef(
+                    key=root,
+                    size=sum(ref.size or 0 for ref in files),
+                    last_modified=max(ref.last_modified for ref in files),
+                    content_type_hint=LAKEHOUSE_TABLE_MIME_TYPE,
+                    table=LakehouseTable(
+                        root=root,
+                        table_format=table_format,
+                        storage=storage,
+                        keys=sorted(ref.key for ref in files),
+                    ),
+                )
+            )
             logger.info(
-                "Skipped %d object(s) of the %s table at %s/: scan it with the %s source, "
-                "which reads it as one table",
-                count,
-                source,
+                "Reading the %s table at %s/ as one table (%d file(s))",
+                table_format,
                 root,
-                source,
+                len(files),
             )
         return kept
+
+    # ── Lakehouse tables ─────────────────────────────────────────────────
+
+    def _lakehouse_storage(self) -> TableStorage | None:
+        """How the table readers reach this provider's storage, or None.
+
+        Providers whose objects DuckDB and the format readers can open
+        (S3-compatible, Azure Blob, GCS, local folders) override this.
+        """
+        return None
+
+    def _lakehouse_authority(self) -> str | None:
+        """The URN authority for tables in this source: its bucket or account.
+
+        A name, never a URL or path: ``Urn.of`` writes it raw, so a slash or
+        ``://`` in it breaks every table URN this source emits.
+        """
+        return None
+
+    def _lakehouse_prefix(self) -> list[str]:
+        """Path segments between the authority and the table root, if any.
+
+        Azure names a table account-first (``Urn.abfss`` puts the container in
+        the path), and a local folder names it under its absolute root, so both
+        add their scope here. S3 and GCS buckets need nothing: the bucket is
+        the authority and the key is the path.
+        """
+        return []
+
+    def _read_key(self, key: str) -> bytes:
+        """Whole bytes of one small object — a table's metadata file."""
+        data, _content_type = self._download_object(
+            ObjectRef(key=key, size=0, last_modified=datetime.now(UTC))
+        )
+        return data
+
+    def _table_to_asset(self, ref: ObjectRef) -> SingleAssetScanResults:
+        """One table asset for a lakehouse table, described by its own metadata."""
+        assert ref.table is not None
+        table = describe_table(ref.table, self._read_key)
+        # The version is what changes when the table does, so it is the checksum
+        # input and the payload cursor's binding.
+        ref = replace(ref, etag=table.fingerprint())
+        external_url = self._external_url(ref.key)
+        asset_hash = self.generate_hash_id(external_url)
+        metadata: dict[str, Any] = {
+            "provider": self.provider_label,
+            "object_key": ref.key,
+            "asset_type": OutputAssetType.TABLE.value,
+            "table_format": table.table_format,
+            "version": table.version,
+            "size_bytes": ref.size,
+            "last_modified": ref.last_modified.isoformat(),
+        }
+        authority = self._lakehouse_authority()
+        prefix = self._lakehouse_prefix()
+        asset_metadata: dict[str, Any] = {
+            "provider": self.provider_label,
+            "object_key": ref.key,
+            # Where another tool would name it: the bucket (or account and
+            # container, or folder) as the database, the table's directory as
+            # its name.
+            "database": "/".join([authority, *prefix]) if authority else self.provider_label,
+            "table_name": ref.key,
+            "table_type": "TABLE",
+            "size_bytes": ref.size,
+            "mime_type": LAKEHOUSE_TABLE_MIME_TYPE,
+            **self._extra_asset_metadata(ref),
+            **{k: v for k, v in table.metadata.items() if v is not None},
+        }
+        if table.version:
+            asset_metadata["table_version"] = table.version
+        urn: str | None = None
+        if authority:
+            try:
+                urn = str(
+                    Urn.of(
+                        table.table_format,
+                        authority,
+                        *prefix,
+                        *[p for p in ref.key.split("/") if p],
+                    )
+                )
+            except UrnError as exc:
+                logger.debug("No URN for table %s: %s", ref.key, exc)
+        asset = SingleAssetScanResults(
+            hash=asset_hash,
+            checksum=self.calculate_checksum(metadata),
+            name=ref.key.split("/")[-1] or ref.key,
+            external_url=external_url,
+            links=[],
+            asset_type=OutputAssetType.TABLE,
+            source_id=self.source_id,
+            created_at=ref.last_modified,
+            updated_at=ref.last_modified,
+            runner_id=self.runner_id,
+            urn=urn,
+            **self.metadata_fields("table", asset_metadata),
+        )
+        self._hash_to_uri[asset_hash] = external_url
+        self._object_ref_by_hash[asset_hash] = ref
+        self._object_key_by_hash[asset_hash] = ref.key
+        return asset
 
     AUTOMATIC_CURSOR_KEY = "objects"
 
@@ -687,6 +832,8 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         )
 
     def _to_asset(self, ref: ObjectRef) -> SingleAssetScanResults:
+        if ref.table is not None:
+            return self._table_to_asset(ref)
         external_url = self._external_url(ref.key)
         asset_hash = self.generate_hash_id(external_url)
 
@@ -1059,7 +1206,7 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         self._pending_child_assets = []
         self._pending_containers = []
 
-        refs = self._without_table_files(list(self._list_objects()))
+        refs = self._split_table_files(list(self._list_objects()))
         sampled_refs = self._apply_sampling(iter(refs))
 
         def _admit(candidates: list[SingleAssetScanResults]) -> list[SingleAssetScanResults]:
@@ -1153,7 +1300,7 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         Decided from the listing alone — no request — because discovery consults
         it before it would otherwise fetch the object.
         """
-        if not self.SUPPORTS_RANGE_READS:
+        if not self.SUPPORTS_RANGE_READS or ref.table is not None:
             return None
         if not ref.size or ref.size <= self._max_object_bytes():
             return None
@@ -1209,7 +1356,12 @@ class ObjectStorageSourceBase(BaseSource, ABC):
 
         Prefers a range reader when the provider has one, which transfers less
         again — only the parts of the object the parser actually touches.
+
+        A lakehouse table is not opened at all: its readers address the storage
+        themselves, so the "payload" is the table description.
         """
+        if ref.table is not None:
+            return ref.table, LAKEHOUSE_TABLE_MIME_TYPE
         range_mime = self._range_read_mime(ref)
         if range_mime is not None:
             handle = self._open_object_range_reader(ref)
@@ -1284,7 +1436,8 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         asset_hash, external_url = self._object_identity(asset_id)
 
         ref = self._object_ref_by_hash.get(asset_hash)
-        if ref is None:
+        if ref is None or ref.table is not None:
+            # A table has rows, not bytes: binary detectors have nothing to read.
             return None
 
         try:

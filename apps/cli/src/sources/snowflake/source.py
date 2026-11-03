@@ -25,7 +25,7 @@ from ...utils.file_parser import render_bytes_cell
 from ...utils.sql_lineage import upstream_tables_from_sql
 from ..dependencies import require_module
 from ..tabular_base import BaseTabularSource
-from ..tabular_utils import TableRef, ViewLineage
+from ..tabular_utils import TableRef, ViewLineage, table_format_from
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +49,7 @@ class SnowflakeSource(BaseTabularSource):
         super().__init__(recipe, source_id, runner_id)
         self.config = SnowflakeInput.model_validate(recipe)
         self.runner_id = runner_id or "local-run"
+        self._table_formats: dict[tuple[str, ...], str] = {}
         self._snowflake = require_module(
             module_name="snowflake.connector",
             source_name="Snowflake",
@@ -453,15 +454,24 @@ class SnowflakeSource(BaseTabularSource):
         object_allowlist = self._object_allowlist()
         limit = self._table_limit()
 
-        query = f"""
-            SELECT TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE
-            FROM {_quote_identifier(database)}.INFORMATION_SCHEMA.TABLES
-            ORDER BY TABLE_SCHEMA, TABLE_NAME
-        """
+        # IS_ICEBERG says whether a table is a Snowflake-managed (or catalog-
+        # linked) Iceberg table. Older accounts lack the column, so it is asked
+        # for and dropped if refused.
+        columns = "TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE, IS_ICEBERG"
         tables: list[TableRef] = []
         conn = self._get_cached_connection(database)
         with conn.cursor() as cursor:
-            cursor.execute(query)
+            try:
+                cursor.execute(
+                    f"SELECT {columns} FROM {_quote_identifier(database)}.INFORMATION_SCHEMA.TABLES "
+                    "ORDER BY TABLE_SCHEMA, TABLE_NAME"
+                )
+            except Exception:
+                cursor.execute(
+                    f"SELECT {columns.rsplit(',', 1)[0]} "
+                    f"FROM {_quote_identifier(database)}.INFORMATION_SCHEMA.TABLES "
+                    "ORDER BY TABLE_SCHEMA, TABLE_NAME"
+                )
             for row in self._fetch_dict_rows(cursor):
                 schema_name = row.get("TABLE_SCHEMA")
                 table_name = row.get("TABLE_NAME")
@@ -491,14 +501,21 @@ class SnowflakeSource(BaseTabularSource):
                 ):
                     continue
 
-                tables.append(
-                    TableRef(
-                        database=database,
-                        schema=schema_name,
-                        table=table_name,
-                        object_type="VIEW" if is_view else "TABLE",
-                    )
+                table_ref = TableRef(
+                    database=database,
+                    schema=schema_name,
+                    table=table_name,
+                    object_type="VIEW" if is_view else "TABLE",
                 )
+                declared = (
+                    "iceberg"
+                    if str(row.get("IS_ICEBERG", "")).upper() == "YES"
+                    else ("external" if "EXTERNAL" in normalized_type else "")
+                )
+                self._table_formats[table_ref.table_key] = table_format_from(
+                    declared, is_view=is_view
+                )
+                tables.append(table_ref)
                 if limit is not None and len(tables) >= limit:
                     break
 
@@ -713,6 +730,7 @@ class SnowflakeSource(BaseTabularSource):
         return {
             "account_id": self._account_id(),
             "object_type": table_ref.object_type,
+            "table_format": self._table_formats.get(table_ref.table_key, "native"),
             "lineage": {
                 "start_time": (
                     extraction.start_time.isoformat() if extraction.start_time else None

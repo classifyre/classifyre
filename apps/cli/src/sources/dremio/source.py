@@ -22,7 +22,7 @@ from ...models.generated_single_asset_scan_results import AssetType as OutputAss
 from ...utils.sql_lineage import table_paths_from_sql
 from ...utils.urn import Urn, UrnError
 from ..tabular_base import BaseTabularSource
-from ..tabular_utils import TableRef, ViewLineage
+from ..tabular_utils import TableRef, ViewLineage, table_format_from
 from .client import (
     JOB_ROW_WINDOW,
     DremioApiError,
@@ -686,8 +686,11 @@ class DremioSource(BaseTabularSource):
         if system:
             extra["source_system"] = system[0]
         data_format = entity.get("format")
+        declared = ""
         if isinstance(data_format, dict) and data_format.get("type"):
             extra["format"] = str(data_format["type"])
+            declared = str(data_format["type"])
+        extra["table_format"] = table_format_from(declared, is_view=table_ref.object_type == "VIEW")
         return extra
 
     def _finding_base_path(self, table_ref: TableRef) -> str:

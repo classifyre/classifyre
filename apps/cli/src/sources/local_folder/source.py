@@ -10,6 +10,8 @@ from urllib.parse import quote
 
 from ...models.generated_input import LocalFolderInput
 from ...utils.file_parser import resolve_mime_type
+from ...utils.lakehouse_storage import local_table_storage
+from ...utils.lakehouse_tables import TableStorage
 from ..object_storage.base import ObjectRef, ObjectStorageSourceBase
 
 logger = logging.getLogger(__name__)
@@ -212,6 +214,17 @@ class LocalFolderSource(ObjectStorageSourceBase):
             self._record_cursor_key(self.ORDER_CHURN_KEY, churn)
         return window
 
+    def _lakehouse_storage(self) -> TableStorage | None:
+        return local_table_storage(self._root())
+
+    def _lakehouse_authority(self) -> str | None:
+        # A folder has no host of its own; the table's path is its name.
+        return "localhost"
+
+    def _lakehouse_prefix(self) -> list[str]:
+        # The absolute root scopes the name: the table key alone is relative.
+        return [p for p in self._root().as_posix().split("/") if p]
+
     def _open_object(self, ref: ObjectRef) -> tuple[Any, str]:
         """Open the file where it already is.
 
@@ -220,6 +233,8 @@ class LocalFolderSource(ObjectStorageSourceBase):
         keeps governing how much is pulled into memory by the *bytes* path
         (binary detectors), not how large a file can be read.
         """
+        if ref.table is not None:
+            return super()._open_object(ref)
         file_path = self._root() / ref.key
         handle = open(file_path, "rb")
         try:

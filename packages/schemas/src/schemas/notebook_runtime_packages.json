@@ -74,15 +74,6 @@
       "group": "file-processing"
     },
     {
-      "name": "deltalake",
-      "version": "1.6.6",
-      "modules": [
-        "deltalake"
-      ],
-      "availability": "on-demand",
-      "group": "delta-lake"
-    },
-    {
       "name": "dropbox",
       "version": "12.2.4",
       "modules": [
@@ -136,6 +127,15 @@
       "group": "google-workspace"
     },
     {
+      "name": "google-cloud-bigquery",
+      "version": "3.47.0",
+      "modules": [
+        "google.cloud.bigquery"
+      ],
+      "availability": "on-demand",
+      "group": "bigquery"
+    },
+    {
       "name": "google-cloud-storage",
       "version": "3.17.1",
       "modules": [
@@ -152,6 +152,15 @@
       ],
       "availability": "on-demand",
       "group": "regex"
+    },
+    {
+      "name": "hudi",
+      "version": "0.5.0",
+      "modules": [
+        "hudi"
+      ],
+      "availability": "on-demand",
+      "group": "lakehouse"
     },
     {
       "name": "huggingface-hub",
@@ -305,6 +314,15 @@
       "group": "file-processing"
     },
     {
+      "name": "pyathena",
+      "version": "3.40.0",
+      "modules": [
+        "pyathena"
+      ],
+      "availability": "on-demand",
+      "group": "athena"
+    },
+    {
       "name": "pydantic",
       "version": "2.14.2",
       "modules": [
@@ -322,13 +340,13 @@
       "group": "hive"
     },
     {
-      "name": "pyiceberg",
-      "version": "0.12.0",
+      "name": "pylance",
+      "version": "14.0.2",
       "modules": [
-        "pyiceberg"
+        "lance"
       ],
       "availability": "on-demand",
-      "group": "file-processing"
+      "group": "lakehouse"
     },
     {
       "name": "pymongo",
@@ -358,6 +376,15 @@
       "group": "mysql"
     },
     {
+      "name": "pypaimon",
+      "version": "2.1.0",
+      "modules": [
+        "pypaimon"
+      ],
+      "availability": "on-demand",
+      "group": "lakehouse"
+    },
+    {
       "name": "pypdfium2",
       "version": "5.14.0",
       "modules": [
@@ -383,6 +410,15 @@
       ],
       "availability": "on-demand",
       "group": "file-processing"
+    },
+    {
+      "name": "redshift-connector",
+      "version": "2.2.0",
+      "modules": [
+        "redshift_connector"
+      ],
+      "availability": "on-demand",
+      "group": "redshift"
     },
     {
       "name": "requests",
@@ -454,6 +490,15 @@
       ],
       "availability": "on-demand",
       "group": "hive"
+    },
+    {
+      "name": "trino",
+      "version": "0.340.0",
+      "modules": [
+        "trino"
+      ],
+      "availability": "on-demand",
+      "group": "trino"
     },
     {
       "name": "youtube-transcript-api",
