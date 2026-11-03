@@ -1,0 +1,61 @@
+---
+title: Amazon Redshift
+description: Scan Amazon Redshift, provisioned or Serverless, including Redshift Spectrum external tables over Iceberg, Hudi and Delta — with view lineage and every setting.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { SqlSourceNotes, LineageNote, SharedSettingsNote } from "@/components/source-notes";
+
+# Amazon Redshift
+
+<SourceFacts
+  type="REDSHIFT"
+  vendor={{ label: "Amazon Redshift", href: "https://aws.amazon.com/redshift/" }}
+  auth={{ label: "Redshift IAM authentication", href: "https://docs.aws.amazon.com/redshift/latest/mgmt/generating-user-credentials.html" }}
+/>
+
+Redshift holds a warehouse's own tables and, through Spectrum, external tables
+read straight out of S3. This source scans both, provisioned clusters and
+Serverless workgroups alike.
+
+## What you need to connect
+
+Host, port and database, and a database user. Sign in with that user's
+password, or leave the password empty to sign in with IAM: give the region and
+the cluster identifier or Serverless workgroup name, plus an access key pair
+unless the environment already has AWS credentials.
+
+## What Classifyre reads
+
+Tables and views in every schema, or only the ones you list, and the external
+tables of Spectrum schemas unless you switch them off. External tables report
+their format (`iceberg`, `hudi`, `delta` or `external`) and their S3 location;
+the warehouse's own tables report `native`.
+
+<SqlSourceNotes foreignKeys={false} />
+
+## Metadata on every asset
+
+<SourceMetadata type="REDSHIFT" />
+
+## Lineage
+
+<LineageNote>
+
+Views and the tables they read are recorded as lineage, parsed from the view
+SQL in Redshift's dialect. Redshift records primary and foreign keys but never
+enforces them, so no reference edges are drawn from them. See
+[Lineage & Relationships](/sources/lineage/).
+
+</LineageNote>
+
+## Worth knowing
+
+- **Spectrum reads bill by bytes scanned** in S3, as Athena does; a smaller page
+  size or a narrower scope keeps the cost down.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="REDSHIFT" />

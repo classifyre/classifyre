@@ -1,14 +1,16 @@
-// Concept guides are listed; the 38 per-source reference pages are reachable
+// Concept guides are listed; the 43 per-source reference pages are reachable
 // from the catalog on the overview page and from search. Listing all of them
 // here would bury the concepts under an alphabetical wall of vendor names.
 const sourcePages = [
+  "athena",
   "azure-blob-storage",
+  "bigquery",
   "confluence",
   "custom",
   "databricks",
-  "delta-lake",
   "dremio",
   "dropbox",
+  "ducklake",
   "elasticsearch",
   "email",
   "git",
@@ -16,7 +18,7 @@ const sourcePages = [
   "google-workspace",
   "hive",
   "hugging-face",
-  "iceberg",
+  "iceberg-rest",
   "jira",
   "kafka",
   "local-folder",
@@ -32,6 +34,7 @@ const sourcePages = [
   "postgresql",
   "powerbi",
   "reddit",
+  "redshift",
   "s3-compatible-storage",
   "sandbox",
   "servicedesk",
@@ -39,6 +42,7 @@ const sourcePages = [
   "snowflake",
   "sqlite",
   "tableau",
+  "trino",
   "wordpress",
   "youtube",
 ];
@@ -56,6 +60,7 @@ export default {
   testing: "Testing & Scheduling",
   "assets-and-metadata": "Assets & Metadata",
   lineage: "Lineage & Relationships",
+  lakehouse: "Lakehouse Tables",
   ...Object.fromEntries(
     sourcePages.map((slug) => [slug, { display: "hidden" }]),
   ),

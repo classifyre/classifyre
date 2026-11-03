@@ -5,7 +5,7 @@ description: Scan objects in AWS S3, MinIO, Cloudflare R2, Backblaze B2 and othe
 ---
 
 import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
-import { ObjectStorageNotes, LineageNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
+import { ObjectStorageNotes, LakehouseNotes, LineageNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
 
 # S3-Compatible Storage
 
@@ -40,6 +40,8 @@ Every object under the prefix you choose, filtered by extension allow- and
 denylists if you want to narrow it further.
 
 <ObjectStorageNotes container="bucket" />
+
+<LakehouseNotes />
 
 <FileHandlingNote what="Objects from this bucket" />
 

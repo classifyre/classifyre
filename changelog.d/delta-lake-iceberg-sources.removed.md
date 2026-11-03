@@ -1,0 +1,1 @@
+The Delta Lake and Apache Iceberg source types are gone, because bucket scans and the new Iceberg REST Catalog source read those tables; upgrading deletes any existing sources of these two types along with their assets and findings, so recreate them as a bucket or Iceberg REST Catalog source.

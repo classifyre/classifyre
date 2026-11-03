@@ -1,0 +1,72 @@
+---
+title: Iceberg REST Catalog
+sidebarTitle: Iceberg REST
+description: Scan Apache Iceberg tables through any Iceberg REST catalog — Polaris, Snowflake Open Catalog, Unity Catalog, Nessie, Gravitino, Lakekeeper, Glue, S3 Tables and BigLake metastore.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { LineageNote, SharedSettingsNote } from "@/components/source-notes";
+
+# Iceberg REST Catalog
+
+<SourceFacts
+  type="ICEBERG_REST"
+  vendor={{ label: "Apache Iceberg", href: "https://iceberg.apache.org/" }}
+  links={[{ label: "Iceberg REST catalog spec", href: "https://iceberg.apache.org/rest-catalog-spec/" }]}
+/>
+
+Most Iceberg tables are reached through a catalog rather than by path. This one
+source connects to any catalog that speaks the Iceberg REST protocol, lists its
+namespaces and tables, and reads each table as the catalog says it is now.
+
+## What you need to connect
+
+The catalog's REST **base URL**, a **sign-in mode**, and usually a
+**warehouse** name. If the catalog hands out credentials for its tables' files
+(vended credentials), nothing else is needed; if it doesn't, add storage keys
+for the bucket the tables live in.
+
+| Catalog | Base URL | Sign-in | Warehouse |
+| --- | --- | --- | --- |
+| Apache Polaris | `https://<host>/api/catalog` | `oauth2`, scope `PRINCIPAL_ROLE:ALL` | Polaris catalog name |
+| Snowflake Open Catalog | `https://<account>.snowflakecomputing.com/polaris/api/catalog` | `oauth2`, scope `PRINCIPAL_ROLE:<role>` | Catalog name |
+| Unity Catalog | `https://<workspace>/api/2.1/unity-catalog/iceberg-rest` | `token` (personal access or service-principal token) | Unity catalog name |
+| Project Nessie | `https://<host>/iceberg` | `none` or `token` | Branch or warehouse name |
+| Apache Gravitino | `https://<host>/iceberg` | `none` or `oauth2` | Optional |
+| Lakekeeper | `https://<host>/catalog` | `oauth2` or `none` | Warehouse name |
+| AWS Glue | `https://glue.<region>.amazonaws.com/iceberg` | `sigv4`, service `glue` | AWS account id |
+| Amazon S3 Tables | `https://s3tables.<region>.amazonaws.com/iceberg` | `sigv4`, service `s3tables` | Table bucket ARN |
+| BigLake metastore | `https://biglake.googleapis.com/iceberg/v1/restcatalog` | `google` (service-account JSON) | `gs://<bucket>` |
+
+Polaris and Gravitino have been read end to end; the others follow the same
+protocol but haven't been run against the live service yet. See
+[Lakehouse Tables](/sources/lakehouse/) for the full status.
+
+## What Classifyre reads
+
+One asset per table, and per view unless views are switched off, across every
+namespace the credentials can see, or only the ones you list. Rows are read from
+the table's current snapshot, so deleted rows are absent and renamed columns
+read as one column.
+
+## Metadata on every asset
+
+<SourceMetadata type="ICEBERG_REST" />
+
+## Lineage
+
+<LineageNote />
+
+## Worth knowing
+
+- **Read-only.** Nothing is committed to the catalog.
+- **Vended credentials** are on by default. Turn them off when the catalog
+  refuses to issue them, and give storage keys instead.
+- **OAuth2 token endpoint** defaults to `<base URL>/v1/oauth/tokens`; set it
+  when your identity provider issues the tokens instead.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="ICEBERG_REST" />

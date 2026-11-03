@@ -4,7 +4,7 @@ description: Scan a folder of files on this computer or mounted into the cluster
 ---
 
 import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
-import { ObjectStorageNotes, LineageNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
+import { ObjectStorageNotes, LakehouseNotes, LineageNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
 
 # Mounted Folder
 
@@ -38,6 +38,8 @@ Every file below the folder, subject to the traversal controls:
 | **Extension allow / denylist** | Narrow it to the file types you care about |
 
 <ObjectStorageNotes container="folder" />
+
+<LakehouseNotes />
 
 <FileHandlingNote what="Files in this folder" />
 

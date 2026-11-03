@@ -1,0 +1,64 @@
+---
+title: Amazon Athena
+description: Scan the tables in the AWS Glue Data Catalog through Amazon Athena — Iceberg, Delta, Hudi and plain files — with each table's format, location and view lineage.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { SqlSourceNotes, LineageNote, SharedSettingsNote } from "@/components/source-notes";
+
+# Amazon Athena
+
+<SourceFacts
+  type="ATHENA"
+  vendor={{ label: "Amazon Athena", href: "https://aws.amazon.com/athena/" }}
+  auth={{ label: "Athena IAM permissions", href: "https://docs.aws.amazon.com/athena/latest/ug/security-iam-athena.html" }}
+  links={[{ label: "AWS Glue Data Catalog", href: "https://docs.aws.amazon.com/glue/latest/dg/catalog-and-crawler.html" }]}
+/>
+
+On AWS, the Glue Data Catalog is the list of what's in the lake, and Athena is
+the way to read it. This source lists databases and tables from Glue and reads
+rows with Athena SQL, so each format is read by its own reader.
+
+## What you need to connect
+
+The **region** and an **S3 location for query results** (Athena writes every
+query's result there). Give an access key pair, or leave it empty to use the
+environment's ambient AWS credentials. The identity needs Glue read access,
+Athena query access, read access to the tables' data, and write access to the
+results location.
+
+## What Classifyre reads
+
+Every Glue database and its tables and views, or only the ones you list. Each
+table reports its format from Glue: `iceberg`, `delta`, `hudi`, `external` for
+plain files, or `view`, plus its storage location.
+
+<SqlSourceNotes foreignKeys={false} />
+
+## Metadata on every asset
+
+<SourceMetadata type="ATHENA" />
+
+## Lineage
+
+<LineageNote>
+
+Views and the tables they read are recorded as lineage, from the SQL Athena
+stores with each view. See [Lineage & Relationships](/sources/lineage/).
+
+</LineageNote>
+
+## Worth knowing
+
+- **Athena bills by bytes scanned**, and a row limit doesn't reduce what a scan
+  of an unpartitioned table reads. Every page of rows is one query, so the page
+  size is also the cost knob, and RANDOM sampling reads the whole table once per
+  run.
+- **Another data catalog** registered in Athena can be named in place of the
+  default `AwsDataCatalog`.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="ATHENA" />
