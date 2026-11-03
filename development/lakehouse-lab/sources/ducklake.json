@@ -1,0 +1,30 @@
+{
+  "type": "DUCKLAKE",
+  "name": "Lab \u00b7 DuckLake",
+  "config": {
+    "type": "DUCKLAKE",
+    "required": {
+      "catalog": "postgres:dbname=lake host=lab-ducklake-pg.classifyre-dev.svc user=lab"
+    },
+    "masked": {
+      "catalog_password": "lab-ducklake",
+      "s3_access_key_id": "lab-access-key",
+      "s3_secret_access_key": "lab-secret-key-0123456789"
+    },
+    "optional": {
+      "connection": {
+        "s3_endpoint_url": "http://lab-s3.classifyre-dev.svc:9000",
+        "s3_region": "us-east-1"
+      }
+    },
+    "sampling": {
+      "strategy": "ALL"
+    },
+    "detectors": [
+      {
+        "type": "PII",
+        "enabled": true
+      }
+    ]
+  }
+}

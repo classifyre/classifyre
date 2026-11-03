@@ -1,0 +1,85 @@
+# Cluster names for the lakehouse lab containers (compose.yaml), so scan pods
+# reach them as http://lab-<name>.classifyre-dev.svc:<port>.
+#
+# Not part of the Helm chart and not deployed by `skaffold dev`; apply by hand:
+#   kubectl --context k3d-classifyre apply -f showcases/lakehouse-lab/k8s-services.yaml
+#
+# Each Service has no selector and a hand-written Endpoints object pointing at the
+# container's fixed address on the k3d-classifyre Docker network.
+---
+apiVersion: v1
+kind: Service
+metadata: {name: lab-s3, namespace: classifyre-dev}
+spec:
+  ports: [{name: s3, port: 9000, targetPort: 9000}]
+---
+apiVersion: v1
+kind: Endpoints
+metadata: {name: lab-s3, namespace: classifyre-dev}
+subsets: [{addresses: [{ip: 172.19.10.10}], ports: [{name: s3, port: 9000}]}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: lab-azurite, namespace: classifyre-dev}
+spec:
+  ports: [{name: blob, port: 10000, targetPort: 10000}]
+---
+apiVersion: v1
+kind: Endpoints
+metadata: {name: lab-azurite, namespace: classifyre-dev}
+subsets: [{addresses: [{ip: 172.19.10.11}], ports: [{name: blob, port: 10000}]}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: lab-fake-gcs, namespace: classifyre-dev}
+spec:
+  ports: [{name: gcs, port: 4443, targetPort: 4443}]
+---
+apiVersion: v1
+kind: Endpoints
+metadata: {name: lab-fake-gcs, namespace: classifyre-dev}
+subsets: [{addresses: [{ip: 172.19.10.12}], ports: [{name: gcs, port: 4443}]}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: lab-gravitino, namespace: classifyre-dev}
+spec:
+  ports: [{name: http, port: 9001, targetPort: 9001}]
+---
+apiVersion: v1
+kind: Endpoints
+metadata: {name: lab-gravitino, namespace: classifyre-dev}
+subsets: [{addresses: [{ip: 172.19.10.20}], ports: [{name: http, port: 9001}]}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: lab-polaris, namespace: classifyre-dev}
+spec:
+  ports: [{name: http, port: 8181, targetPort: 8181}]
+---
+apiVersion: v1
+kind: Endpoints
+metadata: {name: lab-polaris, namespace: classifyre-dev}
+subsets: [{addresses: [{ip: 172.19.10.21}], ports: [{name: http, port: 8181}]}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: lab-trino, namespace: classifyre-dev}
+spec:
+  ports: [{name: http, port: 8080, targetPort: 8080}]
+---
+apiVersion: v1
+kind: Endpoints
+metadata: {name: lab-trino, namespace: classifyre-dev}
+subsets: [{addresses: [{ip: 172.19.10.30}], ports: [{name: http, port: 8080}]}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: lab-ducklake-pg, namespace: classifyre-dev}
+spec:
+  ports: [{name: pg, port: 5432, targetPort: 5432}]
+---
+apiVersion: v1
+kind: Endpoints
+metadata: {name: lab-ducklake-pg, namespace: classifyre-dev}
+subsets: [{addresses: [{ip: 172.19.10.40}], ports: [{name: pg, port: 5432}]}]

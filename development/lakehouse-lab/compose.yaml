@@ -1,0 +1,138 @@
+# Lakehouse lab: open-source storage, catalogs and engines to scan against.
+#
+# Runs on the host's Docker, on the k3d cluster's own network, so scan pods reach
+# every service at a fixed address (see k8s-services.yaml for the names they use).
+# Start profiles as you need them, storage first; README.md has the whole flow.
+#
+#   docker compose --profile storage up -d
+#   docker compose --profile catalogs --profile engines up -d
+#   ./seed.sh
+#
+# Profiles: storage (always needed), catalogs, engines, ducklake, tools.
+# Every credential below is a local test value.
+
+name: lakehouse-lab
+
+networks:
+  k3d:
+    name: k3d-classifyre
+    external: true
+
+x-storage-env: &storage-env
+  AWS_ACCESS_KEY_ID: lab-access-key
+  AWS_SECRET_ACCESS_KEY: lab-secret-key-0123456789
+  AWS_REGION: us-east-1
+
+services:
+  # ── storage ──────────────────────────────────────────────────────────
+  # S3: SeaweedFS's S3 gateway. MinIO stopped publishing community images, and
+  # this is the same API to every reader (path-style addressing, static keys).
+  s3:
+    image: chrislusf/seaweedfs:latest
+    profiles: [storage]
+    command: server -dir=/data -s3 -s3.port=9000 -s3.config=/etc/seaweedfs/s3.json -ip.bind=0.0.0.0
+    volumes: ["./storage/s3.json:/etc/seaweedfs/s3.json:ro"]
+    ports: ["19000:9000"]
+    networks:
+      k3d:
+        ipv4_address: 172.19.10.10
+
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:latest
+    profiles: [storage]
+    # Scan pods address it by a DNS name, which Azurite would otherwise read as
+    # a production-style URL (account in the host name) and 404 every request.
+    command: azurite-blob --blobHost 0.0.0.0 --blobPort 10000 --loose --skipApiVersionCheck --disableProductStyleUrl
+    ports: ["10000:10000"]
+    networks:
+      k3d:
+        ipv4_address: 172.19.10.11
+
+  fake-gcs:
+    image: fsouza/fake-gcs-server:latest
+    profiles: [storage]
+    # The external URL must be the address scan pods use, or signed and resumable
+    # URLs the server hands back point somewhere they cannot reach.
+    command: -scheme http -port 4443 -external-url http://lab-fake-gcs.classifyre-dev.svc:4443 -public-host lab-fake-gcs.classifyre-dev.svc:4443
+    ports: ["14443:4443"]
+    networks:
+      k3d:
+        ipv4_address: 172.19.10.12
+
+  # Seeding and probing: `docker compose run --rm tools python <script>`.
+  tools:
+    build: ./tools
+    image: lakehouse-lab-tools:local
+    profiles: [tools]
+    # /out is what scan pods see as /mnt/corpora/dumps/lakehouse-lab.
+    volumes: ["./seed:/seed", "../../dump_files/lakehouse-lab:/out"]
+    environment:
+      <<: *storage-env
+      LAB_S3_ENDPOINT: http://172.19.10.10:9000
+    networks: [k3d]
+
+  # ── catalogs ─────────────────────────────────────────────────────────
+  # Apache Gravitino's Iceberg REST server, in-memory catalog, vending the lab's
+  # static S3 keys as table credentials.
+  gravitino:
+    # latest (Nov 2026) fails every write with a Jackson NoSuchMethodError.
+    image: apache/gravitino-iceberg-rest:1.0.0
+    profiles: [catalogs]
+    environment:
+      GRAVITINO_WAREHOUSE: s3://lake/gravitino/
+      GRAVITINO_IO_IMPL: org.apache.iceberg.aws.s3.S3FileIO
+      GRAVITINO_S3_ENDPOINT: http://172.19.10.10:9000
+      GRAVITINO_S3_REGION: us-east-1
+      GRAVITINO_S3_ACCESS_KEY: lab-access-key
+      GRAVITINO_S3_SECRET_KEY: lab-secret-key-0123456789
+      GRAVITINO_S3_PATH_STYLE_ACCESS: "true"
+      GRAVITINO_CREDENTIAL_PROVIDERS: s3-secret-key
+    ports: ["19101:9001"]
+    networks:
+      k3d:
+        ipv4_address: 172.19.10.20
+
+  # Apache Polaris (also Snowflake Open Catalog's engine), in-memory, root
+  # principal root/s3cr3t. The catalog is created by seed/polaris_bootstrap.py.
+  polaris:
+    image: apache/polaris:latest
+    profiles: [catalogs]
+    environment:
+      <<: *storage-env
+      POLARIS_BOOTSTRAP_CREDENTIALS: POLARIS,root,s3cr3t
+      polaris.realm-context.realms: POLARIS
+      quarkus.otel.sdk.disabled: "true"
+      # A local lab is not a production deployment: in-memory persistence and
+      # bootstrap credentials are what its readiness checks refuse.
+      polaris.readiness.ignore-severe-issues: "true"
+    ports: ["18181:8181"]
+    networks:
+      k3d:
+        ipv4_address: 172.19.10.21
+
+  # ── engines ──────────────────────────────────────────────────────────
+  # Trino with Iceberg (over Gravitino's REST catalog), Delta Lake and Hive (a
+  # file metastore in the lab bucket) — and the writer of the merge-on-read
+  # deletes and deletion vectors the bucket readers are tested against.
+  trino:
+    image: trinodb/trino:476
+    profiles: [engines]
+    volumes: ["./trino/catalog:/etc/trino/catalog:ro"]
+    ports: ["18080:8080"]
+    networks:
+      k3d:
+        ipv4_address: 172.19.10.30
+
+  # ── ducklake ─────────────────────────────────────────────────────────
+  # DuckLake's catalog in Postgres; its data in the lab bucket (s3://lake/ducklake/).
+  ducklake-pg:
+    image: postgres:16-alpine
+    profiles: [ducklake]
+    environment:
+      POSTGRES_USER: lab
+      POSTGRES_PASSWORD: lab-ducklake
+      POSTGRES_DB: lake
+    ports: ["15432:5432"]
+    networks:
+      k3d:
+        ipv4_address: 172.19.10.40
