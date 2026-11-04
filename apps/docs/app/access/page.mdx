@@ -21,8 +21,10 @@ names in timelines are whatever people type in.
 When it is on, people sign in, and what they can see and change depends on the
 groups they belong to.
 
-- **Kubernetes (Helm chart):** access management will be on by default, and
-  can be turned off.
+- **Kubernetes (Helm chart):** the chart installs the identity server and is
+  on by default; Classifyre starts asking people to sign in in a later
+  release. See [Kubernetes → Sign-in](/deployment/kubernetes/#sign-in) for
+  setting it up or turning it off.
 - **Docker (all-in-one image):** access management is never used. The image is
   meant for one person or a small trusted team on one machine.
 

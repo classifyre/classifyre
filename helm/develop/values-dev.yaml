@@ -602,3 +602,8 @@ telemetry:
     enabled: false
 objectStorage:
   enabled: false
+
+# Sign-in is off by default on the dev stack. Turn it on with
+# `CLASSIFYRE_IAM=true ./scripts/dev/start.sh`, which adds values-dev-iam.yaml.
+iam:
+  enabled: false

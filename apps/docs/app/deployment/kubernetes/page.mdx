@@ -144,6 +144,11 @@ postgres:
   mode: embedded
   embedded:
     password: changeme
+
+# No host name, so no sign-in: anyone who reaches the NodePort can use every
+# workspace. Fine on a laptop; see Sign-in below before sharing it.
+iam:
+  enabled: false
 ```
 
 ### Install the chart
@@ -190,6 +195,10 @@ kubectl create namespace classifyre
 kubectl create secret generic classifyre-pg \
   --namespace classifyre \
   --from-literal=password=<your-pg-password>
+
+kubectl create secret generic classifyre-iam-pg \
+  --namespace classifyre \
+  --from-literal=password=<the-iam-role-password>
 ```
 
 ### Create a values file
@@ -213,6 +222,17 @@ postgres:
     username: classifyre
     existingSecret: classifyre-pg
     existingSecretPasswordKey: password
+
+# Sign-in keeps its users in a database of its own. Create an `iam` database
+# and role on your PostgreSQL and put the role's password in a Secret.
+iam:
+  database:
+    mode: external
+    external:
+      host: pg.example.com
+      database: iam
+      username: iam
+      existingSecret: classifyre-iam-pg
 
 api:
   maskedConfigEncryption:
@@ -269,7 +289,7 @@ postgres:
   --version $version \\
   -f values-cnpg.yaml`}</Sh>
 
-CNPG provisions a 3-instance cluster with synchronous replication and automated failover.
+CNPG provisions a 3-instance cluster with synchronous replication and automated failover. With sign-in on, the chart also asks it for an `iam` role and database (CloudNativePG 1.25 or later).
 
 </Steps>
 
@@ -363,6 +383,75 @@ ingress:
       hosts:
         - classifyre.example.com
 ```
+
+---
+
+## Sign-in
+
+The chart ships sign-in and access management, under the name `iam`, and
+turns it on by default. It runs an identity server next to Classifyre on the
+same host, at `https://<your-host>/iam`. See
+[Access & Sign-in](/access/) for what people can do once signed in.
+
+<Callout type="warning">
+  Sign-in is being built in stages. This release installs the identity server
+  and its first tenant, but Classifyre does not ask anyone to sign in yet. Until
+  it does, treat the instance as open.
+</Callout>
+
+What the chart sets up:
+
+| Part               | Where                                                                                                                                                            |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Identity server    | Deployment and Service `<release>-iam`, served under `iam.path` (default `/iam`)                                                                                 |
+| Its database       | An `iam` role and database on the chart's PostgreSQL (`iam.database.mode: shared`), or your own (`external`)                                                     |
+| Realm `classifyre` | Created and kept up to date by a job on every install and upgrade: the web and API clients, short-lived tokens (5 minutes), brute-force protection, audit events |
+| First tenant       | `iam.bootstrap.tenant` (default `default`) with a group `admins`                                                                                                 |
+| First admin        | `iam.bootstrap.admin.username` (default `admin`), member of `admins`, with a temporary password                                                                  |
+
+Read the first admin's temporary password, which must be changed at first
+sign-in:
+
+```bash
+kubectl -n classifyre get secret classifyre-iam \
+  -o jsonpath='{.data.bootstrap-admin-password}' | base64 -d
+```
+
+### URLs
+
+Sign-in needs to know the address people use. By default it is derived from
+`ingress.host` and `ingress.tls`. Without a host name, set both URLs:
+
+```yaml
+iam:
+  publicUrl: https://classifyre.example.com/iam # the identity server
+  appUrl: https://classifyre.example.com # Classifyre itself
+```
+
+Only the `classifyre` realm is reachable through the ingress. The identity
+server's own admin console stays inside the cluster unless you set
+`iam.exposeAdminConsole: true`; reach it with
+`kubectl port-forward svc/classifyre-iam 8080` and its `admin` user, whose
+password is under `admin-password` in the same Secret.
+
+### Turning it off
+
+```yaml
+iam:
+  enabled: false
+```
+
+Without sign-in anyone who reaches the instance can use every workspace, as
+in the all-in-one Docker image, which never uses it. A sitemap
+(`frontend.sitemap.enabled`) is only allowed with sign-in off: a private
+instance publishes nothing for search engines.
+
+### Upgrades and backups
+
+The identity server's state is its database. Back it up with the rest of
+PostgreSQL, and always before changing `iam.image.tag` across a minor version
+(26.8 → 26.9): those upgrades stop all of its pods and cannot be rolled back
+without the backup. Patch versions are routine.
 
 ---
 

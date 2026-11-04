@@ -72,6 +72,9 @@ export const RESERVED_WEB_PREFIXES = new Set<string>([
   // namespace resolution rather than bypassing it.
   'en',
   'de',
+  // The identity server is served under `/iam` on the same host as the web
+  // app (helm `iam.path`), so a workspace named `iam` could never be opened.
+  'iam',
 ]);
 
 /** True when `slug` collides with a reserved API or web route segment. */
