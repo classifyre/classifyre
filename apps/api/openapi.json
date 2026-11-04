@@ -8694,12 +8694,13 @@
             "description": ""
           }
         },
-        "summary": "List all namespaces",
+        "summary": "List the namespaces the caller can see (all of them without sign-in)",
         "tags": [
           "Namespaces"
         ]
       },
       "post": {
+        "description": "With sign-in, `ownerGroupId` is required: a group of your tenant that you belong to and may create workspaces for (GET /namespaces/owning-groups).",
         "operationId": "NamespacesController_create",
         "parameters": [],
         "responses": {
@@ -8708,6 +8709,21 @@
           }
         },
         "summary": "Create a namespace (provisions its Postgres schema + migrations)",
+        "tags": [
+          "Namespaces"
+        ]
+      }
+    },
+    "/namespaces/owning-groups": {
+      "get": {
+        "operationId": "NamespacesController_owningGroups",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Groups the caller may create workspaces for (empty without sign-in)",
         "tags": [
           "Namespaces"
         ]
@@ -29877,6 +29893,7 @@
             "type": "string",
             "enum": [
               "header",
+              "oidc",
               "mcp-token",
               "internal-key",
               "autopilot",

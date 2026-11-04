@@ -74,8 +74,6 @@ spec:
           env:
             {{- include "classifyre.iam.env" . | nindent 12 }}
             {{- if .Values.iam.enabled }}
-            - name: IAM_APP_URL
-              value: {{ include "classifyre.iam.appUrl" . | quote }}
             - name: IAM_WEB_CLIENT_ID
               value: classifyre-web
             - name: IAM_WEB_CLIENT_SECRET

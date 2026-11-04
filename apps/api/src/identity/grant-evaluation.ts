@@ -1,0 +1,79 @@
+import type { Capability } from './capabilities';
+import { BUILT_IN_ROLES } from './roles';
+import type { Grant } from './tenancy.service';
+
+const ROLE_CAPABILITIES = new Map<string, readonly Capability[]>(
+  BUILT_IN_ROLES.map((role) => [role.key, role.capabilities]),
+);
+
+/** Unknown keys (a grant stored before a role was removed) give nothing. */
+export function roleCapabilities(roleKey: string): readonly Capability[] {
+  return ROLE_CAPABILITIES.get(roleKey) ?? [];
+}
+
+/**
+ * Whether a grant applies to one workspace (docs/prd §5): tenant grants
+ * always do, workspace grants to that workspace, group grants to every
+ * workspace owned by that group or by a group below it. `ownerLineage` is the
+ * owner group followed by its ancestors.
+ */
+export function grantApplies(
+  grant: Pick<Grant, 'scopeType' | 'scopeId'>,
+  workspace: { namespaceId: string; ownerLineage: readonly string[] },
+): boolean {
+  switch (grant.scopeType) {
+    case 'tenant':
+      return true;
+    case 'workspace':
+      return grant.scopeId === workspace.namespaceId;
+    case 'group':
+      return workspace.ownerLineage.includes(grant.scopeId);
+  }
+}
+
+/** Every capability the grants give in one workspace. Grants only add up. */
+export function capabilitiesInWorkspace(
+  grants: readonly Pick<Grant, 'scopeType' | 'scopeId' | 'roleKey'>[],
+  workspace: { namespaceId: string; ownerLineage: readonly string[] },
+): Set<Capability> {
+  const capabilities = new Set<Capability>();
+  for (const grant of grants) {
+    if (!grantApplies(grant, workspace)) continue;
+    for (const capability of roleCapabilities(grant.roleKey)) {
+      capabilities.add(capability);
+    }
+  }
+  return capabilities;
+}
+
+/** Capabilities from grants on the whole tenant only (registry-level routes). */
+export function tenantCapabilities(
+  grants: readonly Pick<Grant, 'scopeType' | 'roleKey'>[],
+): Set<Capability> {
+  const capabilities = new Set<Capability>();
+  for (const grant of grants) {
+    if (grant.scopeType !== 'tenant') continue;
+    for (const capability of roleCapabilities(grant.roleKey)) {
+      capabilities.add(capability);
+    }
+  }
+  return capabilities;
+}
+
+/**
+ * Whether the grants allow creating a workspace owned by `ownerLineage[0]`:
+ * a tenant-wide `tenant.workspace.create`, or one granted on that group or a
+ * group above it. Membership of the owner group is checked separately, as an
+ * invariant no grant can lift (§8.2).
+ */
+export function canCreateWorkspaceFor(
+  grants: readonly Pick<Grant, 'scopeType' | 'scopeId' | 'roleKey'>[],
+  ownerLineage: readonly string[],
+): boolean {
+  return grants.some(
+    (grant) =>
+      roleCapabilities(grant.roleKey).includes('tenant.workspace.create') &&
+      (grant.scopeType === 'tenant' ||
+        (grant.scopeType === 'group' && ownerLineage.includes(grant.scopeId))),
+  );
+}

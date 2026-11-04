@@ -88,6 +88,7 @@ describe('AccessGuard', () => {
     actors,
     internalKey as never,
     policy,
+    null,
   );
 
   beforeEach(() => {

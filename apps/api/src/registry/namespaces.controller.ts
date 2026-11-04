@@ -1,17 +1,25 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
   Get,
   HttpCode,
+  Inject,
   NotFoundException,
   Param,
   Patch,
   Post,
+  Req,
   Res,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import type { FastifyReply } from 'fastify';
+import type { FastifyReply, FastifyRequest } from 'fastify';
+import { CapabilityRequiredException } from '../identity/access.guard';
+import type { Capability } from '../identity/capabilities';
+import type { IdentityService, Principal } from '../identity/identity.service';
+import { IDENTITY } from '../identity/identity.tokens';
+import { TenancyService } from '../identity/tenancy.service';
 import { NamespaceRegistryService } from './namespace-registry.service';
 import type {
   CreateNamespaceCategoryInput,
@@ -36,21 +44,107 @@ import { AccessArea, Requires } from '../identity/access.decorators';
 @AccessArea({ view: 'workspace.view', change: 'workspace.settings' })
 @Controller('namespaces')
 export class NamespacesController {
-  constructor(private readonly registry: NamespaceRegistryService) {}
+  constructor(
+    private readonly registry: NamespaceRegistryService,
+    private readonly tenancy: TenancyService,
+    @Inject(IDENTITY) private readonly identity: IdentityService | null,
+  ) {}
+
+  /**
+   * With sign-in, these routes run outside any workspace, so the access guard
+   * only checked tenant-wide capabilities; each route checks the workspace it
+   * touches here. Another tenant's workspace and an invisible one are 404.
+   */
+  private async principal(request: FastifyRequest): Promise<Principal | null> {
+    if (!this.identity) return null;
+    return this.identity.authenticate(request.raw);
+  }
+
+  private async requireIn(
+    request: FastifyRequest,
+    namespaceId: string,
+    ...needed: Capability[]
+  ): Promise<void> {
+    const principal = await this.principal(request);
+    if (!principal) return;
+    const capabilities = await this.identity!.capabilitiesIn(
+      principal,
+      namespaceId,
+    );
+    if (!capabilities?.has('workspace.view')) {
+      throw new NotFoundException(`Unknown namespace '${namespaceId}'`);
+    }
+    const missing = needed.find((capability) => !capabilities.has(capability));
+    if (missing) throw new CapabilityRequiredException(missing);
+  }
+
+  private async visibleIds(
+    request: FastifyRequest,
+  ): Promise<Set<string> | null> {
+    const principal = await this.principal(request);
+    if (!principal) return null;
+    return new Set((await this.identity!.visibleWorkspaces(principal)).keys());
+  }
 
   @Get()
-  @ApiOperation({ summary: 'List all namespaces' })
-  list(): Promise<Namespace[]> {
-    return this.registry.list();
+  @ApiOperation({
+    summary:
+      'List the namespaces the caller can see (all of them without sign-in)',
+  })
+  async list(@Req() request: FastifyRequest): Promise<Namespace[]> {
+    const [namespaces, visible] = await Promise.all([
+      this.registry.list(),
+      this.visibleIds(request),
+    ]);
+    return visible ? namespaces.filter((ns) => visible.has(ns.id)) : namespaces;
   }
 
   @Requires('tenant.workspace.create')
   @Post()
   @ApiOperation({
     summary: 'Create a namespace (provisions its Postgres schema + migrations)',
+    description:
+      'With sign-in, `ownerGroupId` is required: a group of your tenant that you belong to and may create workspaces for (GET /namespaces/owning-groups).',
   })
-  create(@Body() body: CreateNamespaceInput): Promise<Namespace> {
-    return this.registry.create(body);
+  async create(
+    @Req() request: FastifyRequest,
+    @Body() body: CreateNamespaceInput,
+  ): Promise<Namespace> {
+    const principal = await this.principal(request);
+    if (!principal) return this.registry.create(body);
+
+    if (!body.ownerGroupId) {
+      throw new BadRequestException(
+        'ownerGroupId is required: every workspace is owned by one group of your tenant.',
+      );
+    }
+    if (
+      !(await this.identity!.canCreateWorkspace(principal, body.ownerGroupId))
+    ) {
+      throw new CapabilityRequiredException('tenant.workspace.create');
+    }
+    const created = await this.registry.create(body);
+    await this.tenancy.assignWorkspace(
+      created.id,
+      principal.tenant.id,
+      body.ownerGroupId,
+    );
+    return created;
+  }
+
+  @Get('owning-groups')
+  @ApiOperation({
+    summary:
+      'Groups the caller may create workspaces for (empty without sign-in)',
+  })
+  async owningGroups(
+    @Req() request: FastifyRequest,
+  ): Promise<{ id: string; name: string; path: string }[]> {
+    const principal = await this.principal(request);
+    if (!principal) return [];
+    return (await this.identity!.owningGroups(principal)).map(
+      ({ id, name, path }) => ({ id, name, path }),
+    );
   }
 
   @Get('stats')
@@ -58,8 +152,12 @@ export class NamespacesController {
     summary:
       'Per-namespace source rollups (total + failing + running + pending)',
   })
-  stats(): Promise<NamespaceStats[]> {
-    return this.registry.stats();
+  async stats(@Req() request: FastifyRequest): Promise<NamespaceStats[]> {
+    const [stats, visible] = await Promise.all([
+      this.registry.stats(),
+      this.visibleIds(request),
+    ]);
+    return visible ? stats.filter((row) => visible.has(row.id)) : stats;
   }
 
   // Category routes are declared BEFORE `:id` so `/namespaces/categories` is
@@ -102,16 +200,22 @@ export class NamespacesController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a namespace by id' })
-  get(@Param('id') id: string): Promise<Namespace> {
+  async get(
+    @Req() request: FastifyRequest,
+    @Param('id') id: string,
+  ): Promise<Namespace> {
+    await this.requireIn(request, id, 'workspace.view');
     return this.registry.get(id);
   }
 
   @Get(':id/thumbnail')
   @ApiOperation({ summary: "Stream a namespace's thumbnail image" })
   async thumbnail(
+    @Req() request: FastifyRequest,
     @Param('id') id: string,
     @Res() reply: FastifyReply,
   ): Promise<void> {
+    await this.requireIn(request, id, 'workspace.view');
     const image = await this.registry.getThumbnail(id);
     if (!image) {
       throw new NotFoundException('Namespace has no thumbnail');
@@ -124,10 +228,17 @@ export class NamespacesController {
 
   @Patch(':id')
   @ApiOperation({ summary: 'Update a namespace' })
-  update(
+  async update(
+    @Req() request: FastifyRequest,
     @Param('id') id: string,
     @Body() body: UpdateNamespaceInput,
   ): Promise<Namespace> {
+    await this.requireIn(
+      request,
+      id,
+      'workspace.settings',
+      ...(body.paused !== undefined ? (['workspace.pause'] as const) : []),
+    );
     return this.registry.update(id, body);
   }
 
@@ -137,7 +248,11 @@ export class NamespacesController {
   @ApiOperation({
     summary: 'Soft-delete a namespace (hidden from listings; data retained)',
   })
-  async remove(@Param('id') id: string): Promise<void> {
+  async remove(
+    @Req() request: FastifyRequest,
+    @Param('id') id: string,
+  ): Promise<void> {
+    await this.requireIn(request, id, 'workspace.delete');
     await this.registry.remove(id);
   }
 }

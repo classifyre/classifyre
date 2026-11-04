@@ -16,10 +16,10 @@ export class MeActorDto {
   kind: 'person' | 'agent' | 'integration' | 'system';
 
   @ApiProperty({
-    enum: ['header', 'mcp-token', 'internal-key', 'autopilot', 'none'],
+    enum: ['header', 'oidc', 'mcp-token', 'internal-key', 'autopilot', 'none'],
     description: 'How the actor was identified.',
   })
-  via: 'header' | 'mcp-token' | 'internal-key' | 'autopilot' | 'none';
+  via: 'header' | 'oidc' | 'mcp-token' | 'internal-key' | 'autopilot' | 'none';
 }
 
 export class MeResponseDto {

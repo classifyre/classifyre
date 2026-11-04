@@ -62,6 +62,7 @@ export type MeActorDtoKindEnum = typeof MeActorDtoKindEnum[keyof typeof MeActorD
  */
 export const MeActorDtoViaEnum = {
     Header: 'header',
+    Oidc: 'oidc',
     McpToken: 'mcp-token',
     InternalKey: 'internal-key',
     Autopilot: 'autopilot',

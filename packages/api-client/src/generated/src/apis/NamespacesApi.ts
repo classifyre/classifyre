@@ -45,6 +45,7 @@ export interface NamespacesControllerUpdateCategoryRequest {
 export class NamespacesApi extends runtime.BaseAPI {
 
     /**
+     * With sign-in, `ownerGroupId` is required: a group of your tenant that you belong to and may create workspaces for (GET /namespaces/owning-groups).
      * Create a namespace (provisions its Postgres schema + migrations)
      */
     async namespacesControllerCreateRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
@@ -66,6 +67,7 @@ export class NamespacesApi extends runtime.BaseAPI {
     }
 
     /**
+     * With sign-in, `ownerGroupId` is required: a group of your tenant that you belong to and may create workspaces for (GET /namespaces/owning-groups).
      * Create a namespace (provisions its Postgres schema + migrations)
      */
     async namespacesControllerCreate(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
@@ -137,7 +139,7 @@ export class NamespacesApi extends runtime.BaseAPI {
     }
 
     /**
-     * List all namespaces
+     * List the namespaces the caller can see (all of them without sign-in)
      */
     async namespacesControllerListRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
         const queryParameters: any = {};
@@ -158,7 +160,7 @@ export class NamespacesApi extends runtime.BaseAPI {
     }
 
     /**
-     * List all namespaces
+     * List the namespaces the caller can see (all of them without sign-in)
      */
     async namespacesControllerList(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.namespacesControllerListRaw(initOverrides);
@@ -190,6 +192,34 @@ export class NamespacesApi extends runtime.BaseAPI {
      */
     async namespacesControllerListCategories(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.namespacesControllerListCategoriesRaw(initOverrides);
+    }
+
+    /**
+     * Groups the caller may create workspaces for (empty without sign-in)
+     */
+    async namespacesControllerOwningGroupsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/namespaces/owning-groups`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Groups the caller may create workspaces for (empty without sign-in)
+     */
+    async namespacesControllerOwningGroups(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.namespacesControllerOwningGroupsRaw(initOverrides);
     }
 
     /**

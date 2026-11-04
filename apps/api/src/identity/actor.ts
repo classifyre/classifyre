@@ -7,6 +7,7 @@ const MAX_ACTOR_CHARS = 64;
 export type ActorKind = 'person' | 'agent' | 'integration' | 'system';
 export type ActorVia =
   | 'header'
+  | 'oidc'
   | 'mcp-token'
   | 'internal-key'
   | 'autopilot'
