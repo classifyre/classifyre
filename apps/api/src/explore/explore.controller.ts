@@ -29,9 +29,11 @@ import {
 } from './explore.dto';
 import { ExploreService } from './explore.service';
 import { ExploreViewsService } from './explore-views.service';
+import { AccessArea } from '../identity/access.decorators';
 
 @ApiTags('explore')
 @ApiExtraModels(ExplorePositionDto)
+@AccessArea({ view: 'asset.view', change: 'asset.tag' })
 @Controller('explore')
 export class ExploreController {
   constructor(

@@ -15,7 +15,7 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { FastifyReply } from 'fastify';
-import { ActorName } from '../actor-name.decorator';
+import { ActorRef } from '../identity/actor-ref.decorator';
 import { parseStatuses } from '../glossary/glossary.controller';
 import { EntitiesService, type CreateEntityInput } from './entities.service';
 import { EntityCandidatesService } from './entity-candidates.service';
@@ -24,6 +24,7 @@ import { EntityResolutionService } from './entity-resolution.service';
 import { EntitySwitchService } from './entity-switch.service';
 import { EntityValuesService } from './entity-values.service';
 import { SHIPPED_IDENTIFIER_LABELS } from './entity-labels';
+import { AccessArea } from '../identity/access.decorators';
 
 /**
  * Entities (docs/prd/G5-entities.md). An entity is an ENTITY-kind glossary
@@ -36,6 +37,7 @@ import { SHIPPED_IDENTIFIER_LABELS } from './entity-labels';
  * refused with the same 409 the other feature switches use.
  */
 @ApiTags('entities')
+@AccessArea({ view: 'entity.view', change: 'entity.manage' })
 @Controller('entities')
 export class EntitiesController {
   constructor(
@@ -78,7 +80,7 @@ export class EntitiesController {
     summary:
       'Create an entity, optionally from a finding or an indexed value ("Make entity")',
   })
-  async create(@Body() body: CreateEntityInput, @ActorName() actor?: string) {
+  async create(@Body() body: CreateEntityInput, @ActorRef() actor?: string) {
     await this.switchService.assertEnabled();
     return this.entities.create(body ?? {}, { name: actor ?? 'operator' });
   }
@@ -168,7 +170,7 @@ export class EntitiesController {
     body: {
       decisions?: Array<{ id: string; decision: 'accept' | 'reject' | 'move' }>;
     },
-    @ActorName() actor?: string,
+    @ActorRef() actor?: string,
   ) {
     const decisions = Array.isArray(body?.decisions) ? body.decisions : [];
     if (!decisions.length || decisions.length > 500) {
@@ -201,7 +203,7 @@ export class EntitiesController {
 
   @Delete('values/:valueId')
   @ApiOperation({ summary: 'Remove an identifier or a confirmed value' })
-  removeValue(@Param('valueId') valueId: string, @ActorName() actor?: string) {
+  removeValue(@Param('valueId') valueId: string, @ActorRef() actor?: string) {
     return this.values.removeValue(valueId, { name: actor ?? 'operator' });
   }
 
@@ -223,7 +225,7 @@ export class EntitiesController {
       anchorUrn?: string | null;
       attributes?: Record<string, unknown> | null;
     },
-    @ActorName() actor?: string,
+    @ActorRef() actor?: string,
   ) {
     return this.entities.update(idOrKey, body ?? {}, {
       name: actor ?? 'operator',
@@ -324,7 +326,7 @@ export class EntitiesController {
   async addValue(
     @Param('idOrKey') idOrKey: string,
     @Body() body: { label?: string; value?: string },
-    @ActorName() actor?: string,
+    @ActorRef() actor?: string,
   ) {
     const term = await this.entities.resolveEntity(idOrKey);
     if (typeof body?.label !== 'string' || typeof body?.value !== 'string') {
@@ -348,7 +350,7 @@ export class EntitiesController {
   async merge(
     @Param('idOrKey') idOrKey: string,
     @Body() body: { into?: string },
-    @ActorName() actor?: string,
+    @ActorRef() actor?: string,
   ) {
     if (typeof body?.into !== 'string' || !body.into.trim()) {
       throw new BadRequestException('into (an entity id or key) is required');

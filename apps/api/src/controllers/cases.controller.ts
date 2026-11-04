@@ -12,7 +12,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { ActorName } from '../actor-name.decorator';
+import { ActorRef } from '../identity/actor-ref.decorator';
 import { CasesService } from '../cases.service';
 import {
   AddEvidenceDto,
@@ -36,8 +36,10 @@ import {
   UpdateEvidenceNoteDto,
 } from '../dto/case.dto';
 import { GraphResponseDto } from '../dto/graph.dto';
+import { AccessArea, Requires } from '../identity/access.decorators';
 
 @ApiTags('cases')
+@AccessArea({ view: 'case.view', change: 'case.edit' })
 @Controller('cases')
 export class CasesController {
   constructor(private readonly casesService: CasesService) {}
@@ -48,7 +50,7 @@ export class CasesController {
   @ApiResponse({ status: 201, type: CaseResponseDto })
   create(
     @Body() dto: CreateCaseDto,
-    @ActorName() actor: string | undefined,
+    @ActorRef() actor: string | undefined,
   ): Promise<CaseResponseDto> {
     return this.casesService.create({
       ...dto,
@@ -80,11 +82,12 @@ export class CasesController {
   update(
     @Param('id') id: string,
     @Body() dto: UpdateCaseDto,
-    @ActorName() actor: string | undefined,
+    @ActorRef() actor: string | undefined,
   ): Promise<CaseResponseDto> {
     return this.casesService.update(id, dto, actor);
   }
 
+  @Requires('case.manage')
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete a case (its questions become standalone)' })
@@ -180,7 +183,7 @@ export class CasesController {
   linkInquiries(
     @Param('id') id: string,
     @Body() dto: LinkInquiriesDto,
-    @ActorName() actor: string | undefined,
+    @ActorRef() actor: string | undefined,
   ): Promise<CaseResponseDto> {
     return this.casesService.linkInquiries(id, dto, actor);
   }
@@ -195,7 +198,7 @@ export class CasesController {
     @Param('id') id: string,
     @Param('inquiryId') inquiryId: string,
     @Body() dto: SetInquiryAutoPullDto,
-    @ActorName() actor: string | undefined,
+    @ActorRef() actor: string | undefined,
   ): Promise<CaseResponseDto> {
     // No global ValidationPipe runs here, so the boolean arrives as whatever
     // the client sent — including the string "true" from an older MCP session.
@@ -216,11 +219,12 @@ export class CasesController {
   unlinkInquiry(
     @Param('id') id: string,
     @Param('inquiryId') inquiryId: string,
-    @ActorName() actor: string | undefined,
+    @ActorRef() actor: string | undefined,
   ): Promise<CaseResponseDto> {
     return this.casesService.unlinkInquiry(id, inquiryId, actor);
   }
 
+  @Requires('case.manage')
   @Post(':id/close')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -243,7 +247,7 @@ export class CasesController {
   pull(
     @Param('id') id: string,
     @Body() dto: PullFromInquiryDto,
-    @ActorName() actor: string | undefined,
+    @ActorRef() actor: string | undefined,
   ): Promise<PullFromInquiryResponseDto> {
     return this.casesService.pullFromInquiry(id, dto, actor);
   }

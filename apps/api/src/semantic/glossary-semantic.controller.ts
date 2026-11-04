@@ -10,7 +10,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { ActorName } from '../actor-name.decorator';
+import { ActorRef } from '../identity/actor-ref.decorator';
 import { AllowInDemoMode } from '../demo-mode.decorator';
 import {
   GlossaryProposalsService,
@@ -22,12 +22,14 @@ import type {
 } from './suggestions/glossary-proposals.service';
 import { FindInTextService } from './find-in-text/find-in-text.service';
 import type { FindInTextInput } from './find-in-text/find-in-text.service';
+import { AccessArea, Requires } from '../identity/access.decorators';
 
 /**
  * Glossary routes that belong to the semantic layer: the review queue (SL4)
  * and "Find in text" (SL2 §7).
  */
 @ApiTags('glossary')
+@AccessArea({ view: 'glossary.view', change: 'glossary.edit' })
 @Controller('glossary')
 export class GlossarySemanticController {
   constructor(
@@ -76,6 +78,7 @@ export class GlossarySemanticController {
     return this.proposals.linkGroups();
   }
 
+  @Requires('glossary.approve')
   @Post('proposals/decide')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -91,7 +94,7 @@ export class GlossarySemanticController {
       edit?: Record<string, unknown>;
       reason?: string;
     },
-    @ActorName() actor?: string,
+    @ActorRef() actor?: string,
   ) {
     if (!body?.kind || !body?.id || !body?.decision) {
       throw new BadRequestException('kind, id and decision are required');
@@ -106,6 +109,7 @@ export class GlossarySemanticController {
     });
   }
 
+  @Requires('glossary.approve')
   @Post('proposals/decide-bulk')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -121,7 +125,7 @@ export class GlossarySemanticController {
       decision: 'accept' | 'dismiss';
       reason?: string;
     },
-    @ActorName() actor?: string,
+    @ActorRef() actor?: string,
   ) {
     if (body?.decision !== 'accept' && body?.decision !== 'dismiss') {
       throw new BadRequestException('decision is accept or dismiss');
@@ -158,7 +162,7 @@ export class GlossarySemanticController {
   findInTextCreate(
     @Param('idOrKey') idOrKey: string,
     @Body() body: FindInTextInput,
-    @ActorName() actor?: string,
+    @ActorRef() actor?: string,
   ) {
     return this.findInText.create(idOrKey, {
       ...(body ?? {}),

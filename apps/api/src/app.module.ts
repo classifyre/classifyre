@@ -88,6 +88,8 @@ import { NamespacesController } from './registry/namespaces.controller';
 import { SitemapController } from './sitemap/sitemap.controller';
 import { SitemapService } from './sitemap/sitemap.service';
 import { NamespaceWorkerManager } from './namespace/namespace-worker-manager';
+import { IdentityModule } from './identity/identity.module';
+import { AccessGuard } from './identity/access.guard';
 
 // Import organized controllers
 import {
@@ -126,6 +128,7 @@ import {
     // middleware would run before the namespace is resolved, so we don't use it.
     ClsModule.forRoot({ global: true }),
     PrismaCoreModule,
+    IdentityModule,
     NamespacePauseModule,
     CliRunnerModule,
     NotebookModule,
@@ -180,6 +183,8 @@ import {
     { provide: APP_GUARD, useClass: InternalApiKeyGuard },
     { provide: APP_GUARD, useClass: DemoModeGuard },
     { provide: APP_GUARD, useClass: NamespacePausedGuard },
+    // Last: the questions above (internal key, demo, paused) are answered first.
+    { provide: APP_GUARD, useClass: AccessGuard },
     CliBackpressureGuard,
     DemoModeService,
     InternalApiKeyService,

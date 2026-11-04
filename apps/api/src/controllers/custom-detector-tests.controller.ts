@@ -13,7 +13,9 @@ import {
 import type { FastifyReply } from 'fastify';
 import { CustomDetectorTestsService } from '../custom-detector-tests.service';
 import type { TestTrigger } from '../dto/custom-detector-tests.dto';
+import { AccessArea } from '../identity/access.decorators';
 
+@AccessArea({ view: 'detector.view', change: 'detector.manage' })
 @Controller('custom-detectors/:detectorId/test-scenarios')
 export class CustomDetectorTestsController {
   constructor(private readonly tests: CustomDetectorTestsService) {}

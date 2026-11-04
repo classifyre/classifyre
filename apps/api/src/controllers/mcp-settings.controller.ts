@@ -19,8 +19,10 @@ import {
   McpTokenResponseDto,
   UpdateMcpTokenDto,
 } from '../dto/mcp-settings.dto';
+import { AccessArea, Requires } from '../identity/access.decorators';
 
 @ApiTags('Instance Settings')
+@AccessArea({ view: 'workspace.view', change: 'mcp.token.own' })
 @Controller('instance-settings/mcp')
 export class McpSettingsController {
   constructor(
@@ -57,6 +59,7 @@ export class McpSettingsController {
     return this.mcpToolsCatalogService.getTools();
   }
 
+  @Requires('mcp.token.own')
   @Get('tokens')
   @ApiOperation({
     summary: 'List MCP access tokens',

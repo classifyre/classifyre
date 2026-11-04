@@ -13,6 +13,9 @@ import underPressure from '@fastify/under-pressure';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { McpServerFactoryService } from './mcp-server.factory';
 import { McpTokenService } from './mcp-token.service';
+import { ActorContextService } from './identity/actor-context.service';
+import { ACCESS_POLICY, type AccessPolicy } from './identity/access-policy';
+import { integrationFromMcpToken } from './identity/actor';
 import { InstanceSettingsService } from './instance-settings.service';
 import { PrismaExceptionFilter } from './filters/prisma-exception.filter';
 import { DbRetryInterceptor } from './interceptors/db-retry.interceptor';
@@ -259,6 +262,8 @@ async function bootstrap() {
   const prismaClientManager = app.get(PrismaClientManager);
   const internalApiKey = app.get(InternalApiKeyService);
   const demoMode = app.get(DemoModeService);
+  const actors = app.get(ActorContextService);
+  const accessPolicy = app.get<AccessPolicy>(ACCESS_POLICY);
 
   // Resolve the leading `/<slug>` into a tenant context (404 on unknown slug)
   // before any route runs. `/<slug>/mcp` was already rewritten to `/mcp`.
@@ -308,7 +313,11 @@ async function bootstrap() {
         return;
       }
 
-      let authorizedToken: { toolGroupIds: string[] | null };
+      let authorizedToken: {
+        id: string;
+        name: string;
+        toolGroupIds: string[] | null;
+      };
       try {
         authorizedToken = await mcpTokenService.authorizeBearerToken(
           request.headers.authorization,
@@ -324,11 +333,16 @@ async function bootstrap() {
         return;
       }
 
+      const actor = integrationFromMcpToken(authorizedToken);
+      actors.set(actor);
+      const capabilities = await accessPolicy.capabilities(actor);
+
       reply.hijack();
 
       try {
         const server = mcpServerFactory.createServer({
           toolGroupIds: authorizedToken.toolGroupIds,
+          capabilities,
         });
         const transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: undefined,

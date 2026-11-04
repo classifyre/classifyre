@@ -20,8 +20,10 @@ import { NotificationListResponseDto } from '../dto/notification-list-response.d
 import { NotificationResponseDto } from '../dto/notification-response.dto';
 import { MarkAllReadDto } from '../dto/mark-all-read.dto';
 import { UpdateNotificationImportanceDto } from '../dto/update-notification-importance.dto';
+import { Requires } from '../identity/access.decorators';
 
 @ApiTags('Notifications')
+@Requires('workspace.view')
 @Controller('notifications')
 export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}

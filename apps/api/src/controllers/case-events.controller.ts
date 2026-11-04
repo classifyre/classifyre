@@ -14,8 +14,10 @@ import {
   CreateCaseEventDto,
   UpdateCaseEventDto,
 } from '../dto/case-event.dto';
+import { AccessArea } from '../identity/access.decorators';
 
 @ApiTags('cases')
+@AccessArea({ view: 'case.view', change: 'case.edit' })
 @Controller('cases/:caseId/events')
 export class CaseEventsController {
   constructor(private readonly events: CaseEventsService) {}

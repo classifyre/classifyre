@@ -7,6 +7,7 @@ import {
   type SitemapEntityType,
 } from './sitemap.entities';
 import { SitemapService } from './sitemap.service';
+import { PublicRoute } from '../identity/access.decorators';
 
 /**
  * Namespace-scoped sitemap coordinates (`GET /<namespace>/sitemap/...`).
@@ -16,6 +17,7 @@ import { SitemapService } from './sitemap.service';
  * walking a large tenant cannot turn into a load problem.
  */
 @ApiTags('Sitemap')
+@PublicRoute()
 @Controller('sitemap')
 export class SitemapController {
   constructor(private readonly sitemapService: SitemapService) {}

@@ -9087,6 +9087,28 @@
         ]
       }
     },
+    "/me": {
+      "get": {
+        "operationId": "MeController_me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Who is calling, and what they may do in this workspace",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
     "/sources/{sourceId}/run": {
       "post": {
         "operationId": "CliRunnerController_startRunner",
@@ -29722,6 +29744,115 @@
         "required": [
           "queue",
           "droppedQueued"
+        ]
+      },
+      "MeActorDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Stable principal id; null while identity is self-declared.",
+            "nullable": true
+          },
+          "displayName": {
+            "type": "string",
+            "nullable": true,
+            "example": "Jordan Reyes"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "person",
+              "agent",
+              "integration",
+              "system"
+            ]
+          },
+          "via": {
+            "type": "string",
+            "enum": [
+              "header",
+              "mcp-token",
+              "internal-key",
+              "autopilot",
+              "none"
+            ],
+            "description": "How the actor was identified."
+          }
+        },
+        "required": [
+          "id",
+          "displayName",
+          "kind",
+          "via"
+        ]
+      },
+      "MeResponseDto": {
+        "type": "object",
+        "properties": {
+          "actor": {
+            "$ref": "#/components/schemas/MeActorDto"
+          },
+          "iamEnabled": {
+            "type": "boolean",
+            "description": "True when sign-in and access management are on. Without it every visitor holds every capability."
+          },
+          "capabilities": {
+            "type": "array",
+            "description": "Capabilities the actor holds in this workspace.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "workspace.view",
+                "workspace.settings",
+                "workspace.pause",
+                "workspace.delete",
+                "workspace.transfer",
+                "access.view",
+                "access.manage",
+                "source.view",
+                "source.manage",
+                "source.run",
+                "source.purge",
+                "finding.view",
+                "finding.triage",
+                "asset.view",
+                "asset.tag",
+                "detector.view",
+                "detector.manage",
+                "detector.train",
+                "code.author",
+                "case.view",
+                "case.edit",
+                "case.manage",
+                "inquiry.view",
+                "inquiry.edit",
+                "lead.review",
+                "glossary.view",
+                "glossary.edit",
+                "glossary.approve",
+                "entity.view",
+                "entity.manage",
+                "correlation.review",
+                "agent.view",
+                "agent.configure",
+                "agent.use",
+                "data.export",
+                "mcp.token.own",
+                "mcp.token.admin",
+                "tenant.workspace.create",
+                "tenant.access.manage",
+                "tenant.categories.manage",
+                "tenant.audit.view",
+                "platform.tenants.manage"
+              ]
+            }
+          }
+        },
+        "required": [
+          "actor",
+          "iamEnabled",
+          "capabilities"
         ]
       },
       "StartRunnerDto": {

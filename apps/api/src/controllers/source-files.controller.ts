@@ -21,8 +21,10 @@ import '@fastify/multipart';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { SourceFilesService } from '../source-files.service';
 import { UploadedSourceFileDto } from '../dto/uploaded-source-file.dto';
+import { AccessArea } from '../identity/access.decorators';
 
 @ApiTags('Sources')
+@AccessArea({ view: 'source.view', change: 'source.manage' })
 @Controller('sources/:sourceId/files')
 export class SourceFilesController {
   constructor(private readonly files: SourceFilesService) {}

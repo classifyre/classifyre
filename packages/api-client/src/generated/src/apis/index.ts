@@ -21,6 +21,7 @@ export { FindingsApi } from './FindingsApi';
 export { GlossaryApi } from './GlossaryApi';
 export { GraphApi } from './GraphApi';
 export { HealthApi } from './HealthApi';
+export { IdentityApi } from './IdentityApi';
 export { InquiriesApi } from './InquiriesApi';
 export { InstanceSettingsApi } from './InstanceSettingsApi';
 export { MaintenanceApi } from './MaintenanceApi';
