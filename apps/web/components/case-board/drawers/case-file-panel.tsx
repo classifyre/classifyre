@@ -41,6 +41,8 @@ import { useTimelineLink } from "../hooks/use-timeline-link";
 import { useVisibleCentre } from "../hooks/use-visible-centre";
 import { placeTerm } from "../store/commands";
 import { useNsPath } from "@/lib/ns-path";
+import { ActorName } from "@/components/actor-chip";
+import { ChangedBy } from "@/components/audit-history";
 
 /** The statuses a case moves between while it is being worked; closing has its own button. */
 const STATUSES = ["OPEN", "IN_PROGRESS"] as const;
@@ -321,11 +323,16 @@ function DetailsSection({
         {savingStatus && <Loader2 className="size-3.5 animate-spin text-muted-foreground" />}
         {created && (
           <span className="text-muted-foreground">
-            {caseData.createdBy && !isAiActor(caseData.createdBy)
-              ? t("caseBoard.caseFile.openedBy", { when: created, who: caseData.createdBy })
-              : t("caseBoard.caseFile.opened", { when: created })}
+            {caseData.createdBy && !isAiActor(caseData.createdBy) ? (
+              <ActorName actorRef={caseData.createdBy}>
+                {(who) => t("caseBoard.caseFile.openedBy", { when: created, who })}
+              </ActorName>
+            ) : (
+              t("caseBoard.caseFile.opened", { when: created })
+            )}
           </span>
         )}
+        <ChangedBy entityType="cases" entityId={caseData.id} className="basis-full" />
       </div>
     </section>
   );

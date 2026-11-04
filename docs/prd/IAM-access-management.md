@@ -2,7 +2,7 @@
 
 |                       |                                                                                                                                      |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| **Status**            | In progress: steps 0–2 done 2026-11-04 (§13)                                                                                         |
+| **Status**            | In progress: steps 0–3 done 2026-11-04 (§13)                                                                                         |
 | **Size**              | L (9 steps, each its own PR)                                                                                                         |
 | **Depends on**        | [S1 · Enterprise extension seams](S1-enterprise-extension-seams.md) (step 1 builds S1 R1–R8 and R15)                                 |
 | **Identity provider** | Keycloak 26.8.1 (`quay.io/keycloak/keycloak:26.8.1`, released 2026-10-13), Helm chart only                                           |
@@ -548,6 +548,20 @@ Left for later steps:
 
 - `ActorChip`, `ChangedBy`, `HistoryDrawer`; every page in §11.2; Settings → Activity tab.
 - **Done:** Playwright component tests for the three components; page checks in the dev stack in IAM-off mode.
+
+**As built, 2026-11-04** (`apps/web`):
+
+- **Names.** `hooks/use-actors.ts` resolves references in batches (one `actors/resolve` call per 30 ms burst) and caches them per workspace. Self-declared names, agents and the system need no request; only MCP tokens and people do. `ActorChip` shows an icon per kind (person, token, agent, system; the autopilot keeps its amber sparkle), and its tooltip says a self-declared name is unverified without sign-in. `ActorName` is for sentences that interpolate a name ("Added by {{name}}").
+- **Raw strings replaced** in 16 places that printed an author as text: notifications, case leads, case timeline, evidence, case clean-up filters and hypothesis rules, harness brief and undo, glossary activity and bindings, and on the case board comment pins, thread entries, edges, snapshots and case file. Without this an MCP change would have shown `mcp:<uuid>`.
+- **`ChangedBy`** ("Created by · Last changed by · History") on the source, inquiry, detector, finding and glossary term pages and in the case file. The history opens in a side sheet. "Created by" comes from the entity where it records one; the last change and the history come from the audit trail.
+- **Settings → Activity** lists the whole workspace trail with the entity of each change.
+- **Tests:** `tests/components/audit-history.spec.tsx` (Playwright CT): token resolved to its name and never shown raw, self-declared names not sent for resolving, history lists field names only, empty state.
+
+Left open:
+
+- **Not checked in the running app.** The dev server on port 3000 (started outside this work) answers every page with HTTP 500, `routeModule.ensureInstrumentation is not a function`: it runs Next 16.2.10 while the checkout now resolves 16.4.3. Next refuses a second dev server in the same checkout. Check the pages after restarting it.
+- **Glossary term history** is keyed by term id. Routes that take a key (`/glossary/:idOrKey/...` called with a key) file their events under the key, so those do not show in the term's history.
+- **Places from §11.2 not done yet:** the workspace directory card, scans "triggered by" (it shows trigger kinds such as `pg-boss`, not actors), assets, notebooks, explore views, the MCP token owner column (needs owners, step 5), AI provider and chat bot settings, data transfer jobs.
 
 ### Step 4 · Chart: `iam`
 

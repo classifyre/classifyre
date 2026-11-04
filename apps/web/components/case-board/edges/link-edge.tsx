@@ -10,6 +10,7 @@ import type { TranslationKey } from "@/i18n";
 import { useTranslation } from "@/hooks/use-translation";
 import { useBoard, useUi } from "../store/board-context";
 import type { BoardEdge } from "../store/projection";
+import { useActorName } from "@/hooks/use-actors";
 
 /** The popover's vocabulary in words; custom kinds read as typed. */
 export function humanizeKind(
@@ -32,6 +33,7 @@ export function humanizeKind(
 export const LinkEdge = React.memo(function LinkEdge({ id, source, target, selected, data }: EdgeProps<BoardEdge>) {
   const { t } = useTranslation();
   const link = useBoard((s) => (data?.linkId ? s.links.get(data.linkId) : undefined));
+  const createdByName = useActorName(link?.createdBy);
   const globalEdge = useBoard((s) =>
     data?.systemEdgeId ? s.systemEdges.get(data.systemEdgeId) : undefined,
   );
@@ -59,7 +61,7 @@ export const LinkEdge = React.memo(function LinkEdge({ id, source, target, selec
         hovered && (isGlobal || link?.createdBy)
           ? isGlobal
             ? t("caseBoard.edges.global")
-            : t("caseBoard.edges.by", { name: link?.createdBy ?? t("caseBoard.someone") })
+            : t("caseBoard.edges.by", { name: createdByName ?? t("caseBoard.someone") })
           : null
       }
     />

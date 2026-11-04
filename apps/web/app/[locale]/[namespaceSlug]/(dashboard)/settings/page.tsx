@@ -30,6 +30,7 @@ import {
   Server,
   Settings,
   SlidersHorizontal,
+  History,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useInstanceSettings } from "@/components/instance-settings-provider";
@@ -44,6 +45,7 @@ import { PauseWorkspaceCard } from "@/components/namespace/pause-workspace-card"
 import { WorkerQueuesCard } from "@/components/worker-queues-card";
 
 import { useTranslation } from "@/hooks/use-translation";
+import { AuditEventList } from "@/components/audit-history";
 
 type SettingsDraft = {
   language: InstanceSettingsResponseDtoLanguageEnum;
@@ -233,6 +235,10 @@ export default function SettingsPage() {
             <Database className="h-3.5 w-3.5" />
             {t("settings.tabs.cleanup")}
           </TabsTrigger>
+          <TabsTrigger value="activity" className={TAB_TRIGGER_CLASS}>
+            <History className="h-3.5 w-3.5" />
+            {t("settings.tabs.activity")}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent
@@ -417,6 +423,25 @@ export default function SettingsPage() {
           {/* Whether the engines run, then what their data costs to keep. */}
           <FeatureSwitchesCard />
           <CleanupCard />
+        </TabsContent>
+        <TabsContent
+          value="activity"
+          className="space-y-6 duration-300 animate-in fade-in-50 slide-in-from-bottom-1"
+        >
+          <Card className="panel-card rounded-[6px]">
+            <CardContent className="space-y-3 p-5">
+              <div className="flex items-center gap-2">
+                <History className="h-4 w-4" />
+                <p className="text-xs font-mono uppercase tracking-[0.14em]">
+                  {t("audit.activityTitle")}
+                </p>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {t("audit.activityDescription")}
+              </p>
+              <AuditEventList filter={{}} showEntity />
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

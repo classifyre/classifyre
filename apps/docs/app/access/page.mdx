@@ -106,6 +106,17 @@ Reading something is not recorded, and neither is the work scans report back.
 Without sign-in, a person's name is whatever they typed, so the trail shows
 who _said_ they made a change. With sign-in, it shows who did.
 
-The trail can be read today through the API at `GET /<workspace>/audit-events`,
-filtered by item (`entityType`, `entityId`) or by author (`actor`). The web app
-will show it on each item and in the workspace settings.
+### Where to see it
+
+- **On an item.** Sources, inquiries, detectors, findings, glossary terms and
+  the case file show who created the item and who changed it last. **History**
+  opens every change to it, newest first.
+- **For the whole workspace.** **Settings → Activity** lists every change in
+  the workspace.
+- **Through the API.** `GET /<workspace>/audit-events`, filtered by item
+  (`entityType`, `entityId`) or by author (`actor`).
+
+Names are shown with what they are: a person, an MCP token (named after the
+token, also after it is deleted), an agent such as the autopilot, or the
+system. Without sign-in, hovering a person's name reminds you that it was
+typed in, not verified.

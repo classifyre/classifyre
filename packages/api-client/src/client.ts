@@ -80,6 +80,7 @@ export { GlossaryApi } from "./generated/src/apis/GlossaryApi";
 export { NotebooksApi } from "./generated/src/apis/NotebooksApi";
 export { AIApi } from "./generated/src/apis/AIApi";
 export { WorkerQueuesApi } from "./generated/src/apis/WorkerQueuesApi";
+export { IdentityApi } from "./generated/src/apis/IdentityApi";
 // Notebook DTOs must be listed by name: this file re-exports selectively,
 // so a generated model that is not named here is not importable from the
 // package root however cleanly codegen produced it.
@@ -365,6 +366,10 @@ export type {
   ExploreMarkDto,
   ExploreViewDto,
   SaveExploreViewDto,
+  AuditEventDto,
+  ResolvedActorDto,
+  MeResponseDto,
+  MeActorDto,
   ExplorePositionDto,
   ExploreLinkStarterDto,
   ExploreAssetRefDto,
@@ -1328,6 +1333,7 @@ import { ChatBotsApi } from "./generated/src/apis/ChatBotsApi";
 import { EmbeddingsApi } from "./generated/src/apis/EmbeddingsApi";
 import { GlossaryApi } from "./generated/src/apis/GlossaryApi";
 import { WorkerQueuesApi } from "./generated/src/apis/WorkerQueuesApi";
+import { IdentityApi } from "./generated/src/apis/IdentityApi";
 
 // Determine the correct base URL
 // In browser: use relative path /api which is proxied by Next.js
@@ -1969,6 +1975,7 @@ class ApiClient {
   public workerQueues: WorkerQueuesApi;
   public namespaces: NamespacesApi;
   public maintenance: MaintenanceApi;
+  public identity: IdentityApi;
 
   constructor(baseUrl?: string) {
     this.config = createConfiguration(baseUrl);
@@ -1999,6 +2006,7 @@ class ApiClient {
     this.glossary = new GlossaryApi(this.config);
     this.workerQueues = new WorkerQueuesApi(this.config);
     this.maintenance = new MaintenanceApi();
+    this.identity = new IdentityApi(this.config);
   }
 
   /**

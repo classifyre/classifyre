@@ -735,7 +735,8 @@
       "chat": "Chat-Bots",
       "data": "Export & Import",
       "workers": "Worker",
-      "cleanup": "Bereinigung"
+      "cleanup": "Bereinigung",
+      "activity": "Aktivität"
     },
     "cleanup": {
       "title": "Speicher & Bereinigung",
@@ -7223,5 +7224,34 @@
       "saved": "Labels gespeichert. Die Entitätswerte werden neu erzeugt.",
       "add": "Label hinzufügen"
     }
+  },
+  "actors": {
+    "autopilot": "Autopilot",
+    "system": "System",
+    "mcpToken": "MCP-Token",
+    "person": "Jemand",
+    "selfDeclared": "Von der Person eingegebener Name; ohne Anmeldung nicht geprüft",
+    "viaToken": "Über das MCP-Token {{token}} ausgeführt",
+    "via": "über {{token}}",
+    "kinds": {
+      "user": "Angemeldete Person",
+      "name": "Person",
+      "mcp": "MCP-Token",
+      "agent": "Agent",
+      "system": "System"
+    }
+  },
+  "audit": {
+    "createdBy": "Erstellt von",
+    "lastChangedBy": "Zuletzt geändert von",
+    "history": "Verlauf",
+    "historyTitle": "Verlauf",
+    "historyDescription": "Jede Änderung an diesem Element, neueste zuerst. Gespeichert werden nur Feldnamen, nie ihre Werte.",
+    "mcpTool": "MCP · {{tool}}",
+    "fields": "Felder: {{fields}}",
+    "empty": "Noch keine Änderungen erfasst.",
+    "loadMore": "Mehr laden",
+    "activityTitle": "Aktivität",
+    "activityDescription": "Jede Änderung in diesem Arbeitsbereich, aus der Web-App, der API oder von Agenten über MCP. Lesezugriffe werden nicht erfasst."
   }
 }

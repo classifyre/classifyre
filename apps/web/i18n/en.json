@@ -735,7 +735,8 @@
       "chat": "Chat Bots",
       "data": "Export & Import",
       "workers": "Workers",
-      "cleanup": "Cleanup"
+      "cleanup": "Cleanup",
+      "activity": "Activity"
     },
     "cleanup": {
       "title": "Storage & cleanup",
@@ -7223,5 +7224,34 @@
       "saved": "Labels saved. Entity values are being regenerated.",
       "add": "Add label"
     }
+  },
+  "actors": {
+    "autopilot": "Autopilot",
+    "system": "System",
+    "mcpToken": "MCP token",
+    "person": "Someone",
+    "selfDeclared": "Name entered by the person; not verified without sign-in",
+    "viaToken": "Acted through the MCP token {{token}}",
+    "via": "via {{token}}",
+    "kinds": {
+      "user": "Signed-in person",
+      "name": "Person",
+      "mcp": "MCP token",
+      "agent": "Agent",
+      "system": "System"
+    }
+  },
+  "audit": {
+    "createdBy": "Created by",
+    "lastChangedBy": "Last changed by",
+    "history": "History",
+    "historyTitle": "History",
+    "historyDescription": "Every change to this item, newest first. Only field names are kept, never their values.",
+    "mcpTool": "MCP · {{tool}}",
+    "fields": "Fields: {{fields}}",
+    "empty": "No changes recorded yet.",
+    "loadMore": "Load more",
+    "activityTitle": "Activity",
+    "activityDescription": "Every change made in this workspace, from the web app, the API or agents through MCP. Reads are not recorded."
   }
 }

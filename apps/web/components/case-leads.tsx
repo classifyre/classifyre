@@ -63,6 +63,7 @@ import {
   type LeadReason,
   type LeadSort,
 } from "@/components/case-board/store/leads";
+import { ActorChip } from "@/components/actor-chip";
 
 const ORIGIN_ICON: Record<LeadReason, LucideIcon> = {
   DUPLICATE: Copy,
@@ -308,7 +309,7 @@ export function CaseLeads({
                   <span className="min-w-0 flex-1 truncate">{lead.kind === "ASSET" ? (lead.assetName ?? lead.title) : lead.title}</span>
                   {!joined && (
                     <span className="hidden shrink-0 text-muted-foreground @sm:inline">
-                      {lead.reviewedBy ?? "—"}
+                      {lead.reviewedBy ? <ActorChip actorRef={lead.reviewedBy} /> : "—"}
                       {lead.reviewedAt ? ` · ${new Date(lead.reviewedAt).toLocaleDateString()}` : ""}
                     </span>
                   )}

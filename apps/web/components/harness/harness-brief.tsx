@@ -20,6 +20,7 @@ import Markdown from "react-markdown";
 import { toast } from "sonner";
 import { useTranslation } from "@/hooks/use-translation";
 import { formatRelative } from "@/lib/date";
+import { ActorName } from "@/components/actor-chip";
 
 function humanizeFactKey(key: string): string {
   return key
@@ -88,7 +89,9 @@ export function HarnessBrief() {
         </Badge>
         {brief?.updatedBy && (
           <span className="font-mono text-[10px] text-muted-foreground">
-            {t("harness.brief.updatedBy", { who: brief.updatedBy })}
+            <ActorName actorRef={brief.updatedBy}>
+              {(who) => t("harness.brief.updatedBy", { who })}
+            </ActorName>
           </span>
         )}
         {brief?.updatedAt && (

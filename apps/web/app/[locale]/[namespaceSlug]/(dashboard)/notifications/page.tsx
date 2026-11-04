@@ -56,6 +56,7 @@ import {
 import { formatRelative, formatShortUTC } from "@/lib/date";
 import { useNotificationsWebSocket } from "@/hooks/use-notifications-websocket";
 import { useTranslation } from "@/hooks/use-translation";
+import { ActorName } from "@/components/actor-chip";
 
 type ListNotificationsRequest = NonNullable<
   Parameters<
@@ -613,7 +614,9 @@ export default function NotificationsPage() {
                           )}
                           {item.triggeredBy && (
                             <p className="break-words">
-                              {t("notifications.triggeredByLabel", { name: item.triggeredBy })}
+                              <ActorName actorRef={item.triggeredBy}>
+                                {(name) => t("notifications.triggeredByLabel", { name })}
+                              </ActorName>
                             </p>
                           )}
                           {!item.sourceName &&
