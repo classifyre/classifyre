@@ -9,9 +9,8 @@ import { Callout } from "nextra/components";
 # Access & Sign-in
 
 <Callout type="info">
-  Sign-in is being built in stages. People can sign in to the web app, and the
-  API enforces the access model below. Managing access from the web app comes
-  next; until then it is done through the API.
+  Sign-in is optional and comes with the Helm chart. This page describes how
+  access works once it is on.
 </Callout>
 
 Access management is **optional**. When it is off, Classifyre works as it
@@ -112,21 +111,30 @@ turned on has no owner and stops working: create a new one after signing in.
 
 ## Giving access
 
-Access is given with **grants**. Through the API today, in the web app soon:
+Access is given with **grants**:
 
-- **In a workspace** (`/<workspace>/access/grants`), workspace admins give a
-  group or a person a role on that workspace. Grants that come from the
-  tenant or from the group owning the workspace are listed as inherited and can
-  only be changed by a tenant admin.
-- **For the tenant** (`/tenant/grants`), tenant admins give roles on the whole
-  tenant, on every workspace a group owns, or on one workspace.
+- **In a workspace**, under **Settings → Access**, workspace admins give a
+  group a role on that workspace, optionally until a date. Grants that come
+  from the tenant or from the group owning the workspace are listed as
+  inherited and can only be changed by a tenant admin.
+- **For the tenant**, on the **Tenant access** page (account menu, or
+  `/tenant`), tenant admins give roles on the whole tenant, on every workspace
+  a group owns, or on one workspace, and see the tenant's activity.
+- **When creating a workspace**, you choose the group that owns it. Only
+  groups you belong to and may create workspaces for are offered.
+
+Groups and who is in them are managed in the identity server (or the company
+directory it is connected to), not in Classifyre.
+
+The same is available through the API (`/<workspace>/access/…` and
+`/tenant/…`).
 
 Nobody can give more than they have: a workspace admin cannot make someone a
 code author, because writing code is not part of what a workspace admin may
 do. Grants can end on a date, for people who only need access for a while.
 
-To see why you can do something, `/<workspace>/access/explain?capability=…`
-lists the grants that give it to you.
+To see why you can do something, **Settings → Access → Why can I…?** lists
+the grants that give it to you.
 
 Every grant given or removed, and every workspace created or deleted, is kept
 in the tenant's audit trail (`/tenant/audit-events`).

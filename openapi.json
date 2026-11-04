@@ -9416,6 +9416,31 @@
         ]
       }
     },
+    "/tenant/roles": {
+      "get": {
+        "operationId": "TenantAccessController_roles",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RoleDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "The built-in roles and where each can be granted",
+        "tags": [
+          "Access"
+        ]
+      }
+    },
     "/tenant/groups": {
       "get": {
         "operationId": "TenantAccessController_groups",
@@ -9514,6 +9539,44 @@
           }
         },
         "summary": "Remove any grant of the tenant",
+        "tags": [
+          "Access"
+        ]
+      }
+    },
+    "/tenant/actors/resolve": {
+      "get": {
+        "description": "People and agents resolve as in a workspace; MCP tokens belong to workspaces, so here they show as tokens.",
+        "operationId": "TenantAccessController_resolve",
+        "parameters": [
+          {
+            "name": "refs",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ResolvedActorDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Display names for actor references, outside any workspace",
         "tags": [
           "Access"
         ]

@@ -107,7 +107,11 @@
     "pausedBannerDescription": "Scans, schedules, AI harness cycles and duplicate checks are stopped. Everything is read-only until you resume.",
     "pausedBannerReason": "Reason: {{reason}}",
     "pausedBannerAction": "Resume in settings",
-    "allWorkspaces": "All workspaces"
+    "allWorkspaces": "All workspaces",
+    "owningGroup": "Owning group",
+    "owningGroupPick": "Choose the group that owns it",
+    "owningGroupHint": "Members of this group and its admins get access as their grants allow.",
+    "owningGroupNone": "You cannot create workspaces: ask a tenant admin to make you a workspace manager for your group."
   },
   "categories": {
     "label": "Categories",
@@ -736,7 +740,8 @@
       "data": "Export & Import",
       "workers": "Workers",
       "cleanup": "Cleanup",
-      "activity": "Activity"
+      "activity": "Activity",
+      "access": "Access"
     },
     "cleanup": {
       "title": "Storage & cleanup",
@@ -7258,6 +7263,42 @@
     "menu": "Account",
     "signedIn": "Signed in",
     "tenant": "Tenant: {{name}}",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "tenantSettings": "Tenant access"
+  },
+  "access": {
+    "title": "Access",
+    "description": "Who can open this workspace and what they may do. Grants from the tenant or the group that owns the workspace are inherited and can only be changed by a tenant admin.",
+    "loadFailed": "Could not load access.",
+    "removed": "Removed access for {{subject}}.",
+    "removeFailed": "Could not remove access.",
+    "added": "Access given.",
+    "addFailed": "Could not give access.",
+    "until": "until {{date}}",
+    "inherited": "Inherited",
+    "remove": "Remove access",
+    "none": "Nobody has access yet.",
+    "group": "Group",
+    "pickGroup": "Choose a group",
+    "role": "Role",
+    "untilOptional": "Until (optional)",
+    "add": "Give access",
+    "whyTitle": "Why can I…?",
+    "pickCapability": "Choose something you can do",
+    "becauseOf": "{{subject}} as {{role}} on {{scope}}",
+    "allWorkspaces": "All workspaces",
+    "tenantTitle": "Tenant",
+    "tenantDenied": "Only tenant admins can manage access for the whole tenant.",
+    "tenantGrants": "Access across the tenant",
+    "tenantActivity": "Activity",
+    "scope": "Applies to",
+    "scopes": {
+      "tenant": "The whole tenant",
+      "group": "A group's workspaces",
+      "workspace": "One workspace"
+    },
+    "ownedBy": "Workspaces owned by",
+    "workspace": "Workspace",
+    "pickScope": "Choose"
   }
 }

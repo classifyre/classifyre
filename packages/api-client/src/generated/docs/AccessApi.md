@@ -9,6 +9,8 @@ All URIs are relative to *http://localhost*
 | [**tenantAccessControllerGrants**](AccessApi.md#tenantaccesscontrollergrants) | **GET** /tenant/grants | Every grant of the tenant |
 | [**tenantAccessControllerGroups**](AccessApi.md#tenantaccesscontrollergroups) | **GET** /tenant/groups |  |
 | [**tenantAccessControllerRemoveGrant**](AccessApi.md#tenantaccesscontrollerremovegrant) | **DELETE** /tenant/grants/{id} | Remove any grant of the tenant |
+| [**tenantAccessControllerResolve**](AccessApi.md#tenantaccesscontrollerresolve) | **GET** /tenant/actors/resolve | Display names for actor references, outside any workspace |
+| [**tenantAccessControllerRoles**](AccessApi.md#tenantaccesscontrollerroles) | **GET** /tenant/roles | The built-in roles and where each can be granted |
 | [**tenantAccessControllerTenant**](AccessApi.md#tenantaccesscontrollertenant) | **GET** /tenant | The caller’s tenant and what they may do across it |
 | [**workspaceAccessControllerAddGrant**](AccessApi.md#workspaceaccesscontrolleraddgrant) | **POST** /access/grants | Give a group or a person a role on this workspace |
 | [**workspaceAccessControllerExplain**](AccessApi.md#workspaceaccesscontrollerexplain) | **GET** /access/explain | Why can I do this? The grants that give you a capability here |
@@ -316,6 +318,130 @@ No authorization required
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 | **204** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## tenantAccessControllerResolve
+
+> Array&lt;ResolvedActorDto&gt; tenantAccessControllerResolve(refs)
+
+Display names for actor references, outside any workspace
+
+People and agents resolve as in a workspace; MCP tokens belong to workspaces, so here they show as tokens.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  AccessApi,
+} from '@workspace/api-client';
+import type { TenantAccessControllerResolveRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new AccessApi();
+
+  const body = {
+    // Array<string>
+    refs: ...,
+  } satisfies TenantAccessControllerResolveRequest;
+
+  try {
+    const data = await api.tenantAccessControllerResolve(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **refs** | `Array<string>` |  | |
+
+### Return type
+
+[**Array&lt;ResolvedActorDto&gt;**](ResolvedActorDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## tenantAccessControllerRoles
+
+> Array&lt;RoleDto&gt; tenantAccessControllerRoles()
+
+The built-in roles and where each can be granted
+
+### Example
+
+```ts
+import {
+  Configuration,
+  AccessApi,
+} from '@workspace/api-client';
+import type { TenantAccessControllerRolesRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new AccessApi();
+
+  try {
+    const data = await api.tenantAccessControllerRoles();
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+This endpoint does not need any parameter.
+
+### Return type
+
+[**Array&lt;RoleDto&gt;**](RoleDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 

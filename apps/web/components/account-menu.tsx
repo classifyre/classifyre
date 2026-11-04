@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { LogOut, UserRound } from "lucide-react";
+import { Building2, LogOut, UserRound } from "lucide-react";
 import { api, type TenantDto } from "@workspace/api-client";
 import { Button } from "@workspace/ui/components/button";
 import {
@@ -63,6 +63,14 @@ export function AccountMenu() {
           )}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        {tenant?.capabilities.includes("tenant.access.manage") && (
+          <DropdownMenuItem asChild>
+            <a href="/tenant/">
+              <Building2 className="size-4" />
+              {t("account.tenantSettings")}
+            </a>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem asChild>
           <a href="/auth/logout/">
             <LogOut className="size-4" />

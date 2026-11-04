@@ -2,7 +2,7 @@
 
 |                       |                                                                                                                                      |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| **Status**            | In progress: steps 0–6 done 2026-11-04 (§13)                                                                                         |
+| **Status**            | In progress: steps 0–7 done 2026-11-04 (§13)                                                                                         |
 | **Size**              | L (9 steps, each its own PR)                                                                                                         |
 | **Depends on**        | [S1 · Enterprise extension seams](S1-enterprise-extension-seams.md) (step 1 builds S1 R1–R8 and R15)                                 |
 | **Identity provider** | Keycloak 26.8.1 (`quay.io/keycloak/keycloak:26.8.1`, released 2026-10-13), Helm chart only                                           |
@@ -675,6 +675,19 @@ Also: no token 401; a create without owner 400; a spoofed `X-Actor-Name` recorde
 
 - §12.4: Access tab, tenant admin area, "why" explainer, new-workspace flow, MCP token owner column and admin view.
 - **Done:** U4, U5 and U6 can be set up from the UI alone, with no Keycloak console needed except to add people to groups.
+
+**As built, 2026-11-04** (`apps/web`):
+
+- **Settings → Access** (`components/access/workspace-access-card.tsx`), shown with sign-in to people with `access.view`: every grant reaching the workspace, inherited ones marked and read-only; with `access.manage`, giving a group a workspace role with an optional end date and removing grants made here; "Why can I…?" picks one of your capabilities and lists the grants that give it.
+- **Tenant page** `/tenant` (`components/access/tenant-admin.tsx`), for `tenant.access.manage`: every grant of the tenant with role titles and workspace names, giving a role on the whole tenant, a group's workspaces or one workspace (scopes offered per role), removing any grant, and the tenant activity trail with named authors. Linked from the account menu. The API gained `GET /tenant/roles` and `GET /tenant/actors/resolve` (names outside a workspace) for it.
+- **New workspace** (`create-namespace-dialog.tsx`): with sign-in an **Owning group** picker lists only the groups the person may create for (`GET /namespaces/owning-groups`), preselected when there is one, and explains when there are none.
+- **MCP tokens** show their owner.
+- `useCan()` now stays false until `/me` answers (found by the component test): a control that appears late beats one that is offered and then refused. `useIamEnabled()` (from `IamProvider` in the root layout) works outside a workspace too.
+- **Tests:** `tests/components/workspace-access-card.spec.tsx` (inherited read-only, remove only grants made here, giving access posts the group, nothing to change for a viewer).
+
+**Verified** with a production build against a throwaway release: the finance workspace manager signed in, the new-workspace dialog offered only `/finance` and `/finance/workspace-managers`, the workspace was created owned by `/finance`; its Access tab listed the two inherited grants, and giving `/sales` Viewer from the form (a cookie-signed POST, 201) added it with a remove button. The tenant admin's `/tenant` page listed every grant (the `/sales` grant under "Finance Q4"), the form and the activity; the activity authors first showed as "Someone" because names were only resolved inside a workspace, fixed with the tenant resolver ("Bea Test").
+
+**Left:** the workspace directory has its own header without the account menu, so the tenant page is reached from inside a workspace or by URL; tenant switching for people in several tenants (see step 6).
 
 ### Step 8 · Persona tests, docs, operations
 
