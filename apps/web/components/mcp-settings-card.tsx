@@ -57,6 +57,7 @@ import { useInstanceSettings } from "@/components/instance-settings-provider";
 import { useServerConfig } from "@/components/dashboard-layout";
 import { useTranslation } from "@/hooks/use-translation";
 import { McpToolsCatalog } from "@/components/mcp-tools-catalog";
+import { ActorChip } from "@/components/actor-chip";
 
 type RevealState = {
   name: string;
@@ -706,6 +707,7 @@ export function McpSettingsCard() {
                               <p className="text-sm font-semibold">
                                 {token.name}
                               </p>
+                              {token.owner && <ActorChip actorRef={token.owner} />}
                               <Badge variant={statusTone(token.isActive)}>
                                 {token.isActive
                                   ? t("mcp.active")

@@ -64,6 +64,8 @@ All URIs are relative to *http://localhost*
 *AccessApi* | [**tenantAccessControllerGrants**](docs/AccessApi.md#tenantaccesscontrollergrants) | **GET** /tenant/grants | Every grant of the tenant
 *AccessApi* | [**tenantAccessControllerGroups**](docs/AccessApi.md#tenantaccesscontrollergroups) | **GET** /tenant/groups | 
 *AccessApi* | [**tenantAccessControllerRemoveGrant**](docs/AccessApi.md#tenantaccesscontrollerremovegrant) | **DELETE** /tenant/grants/{id} | Remove any grant of the tenant
+*AccessApi* | [**tenantAccessControllerResolve**](docs/AccessApi.md#tenantaccesscontrollerresolve) | **GET** /tenant/actors/resolve | Display names for actor references, outside any workspace
+*AccessApi* | [**tenantAccessControllerRoles**](docs/AccessApi.md#tenantaccesscontrollerroles) | **GET** /tenant/roles | The built-in roles and where each can be granted
 *AccessApi* | [**tenantAccessControllerTenant**](docs/AccessApi.md#tenantaccesscontrollertenant) | **GET** /tenant | The caller’s tenant and what they may do across it
 *AccessApi* | [**workspaceAccessControllerAddGrant**](docs/AccessApi.md#workspaceaccesscontrolleraddgrant) | **POST** /access/grants | Give a group or a person a role on this workspace
 *AccessApi* | [**workspaceAccessControllerExplain**](docs/AccessApi.md#workspaceaccesscontrollerexplain) | **GET** /access/explain | Why can I do this? The grants that give you a capability here

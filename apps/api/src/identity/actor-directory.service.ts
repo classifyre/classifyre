@@ -27,7 +27,11 @@ export class ActorDirectoryService {
     private readonly tenancy: TenancyService,
   ) {}
 
-  async resolve(refs: string[]): Promise<ResolvedActor[]> {
+  /** `withTokens: false` outside a workspace, where there is no token table to read. */
+  async resolve(
+    refs: string[],
+    options: { withTokens?: boolean } = {},
+  ): Promise<ResolvedActor[]> {
     const unique = [...new Set(refs.filter(Boolean))].slice(0, MAX_REFS);
     const parsed = unique.map((ref) => ({ ref, ...parseActorRef(ref) }));
 
@@ -39,12 +43,13 @@ export class ActorDirectoryService {
         ]),
       ),
     ];
-    const tokens = tokenIds.length
-      ? await this.prisma.mcpAccessToken.findMany({
-          where: { id: { in: tokenIds } },
-          select: { id: true, name: true },
-        })
-      : [];
+    const tokens =
+      tokenIds.length && options.withTokens !== false
+        ? await this.prisma.mcpAccessToken.findMany({
+            where: { id: { in: tokenIds } },
+            select: { id: true, name: true },
+          })
+        : [];
     const tokenName = new Map(tokens.map((token) => [token.id, token.name]));
     const people = await this.tenancy.principalNames([
       ...new Set(

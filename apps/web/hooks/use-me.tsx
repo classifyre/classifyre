@@ -20,13 +20,13 @@ export function useMe(): MeResponseDto | null {
   const [me, setMe] = React.useState<MeResponseDto | null>(null);
 
   React.useEffect(() => {
-    if (!slug) return;
+    const key = slug ?? "";
     let active = true;
-    let pending = cache.get(slug);
+    let pending = cache.get(key);
     if (!pending) {
       pending = api.identity.meControllerMe();
-      cache.set(slug, pending);
-      pending.catch(() => cache.delete(slug));
+      cache.set(key, pending);
+      pending.catch(() => cache.delete(key));
     }
     void pending.then(
       (value) => active && setMe(value),
@@ -40,10 +40,14 @@ export function useMe(): MeResponseDto | null {
   return me;
 }
 
-/** True when the person may do `capability` here; true until `/me` has answered. */
+/**
+ * True when the person may do `capability` here. False until `/me` has
+ * answered: a control that appears late beats one that is offered and then
+ * refused.
+ */
 export function useCan(capability: string): boolean {
   const me = useMe();
-  return me ? (me.capabilities as string[]).includes(capability) : true;
+  return me ? (me.capabilities as string[]).includes(capability) : false;
 }
 
 /**

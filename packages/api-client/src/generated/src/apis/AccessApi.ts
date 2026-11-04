@@ -17,6 +17,7 @@ import * as runtime from '../runtime';
 import type {
   CreateGrantDto,
   GrantDto,
+  ResolvedActorDto,
   RoleDto,
   TenantDto,
   TenantEventDto,
@@ -27,6 +28,8 @@ import {
     CreateGrantDtoToJSON,
     GrantDtoFromJSON,
     GrantDtoToJSON,
+    ResolvedActorDtoFromJSON,
+    ResolvedActorDtoToJSON,
     RoleDtoFromJSON,
     RoleDtoToJSON,
     TenantDtoFromJSON,
@@ -43,6 +46,10 @@ export interface TenantAccessControllerAddGrantRequest {
 
 export interface TenantAccessControllerRemoveGrantRequest {
     id: string;
+}
+
+export interface TenantAccessControllerResolveRequest {
+    refs: Array<string>;
 }
 
 export interface WorkspaceAccessControllerAddGrantRequest {
@@ -220,6 +227,77 @@ export class AccessApi extends runtime.BaseAPI {
      */
     async tenantAccessControllerRemoveGrant(requestParameters: TenantAccessControllerRemoveGrantRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.tenantAccessControllerRemoveGrantRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * People and agents resolve as in a workspace; MCP tokens belong to workspaces, so here they show as tokens.
+     * Display names for actor references, outside any workspace
+     */
+    async tenantAccessControllerResolveRaw(requestParameters: TenantAccessControllerResolveRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<ResolvedActorDto>>> {
+        if (requestParameters['refs'] == null) {
+            throw new runtime.RequiredError(
+                'refs',
+                'Required parameter "refs" was null or undefined when calling tenantAccessControllerResolve().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        if (requestParameters['refs'] != null) {
+            queryParameters['refs'] = requestParameters['refs'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/tenant/actors/resolve`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(ResolvedActorDtoFromJSON));
+    }
+
+    /**
+     * People and agents resolve as in a workspace; MCP tokens belong to workspaces, so here they show as tokens.
+     * Display names for actor references, outside any workspace
+     */
+    async tenantAccessControllerResolve(requestParameters: TenantAccessControllerResolveRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<ResolvedActorDto>> {
+        const response = await this.tenantAccessControllerResolveRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * The built-in roles and where each can be granted
+     */
+    async tenantAccessControllerRolesRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<RoleDto>>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/tenant/roles`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(RoleDtoFromJSON));
+    }
+
+    /**
+     * The built-in roles and where each can be granted
+     */
+    async tenantAccessControllerRoles(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<RoleDto>> {
+        const response = await this.tenantAccessControllerRolesRaw(initOverrides);
+        return await response.value();
     }
 
     /**

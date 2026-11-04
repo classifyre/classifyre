@@ -11,7 +11,12 @@ import {
   Query,
   Req,
 } from '@nestjs/common';
-import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiOkResponse,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import type { FastifyRequest } from 'fastify';
 import { ACCESS_POLICY, type AccessPolicy } from './access-policy';
 import { Requires } from './access.decorators';
@@ -24,6 +29,8 @@ import {
   TenantGroupDto,
 } from './access.dto';
 import { AccessManagementService } from './access-management.service';
+import { ActorDirectoryService } from './actor-directory.service';
+import { ResolvedActorDto } from './audit.dto';
 import { ActorContextService } from './actor-context.service';
 import { isCapability } from './capabilities';
 import type { IdentityService, Principal } from './identity.service';
@@ -152,6 +159,7 @@ export class WorkspaceAccessController {
 export class TenantAccessController {
   constructor(
     private readonly access: AccessManagementService,
+    private readonly actors: ActorDirectoryService,
     @Inject(IDENTITY) private readonly identity: IdentityService | null,
   ) {}
 
@@ -173,6 +181,14 @@ export class TenantAccessController {
       name: principal.tenant.name,
       capabilities: [...this.identity!.tenantCapabilities(principal)].sort(),
     };
+  }
+
+  @Get('roles')
+  @Requires('tenant.access.manage')
+  @ApiOperation({ summary: 'The built-in roles and where each can be granted' })
+  @ApiOkResponse({ type: [RoleDto] })
+  roles(): RoleDto[] {
+    return this.access.roles();
   }
 
   @Get('groups')
@@ -228,6 +244,25 @@ export class TenantAccessController {
     @Param('id') id: string,
   ): Promise<void> {
     await this.access.removeGrant(await this.principal(request), id);
+  }
+
+  @Get('actors/resolve')
+  @Requires('workspace.view')
+  @ApiOperation({
+    summary: 'Display names for actor references, outside any workspace',
+    description:
+      'People and agents resolve as in a workspace; MCP tokens belong to workspaces, so here they show as tokens.',
+  })
+  @ApiQuery({ name: 'refs', required: true, type: [String] })
+  @ApiOkResponse({ type: [ResolvedActorDto] })
+  async resolve(
+    @Req() request: FastifyRequest,
+    @Query('refs') refs: string | string[] = [],
+  ): Promise<ResolvedActorDto[]> {
+    await this.principal(request);
+    return this.actors.resolve(Array.isArray(refs) ? refs : [refs], {
+      withTokens: false,
+    });
   }
 
   @Get('audit-events')

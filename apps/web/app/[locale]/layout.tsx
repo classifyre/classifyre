@@ -8,7 +8,7 @@ import {
 } from "next/font/google";
 
 import "@workspace/ui/globals.css";
-import { IamSession } from "@/components/iam-session";
+import { IamProvider } from "@/components/iam-session";
 import { Providers } from "@/components/providers";
 import { ANALYTICS_CONFIG_PATH } from "@/lib/analytics-config";
 import { isLocale, LOCALES, localeHtmlLang } from "@/lib/locale-detection";
@@ -83,8 +83,9 @@ export default async function RootLayout({
             a small same-origin script that must run before hydration so the
             PostHog provider sees its config on first effect. */}
         <script src={ANALYTICS_CONFIG_PATH} />
-        <IamSession enabled={process.env.IAM_ENABLED === "true"} />
-        <Providers locale={locale}>{children}</Providers>
+        <IamProvider enabled={process.env.IAM_ENABLED === "true"}>
+          <Providers locale={locale}>{children}</Providers>
+        </IamProvider>
       </body>
     </html>
   );

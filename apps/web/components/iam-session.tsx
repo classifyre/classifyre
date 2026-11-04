@@ -3,12 +3,26 @@
 import * as React from "react";
 import { setUnauthorizedHandler } from "@workspace/api-client";
 
+const IamEnabledContext = React.createContext(false);
+
+/** True when people sign in; available everywhere, also outside a workspace. */
+export function useIamEnabled(): boolean {
+  return React.useContext(IamEnabledContext);
+}
+
 /**
- * With sign-in on, a 401 from the API means the session ran out between page
- * loads: renew it once and retry, or go to sign-in (docs/prd §12.1). The
- * tokens themselves never reach the browser; only the server can renew.
+ * Sign-in state for the whole app (docs/prd §12.1). With sign-in on, a 401
+ * from the API means the session ran out between page loads: renew it once
+ * and retry, or go to sign-in. The tokens never reach the browser; only the
+ * server can renew.
  */
-export function IamSession({ enabled }: { enabled: boolean }) {
+export function IamProvider({
+  enabled,
+  children,
+}: {
+  enabled: boolean;
+  children: React.ReactNode;
+}) {
   React.useEffect(() => {
     if (!enabled) return;
     setUnauthorizedHandler(async () => {
@@ -25,5 +39,8 @@ export function IamSession({ enabled }: { enabled: boolean }) {
     });
     return () => setUnauthorizedHandler(null);
   }, [enabled]);
-  return null;
+
+  return (
+    <IamEnabledContext.Provider value={enabled}>{children}</IamEnabledContext.Provider>
+  );
 }

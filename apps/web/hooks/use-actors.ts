@@ -32,8 +32,11 @@ function flush() {
   const refs = [...pending];
   pending.clear();
   if (refs.length === 0) return;
-  void api.identity
-    .auditControllerResolve({ refs })
+  // Outside a workspace (the tenant page) names come from the tenant.
+  const resolve = getActiveNamespaceSlug()
+    ? api.identity.auditControllerResolve({ refs })
+    : api.access.tenantAccessControllerResolve({ refs });
+  void resolve
     .then((resolved) => {
       for (const actor of resolved) cache.set(keyOf(actor.ref), actor);
       notify();

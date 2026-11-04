@@ -1608,6 +1608,15 @@ export interface CreateNamespaceInput {
   externalLinks?: NamespaceExternalLinkInput[];
   /** Defaults to the built-in default category when omitted or empty. */
   categoryIds?: string[];
+  /** With sign-in: the group of your tenant that owns the workspace (required then). */
+  ownerGroupId?: string;
+}
+
+/** A group you may create workspaces for (`GET /namespaces/owning-groups`). */
+export interface OwningGroup {
+  id: string;
+  name: string;
+  path: string;
 }
 
 export interface UpdateNamespaceInput {
@@ -1685,6 +1694,13 @@ class NamespacesApi {
     });
     if (!res.ok) throw new Error(`Failed to load namespace (${res.status})`);
     return this.absolutizeThumbnail((await res.json()) as Namespace);
+  }
+
+  /** Groups you may create workspaces for; empty without sign-in. */
+  async owningGroups(): Promise<OwningGroup[]> {
+    const res = await resilientFetch(this.url("/owning-groups"));
+    if (!res.ok) throw new Error(`Failed to load owning groups (${res.status})`);
+    return (await res.json()) as OwningGroup[];
   }
 
   async create(input: CreateNamespaceInput): Promise<Namespace> {
