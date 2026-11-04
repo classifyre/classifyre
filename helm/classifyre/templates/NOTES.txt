@@ -52,3 +52,15 @@ Database mode: {{ .Values.postgres.mode }}
   !! NOTE: Telemetry is enabled but telemetry.otlpEndpoint is empty.
   !! Set telemetry.otlpEndpoint to the URL of your OTel Collector or disable telemetry.
 {{- end }}
+{{- if .Values.iam.enabled }}
+
+Sign-in (iam) is on. The identity server answers at {{ include "classifyre.iam.publicUrl" . }}.
+  First tenant: {{ .Values.iam.bootstrap.tenant.name }} ({{ .Values.iam.bootstrap.tenant.alias }}), first admin: {{ .Values.iam.bootstrap.admin.username }}.
+  Temporary password (changed at first sign-in):
+    kubectl -n {{ .Release.Namespace }} get secret {{ include "classifyre.iam.secretName" . }} -o jsonpath='{.data.bootstrap-admin-password}' | base64 -d
+  !! Back up the {{ include "classifyre.iam.dbName" . }} database before upgrading iam.image.tag across a minor version:
+  !! the identity server cannot roll its database back.
+{{- else }}
+
+  !! NOTE: iam.enabled=false — there is no sign-in. Anyone who reaches this instance can use every workspace.
+{{- end }}

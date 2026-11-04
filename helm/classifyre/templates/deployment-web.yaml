@@ -72,6 +72,18 @@ spec:
               containerPort: {{ .Values.frontend.service.port }}
               protocol: TCP
           env:
+            {{- include "classifyre.iam.env" . | nindent 12 }}
+            {{- if .Values.iam.enabled }}
+            - name: IAM_APP_URL
+              value: {{ include "classifyre.iam.appUrl" . | quote }}
+            - name: IAM_WEB_CLIENT_ID
+              value: classifyre-web
+            - name: IAM_WEB_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "classifyre.iam.secretName" . }}
+                  key: web-client-secret
+            {{- end }}
             - name: API_URL
               value: {{ printf "http://%s:%v" (include "classifyre.api.fullname" .) .Values.api.service.port | quote }}
             - name: S3_CONFIGURED

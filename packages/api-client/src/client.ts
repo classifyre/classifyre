@@ -1379,6 +1379,7 @@ const RESERVED_ROUTE_PREFIXES = new Set([
   "_next",
   "classifyre-usr", // analytics proxy route
   "sitemap", // per-namespace child sitemaps (/sitemap/<ns>/<file>.xml)
+  "iam", // identity server, on the same host (helm iam.path)
 ]);
 
 /**

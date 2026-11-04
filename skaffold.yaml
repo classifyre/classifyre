@@ -36,6 +36,24 @@ profiles:
         port: 5432
         localPort: 5555
 
+  # Sign-in on top of `dev`: CLASSIFYRE_IAM=true ./scripts/dev/start.sh.
+  # Listed after `dev` so its patches apply to the release `dev` defines.
+  - name: iam
+    activation:
+      - env: CLASSIFYRE_IAM=true
+    patches:
+      - op: add
+        path: /deploy/helm/releases/0/valuesFiles/-
+        value: helm/develop/values-dev-iam.yaml
+      - op: add
+        path: /portForward/-
+        value:
+          resourceType: service
+          resourceName: classifyre-iam
+          namespace: classifyre-dev
+          port: 8080
+          localPort: 8180
+
   # Same local cluster, but writable and pointed at the VPS demo instance's
   # database — so the public instance can stay in read-only demo mode while you
   # create sources and change settings for it. Deployed into its own namespace

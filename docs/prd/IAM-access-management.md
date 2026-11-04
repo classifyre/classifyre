@@ -2,7 +2,7 @@
 
 |                       |                                                                                                                                      |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| **Status**            | In progress: steps 0–3 done 2026-11-04 (§13)                                                                                         |
+| **Status**            | In progress: steps 0–4 done 2026-11-04 (§13)                                                                                         |
 | **Size**              | L (9 steps, each its own PR)                                                                                                         |
 | **Depends on**        | [S1 · Enterprise extension seams](S1-enterprise-extension-seams.md) (step 1 builds S1 R1–R8 and R15)                                 |
 | **Identity provider** | Keycloak 26.8.1 (`quay.io/keycloak/keycloak:26.8.1`, released 2026-10-13), Helm chart only                                           |
@@ -570,6 +570,32 @@ Left open:
 - Dev stack: `skaffold.yaml` / dev values seed a `dev` tenant with groups `/finance`, `/finance/workspace-managers`, `/sales`, `/legal` and one invented user per persona in §7.
 - **Tests:** `helm template` with `iam.enabled` on and off for each Postgres mode; the `keycloak`-name grep (H5); the SEO conflict fails; `docker/` has no diff (H2).
 - **Done:** `helm install` on k3d brings up a working sign-in page at `/iam`.
+
+**As built, 2026-11-04** (`helm/classifyre`):
+
+- **Templates:** `iam-secrets.yaml` (admin, database, both client secrets and the first admin's password, generated once and read back on upgrade), `iam-deployment.yaml` (server, service, headless service), `iam-setup-job.yaml` with `files/iam/setup-realm.sh`, `iam-ingress.yaml`, a network policy, the managed role and `Database` for CloudNativePG in `cnpg-cluster.yaml`, IAM environment for API, worker and web, and `NOTES.txt` lines with the first admin's password command.
+- **Database:** `iam.database.mode: shared` gives the server its own `iam` role and database on the chart's PostgreSQL. On embedded PostgreSQL an init container creates both (it runs as the superuser) and keeps the password in step with the Secret. On CloudNativePG it is a managed role plus a `Database` resource (CNPG 1.25+). With an external PostgreSQL the chart refuses `shared` and asks for `iam.database.external.*`. `iam.database.poolMaxSize` (default 20) caps its connections.
+- **Ingress:** without `iam.exposeAdminConsole` only `/iam/realms/<realm>` and `/iam/resources` are routed, so the admin console and the master realm are not reachable from outside.
+- **Validation:** the sitemap together with IAM fails the install (H4). So does IAM without `ingress.host` or explicit `iam.publicUrl` / `iam.appUrl`, and `shared` on an external PostgreSQL.
+- **Naming (H5):** the word appears only in the image reference and in the `kcadm.sh` path inside the setup script, which the image dictates.
+- **Dev:** `values-dev.yaml` sets `iam.enabled: false`; `CLASSIFYRE_IAM=true ./scripts/dev/start.sh` activates the `iam` skaffold profile, which adds `values-dev-iam.yaml` (public URL `http://localhost:8180/iam`, app URL `http://localhost:3000`, admin console exposed) and the port-forward. `skaffold diagnose` confirms the effective config with and without it.
+- **Public demo:** `values-vps.yaml` and `values-vps-develop.yaml` set `iam.enabled: false`: the demo stays open and keeps its sitemap. Without it, their next deploy would have failed validation.
+- **Reserved:** `iam` can no longer be a workspace slug (API and API client).
+
+**Changed from the plan:**
+
+- **No keycloak-config-cli.** Its last release (6.5.1, May 2026) is built for Keycloak 26.5.5, and tracking a second image whose tag encodes the server version is fragile. The setup job runs `kcadm.sh` from the same image as the server instead: always version-matched, one image for Dependabot. Every step ensures rather than imports, and it never deletes.
+- **Dev personas are not in the chart.** Seeding persona users is test data and moves to step 8; the chart only creates the first tenant (`default`, group `admins`) and its first admin, who must change the password at first sign-in.
+
+**Found while verifying** (throwaway release `iamcheck` in its own namespace, API and worker at zero replicas, removed afterwards; the shared `classifyre-dev` release was in use by another session and left alone):
+
+1. The server image has no `awk`, which the first setup script used. The lookup is plain bash now.
+2. **With _Full Scope Allowed_ off, the API's service account got no roles in its token** and every lookup was 403: the role a service account holds reaches its token only when the client's scope maps it too. The setup job now adds those two scope mappings. Step 0 missed this because its test client kept full scope.
+3. A second run of the job created nothing new: it is safe to repeat on every upgrade.
+
+Verified: the init container created the role and database; the server started in about 20 s; the issuer is the public URL; the API's service account reads tenants, users and organization groups (token 1.2 KB) and is refused writes; the first admin is in `/admins` and is made to set a new password at first sign-in; the sign-in page is "Sign in to Classifyre", username first.
+
+**Before a release:** with the chart default `iam.enabled: true`, a release cut after this step but before steps 5–6 would run a sign-in server that protects nothing yet. Release only after step 6, or with `iam.enabled: false` as the default meanwhile.
 
 ### Step 5 · API identity and tenants
 

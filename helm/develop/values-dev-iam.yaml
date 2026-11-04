@@ -1,0 +1,20 @@
+# Sign-in on the k3d dev stack. Added by the `iam` skaffold profile:
+#   CLASSIFYRE_IAM=true ./scripts/dev/start.sh
+# The identity server is port-forwarded to localhost:8180, so the browser and
+# the locally running web app (localhost:3000) reach it on the same host.
+iam:
+  enabled: true
+  publicUrl: http://localhost:8180/iam
+  appUrl: http://localhost:3000
+  # Dev only: the identity server's own admin console at
+  # http://localhost:8180/iam/admin (user `admin`, password in the
+  # classifyre-iam Secret, key admin-password).
+  exposeAdminConsole: true
+  database:
+    poolMaxSize: 5
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      memory: 1Gi

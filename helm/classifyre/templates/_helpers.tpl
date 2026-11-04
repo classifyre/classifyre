@@ -563,6 +563,16 @@ which each deployment sets on its own after including this block.
       key: {{ include "classifyre.s3SecretSecretAccessKeyKey" . }}
 {{- end }}
 {{- include "classifyre.telemetryEnv" . | nindent 0 }}
+{{- include "classifyre.iam.env" . | nindent 0 }}
+{{- if .Values.iam.enabled }}
+- name: IAM_API_CLIENT_ID
+  value: classifyre-api
+- name: IAM_API_CLIENT_SECRET
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "classifyre.iam.secretName" . }}
+      key: api-client-secret
+{{- end }}
 {{- with .Values.api.extraEnv }}
 {{- toYaml . | nindent 0 }}
 {{- end }}
@@ -677,5 +687,113 @@ Usage: {{ include "classifyre.priorityClassName" (dict "name" .Values.api.priori
 {{- if $pc.create -}}{{- include "classifyre.priorityClassBatchName" .root -}}{{- end -}}
 {{- else -}}
 {{- $name -}}
+{{- end -}}
+{{- end -}}
+
+{{- /*
+Identity and access management (docs/prd/IAM-access-management.md §9). The
+identity server is named `iam` in every resource and value of this chart.
+*/ -}}
+{{- define "classifyre.iam.fullname" -}}
+{{- printf "%s-iam" (include "classifyre.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{- define "classifyre.iam.secretName" -}}
+{{- include "classifyre.iam.fullname" . -}}
+{{- end -}}
+
+{{- define "classifyre.iam.path" -}}
+{{- .Values.iam.path | trimSuffix "/" -}}
+{{- end -}}
+
+{{- /* Public URL people's browsers reach the identity server at; tokens carry it as their issuer. */ -}}
+{{- define "classifyre.iam.publicUrl" -}}
+{{- if .Values.iam.publicUrl -}}
+{{- .Values.iam.publicUrl | trimSuffix "/" -}}
+{{- else -}}
+{{- $scheme := ternary "https" "http" (gt (len .Values.ingress.tls) 0) -}}
+{{- printf "%s://%s%s" $scheme .Values.ingress.host (include "classifyre.iam.path" .) -}}
+{{- end -}}
+{{- end -}}
+
+{{- /* In-cluster URL for the API: keys, token checks and membership lookups. */ -}}
+{{- define "classifyre.iam.internalUrl" -}}
+{{- printf "http://%s:8080%s" (include "classifyre.iam.fullname" .) (include "classifyre.iam.path" .) -}}
+{{- end -}}
+
+{{- define "classifyre.iam.issuerUrl" -}}
+{{- printf "%s/realms/%s" (include "classifyre.iam.publicUrl" .) .Values.iam.realm -}}
+{{- end -}}
+
+{{- define "classifyre.iam.dbHost" -}}
+{{- if eq .Values.iam.database.mode "external" -}}
+{{- .Values.iam.database.external.host -}}
+{{- else -}}
+{{- include "classifyre.databaseHost" . -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "classifyre.iam.dbPort" -}}
+{{- if eq .Values.iam.database.mode "external" -}}
+{{- .Values.iam.database.external.port | toString -}}
+{{- else -}}
+{{- include "classifyre.databasePort" . -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "classifyre.iam.dbName" -}}
+{{- if eq .Values.iam.database.mode "external" -}}
+{{- .Values.iam.database.external.database -}}
+{{- else -}}
+{{- .Values.iam.database.name -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "classifyre.iam.dbUser" -}}
+{{- if eq .Values.iam.database.mode "external" -}}
+{{- .Values.iam.database.external.username -}}
+{{- else -}}
+{{- .Values.iam.database.username -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "classifyre.iam.dbSecretName" -}}
+{{- if eq .Values.iam.database.mode "external" -}}
+{{- .Values.iam.database.external.existingSecret -}}
+{{- else if eq .Values.postgres.mode "cnpg" -}}
+{{- printf "%s-db" (include "classifyre.iam.fullname" .) -}}
+{{- else -}}
+{{- include "classifyre.iam.secretName" . -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "classifyre.iam.dbPasswordKey" -}}
+{{- if eq .Values.iam.database.mode "external" -}}
+{{- .Values.iam.database.external.existingSecretPasswordKey -}}
+{{- else -}}
+password
+{{- end -}}
+{{- end -}}
+
+{{- /* Environment the API and the web share to find the identity server. */ -}}
+{{- define "classifyre.iam.env" -}}
+- name: IAM_ENABLED
+  value: {{ .Values.iam.enabled | quote }}
+{{- if .Values.iam.enabled }}
+- name: IAM_ISSUER_URL
+  value: {{ include "classifyre.iam.issuerUrl" . | quote }}
+- name: IAM_INTERNAL_URL
+  value: {{ include "classifyre.iam.internalUrl" . | quote }}
+- name: IAM_REALM
+  value: {{ .Values.iam.realm | quote }}
+{{- end }}
+{{- end -}}
+
+{{- define "classifyre.iam.appUrl" -}}
+{{- if .Values.iam.appUrl -}}
+{{- .Values.iam.appUrl | trimSuffix "/" -}}
+{{- else -}}
+{{- $scheme := ternary "https" "http" (gt (len .Values.ingress.tls) 0) -}}
+{{- printf "%s://%s" $scheme .Values.ingress.host -}}
 {{- end -}}
 {{- end -}}
