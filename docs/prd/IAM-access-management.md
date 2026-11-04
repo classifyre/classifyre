@@ -2,7 +2,7 @@
 
 |                       |                                                                                                                                      |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| **Status**            | In progress: steps 0–7 done 2026-11-04 (§13)                                                                                         |
+| **Status**            | Steps 0–8 done 2026-11-04 (§13); step 9 open                                                                                         |
 | **Size**              | L (9 steps, each its own PR)                                                                                                         |
 | **Depends on**        | [S1 · Enterprise extension seams](S1-enterprise-extension-seams.md) (step 1 builds S1 R1–R8 and R15)                                 |
 | **Identity provider** | Keycloak 26.8.1 (`quay.io/keycloak/keycloak:26.8.1`, released 2026-10-13), Helm chart only                                           |
@@ -595,7 +595,7 @@ Left open:
 
 Verified: the init container created the role and database; the server started in about 20 s; the issuer is the public URL; the API's service account reads tenants, users and organization groups (token 1.2 KB) and is refused writes; the first admin is in `/admins` and is made to set a new password at first sign-in; the sign-in page is "Sign in to Classifyre", username first.
 
-**Before a release:** with the chart default `iam.enabled: true`, a release cut after this step but before steps 5–6 would run a sign-in server that protects nothing yet. Release only after step 6, or with `iam.enabled: false` as the default meanwhile.
+**Before a release:** with the chart default `iam.enabled: true`, a release cut after this step but before steps 5–6 would have run a sign-in server that protected nothing yet. Steps 5–6 have since landed.
 
 ### Step 5 · API identity and tenants
 
@@ -695,6 +695,15 @@ Also: no token 401; a create without owner 400; a spoofed `X-Actor-Name` recorde
 - Docs (`apps/docs`): "Sign-in and access" for operators (chart values, IdP brokering with FORCE sync, Entra group-claim limits, backups and minor upgrades) and for tenant admins (groups vs grants, roles, examples from §7).
 - Runbook: rotating the `classifyre-api` client secret, restoring the `iam` database, off-boarding urgently (disable user + revoke sessions).
 - **Done:** a release with IAM on by default in the chart.
+
+**As built, 2026-11-04:**
+
+- **Persona suite** `scripts/dev/iam-personas.sh` (+ `iam-personas-seed.sh`, run inside the identity server pod): installs a throwaway release with sign-in in its own namespace on the k3d cluster, seeds two tenants, groups `/finance` (with `workspace-managers` and `ap-team`), `/sales`, `/legal`, `/data-engineering`, `/audit` and one invented user per persona, creates three workspaces, gives the §7 grants through `/tenant/grants`, runs 29 checks, and removes everything (`KEEP=1` keeps it). It covers U1 (viewer read-only, their MCP agent gets only read-only tools), U2, U3, U4, U5, U6, U9, U10 (a grant ending 75 s later), U11 (mover between groups), U12 (leaver disabled: no sign-in, their token refused), U14, U16 and H7 (other tenant, no sign-in). Not covered: U13 (autopilot under a role, step 9) and U15 (platform operator, not built).
+- **Operator docs** `apps/docs/app/access/operations`: the identity server's console, tenants and groups, connecting a company directory (organization-linked providers, group mappers with Force sync, Trust email only for your own directory, Entra group ids and the ~200-group limit), turning sign-in on for an existing install, urgent off-boarding, rotating the chart's secrets, backups and upgrades.
+
+**Found while running it:** two failures in its first run, both in the test, not the product. A Globex user's token was requested for the `default` tenant, so the API correctly answered "choose a tenant" (401) instead of the 404 under test; the helper now takes `user@tenant`. And a request body with escaped quotes inside `"$( … )"` reached the API as invalid JSON (400) because macOS's bash 3.2 keeps the backslashes there; the body is now built outside. While writing the runbook: the chart's identity server `admin` password is read only on its first start, so it cannot be rotated by regenerating the Secret like the client secrets; the docs say to change it in the console and update the Secret.
+
+**Release:** steps 0–8 make sign-in usable end to end. Cutting the release that ships it (chart default `iam.enabled: true`) is the maintainers' call.
 
 ### Step 9 · Later
 
