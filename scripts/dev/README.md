@@ -53,6 +53,14 @@ console is at <http://localhost:8180/iam/admin> (user `admin`, password in the
 Starting again without `CLASSIFYRE_IAM=true` turns it off; the `iam` database
 stays on the embedded Postgres for next time.
 
+To check every access case of the plan at once, run the persona suite. It
+installs its own throwaway release next to the dev stack, so it never touches
+your workspaces:
+
+```bash
+./scripts/dev/iam-personas.sh
+```
+
 ## Prerequisites
 
 Docker, the latest stable k3d, kubectl, Helm, the latest stable Skaffold, and
