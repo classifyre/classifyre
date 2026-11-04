@@ -95,7 +95,7 @@ const nextConfig = {
             destination: "/api/:namespace/mcp/:path*",
           },
           {
-            source: `/:path((?!(?:${LOCALE_ALTERNATION})(?:/|$)|api/|mcp/|_next/|sitemap/|sitemap\\.xml|robots\\.txt|manifest\\.json|classifyre-cfg|classifyre-usr/|favicon\\.ico|icon0\\.svg|icon1\\.png|apple-icon\\.png|docs/.|[^/]+\\.[a-zA-Z0-9]+$).*)`,
+            source: `/:path((?!(?:${LOCALE_ALTERNATION})(?:/|$)|api/|auth/|mcp/|_next/|sitemap/|sitemap\\.xml|robots\\.txt|manifest\\.json|classifyre-cfg|classifyre-usr/|favicon\\.ico|icon0\\.svg|icon1\\.png|apple-icon\\.png|docs/.|[^/]+\\.[a-zA-Z0-9]+$).*)`,
             destination: `/${DEFAULT_LOCALE}/:path`,
           },
         ],

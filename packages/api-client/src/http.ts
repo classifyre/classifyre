@@ -105,10 +105,45 @@ function isAbortError(error: unknown): boolean {
  * committed nothing. The final response (or error) is returned unchanged, so
  * callers keep their existing error handling.
  */
+/**
+ * Called when the API answers 401 (sign-in expired or missing). Returns true
+ * when the session was renewed and the request may be sent once more. Set by
+ * the web app when sign-in is on; unset, a 401 is returned to the caller.
+ */
+let unauthorizedHandler: (() => Promise<boolean>) | null = null;
+let renewing: Promise<boolean> | null = null;
+
+export function setUnauthorizedHandler(
+  handler: (() => Promise<boolean>) | null,
+): void {
+  unauthorizedHandler = handler;
+}
+
+/** One renewal for every request that hit the same expiry at once. */
+function renew(): Promise<boolean> {
+  if (!unauthorizedHandler) return Promise.resolve(false);
+  renewing ??= unauthorizedHandler().finally(() => {
+    renewing = null;
+  });
+  return renewing;
+}
+
 export async function resilientFetch(
   input: RequestInfo | URL,
   init?: RequestInit,
   policy: RetryPolicy = {},
+): Promise<Response> {
+  const response = await fetchWithRetries(input, init, policy);
+  if (response.status === 401 && unauthorizedHandler && (await renew())) {
+    return fetchWithRetries(input, init, policy);
+  }
+  return response;
+}
+
+async function fetchWithRetries(
+  input: RequestInfo | URL,
+  init: RequestInit | undefined,
+  policy: RetryPolicy,
 ): Promise<Response> {
   const attempts = policy.attempts ?? MAX_ATTEMPTS;
   const url = typeof input === "string" ? input : input.toString();

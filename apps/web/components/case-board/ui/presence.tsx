@@ -10,6 +10,7 @@ import { useTranslation } from "@/hooks/use-translation";
 import { useBoard } from "../store/board-context";
 import { initialsOf } from "../store/selectors";
 import { useActorName } from "../hooks/use-actor-name";
+import { useServerConfig } from "@/components/server-config-provider";
 
 /**
  * Whether a person can name themselves on the board. Off until there is a
@@ -61,6 +62,7 @@ function OthersHere({ others }: { others: string[] }) {
 /** "You": the display name your edits carry, set here. */
 function SelfName() {
   const { t } = useTranslation();
+  const { iamEnabled } = useServerConfig();
   const [name, setName] = useActorName();
   const [draft, setDraft] = React.useState(name ?? "");
   const [open, setOpen] = React.useState(false);
@@ -73,6 +75,17 @@ function SelfName() {
     setName(draft);
     setOpen(false);
   };
+
+  if (iamEnabled) {
+    return (
+      <span
+        className="ml-2 flex h-7 items-center rounded-full border-2 border-foreground px-2 font-mono text-[10px] font-bold"
+        title={name ? t("caseBoard.presence.you", { name }) : undefined}
+      >
+        {name ? initialsOf(name) : <UserRound className="size-3.5" aria-hidden />}
+      </span>
+    );
+  }
 
   return (
     <Popover open={open} onOpenChange={setOpen}>

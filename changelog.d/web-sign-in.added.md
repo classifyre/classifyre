@@ -1,0 +1,1 @@
+With sign-in on (Helm `iam.enabled`), people sign in to the web app, see only the workspaces their groups give them, and find their name, tenant and **Sign out** in the account menu. Sessions renew themselves; tokens stay in server-only cookies. A signed-in instance is never offered to search engines.

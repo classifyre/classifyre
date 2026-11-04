@@ -39,6 +39,8 @@ import { LANGUAGE_OPTIONS, LanguageSwitcher, useSwitchLanguage } from "./languag
 import { NotificationCenter } from "./notification-center";
 import { ThemeToggle } from "./theme-toggle";
 import { DemoModeHeaderBadge } from "./demo-mode-badge";
+import { AccountMenu } from "@/components/account-menu";
+import { useServerConfig } from "@/components/server-config-provider";
 
 type T = (key: TranslationKey, params?: Record<string, string | number>) => string;
 
@@ -305,6 +307,7 @@ const iconButton = "relative rounded-[4px] border-2 border-transparent hover:bor
  */
 export function HeaderActions({ demoMode }: { demoMode: boolean }) {
   const { t } = useTranslation();
+  const { iamEnabled } = useServerConfig();
   const { nsHref } = useNamespace();
   const { resolvedTheme, setTheme } = useTheme();
   const { resolvedLanguage, switchLanguage } = useSwitchLanguage();
@@ -334,6 +337,7 @@ export function HeaderActions({ demoMode }: { demoMode: boolean }) {
           <span className="sr-only">{t("breadcrumb.settings")}</span>
         </Link>
       </Button>
+      {iamEnabled && <AccountMenu />}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="icon" className={cn(iconButton, "sm:hidden")} data-testid="header-more">

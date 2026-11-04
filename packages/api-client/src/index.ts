@@ -4,7 +4,7 @@ export * from "./client";
 
 // Retry-aware fetch, for callers that talk to the API without going through
 // the client (WebSocket bootstrap, one-off probes).
-export { resilientFetch } from "./http";
+export { resilientFetch, setUnauthorizedHandler } from "./http";
 export type { RetryPolicy } from "./http";
 
 // Re-export runtime types that might be needed

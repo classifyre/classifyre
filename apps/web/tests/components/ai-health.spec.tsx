@@ -34,7 +34,7 @@ test("demo mode issues no provider probe and renders no harness status", async (
 
   await mount(
     <ServerConfigContext.Provider
-      value={{ logsPersisted: false, demoMode: true }}
+      value={{ logsPersisted: false, demoMode: true, iamEnabled: false }}
     >
       <AiHealthProvider>
         <AiHealthHarnessStatus />
@@ -57,7 +57,7 @@ test("outside demo mode a missing provider marks the Harness entry", async ({
 
   await mount(
     <ServerConfigContext.Provider
-      value={{ logsPersisted: false, demoMode: false }}
+      value={{ logsPersisted: false, demoMode: false, iamEnabled: false }}
     >
       <AiHealthProvider>
         <AiHealthHarnessStatus />
