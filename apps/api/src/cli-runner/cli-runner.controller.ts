@@ -81,8 +81,10 @@ import { SearchRunnersChartsRequestDto } from '../dto/search-runners-charts-requ
 import { SearchRunnersChartsResponseDto } from '../dto/search-runners-charts-response.dto';
 import { SearchRunnersAssetsRequestDto } from '../dto/search-runners-assets-request.dto';
 import { SearchRunnersAssetsResponseDto } from '../dto/search-runners-assets-response.dto';
+import { AccessArea, Requires } from '../identity/access.decorators';
 
 @ApiTags('Runners')
+@AccessArea({ view: 'source.view', change: 'source.run' })
 @Controller()
 export class CliRunnerController {
   constructor(
@@ -503,6 +505,7 @@ export class CliRunnerController {
 @AllowInDemoMode()
 @ReadOnlyEndpoint()
 @ApiTags('Runners')
+@AccessArea({ view: 'source.view', change: 'source.run' })
 @Controller('search')
 export class SearchRunnersController {
   constructor(
@@ -537,6 +540,7 @@ export class SearchRunnersController {
     return this.liveQueryService.queryRunnerAssets(query, { limit, cursor });
   }
 
+  @Requires('data.export')
   @Get('runner-assets/export')
   @ApiOperation({
     summary: 'Export runner assets as CSV',

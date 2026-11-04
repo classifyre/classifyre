@@ -303,6 +303,8 @@ export * from './McpTokenCreatedResponseDto';
 export * from './McpTokenResponseDto';
 export * from './McpToolParameterDto';
 export * from './McpToolSummaryDto';
+export * from './MeActorDto';
+export * from './MeResponseDto';
 export * from './NotebookCellDto';
 export * from './NotebookDto';
 export * from './NotebookExecutionDto';

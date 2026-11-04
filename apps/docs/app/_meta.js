@@ -11,5 +11,6 @@ export default {
   duplicates: "Duplicate Review",
   notifications: "Notifications",
   "data-export": "Data Export",
+  access: "Access & Sign-in",
   settings: "Settings",
 };

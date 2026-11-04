@@ -22,6 +22,7 @@ import type {
   UpdateNamespaceCategoryInput,
   UpdateNamespaceInput,
 } from './namespace.types';
+import { AccessArea, Requires } from '../identity/access.decorators';
 
 /**
  * Namespace (tenant) registry CRUD.
@@ -32,6 +33,7 @@ import type {
  * Used by the web landing page to list/create/select/delete namespaces.
  */
 @ApiTags('Namespaces')
+@AccessArea({ view: 'workspace.view', change: 'workspace.settings' })
 @Controller('namespaces')
 export class NamespacesController {
   constructor(private readonly registry: NamespaceRegistryService) {}
@@ -42,6 +44,7 @@ export class NamespacesController {
     return this.registry.list();
   }
 
+  @Requires('tenant.workspace.create')
   @Post()
   @ApiOperation({
     summary: 'Create a namespace (provisions its Postgres schema + migrations)',
@@ -67,6 +70,7 @@ export class NamespacesController {
     return this.registry.listCategories();
   }
 
+  @Requires('tenant.categories.manage')
   @Post('categories')
   @ApiOperation({ summary: 'Create a workspace category' })
   createCategory(
@@ -75,6 +79,7 @@ export class NamespacesController {
     return this.registry.createCategory(body);
   }
 
+  @Requires('tenant.categories.manage')
   @Patch('categories/:categoryId')
   @ApiOperation({ summary: 'Rename or re-describe a workspace category' })
   updateCategory(
@@ -84,6 +89,7 @@ export class NamespacesController {
     return this.registry.updateCategory(categoryId, body);
   }
 
+  @Requires('tenant.categories.manage')
   @Delete('categories/:categoryId')
   @HttpCode(204)
   @ApiOperation({
@@ -125,6 +131,7 @@ export class NamespacesController {
     return this.registry.update(id, body);
   }
 
+  @Requires('workspace.delete')
   @Delete(':id')
   @HttpCode(204)
   @ApiOperation({

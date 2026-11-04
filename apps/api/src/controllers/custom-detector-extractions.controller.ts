@@ -7,7 +7,9 @@ import {
 } from '@nestjs/common';
 import { CustomDetectorExtractionsService } from '../custom-detector-extractions.service';
 import { SearchExtractionsQueryDto } from '../dto/custom-detector-extraction.dto';
+import { AccessArea } from '../identity/access.decorators';
 
+@AccessArea({ view: 'finding.view', change: 'finding.triage' })
 @Controller()
 export class CustomDetectorExtractionsController {
   constructor(private readonly service: CustomDetectorExtractionsService) {}

@@ -8,7 +8,7 @@ import { Server, Socket } from 'socket.io';
 import { ClsService } from 'nestjs-cls';
 import { CLS_SCHEMA } from '../namespace/namespace.constants';
 import { NamespaceRegistryService } from '../registry/namespace-registry.service';
-import { parseActorName } from '../actor-name.decorator';
+import { parseActorName } from '../identity/actor';
 import type {
   BoardChangedEvent,
   CaseBoardEvents,

@@ -21,6 +21,8 @@ import { FindingsService } from './findings.service';
 import { FindingBulkOperationService } from './findings-bulk/finding-bulk-operation.service';
 import { RetireOutOfScopeService } from './findings-bulk/retire-out-of-scope.service';
 import { MCP_CAPABILITY_GROUPS, MCP_PROMPTS } from './mcp-catalog';
+import type { Capability } from './identity/capabilities';
+import { mcpToolCapability } from './identity/mcp-tool-capabilities';
 import { CustomDetectorFilesService } from './custom-detector-files.service';
 import { isCodeDetectorSchema } from './custom-detector-code';
 import { NotebookService } from './notebook/notebook.service';
@@ -430,7 +432,11 @@ export class McpServerFactoryService {
    * enforcement path read the exact same name<->group mapping and can never
    * drift apart.
    */
-  createServer(options?: { toolGroupIds?: string[] | null }): McpServer {
+  createServer(options?: {
+    toolGroupIds?: string[] | null;
+    /** What the caller may do; tools needing anything else are disabled. Omit for no limit. */
+    capabilities?: ReadonlySet<Capability>;
+  }): McpServer {
     const server = new McpServer({
       name: 'classifyre-mcp',
       version: '1.0.0',
@@ -459,8 +465,38 @@ export class McpServerFactoryService {
     if (options?.toolGroupIds) {
       this.restrictToGroups(server, options.toolGroupIds);
     }
+    if (options?.capabilities) {
+      this.restrictToCapabilities(server, options.capabilities);
+    }
 
     return server;
+  }
+
+  /** Disable every tool whose capability the caller does not hold. Fails
+   * closed like {@link restrictToGroups}: a tool without a resolvable
+   * capability is disabled. */
+  private restrictToCapabilities(
+    server: McpServer,
+    capabilities: ReadonlySet<Capability>,
+  ): void {
+    const registered = (
+      server as unknown as {
+        _registeredTools: Record<
+          string,
+          { disable(): void; annotations?: { readOnlyHint?: boolean } }
+        >;
+      }
+    )._registeredTools;
+
+    for (const [name, tool] of Object.entries(registered)) {
+      const capability = mcpToolCapability(
+        name,
+        tool.annotations?.readOnlyHint,
+      );
+      if (!capability || !capabilities.has(capability)) {
+        tool.disable();
+      }
+    }
   }
 
   /** Disable every registered tool that is not in an allowed group. Fails

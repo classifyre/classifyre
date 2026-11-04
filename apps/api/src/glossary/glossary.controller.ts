@@ -22,7 +22,7 @@ import {
 import { GlossaryService } from './glossary.service';
 import { GlossaryRelationsService } from './glossary-relations.service';
 import { GlossaryImportExportService } from './glossary-import-export.service';
-import { ActorName } from '../actor-name.decorator';
+import { ActorRef } from '../identity/actor-ref.decorator';
 import { AllowInDemoMode } from '../demo-mode.decorator';
 import {
   BulkUpdateGlossaryTermsDto,
@@ -41,6 +41,7 @@ import {
   UpsertGlossaryTermDto,
   UpsertGlossaryTermResponseDto,
 } from './dto/glossary.dto';
+import { AccessArea, Requires } from '../identity/access.decorators';
 
 const STATUSES = new Set<string>(Object.values(GlossaryStatus));
 
@@ -59,6 +60,7 @@ export function parseStatuses(raw?: string): GlossaryStatus[] | undefined {
 }
 
 @ApiTags('glossary')
+@AccessArea({ view: 'glossary.view', change: 'glossary.edit' })
 @Controller('glossary')
 export class GlossaryController {
   constructor(
@@ -126,7 +128,7 @@ export class GlossaryController {
   @Post()
   @ApiOperation({ summary: 'Create or update a glossary term (operator)' })
   @ApiOkResponse({ type: UpsertGlossaryTermResponseDto })
-  upsert(@Body() dto: UpsertGlossaryTermDto, @ActorName() actor?: string) {
+  upsert(@Body() dto: UpsertGlossaryTermDto, @ActorRef() actor?: string) {
     return this.glossary.upsert({
       id: dto.id,
       term: dto.term,
@@ -159,7 +161,7 @@ export class GlossaryController {
   @ApiOkResponse({ type: BulkUpdateGlossaryTermsResponseDto })
   bulkUpdate(
     @Body() dto: BulkUpdateGlossaryTermsDto,
-    @ActorName() actor?: string,
+    @ActorRef() actor?: string,
   ) {
     return this.glossary.bulkUpdate({
       ids: dto.ids,
@@ -172,19 +174,21 @@ export class GlossaryController {
     });
   }
 
+  @Requires('glossary.approve')
   @Post(':id/approve')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'DRAFT → APPROVED' })
   @ApiOkResponse({ type: GlossaryTermDto })
-  approve(@Param('id') id: string, @ActorName() actor?: string) {
+  approve(@Param('id') id: string, @ActorRef() actor?: string) {
     return this.glossary.approve(id, actor ?? 'operator');
   }
 
+  @Requires('glossary.approve')
   @Post(':id/unapprove')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'APPROVED → DRAFT' })
   @ApiOkResponse({ type: GlossaryTermDto })
-  unapprove(@Param('id') id: string, @ActorName() actor?: string) {
+  unapprove(@Param('id') id: string, @ActorRef() actor?: string) {
     return this.glossary.unapprove(id, actor ?? 'operator');
   }
 
@@ -197,7 +201,7 @@ export class GlossaryController {
   deprecate(
     @Param('id') id: string,
     @Body() dto: DeprecateGlossaryTermDto,
-    @ActorName() actor?: string,
+    @ActorRef() actor?: string,
   ) {
     return this.glossary.deprecate(
       id,
@@ -210,7 +214,7 @@ export class GlossaryController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'DEPRECATED → APPROVED' })
   @ApiOkResponse({ type: GlossaryTermDto })
-  reinstate(@Param('id') id: string, @ActorName() actor?: string) {
+  reinstate(@Param('id') id: string, @ActorRef() actor?: string) {
     return this.glossary.reinstate(id, actor ?? 'operator');
   }
 
@@ -228,7 +232,7 @@ export class GlossaryController {
   @ApiOkResponse({ type: GlossarySchemeDto })
   createScheme(
     @Body() dto: UpsertGlossarySchemeDto,
-    @ActorName() actor?: string,
+    @ActorRef() actor?: string,
   ) {
     return this.glossary.upsertScheme({ ...dto, actor });
   }
@@ -245,14 +249,14 @@ export class GlossaryController {
   updateScheme(
     @Param('id') id: string,
     @Body() dto: UpsertGlossarySchemeDto,
-    @ActorName() actor?: string,
+    @ActorRef() actor?: string,
   ) {
     return this.glossary.upsertScheme({ ...dto, id, actor });
   }
 
   @Delete('schemes/:id')
   @ApiOperation({ summary: 'Delete an empty scheme' })
-  deleteScheme(@Param('id') id: string, @ActorName() actor?: string) {
+  deleteScheme(@Param('id') id: string, @ActorRef() actor?: string) {
     return this.glossary.deleteScheme(id, actor ?? 'operator');
   }
 
@@ -292,7 +296,7 @@ export class GlossaryController {
   @ApiOperation({ summary: 'Create a relation (APPROVED for operators)' })
   async createRelation(
     @Body() dto: CreateGlossaryRelationDto,
-    @ActorName() actor?: string,
+    @ActorRef() actor?: string,
   ) {
     if (typeof dto?.from !== 'string' || typeof dto?.to !== 'string') {
       throw new BadRequestException(
@@ -314,14 +318,15 @@ export class GlossaryController {
     });
   }
 
+  @Requires('glossary.approve')
   @Post('relations/:id/approve')
   @HttpCode(HttpStatus.OK)
-  approveRelation(@Param('id') id: string, @ActorName() actor?: string) {
+  approveRelation(@Param('id') id: string, @ActorRef() actor?: string) {
     return this.relations.approve(id, actor ?? 'operator');
   }
 
   @Delete('relations/:id')
-  removeRelation(@Param('id') id: string, @ActorName() actor?: string) {
+  removeRelation(@Param('id') id: string, @ActorRef() actor?: string) {
     return this.relations.remove(id, actor ?? 'operator');
   }
 
@@ -333,7 +338,7 @@ export class GlossaryController {
     summary:
       'Import CSV or SKOS JSON-LD. Defaults to a dry run that reports creates, updates, skips, conflicts and refusals.',
   })
-  import(@Body() dto: GlossaryImportDto, @ActorName() actor?: string) {
+  import(@Body() dto: GlossaryImportDto, @ActorRef() actor?: string) {
     if (!dto?.content) throw new BadRequestException('content is required');
     return this.transfer.importFile(dto.format, dto.content, {
       dryRun: dto.dryRun ?? true,
@@ -351,6 +356,7 @@ export class GlossaryController {
     return this.transfer.importJob(jobId);
   }
 
+  @Requires('data.export')
   @Get('export')
   @AllowInDemoMode()
   @ApiOperation({ summary: 'Export as CSV or SKOS JSON-LD' })
@@ -383,7 +389,7 @@ export class GlossaryController {
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a glossary term (deletion is remembered)' })
   @ApiOkResponse({ type: DeleteGlossaryTermResponseDto })
-  remove(@Param('id') id: string, @ActorName() actor?: string) {
+  remove(@Param('id') id: string, @ActorRef() actor?: string) {
     return this.glossary.remove(id, actor ?? 'operator');
   }
 }

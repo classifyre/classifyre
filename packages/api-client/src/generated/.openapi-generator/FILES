@@ -295,6 +295,7 @@ docs/HarnessToolsResponseDto.md
 docs/HealthApi.md
 docs/HealthControllerGetHealth200Response.md
 docs/HypothesisStatus.md
+docs/IdentityApi.md
 docs/IngestEdgeDto.md
 docs/InquiriesApi.md
 docs/InquiryActivityDto.md
@@ -328,6 +329,8 @@ docs/McpTokenCreatedResponseDto.md
 docs/McpTokenResponseDto.md
 docs/McpToolParameterDto.md
 docs/McpToolSummaryDto.md
+docs/MeActorDto.md
+docs/MeResponseDto.md
 docs/NamespacesApi.md
 docs/NotebookCellDto.md
 docs/NotebookDto.md
@@ -605,6 +608,7 @@ src/apis/FindingsApi.ts
 src/apis/GlossaryApi.ts
 src/apis/GraphApi.ts
 src/apis/HealthApi.ts
+src/apis/IdentityApi.ts
 src/apis/InquiriesApi.ts
 src/apis/InstanceSettingsApi.ts
 src/apis/MaintenanceApi.ts
@@ -922,6 +926,8 @@ src/models/McpTokenCreatedResponseDto.ts
 src/models/McpTokenResponseDto.ts
 src/models/McpToolParameterDto.ts
 src/models/McpToolSummaryDto.ts
+src/models/MeActorDto.ts
+src/models/MeResponseDto.ts
 src/models/NotebookCellDto.ts
 src/models/NotebookDto.ts
 src/models/NotebookExecutionDto.ts

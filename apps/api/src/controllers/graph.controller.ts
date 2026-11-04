@@ -29,8 +29,10 @@ import {
 import { InternalOnly } from '../internal-only.decorator';
 import { AllowInDemoMode } from '../demo-mode.decorator';
 import { ReadOnlyEndpoint } from '../db/read-only-endpoint.decorator';
+import { AccessArea } from '../identity/access.decorators';
 
 @ApiTags('graph')
+@AccessArea({ view: 'asset.view', change: 'asset.tag' })
 @Controller('graph')
 export class GraphController {
   constructor(private readonly graphService: GraphService) {}

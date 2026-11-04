@@ -324,6 +324,7 @@ All URIs are relative to *http://localhost*
 *GraphApi* | [**graphControllerUpdateEdge**](docs/GraphApi.md#graphcontrollerupdateedge) | **PATCH** /graph/edges/{id} | Rename an edge relation type
 *HealthApi* | [**healthControllerGetHealth**](docs/HealthApi.md#healthcontrollergethealth) | **GET** / | Health check
 *HealthApi* | [**healthControllerPing**](docs/HealthApi.md#healthcontrollerping) | **GET** /ping | Ping endpoint
+*IdentityApi* | [**meControllerMe**](docs/IdentityApi.md#mecontrollerme) | **GET** /me | Who is calling, and what they may do in this workspace
 *InquiriesApi* | [**inquiriesControllerCreate**](docs/InquiriesApi.md#inquiriescontrollercreate) | **POST** /inquiries | Create an inquiry (a saved query) and seed its matches
 *InquiriesApi* | [**inquiriesControllerFindOne**](docs/InquiriesApi.md#inquiriescontrollerfindone) | **GET** /inquiries/{id} | Get an inquiry
 *InquiriesApi* | [**inquiriesControllerList**](docs/InquiriesApi.md#inquiriescontrollerlist) | **GET** /inquiries | List inquiries (with match counts)
@@ -787,6 +788,8 @@ All URIs are relative to *http://localhost*
 - [McpTokenResponseDto](docs/McpTokenResponseDto.md)
 - [McpToolParameterDto](docs/McpToolParameterDto.md)
 - [McpToolSummaryDto](docs/McpToolSummaryDto.md)
+- [MeActorDto](docs/MeActorDto.md)
+- [MeResponseDto](docs/MeResponseDto.md)
 - [NotebookCellDto](docs/NotebookCellDto.md)
 - [NotebookDto](docs/NotebookDto.md)
 - [NotebookExecutionDto](docs/NotebookExecutionDto.md)

@@ -1,0 +1,89 @@
+---
+sidebarTitle: Access & Sign-in
+title: Access & Sign-in
+description: How Classifyre decides who can see and change what — tenants, workspaces, groups, roles and capabilities.
+---
+
+import { Callout } from "nextra/components";
+
+# Access & Sign-in
+
+<Callout type="info">
+  Sign-in is being built and is **not available yet**. Today every visitor can
+  do everything, as before. This page describes the access model so you can plan
+  your groups now. It will grow as each part ships.
+</Callout>
+
+Access management is **optional**. When it is off, Classifyre works as it
+always has: anyone who can reach the instance can use every workspace, and
+names in timelines are whatever people type in.
+
+When it is on, people sign in, and what they can see and change depends on the
+groups they belong to.
+
+- **Kubernetes (Helm chart):** access management will be on by default, and
+  can be turned off.
+- **Docker (all-in-one image):** access management is never used. The image is
+  meant for one person or a small trusted team on one machine.
+
+---
+
+## The building blocks
+
+| Term           | What it is                                                                                                                              |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| **Tenant**     | A company, or a department that runs as its own company. A tenant has its own workspaces, groups and people.                            |
+| **Workspace**  | Where sources, findings and investigations live. A workspace belongs to exactly one tenant and is owned by one group.                   |
+| **Group**      | People who belong together: a business unit (`finance`), a team inside it (`finance/ap-team`), or a group made only to hand out access. |
+| **Role**       | A named set of things a person may do, such as _Viewer_ or _Investigator_.                                                              |
+| **Capability** | One thing Classifyre allows, such as _change sources_ or _work on cases_. A role is a list of capabilities.                             |
+| **Grant**      | Gives a group (or one person) a role on a workspace, on every workspace a group owns, or on the whole tenant.                           |
+
+A group never carries permissions by itself, and a role never names a team. A
+**grant** joins the two. So "finance can read these workspaces" and "these
+five people manage finance workspaces" are both just grants, to different
+groups.
+
+Access only adds up. There are no rules that take something away: what you can
+do is the sum of your grants, and the workspace's **Access** settings will show
+which grant gives you what.
+
+---
+
+## Roles
+
+| Role                  | Can                                                                                                   |
+| --------------------- | ----------------------------------------------------------------------------------------------------- |
+| **Viewer**            | Read everything in the workspace. Create personal MCP tokens, which can only read too.                |
+| **Investigator**      | Everything a Viewer can, plus triage findings, tag assets, work on cases and inquiries, review leads. |
+| **Curator**           | Everything a Viewer can, plus write and approve glossary terms, manage entities, decide duplicates.   |
+| **Source manager**    | Connect sources, run scans, manage detectors. Sees findings and assets, but not cases or inquiries.   |
+| **Workspace admin**   | Everything in the workspace, including settings and who has access. Not writing code.                 |
+| **Code author**       | An add-on for writing and running code: custom source notebooks and code detectors.                   |
+| **Workspace manager** | Create workspaces for their own group, and administer every workspace that group owns.                |
+| **Auditor**           | Read the tenant's audit trail and who has access, without seeing findings.                            |
+| **Tenant admin**      | Everything in the tenant.                                                                             |
+
+Investigator and Curator sit side by side: someone who needs both gets both.
+
+### Examples
+
+| Situation                                             | Grant                                                        |
+| ----------------------------------------------------- | ------------------------------------------------------------ |
+| Finance sees its own workspaces, sales sees its own   | Viewer for `finance` on finance's workspaces, same for sales |
+| A fraud team works cases but must not change sources  | Investigator on that workspace                               |
+| Only a few people may create finance workspaces       | Workspace manager for a `finance/workspace-managers` group   |
+| Legal needs a read-only look at one finance workspace | Viewer for `legal` on that one workspace                     |
+| A contractor investigates one workspace for six weeks | Investigator for that person, with an end date               |
+
+---
+
+## MCP tokens and agents
+
+An MCP token acts **as the person who created it**. An agent using your token
+can do what you can do in that workspace, and no more: if you can only read,
+your agent can only read. When your access changes, your tokens follow; when
+you leave, they stop working.
+
+A token can still be narrowed further to a few tool groups when you create it
+(see [MCP Server](/settings/mcp-server/)).
