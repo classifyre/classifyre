@@ -9109,6 +9109,111 @@
         ]
       }
     },
+    "/audit-events": {
+      "get": {
+        "description": "Filter by entity (e.g. entityType=sources&entityId=…) or by actor reference. Page with `before`, the id of the last event received.",
+        "operationId": "AuditController_list",
+        "parameters": [
+          {
+            "name": "entityType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "entityId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "actor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "before",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AuditEventDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Changes made in this workspace, newest first",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
+    "/actors/resolve": {
+      "get": {
+        "description": "Repeat `refs` once per reference (`?refs=a&refs=b`), at most 200. Names may contain commas, so the list is never comma-separated.",
+        "operationId": "AuditController_resolve",
+        "parameters": [
+          {
+            "name": "refs",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ResolvedActorDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Display names for actor references",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
     "/sources/{sourceId}/run": {
       "post": {
         "operationId": "CliRunnerController_startRunner",
@@ -29853,6 +29958,107 @@
           "actor",
           "iamEnabled",
           "capabilities"
+        ]
+      },
+      "AuditEventDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actor": {
+            "type": "string",
+            "nullable": true,
+            "description": "Actor reference; resolve it with GET /actors/resolve.",
+            "example": "mcp:2c7b9260-cc88-45f8-9459-defe4a662708"
+          },
+          "via": {
+            "type": "string",
+            "example": "mcp-token"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "rest",
+              "mcp"
+            ]
+          },
+          "capability": {
+            "type": "string",
+            "example": "source.manage"
+          },
+          "operation": {
+            "type": "string",
+            "example": "PUT /sources/:id"
+          },
+          "entityType": {
+            "type": "string",
+            "nullable": true,
+            "example": "sources"
+          },
+          "entityId": {
+            "type": "string",
+            "nullable": true
+          },
+          "fields": {
+            "description": "Top-level input keys of the change, never their values.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "occurredAt",
+          "actor",
+          "via",
+          "channel",
+          "capability",
+          "operation",
+          "entityType",
+          "entityId",
+          "fields",
+          "status"
+        ]
+      },
+      "ResolvedActorDto": {
+        "type": "object",
+        "properties": {
+          "ref": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "user",
+              "mcp",
+              "agent",
+              "system",
+              "name"
+            ]
+          },
+          "displayName": {
+            "type": "string",
+            "example": "Jordan Reyes"
+          },
+          "viaDisplayName": {
+            "type": "string",
+            "description": "For an action delegated through an MCP token: the token."
+          }
+        },
+        "required": [
+          "ref",
+          "kind",
+          "displayName"
         ]
       },
       "StartRunnerDto": {

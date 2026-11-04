@@ -22,7 +22,15 @@ import { FindingBulkOperationService } from './findings-bulk/finding-bulk-operat
 import { RetireOutOfScopeService } from './findings-bulk/retire-out-of-scope.service';
 import { MCP_CAPABILITY_GROUPS, MCP_PROMPTS } from './mcp-catalog';
 import type { Capability } from './identity/capabilities';
-import { mcpToolCapability } from './identity/mcp-tool-capabilities';
+import {
+  mcpToolCapability,
+  mcpToolEntity,
+} from './identity/mcp-tool-capabilities';
+import {
+  currentActor,
+  currentActorRef,
+} from './identity/actor-context.service';
+import { AuditTrailService, inputFields } from './identity/audit-trail.service';
 import { CustomDetectorFilesService } from './custom-detector-files.service';
 import { isCodeDetectorSchema } from './custom-detector-code';
 import { NotebookService } from './notebook/notebook.service';
@@ -255,6 +263,28 @@ RETIRE: after augment_sources() completes without error/abort and without ctx.se
 
 Read inputs with cohort=False semantics inside augment_sources() (the default there); in extract() a query_assets() call declares partial coverage unless cohort=False.`;
 
+/**
+ * Who a tool call acts as: the token's actor reference, set by the MCP
+ * handler. `mcp` only where no handler ran (specs).
+ */
+function toolAuthor(): string {
+  return currentActorRef() ?? 'mcp';
+}
+
+/** The `id` of the object a tool returned as JSON text, if any. */
+function createdIdOf(result: unknown): string | null {
+  const content = (result as { content?: { type?: string; text?: string }[] })
+    ?.content?.[0];
+  if (content?.type !== 'text' || !content.text) return null;
+  try {
+    const parsed: unknown = JSON.parse(content.text);
+    const id = (parsed as { id?: unknown } | null)?.id;
+    return typeof id === 'string' ? id : null;
+  } catch {
+    return null;
+  }
+}
+
 function jsonResult(payload: unknown) {
   let bounded = payload;
   let truncated = false;
@@ -419,6 +449,7 @@ export class McpServerFactoryService {
     private readonly entitySwitch: EntitySwitchService,
     // Last and optional: specs construct this class positionally.
     @Optional() private readonly exploreService?: ExploreService,
+    @Optional() private readonly auditTrail?: AuditTrailService,
   ) {}
 
   /**
@@ -468,8 +499,55 @@ export class McpServerFactoryService {
     if (options?.capabilities) {
       this.restrictToCapabilities(server, options.capabilities);
     }
+    if (this.auditTrail) {
+      this.recordChanges(server, this.auditTrail);
+    }
 
     return server;
+  }
+
+  /** Record every successful call of a tool that changes something in the
+   * workspace audit trail, like the REST audit interceptor does for routes. */
+  private recordChanges(server: McpServer, audit: AuditTrailService): void {
+    const registered = (
+      server as unknown as {
+        _registeredTools: Record<
+          string,
+          {
+            handler: (...params: unknown[]) => unknown;
+            annotations?: { readOnlyHint?: boolean };
+          }
+        >;
+      }
+    )._registeredTools;
+
+    for (const [name, tool] of Object.entries(registered)) {
+      const capability = mcpToolCapability(
+        name,
+        tool.annotations?.readOnlyHint,
+      );
+      if (!capability || capability.endsWith('.view')) continue;
+      const handler = tool.handler;
+      tool.handler = async (...params: unknown[]) => {
+        const result = await handler(...params);
+        if (!(result as { isError?: boolean } | undefined)?.isError) {
+          // Tools with an input schema get (args, extra); others only (extra).
+          const args = params.length > 1 ? params[0] : undefined;
+          const entity = mcpToolEntity(name, args);
+          await audit.record({
+            actor: currentActor(),
+            channel: 'mcp',
+            capability,
+            operation: name,
+            entityType: entity.entityType,
+            // A create names its entity only in the result, like REST.
+            entityId: entity.entityId ?? createdIdOf(result),
+            fields: inputFields(args),
+          });
+        }
+        return result;
+      };
+    }
   }
 
   /** Disable every tool whose capability the caller does not hold. Fails
@@ -887,7 +965,7 @@ export class McpServerFactoryService {
             findingId,
             rationale,
             origin: 'MANUAL',
-            proposedBy: 'mcp',
+            proposedBy: toolAuthor(),
           }),
         );
       },
@@ -904,7 +982,9 @@ export class McpServerFactoryService {
       },
       async ({ caseId }) => {
         this.mcpToolExecutor.assertNotDemoMode();
-        return jsonResult(await this.caseLeadsService.generate(caseId, 'mcp'));
+        return jsonResult(
+          await this.caseLeadsService.generate(caseId, toolAuthor()),
+        );
       },
     );
 
@@ -929,7 +1009,7 @@ export class McpServerFactoryService {
             caseId,
             leadId,
             action,
-            'mcp',
+            toolAuthor(),
             reason,
           ),
         );
@@ -977,7 +1057,7 @@ export class McpServerFactoryService {
           await this.caseEventsService.create(
             caseId,
             { ...rest, occurredAt: when },
-            'mcp',
+            toolAuthor(),
             'OPERATOR',
           ),
         );
@@ -998,7 +1078,7 @@ export class McpServerFactoryService {
       async ({ caseId, eventId }) => {
         this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
-          await this.caseEventsService.remove(caseId, eventId, 'mcp'),
+          await this.caseEventsService.remove(caseId, eventId, toolAuthor()),
         );
       },
     );
@@ -1876,7 +1956,7 @@ export class McpServerFactoryService {
         const execution = await this.notebookExecutionService.create(
           sourceId,
           { revision: notebook.revision, mode, scope, targetCellId, maxAssets },
-          'mcp',
+          toolAuthor(),
         );
         return jsonResult(this.notebookExecutionService.toDto(execution));
       },
@@ -2412,13 +2492,18 @@ export class McpServerFactoryService {
           dryRun === false
             ? await this.retireOutOfScope.startRetire(
                 customDetectorId,
-                { fromOperationId, expectedCount, confirm, createdBy: 'mcp' },
+                {
+                  fromOperationId,
+                  expectedCount,
+                  confirm,
+                  createdBy: toolAuthor(),
+                },
                 // Emptying what an investigation watches is an operator call.
                 { allowInquiryOverride: false },
               )
             : await this.retireOutOfScope.startDryRun(customDetectorId, {
                 sourceIds,
-                createdBy: 'mcp',
+                createdBy: toolAuthor(),
               });
         return jsonResult(this.findingBulkOperations.toDto(operation));
       },
@@ -2658,7 +2743,7 @@ export class McpServerFactoryService {
             assetId,
             maxAssets,
           },
-          'mcp',
+          toolAuthor(),
         );
         return jsonResult(this.notebookExecutionService.toDto(execution));
       },
@@ -3997,7 +4082,9 @@ export class McpServerFactoryService {
       },
       async ({ id, ...rest }) => {
         this.mcpToolExecutor.assertNotDemoMode();
-        return jsonResult(await this.casesService.update(id, rest, 'mcp'));
+        return jsonResult(
+          await this.casesService.update(id, rest, toolAuthor()),
+        );
       },
     );
 
@@ -4226,7 +4313,7 @@ export class McpServerFactoryService {
             id,
             inquiryId,
             autoPull === true || String(autoPull) === 'true',
-            'mcp',
+            toolAuthor(),
           ),
         );
       },
@@ -4254,7 +4341,7 @@ export class McpServerFactoryService {
       async ({ id, inquiryId }) => {
         this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
-          await this.casesService.unlinkInquiry(id, inquiryId, 'mcp'),
+          await this.casesService.unlinkInquiry(id, inquiryId, toolAuthor()),
         );
       },
     );
@@ -4356,7 +4443,7 @@ export class McpServerFactoryService {
               rules,
               removeEmptiedAssets,
             },
-            'mcp',
+            toolAuthor(),
           ),
         );
       },
@@ -4385,7 +4472,7 @@ export class McpServerFactoryService {
       async ({ id, findingIds }) => {
         this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
-          await this.caseEscalation.clear(id, findingIds, 'mcp'),
+          await this.caseEscalation.clear(id, findingIds, toolAuthor()),
         );
       },
     );
@@ -4411,7 +4498,11 @@ export class McpServerFactoryService {
       async ({ id, filterId }) => {
         this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult({
-          filters: await this.caseFindingFilters.remove(id, filterId, 'mcp'),
+          filters: await this.caseFindingFilters.remove(
+            id,
+            filterId,
+            toolAuthor(),
+          ),
         });
       },
     );
@@ -4465,7 +4556,9 @@ export class McpServerFactoryService {
       },
       async ({ id, ...rule }) => {
         this.mcpToolExecutor.assertNotDemoMode();
-        return jsonResult(await this.caseHypothesisRules.add(id, rule, 'mcp'));
+        return jsonResult(
+          await this.caseHypothesisRules.add(id, rule, toolAuthor()),
+        );
       },
     );
 
@@ -4493,7 +4586,12 @@ export class McpServerFactoryService {
       async ({ id, ruleId, ...patch }) => {
         this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
-          await this.caseHypothesisRules.update(id, ruleId, patch, 'mcp'),
+          await this.caseHypothesisRules.update(
+            id,
+            ruleId,
+            patch,
+            toolAuthor(),
+          ),
         );
       },
     );
@@ -4520,7 +4618,7 @@ export class McpServerFactoryService {
             id,
             ruleId,
             { removeLinks },
-            'mcp',
+            toolAuthor(),
           ),
         );
       },
@@ -4603,7 +4701,7 @@ export class McpServerFactoryService {
             id,
             filterId,
             { pattern, description, removeEmptiedAssets },
-            'mcp',
+            toolAuthor(),
           ),
         );
       },
@@ -4814,7 +4912,7 @@ export class McpServerFactoryService {
         return jsonResult(
           await this.caseThreadsService.update(threadId, {
             ...rest,
-            actor: 'mcp',
+            actor: toolAuthor(),
           }),
         );
       },
@@ -4982,7 +5080,7 @@ export class McpServerFactoryService {
                 opId: op.opId ?? `op-${i + 1}`,
               })),
             },
-            'mcp',
+            toolAuthor(),
           ),
         );
       },
@@ -5013,7 +5111,9 @@ export class McpServerFactoryService {
       },
       async ({ caseId }) => {
         this.mcpToolExecutor.assertNotDemoMode();
-        return jsonResult(await this.caseBoardTools.place(caseId, 'mcp'));
+        return jsonResult(
+          await this.caseBoardTools.place(caseId, toolAuthor()),
+        );
       },
     );
 
@@ -5046,7 +5146,7 @@ export class McpServerFactoryService {
       async ({ caseId, dryRun }) => {
         if (!dryRun) this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
-          await this.caseBoardTools.tidy(caseId, { dryRun }, 'mcp'),
+          await this.caseBoardTools.tidy(caseId, { dryRun }, toolAuthor()),
         );
       },
     );
@@ -5085,7 +5185,7 @@ export class McpServerFactoryService {
           await this.caseBoardTools.frame(
             caseId,
             { itemIds, title, frameId, color, arrangement },
-            'mcp',
+            toolAuthor(),
           ),
         );
       },
@@ -5174,7 +5274,7 @@ export class McpServerFactoryService {
       async ({ caseId }) => {
         this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
-          await this.caseBoardRead.takeSnapshot(caseId, 'MANUAL', 'mcp'),
+          await this.caseBoardRead.takeSnapshot(caseId, 'MANUAL', toolAuthor()),
         );
       },
     );

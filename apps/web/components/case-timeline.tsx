@@ -38,7 +38,7 @@ import { api, type CaseActivityDto, type InquiryActivityDto } from "@workspace/a
 import { EscalationFlag } from "@workspace/case-board/components/finding-node";
 import { Button } from "@workspace/ui/components/button";
 import { cn } from "@workspace/ui/lib/utils";
-import { AiActorBadge, isAiActor } from "@/components/ai-actor-badge";
+import { AI_ACTOR, AiActorBadge, isAiActor } from "@/components/ai-actor-badge";
 import { ESCALATION_INK } from "@/lib/escalation-tone";
 
 // ─── Event metadata ───────────────────────────────────────────────────────────
@@ -1183,7 +1183,7 @@ export function CaseTimeline({
                     error: r.error,
                     runId: r.id,
                   },
-                  actor: "ai-autopilot",
+                  actor: AI_ACTOR,
                   createdAt: r.createdAt,
                 }),
               ),

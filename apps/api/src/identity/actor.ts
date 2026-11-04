@@ -1,4 +1,5 @@
 import type { InternalApiKeyService } from '../internal-api-key.service';
+import { isTypedActorRef, mcpTokenRef, systemRef } from './actor-ref';
 
 export const ACTOR_NAME_HEADER = 'x-actor-name';
 const MAX_ACTOR_CHARS = 64;
@@ -37,12 +38,13 @@ export const ANONYMOUS_ACTOR: Actor = {
   ref: undefined,
 };
 
+/** Callers holding the internal key: the CLI jobs the API launches. */
 export const SYSTEM_ACTOR: Actor = {
-  id: 'system',
+  id: systemRef('runner'),
   displayName: 'system',
   kind: 'system',
   via: 'internal-key',
-  ref: undefined,
+  ref: systemRef('runner'),
 };
 
 /**
@@ -69,7 +71,10 @@ export function parseActorName(raw: unknown): string | undefined {
     .trim()
     .slice(0, MAX_ACTOR_CHARS)
     .trim();
-  return cleaned.length > 0 ? cleaned : undefined;
+  if (cleaned.length === 0) return undefined;
+  // A typed name would pass as a token, agent or system in the audit trail.
+  if (isTypedActorRef(cleaned)) return undefined;
+  return cleaned;
 }
 
 export function personFromHeader(raw: unknown): Actor {
@@ -89,11 +94,11 @@ export function integrationFromMcpToken(token: {
   name: string;
 }): Actor {
   return {
-    id: `mcp:${token.id}`,
+    id: mcpTokenRef(token.id),
     displayName: token.name,
     kind: 'integration',
     via: 'mcp-token',
-    ref: undefined,
+    ref: mcpTokenRef(token.id),
   };
 }
 

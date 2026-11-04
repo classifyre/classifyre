@@ -1,14 +1,15 @@
 import { AgentKind } from '@prisma/client';
+import { AUTOPILOT_ACTOR_REF } from '../identity/actor-ref';
 
 /** pg-boss queue carrying "a source finished ingesting" jobs to the autopilot. */
 export const AUTOPILOT_QUEUE = 'autopilot.cycle';
 
 /**
- * Actor identifier stamped on every autopilot mutation (CaseActivity.actor,
+ * Actor reference stamped on every autopilot mutation (CaseActivity.actor,
  * Inquiry/Case.createdBy, thread entry author, evidence addedBy). The web UI
  * renders an AI badge wherever this value appears.
  */
-export const AI_ACTOR = 'ai-autopilot';
+export const AI_ACTOR = AUTOPILOT_ACTOR_REF;
 
 export type EntityOrigin = 'operator' | 'ai';
 

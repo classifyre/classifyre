@@ -67,3 +67,46 @@ export function mcpToolCapability(
   if (!area || readOnlyHint === undefined) return null;
   return readOnlyHint ? area.view : area.change;
 }
+
+/**
+ * The REST entity a tool group's changes belong to (see `routeEntity` in
+ * `audit.interceptor.ts`), and the argument names that carry its id, so a
+ * case's history shows its MCP changes next to its REST ones.
+ */
+const MCP_GROUP_ENTITY: Record<string, { type: string; idKeys: string[] }> = {
+  sources: { type: 'sources', idKeys: ['sourceId', 'source_id', 'id'] },
+  custom_source_code: { type: 'sources', idKeys: ['sourceId', 'source_id'] },
+  runs: { type: 'runners', idKeys: ['runnerId', 'runner_id', 'id'] },
+  custom_detectors: {
+    type: 'custom-detectors',
+    idKeys: ['customDetectorId', 'detectorId', 'detector_id', 'id'],
+  },
+  findings: { type: 'findings', idKeys: ['findingId', 'finding_id', 'id'] },
+  extractions: { type: 'findings', idKeys: ['findingId', 'finding_id'] },
+  assets: { type: 'assets', idKeys: ['assetId', 'asset_id', 'id'] },
+  lineage: { type: 'graph', idKeys: ['assetId', 'asset_id', 'id'] },
+  inquiries: { type: 'inquiries', idKeys: ['inquiryId', 'inquiry_id', 'id'] },
+  cases: { type: 'cases', idKeys: ['caseId', 'case_id', 'id'] },
+  case_board: { type: 'cases', idKeys: ['caseId', 'case_id', 'id'] },
+  case_leads: { type: 'cases', idKeys: ['caseId', 'case_id'] },
+  glossary: { type: 'glossary', idKeys: ['termId', 'idOrKey', 'id'] },
+  entities: { type: 'entities', idKeys: ['entityId', 'idOrKey', 'id'] },
+  correlation: { type: 'correlation', idKeys: ['assetId', 'id'] },
+  autopilot: { type: 'autopilot', idKeys: ['id'] },
+};
+
+export function mcpToolEntity(
+  toolName: string,
+  args: unknown,
+): { entityType: string | null; entityId: string | null } {
+  const group = GROUP_OF_TOOL.get(toolName);
+  const entity = group ? MCP_GROUP_ENTITY[group] : undefined;
+  if (!entity) return { entityType: null, entityId: null };
+  const record =
+    args && typeof args === 'object' ? (args as Record<string, unknown>) : {};
+  const key = entity.idKeys.find((name) => typeof record[name] === 'string');
+  return {
+    entityType: entity.type,
+    entityId: key ? (record[key] as string) : null,
+  };
+}

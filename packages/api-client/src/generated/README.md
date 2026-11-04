@@ -324,6 +324,8 @@ All URIs are relative to *http://localhost*
 *GraphApi* | [**graphControllerUpdateEdge**](docs/GraphApi.md#graphcontrollerupdateedge) | **PATCH** /graph/edges/{id} | Rename an edge relation type
 *HealthApi* | [**healthControllerGetHealth**](docs/HealthApi.md#healthcontrollergethealth) | **GET** / | Health check
 *HealthApi* | [**healthControllerPing**](docs/HealthApi.md#healthcontrollerping) | **GET** /ping | Ping endpoint
+*IdentityApi* | [**auditControllerList**](docs/IdentityApi.md#auditcontrollerlist) | **GET** /audit-events | Changes made in this workspace, newest first
+*IdentityApi* | [**auditControllerResolve**](docs/IdentityApi.md#auditcontrollerresolve) | **GET** /actors/resolve | Display names for actor references
 *IdentityApi* | [**meControllerMe**](docs/IdentityApi.md#mecontrollerme) | **GET** /me | Who is calling, and what they may do in this workspace
 *InquiriesApi* | [**inquiriesControllerCreate**](docs/InquiriesApi.md#inquiriescontrollercreate) | **POST** /inquiries | Create an inquiry (a saved query) and seed its matches
 *InquiriesApi* | [**inquiriesControllerFindOne**](docs/InquiriesApi.md#inquiriescontrollerfindone) | **GET** /inquiries/{id} | Get an inquiry
@@ -541,6 +543,7 @@ All URIs are relative to *http://localhost*
 - [AssistantControllerRespondRequestMessagesInner](docs/AssistantControllerRespondRequestMessagesInner.md)
 - [AttachFindingsDto](docs/AttachFindingsDto.md)
 - [AttachFindingsResponseDto](docs/AttachFindingsResponseDto.md)
+- [AuditEventDto](docs/AuditEventDto.md)
 - [AutopilotStatsDto](docs/AutopilotStatsDto.md)
 - [BoardEndpointDto](docs/BoardEndpointDto.md)
 - [BoardItemDto](docs/BoardItemDto.md)
@@ -844,6 +847,7 @@ All URIs are relative to *http://localhost*
 - [RematchResponseDto](docs/RematchResponseDto.md)
 - [ReopenDecisionsDto](docs/ReopenDecisionsDto.md)
 - [ReopenDecisionsResponseDto](docs/ReopenDecisionsResponseDto.md)
+- [ResolvedActorDto](docs/ResolvedActorDto.md)
 - [RetireOutOfScopeFindingsDto](docs/RetireOutOfScopeFindingsDto.md)
 - [RevertResultDto](docs/RevertResultDto.md)
 - [ReviewCaseLeadDto](docs/ReviewCaseLeadDto.md)
