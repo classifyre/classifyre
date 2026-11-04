@@ -20,6 +20,7 @@ import { cn } from "@workspace/ui/lib/utils";
 import { extractApiErrorMessage } from "@/lib/extract-api-error-message";
 import { useTranslation } from "@/hooks/use-translation";
 import type { RuleHypothesis } from "./hypothesis-rule-dialog";
+import { ActorName } from "@/components/actor-chip";
 
 /** Ink and glyph per stance: green for, red against, grey for neither. */
 const STANCE_STYLE: Record<string, { glyph: string; ink: string }> = {
@@ -144,7 +145,7 @@ export function HypothesisRuleChips({
                   {rule.description && <p className="text-xs">{rule.description}</p>}
                   <p className="text-[11px] opacity-70">{t("caseHypothesisRules.linkCount", { count: rule.linkCount })}</p>
                   {rule.createdBy && (
-                    <p className="text-[11px] opacity-70">{t("caseFilters.addedBy", { name: rule.createdBy })}</p>
+                    <p className="text-[11px] opacity-70"><ActorName actorRef={rule.createdBy}>{(name) => t("caseFilters.addedBy", { name })}</ActorName></p>
                   )}
                 </TooltipContent>
               </Tooltip>
