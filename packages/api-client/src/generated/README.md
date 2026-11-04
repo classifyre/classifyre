@@ -354,8 +354,9 @@ All URIs are relative to *http://localhost*
 *NamespacesApi* | [**namespacesControllerCreate**](docs/NamespacesApi.md#namespacescontrollercreate) | **POST** /namespaces | Create a namespace (provisions its Postgres schema + migrations)
 *NamespacesApi* | [**namespacesControllerCreateCategory**](docs/NamespacesApi.md#namespacescontrollercreatecategory) | **POST** /namespaces/categories | Create a workspace category
 *NamespacesApi* | [**namespacesControllerGet**](docs/NamespacesApi.md#namespacescontrollerget) | **GET** /namespaces/{id} | Get a namespace by id
-*NamespacesApi* | [**namespacesControllerList**](docs/NamespacesApi.md#namespacescontrollerlist) | **GET** /namespaces | List all namespaces
+*NamespacesApi* | [**namespacesControllerList**](docs/NamespacesApi.md#namespacescontrollerlist) | **GET** /namespaces | List the namespaces the caller can see (all of them without sign-in)
 *NamespacesApi* | [**namespacesControllerListCategories**](docs/NamespacesApi.md#namespacescontrollerlistcategories) | **GET** /namespaces/categories | List workspace categories with workspace counts
+*NamespacesApi* | [**namespacesControllerOwningGroups**](docs/NamespacesApi.md#namespacescontrollerowninggroups) | **GET** /namespaces/owning-groups | Groups the caller may create workspaces for (empty without sign-in)
 *NamespacesApi* | [**namespacesControllerRemove**](docs/NamespacesApi.md#namespacescontrollerremove) | **DELETE** /namespaces/{id} | Soft-delete a namespace (hidden from listings; data retained)
 *NamespacesApi* | [**namespacesControllerRemoveCategory**](docs/NamespacesApi.md#namespacescontrollerremovecategory) | **DELETE** /namespaces/categories/{categoryId} | Delete a category (its workspaces fall back to the default category)
 *NamespacesApi* | [**namespacesControllerStats**](docs/NamespacesApi.md#namespacescontrollerstats) | **GET** /namespaces/stats | Per-namespace source rollups (total + failing + running + pending)

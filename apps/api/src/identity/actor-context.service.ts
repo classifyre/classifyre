@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ClsService, ClsServiceManager } from 'nestjs-cls';
+import { CLS_NAMESPACE_ID } from '../namespace/namespace.constants';
 import { ANONYMOUS_ACTOR, type Actor } from './actor';
 
 export const CLS_ACTOR = 'classifyre:actor';
@@ -20,6 +21,12 @@ export class ActorContextService {
 
   set(actor: Actor): void {
     if (this.cls.isActive()) this.cls.set(CLS_ACTOR, actor);
+  }
+
+  /** The workspace of the current request; undefined on registry routes. */
+  workspaceId(): string | undefined {
+    if (!this.cls.isActive()) return undefined;
+    return this.cls.get<string | undefined>(CLS_NAMESPACE_ID);
   }
 
   /** Run `fn` as `actor`, inheriting the rest of the current CLS context. */

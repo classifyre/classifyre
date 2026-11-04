@@ -16,6 +16,9 @@ import { McpTokenService } from './mcp-token.service';
 import { ActorContextService } from './identity/actor-context.service';
 import { ACCESS_POLICY, type AccessPolicy } from './identity/access-policy';
 import { integrationFromMcpToken } from './identity/actor';
+import { assertIamAllowed } from './identity/iam-config';
+import type { IdentityService } from './identity/identity.service';
+import { IDENTITY } from './identity/identity.tokens';
 import { InstanceSettingsService } from './instance-settings.service';
 import { PrismaExceptionFilter } from './filters/prisma-exception.filter';
 import { DbRetryInterceptor } from './interceptors/db-retry.interceptor';
@@ -57,6 +60,8 @@ const BODY_LIMIT_BYTES = (() => {
 })();
 
 async function bootstrap() {
+  // The all-in-one Docker image never uses sign-in (docs/prd §2 H2).
+  assertIamAllowed();
   const logger = new Logger('Bootstrap');
   const port = process.env.PORT ?? 8000;
 
@@ -267,12 +272,14 @@ async function bootstrap() {
 
   // Resolve the leading `/<slug>` into a tenant context (404 on unknown slug)
   // before any route runs. `/<slug>/mcp` was already rewritten to `/mcp`.
+  const identity = app.get<IdentityService | null>(IDENTITY);
   registerNamespaceHook(
     fastify,
     namespaceRegistry,
     cls,
     prismaClientManager,
     internalApiKey,
+    identity,
   );
 
   const mcpHandler = async (request: any, reply: any) => {
@@ -309,6 +316,18 @@ async function bootstrap() {
         reply.code(503).send({
           error: 'Service Unavailable',
           message: 'MCP is disabled. Enable it in Settings.',
+        });
+        return;
+      }
+
+      if (identity) {
+        // MCP tokens act for the person who created them (docs/prd §8.3);
+        // until tokens have owners, sign-in leaves no way to know who that is.
+        reply.code(401).send({
+          error: 'Unauthorized',
+          code: 'MCP_NEEDS_OWNER',
+          message:
+            'MCP is not available with sign-in yet: tokens need an owner, which comes in a later release.',
         });
         return;
       }

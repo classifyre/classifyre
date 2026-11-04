@@ -394,9 +394,10 @@ same host, at `https://<your-host>/iam`. See
 [Access & Sign-in](/access/) for what people can do once signed in.
 
 <Callout type="warning">
-  Sign-in is being built in stages. This release installs the identity server
-  and its first tenant, but Classifyre does not ask anyone to sign in yet. Until
-  it does, treat the instance as open.
+  Sign-in is being built in stages. With `iam.enabled: true` the API already
+  requires sign-in and separates tenants, but the web app cannot sign people in
+  yet, so the instance is only usable through the API. Until a release says the
+  web app signs in, install with `iam.enabled: false`.
 </Callout>
 
 What the chart sets up:

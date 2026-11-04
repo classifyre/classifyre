@@ -786,6 +786,10 @@ password
   value: {{ include "classifyre.iam.internalUrl" . | quote }}
 - name: IAM_REALM
   value: {{ .Values.iam.realm | quote }}
+- name: IAM_APP_URL
+  value: {{ include "classifyre.iam.appUrl" . | quote }}
+- name: IAM_BOOTSTRAP_TENANT
+  value: {{ .Values.iam.bootstrap.tenant.alias | quote }}
 {{- end }}
 {{- end -}}
 

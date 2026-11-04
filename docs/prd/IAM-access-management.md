@@ -2,7 +2,7 @@
 
 |                       |                                                                                                                                      |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| **Status**            | In progress: steps 0–4 done 2026-11-04 (§13)                                                                                         |
+| **Status**            | In progress: steps 0–4 and 5a done 2026-11-04 (§13)                                                                                  |
 | **Size**              | L (9 steps, each its own PR)                                                                                                         |
 | **Depends on**        | [S1 · Enterprise extension seams](S1-enterprise-extension-seams.md) (step 1 builds S1 R1–R8 and R15)                                 |
 | **Identity provider** | Keycloak 26.8.1 (`quay.io/keycloak/keycloak:26.8.1`, released 2026-10-13), Helm chart only                                           |
@@ -603,6 +603,48 @@ Verified: the init container created the role and database; the server started i
 - Upgrade path for an existing install turning IAM on: all workspaces move to the bootstrap tenant, owned by its `admins` group; existing MCP tokens are revoked (they have no owner) and the release note says so.
 - **Tests:** the full e2e suite in both modes; a tenant-isolation spec in the style of `websocket/namespace-isolation.spec.ts` (tenant A's principal gets 404 on every route of a tenant B workspace, REST, MCP and sockets); boot refusal on `ENVIRONMENT=docker`.
 - **Done:** curl with tokens of two dev personas shows different workspace lists and different 403s.
+
+Split in two, so each part can be verified on its own: **5a** makes the API enforce sign-in end to end; **5b** adds what manages and extends it.
+
+**5a as built, 2026-11-04** (`apps/api/src/identity/`):
+
+- **Mode switch.** `IAM_ENABLED=true` (from the chart) swaps `LocalAccessPolicy` for `IamAccessPolicy` and provides `IdentityService`; without it nothing below runs. `assertIamAllowed()` refuses to boot with `ENVIRONMENT=docker` (H2).
+- **Tokens.** `JwtVerifier` checks signature (JWKS from the in-cluster URL, refetched when a new key id shows up), issuer (public URL), audience `classifyre-api` and expiry with Node's own crypto: no new dependency, and `bun.lock` stays as it is. Accepted as `Authorization: Bearer` or the `cf_session` cookie; MCP tokens (`inmcp_`) are left to the MCP handler.
+- **Who and which tenant.** The token's `organization` claim must name exactly one tenant (`CHOOSE_TENANT` otherwise). `MembershipService` then asks the identity server, cached a minute, whether the account is still enabled and still in that organization, and for its groups with ancestors. A disabled account or one moved out of the tenant stops within a minute, not at token expiry.
+- **Tenancy tables** (`identity/tenancy.sql.ts`, run at boot after the registry DDL): `public.iam_tenants` (with `local` always present), `public.iam_grants`, and `tenant_id` (NOT NULL, `local` by default) plus `owner_group_id` on `public.namespaces`. Tenants are created on first sign-in from the organization.
+- **First tenant.** `IamBootstrapService` retries in the background until the chart's bootstrap organization exists, then creates its tenant, gives its `admins` group Tenant admin, and moves every `local` workspace into it, owned by `admins`.
+- **Grant evaluation** (`grant-evaluation.ts`): tenant grants apply everywhere, workspace grants to their workspace, group grants to workspaces owned by that group or any group below it. Roles are the built-in bundles; unknown role keys give nothing.
+- **Namespace hook.** With sign-in, every workspace request needs a principal of the workspace's tenant with `workspace.view` there; otherwise 401 (`SIGN_IN_REQUIRED`) or 404, the same 404 as an unknown workspace. Cookie-signed writes must come from the app's origin (`CROSS_ORIGIN`). Capabilities and actor go to CLS for the guard. Scan callbacks (internal key) and `/mcp` pass through.
+- **Guard.** With sign-in the actor is the token's person (`user:<sub>`, via `oidc`); `X-Actor-Name` is ignored. In a workspace it checks the route's capability against the hook's set; on registry routes it checks tenant-wide capabilities and leaves per-workspace ones to the controller.
+- **Registry.** The list and stats show only visible workspaces. Get, thumbnail, update and delete check the workspace (404 if invisible; pausing also needs `workspace.pause`). Create needs `ownerGroupId`, membership of that group (tenant admins excepted) and `tenant.workspace.create` on it, and files the workspace under the caller's tenant. `GET /namespaces/owning-groups` lists the groups the caller may create for.
+- **Also:** `/me` reports `iamEnabled: true`; sitemap routes answer 404; MCP answers 401 `MCP_NEEDS_OWNER` until tokens have owners (5b). The chart passes `IAM_APP_URL` and `IAM_BOOTSTRAP_TENANT` to the API.
+
+**Verified** in a throwaway release (namespace `iam-check`, API running, worker at zero, removed afterwards) with a test client allowing password sign-in, groups `/finance`, `/finance/workspace-managers`, `/sales`, a second tenant `globex`, and one invented user per persona:
+
+| Person                    | Grant                           | Saw              | Checks                                                                                |
+| ------------------------- | ------------------------------- | ---------------- | ------------------------------------------------------------------------------------- |
+| Tenant admin              | Tenant admin (bootstrap)        | both workspaces  | created both, with owners                                                             |
+| Finance viewer            | Viewer on `/finance`            | `fin-ledger`     | creating a source 403 `source.manage`; changing settings 403; may create for no group |
+| Finance workspace manager | Workspace manager on `/finance` | `fin-ledger`     | may create for `/finance` and below; for `/sales` 403; settings 200                   |
+| Sales investigator        | Investigator on `/sales`        | `sales-pipeline` | `case.edit` yes, `source.manage` no; `fin-ledger` 404, its settings 404               |
+| Globex user               | none in `default`               | nothing          | `fin-ledger` 404                                                                      |
+
+Also: no token 401; a create without owner 400; a spoofed `X-Actor-Name` recorded as the token's person in the audit trail; cookie reads work, cookie writes from another origin `CROSS_ORIGIN`, from the app 201; MCP `MCP_NEEDS_OWNER`; sitemap 404. With sign-in off the shared dev stack kept working unchanged (31 workspaces, all in `local`).
+
+**Found while verifying:**
+
+1. **Bootstrap race:** the API's first-tenant setup ran before the setup job had created the organization, logged "not found" and stopped. A missing bootstrap tenant is now a retried failure.
+2. **First admin without a profile:** the identity server's default user profile requires first name, last name and email, so the bootstrap admin's password sign-in failed with "Account is not fully set up". In the browser this is a profile form at first sign-in, which is acceptable; the chart could set `iam.bootstrap.admin.email` (and names) to skip it.
+3. **REST-created inquiries have no `createdBy`**, with or without sign-in (the controller never passed an actor). The audit trail has the author; fixing the column is a small follow-up.
+
+**5b, next:**
+
+- Grants API (CRUD for workspace and tenant admins, group search through the identity server) and `GET /<ws>/access/explain?capability=`.
+- MCP tokens with an owner, re-checked on every call (§8.3); remove `MCP_NEEDS_OWNER`. Ownerless tokens are revoked when sign-in is turned on.
+- WebSocket handshakes: same cookie or token, `workspace.view` for the joined workspace.
+- Background actors: `runAs` for scheduler, pg-boss jobs and autopilot (agent principal with a configured role).
+- Input author fields (`createdBy` on three MCP tools) ignored with sign-in.
+- `public.iam_principals` (names for `user:` references), tenant-scoped categories, tenant-level audit of registry changes, platform operator role.
 
 ### Step 6 · Web sign-in
 
