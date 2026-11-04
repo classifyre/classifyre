@@ -146,7 +146,7 @@ describe('SystemBriefService', () => {
         },
       ],
       version: 4,
-      updatedBy: 'ai-autopilot',
+      updatedBy: 'agent:autopilot',
     };
 
     it('is deterministic — identical output across renders', () => {
@@ -174,7 +174,7 @@ describe('SystemBriefService', () => {
         content: 'Overview text',
         facts: { sources: 2, sourcesWithoutFindings: 1 },
         version: 5,
-        updatedBy: 'ai-autopilot',
+        updatedBy: 'agent:autopilot',
       });
       mockPrisma.instanceSettings.findUnique.mockResolvedValue({
         harnessAiProviderConfigId: 'p1',

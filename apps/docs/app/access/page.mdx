@@ -87,3 +87,25 @@ you leave, they stop working.
 
 A token can still be narrowed further to a few tool groups when you create it
 (see [MCP Server](/settings/mcp-server/)).
+
+---
+
+## Who changed what
+
+Every change made in a workspace is recorded in its **audit trail**, whether it
+came from the web app, the API or an agent through MCP. Each entry says:
+
+- **who** made the change: the name a person entered, or the MCP token an agent
+  used, or the autopilot;
+- **what** changed: the source, case, detector or other item, and the action;
+- **which fields** were sent. Their values are never stored, so secrets and
+  matched content stay out of the trail.
+
+Reading something is not recorded, and neither is the work scans report back.
+
+Without sign-in, a person's name is whatever they typed, so the trail shows
+who _said_ they made a change. With sign-in, it shows who did.
+
+The trail can be read today through the API at `GET /<workspace>/audit-events`,
+filtered by item (`entityType`, `entityId`) or by author (`actor`). The web app
+will show it on each item and in the workspace settings.

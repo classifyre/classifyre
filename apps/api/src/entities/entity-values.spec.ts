@@ -184,7 +184,7 @@ describe('EntityValuesService', () => {
       await service.confirmValue(
         'b',
         { label: 'email_address', value: 'office@beta.example' },
-        { name: 'ai-autopilot', isAgent: true },
+        { name: 'agent:autopilot', isAgent: true },
       );
 
       expect(upsert.mock.calls[0][0].create).toMatchObject({
@@ -208,7 +208,7 @@ describe('EntityValuesService', () => {
 
   it('never lets an agent decide candidates or merge (R22)', async () => {
     const { service } = build();
-    const agent = { name: 'ai-autopilot', isAgent: true };
+    const agent = { name: 'agent:autopilot', isAgent: true };
 
     await expect(
       service.review([{ id: 'v', decision: 'accept' }], agent),

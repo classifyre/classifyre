@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ClsModule } from 'nestjs-cls';
 import { CliBackpressureGuard } from './guards/cli-backpressure.guard';
 import { PrismaService } from './prisma.service';
@@ -90,6 +90,7 @@ import { SitemapService } from './sitemap/sitemap.service';
 import { NamespaceWorkerManager } from './namespace/namespace-worker-manager';
 import { IdentityModule } from './identity/identity.module';
 import { AccessGuard } from './identity/access.guard';
+import { AuditInterceptor } from './identity/audit.interceptor';
 
 // Import organized controllers
 import {
@@ -185,6 +186,7 @@ import {
     { provide: APP_GUARD, useClass: NamespacePausedGuard },
     // Last: the questions above (internal key, demo, paused) are answered first.
     { provide: APP_GUARD, useClass: AccessGuard },
+    { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
     CliBackpressureGuard,
     DemoModeService,
     InternalApiKeyService,

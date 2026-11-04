@@ -61,6 +61,7 @@ docs/AssistantControllerRespondRequest.md
 docs/AssistantControllerRespondRequestMessagesInner.md
 docs/AttachFindingsDto.md
 docs/AttachFindingsResponseDto.md
+docs/AuditEventDto.md
 docs/AutopilotApi.md
 docs/AutopilotStatsDto.md
 docs/BoardEndpointDto.md
@@ -388,6 +389,7 @@ docs/RelationTypesResponseDto.md
 docs/RematchResponseDto.md
 docs/ReopenDecisionsDto.md
 docs/ReopenDecisionsResponseDto.md
+docs/ResolvedActorDto.md
 docs/RetireOutOfScopeFindingsDto.md
 docs/RevertResultDto.md
 docs/ReviewCaseLeadDto.md
@@ -679,6 +681,7 @@ src/models/AssistantControllerRespondRequest.ts
 src/models/AssistantControllerRespondRequestMessagesInner.ts
 src/models/AttachFindingsDto.ts
 src/models/AttachFindingsResponseDto.ts
+src/models/AuditEventDto.ts
 src/models/AutopilotStatsDto.ts
 src/models/BoardEndpointDto.ts
 src/models/BoardItemDto.ts
@@ -982,6 +985,7 @@ src/models/RelationTypesResponseDto.ts
 src/models/RematchResponseDto.ts
 src/models/ReopenDecisionsDto.ts
 src/models/ReopenDecisionsResponseDto.ts
+src/models/ResolvedActorDto.ts
 src/models/RetireOutOfScopeFindingsDto.ts
 src/models/RevertResultDto.ts
 src/models/ReviewCaseLeadDto.ts

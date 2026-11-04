@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { ClsService } from 'nestjs-cls';
+import { ClsService, ClsServiceManager } from 'nestjs-cls';
 import { ANONYMOUS_ACTOR, type Actor } from './actor';
 
 export const CLS_ACTOR = 'classifyre:actor';
@@ -29,4 +29,18 @@ export class ActorContextService {
       return fn();
     });
   }
+}
+
+/**
+ * The current actor, for code that has no injected
+ * {@link ActorContextService} (MCP tool callbacks).
+ */
+export function currentActor(): Actor {
+  const cls = ClsServiceManager.getClsService();
+  if (!cls.isActive()) return ANONYMOUS_ACTOR;
+  return cls.get<Actor | undefined>(CLS_ACTOR) ?? ANONYMOUS_ACTOR;
+}
+
+export function currentActorRef(): string | undefined {
+  return currentActor().ref;
 }

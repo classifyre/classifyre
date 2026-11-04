@@ -15,17 +15,128 @@
 
 import * as runtime from '../runtime';
 import type {
+  AuditEventDto,
   MeResponseDto,
+  ResolvedActorDto,
 } from '../models/index';
 import {
+    AuditEventDtoFromJSON,
+    AuditEventDtoToJSON,
     MeResponseDtoFromJSON,
     MeResponseDtoToJSON,
+    ResolvedActorDtoFromJSON,
+    ResolvedActorDtoToJSON,
 } from '../models/index';
+
+export interface AuditControllerListRequest {
+    entityType?: string;
+    entityId?: string;
+    actor?: string;
+    before?: string;
+    limit?: number;
+}
+
+export interface AuditControllerResolveRequest {
+    refs: Array<string>;
+}
 
 /**
  * 
  */
 export class IdentityApi extends runtime.BaseAPI {
+
+    /**
+     * Filter by entity (e.g. entityType=sources&entityId=…) or by actor reference. Page with `before`, the id of the last event received.
+     * Changes made in this workspace, newest first
+     */
+    async auditControllerListRaw(requestParameters: AuditControllerListRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<AuditEventDto>>> {
+        const queryParameters: any = {};
+
+        if (requestParameters['entityType'] != null) {
+            queryParameters['entityType'] = requestParameters['entityType'];
+        }
+
+        if (requestParameters['entityId'] != null) {
+            queryParameters['entityId'] = requestParameters['entityId'];
+        }
+
+        if (requestParameters['actor'] != null) {
+            queryParameters['actor'] = requestParameters['actor'];
+        }
+
+        if (requestParameters['before'] != null) {
+            queryParameters['before'] = requestParameters['before'];
+        }
+
+        if (requestParameters['limit'] != null) {
+            queryParameters['limit'] = requestParameters['limit'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/audit-events`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(AuditEventDtoFromJSON));
+    }
+
+    /**
+     * Filter by entity (e.g. entityType=sources&entityId=…) or by actor reference. Page with `before`, the id of the last event received.
+     * Changes made in this workspace, newest first
+     */
+    async auditControllerList(requestParameters: AuditControllerListRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<AuditEventDto>> {
+        const response = await this.auditControllerListRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Repeat `refs` once per reference (`?refs=a&refs=b`), at most 200. Names may contain commas, so the list is never comma-separated.
+     * Display names for actor references
+     */
+    async auditControllerResolveRaw(requestParameters: AuditControllerResolveRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<ResolvedActorDto>>> {
+        if (requestParameters['refs'] == null) {
+            throw new runtime.RequiredError(
+                'refs',
+                'Required parameter "refs" was null or undefined when calling auditControllerResolve().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        if (requestParameters['refs'] != null) {
+            queryParameters['refs'] = requestParameters['refs'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/actors/resolve`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(ResolvedActorDtoFromJSON));
+    }
+
+    /**
+     * Repeat `refs` once per reference (`?refs=a&refs=b`), at most 200. Names may contain commas, so the list is never comma-separated.
+     * Display names for actor references
+     */
+    async auditControllerResolve(requestParameters: AuditControllerResolveRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<ResolvedActorDto>> {
+        const response = await this.auditControllerResolveRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
 
     /**
      * Who is calling, and what they may do in this workspace

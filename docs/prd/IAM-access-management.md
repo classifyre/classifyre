@@ -2,7 +2,7 @@
 
 |                       |                                                                                                                                      |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| **Status**            | In progress: steps 0–1 done 2026-11-04 (§13)                                                                                         |
+| **Status**            | In progress: steps 0–2 done 2026-11-04 (§13)                                                                                         |
 | **Size**              | L (9 steps, each its own PR)                                                                                                         |
 | **Depends on**        | [S1 · Enterprise extension seams](S1-enterprise-extension-seams.md) (step 1 builds S1 R1–R8 and R15)                                 |
 | **Identity provider** | Keycloak 26.8.1 (`quay.io/keycloak/keycloak:26.8.1`, released 2026-10-13), Helm chart only                                           |
@@ -395,10 +395,10 @@ All in `apps/api/src/identity/` unless noted.
 
 ### 11.1 Data
 
-- **Actor reference**, one text format everywhere: `user:<sub>`, `agent:<workspace>:<kind>`, `mcp:<tokenId>`, `system:<job>`, and in IAM-off mode `name:<display name>`. A delegated action appends the channel: `user:<sub>@mcp:<tokenId>`. Existing free-text columns (`createdBy`, `addedBy`, `decidedBy`, `reviewedBy`, `triggeredBy`, `verifiedBy`, `actor`, `author`) hold this format. One migration per workspace schema rewrites today's plain names to `name:<value>`.
-- **Missing columns.** Add `created_by` / `updated_by` where the UI needs them and they do not exist yet: `Source`, `CustomDetector`, `CustomDetectorTestScenario`, `Finding` (`status_changed_by`), `Inquiry` (`updated_by`), `Case` (`updated_by`), `GlossaryTerm` (`updated_by`), `ExploreView`, `NotebookExecution` (`triggered_by`), `AiProviderConfig`, `McpServerConfig`, `AgentConfig`, `CorrelationConfig`, `InstanceSettings`, `ChatBot`, `DataTransferJob`, and `public.namespaces`.
-- **Audit trail.** A new append-only `audit_events` table in every workspace schema: actor, capability used, entity type and id, a short change summary (changed field names, never secrets or matched content), timestamp. Fed by the domain events of [00 · F1](00-integration-architecture.md) where they exist, and written directly elsewhere. Tenant-level events (grants, workspace create/delete, token create/revoke) go to `public.iam_audit_events`. The existing `CaseActivity`, `InquiryActivity` and `GlossaryActivity` stay: they are product timelines, not the audit trail.
-- **Display names.** `GET /principals/resolve?refs=…` returns name, email, kind and avatar initials. `iam_principals` is refreshed on each sign-in, so names of people who left still resolve.
+- **Actor reference**, one text format everywhere (`identity/actor-ref.ts`): `user:<sub>`, `mcp:<tokenId>`, `agent:<kind>` (the autopilot is `agent:autopilot`), `system:<job>`. A delegated action appends the channel: `user:<sub>@mcp:<tokenId>`. Anything else is a **self-declared name**, stored as typed: that is how identity works with IAM off, so it is not a legacy form to migrate. A typed name that would parse as a reference is refused. Existing free-text columns (`createdBy`, `addedBy`, `decidedBy`, `reviewedBy`, `triggeredBy`, `verifiedBy`, `actor`, `author`) hold this format.
+- **Last changed by comes from the audit trail.** Instead of adding `updated_by` columns to 17 models (and touching every service's update path), "created by / last changed by" for an entity is the oldest and newest audit event for it. Existing author columns stay: product timelines and queries (agent vs. person work) use them.
+- **Audit trail.** An append-only `audit_events` table in every workspace schema: actor, how they were identified, channel (`rest` / `mcp`), the capability used, the operation (`PATCH /sources/:id` or the tool name), entity type and id, the top-level field names sent (never values, so never secrets or matched content), HTTP status. REST changes are recorded by one global interceptor, MCP changes by wrapping each change tool's handler: no feature code writes it. Tenant-level events (grants, workspace create/delete) go to `public.iam_audit_events` in step 5. The existing `CaseActivity`, `InquiryActivity` and `GlossaryActivity` stay: they are product timelines, not the audit trail.
+- **Display names.** `GET /<ws>/actors/resolve?refs=…&refs=…` returns kind and display name: a self-declared name is itself, an MCP token its name (also once deleted), `agent:autopilot` "Autopilot". People (`user:`) resolve from `public.iam_principals`, which arrives with sign-in in step 5 and is refreshed on each sign-in, so names of people who left still resolve.
 
 ### 11.2 UI: where it shows
 
@@ -525,8 +525,24 @@ Left for later steps:
 
 ### Step 2 · Attribution data
 
-- Actor reference format, per-schema migration of existing names to `name:…`, missing `created_by`/`updated_by` columns (§11.1), `audit_events` per workspace, `public.iam_principals`, `GET /principals/resolve`.
-- **Done:** every mutating route writes its actor; a spec lists authored models without an actor column and fails on new ones.
+- Actor reference format (§11.1), `audit_events` per workspace, `GET /<ws>/audit-events`, `GET /<ws>/actors/resolve`.
+- **Done:** every successful change over REST and MCP is in the audit trail with its actor.
+
+**As built, 2026-11-04** (migration `20261104120000_audit_events_and_actor_refs`):
+
+- **References.** MCP tool calls record `mcp:<tokenId>` instead of the literal `'mcp'` (25 call sites in `mcp-server.factory.ts`, through `toolAuthor()`). Internal-key callers are `system:runner`. The autopilot constant `AI_ACTOR` is now `agent:autopilot` in the API and the web; the migration rewrites `ai-autopilot` in all 44 author columns of every workspace.
+- **Audit trail.** `AuditInterceptor` (global) records every REST call that is not a read: method not GET/HEAD, capability not a `.view`, not `@InternalOnly()`, inside a workspace. The entity is the route's static path up to its first parameter plus that parameter (`/cases/:id/evidence/:evidenceId` → `cases` / id); a create takes the id from the response. MCP change tools (`readOnlyHint: false`) are wrapped after registration and file their calls under the same entity names as REST (`update_case` → `cases`). Recording never fails a request; a lost row is logged.
+- **Found while verifying:** an MCP create has no id in its arguments, so the wrapper takes it from the tool's JSON result, as REST takes it from the response body. Without that, `create_inquiry` was recorded with no entity.
+- **Verified** on the dev stack (`test` workspace, rows removed afterwards): REST create, rename and delete of an explore view recorded as the header name with field names only and the right statuses (201, 200, 204); MCP `create_inquiry` and `delete_inquiry` recorded as `mcp:<token>` under the inquiry's id; `actors/resolve` names the token, and "Deleted MCP token" once it is gone. The migration left no `ai-autopilot` in any of the 31 workspaces.
+- **Reading it.** `GET /<ws>/audit-events?entityType=&entityId=&actor=&before=&limit=` (newest first, keyset paging) and `GET /<ws>/actors/resolve?refs=…` (repeated parameter, because names may contain commas). Both need `workspace.view`.
+- **Changed from the plan:** no `name:` prefix for self-declared names and no `updated_by` columns (see §11.1). `public.iam_principals` moves to step 5, where sign-in fills it.
+
+Left for later steps:
+
+- **Background work** (autopilot cycles, scheduler, pg-boss jobs) still writes its author columns directly and is not in the audit trail: it changes data through services, not routes or tools. `ActorContextService.runAs` exists; recording service-level changes is a follow-up once domain events (00 · F1) exist.
+- **Registry routes** (`/namespaces`, outside a workspace) are not recorded until `public.iam_audit_events` in step 5.
+- **Agents can claim an author.** `create_inquiry`, `create_case` and `create_case_thread` accept `createdBy` in their input. With IAM on, input author fields must be ignored in favour of the actor (step 5).
+- **Old literal authors** like `'mcp'`, `'operator'` and `'user'` in existing rows stay as they are: they display as plain names.
 
 ### Step 3 · Attribution UI
 
