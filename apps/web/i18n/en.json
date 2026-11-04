@@ -7253,5 +7253,11 @@
     "loadMore": "Load more",
     "activityTitle": "Activity",
     "activityDescription": "Every change made in this workspace, from the web app, the API or agents through MCP. Reads are not recorded."
+  },
+  "account": {
+    "menu": "Account",
+    "signedIn": "Signed in",
+    "tenant": "Tenant: {{name}}",
+    "signOut": "Sign out"
   }
 }

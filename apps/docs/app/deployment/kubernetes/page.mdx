@@ -393,11 +393,10 @@ turns it on by default. It runs an identity server next to Classifyre on the
 same host, at `https://<your-host>/iam`. See
 [Access & Sign-in](/access/) for what people can do once signed in.
 
-<Callout type="warning">
-  Sign-in is being built in stages. With `iam.enabled: true` the API already
-  requires sign-in and separates tenants, but the web app cannot sign people in
-  yet, so the instance is only usable through the API. Until a release says the
-  web app signs in, install with `iam.enabled: false`.
+<Callout type="info">
+  With `iam.enabled: true` people sign in to the web app and the API keeps
+  tenants and groups apart. Giving access is done through the API for now (see
+  [Access & Sign-in](/access/)); screens for it come in a later release.
 </Callout>
 
 What the chart sets up:

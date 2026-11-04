@@ -12,7 +12,7 @@ import { InstanceSettingsProvider } from "@/components/instance-settings-provide
 export function CleanupCardHarness() {
   return (
     <ServerConfigContext.Provider
-      value={{ logsPersisted: false, demoMode: false }}
+      value={{ logsPersisted: false, demoMode: false, iamEnabled: false }}
     >
       <InstanceSettingsProvider>
         <CleanupCard />

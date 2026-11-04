@@ -7253,5 +7253,11 @@
     "loadMore": "Mehr laden",
     "activityTitle": "Aktivität",
     "activityDescription": "Jede Änderung in diesem Arbeitsbereich, aus der Web-App, der API oder von Agenten über MCP. Lesezugriffe werden nicht erfasst."
+  },
+  "account": {
+    "menu": "Konto",
+    "signedIn": "Angemeldet",
+    "tenant": "Mandant: {{name}}",
+    "signOut": "Abmelden"
   }
 }

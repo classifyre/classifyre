@@ -180,8 +180,16 @@ function readEnv(name: string): string | undefined {
 }
 
 /** Whether this deployment publishes a sitemap and invites crawlers. */
+/**
+ * Crawling is invited only when asked for, and never with sign-in on: a
+ * signed-in instance is private, whatever SITEMAP_ENABLED says (docs/prd
+ * IAM §2 H4). This one switch drives robots.txt, the sitemap routes and every
+ * page's robots metadata.
+ */
 export function isSitemapEnabled(): boolean {
-  return readEnv("SITEMAP_ENABLED") === "true";
+  return (
+    readEnv("SITEMAP_ENABLED") === "true" && readEnv("IAM_ENABLED") !== "true"
+  );
 }
 
 export function sitemapChunkSize(): number {

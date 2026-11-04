@@ -12,6 +12,7 @@ import type { ServerConfig } from "@/lib/server-config";
 export const DEFAULT_SERVER_CONFIG: ServerConfig = {
   logsPersisted: true,
   demoMode: false,
+  iamEnabled: false,
 };
 
 export const ServerConfigContext = React.createContext<ServerConfig>(

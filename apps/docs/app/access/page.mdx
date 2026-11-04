@@ -9,9 +9,9 @@ import { Callout } from "nextra/components";
 # Access & Sign-in
 
 <Callout type="info">
-  Sign-in is being built in stages. The access model below is enforced by the
-  API when sign-in is on, but the web app cannot sign people in yet. This page
-  grows as each part ships.
+  Sign-in is being built in stages. People can sign in to the web app, and the
+  API enforces the access model below. Managing access from the web app comes
+  next; until then it is done through the API.
 </Callout>
 
 Access management is **optional**. When it is off, Classifyre works as it
@@ -27,6 +27,20 @@ groups they belong to.
   setting it up or turning it off.
 - **Docker (all-in-one image):** access management is never used. The image is
   meant for one person or a small trusted team on one machine.
+
+---
+
+## Signing in
+
+With sign-in on, opening Classifyre takes you to its sign-in page. If you
+belong to several tenants, the sign-in page asks which one to open. After
+signing in you see only the workspaces you have access to; a workspace you
+cannot see behaves as if it did not exist.
+
+Your name and tenant are in the account menu in the top-right corner, with
+**Sign out**. Sessions renew themselves while you work; after a long break you
+are asked to sign in again. Classifyre never shows your sign-in tokens to the
+page itself: they live in cookies only the server can read.
 
 ---
 

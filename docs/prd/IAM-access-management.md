@@ -2,7 +2,7 @@
 
 |                       |                                                                                                                                      |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| **Status**            | In progress: steps 0–5 done 2026-11-04 (§13)                                                                                         |
+| **Status**            | In progress: steps 0–6 done 2026-11-04 (§13)                                                                                         |
 | **Size**              | L (9 steps, each its own PR)                                                                                                         |
 | **Depends on**        | [S1 · Enterprise extension seams](S1-enterprise-extension-seams.md) (step 1 builds S1 R1–R8 and R15)                                 |
 | **Identity provider** | Keycloak 26.8.1 (`quay.io/keycloak/keycloak:26.8.1`, released 2026-10-13), Helm chart only                                           |
@@ -655,6 +655,21 @@ Also: no token 401; a create without owner 400; a spoofed `X-Actor-Name` recorde
 
 - §12.1–12.3 and §12.5.
 - **Done:** sign in, refresh, sign out and tenant switch work in the dev stack; with IAM off the web is unchanged.
+
+**As built, 2026-11-04** (`apps/web`):
+
+- **OIDC client on the Next server** (`lib/iam/session.ts`, `app/auth/{login,callback,refresh,logout}`): authorization code with PKCE (S256) and a state, both kept in a sealed, ten-minute `cf_auth_flow` cookie. The callback exchanges the code from the server with the client secret (in-cluster token URL, `IAM_INTERNAL_URL`), sets `cf_session` (access token), `cf_refresh` (refresh token sealed with AES-256-GCM, key derived from the client secret) and `cf_id` (for the logout hint), all `HttpOnly`, `SameSite=Lax`, `Secure` on HTTPS. `returnTo` only accepts paths inside the app. Logout clears them and ends the identity server's session.
+- **`proxy.ts`** renews a session within a minute of expiry and hands the new token to the same request; a page without a session goes to `/auth/login?returnTo=…`; API calls without a session are left to answer 401.
+- **401 in the browser:** `setUnauthorizedHandler` in `@workspace/api-client` (`http.ts`) renews once through `POST /auth/refresh` and retries, one renewal shared by every request that expired together; if renewal fails the page goes to sign-in. This matters in production, where the ingress sends `/api` straight to the API and the proxy never sees those calls.
+- **UI:** `ServerConfig.iamEnabled`; an account menu (name, tenant, sign out) in the header; `useMe()`, `useCan()` and `<Can capability>` from `GET /<ws>/me`; the case board shows the signed-in name instead of asking for one.
+- **SEO off (H4):** `isSitemapEnabled()` is false with `IAM_ENABLED=true`, which drives `robots.txt` (`Disallow: /`), the sitemap routes and every page's robots metadata.
+- **Locale routing** leaves `/auth/*` alone.
+
+**Verified** with a production build of the web app (`next build`, run on port 3005 because another session's dev server held the checkout) against a throwaway release whose app URL was `http://localhost:3005`: `/` without a session → 307 to sign-in → 307 to the identity server with PKCE; signing in as the finance viewer in the browser landed on the workspace, which loaded its data through the API with the cookie; no session cookie was readable from JavaScript; the account menu showed "Ava Test · Tenant: Default · Sign out"; `POST /auth/refresh` answered 204; the directory listed only the finance workspace; `/me` said `oidc`, 12 capabilities, no `source.manage`; sign-out ended the identity server session (the next visit asked for a username again). The same build without sign-in: pages 200, `/auth/login` 404, no account menu, `/me` `iamEnabled: false` with every capability.
+
+**Found while verifying:** `next build` type-checks test files with Next's own `ProcessEnv` (which requires `NODE_ENV`), where plain `tsc` passed; the session config now takes a plain record.
+
+**Not done:** switching tenants for people in several organizations. `/auth/login?tenant=<alias>` asks for one, but the menu does not list a person's tenants yet (the API would need to expose them); with plain `organization` the identity server shows its own picker.
 
 ### Step 7 · Access UI
 
