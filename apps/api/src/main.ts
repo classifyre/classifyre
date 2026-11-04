@@ -19,6 +19,7 @@ import { integrationFromMcpToken } from './identity/actor';
 import { assertIamAllowed } from './identity/iam-config';
 import type { IdentityService } from './identity/identity.service';
 import { IDENTITY } from './identity/identity.tokens';
+import { CLS_CAPABILITIES } from './identity/iam-access-policy';
 import { InstanceSettingsService } from './instance-settings.service';
 import { PrismaExceptionFilter } from './filters/prisma-exception.filter';
 import { DbRetryInterceptor } from './interceptors/db-retry.interceptor';
@@ -320,22 +321,11 @@ async function bootstrap() {
         return;
       }
 
-      if (identity) {
-        // MCP tokens act for the person who created them (docs/prd §8.3);
-        // until tokens have owners, sign-in leaves no way to know who that is.
-        reply.code(401).send({
-          error: 'Unauthorized',
-          code: 'MCP_NEEDS_OWNER',
-          message:
-            'MCP is not available with sign-in yet: tokens need an owner, which comes in a later release.',
-        });
-        return;
-      }
-
       let authorizedToken: {
         id: string;
         name: string;
         toolGroupIds: string[] | null;
+        ownerSub: string | null;
       };
       try {
         authorizedToken = await mcpTokenService.authorizeBearerToken(
@@ -352,9 +342,34 @@ async function bootstrap() {
         return;
       }
 
-      const actor = integrationFromMcpToken(authorizedToken);
+      let actor = integrationFromMcpToken(authorizedToken);
+      let capabilities = await accessPolicy.capabilities(actor);
+      if (identity) {
+        // With sign-in a token acts for its owner, as they are right now.
+        const owner = authorizedToken.ownerSub
+          ? await identity.principalForOwner(
+              authorizedToken.ownerSub,
+              authorizedToken.id,
+              ns.namespaceId,
+            )
+          : null;
+        if (!owner) {
+          reply.code(401).send({
+            error: 'Unauthorized',
+            code: authorizedToken.ownerSub
+              ? 'MCP_OWNER_NO_ACCESS'
+              : 'MCP_TOKEN_WITHOUT_OWNER',
+            message: authorizedToken.ownerSub
+              ? 'The person this token belongs to no longer has access to this workspace.'
+              : 'This token was created before sign-in and has no owner. Sign in and create a new one.',
+          });
+          return;
+        }
+        actor = owner.principal.actor;
+        capabilities = owner.capabilities;
+        cls.set(CLS_CAPABILITIES, capabilities);
+      }
       actors.set(actor);
-      const capabilities = await accessPolicy.capabilities(actor);
 
       reply.hijack();
 

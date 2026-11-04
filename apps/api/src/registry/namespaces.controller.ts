@@ -78,6 +78,24 @@ export class NamespacesController {
     if (missing) throw new CapabilityRequiredException(missing);
   }
 
+  private async tenantId(request: FastifyRequest): Promise<string | undefined> {
+    return (await this.principal(request))?.tenant.id;
+  }
+
+  /** With sign-in a workspace can only be filed under its tenant's categories. */
+  private async assertOwnCategories(
+    request: FastifyRequest,
+    categoryIds: string[] | undefined,
+  ): Promise<void> {
+    const tenantId = await this.tenantId(request);
+    if (!tenantId || !categoryIds?.length) return;
+    const own = new Set(
+      (await this.registry.listCategories(tenantId)).map((c) => c.id),
+    );
+    const foreign = categoryIds.find((id) => !own.has(id));
+    if (foreign) throw new NotFoundException(`Unknown category '${foreign}'`);
+  }
+
   private async visibleIds(
     request: FastifyRequest,
   ): Promise<Set<string> | null> {
@@ -113,6 +131,7 @@ export class NamespacesController {
     const principal = await this.principal(request);
     if (!principal) return this.registry.create(body);
 
+    await this.assertOwnCategories(request, body.categoryIds);
     if (!body.ownerGroupId) {
       throw new BadRequestException(
         'ownerGroupId is required: every workspace is owned by one group of your tenant.',
@@ -128,6 +147,16 @@ export class NamespacesController {
       created.id,
       principal.tenant.id,
       body.ownerGroupId,
+    );
+    await this.tenancy.recordTenantEvent(
+      principal.tenant.id,
+      principal.actor.ref,
+      'workspace.created',
+      {
+        namespaceId: created.id,
+        slug: created.slug,
+        ownerGroupId: body.ownerGroupId,
+      },
     );
     return created;
   }
@@ -164,27 +193,35 @@ export class NamespacesController {
   // matched as itself and not as a namespace whose id is "categories".
   @Get('categories')
   @ApiOperation({ summary: 'List workspace categories with workspace counts' })
-  listCategories(): Promise<NamespaceCategory[]> {
-    return this.registry.listCategories();
+  async listCategories(
+    @Req() request: FastifyRequest,
+  ): Promise<NamespaceCategory[]> {
+    return this.registry.listCategories(await this.tenantId(request));
   }
 
   @Requires('tenant.categories.manage')
   @Post('categories')
   @ApiOperation({ summary: 'Create a workspace category' })
-  createCategory(
+  async createCategory(
+    @Req() request: FastifyRequest,
     @Body() body: CreateNamespaceCategoryInput,
   ): Promise<NamespaceCategory> {
-    return this.registry.createCategory(body);
+    return this.registry.createCategory(body, await this.tenantId(request));
   }
 
   @Requires('tenant.categories.manage')
   @Patch('categories/:categoryId')
   @ApiOperation({ summary: 'Rename or re-describe a workspace category' })
-  updateCategory(
+  async updateCategory(
+    @Req() request: FastifyRequest,
     @Param('categoryId') categoryId: string,
     @Body() body: UpdateNamespaceCategoryInput,
   ): Promise<NamespaceCategory> {
-    return this.registry.updateCategory(categoryId, body);
+    return this.registry.updateCategory(
+      categoryId,
+      body,
+      await this.tenantId(request),
+    );
   }
 
   @Requires('tenant.categories.manage')
@@ -194,8 +231,14 @@ export class NamespacesController {
     summary:
       'Delete a category (its workspaces fall back to the default category)',
   })
-  async removeCategory(@Param('categoryId') categoryId: string): Promise<void> {
-    await this.registry.removeCategory(categoryId);
+  async removeCategory(
+    @Req() request: FastifyRequest,
+    @Param('categoryId') categoryId: string,
+  ): Promise<void> {
+    await this.registry.removeCategory(
+      categoryId,
+      await this.tenantId(request),
+    );
   }
 
   @Get(':id')
@@ -239,6 +282,7 @@ export class NamespacesController {
       'workspace.settings',
       ...(body.paused !== undefined ? (['workspace.pause'] as const) : []),
     );
+    await this.assertOwnCategories(request, body.categoryIds);
     return this.registry.update(id, body);
   }
 
@@ -254,5 +298,14 @@ export class NamespacesController {
   ): Promise<void> {
     await this.requireIn(request, id, 'workspace.delete');
     await this.registry.remove(id);
+    const principal = await this.principal(request);
+    if (principal) {
+      await this.tenancy.recordTenantEvent(
+        principal.tenant.id,
+        principal.actor.ref,
+        'workspace.deleted',
+        { namespaceId: id },
+      );
+    }
   }
 }

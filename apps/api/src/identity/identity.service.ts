@@ -177,7 +177,72 @@ export class IdentityService {
       via: found.via,
     };
     request.classifyrePrincipal = principal;
+    this.rememberName(claims.sub, displayName, member.email);
     return principal;
+  }
+
+  private readonly namesWritten = new Map<string, number>();
+
+  /** Keeps `iam_principals` current, at most every ten minutes per person. */
+  private rememberName(
+    sub: string,
+    displayName: string | null,
+    email: string | null,
+  ) {
+    const last = this.namesWritten.get(sub) ?? 0;
+    if (Date.now() - last < 10 * 60_000) return;
+    this.namesWritten.set(sub, Date.now());
+    // Never part of signing in: a failed write must not fail the request.
+    void Promise.resolve()
+      .then(() => this.tenancy.rememberPrincipal(sub, displayName, email))
+      .catch(() => {
+        // A missing name is cosmetic; the next sign-in writes it.
+        this.namesWritten.delete(sub);
+      });
+  }
+
+  /**
+   * The principal an MCP token acts as: its owner, as they are now (docs/prd
+   * §8.3). Rebuilt on every call, so a viewer's agent stays read-only, a
+   * mover's agent follows the move and a leaver's agent stops. Null when the
+   * owner can no longer see the workspace.
+   */
+  async principalForOwner(
+    sub: string,
+    tokenId: string,
+    namespaceId: string,
+  ): Promise<{ principal: Principal; capabilities: Set<Capability> } | null> {
+    const tenancy = await this.tenancy.workspaceTenancy(namespaceId);
+    const tenant = tenancy
+      ? await this.tenancy.tenantById(tenancy.tenantId)
+      : null;
+    if (!tenant?.orgId) return null;
+    const member = await this.membership.membership(sub);
+    if (
+      !member.enabled ||
+      !member.organizations.some((org) => org.id === tenant.orgId)
+    ) {
+      return null;
+    }
+    const groupIds = await this.membership.groupIds(sub, tenant.orgId);
+    const principal: Principal = {
+      sub,
+      actor: {
+        id: `user:${sub}`,
+        displayName: member.displayName,
+        kind: 'person',
+        via: 'mcp-token',
+        ref: `user:${sub}@mcp:${tokenId}`,
+      },
+      tenant,
+      orgId: tenant.orgId,
+      groupIds,
+      grants: await this.tenancy.grantsFor(tenant.id, sub, groupIds),
+      via: 'bearer',
+    };
+    const capabilities = await this.capabilitiesIn(principal, namespaceId);
+    if (!capabilities?.has('workspace.view')) return null;
+    return { principal, capabilities };
   }
 
   /**
@@ -197,6 +262,36 @@ export class IdentityService {
       namespaceId,
       ownerLineage,
     });
+  }
+
+  /** The owner group of a workspace and the groups above it; empty without an owner. */
+  async ownerLineage(
+    principal: Principal,
+    namespaceId: string,
+  ): Promise<string[]> {
+    const tenancy = await this.tenancy.workspaceTenancy(namespaceId);
+    if (
+      !tenancy ||
+      tenancy.tenantId !== principal.tenant.id ||
+      !tenancy.ownerGroupId
+    ) {
+      return [];
+    }
+    return this.membership.ancestry(principal.orgId, tenancy.ownerGroupId);
+  }
+
+  /** Every group of the principal's tenant. */
+  groupsOf(principal: Principal): Promise<OrgGroup[]> {
+    return this.membership.groups(principal.orgId);
+  }
+
+  /** Whether a person (subject id) belongs to the principal's tenant. */
+  async isMember(principal: Principal, sub: string): Promise<boolean> {
+    const member = await this.membership.membership(sub);
+    return (
+      member.enabled &&
+      member.organizations.some((org) => org.id === principal.orgId)
+    );
   }
 
   /** Every workspace of the principal's tenant they can see, with what they may do there. */

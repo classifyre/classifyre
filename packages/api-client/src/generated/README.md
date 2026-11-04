@@ -59,6 +59,18 @@ All URIs are relative to *http://localhost*
 *AIProviderConfigsApi* | [**aiProviderConfigControllerRemove**](docs/AIProviderConfigsApi.md#aiproviderconfigcontrollerremove) | **DELETE** /ai-provider-configs/{id} | Delete an AI provider configuration
 *AIProviderConfigsApi* | [**aiProviderConfigControllerTest**](docs/AIProviderConfigsApi.md#aiproviderconfigcontrollertest) | **POST** /ai-provider-configs/{id}/test | Test an AI provider configuration
 *AIProviderConfigsApi* | [**aiProviderConfigControllerUpdate**](docs/AIProviderConfigsApi.md#aiproviderconfigcontrollerupdate) | **PUT** /ai-provider-configs/{id} | Update an AI provider configuration
+*AccessApi* | [**tenantAccessControllerAddGrant**](docs/AccessApi.md#tenantaccesscontrolleraddgrant) | **POST** /tenant/grants | Give a group or a person a role on the tenant, a group’s workspaces or one workspace
+*AccessApi* | [**tenantAccessControllerEvents**](docs/AccessApi.md#tenantaccesscontrollerevents) | **GET** /tenant/audit-events | Tenant-level changes: grants, workspaces created or deleted
+*AccessApi* | [**tenantAccessControllerGrants**](docs/AccessApi.md#tenantaccesscontrollergrants) | **GET** /tenant/grants | Every grant of the tenant
+*AccessApi* | [**tenantAccessControllerGroups**](docs/AccessApi.md#tenantaccesscontrollergroups) | **GET** /tenant/groups | 
+*AccessApi* | [**tenantAccessControllerRemoveGrant**](docs/AccessApi.md#tenantaccesscontrollerremovegrant) | **DELETE** /tenant/grants/{id} | Remove any grant of the tenant
+*AccessApi* | [**tenantAccessControllerTenant**](docs/AccessApi.md#tenantaccesscontrollertenant) | **GET** /tenant | The caller’s tenant and what they may do across it
+*AccessApi* | [**workspaceAccessControllerAddGrant**](docs/AccessApi.md#workspaceaccesscontrolleraddgrant) | **POST** /access/grants | Give a group or a person a role on this workspace
+*AccessApi* | [**workspaceAccessControllerExplain**](docs/AccessApi.md#workspaceaccesscontrollerexplain) | **GET** /access/explain | Why can I do this? The grants that give you a capability here
+*AccessApi* | [**workspaceAccessControllerGrants**](docs/AccessApi.md#workspaceaccesscontrollergrants) | **GET** /access/grants | Grants that reach this workspace, including inherited ones
+*AccessApi* | [**workspaceAccessControllerGroups**](docs/AccessApi.md#workspaceaccesscontrollergroups) | **GET** /access/groups | Groups of this tenant, to grant access to
+*AccessApi* | [**workspaceAccessControllerRemoveGrant**](docs/AccessApi.md#workspaceaccesscontrollerremovegrant) | **DELETE** /access/grants/{id} | Remove a grant made on this workspace
+*AccessApi* | [**workspaceAccessControllerRoles**](docs/AccessApi.md#workspaceaccesscontrollerroles) | **GET** /access/roles | The built-in roles and what each one allows
 *AssetsApi* | [**assetsControllerGetAsset**](docs/AssetsApi.md#assetscontrollergetasset) | **GET** /assets/{id} | Get asset by ID
 *AssetsApi* | [**assetsControllerGetReferencingFindings**](docs/AssetsApi.md#assetscontrollergetreferencingfindings) | **GET** /assets/{id}/referencing-findings | Findings recorded on assets that point at this one
 *AssetsApi* | [**searchAssetsControllerExportAssets**](docs/AssetsApi.md#searchassetscontrollerexportassets) | **GET** /search/assets/export | Export assets (with findings) as CSV
@@ -659,6 +671,7 @@ All URIs are relative to *http://localhost*
 - [CreateExternalRunnerDto](docs/CreateExternalRunnerDto.md)
 - [CreateFindingDto](docs/CreateFindingDto.md)
 - [CreateGlossaryRelationDto](docs/CreateGlossaryRelationDto.md)
+- [CreateGrantDto](docs/CreateGrantDto.md)
 - [CreateInquiryDto](docs/CreateInquiryDto.md)
 - [CreateManualEdgeDto](docs/CreateManualEdgeDto.md)
 - [CreateMcpServerDto](docs/CreateMcpServerDto.md)
@@ -754,6 +767,7 @@ All URIs are relative to *http://localhost*
 - [GlossarySchemeRefDto](docs/GlossarySchemeRefDto.md)
 - [GlossaryTermDto](docs/GlossaryTermDto.md)
 - [GlossaryTermUsageDto](docs/GlossaryTermUsageDto.md)
+- [GrantDto](docs/GrantDto.md)
 - [GraphEdgeDto](docs/GraphEdgeDto.md)
 - [GraphNodeDto](docs/GraphNodeDto.md)
 - [GraphResponseDto](docs/GraphResponseDto.md)
@@ -876,6 +890,7 @@ All URIs are relative to *http://localhost*
 - [ReviewSourceNodeDto](docs/ReviewSourceNodeDto.md)
 - [ReviewWaterfallDto](docs/ReviewWaterfallDto.md)
 - [ReviewWaterfallRowDto](docs/ReviewWaterfallRowDto.md)
+- [RoleDto](docs/RoleDto.md)
 - [RunnerAssetFindingSummaryDto](docs/RunnerAssetFindingSummaryDto.md)
 - [RunnerAssetItemDto](docs/RunnerAssetItemDto.md)
 - [RunnerAssetProgressDto](docs/RunnerAssetProgressDto.md)
@@ -981,6 +996,9 @@ All URIs are relative to *http://localhost*
 - [SupervisorJournalEntryDto](docs/SupervisorJournalEntryDto.md)
 - [SupervisorJournalListDto](docs/SupervisorJournalListDto.md)
 - [SupervisorStateDto](docs/SupervisorStateDto.md)
+- [TenantDto](docs/TenantDto.md)
+- [TenantEventDto](docs/TenantEventDto.md)
+- [TenantGroupDto](docs/TenantGroupDto.md)
 - [TestConnectionResponseDto](docs/TestConnectionResponseDto.md)
 - [TextCoverageDto](docs/TextCoverageDto.md)
 - [ThreadEntriesResponseDto](docs/ThreadEntriesResponseDto.md)

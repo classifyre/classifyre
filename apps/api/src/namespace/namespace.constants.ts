@@ -34,6 +34,7 @@ export const RESERVED_PREFIXES = new Set<string>([
   'ping', // health probe
   'health', // health endpoints
   'namespaces', // namespace registry CRUD
+  'tenant', // the caller's tenant: grants, groups, audit (identity/access.controller.ts)
   'socket.io', // Socket.IO transport handshake path
   'favicon.ico',
   // Swagger UI and its generated OpenAPI documents. Mounted at `/docs` rather

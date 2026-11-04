@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { Pool } from 'pg';
 import {
+  DEFAULT_CATEGORY_ID,
   PUBLIC_SEARCH_PATH_OPTION,
   publicConnectionString,
 } from '../registry/namespace-registry.sql';
@@ -83,6 +84,23 @@ export class TenancyService implements OnModuleDestroy {
     return tenant;
   }
 
+  async tenantById(id: string): Promise<Tenant | null> {
+    const { rows } = await this.pool.query<{
+      id: string;
+      alias: string;
+      name: string;
+      org_id: string | null;
+    }>(`SELECT id, alias, name, org_id FROM iam_tenants WHERE id = $1`, [id]);
+    return rows[0]
+      ? {
+          id: rows[0].id,
+          alias: rows[0].alias,
+          name: rows[0].name,
+          orgId: rows[0].org_id,
+        }
+      : null;
+  }
+
   /** The tenant for an organization, created on first sight. */
   async ensureTenant(org: {
     id: string;
@@ -157,14 +175,15 @@ export class TenancyService implements OnModuleDestroy {
       expiresAt?: Date | null;
       createdBy?: string;
     },
-  ): Promise<void> {
+  ): Promise<string> {
+    const id = randomUUID();
     await this.pool.query(
       `INSERT INTO iam_grants
          (id, tenant_id, subject_type, subject_id, role_key, scope_type, scope_id, expires_at, created_by)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        ON CONFLICT (tenant_id, subject_type, subject_id, role_key, scope_type, scope_id) DO NOTHING`,
       [
-        randomUUID(),
+        id,
         grant.tenantId,
         grant.subjectType,
         grant.subjectId,
@@ -175,6 +194,106 @@ export class TenancyService implements OnModuleDestroy {
         grant.createdBy ?? null,
       ],
     );
+    return id;
+  }
+
+  /** Every grant of a tenant, optionally only those on some scopes. */
+  async listGrants(
+    tenantId: string,
+    scope?: { scopeType: GrantScopeType; scopeIds: string[] },
+  ): Promise<(Grant & { createdBy: string | null; createdAt: Date })[]> {
+    const { rows } = await this.pool.query<{
+      id: string;
+      tenant_id: string;
+      subject_type: 'group' | 'user';
+      subject_id: string;
+      role_key: RoleKey;
+      scope_type: GrantScopeType;
+      scope_id: string;
+      expires_at: Date | null;
+      created_by: string | null;
+      created_at: Date;
+    }>(
+      `SELECT id, tenant_id, subject_type, subject_id, role_key, scope_type, scope_id,
+              expires_at, created_by, created_at
+         FROM iam_grants WHERE tenant_id = $1
+         ${scope ? 'AND scope_type = $2 AND scope_id = ANY($3::text[])' : ''}
+        ORDER BY created_at`,
+      scope ? [tenantId, scope.scopeType, scope.scopeIds] : [tenantId],
+    );
+    return rows.map((row) => ({
+      id: row.id,
+      tenantId: row.tenant_id,
+      subjectType: row.subject_type,
+      subjectId: row.subject_id,
+      roleKey: row.role_key,
+      scopeType: row.scope_type,
+      scopeId: row.scope_id,
+      expiresAt: row.expires_at,
+      createdBy: row.created_by,
+      createdAt: row.created_at,
+    }));
+  }
+
+  async grantById(tenantId: string, id: string): Promise<Grant | null> {
+    const { rows } = await this.pool.query<{
+      scope_type: GrantScopeType;
+      scope_id: string;
+    }>(
+      `SELECT scope_type, scope_id FROM iam_grants WHERE tenant_id = $1 AND id = $2`,
+      [tenantId, id],
+    );
+    if (!rows[0]) return null;
+    return (
+      (
+        await this.listGrants(tenantId, {
+          scopeType: rows[0].scope_type,
+          scopeIds: [rows[0].scope_id],
+        })
+      ).find((grant) => grant.id === id) ?? null
+    );
+  }
+
+  async deleteGrant(tenantId: string, id: string): Promise<void> {
+    await this.pool.query(
+      `DELETE FROM iam_grants WHERE tenant_id = $1 AND id = $2`,
+      [tenantId, id],
+    );
+  }
+
+  /** Tenant-level audit trail (grants, workspaces created or deleted). */
+  async recordTenantEvent(
+    tenantId: string,
+    actor: string | undefined,
+    action: string,
+    detail: Record<string, unknown>,
+  ): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO iam_audit_events (id, tenant_id, actor, action, detail)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [randomUUID(), tenantId, actor ?? null, action, JSON.stringify(detail)],
+    );
+  }
+
+  async tenantEvents(tenantId: string, limit = 100) {
+    const { rows } = await this.pool.query<{
+      id: string;
+      occurred_at: Date;
+      actor: string | null;
+      action: string;
+      detail: Record<string, unknown>;
+    }>(
+      `SELECT id, occurred_at, actor, action, detail FROM iam_audit_events
+        WHERE tenant_id = $1 ORDER BY occurred_at DESC LIMIT $2`,
+      [tenantId, Math.min(Math.max(limit, 1), 500)],
+    );
+    return rows.map((row) => ({
+      id: row.id,
+      occurredAt: row.occurred_at,
+      actor: row.actor,
+      action: row.action,
+      detail: row.detail,
+    }));
   }
 
   /**
@@ -209,6 +328,50 @@ export class TenancyService implements OnModuleDestroy {
         `Moved ${rowCount} workspace(s) without sign-in into tenant ${tenant.alias}`,
       );
     }
+    // Categories made without sign-in go with the workspaces; the default one
+    // stays shared.
+    await this.pool.query(
+      `UPDATE namespace_categories SET tenant_id = $1
+        WHERE tenant_id IS NULL AND id <> $2`,
+      [tenant.id, DEFAULT_CATEGORY_ID],
+    );
+  }
+
+  /** Remember a person's name for their actor references. */
+  async rememberPrincipal(
+    sub: string,
+    displayName: string | null,
+    email: string | null,
+  ): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO iam_principals (sub, display_name, email, last_seen_at)
+       VALUES ($1, $2, $3, now())
+       ON CONFLICT (sub) DO UPDATE
+         SET display_name = EXCLUDED.display_name, email = EXCLUDED.email, last_seen_at = now()`,
+      [sub, displayName, email],
+    );
+  }
+
+  async principalNames(
+    subs: string[],
+  ): Promise<
+    Map<string, { displayName: string | null; email: string | null }>
+  > {
+    if (subs.length === 0) return new Map();
+    const { rows } = await this.pool.query<{
+      sub: string;
+      display_name: string | null;
+      email: string | null;
+    }>(
+      `SELECT sub, display_name, email FROM iam_principals WHERE sub = ANY($1::text[])`,
+      [subs],
+    );
+    return new Map(
+      rows.map((row) => [
+        row.sub,
+        { displayName: row.display_name, email: row.email },
+      ]),
+    );
   }
 
   /** File a newly created workspace under its tenant and owning group. */

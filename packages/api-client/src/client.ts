@@ -81,6 +81,7 @@ export { NotebooksApi } from "./generated/src/apis/NotebooksApi";
 export { AIApi } from "./generated/src/apis/AIApi";
 export { WorkerQueuesApi } from "./generated/src/apis/WorkerQueuesApi";
 export { IdentityApi } from "./generated/src/apis/IdentityApi";
+export { AccessApi } from "./generated/src/apis/AccessApi";
 // Notebook DTOs must be listed by name: this file re-exports selectively,
 // so a generated model that is not named here is not importable from the
 // package root however cleanly codegen produced it.
@@ -370,6 +371,12 @@ export type {
   ResolvedActorDto,
   MeResponseDto,
   MeActorDto,
+  GrantDto,
+  CreateGrantDto,
+  RoleDto,
+  TenantDto,
+  TenantEventDto,
+  TenantGroupDto,
   ExplorePositionDto,
   ExploreLinkStarterDto,
   ExploreAssetRefDto,
@@ -1334,6 +1341,7 @@ import { EmbeddingsApi } from "./generated/src/apis/EmbeddingsApi";
 import { GlossaryApi } from "./generated/src/apis/GlossaryApi";
 import { WorkerQueuesApi } from "./generated/src/apis/WorkerQueuesApi";
 import { IdentityApi } from "./generated/src/apis/IdentityApi";
+import { AccessApi } from "./generated/src/apis/AccessApi";
 
 // Determine the correct base URL
 // In browser: use relative path /api which is proxied by Next.js
@@ -1380,6 +1388,7 @@ const RESERVED_ROUTE_PREFIXES = new Set([
   "classifyre-usr", // analytics proxy route
   "sitemap", // per-namespace child sitemaps (/sitemap/<ns>/<file>.xml)
   "iam", // identity server, on the same host (helm iam.path)
+  "tenant", // the caller's tenant (API, not workspace-scoped)
 ]);
 
 /**
@@ -1460,7 +1469,12 @@ export function getNamespacedApiBaseUrl(): string {
 /** Requests to these top-level paths are never namespace-scoped. */
 function isReservedApiPath(pathAfterBase: string): boolean {
   const first = pathAfterBase.replace(/^\/+/, "").split("/")[0] ?? "";
-  return first === "namespaces" || first === "health" || first === "ping";
+  return (
+    first === "namespaces" ||
+    first === "tenant" ||
+    first === "health" ||
+    first === "ping"
+  );
 }
 
 let activeActorName: string | undefined;
@@ -1977,6 +1991,7 @@ class ApiClient {
   public namespaces: NamespacesApi;
   public maintenance: MaintenanceApi;
   public identity: IdentityApi;
+  public access: AccessApi;
 
   constructor(baseUrl?: string) {
     this.config = createConfiguration(baseUrl);
@@ -2008,6 +2023,7 @@ class ApiClient {
     this.workerQueues = new WorkerQueuesApi(this.config);
     this.maintenance = new MaintenanceApi();
     this.identity = new IdentityApi(this.config);
+    this.access = new AccessApi(this.config);
   }
 
   /**

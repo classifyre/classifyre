@@ -1206,6 +1206,11 @@ model McpAccessToken {
   // MCP_CAPABILITY_GROUPS ids. Existing tokens stay NULL on migration so
   // nothing that already worked starts failing.
   toolGroupIds Json?     @map("tool_group_ids")
+  /// With sign-in, the person the token acts for (identity server subject id).
+  /// The token can do what its owner can do in this workspace, checked on every
+  /// call. NULL for tokens created without sign-in; those stop working when
+  /// sign-in is turned on.
+  ownerSub     String?   @map("owner_sub")
   lastUsedAt   DateTime? @map("last_used_at")
   revokedAt    DateTime? @map("revoked_at")
   createdAt    DateTime  @default(now()) @map("created_at")
@@ -1213,6 +1218,7 @@ model McpAccessToken {
 
   @@index([revokedAt])
   @@index([lastUsedAt])
+  @@index([ownerSub])
   @@map("mcp_access_tokens")
 }
 

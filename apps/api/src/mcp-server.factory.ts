@@ -271,6 +271,17 @@ function toolAuthor(): string {
   return currentActorRef() ?? 'mcp';
 }
 
+/**
+ * The author of a tool that lets the caller name one (`createdBy`). With
+ * sign-in it is always the person the token acts for: an agent cannot claim
+ * to be someone else. Without sign-in a named author is kept, as before.
+ */
+function claimedAuthor(claimed: string | undefined): string {
+  const actor = currentActor();
+  if (actor.ref?.startsWith('user:')) return actor.ref;
+  return claimed ?? toolAuthor();
+}
+
 /** The `id` of the object a tool returned as JSON text, if any. */
 function createdIdOf(result: unknown): string | null {
   const content = (result as { content?: { type?: string; text?: string }[] })
@@ -3800,7 +3811,13 @@ export class McpServerFactoryService {
           destructiveHint: false,
         },
       },
-      async (dto) => jsonResult(await this.inquiriesService.create(dto as any)),
+      async (dto) =>
+        jsonResult(
+          await this.inquiriesService.create({
+            ...dto,
+            createdBy: claimedAuthor(dto.createdBy),
+          } as any),
+        ),
     );
 
     server.registerTool(
@@ -4026,7 +4043,13 @@ export class McpServerFactoryService {
           destructiveHint: false,
         },
       },
-      async (dto) => jsonResult(await this.casesService.create(dto as any)),
+      async (dto) =>
+        jsonResult(
+          await this.casesService.create({
+            ...dto,
+            createdBy: claimedAuthor(dto.createdBy),
+          } as any),
+        ),
     );
 
     const cleanupSwitches = {
@@ -4834,6 +4857,7 @@ export class McpServerFactoryService {
           await this.caseThreadsService.create(caseId, {
             kind: kind ?? CaseThreadKind.HYPOTHESIS,
             ...rest,
+            createdBy: claimedAuthor(rest.createdBy),
           }),
         );
       },
