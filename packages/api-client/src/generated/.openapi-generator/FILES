@@ -3,6 +3,7 @@
 README.md
 docs/AIApi.md
 docs/AIProviderConfigsApi.md
+docs/AccessApi.md
 docs/AddCaseFindingFiltersDto.md
 docs/AddCaseHypothesisRuleDto.md
 docs/AddEvidenceDto.md
@@ -182,6 +183,7 @@ docs/CreateDetectorNotebookExecutionDto.md
 docs/CreateExternalRunnerDto.md
 docs/CreateFindingDto.md
 docs/CreateGlossaryRelationDto.md
+docs/CreateGrantDto.md
 docs/CreateInquiryDto.md
 docs/CreateManualEdgeDto.md
 docs/CreateMcpServerDto.md
@@ -286,6 +288,7 @@ docs/GlossarySchemeDto.md
 docs/GlossarySchemeRefDto.md
 docs/GlossaryTermDto.md
 docs/GlossaryTermUsageDto.md
+docs/GrantDto.md
 docs/GraphApi.md
 docs/GraphEdgeDto.md
 docs/GraphNodeDto.md
@@ -417,6 +420,7 @@ docs/ReviewSourceGraphDto.md
 docs/ReviewSourceNodeDto.md
 docs/ReviewWaterfallDto.md
 docs/ReviewWaterfallRowDto.md
+docs/RoleDto.md
 docs/RunnerAssetFindingSummaryDto.md
 docs/RunnerAssetItemDto.md
 docs/RunnerAssetProgressDto.md
@@ -526,6 +530,9 @@ docs/SupervisorGoalListDto.md
 docs/SupervisorJournalEntryDto.md
 docs/SupervisorJournalListDto.md
 docs/SupervisorStateDto.md
+docs/TenantDto.md
+docs/TenantEventDto.md
+docs/TenantGroupDto.md
 docs/TestConnectionResponseDto.md
 docs/TextCoverageDto.md
 docs/ThreadEntriesResponseDto.md
@@ -591,6 +598,7 @@ docs/WorkerQueuesApi.md
 package.json
 src/apis/AIApi.ts
 src/apis/AIProviderConfigsApi.ts
+src/apis/AccessApi.ts
 src/apis/AssetsApi.ts
 src/apis/AssistantApi.ts
 src/apis/AutopilotApi.ts
@@ -796,6 +804,7 @@ src/models/CreateDetectorNotebookExecutionDto.ts
 src/models/CreateExternalRunnerDto.ts
 src/models/CreateFindingDto.ts
 src/models/CreateGlossaryRelationDto.ts
+src/models/CreateGrantDto.ts
 src/models/CreateInquiryDto.ts
 src/models/CreateManualEdgeDto.ts
 src/models/CreateMcpServerDto.ts
@@ -891,6 +900,7 @@ src/models/GlossarySchemeDto.ts
 src/models/GlossarySchemeRefDto.ts
 src/models/GlossaryTermDto.ts
 src/models/GlossaryTermUsageDto.ts
+src/models/GrantDto.ts
 src/models/GraphEdgeDto.ts
 src/models/GraphNodeDto.ts
 src/models/GraphResponseDto.ts
@@ -1013,6 +1023,7 @@ src/models/ReviewSourceGraphDto.ts
 src/models/ReviewSourceNodeDto.ts
 src/models/ReviewWaterfallDto.ts
 src/models/ReviewWaterfallRowDto.ts
+src/models/RoleDto.ts
 src/models/RunnerAssetFindingSummaryDto.ts
 src/models/RunnerAssetItemDto.ts
 src/models/RunnerAssetProgressDto.ts
@@ -1118,6 +1129,9 @@ src/models/SupervisorGoalListDto.ts
 src/models/SupervisorJournalEntryDto.ts
 src/models/SupervisorJournalListDto.ts
 src/models/SupervisorStateDto.ts
+src/models/TenantDto.ts
+src/models/TenantEventDto.ts
+src/models/TenantGroupDto.ts
 src/models/TestConnectionResponseDto.ts
 src/models/TextCoverageDto.ts
 src/models/ThreadEntriesResponseDto.ts

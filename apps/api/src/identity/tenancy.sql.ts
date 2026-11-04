@@ -53,4 +53,35 @@ CREATE TABLE IF NOT EXISTS public.iam_grants (
 );
 CREATE INDEX IF NOT EXISTS iam_grants_subject_idx
   ON public.iam_grants (tenant_id, subject_type, subject_id);
+
+-- Names for user:<sub> actor references, refreshed when a person signs in,
+-- so the UI can show who changed something, also after they have left.
+CREATE TABLE IF NOT EXISTS public.iam_principals (
+  sub          text PRIMARY KEY,
+  display_name text,
+  email        text,
+  last_seen_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- Tenant-level audit trail: changes outside any workspace (grants, workspaces
+-- created or deleted). Workspace changes are in each workspace's audit_events.
+CREATE TABLE IF NOT EXISTS public.iam_audit_events (
+  id          uuid PRIMARY KEY,
+  tenant_id   uuid NOT NULL REFERENCES public.iam_tenants (id) ON DELETE CASCADE,
+  occurred_at timestamptz NOT NULL DEFAULT now(),
+  actor       text,
+  action      text NOT NULL,
+  detail      jsonb NOT NULL DEFAULT '{}'::jsonb
+);
+CREATE INDEX IF NOT EXISTS iam_audit_events_tenant_idx
+  ON public.iam_audit_events (tenant_id, occurred_at DESC);
+
+-- Workspace categories belong to a tenant. NULL is shared by every tenant:
+-- the built-in default category, and every category while sign-in is off.
+ALTER TABLE public.namespace_categories
+  ADD COLUMN IF NOT EXISTS tenant_id uuid REFERENCES public.iam_tenants (id) ON DELETE CASCADE;
+DROP INDEX IF EXISTS public.namespace_categories_title_key;
+CREATE UNIQUE INDEX IF NOT EXISTS namespace_categories_tenant_title_key
+  ON public.namespace_categories
+     (COALESCE(tenant_id, '${LOCAL_TENANT_ID}'::uuid), lower(title));
 `;

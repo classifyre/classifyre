@@ -3,13 +3,14 @@ import {
   Controller,
   Delete,
   Get,
+  Inject,
   Param,
   Patch,
   Post,
 } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { McpOverviewService } from '../mcp-overview.service';
-import { McpTokenService } from '../mcp-token.service';
+import { McpTokenService, type TokenScope } from '../mcp-token.service';
 import { McpToolsCatalogService } from '../mcp-tools-catalog.service';
 import {
   CreateMcpTokenDto,
@@ -20,6 +21,8 @@ import {
   UpdateMcpTokenDto,
 } from '../dto/mcp-settings.dto';
 import { AccessArea, Requires } from '../identity/access.decorators';
+import { ACCESS_POLICY, type AccessPolicy } from '../identity/access-policy';
+import { ActorContextService } from '../identity/actor-context.service';
 
 @ApiTags('Instance Settings')
 @AccessArea({ view: 'workspace.view', change: 'mcp.token.own' })
@@ -29,7 +32,28 @@ export class McpSettingsController {
     private readonly mcpOverviewService: McpOverviewService,
     private readonly mcpTokenService: McpTokenService,
     private readonly mcpToolsCatalogService: McpToolsCatalogService,
+    private readonly actors: ActorContextService,
+    @Inject(ACCESS_POLICY) private readonly policy: AccessPolicy,
   ) {}
+
+  /** The signed-in person's subject id; null without sign-in. */
+  private signedInSub(): string | null {
+    const actor = this.actors.current();
+    return actor.via === 'oidc' && actor.id?.startsWith('user:')
+      ? actor.id.slice('user:'.length)
+      : null;
+  }
+
+  /**
+   * With sign-in a person sees and changes their own tokens only, unless they
+   * hold `mcp.token.admin` for the workspace (docs/prd §8.3).
+   */
+  private async scope(): Promise<TokenScope> {
+    const sub = this.signedInSub();
+    if (!sub) return {};
+    const capabilities = await this.policy.capabilities(this.actors.current());
+    return capabilities.has('mcp.token.admin') ? {} : { ownerSub: sub };
+  }
 
   @Get('overview')
   @ApiOperation({
@@ -71,7 +95,7 @@ export class McpSettingsController {
     type: [McpTokenResponseDto],
   })
   async listTokens(): Promise<McpTokenResponseDto[]> {
-    return this.mcpTokenService.listTokens();
+    return this.mcpTokenService.listTokens(await this.scope());
   }
 
   @Post('tokens')
@@ -88,7 +112,7 @@ export class McpSettingsController {
   async createToken(
     @Body() body: CreateMcpTokenDto,
   ): Promise<McpTokenCreatedResponseDto> {
-    return this.mcpTokenService.createToken(body);
+    return this.mcpTokenService.createToken(body, this.signedInSub());
   }
 
   @Patch('tokens/:id')
@@ -106,7 +130,7 @@ export class McpSettingsController {
     @Param('id') id: string,
     @Body() body: UpdateMcpTokenDto,
   ): Promise<McpTokenResponseDto> {
-    return this.mcpTokenService.updateToken(id, body);
+    return this.mcpTokenService.updateToken(id, body, await this.scope());
   }
 
   @Delete('tokens/:id')
@@ -120,6 +144,6 @@ export class McpSettingsController {
     schema: { example: { deleted: true } },
   })
   async deleteToken(@Param('id') id: string): Promise<{ deleted: true }> {
-    return this.mcpTokenService.deleteToken(id);
+    return this.mcpTokenService.deleteToken(id, await this.scope());
   }
 }

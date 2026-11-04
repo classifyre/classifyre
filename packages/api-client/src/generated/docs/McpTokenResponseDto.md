@@ -8,6 +8,7 @@ Name | Type
 ------------ | -------------
 `id` | string
 `name` | string
+`owner` | string
 `tokenPreview` | string
 `isActive` | boolean
 `toolGroupIds` | Array&lt;string&gt;
@@ -25,6 +26,7 @@ import type { McpTokenResponseDto } from '@workspace/api-client'
 const example = {
   "id": 6c0ae0a4-2740-4c37-aa29-c9c69522e053,
   "name": Cursor local agent,
+  "owner": null,
   "tokenPreview": inmcp_6c0ae0a4...VC-TM,
   "isActive": true,
   "toolGroupIds": ["sources","custom_detectors"],

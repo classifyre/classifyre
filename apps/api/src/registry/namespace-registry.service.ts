@@ -921,7 +921,11 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
    * under it (soft-deleted workspaces keep their memberships but must not be
    * counted — the directory does not show them either).
    */
-  async listCategories(): Promise<NamespaceCategory[]> {
+  /**
+   * Categories, with workspace counts. With `tenantId` (sign-in) only that
+   * tenant's categories plus the shared default, counting only its workspaces.
+   */
+  async listCategories(tenantId?: string): Promise<NamespaceCategory[]> {
     const { rows } = await this.pool.query<{
       id: string;
       title: string;
@@ -936,29 +940,40 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
          LEFT JOIN namespace_category_members m ON m.category_id = c.id
          LEFT JOIN namespaces n
                 ON n.id = m.namespace_id AND n.status = 'active'
+               ${tenantId ? 'AND n.tenant_id = $1' : ''}
+        ${tenantId ? 'WHERE c.tenant_id = $1 OR c.tenant_id IS NULL' : ''}
         GROUP BY c.id
         ORDER BY lower(c.title) ASC`,
+      tenantId ? [tenantId] : [],
     );
     return rows.map((row) => toCategory(row));
   }
 
-  async getCategory(id: string): Promise<NamespaceCategory> {
-    const category = (await this.listCategories()).find((c) => c.id === id);
+  async getCategory(id: string, tenantId?: string): Promise<NamespaceCategory> {
+    const category = (await this.listCategories(tenantId)).find(
+      (c) => c.id === id,
+    );
     if (!category) throw new NotFoundException(`Unknown category '${id}'`);
     return category;
   }
 
   async createCategory(
     input: CreateNamespaceCategoryInput,
+    tenantId?: string,
   ): Promise<NamespaceCategory> {
     const title = normalizeCategoryTitle(input.title);
     try {
       const { rows } = await this.pool.query<{ id: string }>(
-        `INSERT INTO namespace_categories (id, title, description)
-         VALUES ($1, $2, $3) RETURNING id`,
-        [randomUUID(), title, input.description?.trim() || null],
+        `INSERT INTO namespace_categories (id, title, description, tenant_id)
+         VALUES ($1, $2, $3, $4) RETURNING id`,
+        [
+          randomUUID(),
+          title,
+          input.description?.trim() || null,
+          tenantId ?? null,
+        ],
       );
-      return this.getCategory(rows[0].id);
+      return this.getCategory(rows[0].id, tenantId);
     } catch (error) {
       if (isUniqueViolation(error)) {
         throw new ConflictException(
@@ -972,6 +987,7 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
   async updateCategory(
     id: string,
     patch: UpdateNamespaceCategoryInput,
+    tenantId?: string,
   ): Promise<NamespaceCategory> {
     const sets: string[] = [];
     const values: unknown[] = [];
@@ -983,15 +999,18 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
       values.push(patch.description?.trim() || null);
       sets.push(`description = $${values.length}`);
     }
-    if (sets.length === 0) return this.getCategory(id);
+    if (sets.length === 0) return this.getCategory(id, tenantId);
     sets.push('updated_at = now()');
     values.push(id);
+    const idParam = values.length;
+    // With sign-in a tenant changes only its own categories, never the shared default.
+    if (tenantId) values.push(tenantId);
 
     let rowCount: number | null;
     try {
       ({ rowCount } = await this.pool.query(
         `UPDATE namespace_categories SET ${sets.join(', ')}
-          WHERE id = $${values.length}`,
+          WHERE id = $${idParam}${tenantId ? ` AND tenant_id = $${values.length}` : ''}`,
         values,
       ));
     } catch (error) {
@@ -1003,7 +1022,7 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
       throw error;
     }
     if (!rowCount) throw new NotFoundException(`Unknown category '${id}'`);
-    return this.getCategory(id);
+    return this.getCategory(id, tenantId);
   }
 
   /**
@@ -1011,15 +1030,17 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
    * with no category afterwards is re-filed under the default one, which is why
    * the default category itself cannot be deleted (it is the fallback).
    */
-  async removeCategory(id: string): Promise<void> {
+  async removeCategory(id: string, tenantId?: string): Promise<void> {
     if (id === DEFAULT_CATEGORY_ID) {
       throw new BadRequestException(
         'The default category cannot be deleted; workspaces without a category fall back to it.',
       );
     }
     const { rowCount } = await this.pool.query(
-      'DELETE FROM namespace_categories WHERE id = $1',
-      [id],
+      tenantId
+        ? 'DELETE FROM namespace_categories WHERE id = $1 AND tenant_id = $2'
+        : 'DELETE FROM namespace_categories WHERE id = $1',
+      tenantId ? [id, tenantId] : [id],
     );
     if (!rowCount) throw new NotFoundException(`Unknown category '${id}'`);
     // The membership rows went with it (ON DELETE CASCADE); re-home whatever

@@ -90,6 +90,33 @@ you leave, they stop working.
 A token can still be narrowed further to a few tool groups when you create it
 (see [MCP Server](/settings/mcp-server/)).
 
+With sign-in, you see and revoke your own tokens; people allowed to manage
+every token of the workspace see all of them. A token made before sign-in was
+turned on has no owner and stops working: create a new one after signing in.
+
+---
+
+## Giving access
+
+Access is given with **grants**. Through the API today, in the web app soon:
+
+- **In a workspace** (`/<workspace>/access/grants`), workspace admins give a
+  group or a person a role on that workspace. Grants that come from the
+  tenant or from the group owning the workspace are listed as inherited and can
+  only be changed by a tenant admin.
+- **For the tenant** (`/tenant/grants`), tenant admins give roles on the whole
+  tenant, on every workspace a group owns, or on one workspace.
+
+Nobody can give more than they have: a workspace admin cannot make someone a
+code author, because writing code is not part of what a workspace admin may
+do. Grants can end on a date, for people who only need access for a while.
+
+To see why you can do something, `/<workspace>/access/explain?capability=…`
+lists the grants that give it to you.
+
+Every grant given or removed, and every workspace created or deleted, is kept
+in the tenant's audit trail (`/tenant/audit-events`).
+
 ---
 
 ## Who changed what

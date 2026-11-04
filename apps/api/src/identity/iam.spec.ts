@@ -282,6 +282,7 @@ describe('IdentityService', () => {
     } as unknown as MembershipService;
     const tenancy = {
       ensureTenant: () => Promise.resolve(acme),
+      rememberPrincipal: () => Promise.resolve(),
       grantsFor: () => Promise.resolve(grants),
       workspaceTenancy: (id: string) =>
         Promise.resolve(

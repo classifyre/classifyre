@@ -2,7 +2,7 @@
 
 |                       |                                                                                                                                      |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| **Status**            | In progress: steps 0–4 and 5a done 2026-11-04 (§13)                                                                                  |
+| **Status**            | In progress: steps 0–5 done 2026-11-04 (§13)                                                                                         |
 | **Size**              | L (9 steps, each its own PR)                                                                                                         |
 | **Depends on**        | [S1 · Enterprise extension seams](S1-enterprise-extension-seams.md) (step 1 builds S1 R1–R8 and R15)                                 |
 | **Identity provider** | Keycloak 26.8.1 (`quay.io/keycloak/keycloak:26.8.1`, released 2026-10-13), Helm chart only                                           |
@@ -637,14 +637,19 @@ Also: no token 401; a create without owner 400; a spoofed `X-Actor-Name` recorde
 2. **First admin without a profile:** the identity server's default user profile requires first name, last name and email, so the bootstrap admin's password sign-in failed with "Account is not fully set up". In the browser this is a profile form at first sign-in, which is acceptable; the chart could set `iam.bootstrap.admin.email` (and names) to skip it.
 3. **REST-created inquiries have no `createdBy`**, with or without sign-in (the controller never passed an actor). The audit trail has the author; fixing the column is a small follow-up.
 
-**5b, next:**
+**5b as built, 2026-11-04:**
 
-- Grants API (CRUD for workspace and tenant admins, group search through the identity server) and `GET /<ws>/access/explain?capability=`.
-- MCP tokens with an owner, re-checked on every call (§8.3); remove `MCP_NEEDS_OWNER`. Ownerless tokens are revoked when sign-in is turned on.
-- WebSocket handshakes: same cookie or token, `workspace.view` for the joined workspace.
-- Background actors: `runAs` for scheduler, pg-boss jobs and autopilot (agent principal with a configured role).
-- Input author fields (`createdBy` on three MCP tools) ignored with sign-in.
-- `public.iam_principals` (names for `user:` references), tenant-scoped categories, tenant-level audit of registry changes, platform operator role.
+- **Grants API** (`identity/access.controller.ts`, `access-management.service.ts`). In a workspace: `GET /<ws>/access/grants` (its own grants and the inherited ones, marked `inherited`), `POST` (a role on this workspace), `DELETE /<ws>/access/grants/:id` (only grants made on this workspace), `GET /<ws>/access/groups`, `GET /<ws>/access/roles`, `GET /<ws>/access/explain?capability=` ("why can I do this?"). For the tenant, under the new reserved `/tenant` route: `GET /tenant`, `GET|POST|DELETE /tenant/grants`, `GET /tenant/groups`, `GET /tenant/audit-events`. Every grant is checked: the role fits its scope (workspace roles on a workspace, group or tenant; Workspace manager on a group or tenant; tenant roles on the tenant), the subject group or person belongs to the tenant, the expiry is in the future, and **the author holds every capability the role gives where they give it** (`GRANT_EXCEEDS_OWN_ACCESS` otherwise), so a Workspace admin cannot hand out Code author. Without sign-in these answer 409.
+- **Tenant audit trail:** `public.iam_audit_events` records `grant.added`, `grant.removed`, `workspace.created`, `workspace.deleted`.
+- **MCP tokens with owners.** `mcp_access_tokens.owner_sub` (migration `20261104180000_mcp_token_owner`) is set from the signed-in creator. Each MCP call rebuilds the owner's principal from the identity server (`IdentityService.principalForOwner`), so the agent can do exactly what its owner can do now; the actor is `user:<sub>@mcp:<token>`. Tokens without an owner answer `MCP_TOKEN_WITHOUT_OWNER`; an owner who lost access, `MCP_OWNER_NO_ACCESS`. With sign-in a person lists and changes only their own tokens unless they hold `mcp.token.admin`. The `MCP_NEEDS_OWNER` stop-gap of 5a is gone.
+- **Claimed authors:** `create_inquiry`, `create_case` and `create_case_thread` record the token's owner with sign-in, whatever `createdBy` the agent sends.
+- **WebSockets:** the three gateways resolve their workspace through `SocketAccessService.canJoin`, which verifies the session cookie or `auth.token` from the handshake and requires `workspace.view` plus the gateway's own capability (`source.view` for scans, `case.view` for the case board).
+- **Names:** `public.iam_principals` keeps each person's name and email, refreshed at sign-in (at most every ten minutes, never failing the request); `actors/resolve` names `user:` references from it ("Former member" otherwise).
+- **Categories per tenant:** `namespace_categories.tenant_id` (NULL = shared, i.e. the default category and everything while sign-in is off), uniqueness per tenant, and turning sign-in on moves existing categories to the first tenant. A tenant sees its own and the shared default, changes only its own, and can only file a workspace under them.
+
+**Verified** in a fresh throwaway release (removed afterwards): grants given through `/tenant/grants`; a workspace manager listed inherited grants, gave `/sales` Viewer on the workspace (and the sales investigator then saw it), was refused Code author (`GRANT_EXCEEDS_OWN_ACCESS code.author`), could not remove the inherited `/finance` grant (404) but could remove their own (204); a viewer could not remove grants (403); the explainer named `/finance → viewer`; the tenant audit trail listed every change. MCP: the viewer's token saw 92 read-only tools and `update_source` was disabled, the workspace manager's 172; the viewer listed only their own token, the manager both; a change through the token resolves as "Ava Test via ava-agent". **Mover:** after the viewer was taken out of `/finance` in the identity server, their token kept working until the one-minute cache expired and then answered `MCP_OWNER_NO_ACCESS`; their own access to the workspace became 404. Categories: the second tenant saw only the shared default, could not create one (403), and nobody could rename the shared default (404).
+
+**Moved to step 9:** background actors (`runAs` for scheduler, pg-boss jobs and the autopilot under a configured role). They change data through services, not through routes or tools, so there is no access check to bound yet; the autopilot keeps its `agent:autopilot` attribution and its `OBSERVE_ONLY` modes.
 
 ### Step 6 · Web sign-in
 

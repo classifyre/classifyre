@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { parseActorRef, type ActorRefKind } from './actor-ref';
+import { TenancyService } from './tenancy.service';
 
 export interface ResolvedActor {
   ref: string;
@@ -16,12 +17,15 @@ const MAX_REFS = 200;
 /**
  * Turns actor references into what the UI shows (§11.2). Self-declared names
  * are their own display name; MCP tokens are named after the token, also
- * once it is revoked or deleted. Signed-in people (`user:`) resolve once IAM
- * keeps a principal directory (step 5); until then they show their id.
+ * once it is revoked or deleted. Signed-in people (`user:`) are named from
+ * `iam_principals`, written at sign-in.
  */
 @Injectable()
 export class ActorDirectoryService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly tenancy: TenancyService,
+  ) {}
 
   async resolve(refs: string[]): Promise<ResolvedActor[]> {
     const unique = [...new Set(refs.filter(Boolean))].slice(0, MAX_REFS);
@@ -42,6 +46,13 @@ export class ActorDirectoryService {
         })
       : [];
     const tokenName = new Map(tokens.map((token) => [token.id, token.name]));
+    const people = await this.tenancy.principalNames([
+      ...new Set(
+        parsed
+          .filter((actor) => actor.kind === 'user')
+          .map((actor) => actor.id),
+      ),
+    ]);
     const nameOfToken = (id: string) =>
       tokenName.get(id) ?? 'Deleted MCP token';
 
@@ -55,7 +66,9 @@ export class ActorDirectoryService {
             ? (AGENT_NAMES[actor.id] ?? actor.id)
             : actor.kind === 'system'
               ? 'System'
-              : actor.id,
+              : actor.kind === 'user'
+                ? (people.get(actor.id)?.displayName ?? 'Former member')
+                : actor.id,
       ...(actor.via ? { viaDisplayName: nameOfToken(actor.via.id) } : {}),
     }));
   }

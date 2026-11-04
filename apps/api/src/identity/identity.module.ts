@@ -2,6 +2,11 @@ import { Global, Module } from '@nestjs/common';
 import { ClsService } from 'nestjs-cls';
 import { PrismaService } from '../prisma.service';
 import { ACCESS_POLICY, LocalAccessPolicy } from './access-policy';
+import {
+  TenantAccessController,
+  WorkspaceAccessController,
+} from './access.controller';
+import { AccessManagementService } from './access-management.service';
 import { ActorContextService } from './actor-context.service';
 import { ActorDirectoryService } from './actor-directory.service';
 import { AuditController } from './audit.controller';
@@ -14,6 +19,7 @@ import { IdentityService } from './identity.service';
 import { MeController } from './me.controller';
 import { MembershipService } from './membership.service';
 import { TenancyService } from './tenancy.service';
+import { SocketAccessService } from './socket-access.service';
 
 /**
  * Who is acting, what they may do, and what they changed
@@ -24,7 +30,12 @@ import { TenancyService } from './tenancy.service';
  */
 @Global()
 @Module({
-  controllers: [MeController, AuditController],
+  controllers: [
+    MeController,
+    AuditController,
+    WorkspaceAccessController,
+    TenantAccessController,
+  ],
   providers: [
     PrismaService,
     ActorContextService,
@@ -47,8 +58,11 @@ import { TenancyService } from './tenancy.service';
         config ? new IamAccessPolicy(cls) : new LocalAccessPolicy(),
     },
     IamBootstrapService,
+    AccessManagementService,
+    SocketAccessService,
   ],
   exports: [
+    SocketAccessService,
     ActorContextService,
     AuditTrailService,
     TenancyService,
