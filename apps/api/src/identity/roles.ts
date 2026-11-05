@@ -96,6 +96,9 @@ export const BUILT_IN_ROLES = [
     capabilities: ['code.author'],
   },
   {
+    // Access group, not a business unit: its members create workspaces for
+    // the group and get Workspace admin on each one (U5). Tenant scope only,
+    // so it can never be granted on a single workspace.
     key: 'workspace-manager',
     title: 'Workspace manager',
     scope: 'tenant',

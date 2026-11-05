@@ -67,6 +67,7 @@ All URIs are relative to *http://localhost*
 *AccessApi* | [**tenantAccessControllerResolve**](docs/AccessApi.md#tenantaccesscontrollerresolve) | **GET** /tenant/actors/resolve | Display names for actor references, outside any workspace
 *AccessApi* | [**tenantAccessControllerRoles**](docs/AccessApi.md#tenantaccesscontrollerroles) | **GET** /tenant/roles | The built-in roles and where each can be granted
 *AccessApi* | [**tenantAccessControllerTenant**](docs/AccessApi.md#tenantaccesscontrollertenant) | **GET** /tenant | The caller’s tenant and what they may do across it
+*AccessApi* | [**tenantAccessControllerTenants**](docs/AccessApi.md#tenantaccesscontrollertenants) | **GET** /tenant/tenants | Every tenant the caller belongs to, for switching (§12.2)
 *AccessApi* | [**tenantPeopleControllerAdd**](docs/AccessApi.md#tenantpeoplecontrolleradd) | **POST** /tenant/people | Add a person by email
 *AccessApi* | [**tenantPeopleControllerAddMember**](docs/AccessApi.md#tenantpeoplecontrolleraddmember) | **PUT** /tenant/groups/{groupId}/members/{userId} | Put a person of the tenant into a group
 *AccessApi* | [**tenantPeopleControllerCreateGroup**](docs/AccessApi.md#tenantpeoplecontrollercreategroup) | **POST** /tenant/groups | Create a group, at the top or inside another
@@ -1017,6 +1018,7 @@ All URIs are relative to *http://localhost*
 - [TenantDto](docs/TenantDto.md)
 - [TenantEventDto](docs/TenantEventDto.md)
 - [TenantGroupDto](docs/TenantGroupDto.md)
+- [TenantMembershipDto](docs/TenantMembershipDto.md)
 - [TestConnectionResponseDto](docs/TestConnectionResponseDto.md)
 - [TextCoverageDto](docs/TextCoverageDto.md)
 - [ThreadEntriesResponseDto](docs/ThreadEntriesResponseDto.md)

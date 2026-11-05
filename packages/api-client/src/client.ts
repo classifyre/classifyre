@@ -375,6 +375,7 @@ export type {
   CreateGrantDto,
   RoleDto,
   TenantDto,
+  TenantMembershipDto,
   TenantEventDto,
   TenantGroupDto,
   PersonDto,

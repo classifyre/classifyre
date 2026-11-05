@@ -18,14 +18,18 @@ export interface Tenant {
 
 export type GrantScopeType = 'tenant' | 'group' | 'workspace';
 
-export interface Grant {
+/** Scope a grant applies to: the whole tenant, a group's workspaces, or one workspace. */
+export interface GrantScope {
+  scopeType: GrantScopeType;
+  scopeId: string;
+}
+
+export interface Grant extends GrantScope {
   id: string;
   tenantId: string;
   subjectType: 'group' | 'user';
   subjectId: string;
   roleKey: RoleKey;
-  scopeType: GrantScopeType;
-  scopeId: string;
   expiresAt: Date | null;
 }
 

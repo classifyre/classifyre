@@ -27,6 +27,7 @@ import {
   TenantDto,
   TenantEventDto,
   TenantGroupDto,
+  TenantMembershipDto,
 } from './access.dto';
 import { AccessManagementService } from './access-management.service';
 import { ActorDirectoryService } from './actor-directory.service';
@@ -275,5 +276,24 @@ export class TenantAccessController {
   async events(@Req() request: FastifyRequest): Promise<TenantEventDto[]> {
     const principal = await this.principal(request);
     return this.access.tenantEvents(principal);
+  }
+
+  @Get('tenants')
+  @Requires('workspace.view')
+  @ApiOperation({
+    summary: 'Every tenant the caller belongs to, for switching (§12.2)',
+  })
+  @ApiOkResponse({ type: [TenantMembershipDto] })
+  async tenants(
+    @Req() request: FastifyRequest,
+  ): Promise<TenantMembershipDto[]> {
+    const principal = await this.principal(request);
+    const tenants = await this.access.tenants(principal);
+    return tenants.map((tenant) => ({
+      id: tenant.id,
+      alias: tenant.alias,
+      name: tenant.name,
+      current: tenant.id === principal.tenant.id,
+    }));
   }
 }

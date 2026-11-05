@@ -4,8 +4,6 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
-  ServiceUnavailableException,
-  UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { InternalApiKeyService } from '../internal-api-key.service';
@@ -14,16 +12,12 @@ import { resolveLocalRequestActor, SYSTEM_ACTOR, type Actor } from './actor';
 import { ActorContextService } from './actor-context.service';
 import type { Capability } from './capabilities';
 import { resolveRouteAccess } from './route-access';
-import {
-  AuthenticationError,
-  type IdentityService,
-  type Principal,
-} from './identity.service';
+import type { IdentityService, Principal } from './identity.service';
 import { IDENTITY } from './identity.tokens';
 import {
-  CROSS_ORIGIN_BODY,
-  isCrossOriginCookieWrite,
+  assertSameOrigin,
   stampAuthorFields,
+  throwAuthenticationError,
 } from './signed-in-request';
 
 /** Where the guard leaves the resolved actor for `@ActorRef()`. */
@@ -107,16 +101,11 @@ export class AccessGuard implements CanActivate {
     }
 
     const principal = await this.authenticate(request);
-    if (
-      isCrossOriginCookieWrite(
-        principal,
-        request.method,
-        request.headers?.origin,
-        this.identity.config.appOrigin,
-      )
-    ) {
-      throw new ForbiddenException(CROSS_ORIGIN_BODY);
-    }
+    assertSameOrigin(
+      principal,
+      { method: request.method, headers: request.headers },
+      this.identity.config.appOrigin,
+    );
     this.remember(request, principal.actor);
     if (principal.actor.ref) {
       stampAuthorFields(request.body, principal.actor.ref);
@@ -163,20 +152,7 @@ export class AccessGuard implements CanActivate {
     try {
       return await this.identity!.authenticate(request.raw ?? request);
     } catch (error) {
-      if (error instanceof AuthenticationError) {
-        throw new UnauthorizedException({
-          statusCode: 401,
-          error: 'Unauthorized',
-          code: error.code,
-          message: error.message,
-        });
-      }
-      throw new ServiceUnavailableException({
-        statusCode: 503,
-        error: 'Service Unavailable',
-        code: 'IDENTITY_UNAVAILABLE',
-        message: 'Sign-in cannot be checked right now. Try again in a moment.',
-      });
+      throwAuthenticationError(error);
     }
   }
 }

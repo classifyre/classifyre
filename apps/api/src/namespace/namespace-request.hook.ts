@@ -16,15 +16,12 @@ import {
 import { PrismaClientManager } from '../prisma/prisma-client-manager';
 import { transientDbErrorCode } from '../db/transient-db-error';
 import { InternalApiKeyService } from '../internal-api-key.service';
-import {
-  AuthenticationError,
-  type IdentityService,
-} from '../identity/identity.service';
+import type { IdentityService } from '../identity/identity.service';
 import { CLS_ACTOR } from '../identity/actor-context.service';
 import { CLS_CAPABILITIES } from '../identity/iam-access-policy';
 import {
-  CROSS_ORIGIN_BODY,
-  isCrossOriginCookieWrite,
+  assertSameOrigin,
+  authenticateOr,
 } from '../identity/signed-in-request';
 
 /**
@@ -209,37 +206,31 @@ async function authorizeWorkspaceRequest(
   if (internalApiKey.isInternalRequest(request.headers)) return true;
   if (request.url.split('?')[0] === '/mcp') return true;
 
-  let principal;
-  try {
-    principal = await identity.authenticate(request.raw);
-  } catch (error) {
-    if (error instanceof AuthenticationError) {
-      await reply.code(401).send({
-        statusCode: 401,
-        error: 'Unauthorized',
-        code: error.code,
-        message: error.message,
-      });
-      return false;
-    }
-    await reply.code(503).send({
-      statusCode: 503,
-      error: 'Service Unavailable',
-      code: 'IDENTITY_UNAVAILABLE',
-      message: 'Sign-in cannot be checked right now. Try again in a moment.',
-    });
-    return false;
-  }
+  const principal = await authenticateOr(
+    () => identity.authenticate(request.raw),
+    {
+      unauthorized: (body) => reply.code(401).send(body),
+      unavailable: (body) => reply.code(503).send(body),
+    },
+  );
+  if (!principal) return false;
 
-  if (
-    isCrossOriginCookieWrite(
+  try {
+    assertSameOrigin(
       principal,
-      request.method,
-      request.headers.origin,
+      {
+        method: request.method,
+        headers: request.headers,
+      },
       identity.config.appOrigin,
-    )
-  ) {
-    await reply.code(403).send(CROSS_ORIGIN_BODY);
+    );
+  } catch {
+    await reply.code(403).send({
+      statusCode: 403,
+      error: 'Forbidden',
+      code: 'CROSS_ORIGIN',
+      message: 'Changes are only accepted from the Classifyre app.',
+    });
     return false;
   }
 

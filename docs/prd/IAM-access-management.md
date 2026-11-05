@@ -160,7 +160,7 @@ Every REST route declares one with `@Requires('<capability>')`. Every MCP tool d
 | Agents              | `agent.view`, `agent.configure` (harness, autopilot, AI providers, chat bots), `agent.use` (assistant, AI completion)             |
 | Data out            | `data.export` (CSV, case export, live queries)                                                                                    |
 | Tokens              | `mcp.token.own` (create and revoke your own), `mcp.token.admin` (see and revoke everyone's in the workspace)                      |
-| Tenant              | `tenant.workspace.create` (scoped to an owning group), `tenant.access.manage`, `tenant.categories.manage`, `tenant.audit.view`    |
+| Tenant              | `tenant.workspace.create` (scoped to an owning group), `tenant.access.manage`, `tenant.people.manage` (people and groups, 8c), `tenant.categories.manage`, `tenant.audit.view` |
 | Platform            | `platform.tenants.manage`                                                                                                         |
 
 ### 6.2 Built-in roles
@@ -168,13 +168,13 @@ Every REST route declares one with `@Requires('<capability>')`. Every MCP tool d
 | Role                     | Scope              | Adds to the role on its left                                                                                                                   |
 | ------------------------ | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Viewer**               | workspace or group | every `*.view`, `mcp.token.own`                                                                                                                |
-| **Investigator**         | workspace or group | Viewer + `finding.triage`, `case.edit`, `inquiry.edit`, `lead.review`, `asset.tag`                                                             |
-| **Curator**              | workspace or group | Viewer + `glossary.edit`, `glossary.approve`, `entity.manage`, `correlation.review`                                                            |
+| **Investigator**         | workspace or group | Viewer + `agent.use` (assistant and completion), `finding.triage`, `case.edit`, `inquiry.edit`, `lead.review`, `asset.tag`                      |
+| **Curator**              | workspace or group | Viewer + `agent.use` (assistant and completion), `glossary.edit`, `glossary.approve`, `entity.manage`, `correlation.review`                     |
 | **Source manager**       | workspace or group | Not built on Viewer: `workspace.view`, `source.*`, `detector.*`, `finding.view`, `asset.view`, `mcp.token.own`. No case or inquiry access (U3) |
 | **Workspace admin**      | workspace or group | everything workspace-scoped except `code.author`                                                                                               |
 | **Code author** (add-on) | workspace or group | `code.author` only. Combined with another role                                                                                                 |
-| **Workspace manager**    | group              | `tenant.workspace.create` for that group, and Workspace admin on every workspace the group owns                                                |
-| **Auditor**              | tenant             | `tenant.audit.view`, `access.view` and `workspace.view` (metadata only, no findings content)                                                   |
+| **Workspace manager**    | tenant             | `tenant.workspace.create` for that group, and Workspace admin on every workspace the group owns. Tenant scope only: an access group (`/finance/workspace-managers`), never one workspace |
+| **Auditor**              | tenant             | `tenant.audit.view`, `access.view` and `workspace.view` (metadata only, no findings content; redaction by S1's content presenter is step 9)    |
 | **Tenant admin**         | tenant             | everything in the tenant, including `code.author`                                                                                              |
 | **Platform operator**    | instance           | `platform.tenants.manage`. Sees no workspace content unless also granted. The one Keycloak realm role (`classifyre-operator`)                  |
 
@@ -209,8 +209,8 @@ flowchart TB
   end
   FG -- "Viewer, scope: group /finance" --> W1
   FG -- "Viewer, scope: group /finance" --> W2
-  FM -- "Workspace manager, scope: group /finance" --> W1
-  FM -- "Workspace manager, scope: group /finance" --> W2
+  FM -- "Workspace manager on group /finance" --> W1
+  FM -- "Workspace manager on group /finance" --> W2
   FA -- "Investigator, scope: workspace" --> W1
   LG -- "Viewer, scope: workspace" --> W2
   SG -- "Investigator, scope: group /sales" --> W3
@@ -441,7 +441,7 @@ Without IAM the same components show the self-declared name with a small "unveri
 
 ### 12.2 Tenant switcher
 
-A user in several organizations picks one at sign-in (the `organization` scope) and can switch from the account menu, which signs in again for the other organization. Opening a link to a workspace of the other tenant offers the switch instead of a bare 404.
+A user in several organizations picks one at sign-in (the `organization` scope) and can switch from the account menu (`GET /tenant/tenants` lists their tenants; each entry signs in again for that organization). Opening a link to a workspace of another tenant answers 404 (H7: the tenant boundary never leaks); the workspace directory and the account menu are where a person sees and switches between the tenants they belong to.
 
 ### 12.3 Capabilities in the UI
 
@@ -671,7 +671,7 @@ Also: no token 401; a create without owner 400; a spoofed `X-Actor-Name` recorde
 
 **Found while verifying:** `next build` type-checks test files with Next's own `ProcessEnv` (which requires `NODE_ENV`), where plain `tsc` passed; the session config now takes a plain record.
 
-**Not done:** switching tenants for people in several organizations. `/auth/login?tenant=<alias>` asks for one, but the menu does not list a person's tenants yet (the API would need to expose them); with plain `organization` the identity server shows its own picker.
+Tenant switching: `/auth/login?tenant=<alias>` signs in again for one organization; the account menu lists the person's tenants (`GET /tenant/tenants`). With plain `organization` the identity server shows its own picker.
 
 ### Step 7 · Access UI
 
@@ -689,7 +689,7 @@ Also: no token 401; a create without owner 400; a spoofed `X-Actor-Name` recorde
 
 **Verified** with a production build against a throwaway release: the finance workspace manager signed in, the new-workspace dialog offered only `/finance` and `/finance/workspace-managers`, the workspace was created owned by `/finance`; its Access tab listed the two inherited grants, and giving `/sales` Viewer from the form (a cookie-signed POST, 201) added it with a remove button. The tenant admin's `/tenant` page listed every grant (the `/sales` grant under "Finance Q4"), the form and the activity; the activity authors first showed as "Someone" because names were only resolved inside a workspace, fixed with the tenant resolver ("Bea Test").
 
-**Left:** the workspace directory has its own header without the account menu, so the tenant page is reached from inside a workspace or by URL; tenant switching for people in several tenants (see step 6).
+**Left:** the workspace directory has its own header without the account menu, so the tenant page is reached from inside a workspace or by URL.
 
 ### Step 8 · Persona tests, docs, operations
 
@@ -797,6 +797,23 @@ First use showed the split was awkward: groups and people in the identity server
 - Restricted cases: a case visible only to its members, inside a workspace. Needs record-level checks in services; the `ACCESS_POLICY` seam already takes a resource.
 - Redaction by role through S1's content presenter (Auditor sees metadata, never matched content).
 - Membership change events from Keycloak to cut the 60-second cache delay.
+
+#### Step 9a · Agent roles (U13, sized, not built)
+
+The autopilot keeps `agent:autopilot` attribution and the `OBSERVE_ONLY` modes. To run it under a configured role instead:
+
+1. **Harness settings gain a role picker** (`AgentConfigDto.roleKey`, default `investigator`): offered roles are the workspace-scoped built-ins, read from `GET /<ws>/access/roles`. Needs `agent.configure` to change, like every other harness setting.
+2. **Each cycle rebuilds the owner's principal the way MCP does** (`IdentityService.principalForOwner` with a synthetic owner — the role from settings, the workspace as scope), caps the tool set by `roleCapabilities(roleKey)`, and records `agent:<workspace>:autopilot` (migration rewrites `agent:autopilot` per workspace, or resolves it with the workspace in context).
+3. **Chat bots keep `chatMutationsAllowed`** (read-only with sign-in) until they get the same picker; a bot's role would be picked when the bot is configured (`agent.configure`).
+4. **Tests:** a persona check that an autopilot limited to Viewer runs reads but is refused writes; a check that changing the role takes effect on the next cycle without restarting anything. Estimated 2-3 days (picker + `principalForOwner` reuse + specs + persona checks).
+
+#### Step 9b · Platform operator console (U15, sized, not built)
+
+The `platform-operator` role and the `platform.tenants.manage` capability exist in code; nothing calls them yet. To make U15 real:
+
+1. **API:** a `platform.tenants.*` route family outside any tenant (create tenant, list tenants, disable tenant), guarded by `platform.tenants.manage` from the token's realm role `classifyre-operator` (read from the service account's role mapping, the same way `view-users` is today). The setup job already creates the realm role.
+2. **Web:** an operator page (outside `/tenant`, reachable only with the capability) listing tenants with create/disable. No workspace content is ever shown there (spec §6.2).
+3. **Tests:** an operator persona in the seed (realm role assignment) + checks (create tenant, new tenant's admin signs in, operator gets 404 on workspace content). Estimated 2-3 days (routes + page + seed + checks).
 
 ## 14. Testing summary
 

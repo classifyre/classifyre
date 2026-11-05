@@ -29,6 +29,7 @@ import type {
   TenantDto,
   TenantEventDto,
   TenantGroupDto,
+  TenantMembershipDto,
 } from '../models/index';
 import {
     AddPersonDtoFromJSON,
@@ -59,6 +60,8 @@ import {
     TenantEventDtoToJSON,
     TenantGroupDtoFromJSON,
     TenantGroupDtoToJSON,
+    TenantMembershipDtoFromJSON,
+    TenantMembershipDtoToJSON,
 } from '../models/index';
 
 export interface TenantAccessControllerAddGrantRequest {
@@ -382,6 +385,35 @@ export class AccessApi extends runtime.BaseAPI {
      */
     async tenantAccessControllerTenant(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantDto> {
         const response = await this.tenantAccessControllerTenantRaw(initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Every tenant the caller belongs to, for switching (§12.2)
+     */
+    async tenantAccessControllerTenantsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<TenantMembershipDto>>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/tenant/tenants`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(TenantMembershipDtoFromJSON));
+    }
+
+    /**
+     * Every tenant the caller belongs to, for switching (§12.2)
+     */
+    async tenantAccessControllerTenants(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<TenantMembershipDto>> {
+        const response = await this.tenantAccessControllerTenantsRaw(initOverrides);
         return await response.value();
     }
 

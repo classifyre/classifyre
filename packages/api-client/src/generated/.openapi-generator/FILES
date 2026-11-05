@@ -540,6 +540,7 @@ docs/TemporaryPasswordDto.md
 docs/TenantDto.md
 docs/TenantEventDto.md
 docs/TenantGroupDto.md
+docs/TenantMembershipDto.md
 docs/TestConnectionResponseDto.md
 docs/TextCoverageDto.md
 docs/ThreadEntriesResponseDto.md
@@ -1146,6 +1147,7 @@ src/models/TemporaryPasswordDto.ts
 src/models/TenantDto.ts
 src/models/TenantEventDto.ts
 src/models/TenantGroupDto.ts
+src/models/TenantMembershipDto.ts
 src/models/TestConnectionResponseDto.ts
 src/models/TextCoverageDto.ts
 src/models/ThreadEntriesResponseDto.ts

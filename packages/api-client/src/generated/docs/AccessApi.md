@@ -12,6 +12,7 @@ All URIs are relative to *http://localhost*
 | [**tenantAccessControllerResolve**](AccessApi.md#tenantaccesscontrollerresolve) | **GET** /tenant/actors/resolve | Display names for actor references, outside any workspace |
 | [**tenantAccessControllerRoles**](AccessApi.md#tenantaccesscontrollerroles) | **GET** /tenant/roles | The built-in roles and where each can be granted |
 | [**tenantAccessControllerTenant**](AccessApi.md#tenantaccesscontrollertenant) | **GET** /tenant | The caller’s tenant and what they may do across it |
+| [**tenantAccessControllerTenants**](AccessApi.md#tenantaccesscontrollertenants) | **GET** /tenant/tenants | Every tenant the caller belongs to, for switching (§12.2) |
 | [**tenantPeopleControllerAdd**](AccessApi.md#tenantpeoplecontrolleradd) | **POST** /tenant/people | Add a person by email |
 | [**tenantPeopleControllerAddMember**](AccessApi.md#tenantpeoplecontrolleraddmember) | **PUT** /tenant/groups/{groupId}/members/{userId} | Put a person of the tenant into a group |
 | [**tenantPeopleControllerCreateGroup**](AccessApi.md#tenantpeoplecontrollercreategroup) | **POST** /tenant/groups | Create a group, at the top or inside another |
@@ -493,6 +494,63 @@ This endpoint does not need any parameter.
 ### Return type
 
 [**TenantDto**](TenantDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## tenantAccessControllerTenants
+
+> Array&lt;TenantMembershipDto&gt; tenantAccessControllerTenants()
+
+Every tenant the caller belongs to, for switching (§12.2)
+
+### Example
+
+```ts
+import {
+  Configuration,
+  AccessApi,
+} from '@workspace/api-client';
+import type { TenantAccessControllerTenantsRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new AccessApi();
+
+  try {
+    const data = await api.tenantAccessControllerTenants();
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+This endpoint does not need any parameter.
+
+### Return type
+
+[**Array&lt;TenantMembershipDto&gt;**](TenantMembershipDto.md)
 
 ### Authorization
 
