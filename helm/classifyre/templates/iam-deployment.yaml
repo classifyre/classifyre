@@ -1,0 +1,224 @@
+{{- if .Values.iam.enabled }}
+{{- $fullname := include "classifyre.iam.fullname" . -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "classifyre.commonLabels" . | nindent 4 }}
+    app.kubernetes.io/component: iam
+spec:
+  replicas: {{ .Values.iam.replicas }}
+  # Minor upgrades of the identity server need every node stopped; patch
+  # upgrades would allow a rolling update, but one strategy that is always
+  # safe beats one that is right most of the time. Issued tokens stay valid
+  # meanwhile: the API checks them against keys it has cached.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "classifyre.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: iam
+  template:
+    metadata:
+      labels:
+        {{- include "classifyre.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: iam
+      annotations:
+        checksum/secret: {{ include (print $.Template.BasePath "/iam-secrets.yaml") . | sha256sum }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 0
+        fsGroup: 0
+      {{- if and (eq .Values.iam.database.mode "shared") (eq .Values.postgres.mode "embedded") }}
+      initContainers:
+        # The embedded PostgreSQL runs as a superuser, so the chart can give
+        # the identity server its own role and database on it. Idempotent:
+        # runs on every start and keeps the role's password in step with the
+        # Secret.
+        - name: iam-database
+          image: {{ .Values.postgres.embedded.image.repository }}:{{ .Values.postgres.embedded.image.tag }}
+          imagePullPolicy: {{ .Values.postgres.embedded.image.pullPolicy }}
+          securityContext:
+            runAsUser: 999
+            runAsGroup: 999
+            allowPrivilegeEscalation: false
+          env:
+            - name: PGHOST
+              value: {{ include "classifyre.databaseHost" . | quote }}
+            - name: PGPORT
+              value: {{ include "classifyre.databasePort" . | quote }}
+            - name: PGUSER
+              value: {{ include "classifyre.databaseUser" . | quote }}
+            - name: PGDATABASE
+              value: {{ include "classifyre.databaseName" . | quote }}
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "classifyre.databaseSecretName" . }}
+                  key: {{ include "classifyre.databasePasswordKey" . }}
+            - name: IAM_DB_NAME
+              value: {{ .Values.iam.database.name | quote }}
+            - name: IAM_DB_USER
+              value: {{ .Values.iam.database.username | quote }}
+            - name: IAM_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "classifyre.iam.secretName" . }}
+                  key: password
+          command: ["/bin/sh", "-ec"]
+          args:
+            - |
+              until pg_isready -q; do echo "waiting for PostgreSQL"; sleep 2; done
+              if [ -z "$(psql -tAc "SELECT 1 FROM pg_roles WHERE rolname = '${IAM_DB_USER}'")" ]; then
+                psql -v ON_ERROR_STOP=1 -c "CREATE ROLE \"${IAM_DB_USER}\" LOGIN"
+              fi
+              psql -v ON_ERROR_STOP=1 -c "ALTER ROLE \"${IAM_DB_USER}\" WITH LOGIN PASSWORD '${IAM_DB_PASSWORD}'"
+              if [ -z "$(psql -tAc "SELECT 1 FROM pg_database WHERE datname = '${IAM_DB_NAME}'")" ]; then
+                psql -v ON_ERROR_STOP=1 -c "CREATE DATABASE \"${IAM_DB_NAME}\" OWNER \"${IAM_DB_USER}\""
+              fi
+      {{- end }}
+      containers:
+        - name: iam
+          image: {{ .Values.iam.image.repository }}:{{ .Values.iam.image.tag }}
+          imagePullPolicy: {{ .Values.iam.image.pullPolicy }}
+          args: ["start"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          env:
+            - name: KC_DB
+              value: postgres
+            - name: KC_DB_URL_HOST
+              value: {{ include "classifyre.iam.dbHost" . | quote }}
+            - name: KC_DB_URL_PORT
+              value: {{ include "classifyre.iam.dbPort" . | quote }}
+            - name: KC_DB_URL_DATABASE
+              value: {{ include "classifyre.iam.dbName" . | quote }}
+            - name: KC_DB_USERNAME
+              value: {{ include "classifyre.iam.dbUser" . | quote }}
+            - name: KC_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "classifyre.iam.dbSecretName" . }}
+                  key: {{ include "classifyre.iam.dbPasswordKey" . }}
+            - name: KC_DB_POOL_MAX_SIZE
+              value: {{ .Values.iam.database.poolMaxSize | quote }}
+            - name: KC_HTTP_ENABLED
+              value: "true"
+            - name: KC_HTTP_RELATIVE_PATH
+              value: {{ include "classifyre.iam.path" . | quote }}
+            # Browsers and token issuers use the public URL; the API reaches
+            # the server in-cluster, and backchannel URLs follow the request.
+            - name: KC_HOSTNAME
+              value: {{ include "classifyre.iam.publicUrl" . | quote }}
+            - name: KC_HOSTNAME_BACKCHANNEL_DYNAMIC
+              value: "true"
+            - name: KC_PROXY_HEADERS
+              value: xforwarded
+            - name: KC_HEALTH_ENABLED
+              value: "true"
+            - name: KC_METRICS_ENABLED
+              value: "true"
+            {{- if gt (int .Values.iam.replicas) 1 }}
+            - name: KC_CACHE
+              value: ispn
+            - name: KC_CACHE_STACK
+              value: kubernetes
+            - name: JAVA_OPTS_APPEND
+              value: {{ printf "-Djgroups.dns.query=%s-headless.%s.svc.cluster.local" $fullname .Release.Namespace | quote }}
+            {{- else }}
+            - name: KC_CACHE
+              value: local
+            {{- end }}
+            # Administrator of the identity server itself, created on first
+            # start in its own master realm; only the realm setup job uses it.
+            - name: KC_BOOTSTRAP_ADMIN_USERNAME
+              value: admin
+            - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "classifyre.iam.secretName" . }}
+                  key: admin-password
+            {{- with .Values.iam.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: management
+              containerPort: 9000
+            - name: jgroups
+              containerPort: 7800
+          startupProbe:
+            httpGet:
+              path: {{ include "classifyre.iam.path" . }}/health/started
+              port: management
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: {{ include "classifyre.iam.path" . }}/health/ready
+              port: management
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: {{ include "classifyre.iam.path" . }}/health/live
+              port: management
+            periodSeconds: 20
+            failureThreshold: 6
+          resources:
+            {{- toYaml .Values.iam.resources | nindent 12 }}
+      {{- with .Values.iam.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.iam.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.iam.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "classifyre.commonLabels" . | nindent 4 }}
+    app.kubernetes.io/component: iam
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "classifyre.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: iam
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+# Lets the identity server's nodes find each other when replicas > 1.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}-headless
+  labels:
+    {{- include "classifyre.commonLabels" . | nindent 4 }}
+    app.kubernetes.io/component: iam
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    {{- include "classifyre.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: iam
+  ports:
+    - name: jgroups
+      port: 7800
+      targetPort: jgroups
+{{- end }}

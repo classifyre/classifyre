@@ -146,7 +146,7 @@ describe('InquiryMatchingService', () => {
 
     it("does not notify for the autopilot's own inquiries", async () => {
       mockPrisma.inquiry.findMany.mockResolvedValue([
-        inquiry({ findingTypes: ['email'], createdBy: 'ai-autopilot' }),
+        inquiry({ findingTypes: ['email'], createdBy: 'agent:autopilot' }),
       ]);
       mockPrisma.runner.findUnique.mockResolvedValue({ startedAt: started });
       mockPrisma.finding.findMany.mockResolvedValue([fresh()]);
@@ -312,7 +312,7 @@ describe('InquiryMatchingService', () => {
         service.findNewInquiryMatchForRunner({
           sourceId: 's1',
           runnerId: 'run-current',
-          createdByNot: 'ai-autopilot',
+          createdByNot: 'agent:autopilot',
         }),
       ).resolves.toEqual({ id: 'q1', title: 'Board travel' });
 
@@ -323,7 +323,7 @@ describe('InquiryMatchingService', () => {
               {
                 OR: [
                   { createdBy: null },
-                  { createdBy: { not: 'ai-autopilot' } },
+                  { createdBy: { not: 'agent:autopilot' } },
                 ],
               },
               {
@@ -358,7 +358,7 @@ describe('InquiryMatchingService', () => {
         service.findNewInquiryMatchForRunner({
           sourceId: 's1',
           runnerId: 'run-current',
-          createdByNot: 'ai-autopilot',
+          createdByNot: 'agent:autopilot',
         }),
       ).resolves.toBeNull();
     });
@@ -375,7 +375,7 @@ describe('InquiryMatchingService', () => {
         service.findNewInquiryMatchForRunner({
           sourceId: 's1',
           runnerId: 'run-current',
-          createdByNot: 'ai-autopilot',
+          createdByNot: 'agent:autopilot',
         }),
       ).resolves.toBeNull();
     });

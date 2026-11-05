@@ -1,11 +1,15 @@
 import {
+  Inject,
   Injectable,
   Logger,
   OnModuleDestroy,
   OnModuleInit,
+  Optional,
 } from '@nestjs/common';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import type { IamConfig } from '../identity/iam-config';
+import { IAM_CONFIG } from '../identity/identity.tokens';
 import { McpServerFactoryService } from '../mcp-server.factory';
 import { ToolRegistry } from '../autopilot/tools/tool-registry.service';
 import {
@@ -27,9 +31,13 @@ export class BuiltinMcpToolsService implements OnModuleInit, OnModuleDestroy {
   private client: Client | null = null;
   private readonly registered: string[] = [];
 
+  /** Tool name → read-only, from the tool's annotations. */
+  private readonly readOnly = new Map<string, boolean>();
+
   constructor(
     private readonly factory: McpServerFactoryService,
     private readonly registry: ToolRegistry,
+    @Optional() @Inject(IAM_CONFIG) private readonly iam?: IamConfig | null,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -71,6 +79,7 @@ export class BuiltinMcpToolsService implements OnModuleInit, OnModuleDestroy {
 
     const listed = await client.listTools();
     for (const remote of (listed.tools ?? []) as BuiltinRemoteTool[]) {
+      this.readOnly.set(remote.name, remote.annotations?.readOnlyHint === true);
       const tool = adaptBuiltinMcpTool({
         remote,
         call: (toolName, args) => this.callTool(toolName, args),
@@ -86,6 +95,13 @@ export class BuiltinMcpToolsService implements OnModuleInit, OnModuleDestroy {
   ): Promise<unknown> {
     if (!this.client) {
       throw new Error('Built-in MCP bridge is not connected.');
+    }
+    // Chat bots act without a signed-in person. With sign-in on they may only
+    // read until they get a role of their own (docs/prd IAM, step 9).
+    if (this.iam && this.readOnly.get(name) !== true) {
+      throw new Error(
+        `With sign-in on, chat bots can only use read tools; "${name}" changes data.`,
+      );
     }
     const result = await this.client.callTool(
       { name, arguments: args },

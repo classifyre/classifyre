@@ -21,8 +21,10 @@ import {
   type SetWorkspaceFeatureResult,
   type WorkspaceFeaturesOverview,
 } from './workspace-features.service';
+import { AccessArea } from '../identity/access.decorators';
 
 @ApiTags('maintenance')
+@AccessArea({ view: 'workspace.view', change: 'workspace.settings' })
 @Controller('maintenance')
 export class MaintenanceController {
   constructor(

@@ -2,6 +2,7 @@ import { RunnerEventsGateway } from './runner-events.gateway';
 import { NotificationEventsGateway } from './notification-events.gateway';
 import { CaseBoardGateway } from './case-board.gateway';
 import { CLS_SCHEMA } from '../namespace/namespace.constants';
+import { SocketAccessService } from '../identity/socket-access.service';
 
 describe('WebSocket namespace isolation', () => {
   const registry = {
@@ -17,10 +18,40 @@ describe('WebSocket namespace isolation', () => {
     get: jest.fn((key: string) => (key === CLS_SCHEMA ? 'ns_acme' : undefined)),
   };
 
+  // Sign-in off: every socket may join.
+  const open = new SocketAccessService(null);
+
   beforeEach(() => jest.clearAllMocks());
 
+  it('refuses a socket that sign-in does not let into the workspace', async () => {
+    const refusing = {
+      canJoin: jest.fn(() => Promise.resolve(false)),
+    } as unknown as SocketAccessService;
+    const gateway = new NotificationEventsGateway(
+      cls as any,
+      registry as any,
+      refusing,
+    );
+    const client = {
+      id: 'socket-0',
+      data: {},
+      handshake: { auth: { namespaceSlug: 'acme' } },
+      join: jest.fn(),
+    };
+
+    await expect(
+      gateway.handleSubscribeNotifications(client as any),
+    ).resolves.toEqual({ success: false, message: 'Unknown namespace' });
+    expect(refusing.canJoin).toHaveBeenCalledWith(
+      client,
+      'id-acme',
+      'workspace.view',
+    );
+    expect(client.join).not.toHaveBeenCalled();
+  });
+
   it('joins runner clients only to schema-qualified rooms', async () => {
-    const gateway = new RunnerEventsGateway(cls as any, registry as any);
+    const gateway = new RunnerEventsGateway(cls as any, registry as any, open);
     const client = {
       id: 'socket-1',
       data: {},
@@ -36,7 +67,11 @@ describe('WebSocket namespace isolation', () => {
   });
 
   it('rejects notification subscriptions for unknown namespaces', async () => {
-    const gateway = new NotificationEventsGateway(cls as any, registry as any);
+    const gateway = new NotificationEventsGateway(
+      cls as any,
+      registry as any,
+      open,
+    );
     const client = {
       id: 'socket-2',
       data: {},
@@ -51,7 +86,11 @@ describe('WebSocket namespace isolation', () => {
   });
 
   it('emits notifications only to the current schema room', () => {
-    const gateway = new NotificationEventsGateway(cls as any, registry as any);
+    const gateway = new NotificationEventsGateway(
+      cls as any,
+      registry as any,
+      open,
+    );
     const emit = jest.fn();
     const to = jest.fn(() => ({ emit }));
     gateway.server = { to } as any;
@@ -75,7 +114,7 @@ describe('WebSocket namespace isolation', () => {
     });
 
     it('joins schema-qualified case rooms and broadcasts presence there', async () => {
-      const gateway = new CaseBoardGateway(cls as any, registry as any);
+      const gateway = new CaseBoardGateway(cls as any, registry as any, open);
       const emit = jest.fn();
       const to = jest.fn(() => ({ emit }));
       gateway.server = { to } as any;
@@ -93,7 +132,7 @@ describe('WebSocket namespace isolation', () => {
     });
 
     it('refuses unknown namespaces and malformed case ids', async () => {
-      const gateway = new CaseBoardGateway(cls as any, registry as any);
+      const gateway = new CaseBoardGateway(cls as any, registry as any, open);
       gateway.server = { to: jest.fn(() => ({ emit: jest.fn() })) } as any;
       const stranger = client('socket-4', 'unknown');
       await expect(
@@ -108,7 +147,7 @@ describe('WebSocket namespace isolation', () => {
     });
 
     it('emits board changes only to the current schema room', () => {
-      const gateway = new CaseBoardGateway(cls as any, registry as any);
+      const gateway = new CaseBoardGateway(cls as any, registry as any, open);
       const emit = jest.fn();
       const to = jest.fn(() => ({ emit }));
       gateway.server = { to } as any;

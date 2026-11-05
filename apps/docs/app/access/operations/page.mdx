@@ -1,0 +1,175 @@
+---
+sidebarTitle: Running Sign-in
+title: Running Sign-in
+description: For operators — connecting a company directory, adding tenants, turning sign-in on for an existing install, off-boarding, backups and upgrades.
+---
+
+import { Callout } from "nextra/components";
+
+# Running Sign-in
+
+This page is for the people who run Classifyre on Kubernetes. Installing it is
+covered under [Kubernetes → Sign-in](/deployment/kubernetes/#sign-in); what
+signed-in people can do is under [Access & Sign-in](/access/).
+
+The Helm chart runs an identity server next to Classifyre (named `iam` in the
+chart). It keeps **who people are**: accounts, tenants and groups. Classifyre
+keeps **what they may do**: grants. You manage people in the identity server,
+or in the company directory it is connected to, and access in Classifyre.
+
+---
+
+## The identity server's console
+
+Its own admin console is not reachable from outside the cluster unless
+`iam.exposeAdminConsole` is on. Reach it with a port-forward:
+
+```bash
+kubectl -n classifyre port-forward svc/classifyre-iam 8080
+```
+
+Then open [localhost:8080/iam/admin](http://localhost:8080/iam/admin/) and sign in as `admin`, with the
+password from:
+
+```bash
+kubectl -n classifyre get secret classifyre-iam \
+  -o jsonpath='{.data.admin-password}' | base64 -d
+```
+
+Work in the **classifyre** realm. Leave the `master` realm alone.
+
+---
+
+## Tenants and groups
+
+A tenant is an **organization** in the identity server. The chart creates the
+first one (`iam.bootstrap.tenant`, default `default`) with a group `admins`
+whose members are tenant admins.
+
+To add a tenant, create an organization in the `classifyre` realm (its
+**alias** is how Classifyre names it), add its members, and give it a
+top-level group called `admins` with its first admins in it. The tenant
+appears in Classifyre the first time one of its members signs in, and its
+`admins` group then becomes tenant admin, once: if a tenant admin later takes
+that away, it stays away. A tenant admin gives everyone else access through
+the **Tenant access** page; until a grant exists, other members see no
+workspaces.
+
+Do not delete an organization and create it again under the same alias: its
+members are refused with a message that an operator has to link the tenant
+again, so nobody inherits the old tenant's workspaces by accident.
+
+Groups live inside an organization (**Organizations → your tenant →
+Groups**). They can be nested: being in `/finance/ap-team` counts as being in
+`/finance`. Renaming or moving a group never breaks access, because grants
+point at the group itself, not its name.
+
+Groups made under the realm's own **Groups** menu belong to no tenant, so
+Classifyre does not list them and grants cannot use them. A person must be a
+**member of the organization** (Organizations → your tenant → Members) before
+anything else counts. Someone who signs in without being in any organization
+sees a page saying their account is not in a tenant yet, with a button to try
+again once they have been added.
+
+Roles and what they allow (capabilities such as managing sources or access)
+are not in the identity server at all. They live in Classifyre, and a tenant
+admin gives them to groups on the **Tenant access** page or a workspace's
+**Access** tab.
+
+---
+
+## Connecting a company directory
+
+Instead of managing accounts by hand, connect the identity server to your
+company's directory (Entra ID, Okta, any OIDC or SAML provider, or LDAP):
+
+- Add it under **Identity providers** in the `classifyre` realm and link it to
+  the tenant's organization, so people of that company land in the right
+  tenant.
+- Map the directory's groups to **organization groups** with group mappers,
+  and set their **sync mode to Force**. With the default, someone removed from
+  a group in the directory keeps the matching group in the identity server for
+  as long as the account exists.
+- Turn on **Trust email** and automatic account linking only for your own
+  company's directory, never for one you do not control: a forged email address
+  would otherwise take over an account.
+- Entra ID sends group ids, not names, and leaves groups out of the token when a
+  person is in more than about 200. Send only the groups assigned to the
+  application, or use app roles, and keep a list of which id is which group.
+
+Changes in the directory reach Classifyre when the person signs in next, and
+group changes within a minute after that.
+
+---
+
+## Turning sign-in on for an existing install
+
+An instance that ran without sign-in can switch it on with an upgrade
+(`iam.enabled: true`). What happens:
+
+- Every existing workspace and category moves into the first tenant. The
+  workspaces are owned by its `admins` group, which can then hand out access.
+- Names people typed in are kept on existing records. New changes are
+  attributed to the signed-in person; a typed-in name is ignored.
+- MCP tokens created before have no owner and stop working. People create new
+  ones after signing in; those act for them.
+- A sitemap is no longer allowed (`frontend.sitemap.enabled` must be off).
+
+Turning sign-in off again makes the instance open to anyone who reaches it.
+
+---
+
+## Off-boarding someone urgently
+
+1. In the identity server, **disable** the account (Users → the person →
+   Enabled off) and use **Sign out** on its sessions.
+2. Within a minute Classifyre stops accepting their requests and every MCP
+   token they created, even though tokens already issued would otherwise be
+   valid for up to five minutes.
+
+Removing someone from a group works the same way, for that group's access
+only.
+
+---
+
+## Rotating the chart's secrets
+
+The chart generates the identity server's database password and the two client
+secrets once, and keeps them across upgrades. To rotate one, delete its key
+from the `classifyre-iam` Secret, run `helm upgrade` (the chart generates a new
+value and the realm setup job applies it to the identity server), then restart
+the API and web:
+
+```bash
+kubectl -n classifyre rollout restart deploy/classifyre-api deploy/classifyre-worker deploy/classifyre-web
+```
+
+Signed-in people are asked to sign in again.
+
+The identity server's own `admin` password is different: it is only read on its
+very first start. Change it in the console (master realm → Users → admin →
+Credentials) and then put the same value under `admin-password` in the Secret,
+so the realm setup job can still sign in.
+
+---
+
+## Backups and upgrades
+
+<Callout type="warning">
+  The identity server's state is the `iam` database. Back it up with the rest
+  of PostgreSQL, and always before changing `iam.image.tag` across a minor
+  version.
+</Callout>
+
+- **Patch versions** (26.8.1 → 26.8.2) are routine.
+- **Minor versions** (26.8 → 26.9) stop all of its pods while it migrates its
+  database, and cannot be undone without the backup. Signing in is unavailable
+  for a minute or two; people already signed in keep working.
+- **Major versions** are never proposed automatically.
+
+If the identity server is down, nobody can sign in. People already signed in
+keep working with the access they had until their session needs renewing,
+which happens every few minutes (`iam.accessTokenLifespanSeconds`, 5 minutes
+by default). Scripts with long-lived tokens and MCP agents keep working for up
+to 15 minutes; after that Classifyre refuses them rather than trust access it
+can no longer check.

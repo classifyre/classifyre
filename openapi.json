@@ -8694,12 +8694,13 @@
             "description": ""
           }
         },
-        "summary": "List all namespaces",
+        "summary": "List the namespaces the caller can see (all of them without sign-in)",
         "tags": [
           "Namespaces"
         ]
       },
       "post": {
+        "description": "With sign-in, `ownerGroupId` is required: a group of your tenant that you belong to and may create workspaces for (GET /namespaces/owning-groups).",
         "operationId": "NamespacesController_create",
         "parameters": [],
         "responses": {
@@ -8708,6 +8709,21 @@
           }
         },
         "summary": "Create a namespace (provisions its Postgres schema + migrations)",
+        "tags": [
+          "Namespaces"
+        ]
+      }
+    },
+    "/namespaces/owning-groups": {
+      "get": {
+        "operationId": "NamespacesController_owningGroups",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Groups the caller may create workspaces for (empty without sign-in)",
         "tags": [
           "Namespaces"
         ]
@@ -9084,6 +9100,808 @@
         "summary": "Drop a queue’s waiting backlog",
         "tags": [
           "Worker Queues"
+        ]
+      }
+    },
+    "/me": {
+      "get": {
+        "operationId": "MeController_me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Who is calling, and what they may do in this workspace",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
+    "/audit-events": {
+      "get": {
+        "description": "Filter by entity (e.g. entityType=sources&entityId=…) or by actor reference. Page with `before`, the id of the last event received.",
+        "operationId": "AuditController_list",
+        "parameters": [
+          {
+            "name": "entityType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "entityId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "actor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "before",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AuditEventDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Changes made in this workspace, newest first",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
+    "/actors/resolve": {
+      "get": {
+        "description": "Repeat `refs` once per reference (`?refs=a&refs=b`), at most 200. Names may contain commas, so the list is never comma-separated.",
+        "operationId": "AuditController_resolve",
+        "parameters": [
+          {
+            "name": "refs",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ResolvedActorDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Display names for actor references",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
+    "/access/roles": {
+      "get": {
+        "operationId": "WorkspaceAccessController_roles",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RoleDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "The built-in roles and what each one allows",
+        "tags": [
+          "Access"
+        ]
+      }
+    },
+    "/access/groups": {
+      "get": {
+        "operationId": "WorkspaceAccessController_groups",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TenantGroupDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Groups of this tenant, to grant access to",
+        "tags": [
+          "Access"
+        ]
+      }
+    },
+    "/access/grants": {
+      "get": {
+        "operationId": "WorkspaceAccessController_grants",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/GrantDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Grants that reach this workspace, including inherited ones",
+        "tags": [
+          "Access"
+        ]
+      },
+      "post": {
+        "description": "You can only give a role whose capabilities you all hold here (no escalation).",
+        "operationId": "WorkspaceAccessController_addGrant",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGrantDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GrantDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Give a group or a person a role on this workspace",
+        "tags": [
+          "Access"
+        ]
+      }
+    },
+    "/access/grants/{id}": {
+      "delete": {
+        "operationId": "WorkspaceAccessController_removeGrant",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Remove a grant made on this workspace",
+        "tags": [
+          "Access"
+        ]
+      }
+    },
+    "/access/explain": {
+      "get": {
+        "operationId": "WorkspaceAccessController_explain",
+        "parameters": [
+          {
+            "name": "capability",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/GrantDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Why can I do this? The grants that give you a capability here",
+        "tags": [
+          "Access"
+        ]
+      }
+    },
+    "/tenant": {
+      "get": {
+        "operationId": "TenantAccessController_tenant",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "The caller’s tenant and what they may do across it",
+        "tags": [
+          "Access"
+        ]
+      }
+    },
+    "/tenant/roles": {
+      "get": {
+        "operationId": "TenantAccessController_roles",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RoleDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "The built-in roles and where each can be granted",
+        "tags": [
+          "Access"
+        ]
+      }
+    },
+    "/tenant/groups": {
+      "get": {
+        "operationId": "TenantAccessController_groups",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TenantGroupDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Access"
+        ]
+      },
+      "post": {
+        "operationId": "TenantPeopleController_createGroup",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGroupDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantGroupDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create a group, at the top or inside another",
+        "tags": [
+          "Access"
+        ]
+      }
+    },
+    "/tenant/grants": {
+      "get": {
+        "operationId": "TenantAccessController_grants",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/GrantDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Every grant of the tenant",
+        "tags": [
+          "Access"
+        ]
+      },
+      "post": {
+        "operationId": "TenantAccessController_addGrant",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGrantDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GrantDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Give a group or a person a role on the tenant, a group’s workspaces or one workspace",
+        "tags": [
+          "Access"
+        ]
+      }
+    },
+    "/tenant/grants/{id}": {
+      "delete": {
+        "operationId": "TenantAccessController_removeGrant",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Remove any grant of the tenant",
+        "tags": [
+          "Access"
+        ]
+      }
+    },
+    "/tenant/actors/resolve": {
+      "get": {
+        "description": "People and agents resolve as in a workspace; MCP tokens belong to workspaces, so here they show as tokens.",
+        "operationId": "TenantAccessController_resolve",
+        "parameters": [
+          {
+            "name": "refs",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ResolvedActorDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Display names for actor references, outside any workspace",
+        "tags": [
+          "Access"
+        ]
+      }
+    },
+    "/tenant/audit-events": {
+      "get": {
+        "operationId": "TenantAccessController_events",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TenantEventDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Tenant-level changes: grants, workspaces created or deleted",
+        "tags": [
+          "Access"
+        ]
+      }
+    },
+    "/tenant/tenants": {
+      "get": {
+        "operationId": "TenantAccessController_tenants",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TenantMembershipDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Every tenant the caller belongs to, for switching (§12.2)",
+        "tags": [
+          "Access"
+        ]
+      }
+    },
+    "/tenant/people": {
+      "get": {
+        "operationId": "TenantPeopleController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PersonDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Everyone in the tenant, with their groups",
+        "tags": [
+          "Access"
+        ]
+      },
+      "post": {
+        "description": "Creates an account with a temporary password (shown once), or adds an existing account that is in no tenant.",
+        "operationId": "TenantPeopleController_add",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddPersonDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddedPersonDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Add a person by email",
+        "tags": [
+          "Access"
+        ]
+      }
+    },
+    "/tenant/people/{userId}": {
+      "delete": {
+        "operationId": "TenantPeopleController_remove",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemovedPersonDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Remove a person from the tenant, its groups and their grants",
+        "tags": [
+          "Access"
+        ]
+      }
+    },
+    "/tenant/people/{userId}/password": {
+      "post": {
+        "operationId": "TenantPeopleController_resetPassword",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemporaryPasswordDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Give an account made here a new temporary password",
+        "tags": [
+          "Access"
+        ]
+      }
+    },
+    "/tenant/groups/{groupId}": {
+      "patch": {
+        "operationId": "TenantPeopleController_renameGroup",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenameGroupDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantGroupDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Rename a group",
+        "tags": [
+          "Access"
+        ]
+      },
+      "delete": {
+        "operationId": "TenantPeopleController_deleteGroup",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Delete a group and the groups below it, with their grants (refused while they own workspaces)",
+        "tags": [
+          "Access"
+        ]
+      }
+    },
+    "/tenant/groups/{groupId}/members/{userId}": {
+      "put": {
+        "operationId": "TenantPeopleController_addMember",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Put a person of the tenant into a group",
+        "tags": [
+          "Access"
+        ]
+      },
+      "delete": {
+        "operationId": "TenantPeopleController_removeMember",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Take a person out of a group",
+        "tags": [
+          "Access"
         ]
       }
     },
@@ -22246,6 +23064,11 @@
             "type": "string",
             "example": "Cursor local agent"
           },
+          "owner": {
+            "type": "string",
+            "description": "With sign-in, the person the token acts for (actor reference `user:<sub>`); null for tokens made without sign-in.",
+            "nullable": true
+          },
           "tokenPreview": {
             "type": "string",
             "description": "Masked token preview shown in settings after creation.",
@@ -22290,6 +23113,7 @@
         "required": [
           "id",
           "name",
+          "owner",
           "tokenPreview",
           "isActive",
           "createdAt",
@@ -22332,6 +23156,11 @@
           "name": {
             "type": "string",
             "example": "Cursor local agent"
+          },
+          "owner": {
+            "type": "string",
+            "description": "With sign-in, the person the token acts for (actor reference `user:<sub>`); null for tokens made without sign-in.",
+            "nullable": true
           },
           "tokenPreview": {
             "type": "string",
@@ -22382,6 +23211,7 @@
         "required": [
           "id",
           "name",
+          "owner",
           "tokenPreview",
           "isActive",
           "createdAt",
@@ -29722,6 +30552,716 @@
         "required": [
           "queue",
           "droppedQueued"
+        ]
+      },
+      "MeActorDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Stable principal id; null while identity is self-declared.",
+            "nullable": true
+          },
+          "displayName": {
+            "type": "string",
+            "nullable": true,
+            "example": "Jordan Reyes"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "person",
+              "agent",
+              "integration",
+              "system"
+            ]
+          },
+          "via": {
+            "type": "string",
+            "enum": [
+              "header",
+              "oidc",
+              "mcp-token",
+              "internal-key",
+              "autopilot",
+              "none"
+            ],
+            "description": "How the actor was identified."
+          }
+        },
+        "required": [
+          "id",
+          "displayName",
+          "kind",
+          "via"
+        ]
+      },
+      "MeResponseDto": {
+        "type": "object",
+        "properties": {
+          "actor": {
+            "$ref": "#/components/schemas/MeActorDto"
+          },
+          "iamEnabled": {
+            "type": "boolean",
+            "description": "True when sign-in and access management are on. Without it every visitor holds every capability."
+          },
+          "capabilities": {
+            "type": "array",
+            "description": "Capabilities the actor holds in this workspace.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "workspace.view",
+                "workspace.settings",
+                "workspace.pause",
+                "workspace.delete",
+                "workspace.transfer",
+                "access.view",
+                "access.manage",
+                "source.view",
+                "source.manage",
+                "source.run",
+                "source.purge",
+                "finding.view",
+                "finding.triage",
+                "asset.view",
+                "asset.tag",
+                "detector.view",
+                "detector.manage",
+                "detector.train",
+                "code.author",
+                "case.view",
+                "case.edit",
+                "case.manage",
+                "inquiry.view",
+                "inquiry.edit",
+                "lead.review",
+                "glossary.view",
+                "glossary.edit",
+                "glossary.approve",
+                "entity.view",
+                "entity.manage",
+                "correlation.review",
+                "agent.view",
+                "agent.configure",
+                "agent.use",
+                "data.export",
+                "mcp.token.own",
+                "mcp.token.admin",
+                "tenant.workspace.create",
+                "tenant.access.manage",
+                "tenant.people.manage",
+                "tenant.categories.manage",
+                "tenant.audit.view",
+                "platform.tenants.manage"
+              ]
+            }
+          }
+        },
+        "required": [
+          "actor",
+          "iamEnabled",
+          "capabilities"
+        ]
+      },
+      "AuditEventDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actor": {
+            "type": "string",
+            "nullable": true,
+            "description": "Actor reference; resolve it with GET /actors/resolve.",
+            "example": "mcp:2c7b9260-cc88-45f8-9459-defe4a662708"
+          },
+          "via": {
+            "type": "string",
+            "example": "mcp-token"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "rest",
+              "mcp"
+            ]
+          },
+          "capability": {
+            "type": "string",
+            "example": "source.manage"
+          },
+          "operation": {
+            "type": "string",
+            "example": "PUT /sources/:id"
+          },
+          "entityType": {
+            "type": "string",
+            "nullable": true,
+            "example": "sources"
+          },
+          "entityId": {
+            "type": "string",
+            "nullable": true
+          },
+          "fields": {
+            "description": "Top-level input keys of the change, never their values.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "occurredAt",
+          "actor",
+          "via",
+          "channel",
+          "capability",
+          "operation",
+          "entityType",
+          "entityId",
+          "fields",
+          "status"
+        ]
+      },
+      "ResolvedActorDto": {
+        "type": "object",
+        "properties": {
+          "ref": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "user",
+              "mcp",
+              "agent",
+              "system",
+              "name"
+            ]
+          },
+          "displayName": {
+            "type": "string",
+            "example": "Jordan Reyes"
+          },
+          "viaDisplayName": {
+            "type": "string",
+            "description": "For an action delegated through an MCP token: the token."
+          }
+        },
+        "required": [
+          "ref",
+          "kind",
+          "displayName"
+        ]
+      },
+      "RoleDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "example": "investigator"
+          },
+          "title": {
+            "type": "string",
+            "example": "Investigator"
+          },
+          "scopes": {
+            "type": "array",
+            "description": "Where this role can be granted.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "tenant",
+                "group",
+                "workspace"
+              ]
+            }
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "workspace.view",
+                "workspace.settings",
+                "workspace.pause",
+                "workspace.delete",
+                "workspace.transfer",
+                "access.view",
+                "access.manage",
+                "source.view",
+                "source.manage",
+                "source.run",
+                "source.purge",
+                "finding.view",
+                "finding.triage",
+                "asset.view",
+                "asset.tag",
+                "detector.view",
+                "detector.manage",
+                "detector.train",
+                "code.author",
+                "case.view",
+                "case.edit",
+                "case.manage",
+                "inquiry.view",
+                "inquiry.edit",
+                "lead.review",
+                "glossary.view",
+                "glossary.edit",
+                "glossary.approve",
+                "entity.view",
+                "entity.manage",
+                "correlation.review",
+                "agent.view",
+                "agent.configure",
+                "agent.use",
+                "data.export",
+                "mcp.token.own",
+                "mcp.token.admin",
+                "tenant.workspace.create",
+                "tenant.access.manage",
+                "tenant.people.manage",
+                "tenant.categories.manage",
+                "tenant.audit.view",
+                "platform.tenants.manage"
+              ]
+            }
+          }
+        },
+        "required": [
+          "key",
+          "title",
+          "scopes",
+          "capabilities"
+        ]
+      },
+      "TenantGroupDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "example": "workspace-managers"
+          },
+          "path": {
+            "type": "string",
+            "example": "/finance/workspace-managers"
+          },
+          "parentId": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "path",
+          "parentId"
+        ]
+      },
+      "GrantDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "subjectType": {
+            "type": "string",
+            "enum": [
+              "group",
+              "user"
+            ]
+          },
+          "subjectId": {
+            "type": "string"
+          },
+          "subjectLabel": {
+            "type": "string",
+            "example": "/finance"
+          },
+          "roleKey": {
+            "type": "string",
+            "example": "viewer"
+          },
+          "scopeType": {
+            "type": "string",
+            "enum": [
+              "tenant",
+              "group",
+              "workspace"
+            ]
+          },
+          "scopeId": {
+            "type": "string"
+          },
+          "scopeLabel": {
+            "type": "string",
+            "example": "Workspaces of /finance"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "inherited": {
+            "type": "boolean",
+            "description": "True when the grant comes from the tenant or an owning group rather than this workspace."
+          }
+        },
+        "required": [
+          "id",
+          "subjectType",
+          "subjectId",
+          "subjectLabel",
+          "roleKey",
+          "scopeType",
+          "scopeId",
+          "scopeLabel",
+          "expiresAt"
+        ]
+      },
+      "CreateGrantDto": {
+        "type": "object",
+        "properties": {
+          "subjectType": {
+            "type": "string",
+            "enum": [
+              "group",
+              "user"
+            ]
+          },
+          "subjectId": {
+            "type": "string",
+            "description": "Group id, or the person’s subject id."
+          },
+          "roleKey": {
+            "type": "string",
+            "example": "viewer"
+          },
+          "scopeType": {
+            "type": "string",
+            "enum": [
+              "tenant",
+              "group",
+              "workspace"
+            ],
+            "description": "Tenant-level grants only: where the role applies. Workspace grants are always on that workspace."
+          },
+          "scopeId": {
+            "type": "string",
+            "description": "Tenant-level grants only: the tenant id, owner group id or workspace id."
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "When the grant ends, e.g. for a contractor (U10)."
+          }
+        },
+        "required": [
+          "subjectType",
+          "subjectId",
+          "roleKey"
+        ]
+      },
+      "TenantDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "alias": {
+            "type": "string",
+            "example": "default"
+          },
+          "name": {
+            "type": "string",
+            "example": "Default"
+          },
+          "capabilities": {
+            "type": "array",
+            "description": "What the caller may do across the whole tenant.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "workspace.view",
+                "workspace.settings",
+                "workspace.pause",
+                "workspace.delete",
+                "workspace.transfer",
+                "access.view",
+                "access.manage",
+                "source.view",
+                "source.manage",
+                "source.run",
+                "source.purge",
+                "finding.view",
+                "finding.triage",
+                "asset.view",
+                "asset.tag",
+                "detector.view",
+                "detector.manage",
+                "detector.train",
+                "code.author",
+                "case.view",
+                "case.edit",
+                "case.manage",
+                "inquiry.view",
+                "inquiry.edit",
+                "lead.review",
+                "glossary.view",
+                "glossary.edit",
+                "glossary.approve",
+                "entity.view",
+                "entity.manage",
+                "correlation.review",
+                "agent.view",
+                "agent.configure",
+                "agent.use",
+                "data.export",
+                "mcp.token.own",
+                "mcp.token.admin",
+                "tenant.workspace.create",
+                "tenant.access.manage",
+                "tenant.people.manage",
+                "tenant.categories.manage",
+                "tenant.audit.view",
+                "platform.tenants.manage"
+              ]
+            }
+          },
+          "peopleManagement": {
+            "type": "boolean",
+            "description": "True when people and groups are managed here; false when a company directory or the identity server owns them and they are read-only."
+          }
+        },
+        "required": [
+          "id",
+          "alias",
+          "name",
+          "capabilities",
+          "peopleManagement"
+        ]
+      },
+      "TenantEventDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actor": {
+            "type": "string",
+            "nullable": true
+          },
+          "action": {
+            "type": "string",
+            "example": "grant.added"
+          },
+          "detail": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "occurredAt",
+          "actor",
+          "action",
+          "detail"
+        ]
+      },
+      "TenantMembershipDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "alias": {
+            "type": "string",
+            "example": "default"
+          },
+          "name": {
+            "type": "string",
+            "example": "Default"
+          },
+          "current": {
+            "type": "boolean",
+            "description": "True when this is the tenant of the current session."
+          }
+        },
+        "required": [
+          "id",
+          "alias",
+          "name",
+          "current"
+        ]
+      },
+      "PersonDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The person’s id in the identity server."
+          },
+          "username": {
+            "type": "string",
+            "example": "ada@example.test"
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "firstName": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastName": {
+            "type": "string",
+            "nullable": true
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "fromDirectory": {
+            "type": "boolean",
+            "description": "Brought by the tenant’s company directory, not added here."
+          },
+          "createdHere": {
+            "type": "boolean",
+            "description": "Classifyre created this account, so it can set a temporary password and deletes the account when the person leaves."
+          },
+          "groupIds": {
+            "description": "Groups the person is directly in.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "isYou": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "username",
+          "email",
+          "firstName",
+          "lastName",
+          "enabled",
+          "fromDirectory",
+          "createdHere",
+          "groupIds",
+          "isYou"
+        ]
+      },
+      "AddPersonDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "ada@example.test"
+          },
+          "firstName": {
+            "type": "string",
+            "example": "Ada"
+          },
+          "lastName": {
+            "type": "string",
+            "example": "Kowalczyk"
+          }
+        },
+        "required": [
+          "email",
+          "firstName",
+          "lastName"
+        ]
+      },
+      "AddedPersonDto": {
+        "type": "object",
+        "properties": {
+          "person": {
+            "$ref": "#/components/schemas/PersonDto"
+          },
+          "temporaryPassword": {
+            "type": "string",
+            "nullable": true,
+            "description": "Only for a new account: shown once, changed by the person at first sign-in. Null when an existing account was added."
+          }
+        },
+        "required": [
+          "person",
+          "temporaryPassword"
+        ]
+      },
+      "RemovedPersonDto": {
+        "type": "object",
+        "properties": {
+          "accountDeleted": {
+            "type": "boolean",
+            "description": "The account was deleted too (Classifyre made it and it is in no other tenant)."
+          }
+        },
+        "required": [
+          "accountDeleted"
+        ]
+      },
+      "TemporaryPasswordDto": {
+        "type": "object",
+        "properties": {
+          "temporaryPassword": {
+            "type": "string",
+            "description": "Shown once; changed at first sign-in."
+          }
+        },
+        "required": [
+          "temporaryPassword"
+        ]
+      },
+      "CreateGroupDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "managers"
+          },
+          "parentId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Create it inside this group."
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "RenameGroupDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "finance"
+          }
+        },
+        "required": [
+          "name"
         ]
       },
       "StartRunnerDto": {

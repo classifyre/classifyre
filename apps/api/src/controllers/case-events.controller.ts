@@ -14,8 +14,11 @@ import {
   CreateCaseEventDto,
   UpdateCaseEventDto,
 } from '../dto/case-event.dto';
+import { AccessArea } from '../identity/access.decorators';
+import { ActorRef } from '../identity/actor-ref.decorator';
 
 @ApiTags('cases')
+@AccessArea({ view: 'case.view', change: 'case.edit' })
 @Controller('cases/:caseId/events')
 export class CaseEventsController {
   constructor(private readonly events: CaseEventsService) {}
@@ -32,7 +35,11 @@ export class CaseEventsController {
   @Post()
   @ApiOperation({ summary: 'Add a dated event to the case chronology' })
   @ApiOkResponse({ type: CaseEventDto })
-  create(@Param('caseId') caseId: string, @Body() dto: CreateCaseEventDto) {
+  create(
+    @Param('caseId') caseId: string,
+    @Body() dto: CreateCaseEventDto,
+    @ActorRef() actor: string | undefined,
+  ) {
     return this.events.create(
       caseId,
       {
@@ -44,7 +51,7 @@ export class CaseEventsController {
         findingIds: dto.findingIds,
         evidenceIds: dto.evidenceIds,
       },
-      dto.createdBy ?? 'user',
+      dto.createdBy ?? actor ?? 'user',
       'OPERATOR',
     );
   }
@@ -58,8 +65,14 @@ export class CaseEventsController {
     @Param('caseId') caseId: string,
     @Param('eventId') eventId: string,
     @Body() dto: UpdateCaseEventDto,
+    @ActorRef() actor: string | undefined,
   ) {
-    return this.events.update(caseId, eventId, dto, dto.updatedBy ?? 'user');
+    return this.events.update(
+      caseId,
+      eventId,
+      dto,
+      dto.updatedBy ?? actor ?? 'user',
+    );
   }
 
   @Delete(':eventId')

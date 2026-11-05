@@ -67,6 +67,8 @@ import {
   type TermUsage,
 } from "@/lib/semantic-api";
 import { useStaticRouteParam } from "@/lib/use-route-id";
+import { ActorChip } from "@/components/actor-chip";
+import { ChangedBy } from "@/components/audit-history";
 
 // The canvas measures the DOM: client-only, loaded when the overview opens.
 const ExploreWorkspace = dynamic(
@@ -128,7 +130,7 @@ function Activity({ termKey }: { termKey: string }) {
             {new Date(row.createdAt).toLocaleString()}
           </span>
           <span className="font-mono text-[11px] uppercase">{row.type}</span>
-          <span className="text-xs text-muted-foreground">{row.actor ?? ""}</span>
+          <ActorChip actorRef={row.actor} />
         </li>
       ))}
     </ol>
@@ -269,6 +271,7 @@ export default function GlossaryTermDetail() {
             </nav>
           ) : null}
           <h1 className="font-serif text-3xl font-black tracking-[0.02em]">{term.term}</h1>
+          <ChangedBy entityType="glossary" entityId={term.id} />
           <div className="flex flex-wrap items-center gap-2">
             <TermKindBadge kind={term.kind} />
             <TermStatusBadge status={term.status} />

@@ -18,8 +18,10 @@ import '@fastify/multipart';
 import type { FastifyRequest } from 'fastify';
 import { AssistantService } from '../assistant.service';
 import { BlockWhenPaused } from '../namespace/block-when-paused.decorator';
+import { Requires } from '../identity/access.decorators';
 
 @ApiTags('Assistant')
+@Requires('agent.use')
 @Controller('assistant')
 export class AssistantController {
   constructor(private readonly assistantService: AssistantService) {}

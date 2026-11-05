@@ -34,6 +34,7 @@ export const RESERVED_PREFIXES = new Set<string>([
   'ping', // health probe
   'health', // health endpoints
   'namespaces', // namespace registry CRUD
+  'tenant', // the caller's tenant: grants, groups, audit (identity/access.controller.ts)
   'socket.io', // Socket.IO transport handshake path
   'favicon.ico',
   // Swagger UI and its generated OpenAPI documents. Mounted at `/docs` rather
@@ -72,6 +73,9 @@ export const RESERVED_WEB_PREFIXES = new Set<string>([
   // namespace resolution rather than bypassing it.
   'en',
   'de',
+  // The identity server is served under `/iam` on the same host as the web
+  // app (helm `iam.path`), so a workspace named `iam` could never be opened.
+  'iam',
 ]);
 
 /** True when `slug` collides with a reserved API or web route segment. */

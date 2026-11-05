@@ -17,6 +17,7 @@ import {
   WorkerOverviewDto,
   WorkerQueueDto,
 } from '../dto/worker-queue.dto';
+import { AccessArea } from '../identity/access.decorators';
 
 /**
  * Background-worker visibility for the current workspace.
@@ -29,6 +30,7 @@ import {
  * on a demo instance without any extra annotation.
  */
 @ApiTags('Worker Queues')
+@AccessArea({ view: 'workspace.view', change: 'workspace.settings' })
 @Controller('worker-queues')
 export class WorkerQueuesController {
   constructor(private readonly workerQueues: WorkerQueuesService) {}

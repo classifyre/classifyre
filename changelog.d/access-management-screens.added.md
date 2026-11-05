@@ -1,0 +1,1 @@
+With sign-in on, workspace admins manage who has access under **Settings → Access**, tenant admins manage access across the tenant on the **Tenant access** page, and new workspaces are created for an owning group you belong to. **Why can I…?** shows which grant gives you a permission, and MCP tokens show whose access they carry.

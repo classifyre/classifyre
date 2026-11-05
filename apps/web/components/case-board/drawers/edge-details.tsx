@@ -39,6 +39,7 @@ import { parseBoardEdgeId, type DetailsTarget } from "../store/ui-store";
 import type { BoardLink, SystemEdge } from "../store/types";
 import { humanizeKind } from "../edges/link-edge";
 import { nodeLabel } from "../edges/system-edge";
+import { ActorName } from "@/components/actor-chip";
 
 const openInTab = (path: string) => window.open(nsPath(path), "_blank", "noopener");
 
@@ -192,7 +193,11 @@ function LinkDetails({ linkId, onFlyTo }: { linkId: string; onFlyTo: (nodeId: st
       <div className="space-y-1">
         <p className="font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase">{t("caseBoard.edgeDetails.link")}</p>
         <p className="text-xs text-muted-foreground">
-          {t("caseBoard.edges.by", { name: link.createdBy ?? t("caseBoard.someone") })}
+          {link.createdBy ? (
+            <ActorName actorRef={link.createdBy}>{(name) => t("caseBoard.edges.by", { name })}</ActorName>
+          ) : (
+            t("caseBoard.edges.by", { name: t("caseBoard.someone") })
+          )}
           {" · "}
           {formatDistanceToNowStrict(new Date(link.updatedAt), { addSuffix: true })}
           {link.promotedEdgeId ? ` · ${t("caseBoard.edges.globalBadge")}` : ""}

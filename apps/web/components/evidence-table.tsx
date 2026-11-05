@@ -51,6 +51,7 @@ import {
 } from "@workspace/ui/components";
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
+import { ActorChip } from "@/components/actor-chip";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -773,7 +774,7 @@ export function EvidenceTable({
                           </Tooltip>
                           {e.addedBy && (
                             <span className="block text-[11px] text-muted-foreground">
-                              by {e.addedBy}
+                              by <ActorChip actorRef={e.addedBy} />
                             </span>
                           )}
                         </TableCell>

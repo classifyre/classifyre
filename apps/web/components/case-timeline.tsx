@@ -38,8 +38,9 @@ import { api, type CaseActivityDto, type InquiryActivityDto } from "@workspace/a
 import { EscalationFlag } from "@workspace/case-board/components/finding-node";
 import { Button } from "@workspace/ui/components/button";
 import { cn } from "@workspace/ui/lib/utils";
-import { AiActorBadge, isAiActor } from "@/components/ai-actor-badge";
+import { AI_ACTOR, AiActorBadge, isAiActor } from "@/components/ai-actor-badge";
 import { ESCALATION_INK } from "@/lib/escalation-tone";
+import { ActorChip } from "@/components/actor-chip";
 
 // ─── Event metadata ───────────────────────────────────────────────────────────
 
@@ -1183,7 +1184,7 @@ export function CaseTimeline({
                     error: r.error,
                     runId: r.id,
                   },
-                  actor: "ai-autopilot",
+                  actor: AI_ACTOR,
                   createdAt: r.createdAt,
                 }),
               ),
@@ -1462,7 +1463,7 @@ export function CaseTimeline({
                           </p>
                         ) : (
                           <p className="text-muted-foreground/70 mt-0.5 text-[11px]">
-                            by {SYSTEM_ACTORS[item.actor] ?? item.actor}
+                            by {SYSTEM_ACTORS[item.actor] ?? <ActorChip actorRef={item.actor} />}
                           </p>
                         ))}
                     </li>

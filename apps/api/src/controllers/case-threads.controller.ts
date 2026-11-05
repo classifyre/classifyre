@@ -22,17 +22,19 @@ import {
   ThreadResponseDto,
   UpdateThreadDto,
 } from '../dto/case-thread.dto';
-import { ActorName } from '../actor-name.decorator';
+import { ActorRef } from '../identity/actor-ref.decorator';
 import {
   ThreadRemovalPreviewDto,
   ThreadRemovalResultDto,
 } from '../dto/case-hypothesis-rules.dto';
 import { CaseTimelineResponseDto } from '../dto/case-activity.dto';
 import { activityTypes } from '../activity-page';
+import { AccessArea } from '../identity/access.decorators';
 
 // ─── Timeline ─────────────────────────────────────────────────────────────────
 
 @ApiTags('cases')
+@AccessArea({ view: 'case.view', change: 'case.edit' })
 @Controller()
 export class CaseTimelineController {
   constructor(private readonly activity: CaseActivityService) {}
@@ -89,6 +91,7 @@ export class CaseTimelineController {
 // ─── Threads ──────────────────────────────────────────────────────────────────
 
 @ApiTags('threads')
+@AccessArea({ view: 'case.view', change: 'case.edit' })
 @Controller()
 export class CaseThreadsController {
   constructor(private readonly threads: CaseThreadsService) {}
@@ -148,7 +151,7 @@ export class CaseThreadsController {
   async remove(
     @Param('id') id: string,
     @Query('evidence') evidence: string | undefined,
-    @ActorName() actor: string | undefined,
+    @ActorRef() actor: string | undefined,
   ): Promise<ThreadRemovalResultDto> {
     return this.threads.remove(
       id,

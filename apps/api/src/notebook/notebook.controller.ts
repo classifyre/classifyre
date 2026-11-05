@@ -36,8 +36,10 @@ import {
   UpdateNotebookDto,
   UpdateNotebookResponseDto,
 } from './dto/notebook.dto';
+import { AccessArea } from '../identity/access.decorators';
 
 @ApiTags('Notebooks')
+@AccessArea({ view: 'source.view', change: 'code.author' })
 @Controller()
 export class NotebookController {
   constructor(

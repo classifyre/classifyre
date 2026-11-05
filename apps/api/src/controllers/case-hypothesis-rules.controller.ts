@@ -11,7 +11,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { ActorName } from '../actor-name.decorator';
+import { ActorRef } from '../identity/actor-ref.decorator';
 import { CaseHypothesisRulesService } from '../cases/case-hypothesis-rules.service';
 import {
   AddCaseHypothesisRuleDto,
@@ -20,6 +20,7 @@ import {
   CaseHypothesisRulesChangeResponseDto,
   UpdateCaseHypothesisRuleDto,
 } from '../dto/case-hypothesis-rules.dto';
+import { AccessArea } from '../identity/access.decorators';
 
 /** No global ValidationPipe: a form or MCP "true" arrives as text. */
 function flag(value: unknown): boolean {
@@ -32,6 +33,7 @@ function flag(value: unknown): boolean {
  * Case-level like the finding filters; the watch itself is untouched.
  */
 @ApiTags('cases')
+@AccessArea({ view: 'case.view', change: 'case.edit' })
 @Controller('cases/:id/hypothesis-rules')
 export class CaseHypothesisRulesController {
   constructor(private readonly rules: CaseHypothesisRulesService) {}
@@ -55,7 +57,7 @@ export class CaseHypothesisRulesController {
   add(
     @Param('id') id: string,
     @Body() dto: AddCaseHypothesisRuleDto,
-    @ActorName() actor: string | undefined,
+    @ActorRef() actor: string | undefined,
   ): Promise<CaseHypothesisRulesChangeResponseDto> {
     return this.rules.add(
       id,
@@ -74,7 +76,7 @@ export class CaseHypothesisRulesController {
     @Param('id') id: string,
     @Param('ruleId') ruleId: string,
     @Body() dto: UpdateCaseHypothesisRuleDto,
-    @ActorName() actor: string | undefined,
+    @ActorRef() actor: string | undefined,
   ): Promise<CaseHypothesisRulesChangeResponseDto> {
     return this.rules.update(
       id,
@@ -101,7 +103,7 @@ export class CaseHypothesisRulesController {
     @Param('id') id: string,
     @Param('ruleId') ruleId: string,
     @Query('removeLinks') removeLinks: string | undefined,
-    @ActorName() actor: string | undefined,
+    @ActorRef() actor: string | undefined,
   ): Promise<CaseHypothesisRuleRemovalResponseDto> {
     return this.rules.remove(
       id,

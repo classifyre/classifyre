@@ -1,0 +1,83 @@
+{{- if .Values.iam.enabled }}
+{{- $fullname := include "classifyre.iam.fullname" . -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $fullname }}-setup
+  labels:
+    {{- include "classifyre.commonLabels" . | nindent 4 }}
+    app.kubernetes.io/component: iam
+data:
+  setup-realm.sh: |
+    {{- .Files.Get "files/iam/setup-realm.sh" | nindent 4 }}
+---
+# One job per release revision: a new revision gets a new job (and the old one
+# leaves with the old manifest), without making `helm upgrade` wait for the
+# identity server the way a hook would.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ printf "%s-setup-%d" $fullname .Release.Revision | trunc 63 | trimSuffix "-" }}
+  labels:
+    {{- include "classifyre.commonLabels" . | nindent 4 }}
+    app.kubernetes.io/component: iam-setup
+spec:
+  backoffLimit: 10
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        {{- include "classifyre.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: iam-setup
+    spec:
+      restartPolicy: OnFailure
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: setup
+          image: {{ .Values.iam.image.repository }}:{{ .Values.iam.image.tag }}
+          imagePullPolicy: {{ .Values.iam.image.pullPolicy }}
+          command: ["/bin/bash", "/setup/setup-realm.sh"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          env:
+            - name: IAM_INTERNAL_URL
+              value: {{ include "classifyre.iam.internalUrl" . | quote }}
+            - name: IAM_REALM
+              value: {{ .Values.iam.realm | quote }}
+            - name: IAM_APP_URL
+              value: {{ include "classifyre.iam.appUrl" . | quote }}
+            - name: IAM_ACCESS_TOKEN_LIFESPAN
+              value: {{ .Values.iam.accessTokenLifespanSeconds | quote }}
+            - name: IAM_TENANT_ALIAS
+              value: {{ .Values.iam.bootstrap.tenant.alias | quote }}
+            - name: IAM_PEOPLE_MANAGEMENT
+              value: {{ .Values.iam.peopleManagement | quote }}
+            - name: IAM_TENANT_NAME
+              value: {{ .Values.iam.bootstrap.tenant.name | quote }}
+            - name: IAM_BOOTSTRAP_ADMIN
+              value: {{ .Values.iam.bootstrap.admin.username | quote }}
+            - name: IAM_BOOTSTRAP_ADMIN_EMAIL
+              value: {{ .Values.iam.bootstrap.admin.email | quote }}
+            {{- range $env, $key := dict "IAM_ADMIN_PASSWORD" "admin-password" "IAM_WEB_CLIENT_SECRET" "web-client-secret" "IAM_API_CLIENT_SECRET" "api-client-secret" "IAM_BOOTSTRAP_ADMIN_PASSWORD" "bootstrap-admin-password" }}
+            - name: {{ $env }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "classifyre.iam.secretName" $ }}
+                  key: {{ $key }}
+            {{- end }}
+          volumeMounts:
+            - name: setup
+              mountPath: /setup
+              readOnly: true
+          resources:
+            {{- toYaml .Values.iam.configJob.resources | nindent 12 }}
+      volumes:
+        - name: setup
+          configMap:
+            name: {{ $fullname }}-setup
+{{- end }}

@@ -420,6 +420,38 @@ helm upgrade --install classifyre ./helm/classifyre \
 | frontend.tolerations | list | `[]` | Web scheduling: tolerations. |
 | frontend.topologySpreadConstraints | list | `[]` | Web topology spread constraints. When empty, a default hostname spread is applied. |
 | fullnameOverride | string | `""` | Fully override release-based resource names. |
+| iam.accessTokenLifespanSeconds | int | `300` | Access token lifetime in seconds. Short, because group changes take effect when tokens renew. |
+| iam.affinity | object | `{}` | Affinity. |
+| iam.appUrl | string | `""` | URL people open Classifyre at, for sign-in redirects, e.g. `https://classifyre.example.com`. Empty derives it from `ingress.host` and `ingress.tls`. |
+| iam.bootstrap.admin.email | string | `""` | Email of the first tenant admin. |
+| iam.bootstrap.admin.username | string | `"admin"` | Username of the first tenant admin. Its temporary password is in the `<release>-iam` Secret, key `bootstrap-admin-password`, and must be changed at first sign-in. |
+| iam.bootstrap.tenant.alias | string | `"default"` | Alias of the first tenant (organization), created on install. |
+| iam.bootstrap.tenant.name | string | `"Default"` | Display name of the first tenant. |
+| iam.configJob | object | `{"resources":{"limits":{"memory":"512Mi"},"requests":{"cpu":"100m","memory":"256Mi"}}}` | Resources of the realm setup job. |
+| iam.database.external.database | string | `"iam"` | External database name. |
+| iam.database.external.existingSecret | string | `""` | Secret holding the external database password. |
+| iam.database.external.existingSecretPasswordKey | string | `"password"` | Key of the password in `existingSecret`. |
+| iam.database.external.host | string | `""` | External database host. |
+| iam.database.external.port | int | `5432` | External database port. |
+| iam.database.external.username | string | `"iam"` | External database user. |
+| iam.database.mode | string | `"shared"` | `shared`: an `iam` database and role on the chart's PostgreSQL (embedded or cnpg). `external`: your own database, below. |
+| iam.database.name | string | `"iam"` | Database name (shared mode). |
+| iam.database.poolMaxSize | int | `20` | Most connections the identity server opens (KC_DB_POOL_MAX_SIZE). Counts against PostgreSQL's `max_connections` next to the API's pools. |
+| iam.database.username | string | `"iam"` | Database role (shared mode). |
+| iam.enabled | bool | `true` | Turn sign-in and access management on. Off restores open access. |
+| iam.exposeAdminConsole | bool | `false` | Expose the identity server's own admin console (`<path>/admin`) and master realm at the ingress. Off routes only the `classifyre` realm. |
+| iam.extraEnv | list | `[]` | Extra environment variables for the identity server (`KC_*` options). |
+| iam.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy. |
+| iam.image.repository | string | `"quay.io/keycloak/keycloak"` | Identity server image repository. |
+| iam.image.tag | string | `"26.8.1"` | Identity server image tag. Keep it a quoted string so Dependabot can bump it. |
+| iam.nodeSelector | object | `{}` | Node selector. |
+| iam.path | string | `"/iam"` | Path the identity server is served under, on `ingress.host`. |
+| iam.peopleManagement | bool | `true` | Tenant admins manage their tenant's people and groups in Classifyre (Tenant access → People, Groups). Gives the API's service account `manage-users` and `manage-organizations` in the realm; Classifyre keeps every change inside the caller's tenant. `false` keeps it read-only, for installs where a company directory owns membership. |
+| iam.publicUrl | string | `""` | Public URL of the identity server, e.g. `https://classifyre.example.com/iam`. Empty derives it from `ingress.host`, `ingress.tls` and `iam.path`. |
+| iam.realm | string | `"classifyre"` | Realm that holds users, tenants (organizations) and groups. |
+| iam.replicas | int | `1` | Replicas. More than one forms a cluster over the headless service; minor upgrades still stop all of them. |
+| iam.resources | object | `{"limits":{"memory":"1536Mi"},"requests":{"cpu":"250m","memory":"768Mi"}}` | Resources of the identity server container. |
+| iam.tolerations | list | `[]` | Tolerations. |
 | imagePullSecrets | list | `[]` | Image pull secrets for all workloads. |
 | ingress.annotations | object | `{}` | Shared ingress annotations (nginx-specific rewrite annotations are applied to API ingress automatically). |
 | ingress.className | string | `"nginx"` | Ingress class name. |

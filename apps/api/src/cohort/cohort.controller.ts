@@ -4,9 +4,11 @@ import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ReadOnlyEndpoint } from '../db/read-only-endpoint.decorator';
 import { CohortWeightsService } from './cohort-weights.service';
 import { CohortWeightsPreviewDto } from './cohort-weights.dto';
+import { AccessArea } from '../identity/access.decorators';
 
 @ReadOnlyEndpoint()
 @ApiTags('Sources')
+@AccessArea({ view: 'source.view', change: 'source.manage' })
 @Controller('sources')
 export class CohortController {
   constructor(private readonly cohortWeights: CohortWeightsService) {}
