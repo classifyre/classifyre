@@ -297,34 +297,53 @@ export class TenancyService implements OnModuleDestroy {
   }
 
   /**
-   * Turning sign-in on for an instance that ran without it: workspaces in the
-   * `local` tenant move to the first tenant, owned by its `admins` group, and
-   * that group becomes Tenant admin. Idempotent; a no-op once nothing is left
-   * in `local`.
-   */
-  /**
    * Gives a tenant's top-level `admins` group Tenant admin, once per tenant
    * (`iam_tenants.admins_granted_at`), so a tenant admin can take it away
-   * again. False when it was given before.
+   * again. Claiming the marker and the grant are one transaction, so a second
+   * pod can never give it again after a revocation. False when it was given
+   * before.
    */
   async grantAdminsOnce(
     tenantId: string,
     adminsGroupId: string,
   ): Promise<boolean> {
-    if (!(await this.adminsPending(tenantId))) return false;
-    // The grant is unique, so two pods doing this at once give it once.
-    await this.addGrant({
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const { rowCount } = await client.query(
+        `UPDATE iam_tenants SET admins_granted_at = now()
+          WHERE id = $1 AND admins_granted_at IS NULL`,
+        [tenantId],
+      );
+      if (!rowCount) {
+        await client.query('ROLLBACK');
+        return false;
+      }
+      await client.query(
+        `INSERT INTO iam_grants
+           (id, tenant_id, subject_type, subject_id, role_key, scope_type, scope_id, created_by)
+         VALUES ($1, $2, 'group', $3, 'tenant-admin', 'tenant', $4, 'system:bootstrap')
+         ON CONFLICT (tenant_id, subject_type, subject_id, role_key, scope_type, scope_id) DO NOTHING`,
+        // Same id twice: tenant_id is uuid, scope_id text, so one parameter cannot be both.
+        [randomUUID(), tenantId, adminsGroupId, tenantId],
+      );
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+    await this.recordTenantEvent(
       tenantId,
-      subjectType: 'group',
-      subjectId: adminsGroupId,
-      roleKey: 'tenant-admin',
-      scopeType: 'tenant',
-      scopeId: tenantId,
-      createdBy: 'system:bootstrap',
-    });
-    await this.pool.query(
-      `UPDATE iam_tenants SET admins_granted_at = now() WHERE id = $1`,
-      [tenantId],
+      'system:bootstrap',
+      'grant.created',
+      {
+        subjectType: 'group',
+        subjectId: adminsGroupId,
+        roleKey: 'tenant-admin',
+        scopeType: 'tenant',
+      },
     );
     return true;
   }
@@ -338,6 +357,11 @@ export class TenancyService implements OnModuleDestroy {
     return rows.length > 0;
   }
 
+  /**
+   * Turning sign-in on for an instance that ran without it: workspaces in the
+   * `local` tenant move to the first tenant, owned by its `admins` group once
+   * that group exists. Idempotent.
+   */
   async adoptLocalWorkspaces(
     tenant: Tenant,
     adminsGroupId: string | null,
@@ -351,6 +375,15 @@ export class TenancyService implements OnModuleDestroy {
     if (rowCount) {
       this.logger.log(
         `Moved ${rowCount} workspace(s) without sign-in into tenant ${tenant.alias}`,
+      );
+    }
+    if (adminsGroupId) {
+      // Adopted before the group existed: with sign-in every created
+      // workspace has an owner, so only adopted ones can be without.
+      await this.pool.query(
+        `UPDATE namespaces SET owner_group_id = $2
+          WHERE tenant_id = $1 AND owner_group_id IS NULL`,
+        [tenant.id, adminsGroupId],
       );
     }
     // Categories made without sign-in go with the workspaces; the default one

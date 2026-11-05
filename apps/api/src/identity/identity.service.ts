@@ -149,7 +149,7 @@ export class IdentityService {
       );
     }
     const tenant = await this.tenancy.ensureTenant(org);
-    if (tenant.orgId && tenant.orgId !== org.id) {
+    if (tenant.orgId !== org.id) {
       // An organization deleted and made again under the same alias is not
       // the tenant whose workspaces and grants carry that alias.
       throw new AuthenticationError(
@@ -413,6 +413,8 @@ export class IdentityService {
     }
     const tenant = await this.tenancy.ensureTenant(org);
     const admins = await this.adminsGroup(org.id);
+    // Workspaces move in either way; they get their owner once `admins` exists.
+    await this.tenancy.adoptLocalWorkspaces(tenant, admins?.id ?? null);
     if (!admins) {
       // The setup job creates it right after the organization: retried.
       throw new Error(
@@ -420,6 +422,5 @@ export class IdentityService {
       );
     }
     await this.tenancy.grantAdminsOnce(tenant.id, admins.id);
-    await this.tenancy.adoptLocalWorkspaces(tenant, admins.id);
   }
 }

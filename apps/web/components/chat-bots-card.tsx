@@ -52,6 +52,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useIamEnabled } from "@/components/iam-session";
 import { useChatBots } from "@/hooks/use-chat-bots";
 import { useTranslation } from "@/hooks/use-translation";
 
@@ -150,6 +151,7 @@ function draftFromBot(bot: ChatBotResponseDto): BotDraft {
 
 export function ChatBotsCard() {
   const { t } = useTranslation();
+  const iamEnabled = useIamEnabled();
   const { bots, loading, error, refresh } = useChatBots();
 
   const [groups, setGroups] = React.useState<McpCapabilityGroupDto[]>([]);
@@ -437,11 +439,14 @@ export function ChatBotsCard() {
                   {t("chatBots.allowMutations")}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {t("chatBots.allowMutationsHint")}
+                  {iamEnabled
+                    ? t("chatBots.allowMutationsSignIn")
+                    : t("chatBots.allowMutationsHint")}
                 </p>
               </div>
               <Switch
-                checked={draft.allowMutations}
+                disabled={iamEnabled}
+                checked={draft.allowMutations && !iamEnabled}
                 onCheckedChange={(checked) =>
                   setDraft((d) => ({ ...d, allowMutations: checked === true }))
                 }

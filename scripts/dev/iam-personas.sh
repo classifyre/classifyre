@@ -81,7 +81,17 @@ helm install "$REL" "$ROOT/helm/classifyre" -n "$NS" \
 say "wait for the API, the identity server and the realm setup"
 until kubectl -n "$NS" get pods --no-headers 2>/dev/null | grep -q "api.*1/1"; do sleep 10; done
 until kubectl -n "$NS" get jobs --no-headers 2>/dev/null | grep -q Complete; do sleep 5; done
-until kubectl -n "$NS" logs "deploy/$REL-classifyre-api" --tail=500 2>/dev/null | grep -q "Sign-in tenants are set up"; do sleep 10; done
+# The API retries its tenant setup for about ten minutes, then gives up.
+for _ in $(seq 1 72); do
+  LOGS=$(kubectl -n "$NS" logs "deploy/$REL-classifyre-api" --tail=500 2>/dev/null || true)
+  echo "$LOGS" | grep -q "Sign-in tenants are set up" && break
+  if echo "$LOGS" | grep -q "Sign-in tenant setup gave up"; then
+    echo "$LOGS" | grep "IamBootstrapService" | tail -3
+    echo "FAIL: the API could not set up the sign-in tenant"; exit 1
+  fi
+  sleep 10
+done
+echo "$LOGS" | grep -q "Sign-in tenants are set up" || { echo "FAIL: tenant setup timed out"; exit 1; }
 kubectl -n "$NS" port-forward "svc/$REL-classifyre-api" "$API_PORT:8000" >/dev/null 2>&1 & PF_PIDS+=($!)
 kubectl -n "$NS" port-forward "svc/$REL-classifyre-iam" "$IAM_PORT:8080" >/dev/null 2>&1 & PF_PIDS+=($!)
 until curl -s -m 3 "$B/ping" | grep -q pong; do sleep 2; done

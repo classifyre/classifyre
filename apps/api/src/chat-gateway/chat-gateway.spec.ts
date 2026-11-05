@@ -94,7 +94,7 @@ describe('chat bots with sign-in', () => {
   it('turns a write tool into observe-only when mutations are off', async () => {
     const tool = withChatBotGate({
       name: 'cases.close',
-      sideEffect: 'write',
+      sideEffect: 'mutate',
     } as unknown as Tool);
     const gate = await tool.resolveGate!(
       {},
