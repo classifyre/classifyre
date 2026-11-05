@@ -1,0 +1,4 @@
+interface:
+  display_name: "Add New Source"
+  short_description: "Guide adding new source integrations"
+  default_prompt: "Add a new source end to end in this repository."
