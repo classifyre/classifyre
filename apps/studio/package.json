@@ -14,24 +14,29 @@
     "test:e2e": "echo 'No e2e tests configured for studio'"
   },
   "dependencies": {
+    "@react-three/fiber": "^9.8.2",
     "@remotion/cli": "4.0.532",
     "@remotion/google-fonts": "4.0.532",
     "@remotion/tailwind-v4": "4.0.532",
+    "@remotion/three": "4.0.532",
     "@remotion/transitions": "4.0.532",
     "@workspace/case-board": "workspace:*",
     "@workspace/ui": "workspace:*",
     "@xyflow/react": "^12.12.0",
+    "gsap": "^3.15.1",
     "lucide-react": "^1.7.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "remotion": "4.0.532",
-    "simple-icons": "^16.28.0"
+    "simple-icons": "^16.28.0",
+    "three": "^0.187.0"
   },
   "devDependencies": {
     "@remotion/eslint-plugin": "4.0.532",
     "@types/node": "^26.1.1",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "@types/three": "^0.187.0",
     "@workspace/eslint-config": "workspace:*",
     "@workspace/typescript-config": "workspace:*",
     "eslint": "^9.39.4",

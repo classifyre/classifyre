@@ -35,6 +35,32 @@ Two modes:
 | `dev` (default) | embedded Postgres in-cluster    | per `helm/develop/values-dev.yaml` | Normal feature work on throwaway local data         |
 | `dev-vps-db`    | the **VPS instance's** Postgres | forced off            | Administer the public showcase while it stays read-only |
 
+## Sign-in (iam)
+
+Sign-in is off on the dev stack by default. Start with it on:
+
+```bash
+CLASSIFYRE_IAM=true ./scripts/dev/start.sh
+```
+
+The `iam` skaffold profile adds `helm/develop/values-dev-iam.yaml` and
+port-forwards the identity server to <http://localhost:8180/iam>. Its admin
+console is at <http://localhost:8180/iam/admin> (user `admin`, password in the
+`classifyre-iam` Secret, key `admin-password`). The first tenant admin is
+`admin` in the `classifyre` realm, with a temporary password under
+`bootstrap-admin-password` in the same Secret.
+
+Starting again without `CLASSIFYRE_IAM=true` turns it off; the `iam` database
+stays on the embedded Postgres for next time.
+
+To check every access case of the plan at once, run the persona suite. It
+installs its own throwaway release next to the dev stack, so it never touches
+your workspaces:
+
+```bash
+./scripts/dev/iam-personas.sh
+```
+
 ## Prerequisites
 
 Docker, the latest stable k3d, kubectl, Helm, the latest stable Skaffold, and

@@ -93,10 +93,9 @@ CREATE TABLE IF NOT EXISTS public.namespace_categories (
   created_at  timestamptz NOT NULL DEFAULT now(),
   updated_at  timestamptz NOT NULL DEFAULT now()
 );
--- Case-insensitive uniqueness: the create-category dialog offers a free-text
--- title, and "Clients"/"clients" as two rows would just be a broken grouping.
-CREATE UNIQUE INDEX IF NOT EXISTS namespace_categories_title_key
-  ON public.namespace_categories (lower(title));
+-- Case-insensitive uniqueness ("Clients"/"clients" as two rows would just be a
+-- broken grouping) is per tenant, so its index is created with the tenant
+-- column in identity/tenancy.sql.ts.
 
 -- Many-to-many: one workspace can be filed under several categories.
 CREATE TABLE IF NOT EXISTS public.namespace_category_members (

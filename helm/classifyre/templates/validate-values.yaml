@@ -30,3 +30,29 @@
 
 {{- /* Production reminder: when postgres.mode=external, set postgres.connection.sslMode to
      "require" or "verify-full". The default "disable" is intentional for embedded/local installs. */ -}}
+
+{{- if .Values.iam.enabled -}}
+{{- /* Sign-in means a private instance: nothing in it is for crawlers (§2 H4). */ -}}
+{{- if .Values.frontend.sitemap.enabled -}}
+{{- fail "frontend.sitemap.enabled must be false when iam.enabled=true: a signed-in instance publishes no sitemap and allows no crawling" -}}
+{{- end -}}
+{{- if and (not .Values.iam.publicUrl) (empty .Values.ingress.host) -}}
+{{- fail "iam.enabled=true needs ingress.host (or iam.publicUrl and iam.appUrl) to know the URL people sign in at; set iam.enabled=false for an instance without sign-in" -}}
+{{- end -}}
+{{- if and (not .Values.iam.appUrl) (empty .Values.ingress.host) -}}
+{{- fail "iam.appUrl is required when ingress.host is empty" -}}
+{{- end -}}
+{{- $validIamDbModes := list "shared" "external" -}}
+{{- if not (has .Values.iam.database.mode $validIamDbModes) -}}
+{{- fail (printf "iam.database.mode must be one of: %s" (join ", " $validIamDbModes)) -}}
+{{- end -}}
+{{- if and (eq .Values.iam.database.mode "shared") (eq .Values.postgres.mode "external") -}}
+{{- fail "iam.database.mode=shared needs postgres.mode embedded or cnpg; with an external PostgreSQL set iam.database.mode=external and iam.database.external.*" -}}
+{{- end -}}
+{{- if and (eq .Values.iam.database.mode "external") (or (empty .Values.iam.database.external.host) (empty .Values.iam.database.external.existingSecret)) -}}
+{{- fail "iam.database.mode=external needs iam.database.external.host and iam.database.external.existingSecret" -}}
+{{- end -}}
+{{- if not (regexMatch "^/[a-z0-9-]+$" .Values.iam.path) -}}
+{{- fail "iam.path must be one path segment such as /iam" -}}
+{{- end -}}
+{{- end -}}

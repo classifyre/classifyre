@@ -2,7 +2,7 @@ import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CaseLeadsService } from '../case-leads.service';
 import { BlockWhenPaused } from '../namespace/block-when-paused.decorator';
-import { ActorName } from '../actor-name.decorator';
+import { ActorRef } from '../identity/actor-ref.decorator';
 import {
   CaseLeadDto,
   GenerateCaseLeadsResponseDto,
@@ -12,8 +12,10 @@ import {
   ReviewCaseLeadsDto,
   ReviewCaseLeadsResponseDto,
 } from '../dto/case-lead.dto';
+import { AccessArea } from '../identity/access.decorators';
 
 @ApiTags('cases')
+@AccessArea({ view: 'case.view', change: 'lead.review' })
 @Controller('cases/:caseId/leads')
 export class CaseLeadsController {
   constructor(private readonly leads: CaseLeadsService) {}
@@ -30,7 +32,7 @@ export class CaseLeadsController {
   propose(
     @Param('caseId') caseId: string,
     @Body() dto: ProposeCaseLeadDto,
-    @ActorName() actor: string | undefined,
+    @ActorRef() actor: string | undefined,
   ) {
     return this.leads.propose(caseId, {
       findingId: dto.findingId,
@@ -49,7 +51,7 @@ export class CaseLeadsController {
   @ApiOkResponse({ type: GenerateCaseLeadsResponseDto })
   generate(
     @Param('caseId') caseId: string,
-    @ActorName() actor: string | undefined,
+    @ActorRef() actor: string | undefined,
   ) {
     return this.leads.generate(caseId, actor ?? 'user');
   }
@@ -62,7 +64,7 @@ export class CaseLeadsController {
   reviewMany(
     @Param('caseId') caseId: string,
     @Body() dto: ReviewCaseLeadsDto,
-    @ActorName() actor: string | undefined,
+    @ActorRef() actor: string | undefined,
   ) {
     // No global ValidationPipe: the body is normalised here, not trusted.
     const ids = Array.isArray(dto?.leadIds)
@@ -83,7 +85,7 @@ export class CaseLeadsController {
     @Param('caseId') caseId: string,
     @Param('leadId') leadId: string,
     @Body() dto: ReviewCaseLeadDto,
-    @ActorName() actor: string | undefined,
+    @ActorRef() actor: string | undefined,
   ) {
     return this.leads.review(
       caseId,

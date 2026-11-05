@@ -16,6 +16,16 @@ import {
 import { PrismaClientManager } from '../prisma/prisma-client-manager';
 import { transientDbErrorCode } from '../db/transient-db-error';
 import { InternalApiKeyService } from '../internal-api-key.service';
+import {
+  AuthenticationError,
+  type IdentityService,
+} from '../identity/identity.service';
+import { CLS_ACTOR } from '../identity/actor-context.service';
+import { CLS_CAPABILITIES } from '../identity/iam-access-policy';
+import {
+  CROSS_ORIGIN_BODY,
+  isCrossOriginCookieWrite,
+} from '../identity/signed-in-request';
 
 /**
  * Fastify raw request augmented by the namespace pipeline.
@@ -71,6 +81,7 @@ export function registerNamespaceHook(
   cls: ClsService,
   prismaManager: PrismaClientManager,
   internalApiKey: InternalApiKeyService,
+  identity: IdentityService | null = null,
 ): void {
   const logger = new Logger('NamespaceHook');
 
@@ -133,6 +144,20 @@ export function registerNamespaceHook(
       return;
     }
 
+    if (
+      identity &&
+      !(await authorizeWorkspaceRequest(
+        identity,
+        cls,
+        request,
+        reply,
+        ns,
+        internalApiKey,
+      ))
+    ) {
+      return;
+    }
+
     cls.set(CLS_SCHEMA, ns.schemaName);
     cls.set(CLS_NAMESPACE_ID, ns.namespaceId);
     cls.set(CLS_SLUG, ns.slug);
@@ -158,6 +183,76 @@ export function registerNamespaceHook(
   fastify.addHook('onRequestAbort', (request) => {
     releasePrismaPin(request.raw, prismaManager);
   });
+}
+
+/**
+ * With sign-in on, a workspace request needs a signed-in principal of the
+ * workspace's tenant who can see it (docs/prd §8.1). Another tenant's
+ * workspace and an invisible one both answer 404, exactly like a workspace
+ * that does not exist. Leaves the principal's actor and capabilities in CLS
+ * for the access guard. Scan callbacks (internal key) and MCP (its own
+ * tokens) are not signed-in requests and pass through.
+ */
+async function authorizeWorkspaceRequest(
+  identity: IdentityService,
+  cls: ClsService,
+  request: {
+    raw: IncomingMessage;
+    url: string;
+    method: string;
+    headers: Record<string, unknown>;
+  },
+  reply: { code(code: number): { send(body: unknown): unknown } },
+  ns: NamespaceContext,
+  internalApiKey: InternalApiKeyService,
+): Promise<boolean> {
+  if (internalApiKey.isInternalRequest(request.headers)) return true;
+  if (request.url.split('?')[0] === '/mcp') return true;
+
+  let principal;
+  try {
+    principal = await identity.authenticate(request.raw);
+  } catch (error) {
+    if (error instanceof AuthenticationError) {
+      await reply.code(401).send({
+        statusCode: 401,
+        error: 'Unauthorized',
+        code: error.chooseTenant ? 'CHOOSE_TENANT' : 'SIGN_IN_REQUIRED',
+        message: error.message,
+      });
+      return false;
+    }
+    await reply.code(503).send({
+      statusCode: 503,
+      error: 'Service Unavailable',
+      code: 'IDENTITY_UNAVAILABLE',
+      message: 'Sign-in cannot be checked right now. Try again in a moment.',
+    });
+    return false;
+  }
+
+  if (
+    isCrossOriginCookieWrite(
+      principal,
+      request.method,
+      request.headers.origin,
+      identity.config.appOrigin,
+    )
+  ) {
+    await reply.code(403).send(CROSS_ORIGIN_BODY);
+    return false;
+  }
+
+  const capabilities = await identity.capabilitiesIn(principal, ns.namespaceId);
+  if (!capabilities?.has('workspace.view')) {
+    await reply
+      .code(404)
+      .send({ error: 'Not Found', message: `Unknown namespace '${ns.slug}'` });
+    return false;
+  }
+  cls.set(CLS_ACTOR, principal.actor);
+  cls.set(CLS_CAPABILITIES, capabilities);
+  return true;
 }
 
 /**

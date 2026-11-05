@@ -73,7 +73,9 @@ import { AllowInDemoMode } from '../demo-mode.decorator';
 import { ReadOnlyEndpoint } from '../db/read-only-endpoint.decorator';
 import { SourceFilesService } from '../source-files.service';
 import { BlockWhenPaused } from '../namespace/block-when-paused.decorator';
+import { AccessArea, Requires } from '../identity/access.decorators';
 
+@AccessArea({ view: 'source.view', change: 'source.manage' })
 @Controller('sources')
 @ApiTags('Sources')
 export class SourcesController {
@@ -249,6 +251,7 @@ export class SourcesController {
   }
 
   @BlockWhenPaused()
+  @Requires('source.run')
   @Post('bulk-run')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -1131,6 +1134,7 @@ export class SourcesController {
   }
 
   @BlockWhenPaused()
+  @Requires('source.run')
   @Post(':id/runs')
   @ApiOperation({
     summary: 'Start a new ingestion run',
@@ -1287,6 +1291,7 @@ export class SourcesController {
   }
 
   @BlockWhenPaused()
+  @Requires('source.run')
   @Post(':id/schedule/resume')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -1347,6 +1352,7 @@ export class SourcesController {
     await this.sourceService.deleteSource({ id });
   }
 
+  @Requires('source.purge')
   @Delete(':id/findings')
   @ApiOperation({
     summary: 'Purge all findings of a data source',
@@ -1373,6 +1379,7 @@ export class SourcesController {
     return this.sourceService.purgeFindings(id);
   }
 
+  @Requires('source.purge')
   @Delete(':id/assets')
   @ApiOperation({
     summary: "Retire a source's assets — all of them, or a named subset",
@@ -1462,6 +1469,7 @@ export class SourcesController {
 
 @AllowInDemoMode()
 @ReadOnlyEndpoint()
+@AccessArea({ view: 'source.view', change: 'source.manage' })
 @Controller('search/sources')
 @ApiTags('Sources')
 export class SearchSourcesController {

@@ -18,7 +18,7 @@ import {
   GlossaryOrigin,
   SemanticLinkMethod,
 } from '@prisma/client';
-import { ActorName } from '../actor-name.decorator';
+import { ActorRef } from '../identity/actor-ref.decorator';
 import { AllowInDemoMode } from '../demo-mode.decorator';
 import { GlossaryService } from '../glossary/glossary.service';
 import { BindingsService } from './bindings/bindings.service';
@@ -32,6 +32,7 @@ import { SemanticSuggestionsService } from './suggestions/semantic-suggestions.s
 import { SemanticMapService } from './map/semantic-map.service';
 import { unknownTermRefs } from './term-refs';
 import { PrismaService } from '../prisma.service';
+import { AccessArea, Requires } from '../identity/access.decorators';
 
 function bool(value: unknown): boolean {
   return value === true || value === 'true' || value === '1';
@@ -83,6 +84,7 @@ export function parseBindingSpec(
  * links, packs, suggestions, the linker and the semantic map.
  */
 @ApiTags('semantic')
+@AccessArea({ view: 'glossary.view', change: 'glossary.edit' })
 @Controller('semantic')
 export class SemanticController {
   constructor(
@@ -235,7 +237,7 @@ export class SemanticController {
   })
   createBinding(
     @Body() body: Record<string, unknown>,
-    @ActorName() actor?: string,
+    @ActorRef() actor?: string,
   ) {
     const { status, note, ...rest } = body ?? {};
     if (status !== undefined && status !== 'APPROVED' && status !== 'DRAFT') {
@@ -259,7 +261,7 @@ export class SemanticController {
   updateBinding(
     @Param('id') id: string,
     @Body() body: Record<string, unknown>,
-    @ActorName() actor?: string,
+    @ActorRef() actor?: string,
   ) {
     const { note, ...rest } = body ?? {};
     return this.bindings.update(id, parseBindingSpec(rest), {
@@ -268,21 +270,24 @@ export class SemanticController {
     });
   }
 
+  @Requires('glossary.approve')
   @Post('bindings/:id/approve')
   @HttpCode(HttpStatus.OK)
-  approveBinding(@Param('id') id: string, @ActorName() actor?: string) {
+  approveBinding(@Param('id') id: string, @ActorRef() actor?: string) {
     return this.bindings.approve(id, actor ?? 'operator');
   }
 
+  @Requires('glossary.approve')
   @Post('bindings/:id/disable')
   @HttpCode(HttpStatus.OK)
-  disableBinding(@Param('id') id: string, @ActorName() actor?: string) {
+  disableBinding(@Param('id') id: string, @ActorRef() actor?: string) {
     return this.bindings.disable(id, actor ?? 'operator');
   }
 
+  @Requires('glossary.approve')
   @Post('bindings/:id/enable')
   @HttpCode(HttpStatus.OK)
-  enableBinding(@Param('id') id: string, @ActorName() actor?: string) {
+  enableBinding(@Param('id') id: string, @ActorRef() actor?: string) {
     return this.bindings.enable(id, actor ?? 'operator');
   }
 
@@ -291,13 +296,13 @@ export class SemanticController {
   @ApiOperation({
     summary: "Aim a binding at its deprecated concept's successor",
   })
-  retargetBinding(@Param('id') id: string, @ActorName() actor?: string) {
+  retargetBinding(@Param('id') id: string, @ActorRef() actor?: string) {
     return this.bindings.retarget(id, actor ?? 'operator');
   }
 
   @Delete('bindings/:id')
   @ApiOperation({ summary: 'Delete a DRAFT or DISABLED binding' })
-  deleteBinding(@Param('id') id: string, @ActorName() actor?: string) {
+  deleteBinding(@Param('id') id: string, @ActorRef() actor?: string) {
     return this.bindings.remove(id, actor ?? 'operator');
   }
 
@@ -320,7 +325,7 @@ export class SemanticController {
       dryRun?: boolean;
       resolutions?: Record<string, 'skip' | 'overwrite'>;
     },
-    @ActorName() actor?: string,
+    @ActorRef() actor?: string,
   ) {
     return this.packs.install({ ...body, actor });
   }
@@ -330,7 +335,7 @@ export class SemanticController {
   upgradePack(
     @Param('key') key: string,
     @Body() body: { pack?: unknown; dryRun?: boolean } = {},
-    @ActorName() actor?: string,
+    @ActorRef() actor?: string,
   ) {
     return this.packs.upgrade(key, { ...body, actor });
   }
@@ -342,7 +347,7 @@ export class SemanticController {
   uninstallPack(
     @Param('key') key: string,
     @Query('dryRun') dryRun?: string,
-    @ActorName() actor?: string,
+    @ActorRef() actor?: string,
   ) {
     return this.packs.uninstall(key, {
       dryRun: dryRun === undefined ? false : bool(dryRun),
@@ -352,6 +357,7 @@ export class SemanticController {
 
   // ── Meaning (SL3 R4) ─────────────────────────────────────────────────────
 
+  @Requires('finding.view')
   @Get('findings/:findingId/meaning')
   @ApiOperation({
     summary:
@@ -361,6 +367,7 @@ export class SemanticController {
     return this.meaning.findingMeaning(findingId);
   }
 
+  @Requires('asset.view')
   @Get('assets/:assetId/meaning')
   @ApiOperation({
     summary:
@@ -373,6 +380,7 @@ export class SemanticController {
     return this.meaning.assetMeaning(assetId, bool(history));
   }
 
+  @Requires('asset.view')
   @Get('assets/:assetId/terms/:termId/evidence')
   @ApiOperation({ summary: 'Why this asset is about this term' })
   async assetTermEvidence(
@@ -436,6 +444,7 @@ export class SemanticController {
     return this.meaning.termCasesAndWatches(await this.termId(termId));
   }
 
+  @Requires('case.view')
   @Get('cases/:caseId/links')
   @ApiOperation({ summary: 'Terms a case is about (case ABOUT links)' })
   caseLinks(@Param('caseId') caseId: string) {
@@ -454,7 +463,7 @@ export class SemanticController {
       target?: { type: string; id: string };
       note?: string;
     },
-    @ActorName() actor?: string,
+    @ActorRef() actor?: string,
   ) {
     const ref = body?.termId ?? body?.termKey;
     if (!ref) throw new BadRequestException('termId or termKey is required');
@@ -472,7 +481,7 @@ export class SemanticController {
   @Delete('links/:referenceId')
   unlink(
     @Param('referenceId') referenceId: string,
-    @ActorName() actor?: string,
+    @ActorRef() actor?: string,
   ) {
     return this.meaning.unlink(referenceId, actor ?? 'operator');
   }

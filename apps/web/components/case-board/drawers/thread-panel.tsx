@@ -73,6 +73,7 @@ import { placeThread } from "../store/commands";
 import { hypothesisMeta } from "../store/selectors";
 import { useFlyToEvidence } from "../hooks/use-place-evidence";
 import { useVisibleCentre } from "../hooks/use-visible-centre";
+import { ActorName } from "@/components/actor-chip";
 
 export type Verdict = "PROPOSED" | "SUPPORTED" | "REFUTED" | "INCONCLUSIVE";
 type Stance = "SUPPORTS" | "CONTRADICTS" | "NEUTRAL";
@@ -714,7 +715,7 @@ function EntryLog({ entries }: { entries: ThreadEntryDto[] }) {
             <div className="flex items-baseline gap-2 font-mono text-[10px] tracking-[0.06em] text-muted-foreground uppercase">
               <span className="truncate">
                 {e.id === firstStatement ? t("caseBoard.thread.entry.STATED") : t(`caseBoard.thread.entry.${e.entryType}` as TranslationKey)}
-                {e.author ? ` · ${e.author}` : ""}
+                {e.author && <ActorName actorRef={e.author}>{(name) => ` · ${name}`}</ActorName>}
               </span>
               <span className="ml-auto shrink-0 normal-case">
                 {formatDistanceToNowStrict(new Date(e.createdAt), { addSuffix: true })}

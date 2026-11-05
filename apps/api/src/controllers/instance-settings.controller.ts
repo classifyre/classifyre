@@ -3,8 +3,10 @@ import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { InstanceSettingsService } from '../instance-settings.service';
 import { InstanceSettingsResponseDto } from '../dto/instance-settings-response.dto';
 import { UpdateInstanceSettingsDto } from '../dto/update-instance-settings.dto';
+import { AccessArea } from '../identity/access.decorators';
 
 @ApiTags('Instance Settings')
+@AccessArea({ view: 'workspace.view', change: 'workspace.settings' })
 @Controller('instance-settings')
 export class InstanceSettingsController {
   constructor(

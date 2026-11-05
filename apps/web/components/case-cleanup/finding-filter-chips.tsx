@@ -9,6 +9,7 @@ import { cn } from "@workspace/ui/lib/utils";
 import { ESCALATION_INK } from "@/lib/escalation-tone";
 import { extractApiErrorMessage } from "@/lib/extract-api-error-message";
 import { useTranslation } from "@/hooks/use-translation";
+import { ActorName } from "@/components/actor-chip";
 
 /**
  * A scope's filters as chips: what kind (type or value), the pattern, and why.
@@ -105,7 +106,7 @@ export function FindingFilterChips({
                 <p className="font-mono text-xs">{filter.pattern}</p>
                 {filter.description && <p className="text-xs">{filter.description}</p>}
                 {filter.createdBy && (
-                  <p className="text-[11px] opacity-70">{t("caseFilters.addedBy", { name: filter.createdBy })}</p>
+                  <p className="text-[11px] opacity-70"><ActorName actorRef={filter.createdBy}>{(name) => t("caseFilters.addedBy", { name })}</ActorName></p>
                 )}
               </TooltipContent>
             </Tooltip>

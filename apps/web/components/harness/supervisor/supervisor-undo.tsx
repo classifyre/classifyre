@@ -7,6 +7,7 @@ import { Button } from "@workspace/ui/components";
 import { toast } from "sonner";
 import { useTranslation } from "@/hooks/use-translation";
 import { formatRelative } from "@/lib/date";
+import { ActorName } from "@/components/actor-chip";
 
 /**
  * The undo log.
@@ -95,11 +96,13 @@ export function SupervisorUndo() {
                           when: formatRelative(entry.revertedAt),
                         })
                       : t("harness.supervisor.undo.expired")}
-                    {entry.revertedBy
-                      ? ` ${t("harness.supervisor.undo.revertedBy", {
-                          who: entry.revertedBy,
-                        })}`
-                      : ""}
+                    {entry.revertedBy && (
+                      <ActorName actorRef={entry.revertedBy}>
+                        {(who) =>
+                          ` ${t("harness.supervisor.undo.revertedBy", { who })}`
+                        }
+                      </ActorName>
+                    )}
                   </p>
                 )}
               </div>

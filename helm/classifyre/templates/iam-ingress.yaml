@@ -1,0 +1,42 @@
+{{- if and .Values.iam.enabled .Values.ingress.enabled }}
+{{- $path := include "classifyre.iam.path" . -}}
+{{- /* Without exposeAdminConsole only the classifyre realm and the theme's
+     static files are routed: the admin console and the master realm are
+     never reachable from outside the cluster. */ -}}
+{{- $paths := list $path -}}
+{{- if not .Values.iam.exposeAdminConsole -}}
+{{- $paths = list (printf "%s/realms/%s" $path .Values.iam.realm) (printf "%s/resources" $path) -}}
+{{- end }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "classifyre.iam.fullname" . }}
+  labels:
+    {{- include "classifyre.commonLabels" . | nindent 4 }}
+    app.kubernetes.io/component: iam
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with .Values.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  {{- with .Values.ingress.tls }}
+  tls:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.host | quote }}
+      http:
+        paths:
+          {{- range $paths }}
+          - path: {{ . }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "classifyre.iam.fullname" $ }}
+                port:
+                  number: 8080
+          {{- end }}
+{{- end }}

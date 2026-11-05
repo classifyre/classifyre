@@ -27,6 +27,16 @@ spec:
     {{- with .Values.postgres.cnpg.storage.storageClassName }}
     storageClass: {{ . | quote }}
     {{- end }}
+  {{- if and .Values.iam.enabled (eq .Values.iam.database.mode "shared") }}
+  # The identity server's own role; its database is the Database below.
+  managed:
+    roles:
+      - name: {{ .Values.iam.database.username | quote }}
+        ensure: present
+        login: true
+        passwordSecret:
+          name: {{ include "classifyre.iam.dbSecretName" . }}
+  {{- end }}
   bootstrap:
     initdb:
       database: {{ .Values.postgres.cnpg.database | quote }}
@@ -38,4 +48,20 @@ spec:
         {{- if has "pg_stat_statements" .Values.postgres.cnpg.postgresql.sharedPreloadLibraries }}
         - CREATE EXTENSION IF NOT EXISTS pg_stat_statements
         {{- end }}
+{{- if and .Values.iam.enabled (eq .Values.iam.database.mode "shared") }}
+---
+# Needs CloudNativePG 1.25 or later (the Database resource).
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: {{ printf "%s-%s" .Values.postgres.cnpg.clusterName .Values.iam.database.name }}
+  labels:
+    {{- include "classifyre.commonLabels" . | nindent 4 }}
+    app.kubernetes.io/component: iam
+spec:
+  name: {{ .Values.iam.database.name | quote }}
+  owner: {{ .Values.iam.database.username | quote }}
+  cluster:
+    name: {{ .Values.postgres.cnpg.clusterName }}
+{{- end }}
 {{- end }}

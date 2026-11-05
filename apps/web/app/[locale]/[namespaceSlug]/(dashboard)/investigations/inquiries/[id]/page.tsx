@@ -66,6 +66,7 @@ import { useRegisterAssistantBridge } from "@/components/assistant-workflow-prov
 import { useTranslation } from "@/hooks/use-translation";
 import { useGoBack } from "@/hooks/use-go-back";
 import { InquiryCasesPanel } from "@/components/inquiry-cases";
+import { ChangedBy } from "@/components/audit-history";
 
 export default function InquiryDetailPage() {
   return (
@@ -309,6 +310,13 @@ function InquiryDetailInner() {
             {inquiry.title}
           </h1>
           {isAiActor(inquiry.createdBy) && <AiActorBadge />}
+          <ChangedBy
+            entityType="inquiries"
+            entityId={inquiry.id}
+            createdBy={inquiry.createdBy}
+            createdAt={inquiry.createdAt}
+            className="order-last basis-full"
+          />
           {isArchived && (
             <Badge variant="outline" className="uppercase tracking-wide">
               archived

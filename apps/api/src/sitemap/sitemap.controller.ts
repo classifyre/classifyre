@@ -1,4 +1,11 @@
-import { BadRequestException, Controller, Get, Query } from '@nestjs/common';
+import {
+  BadRequestException,
+  Controller,
+  Get,
+  Inject,
+  NotFoundException,
+  Query,
+} from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { SitemapEntriesDto, SitemapIndexDto } from './sitemap.dto';
 import {
@@ -7,6 +14,9 @@ import {
   type SitemapEntityType,
 } from './sitemap.entities';
 import { SitemapService } from './sitemap.service';
+import { PublicRoute } from '../identity/access.decorators';
+import type { IamConfig } from '../identity/iam-config';
+import { IAM_CONFIG } from '../identity/identity.tokens';
 
 /**
  * Namespace-scoped sitemap coordinates (`GET /<namespace>/sitemap/...`).
@@ -16,9 +26,18 @@ import { SitemapService } from './sitemap.service';
  * walking a large tenant cannot turn into a load problem.
  */
 @ApiTags('Sitemap')
+@PublicRoute()
 @Controller('sitemap')
 export class SitemapController {
-  constructor(private readonly sitemapService: SitemapService) {}
+  constructor(
+    private readonly sitemapService: SitemapService,
+    @Inject(IAM_CONFIG) private readonly iam: IamConfig | null,
+  ) {}
+
+  /** A signed-in instance is private: nothing in it is for crawlers (docs/prd §2 H4). */
+  private assertPublic(): void {
+    if (this.iam) throw new NotFoundException();
+  }
 
   @Get()
   @ApiOperation({
@@ -31,6 +50,7 @@ export class SitemapController {
   })
   @ApiResponse({ status: 200, type: SitemapIndexDto })
   getIndex(@Query('chunkSize') chunkSize?: string): Promise<SitemapIndexDto> {
+    this.assertPublic();
     return this.sitemapService.getIndex(parseIntOrUndefined(chunkSize));
   }
 
@@ -51,6 +71,7 @@ export class SitemapController {
     @Query('chunk') chunk?: string,
     @Query('chunkSize') chunkSize?: string,
   ): Promise<SitemapEntriesDto> {
+    this.assertPublic();
     return this.sitemapService.getEntries(
       parseEntityType(type),
       parseIntOrUndefined(chunk) ?? 0,

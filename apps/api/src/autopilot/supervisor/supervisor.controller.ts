@@ -40,10 +40,12 @@ import {
 } from '../dto/supervisor.dto';
 import { BindingsService } from '../../semantic/bindings/bindings.service';
 import { GlossaryRelationsService } from '../../glossary/glossary-relations.service';
+import { AccessArea } from '../../identity/access.decorators';
 
 const INSTANCE_SETTINGS_ID = 1;
 
 @ApiTags('autopilot')
+@AccessArea({ view: 'agent.view', change: 'agent.configure' })
 @Controller('autopilot/supervisor')
 export class SupervisorController {
   constructor(

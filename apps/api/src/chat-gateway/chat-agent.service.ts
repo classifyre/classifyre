@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import type { ChatBot } from '@prisma/client';
 import {
   AgentKind,
@@ -8,6 +8,8 @@ import {
 } from '@prisma/client';
 import { AiClientService, type AiMessage } from '../ai';
 import { PrismaService } from '../prisma.service';
+import type { IamConfig } from '../identity/iam-config';
+import { IAM_CONFIG } from '../identity/identity.tokens';
 import { AgentAuditService } from '../autopilot/audit/agent-audit.service';
 import { AgentLoggerService } from '../autopilot/audit/agent-logger.service';
 import { ToolDispatcherService } from '../autopilot/tools/tool-dispatcher.service';
@@ -20,6 +22,7 @@ import { ChatHarnessToolset } from './chat-harness.toolset';
 import {
   allowedBuiltinToolNames,
   CHAT_INVESTIGATION_TOOL_NAMES,
+  chatMutationsAllowed,
 } from './chat-permissions';
 import { ChatSessionService } from './chat-session.service';
 
@@ -63,6 +66,7 @@ export class ChatAgentService {
     private readonly sessions: ChatSessionService,
     private readonly builtinTools: BuiltinMcpToolsService,
     private readonly harnessTools: ChatHarnessToolset,
+    @Optional() @Inject(IAM_CONFIG) private readonly iam?: IamConfig | null,
   ) {}
 
   async handleInboundMessage(
@@ -150,7 +154,7 @@ export class ChatAgentService {
       state: {
         [CHAT_BOT_STATE_KEY]: {
           id: bot.id,
-          allowMutations: bot.allowMutations,
+          allowMutations: chatMutationsAllowed(bot, Boolean(this.iam)),
           agentKinds: bot.agentKinds,
         },
       },

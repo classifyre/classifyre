@@ -30,6 +30,18 @@ export const CHAT_INVESTIGATION_TOOL_NAMES = [
 ] as const;
 
 /**
+ * Whether a bot's chat turns may change anything. A chat message has no
+ * signed-in person behind it, so with sign-in on a bot only reads, whatever
+ * its allowMutations flag says (docs/prd/IAM-access-management.md, H-1).
+ */
+export function chatMutationsAllowed(
+  bot: { allowMutations: boolean },
+  signInOn: boolean,
+): boolean {
+  return bot.allowMutations && !signInOn;
+}
+
+/**
  * In a chat turn the ONLY mutation gate that matters is the bot's
  * allowMutations flag: the operator asked in person, so autopilot
  * enablement settings do not apply. Preserves the original gate's

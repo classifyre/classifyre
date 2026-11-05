@@ -107,7 +107,11 @@
     "pausedBannerDescription": "Scans, Pläne, KI-Harness-Zyklen und Duplikatprüfungen sind gestoppt. Bis zum Fortsetzen ist alles schreibgeschützt.",
     "pausedBannerReason": "Grund: {{reason}}",
     "pausedBannerAction": "In den Einstellungen fortsetzen",
-    "allWorkspaces": "Alle Arbeitsbereiche"
+    "allWorkspaces": "Alle Arbeitsbereiche",
+    "owningGroup": "Eigentümergruppe",
+    "owningGroupPick": "Gruppe wählen, der er gehört",
+    "owningGroupHint": "Mitglieder dieser Gruppe erhalten Zugriff gemäß ihren Freigaben.",
+    "owningGroupNone": "Sie können keine Arbeitsbereiche anlegen: Bitten Sie eine Mandanten-Admin, Sie zur Arbeitsbereichs-Verwaltung Ihrer Gruppe zu machen."
   },
   "categories": {
     "label": "Kategorien",
@@ -735,7 +739,9 @@
       "chat": "Chat-Bots",
       "data": "Export & Import",
       "workers": "Worker",
-      "cleanup": "Bereinigung"
+      "cleanup": "Bereinigung",
+      "activity": "Aktivität",
+      "access": "Zugriff"
     },
     "cleanup": {
       "title": "Speicher & Bereinigung",
@@ -5985,6 +5991,7 @@
     "enabledHint": "Bot verbinden und Nachrichten beantworten.",
     "allowMutations": "Änderungen erlauben",
     "allowMutationsHint": "Wenn deaktiviert, ist der Bot schreibgeschützt: Er kann lesen, aber nie erstellen, ändern oder löschen.",
+    "allowMutationsSignIn": "Mit Anmeldung sind Bots immer schreibgeschützt: Hinter einer Chat-Nachricht steht keine angemeldete Person.",
     "capabilityGroups": "Fähigkeiten",
     "capabilityGroupsHint": "Welche Tool-Gruppen der Bot nutzen darf. Standardmäßig sind alle aktiviert.",
     "agents": "Autopilot-Agenten",
@@ -7223,5 +7230,76 @@
       "saved": "Labels gespeichert. Die Entitätswerte werden neu erzeugt.",
       "add": "Label hinzufügen"
     }
+  },
+  "actors": {
+    "autopilot": "Autopilot",
+    "system": "System",
+    "mcpToken": "MCP-Token",
+    "person": "Jemand",
+    "selfDeclared": "Von der Person eingegebener Name; ohne Anmeldung nicht geprüft",
+    "viaToken": "Über das MCP-Token {{token}} ausgeführt",
+    "via": "über {{token}}",
+    "kinds": {
+      "user": "Angemeldete Person",
+      "name": "Person",
+      "mcp": "MCP-Token",
+      "agent": "Agent",
+      "system": "System"
+    }
+  },
+  "audit": {
+    "createdBy": "Erstellt von",
+    "lastChangedBy": "Zuletzt geändert von",
+    "history": "Verlauf",
+    "historyTitle": "Verlauf",
+    "historyDescription": "Jede Änderung an diesem Element, neueste zuerst. Gespeichert werden nur Feldnamen, nie ihre Werte.",
+    "mcpTool": "MCP · {{tool}}",
+    "fields": "Felder: {{fields}}",
+    "empty": "Noch keine Änderungen erfasst.",
+    "loadMore": "Mehr laden",
+    "activityTitle": "Aktivität",
+    "activityDescription": "Jede Änderung in diesem Arbeitsbereich, aus der Web-App, der API oder von Agenten über MCP. Lesezugriffe werden nicht erfasst."
+  },
+  "account": {
+    "menu": "Konto",
+    "signedIn": "Angemeldet",
+    "tenant": "Mandant: {{name}}",
+    "signOut": "Abmelden",
+    "tenantSettings": "Mandantenzugriff"
+  },
+  "access": {
+    "title": "Zugriff",
+    "description": "Wer diesen Arbeitsbereich öffnen kann und was erlaubt ist. Freigaben des Mandanten oder der Eigentümergruppe sind geerbt und können nur von Mandanten-Admins geändert werden.",
+    "loadFailed": "Zugriff konnte nicht geladen werden.",
+    "removed": "Zugriff für {{subject}} entfernt.",
+    "removeFailed": "Zugriff konnte nicht entfernt werden.",
+    "added": "Zugriff gewährt.",
+    "addFailed": "Zugriff konnte nicht gewährt werden.",
+    "until": "bis {{date}}",
+    "inherited": "Geerbt",
+    "remove": "Zugriff entfernen",
+    "none": "Noch hat niemand Zugriff.",
+    "group": "Gruppe",
+    "pickGroup": "Gruppe wählen",
+    "role": "Rolle",
+    "untilOptional": "Bis (optional)",
+    "add": "Zugriff gewähren",
+    "whyTitle": "Warum darf ich …?",
+    "pickCapability": "Etwas wählen, das Sie dürfen",
+    "becauseOf": "{{subject}} als {{role}} auf {{scope}}",
+    "allWorkspaces": "Alle Arbeitsbereiche",
+    "tenantTitle": "Mandant",
+    "tenantDenied": "Nur Mandanten-Admins verwalten den Zugriff für den ganzen Mandanten.",
+    "tenantGrants": "Zugriff im ganzen Mandanten",
+    "tenantActivity": "Aktivität",
+    "scope": "Gilt für",
+    "scopes": {
+      "tenant": "Den ganzen Mandanten",
+      "group": "Arbeitsbereiche einer Gruppe",
+      "workspace": "Einen Arbeitsbereich"
+    },
+    "ownedBy": "Arbeitsbereiche von",
+    "workspace": "Arbeitsbereich",
+    "pickScope": "Wählen"
   }
 }

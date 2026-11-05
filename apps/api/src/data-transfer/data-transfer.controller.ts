@@ -35,6 +35,7 @@ import {
   TransferScopeDto,
   DATA_TRANSFER_CONFLICT_MODES,
 } from './dto/data-transfer.dto';
+import { Requires } from '../identity/access.decorators';
 
 /**
  * Namespace-scoped export and import.
@@ -43,6 +44,7 @@ import {
  * by default — a demo instance must not hand out its corpus or accept one.
  */
 @ApiTags('data-transfer')
+@Requires('workspace.transfer')
 @Controller('data-transfer')
 export class DataTransferController {
   constructor(

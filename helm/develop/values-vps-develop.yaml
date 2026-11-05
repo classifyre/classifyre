@@ -89,3 +89,7 @@ telemetry:
 
 objectStorage:
   enabled: false
+
+# The public demo stays open: no sign-in, so its sitemap can stay on.
+iam:
+  enabled: false

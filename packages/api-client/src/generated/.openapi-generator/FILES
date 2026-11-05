@@ -3,6 +3,7 @@
 README.md
 docs/AIApi.md
 docs/AIProviderConfigsApi.md
+docs/AccessApi.md
 docs/AddCaseFindingFiltersDto.md
 docs/AddCaseHypothesisRuleDto.md
 docs/AddEvidenceDto.md
@@ -61,6 +62,7 @@ docs/AssistantControllerRespondRequest.md
 docs/AssistantControllerRespondRequestMessagesInner.md
 docs/AttachFindingsDto.md
 docs/AttachFindingsResponseDto.md
+docs/AuditEventDto.md
 docs/AutopilotApi.md
 docs/AutopilotStatsDto.md
 docs/BoardEndpointDto.md
@@ -181,6 +183,7 @@ docs/CreateDetectorNotebookExecutionDto.md
 docs/CreateExternalRunnerDto.md
 docs/CreateFindingDto.md
 docs/CreateGlossaryRelationDto.md
+docs/CreateGrantDto.md
 docs/CreateInquiryDto.md
 docs/CreateManualEdgeDto.md
 docs/CreateMcpServerDto.md
@@ -285,6 +288,7 @@ docs/GlossarySchemeDto.md
 docs/GlossarySchemeRefDto.md
 docs/GlossaryTermDto.md
 docs/GlossaryTermUsageDto.md
+docs/GrantDto.md
 docs/GraphApi.md
 docs/GraphEdgeDto.md
 docs/GraphNodeDto.md
@@ -295,6 +299,7 @@ docs/HarnessToolsResponseDto.md
 docs/HealthApi.md
 docs/HealthControllerGetHealth200Response.md
 docs/HypothesisStatus.md
+docs/IdentityApi.md
 docs/IngestEdgeDto.md
 docs/InquiriesApi.md
 docs/InquiryActivityDto.md
@@ -328,6 +333,8 @@ docs/McpTokenCreatedResponseDto.md
 docs/McpTokenResponseDto.md
 docs/McpToolParameterDto.md
 docs/McpToolSummaryDto.md
+docs/MeActorDto.md
+docs/MeResponseDto.md
 docs/NamespacesApi.md
 docs/NotebookCellDto.md
 docs/NotebookDto.md
@@ -385,6 +392,7 @@ docs/RelationTypesResponseDto.md
 docs/RematchResponseDto.md
 docs/ReopenDecisionsDto.md
 docs/ReopenDecisionsResponseDto.md
+docs/ResolvedActorDto.md
 docs/RetireOutOfScopeFindingsDto.md
 docs/RevertResultDto.md
 docs/ReviewCaseLeadDto.md
@@ -412,6 +420,7 @@ docs/ReviewSourceGraphDto.md
 docs/ReviewSourceNodeDto.md
 docs/ReviewWaterfallDto.md
 docs/ReviewWaterfallRowDto.md
+docs/RoleDto.md
 docs/RunnerAssetFindingSummaryDto.md
 docs/RunnerAssetItemDto.md
 docs/RunnerAssetProgressDto.md
@@ -521,6 +530,9 @@ docs/SupervisorGoalListDto.md
 docs/SupervisorJournalEntryDto.md
 docs/SupervisorJournalListDto.md
 docs/SupervisorStateDto.md
+docs/TenantDto.md
+docs/TenantEventDto.md
+docs/TenantGroupDto.md
 docs/TestConnectionResponseDto.md
 docs/TextCoverageDto.md
 docs/ThreadEntriesResponseDto.md
@@ -586,6 +598,7 @@ docs/WorkerQueuesApi.md
 package.json
 src/apis/AIApi.ts
 src/apis/AIProviderConfigsApi.ts
+src/apis/AccessApi.ts
 src/apis/AssetsApi.ts
 src/apis/AssistantApi.ts
 src/apis/AutopilotApi.ts
@@ -605,6 +618,7 @@ src/apis/FindingsApi.ts
 src/apis/GlossaryApi.ts
 src/apis/GraphApi.ts
 src/apis/HealthApi.ts
+src/apis/IdentityApi.ts
 src/apis/InquiriesApi.ts
 src/apis/InstanceSettingsApi.ts
 src/apis/MaintenanceApi.ts
@@ -675,6 +689,7 @@ src/models/AssistantControllerRespondRequest.ts
 src/models/AssistantControllerRespondRequestMessagesInner.ts
 src/models/AttachFindingsDto.ts
 src/models/AttachFindingsResponseDto.ts
+src/models/AuditEventDto.ts
 src/models/AutopilotStatsDto.ts
 src/models/BoardEndpointDto.ts
 src/models/BoardItemDto.ts
@@ -789,6 +804,7 @@ src/models/CreateDetectorNotebookExecutionDto.ts
 src/models/CreateExternalRunnerDto.ts
 src/models/CreateFindingDto.ts
 src/models/CreateGlossaryRelationDto.ts
+src/models/CreateGrantDto.ts
 src/models/CreateInquiryDto.ts
 src/models/CreateManualEdgeDto.ts
 src/models/CreateMcpServerDto.ts
@@ -884,6 +900,7 @@ src/models/GlossarySchemeDto.ts
 src/models/GlossarySchemeRefDto.ts
 src/models/GlossaryTermDto.ts
 src/models/GlossaryTermUsageDto.ts
+src/models/GrantDto.ts
 src/models/GraphEdgeDto.ts
 src/models/GraphNodeDto.ts
 src/models/GraphResponseDto.ts
@@ -922,6 +939,8 @@ src/models/McpTokenCreatedResponseDto.ts
 src/models/McpTokenResponseDto.ts
 src/models/McpToolParameterDto.ts
 src/models/McpToolSummaryDto.ts
+src/models/MeActorDto.ts
+src/models/MeResponseDto.ts
 src/models/NotebookCellDto.ts
 src/models/NotebookDto.ts
 src/models/NotebookExecutionDto.ts
@@ -976,6 +995,7 @@ src/models/RelationTypesResponseDto.ts
 src/models/RematchResponseDto.ts
 src/models/ReopenDecisionsDto.ts
 src/models/ReopenDecisionsResponseDto.ts
+src/models/ResolvedActorDto.ts
 src/models/RetireOutOfScopeFindingsDto.ts
 src/models/RevertResultDto.ts
 src/models/ReviewCaseLeadDto.ts
@@ -1003,6 +1023,7 @@ src/models/ReviewSourceGraphDto.ts
 src/models/ReviewSourceNodeDto.ts
 src/models/ReviewWaterfallDto.ts
 src/models/ReviewWaterfallRowDto.ts
+src/models/RoleDto.ts
 src/models/RunnerAssetFindingSummaryDto.ts
 src/models/RunnerAssetItemDto.ts
 src/models/RunnerAssetProgressDto.ts
@@ -1108,6 +1129,9 @@ src/models/SupervisorGoalListDto.ts
 src/models/SupervisorJournalEntryDto.ts
 src/models/SupervisorJournalListDto.ts
 src/models/SupervisorStateDto.ts
+src/models/TenantDto.ts
+src/models/TenantEventDto.ts
+src/models/TenantGroupDto.ts
 src/models/TestConnectionResponseDto.ts
 src/models/TextCoverageDto.ts
 src/models/ThreadEntriesResponseDto.ts
