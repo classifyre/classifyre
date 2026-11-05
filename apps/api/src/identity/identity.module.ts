@@ -18,6 +18,8 @@ import { IDENTITY, IAM_CONFIG } from './identity.tokens';
 import { IdentityService } from './identity.service';
 import { MeController } from './me.controller';
 import { MembershipService } from './membership.service';
+import { TenantPeopleController } from './people.controller';
+import { PeopleService } from './people.service';
 import { TenancyService } from './tenancy.service';
 import { SocketAccessService } from './socket-access.service';
 
@@ -35,6 +37,7 @@ import { SocketAccessService } from './socket-access.service';
     AuditController,
     WorkspaceAccessController,
     TenantAccessController,
+    TenantPeopleController,
   ],
   providers: [
     PrismaService,
@@ -59,6 +62,7 @@ import { SocketAccessService } from './socket-access.service';
     },
     IamBootstrapService,
     AccessManagementService,
+    PeopleService,
     SocketAccessService,
   ],
   exports: [

@@ -167,7 +167,7 @@ export class AccessGuard implements CanActivate {
         throw new UnauthorizedException({
           statusCode: 401,
           error: 'Unauthorized',
-          code: error.chooseTenant ? 'CHOOSE_TENANT' : 'SIGN_IN_REQUIRED',
+          code: error.code,
           message: error.message,
         });
       }

@@ -217,7 +217,7 @@ async function authorizeWorkspaceRequest(
       await reply.code(401).send({
         statusCode: 401,
         error: 'Unauthorized',
-        code: error.chooseTenant ? 'CHOOSE_TENANT' : 'SIGN_IN_REQUIRED',
+        code: error.code,
         message: error.message,
       });
       return false;

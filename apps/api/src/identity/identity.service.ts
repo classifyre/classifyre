@@ -25,11 +25,20 @@ export interface Principal {
   via: 'bearer' | 'cookie';
 }
 
+/**
+ * Why a request is not signed in, as the API's 401 `code`. `NO_TENANT` and
+ * `CHOOSE_TENANT` are signed-in people: renewing their session changes
+ * nothing, so the web shows them a page instead of retrying.
+ */
+export type AuthenticationCode =
+  | 'SIGN_IN_REQUIRED'
+  | 'NO_TENANT'
+  | 'CHOOSE_TENANT';
+
 export class AuthenticationError extends Error {
   constructor(
     message: string,
-    /** True when the person is signed in but must pick one of several tenants. */
-    readonly chooseTenant = false,
+    readonly code: AuthenticationCode = 'SIGN_IN_REQUIRED',
   ) {
     super(message);
   }
@@ -74,13 +83,21 @@ export function tokenOf(
 }
 
 /** The single tenant a token was issued for (`organization` claim). */
-export function tenantAliasOf(claim: unknown): string | null {
-  const aliases = Array.isArray(claim)
+function tenantAliases(claim: unknown): string[] {
+  return Array.isArray(claim)
     ? claim.filter((value): value is string => typeof value === 'string')
     : claim && typeof claim === 'object'
       ? Object.keys(claim)
       : [];
+}
+
+export function tenantAliasOf(claim: unknown): string | null {
+  const aliases = tenantAliases(claim);
   return aliases.length === 1 ? aliases[0] : null;
+}
+
+function tenantCount(claim: unknown): number {
+  return tenantAliases(claim).length;
 }
 
 /**
@@ -94,7 +111,8 @@ export class IdentityService {
 
   constructor(
     readonly config: IamConfig,
-    private readonly membership: MembershipService,
+    /** Also the identity server's admin client for {@link PeopleService}. */
+    readonly membership: MembershipService,
     private readonly tenancy: TenancyService,
     verifier?: Pick<JwtVerifier, 'verify'>,
   ) {
@@ -131,10 +149,15 @@ export class IdentityService {
 
     const alias = tenantAliasOf(claims.organization);
     if (!alias) {
-      throw new AuthenticationError(
-        'The sign-in is not for exactly one tenant. Sign in again and choose one.',
-        true,
-      );
+      throw tenantCount(claims.organization) === 0
+        ? new AuthenticationError(
+            'This account is not in any tenant yet. A tenant admin adds it to their organization in the identity server.',
+            'NO_TENANT',
+          )
+        : new AuthenticationError(
+            'This account is in several tenants. Sign in again and choose one.',
+            'CHOOSE_TENANT',
+          );
     }
     // The token proves who it was issued to; the identity server says who
     // the person is now. A disabled account or one moved out of the tenant
@@ -144,9 +167,14 @@ export class IdentityService {
       (candidate) => candidate.alias === alias,
     );
     if (!member.enabled || !org) {
-      throw new AuthenticationError(
-        'This account no longer has access to that tenant.',
-      );
+      throw member.enabled && member.organizations.length === 0
+        ? new AuthenticationError(
+            'This account is no longer in any tenant.',
+            'NO_TENANT',
+          )
+        : new AuthenticationError(
+            'This account no longer has access to that tenant.',
+          );
     }
     const tenant = await this.tenancy.ensureTenant(org);
     if (tenant.orgId !== org.id) {

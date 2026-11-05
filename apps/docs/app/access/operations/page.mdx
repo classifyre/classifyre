@@ -64,6 +64,18 @@ Groups**). They can be nested: being in `/finance/ap-team` counts as being in
 `/finance`. Renaming or moving a group never breaks access, because grants
 point at the group itself, not its name.
 
+Groups made under the realm's own **Groups** menu belong to no tenant, so
+Classifyre does not list them and grants cannot use them. A person must be a
+**member of the organization** (Organizations → your tenant → Members) before
+anything else counts. Someone who signs in without being in any organization
+sees a page saying their account is not in a tenant yet, with a button to try
+again once they have been added.
+
+Roles and what they allow (capabilities such as managing sources or access)
+are not in the identity server at all. They live in Classifyre, and a tenant
+admin gives them to groups on the **Tenant access** page or a workspace's
+**Access** tab.
+
 ---
 
 ## Connecting a company directory

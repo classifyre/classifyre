@@ -288,8 +288,10 @@ describe('IdentityService', () => {
   let pending: boolean;
   let adminGrants: string[];
   let tenantOrg: string;
+  let orgClaim: unknown;
 
   beforeEach(() => {
+    orgClaim = ['acme'];
     pending = false;
     adminGrants = [];
     tenantOrg = 'org-acme';
@@ -342,7 +344,7 @@ describe('IdentityService', () => {
           sub: 'u1',
           iss: ISSUER,
           exp: 0,
-          organization: ['acme'],
+          organization: orgClaim,
         } as VerifiedClaims),
     };
     return new IdentityService(config, membership, tenancy, verifier);
@@ -387,6 +389,24 @@ describe('IdentityService', () => {
     await expect(
       service({ enabled: true, orgs: ['acme'] }).authenticate(request()),
     ).rejects.toThrow(/link it again/);
+  });
+
+  it('tells a person in no tenant from one in several (NO_TENANT, CHOOSE_TENANT)', async () => {
+    orgClaim = undefined;
+    await expect(
+      service({ enabled: true, orgs: [] }).authenticate(request()),
+    ).rejects.toMatchObject({ code: 'NO_TENANT' });
+    orgClaim = ['acme', 'globex'];
+    await expect(
+      service({ enabled: true, orgs: ['acme', 'globex'] }).authenticate(
+        request(),
+      ),
+    ).rejects.toMatchObject({ code: 'CHOOSE_TENANT' });
+    // Removed from every organization after the token was issued.
+    orgClaim = ['acme'];
+    await expect(
+      service({ enabled: true, orgs: [] }).authenticate(request()),
+    ).rejects.toMatchObject({ code: 'NO_TENANT' });
   });
 
   it('refuses a request without a token', async () => {

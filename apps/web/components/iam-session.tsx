@@ -25,7 +25,13 @@ export function IamProvider({
 }) {
   React.useEffect(() => {
     if (!enabled) return;
-    setUnauthorizedHandler(async () => {
+    setUnauthorizedHandler(async ({ code }) => {
+      // Signed in, but in no tenant or in several: a new session would be
+      // refused the same way, so say so instead of retrying.
+      if (code === "NO_TENANT" || code === "CHOOSE_TENANT") {
+        window.location.assign(`/auth/no-tenant/?reason=${code}`);
+        return false;
+      }
       const response = await fetch("/auth/refresh/", {
         method: "POST",
         credentials: "same-origin",

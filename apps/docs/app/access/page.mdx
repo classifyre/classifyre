@@ -31,10 +31,14 @@ groups they belong to.
 
 ## Signing in
 
-With sign-in on, opening Classifyre takes you to its sign-in page. If you
-belong to several tenants, the sign-in page asks which one to open. After
+With sign-in on, opening Classifyre takes you to its sign-in page. After
 signing in you see only the workspaces you have access to; a workspace you
 cannot see behaves as if it did not exist.
+
+Each person belongs to one tenant. Someone whose account is not in a tenant
+yet sees a page saying so, with **Try again** for once a tenant admin has added
+them. Someone in several tenants sees a page asking them to choose one;
+working in several tenants side by side is not available yet.
 
 Your name and tenant are in the account menu in the top-right corner, with
 **Sign out**. Sessions renew themselves while you work; after a long break you
@@ -123,8 +127,9 @@ Access is given with **grants**:
 - **When creating a workspace**, you choose the group that owns it. Only
   groups you belong to and may create workspaces for are offered.
 
-Groups and who is in them are managed in the identity server (or the company
-directory it is connected to), not in Classifyre.
+Tenant admins also manage the tenant's **people and groups** on the same
+page: see [People and groups](/access/people/). Roles live only in
+Classifyre; there is nothing to set up in the identity server for them.
 
 The same is available through the API (`/<workspace>/access/…` and
 `/tenant/…`).

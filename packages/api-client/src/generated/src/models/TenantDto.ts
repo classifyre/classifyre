@@ -43,6 +43,12 @@ export interface TenantDto {
      * @memberof TenantDto
      */
     capabilities: Array<TenantDtoCapabilitiesEnum>;
+    /**
+     * True when people and groups are managed here; false when a company directory or the identity server owns them and they are read-only.
+     * @type {boolean}
+     * @memberof TenantDto
+     */
+    peopleManagement: boolean;
 }
 
 
@@ -89,6 +95,7 @@ export const TenantDtoCapabilitiesEnum = {
     McpTokenAdmin: 'mcp.token.admin',
     TenantWorkspaceCreate: 'tenant.workspace.create',
     TenantAccessManage: 'tenant.access.manage',
+    TenantPeopleManage: 'tenant.people.manage',
     TenantCategoriesManage: 'tenant.categories.manage',
     TenantAuditView: 'tenant.audit.view',
     PlatformTenantsManage: 'platform.tenants.manage'
@@ -104,6 +111,7 @@ export function instanceOfTenantDto(value: object): value is TenantDto {
     if (!('alias' in value) || value['alias'] === undefined) return false;
     if (!('name' in value) || value['name'] === undefined) return false;
     if (!('capabilities' in value) || value['capabilities'] === undefined) return false;
+    if (!('peopleManagement' in value) || value['peopleManagement'] === undefined) return false;
     return true;
 }
 
@@ -121,6 +129,7 @@ export function TenantDtoFromJSONTyped(json: any, ignoreDiscriminator: boolean):
         'alias': json['alias'],
         'name': json['name'],
         'capabilities': json['capabilities'],
+        'peopleManagement': json['peopleManagement'],
     };
 }
 
@@ -139,6 +148,7 @@ export function TenantDtoToJSONTyped(value?: TenantDto | null, ignoreDiscriminat
         'alias': value['alias'],
         'name': value['name'],
         'capabilities': value['capabilities'],
+        'peopleManagement': value['peopleManagement'],
     };
 }
 
