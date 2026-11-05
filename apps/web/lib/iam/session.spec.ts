@@ -67,6 +67,8 @@ describe("web sign-in session", () => {
     expect(safeReturnTo("/acme/findings?x=1")).toBe("/acme/findings?x=1");
     expect(safeReturnTo("https://evil.example/")).toBe("/");
     expect(safeReturnTo("//evil.example/")).toBe("/");
+    expect(safeReturnTo("/\\evil.example/")).toBe("/");
+    expect(safeReturnTo("/\t/evil.example/")).toBe("/");
     expect(safeReturnTo(null)).toBe("/");
   });
 

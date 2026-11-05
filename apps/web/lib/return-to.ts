@@ -26,6 +26,9 @@ export function withReturnTo(path: string, returnTo: string = currentAddress()):
 export function safeReturnTo(value: string | null | undefined): string | null {
   if (!value) return null;
   const trimmed = value.trim();
+  // Browsers drop tabs and newlines from URLs, so "/\t/evil.test" is "//evil.test".
+  // eslint-disable-next-line no-control-regex -- matching control characters is the point
+  if (/[\u0000-\u001f\u007f]/.test(trimmed)) return null;
   if (!trimmed.startsWith("/") || trimmed.startsWith("//") || trimmed.startsWith("/\\")) return null;
   if (/^\/[^/?#]*:/.test(trimmed) || trimmed.includes("://")) return null;
   return trimmed.length <= 2048 ? trimmed : null;

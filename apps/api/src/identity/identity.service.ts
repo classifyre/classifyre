@@ -359,7 +359,7 @@ export class IdentityService {
 
   /**
    * First-tenant setup when sign-in is turned on: the tenant row for the
-   * bootstrap organization, Tenant admin for its `admins` group, and every
+   * bootstrap organization, Tenant admin for its `admins` group (once), and every
    * workspace that ran without sign-in moved into it.
    */
   async bootstrap(): Promise<void> {

@@ -4,6 +4,7 @@ import {
   createHash,
   randomBytes,
 } from "node:crypto";
+import { safeReturnTo as sameAppPath } from "@/lib/return-to";
 
 /**
  * Sign-in for the web app (docs/prd/IAM-access-management.md §12.1). The Next
@@ -208,5 +209,5 @@ export async function renew(
 
 /** Only same-app paths: a sign-in must never bounce to another site. */
 export function safeReturnTo(value: string | null | undefined): string {
-  return value && value.startsWith("/") && !value.startsWith("//") ? value : "/";
+  return sameAppPath(value) ?? "/";
 }

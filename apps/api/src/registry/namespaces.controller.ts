@@ -142,12 +142,10 @@ export class NamespacesController {
     ) {
       throw new CapabilityRequiredException('tenant.workspace.create');
     }
-    const created = await this.registry.create(body);
-    await this.tenancy.assignWorkspace(
-      created.id,
-      principal.tenant.id,
-      body.ownerGroupId,
-    );
+    const created = await this.registry.create(body, {
+      tenantId: principal.tenant.id,
+      ownerGroupId: body.ownerGroupId,
+    });
     await this.tenancy.recordTenantEvent(
       principal.tenant.id,
       principal.actor.ref,

@@ -22,6 +22,10 @@ import {
 } from '../identity/identity.service';
 import { CLS_ACTOR } from '../identity/actor-context.service';
 import { CLS_CAPABILITIES } from '../identity/iam-access-policy';
+import {
+  CROSS_ORIGIN_BODY,
+  isCrossOriginCookieWrite,
+} from '../identity/signed-in-request';
 
 /**
  * Fastify raw request augmented by the namespace pipeline.
@@ -181,8 +185,6 @@ export function registerNamespaceHook(
   });
 }
 
-const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
-
 /**
  * With sign-in on, a workspace request needs a signed-in principal of the
  * workspace's tenant who can see it (docs/prd §8.1). Another tenant's
@@ -229,22 +231,16 @@ async function authorizeWorkspaceRequest(
     return false;
   }
 
-  // A browser sends its session cookie with any request, also one a foreign
-  // page triggers; a write is accepted only from the app's own origin.
   if (
-    principal.via === 'cookie' &&
-    UNSAFE_METHODS.has(request.method.toUpperCase())
+    isCrossOriginCookieWrite(
+      principal,
+      request.method,
+      request.headers.origin,
+      identity.config.appOrigin,
+    )
   ) {
-    const origin = request.headers.origin;
-    if (!identity.config.appOrigin || origin !== identity.config.appOrigin) {
-      await reply.code(403).send({
-        statusCode: 403,
-        error: 'Forbidden',
-        code: 'CROSS_ORIGIN',
-        message: 'Changes are only accepted from the Classifyre app.',
-      });
-      return false;
-    }
+    await reply.code(403).send(CROSS_ORIGIN_BODY);
+    return false;
   }
 
   const capabilities = await identity.capabilitiesIn(principal, ns.namespaceId);

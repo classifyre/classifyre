@@ -22,6 +22,9 @@ export interface Membership {
 }
 
 const TTL_MS = 60_000;
+/** How long a failed refresh may fall back to the last answer. */
+const STALE_GRACE_MS = 15 * 60_000;
+const MAX_ENTRIES = 5_000;
 
 interface Cached<T> {
   value: T;
@@ -117,15 +120,21 @@ export class MembershipService {
     return [...(await this.groupTree(orgId)).values()];
   }
 
+  /**
+   * The organization with this alias. The server's `search` matches names and
+   * domains, not aliases, so this pages through every organization.
+   */
   async organizationByAlias(alias: string): Promise<Organization | null> {
-    const found =
-      (await this.get<Organization[]>(
-        `/organizations?search=${encodeURIComponent(alias)}&briefRepresentation=true`,
-      )) ?? [];
-    const match = found.find((org) => org.alias === alias);
-    return match
-      ? { id: match.id, alias: match.alias, name: match.name }
-      : null;
+    const page = 500;
+    for (let first = 0; ; first += page) {
+      const found =
+        (await this.get<Organization[]>(
+          `/organizations?briefRepresentation=true&first=${first}&max=${page}`,
+        )) ?? [];
+      const match = found.find((org) => org.alias === alias);
+      if (match) return { id: match.id, alias: match.alias, name: match.name };
+      if (found.length < page) return null;
+    }
   }
 
   private lineage(tree: Map<string, OrgGroup>, id: string): string[] {
@@ -167,16 +176,59 @@ export class MembershipService {
     });
   }
 
-  private async cached<T>(
+  /**
+   * One lookup per key at a time, shared by every request that needs it. When
+   * a refresh fails (the identity server restarting, a minor upgrade), the
+   * last answer is served for up to {@link STALE_GRACE_MS} so signed-in people
+   * keep working; past that the request fails rather than trust stale access.
+   */
+  private cached<T>(
     map: Map<string, Cached<T>>,
     key: string,
     load: () => Promise<T>,
   ): Promise<T> {
     const hit = map.get(key);
-    if (hit && hit.expiresAt > Date.now()) return hit.value;
-    const value = await load();
-    map.set(key, { value, expiresAt: Date.now() + TTL_MS });
-    return value;
+    if (hit && hit.expiresAt > Date.now()) return Promise.resolve(hit.value);
+
+    const flightKey = `${this.mapId(map)}|${key}`;
+    const running = this.inflight.get(flightKey) as Promise<T> | undefined;
+    if (running) return running;
+
+    const flight = load()
+      .then((value) => {
+        map.set(key, { value, expiresAt: Date.now() + TTL_MS });
+        if (map.size > MAX_ENTRIES) this.evictExpired(map);
+        return value;
+      })
+      .catch((error: unknown) => {
+        if (hit && Date.now() - hit.expiresAt < STALE_GRACE_MS) {
+          this.logger.warn(
+            `Identity server lookup failed; serving the last known answer: ${String(error)}`,
+          );
+          return hit.value;
+        }
+        throw error;
+      })
+      .finally(() => this.inflight.delete(flightKey));
+    this.inflight.set(flightKey, flight);
+    return flight;
+  }
+
+  private readonly inflight = new Map<string, Promise<unknown>>();
+  private mapId(map: object): string {
+    return map === this.users
+      ? 'users'
+      : map === this.memberGroups
+        ? 'groups'
+        : 'tree';
+  }
+
+  /** Drops entries past their grace period, so the caches cannot grow without bound. */
+  private evictExpired<T>(map: Map<string, Cached<T>>): void {
+    const cutoff = Date.now() - STALE_GRACE_MS;
+    for (const [key, entry] of map) {
+      if (entry.expiresAt < cutoff) map.delete(key);
+    }
   }
 
   private async get<T>(path: string, allowMissing = false): Promise<T | null> {

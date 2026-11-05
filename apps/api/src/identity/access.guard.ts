@@ -20,6 +20,11 @@ import {
   type Principal,
 } from './identity.service';
 import { IDENTITY } from './identity.tokens';
+import {
+  CROSS_ORIGIN_BODY,
+  isCrossOriginCookieWrite,
+  stampAuthorFields,
+} from './signed-in-request';
 
 /** Where the guard leaves the resolved actor for `@ActorRef()`. */
 export interface ActorRequest {
@@ -63,6 +68,7 @@ export class AccessGuard implements CanActivate {
       ActorRequest & {
         method: string;
         headers?: Record<string, unknown>;
+        body?: unknown;
         raw?: ActorRequest & { classifyrePrincipal?: Principal | null };
       }
     >();
@@ -101,7 +107,20 @@ export class AccessGuard implements CanActivate {
     }
 
     const principal = await this.authenticate(request);
+    if (
+      isCrossOriginCookieWrite(
+        principal,
+        request.method,
+        request.headers?.origin,
+        this.identity.config.appOrigin,
+      )
+    ) {
+      throw new ForbiddenException(CROSS_ORIGIN_BODY);
+    }
     this.remember(request, principal.actor);
+    if (principal.actor.ref) {
+      stampAuthorFields(request.body, principal.actor.ref);
+    }
 
     if (this.inWorkspace()) {
       // The namespace hook computed what the principal may do here.

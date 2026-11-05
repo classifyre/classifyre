@@ -21,6 +21,10 @@ CREATE TABLE IF NOT EXISTS public.iam_tenants (
 INSERT INTO public.iam_tenants (id, alias, name)
 VALUES ('${LOCAL_TENANT_ID}', 'local', 'Local')
 ON CONFLICT (id) DO NOTHING;
+-- When the tenant's 'admins' group got Tenant admin, so the bootstrap gives it
+-- once and a tenant admin can take it away again.
+ALTER TABLE public.iam_tenants
+  ADD COLUMN IF NOT EXISTS admins_granted_at timestamptz;
 
 -- A workspace belongs to exactly one tenant, and with sign-in on is owned by
 -- exactly one of its groups (an organization group id in the identity server).

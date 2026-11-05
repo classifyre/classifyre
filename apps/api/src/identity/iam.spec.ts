@@ -95,6 +95,21 @@ describe('JwtVerifier', () => {
     ).rejects.toBeInstanceOf(InvalidTokenError);
   });
 
+  it.each([
+    ['no algorithm', 'none'],
+    ['a symmetric algorithm', 'HS256'],
+    ['another algorithm than the key is published for', 'RS512'],
+  ])('refuses %s', async (_label, alg) => {
+    const token = signToken(current.privateKey, 'k1', claims);
+    const [, body, signature] = token.split('.');
+    const head = Buffer.from(
+      JSON.stringify({ alg, kid: 'k1', typ: 'JWT' }),
+    ).toString('base64url');
+    await expect(
+      verifier.verify(`${head}.${body}.${signature}`),
+    ).rejects.toBeInstanceOf(InvalidTokenError);
+  });
+
   it('refuses a signature made with another key under a known key id', async () => {
     await expect(
       verifier.verify(signToken(rotated.privateKey, 'k1', claims)),
@@ -237,6 +252,13 @@ describe('sign-in configuration', () => {
       /not supported in the all-in-one Docker image/,
     );
     expect(() => assertIamAllowed({ ENVIRONMENT: 'docker' })).not.toThrow();
+  });
+
+  it('refuses to start without the internal key (scan callbacks stay closed)', () => {
+    expect(() => assertIamAllowed(env)).toThrow(/CLASSIFYRE_INTERNAL_KEY/);
+    expect(() =>
+      assertIamAllowed({ ...env, CLASSIFYRE_INTERNAL_KEY: 'k' }),
+    ).not.toThrow();
   });
 });
 

@@ -161,3 +161,88 @@ describe('AccessGuard', () => {
     expect(current).toMatchObject({ kind: 'system', via: 'internal-key' });
   });
 });
+
+describe('AccessGuard with sign-in', () => {
+  const APP = 'https://classifyre.example';
+  const actor: Actor = {
+    id: 'user:u1',
+    ref: 'user:u1',
+    displayName: 'Ada Kowalczyk',
+    kind: 'person',
+    via: 'oidc',
+  };
+  let via: 'bearer' | 'cookie';
+  let allow: boolean;
+
+  const identity = {
+    config: { appOrigin: APP },
+    authenticate: () => Promise.resolve({ actor, via, grants: [] }),
+    tenantCapabilities: () => new Set(),
+  };
+  const guard = new AccessGuard(
+    new Reflector(),
+    {
+      set: () => undefined,
+      workspaceId: () => 'ws-1',
+    } as unknown as ActorContextService,
+    { isInternalRequest: () => false } as never,
+    { check: () => ({ allow }), capabilities: () => new Set() },
+    identity as never,
+  );
+
+  beforeEach(() => {
+    via = 'cookie';
+    allow = true;
+  });
+
+  it('refuses a cookie write from another origin (CSRF)', async () => {
+    const { context } = contextFor(SampleController, 'create', 'POST', {
+      origin: 'https://evil.example',
+    });
+    await expect(guard.canActivate(context)).rejects.toMatchObject({
+      response: { code: 'CROSS_ORIGIN' },
+    });
+  });
+
+  it('accepts a cookie write from the app, a cookie read from anywhere, and a bearer write', async () => {
+    const same = contextFor(SampleController, 'create', 'POST', {
+      origin: APP,
+    });
+    await expect(guard.canActivate(same.context)).resolves.toBe(true);
+    const read = contextFor(SampleController, 'list', 'GET', {
+      origin: 'https://evil.example',
+    });
+    await expect(guard.canActivate(read.context)).resolves.toBe(true);
+    via = 'bearer';
+    const bearer = contextFor(SampleController, 'create', 'POST');
+    await expect(guard.canActivate(bearer.context)).resolves.toBe(true);
+  });
+
+  it('records the signed-in person as author, whatever the body claims', async () => {
+    const { context, request } = contextFor(
+      SampleController,
+      'create',
+      'POST',
+      {
+        origin: APP,
+      },
+    );
+    request.body = { title: 'x', createdBy: 'Someone Else', author: 'user:u2' };
+    await guard.canActivate(context);
+    expect(request.body).toEqual({
+      title: 'x',
+      createdBy: 'user:u1',
+      author: 'user:u1',
+    });
+  });
+
+  it('checks the route capability in the workspace', async () => {
+    allow = false;
+    const { context } = contextFor(SampleController, 'create', 'POST', {
+      origin: APP,
+    });
+    await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
+      CapabilityRequiredException,
+    );
+  });
+});

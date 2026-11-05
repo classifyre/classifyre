@@ -34,6 +34,13 @@ export function assertIamAllowed(env: NodeJS.ProcessEnv = process.env): void {
       'IAM_ENABLED=true is not supported in the all-in-one Docker image (ENVIRONMENT=docker). Use the Helm chart for sign-in, or unset IAM_ENABLED.',
     );
   }
+  // Without the key, internal-only routes (scan callbacks) would be open to
+  // every signed-in person; the chart always sets one.
+  if (iamEnabled(env) && !env.CLASSIFYRE_INTERNAL_KEY?.trim()) {
+    throw new Error(
+      'IAM_ENABLED=true needs CLASSIFYRE_INTERNAL_KEY to be set, so internal-only routes stay closed to signed-in people.',
+    );
+  }
 }
 
 /** Null without sign-in. Throws when sign-in is on but incompletely configured. */

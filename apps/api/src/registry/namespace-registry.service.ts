@@ -26,6 +26,7 @@ import {
   publicConnectionString,
   PUBLIC_SEARCH_PATH_OPTION,
 } from './namespace-registry.sql';
+import { LOCAL_TENANT_ID } from '../identity/tenancy.sql';
 import { withDbRetry } from '../db/db-retry';
 import { isTransientDbError } from '../db/transient-db-error';
 import type {
@@ -588,7 +589,14 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  async create(input: CreateNamespaceInput): Promise<Namespace> {
+  /**
+   * `tenancy` files the workspace under its tenant and owning group in the
+   * same INSERT (sign-in), so it can never exist, even briefly, in `local`.
+   */
+  async create(
+    input: CreateNamespaceInput,
+    tenancy?: { tenantId: string; ownerGroupId: string },
+  ): Promise<Namespace> {
     const name = input.name?.trim();
     if (!name) throw new BadRequestException('Namespace name is required');
 
@@ -614,8 +622,9 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
     try {
       const { rows } = await this.pool.query<NamespaceRow>(
         `INSERT INTO namespaces
-           (id, name, slug, schema_name, description, status, thumbnail_blob, thumbnail_mime, external_links)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+           (id, name, slug, schema_name, description, status, thumbnail_blob, thumbnail_mime, external_links,
+            tenant_id, owner_group_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          RETURNING ${NAMESPACE_COLUMNS}`,
         [
           id,
@@ -627,6 +636,8 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
           thumbnail?.blob ?? null,
           thumbnail?.mime ?? null,
           JSON.stringify(externalLinks),
+          tenancy?.tenantId ?? LOCAL_TENANT_ID,
+          tenancy?.ownerGroupId ?? null,
         ],
       );
       // Filed before anything else can fail: a workspace row that exists but is
@@ -678,7 +689,7 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       if (isUniqueViolation(error)) {
         throw new ConflictException(
-          `A namespace with slug '${slug}' already exists`,
+          `The address '${slug}' is taken; choose another`,
         );
       }
       throw error;
@@ -767,7 +778,7 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       if (isUniqueViolation(error)) {
         throw new ConflictException(
-          `A namespace with slug '${patch.slug}' already exists`,
+          `The address '${patch.slug}' is taken; choose another`,
         );
       }
       throw error;
