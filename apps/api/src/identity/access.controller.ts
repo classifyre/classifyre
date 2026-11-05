@@ -180,6 +180,7 @@ export class TenantAccessController {
       alias: principal.tenant.alias,
       name: principal.tenant.name,
       capabilities: [...this.identity!.tenantCapabilities(principal)].sort(),
+      peopleManagement: this.identity!.config.peopleManagement,
     };
   }
 

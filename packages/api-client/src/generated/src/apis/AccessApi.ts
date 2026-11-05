@@ -15,23 +15,44 @@
 
 import * as runtime from '../runtime';
 import type {
+  AddPersonDto,
+  AddedPersonDto,
   CreateGrantDto,
+  CreateGroupDto,
   GrantDto,
+  PersonDto,
+  RemovedPersonDto,
+  RenameGroupDto,
   ResolvedActorDto,
   RoleDto,
+  TemporaryPasswordDto,
   TenantDto,
   TenantEventDto,
   TenantGroupDto,
 } from '../models/index';
 import {
+    AddPersonDtoFromJSON,
+    AddPersonDtoToJSON,
+    AddedPersonDtoFromJSON,
+    AddedPersonDtoToJSON,
     CreateGrantDtoFromJSON,
     CreateGrantDtoToJSON,
+    CreateGroupDtoFromJSON,
+    CreateGroupDtoToJSON,
     GrantDtoFromJSON,
     GrantDtoToJSON,
+    PersonDtoFromJSON,
+    PersonDtoToJSON,
+    RemovedPersonDtoFromJSON,
+    RemovedPersonDtoToJSON,
+    RenameGroupDtoFromJSON,
+    RenameGroupDtoToJSON,
     ResolvedActorDtoFromJSON,
     ResolvedActorDtoToJSON,
     RoleDtoFromJSON,
     RoleDtoToJSON,
+    TemporaryPasswordDtoFromJSON,
+    TemporaryPasswordDtoToJSON,
     TenantDtoFromJSON,
     TenantDtoToJSON,
     TenantEventDtoFromJSON,
@@ -50,6 +71,41 @@ export interface TenantAccessControllerRemoveGrantRequest {
 
 export interface TenantAccessControllerResolveRequest {
     refs: Array<string>;
+}
+
+export interface TenantPeopleControllerAddRequest {
+    addPersonDto: AddPersonDto;
+}
+
+export interface TenantPeopleControllerAddMemberRequest {
+    groupId: string;
+    userId: string;
+}
+
+export interface TenantPeopleControllerCreateGroupRequest {
+    createGroupDto: CreateGroupDto;
+}
+
+export interface TenantPeopleControllerDeleteGroupRequest {
+    groupId: string;
+}
+
+export interface TenantPeopleControllerRemoveRequest {
+    userId: string;
+}
+
+export interface TenantPeopleControllerRemoveMemberRequest {
+    groupId: string;
+    userId: string;
+}
+
+export interface TenantPeopleControllerRenameGroupRequest {
+    groupId: string;
+    renameGroupDto: RenameGroupDto;
+}
+
+export interface TenantPeopleControllerResetPasswordRequest {
+    userId: string;
 }
 
 export interface WorkspaceAccessControllerAddGrantRequest {
@@ -326,6 +382,360 @@ export class AccessApi extends runtime.BaseAPI {
      */
     async tenantAccessControllerTenant(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantDto> {
         const response = await this.tenantAccessControllerTenantRaw(initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates an account with a temporary password (shown once), or adds an existing account that is in no tenant.
+     * Add a person by email
+     */
+    async tenantPeopleControllerAddRaw(requestParameters: TenantPeopleControllerAddRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AddedPersonDto>> {
+        if (requestParameters['addPersonDto'] == null) {
+            throw new runtime.RequiredError(
+                'addPersonDto',
+                'Required parameter "addPersonDto" was null or undefined when calling tenantPeopleControllerAdd().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/tenant/people`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: AddPersonDtoToJSON(requestParameters['addPersonDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => AddedPersonDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Creates an account with a temporary password (shown once), or adds an existing account that is in no tenant.
+     * Add a person by email
+     */
+    async tenantPeopleControllerAdd(requestParameters: TenantPeopleControllerAddRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AddedPersonDto> {
+        const response = await this.tenantPeopleControllerAddRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Put a person of the tenant into a group
+     */
+    async tenantPeopleControllerAddMemberRaw(requestParameters: TenantPeopleControllerAddMemberRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['groupId'] == null) {
+            throw new runtime.RequiredError(
+                'groupId',
+                'Required parameter "groupId" was null or undefined when calling tenantPeopleControllerAddMember().'
+            );
+        }
+
+        if (requestParameters['userId'] == null) {
+            throw new runtime.RequiredError(
+                'userId',
+                'Required parameter "userId" was null or undefined when calling tenantPeopleControllerAddMember().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/tenant/groups/{groupId}/members/{userId}`;
+        urlPath = urlPath.replace(`{${"groupId"}}`, encodeURIComponent(String(requestParameters['groupId'])));
+        urlPath = urlPath.replace(`{${"userId"}}`, encodeURIComponent(String(requestParameters['userId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'PUT',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Put a person of the tenant into a group
+     */
+    async tenantPeopleControllerAddMember(requestParameters: TenantPeopleControllerAddMemberRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.tenantPeopleControllerAddMemberRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Create a group, at the top or inside another
+     */
+    async tenantPeopleControllerCreateGroupRaw(requestParameters: TenantPeopleControllerCreateGroupRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantGroupDto>> {
+        if (requestParameters['createGroupDto'] == null) {
+            throw new runtime.RequiredError(
+                'createGroupDto',
+                'Required parameter "createGroupDto" was null or undefined when calling tenantPeopleControllerCreateGroup().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/tenant/groups`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: CreateGroupDtoToJSON(requestParameters['createGroupDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => TenantGroupDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Create a group, at the top or inside another
+     */
+    async tenantPeopleControllerCreateGroup(requestParameters: TenantPeopleControllerCreateGroupRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantGroupDto> {
+        const response = await this.tenantPeopleControllerCreateGroupRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Delete a group and the groups below it, with their grants (refused while they own workspaces)
+     */
+    async tenantPeopleControllerDeleteGroupRaw(requestParameters: TenantPeopleControllerDeleteGroupRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['groupId'] == null) {
+            throw new runtime.RequiredError(
+                'groupId',
+                'Required parameter "groupId" was null or undefined when calling tenantPeopleControllerDeleteGroup().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/tenant/groups/{groupId}`;
+        urlPath = urlPath.replace(`{${"groupId"}}`, encodeURIComponent(String(requestParameters['groupId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Delete a group and the groups below it, with their grants (refused while they own workspaces)
+     */
+    async tenantPeopleControllerDeleteGroup(requestParameters: TenantPeopleControllerDeleteGroupRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.tenantPeopleControllerDeleteGroupRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Everyone in the tenant, with their groups
+     */
+    async tenantPeopleControllerListRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<PersonDto>>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/tenant/people`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(PersonDtoFromJSON));
+    }
+
+    /**
+     * Everyone in the tenant, with their groups
+     */
+    async tenantPeopleControllerList(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<PersonDto>> {
+        const response = await this.tenantPeopleControllerListRaw(initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Remove a person from the tenant, its groups and their grants
+     */
+    async tenantPeopleControllerRemoveRaw(requestParameters: TenantPeopleControllerRemoveRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<RemovedPersonDto>> {
+        if (requestParameters['userId'] == null) {
+            throw new runtime.RequiredError(
+                'userId',
+                'Required parameter "userId" was null or undefined when calling tenantPeopleControllerRemove().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/tenant/people/{userId}`;
+        urlPath = urlPath.replace(`{${"userId"}}`, encodeURIComponent(String(requestParameters['userId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => RemovedPersonDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Remove a person from the tenant, its groups and their grants
+     */
+    async tenantPeopleControllerRemove(requestParameters: TenantPeopleControllerRemoveRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<RemovedPersonDto> {
+        const response = await this.tenantPeopleControllerRemoveRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Take a person out of a group
+     */
+    async tenantPeopleControllerRemoveMemberRaw(requestParameters: TenantPeopleControllerRemoveMemberRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['groupId'] == null) {
+            throw new runtime.RequiredError(
+                'groupId',
+                'Required parameter "groupId" was null or undefined when calling tenantPeopleControllerRemoveMember().'
+            );
+        }
+
+        if (requestParameters['userId'] == null) {
+            throw new runtime.RequiredError(
+                'userId',
+                'Required parameter "userId" was null or undefined when calling tenantPeopleControllerRemoveMember().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/tenant/groups/{groupId}/members/{userId}`;
+        urlPath = urlPath.replace(`{${"groupId"}}`, encodeURIComponent(String(requestParameters['groupId'])));
+        urlPath = urlPath.replace(`{${"userId"}}`, encodeURIComponent(String(requestParameters['userId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Take a person out of a group
+     */
+    async tenantPeopleControllerRemoveMember(requestParameters: TenantPeopleControllerRemoveMemberRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.tenantPeopleControllerRemoveMemberRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Rename a group
+     */
+    async tenantPeopleControllerRenameGroupRaw(requestParameters: TenantPeopleControllerRenameGroupRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantGroupDto>> {
+        if (requestParameters['groupId'] == null) {
+            throw new runtime.RequiredError(
+                'groupId',
+                'Required parameter "groupId" was null or undefined when calling tenantPeopleControllerRenameGroup().'
+            );
+        }
+
+        if (requestParameters['renameGroupDto'] == null) {
+            throw new runtime.RequiredError(
+                'renameGroupDto',
+                'Required parameter "renameGroupDto" was null or undefined when calling tenantPeopleControllerRenameGroup().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/tenant/groups/{groupId}`;
+        urlPath = urlPath.replace(`{${"groupId"}}`, encodeURIComponent(String(requestParameters['groupId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'PATCH',
+            headers: headerParameters,
+            query: queryParameters,
+            body: RenameGroupDtoToJSON(requestParameters['renameGroupDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => TenantGroupDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Rename a group
+     */
+    async tenantPeopleControllerRenameGroup(requestParameters: TenantPeopleControllerRenameGroupRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantGroupDto> {
+        const response = await this.tenantPeopleControllerRenameGroupRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Give an account made here a new temporary password
+     */
+    async tenantPeopleControllerResetPasswordRaw(requestParameters: TenantPeopleControllerResetPasswordRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TemporaryPasswordDto>> {
+        if (requestParameters['userId'] == null) {
+            throw new runtime.RequiredError(
+                'userId',
+                'Required parameter "userId" was null or undefined when calling tenantPeopleControllerResetPassword().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/tenant/people/{userId}/password`;
+        urlPath = urlPath.replace(`{${"userId"}}`, encodeURIComponent(String(requestParameters['userId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => TemporaryPasswordDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Give an account made here a new temporary password
+     */
+    async tenantPeopleControllerResetPassword(requestParameters: TenantPeopleControllerResetPasswordRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TemporaryPasswordDto> {
+        const response = await this.tenantPeopleControllerResetPasswordRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

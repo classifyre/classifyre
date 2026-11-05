@@ -162,6 +162,14 @@ describe("resilientFetch after a 401", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it("tells the handler why the API refused", async () => {
+    mockFetch(jsonResponse(401, { code: "NO_TENANT" }));
+    const handler = jest.fn(() => Promise.resolve(false));
+    setUnauthorizedHandler(handler);
+    expect((await resilientFetch("/acme/sources")).status).toBe(401);
+    expect(handler).toHaveBeenCalledWith({ code: "NO_TENANT" });
+  });
+
   it("returns the 401 when the session cannot be renewed", async () => {
     mockFetch(jsonResponse(401, {}));
     setUnauthorizedHandler(() => Promise.resolve(false));

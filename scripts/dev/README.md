@@ -46,12 +46,28 @@ CLASSIFYRE_IAM=true ./scripts/dev/start.sh
 The `iam` skaffold profile adds `helm/develop/values-dev-iam.yaml` and
 port-forwards the identity server to <http://localhost:8180/iam>. Its admin
 console is at <http://localhost:8180/iam/admin> (user `admin`, password in the
-`classifyre-iam` Secret, key `admin-password`). The first tenant admin is
-`admin` in the `classifyre` realm, with a temporary password under
-`bootstrap-admin-password` in the same Secret.
+`classifyre-iam` Secret, key `admin-password`). That account is the identity
+server's own and cannot sign in to Classifyre. Classifyre's first tenant admin
+is a different user, also called `admin`, in the `classifyre` realm, with a
+temporary password under `bootstrap-admin-password` in the same Secret.
+
+To add a person, create the user, then add them under **Organizations →
+Default → Members**, and to a group under **Organizations → Default → Groups**.
+Groups made under the realm's own **Groups** menu are not used by Classifyre;
+a user in no organization sees a "not in a tenant yet" page.
+
+Run the web app with sign-in in a second terminal (it reads the web client's
+secret from the cluster):
+
+```bash
+./scripts/dev/web-iam.sh
+```
 
 Starting again without `CLASSIFYRE_IAM=true` turns it off; the `iam` database
-stays on the embedded Postgres for next time.
+and the `classifyre-iam` Secret both stay for next time (the identity server
+keeps the admin password it was first started with, so the two must match).
+Turning sign-in on moves every workspace into the `default` tenant, owned by
+its `admins` group; with sign-in off they are all visible again as before.
 
 To check every access case of the plan at once, run the persona suite. It
 installs its own throwaway release next to the dev stack, so it never touches

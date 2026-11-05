@@ -763,6 +763,33 @@ Open as low: N-6 (people can edit their own first/last name in the identity serv
 
 L-1 (sockets checked once per connection), L-2 (`/tenant/actors/resolve` names a principal of any tenant if given its id), L-4 and L-5 stay open as low. New unit tests: the guard's signed-in branch (cross-origin cookie write, same-origin, bearer, author stamping, capability), the membership cache (single-flight, grace, refusal past it), the verifier's algorithm cases, the boot check, the assistant's refusal, and the return-address cases.
 
+### First use on the dev stack, 2026-11-05
+
+Turning sign-in on for the developer's own stack found what the persona suite could not, because the suite sets up organizations correctly:
+
+- **The `classifyre-iam` Secret was deleted with `iam.enabled: false` while the `iam` database stayed**, so turning sign-in on again generated new passwords the database had never seen, and the setup job retried its admin login forever. The Secret now has `helm.sh/resource-policy: keep`, and the setup job gives up after ten minutes with a message naming the cause.
+- **A user in no organization got bare 401s.** The API now answers `NO_TENANT` (no organization) or `CHOOSE_TENANT` (several) instead of one code for both; the browser's 401 handler sends those to `/auth/no-tenant`, a plain page that says what is wrong, who can fix it, and offers Try again and Sign out, instead of renewing a session that would be refused the same way.
+- **Realm groups looked like they should count.** Only organization groups are tenant groups; the access screens now say where groups come from, and the operations docs, install notes and dev README say people must be organization members first.
+- **Two users called `admin`.** The install notes now say which password is for the identity server's console (`admin-password`, master realm) and which signs in to Classifyre (`bootstrap-admin-password`).
+- **The workspace list offered "Create workspace" to people who cannot create one, and had no account menu.** It now shows "No workspaces for you yet" when the person may create for no group, hides New workspace for them, and carries the account menu (name, tenant access, sign out).
+- `scripts/dev/web-iam.sh` runs the local web app with sign-in against the dev stack.
+
+### Step 8c · People and groups in Classifyre (2026-11-05)
+
+First use showed the split was awkward: groups and people in the identity server's console, roles in Classifyre, and the console is not tenant-scoped, so a tenant admin who may change groups there can change every tenant's. Everything a tenant admin does now happens on Classifyre's **Tenant access** page; the identity server's console is left to operators (realm setup, creating tenants, connecting company directories).
+
+- **What moves:** creating, renaming and deleting the tenant's groups (also nested), adding people to the tenant (a new account with a temporary password, or an existing account that is in no tenant), removing them, and adding and removing group members. Roles and grants were already here.
+- **Capability:** `tenant.people.manage` ("Manage the tenant's people and groups"), part of Tenant admin. Workspace managers do not get it: they give access to their group's workspaces, they do not decide who is in the group.
+- **Rights in the identity server (measured on 26.8.1):** group writes need `manage-organizations`; adding and removing members, creating accounts and setting passwords also need `manage-users`. Realm settings stay refused. Both rights are realm-wide, so the tenant boundary is the API's job: every group and person id a request names is checked against the caller's own organization first, and the organization id always comes from the signed-in principal, never from the request. The chart gives these rights only with `iam.peopleManagement: true` (the default); with `false` the service account stays read-only and the page shows people and groups read-only, for installs whose company directory owns membership.
+- **Rules that keep a tenant safe:**
+  - An existing account can be added only if it is in no other tenant. An account in another tenant is refused with the same message as an unusable address, so one tenant cannot learn about another's people, nor break their sign-in (two tenants means "choose a tenant").
+  - Removing someone removes them from the tenant, its groups and their personal grants. The account itself is deleted only when Classifyre created it for this tenant (`iam_people`) and it is in no other tenant; accounts from a directory or made by an operator stay.
+  - Nobody can remove themselves from the tenant or from `admins`, the last member of `admins` cannot be removed, and the top-level `admins` group cannot be renamed or deleted, so a tenant cannot lock itself out.
+  - A group that owns workspaces (itself or below) cannot be deleted; deleting a group also deletes the grants given to it or on its workspaces.
+  - Temporary passwords are generated by the API, shown once, and must be changed at first sign-in; only for accounts Classifyre created.
+  - Every change is in the tenant's activity log.
+- **Caches:** the pod that makes a change forgets its cached memberships at once; other API pods follow within a minute (the membership cache).
+
 ### Step 9 · Later
 
 - Custom roles: tenant admins compose capability bundles (still no conditions).

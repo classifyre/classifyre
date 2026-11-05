@@ -67,6 +67,15 @@ All URIs are relative to *http://localhost*
 *AccessApi* | [**tenantAccessControllerResolve**](docs/AccessApi.md#tenantaccesscontrollerresolve) | **GET** /tenant/actors/resolve | Display names for actor references, outside any workspace
 *AccessApi* | [**tenantAccessControllerRoles**](docs/AccessApi.md#tenantaccesscontrollerroles) | **GET** /tenant/roles | The built-in roles and where each can be granted
 *AccessApi* | [**tenantAccessControllerTenant**](docs/AccessApi.md#tenantaccesscontrollertenant) | **GET** /tenant | The caller’s tenant and what they may do across it
+*AccessApi* | [**tenantPeopleControllerAdd**](docs/AccessApi.md#tenantpeoplecontrolleradd) | **POST** /tenant/people | Add a person by email
+*AccessApi* | [**tenantPeopleControllerAddMember**](docs/AccessApi.md#tenantpeoplecontrolleraddmember) | **PUT** /tenant/groups/{groupId}/members/{userId} | Put a person of the tenant into a group
+*AccessApi* | [**tenantPeopleControllerCreateGroup**](docs/AccessApi.md#tenantpeoplecontrollercreategroup) | **POST** /tenant/groups | Create a group, at the top or inside another
+*AccessApi* | [**tenantPeopleControllerDeleteGroup**](docs/AccessApi.md#tenantpeoplecontrollerdeletegroup) | **DELETE** /tenant/groups/{groupId} | Delete a group and the groups below it, with their grants (refused while they own workspaces)
+*AccessApi* | [**tenantPeopleControllerList**](docs/AccessApi.md#tenantpeoplecontrollerlist) | **GET** /tenant/people | Everyone in the tenant, with their groups
+*AccessApi* | [**tenantPeopleControllerRemove**](docs/AccessApi.md#tenantpeoplecontrollerremove) | **DELETE** /tenant/people/{userId} | Remove a person from the tenant, its groups and their grants
+*AccessApi* | [**tenantPeopleControllerRemoveMember**](docs/AccessApi.md#tenantpeoplecontrollerremovemember) | **DELETE** /tenant/groups/{groupId}/members/{userId} | Take a person out of a group
+*AccessApi* | [**tenantPeopleControllerRenameGroup**](docs/AccessApi.md#tenantpeoplecontrollerrenamegroup) | **PATCH** /tenant/groups/{groupId} | Rename a group
+*AccessApi* | [**tenantPeopleControllerResetPassword**](docs/AccessApi.md#tenantpeoplecontrollerresetpassword) | **POST** /tenant/people/{userId}/password | Give an account made here a new temporary password
 *AccessApi* | [**workspaceAccessControllerAddGrant**](docs/AccessApi.md#workspaceaccesscontrolleraddgrant) | **POST** /access/grants | Give a group or a person a role on this workspace
 *AccessApi* | [**workspaceAccessControllerExplain**](docs/AccessApi.md#workspaceaccesscontrollerexplain) | **GET** /access/explain | Why can I do this? The grants that give you a capability here
 *AccessApi* | [**workspaceAccessControllerGrants**](docs/AccessApi.md#workspaceaccesscontrollergrants) | **GET** /access/grants | Grants that reach this workspace, including inherited ones
@@ -507,7 +516,9 @@ All URIs are relative to *http://localhost*
 - [AddEvidenceDto](docs/AddEvidenceDto.md)
 - [AddExclusionDto](docs/AddExclusionDto.md)
 - [AddFindingDto](docs/AddFindingDto.md)
+- [AddPersonDto](docs/AddPersonDto.md)
 - [AddThreadEntryDto](docs/AddThreadEntryDto.md)
+- [AddedPersonDto](docs/AddedPersonDto.md)
 - [AgentActivityItemDto](docs/AgentActivityItemDto.md)
 - [AgentActivityListResponseDto](docs/AgentActivityListResponseDto.md)
 - [AgentCapacityReportDto](docs/AgentCapacityReportDto.md)
@@ -674,6 +685,7 @@ All URIs are relative to *http://localhost*
 - [CreateFindingDto](docs/CreateFindingDto.md)
 - [CreateGlossaryRelationDto](docs/CreateGlossaryRelationDto.md)
 - [CreateGrantDto](docs/CreateGrantDto.md)
+- [CreateGroupDto](docs/CreateGroupDto.md)
 - [CreateInquiryDto](docs/CreateInquiryDto.md)
 - [CreateManualEdgeDto](docs/CreateManualEdgeDto.md)
 - [CreateMcpServerDto](docs/CreateMcpServerDto.md)
@@ -829,6 +841,7 @@ All URIs are relative to *http://localhost*
 - [PatternLabelExclusionCandidateDto](docs/PatternLabelExclusionCandidateDto.md)
 - [PatternPreviewResponseDto](docs/PatternPreviewResponseDto.md)
 - [PayloadCursorEntryDto](docs/PayloadCursorEntryDto.md)
+- [PersonDto](docs/PersonDto.md)
 - [PivotGraphDto](docs/PivotGraphDto.md)
 - [PreviewCaseFindingFiltersDto](docs/PreviewCaseFindingFiltersDto.md)
 - [PreviewDiagnosticDto](docs/PreviewDiagnosticDto.md)
@@ -862,6 +875,8 @@ All URIs are relative to *http://localhost*
 - [RelationTypeDto](docs/RelationTypeDto.md)
 - [RelationTypesResponseDto](docs/RelationTypesResponseDto.md)
 - [RematchResponseDto](docs/RematchResponseDto.md)
+- [RemovedPersonDto](docs/RemovedPersonDto.md)
+- [RenameGroupDto](docs/RenameGroupDto.md)
 - [ReopenDecisionsDto](docs/ReopenDecisionsDto.md)
 - [ReopenDecisionsResponseDto](docs/ReopenDecisionsResponseDto.md)
 - [ResolvedActorDto](docs/ResolvedActorDto.md)
@@ -998,6 +1013,7 @@ All URIs are relative to *http://localhost*
 - [SupervisorJournalEntryDto](docs/SupervisorJournalEntryDto.md)
 - [SupervisorJournalListDto](docs/SupervisorJournalListDto.md)
 - [SupervisorStateDto](docs/SupervisorStateDto.md)
+- [TemporaryPasswordDto](docs/TemporaryPasswordDto.md)
 - [TenantDto](docs/TenantDto.md)
 - [TenantEventDto](docs/TenantEventDto.md)
 - [TenantGroupDto](docs/TenantGroupDto.md)

@@ -10,6 +10,7 @@ Name | Type
 `alias` | string
 `name` | string
 `capabilities` | Array&lt;string&gt;
+`peopleManagement` | boolean
 
 ## Example
 
@@ -22,6 +23,7 @@ const example = {
   "alias": default,
   "name": Default,
   "capabilities": null,
+  "peopleManagement": null,
 } satisfies TenantDto
 
 console.log(example)

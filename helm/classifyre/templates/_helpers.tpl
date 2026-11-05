@@ -790,6 +790,8 @@ password
   value: {{ include "classifyre.iam.appUrl" . | quote }}
 - name: IAM_BOOTSTRAP_TENANT
   value: {{ .Values.iam.bootstrap.tenant.alias | quote }}
+- name: IAM_PEOPLE_MANAGEMENT
+  value: {{ .Values.iam.peopleManagement | quote }}
 {{- end }}
 {{- end -}}
 

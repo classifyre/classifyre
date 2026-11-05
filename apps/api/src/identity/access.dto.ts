@@ -116,6 +116,106 @@ export class TenantDto {
     description: 'What the caller may do across the whole tenant.',
   })
   capabilities: string[];
+
+  @ApiProperty({
+    description:
+      'True when people and groups are managed here; false when a company directory or the identity server owns them and they are read-only.',
+  })
+  peopleManagement: boolean;
+}
+
+export class PersonDto {
+  @ApiProperty({ description: 'The person’s id in the identity server.' })
+  id: string;
+
+  @ApiProperty({ example: 'ada@example.test' })
+  username: string;
+
+  @ApiProperty({ type: String, nullable: true })
+  email: string | null;
+
+  @ApiProperty({ type: String, nullable: true })
+  firstName: string | null;
+
+  @ApiProperty({ type: String, nullable: true })
+  lastName: string | null;
+
+  @ApiProperty()
+  enabled: boolean;
+
+  @ApiProperty({
+    description: 'Brought by the tenant’s company directory, not added here.',
+  })
+  fromDirectory: boolean;
+
+  @ApiProperty({
+    description:
+      'Classifyre created this account, so it can set a temporary password and deletes the account when the person leaves.',
+  })
+  createdHere: boolean;
+
+  @ApiProperty({
+    type: [String],
+    description: 'Groups the person is directly in.',
+  })
+  groupIds: string[];
+
+  @ApiProperty()
+  isYou: boolean;
+}
+
+export class AddPersonDto {
+  @ApiProperty({ example: 'ada@example.test' })
+  email: string;
+
+  @ApiProperty({ example: 'Ada' })
+  firstName: string;
+
+  @ApiProperty({ example: 'Kowalczyk' })
+  lastName: string;
+}
+
+export class AddedPersonDto {
+  @ApiProperty({ type: PersonDto })
+  person: PersonDto;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description:
+      'Only for a new account: shown once, changed by the person at first sign-in. Null when an existing account was added.',
+  })
+  temporaryPassword: string | null;
+}
+
+export class TemporaryPasswordDto {
+  @ApiProperty({ description: 'Shown once; changed at first sign-in.' })
+  temporaryPassword: string;
+}
+
+export class RemovedPersonDto {
+  @ApiProperty({
+    description:
+      'The account was deleted too (Classifyre made it and it is in no other tenant).',
+  })
+  accountDeleted: boolean;
+}
+
+export class CreateGroupDto {
+  @ApiProperty({ example: 'managers' })
+  name: string;
+
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description: 'Create it inside this group.',
+  })
+  parentId?: string | null;
+}
+
+export class RenameGroupDto {
+  @ApiProperty({ example: 'finance' })
+  name: string;
 }
 
 export class TenantEventDto {

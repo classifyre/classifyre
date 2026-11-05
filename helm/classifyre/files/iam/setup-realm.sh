@@ -12,8 +12,18 @@ set -euo pipefail
 KC=/opt/keycloak/bin/kcadm.sh
 R="$IAM_REALM"
 
+tries=0
 until "$KC" config credentials --server "$IAM_INTERNAL_URL" --realm master \
   --user admin --password "$IAM_ADMIN_PASSWORD" >/dev/null 2>&1; do
+  tries=$((tries + 1))
+  if [ "$tries" -ge 120 ]; then
+    # Ten minutes. A server that is up but refuses the password was first
+    # started with another one (its database outlived the Secret).
+    echo "cannot sign in to the identity server as admin after 10 minutes." >&2
+    echo "If its pod is ready, the admin password in the Secret (key admin-password) is not" >&2
+    echo "the one its database was created with: put the original back, or reset it there." >&2
+    exit 1
+  fi
   echo "waiting for the identity server at $IAM_INTERNAL_URL"
   sleep 5
 done
@@ -88,19 +98,52 @@ fi
   -s implicitFlowEnabled=false \
   -s directAccessGrantsEnabled=false \
   -s fullScopeAllowed=false
-# Read users, organizations and their groups; never change them.
-"$KC" add-roles -r "$R" --uusername service-account-classifyre-api \
-  --cclientid realm-management --rolename view-users --rolename view-organizations
+# Always: read users, organizations and their groups. With people management
+# (iam.peopleManagement) also change them, so tenant admins manage their
+# people and groups from Classifyre: manage-organizations for groups,
+# manage-users for members, accounts and temporary passwords. Both are
+# realm-wide; Classifyre keeps each change inside the caller's tenant.
+# Realm settings, clients and identity providers stay out of reach.
+READ_ROLES="view-users view-organizations"
+WRITE_ROLES="manage-users manage-organizations"
+if [ "${IAM_PEOPLE_MANAGEMENT:-true}" = "true" ]; then
+  GIVE="$READ_ROLES $WRITE_ROLES"
+  TAKE=""
+else
+  GIVE="$READ_ROLES"
+  TAKE="$WRITE_ROLES"
+fi
+RM_ID=$(find_id clients clientId realm-management)
+# role_list <names...>: the roles as the JSON array the API takes.
+role_list() {
+  local first=1 role
+  echo "["
+  for role in "$@"; do
+    [ "$first" = 1 ] || echo ","
+    first=0
+    "$KC" get "clients/$RM_ID/roles/$role" -r "$R"
+  done
+  echo "]"
+}
+# shellcheck disable=SC2086 # word lists on purpose
+for role in $GIVE; do
+  "$KC" add-roles -r "$R" --uusername service-account-classifyre-api \
+    --cclientid realm-management --rolename "$role"
+done
 # With full scope off, a role the account holds only reaches its token when
 # the client's scope maps it too.
-RM_ID=$(find_id clients clientId realm-management)
-{
-  echo "["
-  "$KC" get "clients/$RM_ID/roles/view-users" -r "$R"
-  echo ","
-  "$KC" get "clients/$RM_ID/roles/view-organizations" -r "$R"
-  echo "]"
-} | "$KC" create "clients/$API_ID/scope-mappings/clients/$RM_ID" -r "$R" -f - >/dev/null
+# shellcheck disable=SC2086
+role_list $GIVE | "$KC" create "clients/$API_ID/scope-mappings/clients/$RM_ID" -r "$R" -f - >/dev/null
+if [ -n "$TAKE" ]; then
+  echo "people management off: the API's service account only reads"
+  # shellcheck disable=SC2086
+  for role in $TAKE; do
+    "$KC" remove-roles -r "$R" --uusername service-account-classifyre-api \
+      --cclientid realm-management --rolename "$role" 2>/dev/null || true
+  done
+  # shellcheck disable=SC2086
+  role_list $TAKE | "$KC" delete "clients/$API_ID/scope-mappings/clients/$RM_ID" -r "$R" -f - >/dev/null 2>&1 || true
+fi
 
 echo "client classifyre-web"
 WEB_ID=$(find_id clients clientId classifyre-web)

@@ -1037,6 +1037,8 @@ iam:
   exposeAdminConsole: false
   # -- Realm that holds users, tenants (organizations) and groups.
   realm: classifyre
+  # -- Tenant admins manage their tenant's people and groups in Classifyre (Tenant access → People, Groups). Gives the API's service account `manage-users` and `manage-organizations` in the realm; Classifyre keeps every change inside the caller's tenant. `false` keeps it read-only, for installs where a company directory owns membership.
+  peopleManagement: true
   # -- Access token lifetime in seconds. Short, because group changes take effect when tokens renew.
   accessTokenLifespanSeconds: 300
   database:

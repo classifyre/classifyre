@@ -14,6 +14,18 @@ export interface OrgGroup {
   parentId: string | null;
 }
 
+/** A person as the admin screens list them. */
+export interface OrgMember {
+  id: string;
+  username: string;
+  email: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  enabled: boolean;
+  /** MANAGED: the organization's own identity provider (a company directory) brought them. */
+  fromDirectory: boolean;
+}
+
 export interface Membership {
   enabled: boolean;
   displayName: string | null;
@@ -118,8 +130,77 @@ export class MembershipService {
     return this.lineage(await this.groupTree(orgId), groupId);
   }
 
-  async groups(orgId: string): Promise<OrgGroup[]> {
+  /** `fresh` skips the cache: the admin screens must show a change at once. */
+  async groups(
+    orgId: string,
+    options: { fresh?: boolean } = {},
+  ): Promise<OrgGroup[]> {
+    if (options.fresh) this.orgGroups.delete(orgId);
     return [...(await this.groupTree(orgId)).values()];
+  }
+
+  /** Everyone in the organization, uncached (admin screens). */
+  async members(orgId: string): Promise<OrgMember[]> {
+    const page = 500;
+    const all: OrgMember[] = [];
+    for (let first = 0; ; first += page) {
+      const found =
+        (await this.get<MemberRepresentation[]>(
+          `/organizations/${encodeURIComponent(orgId)}/members?first=${first}&max=${page}&briefRepresentation=false`,
+        )) ?? [];
+      all.push(...found.map(toMember));
+      if (found.length < page) return all;
+    }
+  }
+
+  /** Ids of a group's direct members, uncached (admin screens). */
+  async groupMemberIds(orgId: string, groupId: string): Promise<string[]> {
+    const found =
+      (await this.get<{ id: string }[]>(
+        `/organizations/${encodeURIComponent(orgId)}/groups/${encodeURIComponent(groupId)}/members?max=10000&briefRepresentation=true`,
+      )) ?? [];
+    return found.map((user) => user.id);
+  }
+
+  /**
+   * Forget what is cached about an organization (its group tree) and,
+   * optionally, people in it, after a change made through this pod. Other
+   * pods follow within the cache's minute.
+   */
+  forget(orgId: string, subs: string[] = []): void {
+    this.orgGroups.delete(orgId);
+    for (const sub of subs) {
+      this.users.delete(sub);
+      this.memberGroups.delete(`${orgId}|${sub}`);
+    }
+  }
+
+  /**
+   * A write to the identity server's admin API (People and groups). Returns
+   * the response; the caller decides what a status means. Paths are relative
+   * to the realm and built by the caller from ids it has checked. `body` is
+   * sent as JSON (a plain string becomes a JSON string, as the members
+   * endpoint wants).
+   */
+  async send(
+    method: 'POST' | 'PUT' | 'DELETE',
+    path: string,
+    body?: unknown,
+  ): Promise<Response> {
+    return this.fetchImpl(`${this.config.adminUrl}${path}`, {
+      method,
+      headers: {
+        Authorization: `Bearer ${await this.token()}`,
+        ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: AbortSignal.timeout(LOOKUP_TIMEOUT_MS),
+    });
+  }
+
+  /** One admin read, uncached; null on 404. */
+  async read<T>(path: string): Promise<T | null> {
+    return this.get<T>(path, true);
   }
 
   /**
@@ -279,4 +360,26 @@ export class MembershipService {
     };
     return body.access_token;
   }
+}
+
+interface MemberRepresentation {
+  id: string;
+  username: string;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  enabled?: boolean;
+  membershipType?: 'MANAGED' | 'UNMANAGED';
+}
+
+function toMember(user: MemberRepresentation): OrgMember {
+  return {
+    id: user.id,
+    username: user.username,
+    email: user.email ?? null,
+    firstName: user.firstName ?? null,
+    lastName: user.lastName ?? null,
+    enabled: user.enabled !== false,
+    fromDirectory: user.membershipType === 'MANAGED',
+  };
 }

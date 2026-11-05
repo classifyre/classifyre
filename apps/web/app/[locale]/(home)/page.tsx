@@ -25,6 +25,7 @@ import {
   AlertDialogTitle,
 } from "@workspace/ui/components/alert-dialog";
 import { CreateNamespaceDialog } from "@/components/namespace/create-namespace-dialog";
+import { useIamEnabled } from "@/components/iam-session";
 import { SectionHeading } from "@/components/section-heading";
 import { useTranslation } from "@/hooks/use-translation";
 import { useLocalePath } from "@/lib/app-path";
@@ -105,6 +106,7 @@ function groupByCategory(
 
 export default function LandingPage() {
   const { t } = useTranslation();
+  const canCreate = useCanCreateWorkspace();
   const headingId = React.useId();
   const localePath = useLocalePath();
   const { removeBySlug } = useActiveNamespaces();
@@ -241,10 +243,12 @@ export default function LandingPage() {
                   {t("categories.manage")}
                 </Link>
               </Button>
-              <Button variant="default" onClick={() => setCreateOpen(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                {t("workspaces.new")}
-              </Button>
+              {canCreate && (
+                <Button variant="default" onClick={() => setCreateOpen(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  {t("workspaces.new")}
+                </Button>
+              )}
             </div>
           )}
         </div>
@@ -275,15 +279,23 @@ export default function LandingPage() {
             className="bg-card/90 shadow-none"
             data-testid="workspace-empty-state"
           >
-            <EmptyState
-              icon={FolderOpen}
-              title={t("workspaces.emptyTitle")}
-              description={t("workspaces.emptyDescription")}
-              action={{
-                label: t("workspaces.createAction"),
-                onClick: () => setCreateOpen(true),
-              }}
-            />
+            {canCreate ? (
+              <EmptyState
+                icon={FolderOpen}
+                title={t("workspaces.emptyTitle")}
+                description={t("workspaces.emptyDescription")}
+                action={{
+                  label: t("workspaces.createAction"),
+                  onClick: () => setCreateOpen(true),
+                }}
+              />
+            ) : (
+              <EmptyState
+                icon={FolderOpen}
+                title={t("workspaces.emptyNoAccessTitle")}
+                description={t("workspaces.emptyNoAccessDescription")}
+              />
+            )}
           </Card>
         ) : (
           <div className="space-y-12">
@@ -423,4 +435,29 @@ export default function LandingPage() {
       </main>
     </div>
   );
+}
+
+/**
+ * Without sign-in anyone may create a workspace. With it, only someone who
+ * may create for at least one group (docs/prd §8.2); until that is known the
+ * button stays hidden rather than flicker in for people who cannot use it.
+ */
+function useCanCreateWorkspace(): boolean {
+  const iamEnabled = useIamEnabled();
+  const [canCreate, setCanCreate] = React.useState(!iamEnabled);
+  React.useEffect(() => {
+    if (!iamEnabled) {
+      setCanCreate(true);
+      return;
+    }
+    let active = true;
+    void api.namespaces.owningGroups().then(
+      (groups) => active && setCanCreate(groups.length > 0),
+      () => active && setCanCreate(false),
+    );
+    return () => {
+      active = false;
+    };
+  }, [iamEnabled]);
+  return canCreate;
 }

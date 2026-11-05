@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Persona checks for sign-in and access (docs/prd/IAM-access-management.md §7,
-# step 8). Installs a throwaway release with sign-in on next to the dev stack,
+# step 8, people and groups of step 8c). Installs a throwaway release with sign-in on next to the dev stack,
 # seeds groups and invented users, gives the grants of §7 through the API,
 # then checks what each persona can and cannot do. Exits non-zero on any
 # mismatch and removes everything afterwards (KEEP=1 keeps it for poking).
@@ -152,6 +152,33 @@ check H7 "another tenant sees nothing" "" "$(slugs outsider globex)"
 check H7 "another tenant gets 404" 404 "$(status outsider@globex GET /fin-ledger/sources)"
 check H7 "no sign-in is 401" 401 "$(status - GET /namespaces)"
 check U10 "contractor works until the end date" 200 "$(status contractor GET /fin-ledger/sources)"
+
+say "people and groups, managed in Classifyre (step 8c)"
+req() { # req <method> <path> [body]: as the tenant admin, prints the body
+  curl -s -X "$1" -H "Authorization: Bearer $(token admin)" -H 'Content-Type: application/json' ${3:+-d "$3"} "$B$2"
+}
+EAST=$(req POST /tenant/groups "{\"name\":\"east\",\"parentId\":\"$SALES\"}" | json "print(d.get('path','') + '|' + d.get('id',''))")
+check U17 "tenant admin creates a group inside /sales" "/sales/east" "${EAST%%|*}"
+EAST=${EAST#*|}
+NEWBIE=$(req POST /tenant/people '{"email":"newbie@example.test","firstName":"New","lastName":"Persona"}' \
+  | json "print(d['person']['id'] + '|' + ('yes' if d.get('temporaryPassword') else 'no'))")
+check U17 "adding a new person gives a temporary password" yes "${NEWBIE#*|}"
+NEWBIE=${NEWBIE%%|*}
+check U17 "tenant admin puts them in the group" 204 "$(status admin PUT "/tenant/groups/$EAST/members/$NEWBIE")"
+check U17 "the people list shows the group" yes "$(req GET /tenant/people | json "print('yes' if any(p['id']=='$NEWBIE' and '$EAST' in p['groupIds'] for p in d) else 'no')")"
+check U17 "a viewer cannot list or change people" 403 "$(status controller GET /tenant/people)"
+check U17 "a workspace manager cannot create groups" 403 "$(status manager POST /tenant/groups '{"name":"x"}')"
+check U17 "another tenant's person is refused like an unusable address" PERSON_UNAVAILABLE \
+  "$(req POST /tenant/people '{"email":"outsider@example.test","firstName":"O","lastName":"P"}' | json "print(d.get('code'))")"
+GLOBEX_ADMINS=$(kubectl -n "$NS" exec -i "deploy/$REL-classifyre-iam" -c iam -- env ADMIN_PW="$ADMIN_PW" GLOBEX="$GLOBEX" bash -c \
+  'K=/opt/keycloak/bin/kcadm.sh; $K config credentials --server http://localhost:8080/iam --realm master --user admin --password "$ADMIN_PW" >/dev/null 2>&1; $K create organizations/$GLOBEX/groups -r classifyre -s name=globex-team -i 2>/dev/null || $K get organizations/$GLOBEX/groups -r classifyre --fields id --format csv --noquotes | head -1' | tr -d '\r')
+check U17 "another tenant's group is not found" 404 "$(status admin PUT "/tenant/groups/$GLOBEX_ADMINS/members/$NEWBIE")"
+ME=$(req GET /tenant/people | json "print(next(p['id'] for p in d if p['isYou']))")
+check U17 "nobody removes themselves" 403 "$(status admin DELETE "/tenant/people/$ME")"
+check U17 "a group that owns workspaces cannot be deleted" GROUP_OWNS_WORKSPACES "$(req DELETE "/tenant/groups/$FIN" | json "print(d.get('code'))")"
+check U17 "removing a person made here deletes their account" True "$(req DELETE "/tenant/people/$NEWBIE" | json "print(d.get('accountDeleted'))")"
+check U17 "an empty group is deleted" 204 "$(status admin DELETE "/tenant/groups/$EAST")"
+check U17 "every change is in the tenant's activity" yes "$(req GET /tenant/audit-events | json "a={e['action'] for e in d}; print('yes' if {'group.created','person.added','group.member_added','person.removed','group.deleted'} <= a else sorted(a))")"
 
 say "mover, leaver and the contractor's end date (one-minute cache)"
 kubectl -n "$NS" exec -i "deploy/$REL-classifyre-iam" -c iam -- env ADMIN_PW="$ADMIN_PW" \

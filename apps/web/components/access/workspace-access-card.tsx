@@ -229,6 +229,9 @@ function AddGrantForm({
       <Button type="submit" disabled={!groupId || saving}>
         {t("access.add")}
       </Button>
+      <p className="text-xs text-muted-foreground sm:col-span-4">
+        {t("access.groupsHint")}
+      </p>
     </form>
   );
 }
