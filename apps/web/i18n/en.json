@@ -5991,6 +5991,7 @@
     "enabledHint": "Connect this bot and start answering messages.",
     "allowMutations": "Allow changes",
     "allowMutationsHint": "When off, the bot is read-only: it can inspect but never create, update or delete.",
+    "allowMutationsSignIn": "With sign-in on, bots are always read-only: a chat message has no signed-in person behind it.",
     "capabilityGroups": "Capabilities",
     "capabilityGroupsHint": "Which tool groups the bot may use. All are enabled by default.",
     "agents": "Autopilot agents",

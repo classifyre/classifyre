@@ -5991,6 +5991,7 @@
     "enabledHint": "Bot verbinden und Nachrichten beantworten.",
     "allowMutations": "Änderungen erlauben",
     "allowMutationsHint": "Wenn deaktiviert, ist der Bot schreibgeschützt: Er kann lesen, aber nie erstellen, ändern oder löschen.",
+    "allowMutationsSignIn": "Mit Anmeldung sind Bots immer schreibgeschützt: Hinter einer Chat-Nachricht steht keine angemeldete Person.",
     "capabilityGroups": "Fähigkeiten",
     "capabilityGroupsHint": "Welche Tool-Gruppen der Bot nutzen darf. Standardmäßig sind alle aktiviert.",
     "agents": "Autopilot-Agenten",

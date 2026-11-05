@@ -2,7 +2,7 @@
 
 |                       |                                                                                                                                      |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| **Status**            | Steps 0–8 done 2026-11-04; review blockers fixed 2026-11-05 (§13, Review and Hardening)                                              |
+| **Status**            | Steps 0–8 done 2026-11-04; three reviews, all blockers fixed 2026-11-05 (§13, Review and Hardening); release is the maintainers' call |
 | **Size**              | L (9 steps, each its own PR)                                                                                                         |
 | **Depends on**        | [S1 · Enterprise extension seams](S1-enterprise-extension-seams.md) (step 1 builds S1 R1–R8 and R15)                                 |
 | **Identity provider** | Keycloak 26.8.1 (`quay.io/keycloak/keycloak:26.8.1`, released 2026-10-13), Helm chart only                                           |
@@ -759,6 +759,8 @@ Every finding of the review is fixed or deliberately accepted:
 
 Open as low: N-6 (people can edit their own first/last name in the identity server's account console, so the shown name is self-chosen; the stored `user:<sub>` stays exact; restrict the name attributes in the realm's user profile if that matters), L-1, L-2, L-4, L-5, and the hook/registry/MCP-handler IAM branches still have no unit tests (covered by the persona suite).
 
+**Verification review, 2026-11-05** (fresh reviewer, of the second-review fixes): **4.0 / 5** (security 4, isolation 4, robustness 4, compatibility 5, tests 3, maintainability 4, docs 4), N-1–N-8 fixed, **no release blockers**. Its low findings were fixed too: the reserved `local` tenant can no longer be reached through an organization or `IAM_BOOTSTRAP_TENANT` (F-1); the once-only admin grant claims its marker and inserts the grant in one transaction, and is written to the tenant audit trail (F-2); the bootstrap moves `local` workspaces in even before `admins` exists and gives them their owner once it does (F-3); case-board presence ignores the client's name for anyone signed in (F-4); the chat-bot form says bots are read-only with sign-in and disables the switch (F-6). Found while running the persona suite on these fixes: the new transactional grant passed the tenant id as one SQL parameter for both `tenant_id` (uuid) and `scope_id` (text), which Postgres refuses ("inconsistent types deduced"); the unit tests mock the database, so only the live run caught it. The suite also waited forever when the API gave up on its tenant setup; it now fails with the API's last message after about twelve minutes. Still open as low: unit tests for the service wiring, the proxy's outage branch and presence (F-5), and skipping renewal for a few seconds after the identity server failed to answer (F-7).
+
 L-1 (sockets checked once per connection), L-2 (`/tenant/actors/resolve` names a principal of any tenant if given its id), L-4 and L-5 stay open as low. New unit tests: the guard's signed-in branch (cross-origin cookie write, same-origin, bearer, author stamping, capability), the membership cache (single-flight, grace, refusal past it), the verifier's algorithm cases, the boot check, the assistant's refusal, and the return-address cases.
 
 ### Step 9 · Later
@@ -782,7 +784,7 @@ L-1 (sockets checked once per connection), L-2 (`/tenant/actors/resolve` names a
 
 ## 15. Risks and open questions
 
-- **Keycloak outage.** Sign-in stops. Signed-in users keep working until their token expires and the membership cache entry ages out (about 5 minutes), then requests fail closed. Two replicas in production values.
+- **Keycloak outage.** Sign-in stops. Signed-in browser sessions keep working until their access token expires (5 minutes); bearer tokens and MCP agents until the membership fallback runs out (15 minutes); then requests fail closed. Two replicas in production values.
 - **Organization groups are young** (added in 26.6). Step 0 found them sufficient; re-check the Admin API calls of §10 item 4 after every Keycloak minor upgrade.
 - **Global slugs** let one tenant learn that another tenant's slug exists. Alternative: `/<tenant>/<slug>/…` URLs, a larger change to routing and links. Decide before step 5.
 - **Source manager without case access (U3).** Confirm with a real data-engineering user before step 1 fixes the role table.

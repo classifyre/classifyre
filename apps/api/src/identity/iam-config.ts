@@ -65,7 +65,7 @@ export function readIamConfig(
     audience: env.IAM_AUDIENCE?.trim() || 'classifyre-api',
     apiClientId: required('IAM_API_CLIENT_ID'),
     apiClientSecret: required('IAM_API_CLIENT_SECRET'),
-    bootstrapTenantAlias: env.IAM_BOOTSTRAP_TENANT?.trim() || 'default',
+    bootstrapTenantAlias: bootstrapTenant(env),
     appOrigin: originOf(env.IAM_APP_URL),
   };
 }
@@ -77,4 +77,15 @@ function originOf(url: string | undefined): string | null {
   } catch {
     return null;
   }
+}
+
+/** `local` is the reserved tenant of workspaces made without sign-in. */
+function bootstrapTenant(env: NodeJS.ProcessEnv): string {
+  const alias = env.IAM_BOOTSTRAP_TENANT?.trim() || 'default';
+  if (alias === 'local') {
+    throw new Error(
+      "IAM_BOOTSTRAP_TENANT cannot be 'local': that name is kept for workspaces made without sign-in.",
+    );
+  }
+  return alias;
 }
