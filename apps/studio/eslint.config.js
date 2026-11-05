@@ -9,6 +9,11 @@ export default [
     ...remotion.flatPlugin,
   },
   {
+    // react-three-fiber children (<mesh rotation=…>) are not DOM props.
+    files: ["**/*.three.tsx"],
+    rules: { "react/no-unknown-property": "off" },
+  },
+  {
     ignores: ["out/**", "build/**"],
   },
 ];
