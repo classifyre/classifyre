@@ -75,7 +75,13 @@ export class CaseBoardGateway implements OnGatewayDisconnect, CaseBoardEvents {
     }
     await client.join(room);
     const members = this.presence.get(room) ?? new Map<string, string>();
-    members.set(client.id, parseActorName(body?.actor) ?? '');
+    // With sign-in the board shows who signed in, not a name the client sends.
+    const signedIn = (
+      client.data['classifyrePrincipal'] as
+        | { actor?: { displayName?: string | null } }
+        | undefined
+    )?.actor?.displayName;
+    members.set(client.id, signedIn ?? parseActorName(body?.actor) ?? '');
     this.presence.set(room, members);
     this.broadcastPresence(room);
     return { success: true };

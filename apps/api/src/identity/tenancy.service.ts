@@ -302,30 +302,46 @@ export class TenancyService implements OnModuleDestroy {
    * that group becomes Tenant admin. Idempotent; a no-op once nothing is left
    * in `local`.
    */
+  /**
+   * Gives a tenant's top-level `admins` group Tenant admin, once per tenant
+   * (`iam_tenants.admins_granted_at`), so a tenant admin can take it away
+   * again. False when it was given before.
+   */
+  async grantAdminsOnce(
+    tenantId: string,
+    adminsGroupId: string,
+  ): Promise<boolean> {
+    if (!(await this.adminsPending(tenantId))) return false;
+    // The grant is unique, so two pods doing this at once give it once.
+    await this.addGrant({
+      tenantId,
+      subjectType: 'group',
+      subjectId: adminsGroupId,
+      roleKey: 'tenant-admin',
+      scopeType: 'tenant',
+      scopeId: tenantId,
+      createdBy: 'system:bootstrap',
+    });
+    await this.pool.query(
+      `UPDATE iam_tenants SET admins_granted_at = now() WHERE id = $1`,
+      [tenantId],
+    );
+    return true;
+  }
+
+  /** True until the tenant's `admins` group has been given Tenant admin. */
+  async adminsPending(tenantId: string): Promise<boolean> {
+    const { rows } = await this.pool.query(
+      `SELECT 1 FROM iam_tenants WHERE id = $1 AND admins_granted_at IS NULL`,
+      [tenantId],
+    );
+    return rows.length > 0;
+  }
+
   async adoptLocalWorkspaces(
     tenant: Tenant,
     adminsGroupId: string | null,
   ): Promise<void> {
-    const { rows: pending } = await this.pool.query(
-      `SELECT 1 FROM iam_tenants WHERE id = $1 AND admins_granted_at IS NULL`,
-      [tenant.id],
-    );
-    if (adminsGroupId && pending.length > 0) {
-      // The grant is unique, so two pods booting at once give it once.
-      await this.addGrant({
-        tenantId: tenant.id,
-        subjectType: 'group',
-        subjectId: adminsGroupId,
-        roleKey: 'tenant-admin',
-        scopeType: 'tenant',
-        scopeId: tenant.id,
-        createdBy: 'system:bootstrap',
-      });
-      await this.pool.query(
-        `UPDATE iam_tenants SET admins_granted_at = now() WHERE id = $1`,
-        [tenant.id],
-      );
-    }
     const { rowCount } = await this.pool.query(
       `UPDATE namespaces
           SET tenant_id = $1, owner_group_id = COALESCE(owner_group_id, $2)

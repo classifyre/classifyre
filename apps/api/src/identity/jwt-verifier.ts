@@ -124,6 +124,7 @@ export class JwtVerifier {
     this.lastFetch = Date.now();
     const response = await (this.options.fetchImpl ?? fetch)(
       this.options.jwksUrl,
+      { signal: AbortSignal.timeout(3_000) },
     );
     if (!response.ok) {
       throw new InvalidTokenError(

@@ -47,10 +47,17 @@ first one (`iam.bootstrap.tenant`, default `default`) with a group `admins`
 whose members are tenant admins.
 
 To add a tenant, create an organization in the `classifyre` realm (its
-**alias** is how Classifyre names it), add its members, and give it a group
-for its admins. The tenant appears in Classifyre the first time one of its
-members signs in; a tenant admin of that tenant then gives access through the
-**Tenant access** page. Until a grant exists, its members see no workspaces.
+**alias** is how Classifyre names it), add its members, and give it a
+top-level group called `admins` with its first admins in it. The tenant
+appears in Classifyre the first time one of its members signs in, and its
+`admins` group then becomes tenant admin, once: if a tenant admin later takes
+that away, it stays away. A tenant admin gives everyone else access through
+the **Tenant access** page; until a grant exists, other members see no
+workspaces.
+
+Do not delete an organization and create it again under the same alias: its
+members are refused with a message that an operator has to link the tenant
+again, so nobody inherits the old tenant's workspaces by accident.
 
 Groups live inside an organization (**Organizations → your tenant →
 Groups**). They can be nested: being in `/finance/ap-team` counts as being in

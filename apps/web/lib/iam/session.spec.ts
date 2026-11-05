@@ -1,4 +1,6 @@
 import {
+  IdentityUnavailableError,
+  tokenRequest,
   iamWebConfig,
   needsRenewal,
   newFlow,
@@ -85,5 +87,25 @@ describe("web sign-in session", () => {
     ]);
     expect(cookies[1]?.value).not.toBe("r");
     expect(cookies.every((cookie) => cookie.maxAge === 1800)).toBe(true);
+  });
+
+  describe("when the identity server is away", () => {
+    afterEach(() => jest.restoreAllMocks());
+
+    it("tells a refused token (sign-in ended) from no answer (keep the session)", async () => {
+      const fetchMock = jest.spyOn(global, "fetch");
+      fetchMock.mockResolvedValueOnce(new Response("{}", { status: 400 }));
+      await expect(tokenRequest(config, { grant_type: "refresh_token" })).resolves.toBeNull();
+
+      fetchMock.mockResolvedValueOnce(new Response("", { status: 503 }));
+      await expect(tokenRequest(config, { grant_type: "refresh_token" })).rejects.toBeInstanceOf(
+        IdentityUnavailableError,
+      );
+
+      fetchMock.mockRejectedValueOnce(new TypeError("fetch failed"));
+      await expect(tokenRequest(config, { grant_type: "refresh_token" })).rejects.toBeInstanceOf(
+        IdentityUnavailableError,
+      );
+    });
   });
 });

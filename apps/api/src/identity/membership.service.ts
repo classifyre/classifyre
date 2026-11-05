@@ -25,6 +25,8 @@ const TTL_MS = 60_000;
 /** How long a failed refresh may fall back to the last answer. */
 const STALE_GRACE_MS = 15 * 60_000;
 const MAX_ENTRIES = 5_000;
+/** A hanging identity server must fail fast, so the stale answer can serve. */
+const LOOKUP_TIMEOUT_MS = 3_000;
 
 interface Cached<T> {
   value: T;
@@ -234,6 +236,7 @@ export class MembershipService {
   private async get<T>(path: string, allowMissing = false): Promise<T | null> {
     const response = await this.fetchImpl(`${this.config.adminUrl}${path}`, {
       headers: { Authorization: `Bearer ${await this.token()}` },
+      signal: AbortSignal.timeout(LOOKUP_TIMEOUT_MS),
     });
     if (allowMissing && response.status === 404) return null;
     if (!response.ok) {
@@ -252,6 +255,7 @@ export class MembershipService {
       `${this.config.internalRealmUrl}/protocol/openid-connect/token`,
       {
         method: 'POST',
+        signal: AbortSignal.timeout(LOOKUP_TIMEOUT_MS),
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
           grant_type: 'client_credentials',
