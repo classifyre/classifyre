@@ -1,6 +1,8 @@
 import { Composition, Folder } from "remotion";
 import "./studio.css";
 import { VIDEO_DEFAULTS, type VideoDefinition } from "./kit";
+import { gsapCheck } from "./smoke/gsap-check";
+import { threeCheck } from "./smoke/three-check.three";
 import { reuseCheck } from "./smoke/reuse-check";
 
 /*
@@ -21,7 +23,9 @@ export function RemotionRoot() {
   return (
     <>
       <Folder name="videos">{videos.map(compositionFor)}</Folder>
-      <Folder name="studio">{compositionFor(reuseCheck)}</Folder>
+      <Folder name="studio">{compositionFor(reuseCheck)}
+        {compositionFor(gsapCheck)}
+        {compositionFor(threeCheck)}</Folder>
     </>
   );
 }

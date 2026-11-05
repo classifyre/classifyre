@@ -26,6 +26,13 @@ the `remotion-best-practices` skill and its references. Where they say to
 scaffold a project or run `npx remotion ...`, do not: the project exists, and
 the commands here are `bun run studio` / `bun run studio:render <id>`.
 
+For the look of a scene (hierarchy, type, colour, spacing, and the tells of
+generic AI design) use the `impeccable` skill: `/impeccable critique` or
+`polish` on a still before calling a scene done, and `npx impeccable detect`
+on the video's source. Its context files (`PRODUCT.md`, `DESIGN.md`) come from
+`/impeccable init`, not from here; the house style in `PLAYBOOK.md` wins where
+they differ.
+
 ## From scenario to video
 
 1. Save the scenario verbatim as `apps/studio/videos/<name>/scenario.md`.
@@ -59,9 +66,23 @@ the commands here are `bun run studio` / `bun run studio:render <id>`.
 
 - Every scene is wrapped in `Stage` (theme + fonts). Product UI goes inside
   `Viewport` so it is legible at 1080p without restyling.
-- Motion comes from the frame: the kit's `Rise`, `Pop`, `useEnter`, `useCount`,
-  or `interpolate`/`spring`. CSS transitions, `animate-*` utilities and hover
-  states do not render.
+- Motion comes from the frame. Anything beyond a plain fade or slide is GSAP,
+  through the kit: `useTimeline` (a paused timeline seeked to `frame / fps`:
+  staggers, sequences, `expo.out` / `back.out` eases) and `tween(frame, start,
+  frames, ease)` / `gsapEase(name)` for a single value. Do not hand-roll
+  `interpolate` + `Easing` chains or springs for choreography, and never let
+  GSAP play on its own ticker (no `gsap.to` outside a `useTimeline`, no
+  `ScrollTrigger`, no `repeat: -1` driven by time). `Rise`, `Pop`, `useEnter`
+  and `useCount` stay for the simple cases. CSS transitions, `animate-*`
+  utilities and hover states do not render.
+- 3D is three.js through `@remotion/three`: a `ThreeCanvas` (give it the
+  video's `width`/`height`) with react-three-fiber children, driven by
+  `useCurrentFrame()`. Use it sparingly, for a moment that earns it (a data
+  object turning, a lineage or vector space seen in depth), not as the default
+  look. Never `useFrame`, `useThree().clock` or drei's auto-animating helpers:
+  they run on wall-clock time. Models and textures load through `staticFile`
+  or an import, wrapped by `delayRender`/`useLoader` so a frame waits for them.
+  Product UI stays DOM; 3D sits behind or beside it, never redraws it.
 - Data is fixed. No `Date.now()`, no `Math.random()`; write the fixture in the
   video file. `packages/ui/src/mocks` is stale in places (lower-case source
   types, dates relative to now) — do not spread it into components unchecked.
@@ -78,6 +99,6 @@ the commands here are `bun run studio` / `bun run studio:render <id>`.
 ## Licence boundary
 
 Free Remotion core only (`remotion`, `@remotion/cli`, `transitions`,
-`google-fonts`, `tailwind-v4`, and other free `@remotion/*` packages at the same
+`google-fonts`, `tailwind-v4`, `three` (with `three`, `@react-three/fiber`), and other free `@remotion/*` packages at the same
 pinned version). Do not add Editor Starter or other paid products, and keep all
 `@remotion/*` versions identical and exact (no `^`).

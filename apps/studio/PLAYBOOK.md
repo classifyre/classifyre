@@ -432,8 +432,35 @@ tag) is drawn outside the `Camera`.
   table scene, and the line again on the last card. Findings are then quoted
   word for word: they are the workspace's own, about its own invented data.
 
+## Motion is GSAP
+
+Choreography (staggers, sequenced reveals, anything that should feel sprung or
+eased with character) is a GSAP timeline through the kit's `useTimeline`. It is
+built paused and seeked to `frame / fps` on every render, so the frame stays
+the only clock. For one value, `tween(frame, start, frames, "expo.out")`. Pick
+eases by name (`power3.out` to arrive, `power2.inOut` to move, `back.out(1.4)`
+for a pop, `expo.out` for a hard stop); do not stack `interpolate` calls to
+imitate them. `glide`, `arrive`, `track` and `Camera` stay for camera and
+cursor paths measured in frame numbers.
+
+## Sometimes, 3D
+
+A moment that is better seen in depth (a graph of lineage, a point cloud of
+meanings, an object the story turns over) can be three.js: `ThreeCanvas` from
+`@remotion/three`, react-three-fiber inside, everything a function of
+`useCurrentFrame()`. It is the exception, one or two scenes in a film, not a
+style. GSAP can still drive it: animate a plain object in a `useTimeline`
+and read it into the mesh. WebGL needs the `angle` renderer, which
+`remotion.config.ts` sets; `src/smoke/three-check.three.tsx` is the smoke test. Name files that hold react-three-fiber JSX `*.three.tsx`: the lint rule about unknown DOM props is off for them.
+
 ## Things that break renders
 
+- **GSAP on its own clock.** `gsap.to` / `gsap.from` outside `useTimeline`,
+  `ScrollTrigger`, `repeat: -1`, `delay` read from the ticker: they play in
+  real time and come out frozen or jumping. Put the tween in a `useTimeline`.
+- **three.js on its own clock.** `useFrame`, `Clock`, drei helpers that
+  animate by themselves, orbit controls: all real-time. Set transforms from
+  the frame. And no WebGL without `angle` (`remotion.config.ts`).
 - **Wall-clock motion.** CSS animations, transitions, `setInterval`. Switch
   them off in CSS for the filmed page (`src/kit/desktop.css` does it for the
   landing page) and move things from the frame.

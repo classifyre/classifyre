@@ -2,6 +2,7 @@ export * from "./brand";
 export * from "./desktop";
 export * from "./dom";
 export * from "./fonts";
+export * from "./gsap";
 export * from "./lettering";
 export * from "./motion";
 export * from "./mr-fyre";

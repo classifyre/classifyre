@@ -58,6 +58,7 @@ The first render downloads Chrome Headless Shell (~95 MB) into `node_modules`.
 | --- | --- |
 | `Stage`, `Viewport` | The frame every scene sits in: theme, fonts, ground |
 | `Rise`, `Pop`, `useEnter`, `useCount` | Things that enter |
+| `useTimeline`, `tween`, `gsapEase`, `gsap` | [GSAP](https://gsap.com) timelines seeked by the frame, for staggers and sequenced motion |
 | `glide`, `arrive`, `during`, `track`, `typed` | Plain functions of the frame, for everything else |
 | `Desktop`, `Window`, `Browser`, `Cursor`, `Camera` | The laptop a story happens on, its pointer, and the camera |
 | `useSpots`, `route`, `useOffsets`, `fill`, `useHands` | Measuring the product's components and typing into them |
@@ -65,6 +66,8 @@ The first render downloads Chrome Headless Shell (~95 MB) into `node_modules`.
 | `Voice`, `Captions`, `Bed`, `Narrator` | What lies over every scene of a narrated video |
 | `Chip`, `Headline`, `Mark` | The words a video sets itself |
 | `Logo`, `Mascot`, `MrFyre`, `MrFyreActor` | The brand |
+
+For 3D, `@remotion/three`'s `ThreeCanvas` and react-three-fiber are installed (see `src/smoke/three-check.three.tsx`, and "Sometimes, 3D" in `PLAYBOOK.md`).
 
 Three heavier pieces are imported by their own path, because not every video
 wants what they bring with them:

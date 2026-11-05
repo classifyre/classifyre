@@ -5,6 +5,8 @@ import { enableTailwind } from "@remotion/tailwind-v4";
 Config.setEntryPoint("./src/index.ts");
 Config.setVideoImageFormat("jpeg");
 Config.setOverwriteOutput(true);
+// three.js (src/kit, @remotion/three) needs a WebGL context in the headless browser.
+Config.setChromiumOpenGlRenderer("angle");
 
 // Every script that reaches this file runs from apps/studio.
 const apps = path.resolve(process.cwd(), "..");
