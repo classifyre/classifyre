@@ -285,6 +285,16 @@ describe('IdentityService', () => {
     },
   ];
 
+  let pending: boolean;
+  let adminGrants: string[];
+  let tenantOrg: string;
+
+  beforeEach(() => {
+    pending = false;
+    adminGrants = [];
+    tenantOrg = 'org-acme';
+  });
+
   function service(member: { enabled: boolean; orgs: string[] }) {
     const membership = {
       membership: () =>
@@ -299,11 +309,22 @@ describe('IdentityService', () => {
           })),
         }),
       groupIds: () => Promise.resolve(new Set(['finance'])),
+      groups: () =>
+        Promise.resolve([
+          { id: 'admins', name: 'admins', path: '/admins', parentId: null },
+          { id: 'finance', name: 'finance', path: '/finance', parentId: null },
+        ]),
       ancestry: (_org: string, id: string) =>
         Promise.resolve(id === 'ap-team' ? ['ap-team', 'finance'] : [id]),
     } as unknown as MembershipService;
     const tenancy = {
-      ensureTenant: () => Promise.resolve(acme),
+      ensureTenant: () => Promise.resolve({ ...acme, orgId: tenantOrg }),
+      adminsPending: () => Promise.resolve(pending),
+      grantAdminsOnce: (_tenant: string, group: string) => {
+        adminGrants.push(group);
+        pending = false;
+        return Promise.resolve(true);
+      },
       rememberPrincipal: () => Promise.resolve(),
       grantsFor: () => Promise.resolve(grants),
       workspaceTenancy: (id: string) =>
@@ -351,6 +372,21 @@ describe('IdentityService', () => {
     await expect(
       service({ enabled: true, orgs: ['globex'] }).authenticate(request()),
     ).rejects.toBeInstanceOf(AuthenticationError);
+  });
+
+  it("gives a new tenant's admins group Tenant admin on its first sign-in, once", async () => {
+    pending = true;
+    const identity = service({ enabled: true, orgs: ['acme'] });
+    await identity.authenticate(request());
+    await identity.authenticate(request());
+    expect(adminGrants).toEqual(['admins']);
+  });
+
+  it('refuses a tenant whose organization was made again under its alias', async () => {
+    tenantOrg = 'org-old';
+    await expect(
+      service({ enabled: true, orgs: ['acme'] }).authenticate(request()),
+    ).rejects.toThrow(/link it again/);
   });
 
   it('refuses a request without a token', async () => {

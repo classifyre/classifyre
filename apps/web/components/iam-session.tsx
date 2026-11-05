@@ -31,6 +31,9 @@ export function IamProvider({
         credentials: "same-origin",
       });
       if (response.status === 204) return true;
+      // The identity server is away for a moment: the request fails, the
+      // session stays, and the next one tries again.
+      if (response.status === 503) return false;
       const returnTo = `${window.location.pathname}${window.location.search}`;
       window.location.assign(
         `/auth/login/?returnTo=${encodeURIComponent(returnTo)}`,

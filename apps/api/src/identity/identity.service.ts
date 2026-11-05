@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import type { Actor } from './actor';
 import type { Capability } from './capabilities';
 import {
@@ -89,6 +89,7 @@ export function tenantAliasOf(claim: unknown): string | null {
  */
 @Injectable()
 export class IdentityService {
+  private readonly logger = new Logger(IdentityService.name);
   private readonly verifier: Pick<JwtVerifier, 'verify'>;
 
   constructor(
@@ -148,6 +149,14 @@ export class IdentityService {
       );
     }
     const tenant = await this.tenancy.ensureTenant(org);
+    if (tenant.orgId && tenant.orgId !== org.id) {
+      // An organization deleted and made again under the same alias is not
+      // the tenant whose workspaces and grants carry that alias.
+      throw new AuthenticationError(
+        `Tenant '${alias}' belongs to an organization that no longer exists. An operator has to link it again.`,
+      );
+    }
+    await this.ensureAdmins(tenant, org.id);
     const groupIds = await this.membership.groupIds(claims.sub, org.id);
     const grants = await this.tenancy.grantsFor(
       tenant.id,
@@ -179,6 +188,35 @@ export class IdentityService {
     request.classifyrePrincipal = principal;
     this.rememberName(claims.sub, displayName, member.email);
     return principal;
+  }
+
+  /** Tenants whose `admins` group already has Tenant admin, and when others were last checked. */
+  private readonly adminsChecked = new Map<string, number>();
+
+  /**
+   * Every tenant's top-level `admins` group gets Tenant admin once, the first
+   * time anyone of the tenant signs in; without it nobody could give a grant
+   * in a new tenant. Checked at most once a minute while the group is missing.
+   */
+  private async ensureAdmins(tenant: Tenant, orgId: string): Promise<void> {
+    const checked = this.adminsChecked.get(tenant.id);
+    if (checked === Infinity) return;
+    if (checked && Date.now() - checked < 60_000) return;
+    if (!(await this.tenancy.adminsPending(tenant.id))) {
+      this.adminsChecked.set(tenant.id, Infinity);
+      return;
+    }
+    const admins = await this.adminsGroup(orgId);
+    if (admins && (await this.tenancy.grantAdminsOnce(tenant.id, admins.id))) {
+      this.logger.log(`Gave ${admins.path} Tenant admin in ${tenant.alias}`);
+    }
+    this.adminsChecked.set(tenant.id, admins ? Infinity : Date.now());
+  }
+
+  private async adminsGroup(orgId: string) {
+    return (await this.membership.groups(orgId)).find(
+      (group) => group.parentId === null && group.name === 'admins',
+    );
   }
 
   private readonly namesWritten = new Map<string, number>();
@@ -374,9 +412,14 @@ export class IdentityService {
       );
     }
     const tenant = await this.tenancy.ensureTenant(org);
-    const admins = (await this.membership.groups(org.id)).find(
-      (group) => group.parentId === null && group.name === 'admins',
-    );
-    await this.tenancy.adoptLocalWorkspaces(tenant, admins?.id ?? null);
+    const admins = await this.adminsGroup(org.id);
+    if (!admins) {
+      // The setup job creates it right after the organization: retried.
+      throw new Error(
+        `Bootstrap tenant '${org.alias}' has no 'admins' group in the identity server yet`,
+      );
+    }
+    await this.tenancy.grantAdminsOnce(tenant.id, admins.id);
+    await this.tenancy.adoptLocalWorkspaces(tenant, admins.id);
   }
 }

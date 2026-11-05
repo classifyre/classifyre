@@ -138,20 +138,38 @@ export interface TokenSet {
   refresh_expires_in?: number;
 }
 
+/**
+ * The identity server did not answer (down, restarting, too slow). Unlike a
+ * refused token this does not end anyone's sign-in.
+ */
+export class IdentityUnavailableError extends Error {}
+
+const TOKEN_TIMEOUT_MS = 5_000;
+
+/** Null when the identity server refuses (sign-in has ended); throws {@link IdentityUnavailableError} when it does not answer. */
 export async function tokenRequest(
   config: IamWebConfig,
   params: Record<string, string>,
 ): Promise<TokenSet | null> {
-  const response = await fetch(config.tokenUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: config.clientId,
-      client_secret: config.clientSecret,
-      ...params,
-    }),
-    cache: "no-store",
-  });
+  let response: Response;
+  try {
+    response = await fetch(config.tokenUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: config.clientId,
+        client_secret: config.clientSecret,
+        ...params,
+      }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(TOKEN_TIMEOUT_MS),
+    });
+  } catch (error) {
+    throw new IdentityUnavailableError(String(error));
+  }
+  if (response.status >= 500) {
+    throw new IdentityUnavailableError(`Identity server answered ${response.status}`);
+  }
   if (!response.ok) return null;
   return (await response.json()) as TokenSet;
 }

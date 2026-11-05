@@ -4,7 +4,11 @@ import {
   BUILTIN_MCP_PREFIX,
   CHAT_BOT_STATE_KEY,
 } from './builtin-mcp-tool-adapter';
-import { allowedBuiltinToolNames } from './chat-permissions';
+import {
+  allowedBuiltinToolNames,
+  chatMutationsAllowed,
+  withChatBotGate,
+} from './chat-permissions';
 import { runChatTurn } from './chat-agent-loop';
 import type { AgentLoopDeps } from '../autopilot/harness/agent-loop';
 import type { AgentContext } from '../autopilot/autopilot.types';
@@ -77,6 +81,26 @@ describe('adaptBuiltinMcpTool', () => {
     // No chat-bot state (e.g. an autopilot mission) → fail closed.
     const noBot = await tool.resolveGate!({}, makeToolContext());
     expect(noBot.mode).toBe(AiManagementMode.OBSERVE_ONLY);
+  });
+});
+
+describe('chat bots with sign-in', () => {
+  it('may change things only when allowed and sign-in is off', () => {
+    expect(chatMutationsAllowed({ allowMutations: true }, false)).toBe(true);
+    expect(chatMutationsAllowed({ allowMutations: false }, false)).toBe(false);
+    expect(chatMutationsAllowed({ allowMutations: true }, true)).toBe(false);
+  });
+
+  it('turns a write tool into observe-only when mutations are off', async () => {
+    const tool = withChatBotGate({
+      name: 'cases.close',
+      sideEffect: 'write',
+    } as unknown as Tool);
+    const gate = await tool.resolveGate!(
+      {},
+      makeToolContext({ id: 'b1', allowMutations: false, agentKinds: [] }),
+    );
+    expect(gate.mode).toBe(AiManagementMode.OBSERVE_ONLY);
   });
 });
 
