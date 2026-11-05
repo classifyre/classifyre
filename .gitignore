@@ -5,7 +5,6 @@ apps/web/playwright/.cache/
 **/__pycache__/
 *.py[cod]
 .secrets
-.claude/skills/add-new-source
 reference_project/
 showcases/
 .codex/
