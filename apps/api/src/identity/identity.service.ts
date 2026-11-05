@@ -15,6 +15,7 @@ import { TenancyService, type Grant, type Tenant } from './tenancy.service';
 export const SESSION_COOKIE = 'cf_session';
 
 export interface Principal {
+  /** Keycloak subject id of the signed-in person; never a group or actor ref. */
   sub: string;
   actor: Actor;
   tenant: Tenant;

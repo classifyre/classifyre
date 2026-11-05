@@ -9637,6 +9637,31 @@
         ]
       }
     },
+    "/tenant/tenants": {
+      "get": {
+        "operationId": "TenantAccessController_tenants",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TenantMembershipDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Every tenant the caller belongs to, for switching (§12.2)",
+        "tags": [
+          "Access"
+        ]
+      }
+    },
     "/tenant/people": {
       "get": {
         "operationId": "TenantPeopleController_list",
@@ -31061,6 +31086,32 @@
           "actor",
           "action",
           "detail"
+        ]
+      },
+      "TenantMembershipDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "alias": {
+            "type": "string",
+            "example": "default"
+          },
+          "name": {
+            "type": "string",
+            "example": "Default"
+          },
+          "current": {
+            "type": "boolean",
+            "description": "True when this is the tenant of the current session."
+          }
+        },
+        "required": [
+          "id",
+          "alias",
+          "name",
+          "current"
         ]
       },
       "PersonDto": {

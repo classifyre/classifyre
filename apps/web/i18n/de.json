@@ -7267,7 +7267,8 @@
     "signedIn": "Angemeldet",
     "tenant": "Mandant: {{name}}",
     "signOut": "Abmelden",
-    "tenantSettings": "Mandantenzugriff"
+    "tenantSettings": "Mandantenzugriff",
+    "switchTenant": "Mandant wechseln"
   },
   "access": {
     "title": "Zugriff",

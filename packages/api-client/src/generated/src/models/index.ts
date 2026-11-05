@@ -506,6 +506,7 @@ export * from './TemporaryPasswordDto';
 export * from './TenantDto';
 export * from './TenantEventDto';
 export * from './TenantGroupDto';
+export * from './TenantMembershipDto';
 export * from './TestConnectionResponseDto';
 export * from './TextCoverageDto';
 export * from './ThreadEntriesResponseDto';

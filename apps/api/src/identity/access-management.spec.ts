@@ -48,9 +48,29 @@ describe('AccessManagementService', () => {
     grantById: (_t: string, id: string) =>
       Promise.resolve(stored.find((grant) => grant.id === id) ?? null),
     deleteGrant: () => Promise.resolve(),
+    tenantByAlias: (alias: string) =>
+      Promise.resolve(
+        alias === 'acme'
+          ? { id: 't1', alias: 'acme', name: 'Acme', orgId: 'org1' }
+          : alias === 'globex'
+            ? { id: 't2', alias: 'globex', name: 'Globex', orgId: 'org2' }
+            : null,
+      ),
   } as unknown as TenancyService;
 
   const identity = {
+    membership: {
+      membership: (_sub: string) =>
+        Promise.resolve({
+          enabled: true,
+          displayName: 'Admin',
+          email: null,
+          organizations: [
+            { id: 'org1', alias: 'acme', name: 'Acme' },
+            { id: 'org9', alias: 'unknown', name: 'Unknown' },
+          ],
+        }),
+    },
     groupsOf: () =>
       Promise.resolve([
         { id: 'finance', name: 'finance', path: '/finance', parentId: null },
@@ -175,5 +195,11 @@ describe('AccessManagementService', () => {
     expect(off.roles().map((role) => role.key)).not.toContain(
       'platform-operator',
     );
+  });
+
+  it('lists only the tenants Classifyre knows, current one last marked', async () => {
+    const tenants = await service.tenants(principal);
+    // `unknown` is an organization without a tenant row: not offered.
+    expect(tenants.map((tenant) => tenant.alias)).toEqual(['acme']);
   });
 });

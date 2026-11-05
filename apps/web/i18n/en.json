@@ -7267,7 +7267,8 @@
     "signedIn": "Signed in",
     "tenant": "Tenant: {{name}}",
     "signOut": "Sign out",
-    "tenantSettings": "Tenant access"
+    "tenantSettings": "Tenant access",
+    "switchTenant": "Switch tenant"
   },
   "access": {
     "title": "Access",

@@ -14,15 +14,15 @@ import { BUILT_IN_ROLES } from './roles';
 import {
   TenancyService,
   type Grant,
+  type GrantScope,
   type GrantScopeType,
+  type Tenant,
 } from './tenancy.service';
 
-export interface GrantInput {
+export interface GrantInput extends GrantScope {
   subjectType: 'group' | 'user';
   subjectId: string;
   roleKey: string;
-  scopeType: GrantScopeType;
-  scopeId: string;
   expiresAt?: string | null;
 }
 
@@ -86,6 +86,20 @@ export class AccessManagementService {
   tenantEvents(principal: Principal) {
     this.requireSignIn();
     return this.tenancy.tenantEvents(principal.tenant.id);
+  }
+
+  /** Every tenant the principal belongs to, for the account menu's switcher (§12.2). */
+  async tenants(principal: Principal): Promise<Tenant[]> {
+    const identity = this.requireSignIn();
+    const { organizations } = await identity.membership.membership(
+      principal.sub,
+    );
+    const tenants: Tenant[] = [];
+    for (const org of organizations) {
+      const tenant = await this.tenancy.tenantByAlias(org.alias);
+      if (tenant) tenants.push({ ...tenant, orgId: org.id });
+    }
+    return tenants.sort((a, b) => a.name.localeCompare(b.name));
   }
 
   async groups(principal: Principal) {

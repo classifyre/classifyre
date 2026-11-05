@@ -52,11 +52,15 @@ export class NamespacesController {
 
   /**
    * With sign-in, these routes run outside any workspace, so the access guard
-   * only checked tenant-wide capabilities; each route checks the workspace it
-   * touches here. Another tenant's workspace and an invisible one are 404.
+   * only checked tenant-wide capabilities.
+   *
+   * The guard already authenticated this request (registry routes pass through
+   * it), so reuse its principal instead of verifying the token again:
+   * `IdentityService.authenticate` returns the principal cached on the
+   * request on repeat calls.
    */
-  private async principal(request: FastifyRequest): Promise<Principal | null> {
-    if (!this.identity) return null;
+  private principal(request: FastifyRequest): Promise<Principal | null> {
+    if (!this.identity) return Promise.resolve(null);
     return this.identity.authenticate(request.raw);
   }
 

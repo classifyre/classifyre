@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { CAPABILITY_IDS } from './capabilities';
+import type { GrantScopeType } from './tenancy.service';
 
 export class RoleDto {
   @ApiProperty({ example: 'investigator' })
@@ -48,7 +49,7 @@ export class CreateGrantDto {
     description:
       'Tenant-level grants only: where the role applies. Workspace grants are always on that workspace.',
   })
-  scopeType?: 'tenant' | 'group' | 'workspace';
+  scopeType?: GrantScopeType;
 
   @ApiPropertyOptional({
     description:
@@ -122,6 +123,23 @@ export class TenantDto {
       'True when people and groups are managed here; false when a company directory or the identity server owns them and they are read-only.',
   })
   peopleManagement: boolean;
+}
+
+/** One tenant the caller belongs to, for the account menu (§12.2). */
+export class TenantMembershipDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty({ example: 'default' })
+  alias: string;
+
+  @ApiProperty({ example: 'Default' })
+  name: string;
+
+  @ApiProperty({
+    description: 'True when this is the tenant of the current session.',
+  })
+  current: boolean;
 }
 
 export class PersonDto {

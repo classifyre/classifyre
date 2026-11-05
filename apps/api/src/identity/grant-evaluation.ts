@@ -1,6 +1,6 @@
 import type { Capability } from './capabilities';
 import { BUILT_IN_ROLES } from './roles';
-import type { Grant } from './tenancy.service';
+import type { GrantScope } from './tenancy.service';
 
 const ROLE_CAPABILITIES = new Map<string, readonly Capability[]>(
   BUILT_IN_ROLES.map((role) => [role.key, role.capabilities]),
@@ -18,7 +18,7 @@ export function roleCapabilities(roleKey: string): readonly Capability[] {
  * owner group followed by its ancestors.
  */
 export function grantApplies(
-  grant: Pick<Grant, 'scopeType' | 'scopeId'>,
+  grant: GrantScope,
   workspace: { namespaceId: string; ownerLineage: readonly string[] },
 ): boolean {
   switch (grant.scopeType) {
@@ -33,7 +33,7 @@ export function grantApplies(
 
 /** Every capability the grants give in one workspace. Grants only add up. */
 export function capabilitiesInWorkspace(
-  grants: readonly Pick<Grant, 'scopeType' | 'scopeId' | 'roleKey'>[],
+  grants: readonly (GrantScope & { roleKey: string })[],
   workspace: { namespaceId: string; ownerLineage: readonly string[] },
 ): Set<Capability> {
   const capabilities = new Set<Capability>();
@@ -48,7 +48,7 @@ export function capabilitiesInWorkspace(
 
 /** Capabilities from grants on the whole tenant only (registry-level routes). */
 export function tenantCapabilities(
-  grants: readonly Pick<Grant, 'scopeType' | 'roleKey'>[],
+  grants: readonly (Pick<GrantScope, 'scopeType'> & { roleKey: string })[],
 ): Set<Capability> {
   const capabilities = new Set<Capability>();
   for (const grant of grants) {
@@ -67,7 +67,7 @@ export function tenantCapabilities(
  * invariant no grant can lift (§8.2).
  */
 export function canCreateWorkspaceFor(
-  grants: readonly Pick<Grant, 'scopeType' | 'scopeId' | 'roleKey'>[],
+  grants: readonly (GrantScope & { roleKey: string })[],
   ownerLineage: readonly string[],
 ): boolean {
   return grants.some(

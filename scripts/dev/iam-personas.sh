@@ -17,7 +17,10 @@ ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 NS=${IAM_PERSONAS_NAMESPACE:-iam-personas}
 REL=personas
 API_PORT=${IAM_PERSONAS_API_PORT:-8814}
-IAM_PORT=8180
+# Not 8180: the dev stack (`skaffold dev` with the `iam` profile) already
+# forwards the identity server there; two forwards on one port race and the
+# token calls land on the wrong realm ("Invalid client").
+IAM_PORT=${IAM_PERSONAS_IAM_PORT:-8182}
 B="http://127.0.0.1:${API_PORT}"
 KCURL="http://localhost:${IAM_PORT}/iam/realms/classifyre"
 PF_PIDS=()
@@ -34,7 +37,19 @@ cleanup() {
 trap cleanup EXIT
 
 say() { printf '\n== %s\n' "$*"; }
-json() { python3 -c "import sys,json; d=json.loads(sys.stdin.read() or 'null', strict=False); $1"; }
+# Every check pipes an HTTP body through here. When the API is unreachable the
+# body is empty (or an error page), so a bare `d['…']` would raise: stderr
+# noise, an empty result, a confusing FAIL. Fail closed instead — print a
+# marker that never equals the expected value, so the check still fails but
+# the log says why.
+json() { python3 -c "
+import sys,json
+try:
+    d=json.loads(sys.stdin.read() or 'null', strict=False)
+    $1
+except Exception as e:
+    print('FAIL-CLOSED: ' + type(e).__name__)
+"; }
 
 check() { # check <case> <description> <expected> <actual>
   if [ "$3" = "$4" ]; then
@@ -45,23 +60,41 @@ check() { # check <case> <description> <expected> <actual>
   fi
 }
 
+# The suite only checks what the API does, so keep every call bare: a NestJS
+# JSON body parser refuses an empty body that carries a content type, and the
+# generated TypeScript client never sends one bodyless either. The one POST
+# still carries its JSON body.
 token() { # token <username> [tenant]
   curl -s -d client_id=persona-test -d "username=$1" -d password=persona-pass-1 \
     -d grant_type=password -d "scope=openid organization:${2:-default}" \
     "$KCURL/protocol/openid-connect/token" | json "print((d or {}).get('access_token',''))"
 }
 status() { # status <user[@tenant]|-> <method> <path> [body]
-  local args=(-s -o /dev/null -w '%{http_code}' -X "$2" -H 'Content-Type: application/json')
-  if [ "$1" != "-" ]; then
-    args+=(-H "Authorization: Bearer $(token "${1%@*}" "$(tenant_of "$1")")")
+  # The content type only rides along with a body: the JSON body parser
+  # refuses an empty body that carries one, so a bodyless PUT/DELETE with the
+  # header answers 400 before authentication runs (see above token()).
+  local args=(-s -o /dev/null -w '%{http_code}' -X "$2") auth
+  if [ $# -ge 4 ]; then
+    args+=(-H 'Content-Type: application/json' -d "$4")
   fi
-  if [ $# -ge 4 ]; then args+=(-d "$4"); fi
+  if auth=$(authed "$1"); then
+    args+=(-H "$auth")
+  fi
   curl "${args[@]}" "$B$3"
 }
 # "user@tenant" -> tenant; plain "user" -> default.
 tenant_of() { case "$1" in *@*) echo "${1#*@}" ;; *) echo default ;; esac; }
-get() { curl -s -H "Authorization: Bearer $(token "$1" "${3:-default}")" "$B$2"; }
-post() { curl -s -X POST -H "Authorization: Bearer $(token "$1")" -H 'Content-Type: application/json' -d "$3" "$B$2"; }
+# One place builds the Authorization header. The command substitution runs
+# before curl starts, so a token fetch can never steal curl's stdin or drain
+# the response pipe into the next stage (a bodyless pipe the reader parses as
+# the response body).
+authed() { # authed <user[@tenant]> [tenant]: prints "Authorization: Bearer <token>"
+  if [ "$1" = "-" ]; then return 1; fi
+  local tenant=${2:-$(tenant_of "$1")}
+  printf 'Authorization: Bearer %s' "$(token "${1%@*}" "$tenant")"
+}
+get() { curl -s -H "$(authed "$1" "${3:-$(tenant_of "$1")}")" "$B$2"; }
+post() { curl -s -X POST -H "$(authed "$1")" -H 'Content-Type: application/json' -d "$3" "$B$2"; }
 slugs() { get "$1" /namespaces "${2:-default}" | json "print(','.join(sorted(n['slug'] for n in d)))"; }
 has_cap() { get "$1" "/$2/me" | json "print('yes' if '$3' in d['capabilities'] else 'no')"; }
 grant() { # grant <subjectType> <subjectId> <role> <scopeType> <scopeId> [expiresAt]
@@ -155,7 +188,14 @@ check U10 "contractor works until the end date" 200 "$(status contractor GET /fi
 
 say "people and groups, managed in Classifyre (step 8c)"
 req() { # req <method> <path> [body]: as the tenant admin, prints the body
-  curl -s -X "$1" -H "Authorization: Bearer $(token admin)" -H 'Content-Type: application/json' ${3:+-d "$3"} "$B$2"
+  # Like status(): no content type without a body (the JSON body parser 400s
+  # an empty body that carries one), so bodyless DELETEs and GETs are sent bare.
+  local method=$1 path=$2
+  if [ $# -ge 3 ]; then
+    curl -s -X "$method" -H "$(authed admin)" -H 'Content-Type: application/json' -d "$3" "$B$path"
+  else
+    curl -s -X "$method" -H "$(authed admin)" "$B$path"
+  fi
 }
 EAST=$(req POST /tenant/groups "{\"name\":\"east\",\"parentId\":\"$SALES\"}" | json "print(d.get('path','') + '|' + d.get('id',''))")
 check U17 "tenant admin creates a group inside /sales" "/sales/east" "${EAST%%|*}"
@@ -178,7 +218,7 @@ check U17 "nobody removes themselves" 403 "$(status admin DELETE "/tenant/people
 check U17 "a group that owns workspaces cannot be deleted" GROUP_OWNS_WORKSPACES "$(req DELETE "/tenant/groups/$FIN" | json "print(d.get('code'))")"
 check U17 "removing a person made here deletes their account" True "$(req DELETE "/tenant/people/$NEWBIE" | json "print(d.get('accountDeleted'))")"
 check U17 "an empty group is deleted" 204 "$(status admin DELETE "/tenant/groups/$EAST")"
-check U17 "every change is in the tenant's activity" yes "$(req GET /tenant/audit-events | json "a={e['action'] for e in d}; print('yes' if {'group.created','person.added','group.member_added','person.removed','group.deleted'} <= a else sorted(a))")"
+check U17 "every change is in the tenant's activity" yes "$(req GET /tenant/audit-events | json "a=set(e['action'] for e in d); need=set(['group.created','person.added','group.member_added','person.removed','group.deleted']); print('yes' if need <= a else sorted(a))")"
 
 say "mover, leaver and the contractor's end date (one-minute cache)"
 kubectl -n "$NS" exec -i "deploy/$REL-classifyre-iam" -c iam -- env ADMIN_PW="$ADMIN_PW" \
