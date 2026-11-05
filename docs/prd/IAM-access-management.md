@@ -2,7 +2,7 @@
 
 |                       |                                                                                                                                      |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| **Status**            | Steps 0–8 done 2026-11-04; review found release blockers (§13, Review)                                                               |
+| **Status**            | Steps 0–8 done 2026-11-04; review blockers fixed 2026-11-05 (§13, Review and Hardening)                                              |
 | **Size**              | L (9 steps, each its own PR)                                                                                                         |
 | **Depends on**        | [S1 · Enterprise extension seams](S1-enterprise-extension-seams.md) (step 1 builds S1 R1–R8 and R15)                                 |
 | **Identity provider** | Keycloak 26.8.1 (`quay.io/keycloak/keycloak:26.8.1`, released 2026-10-13), Helm chart only                                           |
@@ -302,7 +302,7 @@ sequenceDiagram
   A-->>Ag: refused: needs source.manage
 ```
 
-- `McpAccessToken` gains `owner_principal_id`. When IAM is on, a token without an owner cannot exist.
+- `McpAccessToken` gains `owner_sub`. With IAM on, a token without an owner is refused (`MCP_TOKEN_WITHOUT_OWNER`).
 - Effective rights are computed on **every call** from the owner's current grants. They are never copied into the token. So a viewer's agent is read-only, a mover's agent follows the move, a leaver's agent stops.
 - `tools/list` hides tools the owner cannot use, so agents do not plan with tools they will be refused.
 - Attribution reads "Anna Berg via _claude-desktop_" (actor reference `user:<sub>@mcp:<tokenId>`).
@@ -364,13 +364,13 @@ Decisions:
 - **Own templates, not a sub-chart.** Keycloak is one container. The Bitnami chart's images are no longer freely published, the community `keycloakx` chart lags upstream, and the operator needs cluster-wide CRDs that a workload chart should not install. Our own `Deployment` keeps names under `iam` (H5).
 - **Separate database, same server.** Keycloak gets its own database `iam` with its own user, never the `classifyre` database, whose `public` schema holds the registry. For `cnpg` it is a `Database` resource on the existing cluster; for `embedded` an init step; for `external` the operator supplies it.
 - **Same host, path `/iam`.** `iam` is added to `RESERVED_PREFIXES` and `RESERVED_WEB_PREFIXES` in `namespace/namespace.constants.ts`, so no workspace can be called `iam`.
-- **Upgrades use `strategy: Recreate`.** Keycloak minor upgrades need all nodes stopped. Sign-in is down for about a minute; issued tokens keep working because the API checks them against cached keys. Back up the `iam` database before minor upgrades (documented in `NOTES.txt` and the chart README).
+- **Upgrades use `strategy: Recreate`.** Keycloak minor upgrades need all nodes stopped. Sign-in is down for about a minute; issued tokens keep working because the API checks them against cached keys, and membership lookups fall back to the last answer for up to 15 minutes. Back up the `iam` database before minor upgrades (documented in `NOTES.txt` and the chart README).
 - **Structure as code, membership by people.** The `iam-config` hook Job applies the realm structure (clients, client scopes, mappers, flows, the `classifyre-operator` role) on every install and upgrade. Groups, users and organization membership are left to tenant admins and IdPs: the job never deletes what it does not own, which avoids the known `managed.group=full` deletion trap.
 - **Realm settings from the Keycloak guidance:** clients `classifyre-web` (confidential, used by the web server, authorization code + PKCE) and `classifyre-api` (audience; service account allowed to read users and groups only). _Full Scope Allowed_ off on every client. Implicit and password grants off. Access tokens 5 minutes. Brute-force detection on. Admin events with representation on. The master realm is never used by the application.
 
 ### 9.3 Keeping Keycloak current
 
-No new Dependabot entry is needed. The existing `helm` entry for `/helm/classifyre` already reads image references in `values.yaml`: Dependabot's Helm parser (`helm/lib/dependabot/helm/file_parser.rb`, `parse_values_yaml_files`) picks up every hash that has a `repository` and a **string** `tag`. So `iam.image` and `iam.config.image` are tracked as long as their tags are quoted strings and never empty or templated. A chart test asserts that.
+No new Dependabot entry is needed. The existing `helm` entry for `/helm/classifyre` already reads image references in `values.yaml`: Dependabot's Helm parser (`helm/lib/dependabot/helm/file_parser.rb`, `parse_values_yaml_files`) picks up every hash that has a `repository` and a **string** `tag`. So `iam.image` is tracked as long as its tag is a quoted string, never empty or templated. (The setup job runs `kcadm.sh` from the same image, so there is no second image to track.)
 
 Majors (27.x) are ignored in `dependabot.yml` and upgraded on purpose, like Node and Python today. Step 4 adds that `ignore` rule for `quay.io/keycloak/keycloak`.
 
@@ -380,7 +380,7 @@ All in `apps/api/src/identity/` unless noted.
 
 1. **Actor context and access seam (S1 R1–R8).** `ActorContextService`, `ACCESS_POLICY` with `LocalAccessPolicy`, `@Requires()` on every route, a capability on every MCP tool, completeness specs. The 11 `@ActorName()` call sites move to `@CurrentActor()` and the decorator is deleted (no adapter kept).
 2. **Mode switch.** `IAM_ENABLED` selects `LocalAccessPolicy` or `IamAccessPolicy` at boot. Boot fails on `ENVIRONMENT=docker` with IAM on, and fails when IAM is on but the issuer is unreachable at startup after retries.
-3. **Credential verification.** JWT checked with `jose` against the realm's JWKS (`IAM_INTERNAL_URL`), `iss` = `IAM_ISSUER_URL`, `aud` = `classifyre-api`. Accepted from `Authorization: Bearer` (scripts) or the `cf_session` cookie (browser, §12.1). Cookie-authenticated unsafe methods require a matching `Origin`.
+3. **Credential verification.** JWT checked with Node's `crypto` (no extra dependency; RS/PS/ES algorithms, the key's published `alg` must match) against the realm's JWKS (`IAM_INTERNAL_URL`), `iss` = `IAM_ISSUER_URL`, `aud` = `classifyre-api`. Accepted from `Authorization: Bearer` (scripts) or the `cf_session` cookie (browser, §12.1). Cookie-authenticated unsafe methods require a matching `Origin`, checked in the namespace hook for workspace routes and in `AccessGuard` for every other route.
 4. **Membership lookup.** `MembershipService` asks Keycloak (service account `classifyre-api`, realm-management roles `view-users` and `view-organizations` only) for the user's enabled state (`GET /users/{id}`), their organizations (`GET /organizations/members/{id}/organizations`) and their groups in the active one (`GET /organizations/{org}/members/{id}/groups`). That last call returns direct memberships only, each with its `parentId`, so ancestors come from the organization's group tree (`GET /organizations/{org}/groups`, cached per organization). Results are cached 60 seconds per principal. Tokens carry identity and tenant only, so they stay small and group renames do not matter.
 5. **Tenant model.** `public.iam_tenants`, `iam_grants`, `iam_principals`; `tenant_id` and `owner_group_id` on `public.namespaces`; `tenant_id` on categories. The `local` tenant row exists in both modes, so code never branches on "is there a tenant".
 6. **Namespace hook.** Resolves principal, checks tenant (404), computes capabilities, requires `workspace.view` (404). `NamespacePausedGuard` and `DemoModeGuard` stay separate and unchanged.
@@ -446,6 +446,8 @@ A user in several organizations picks one at sign-in (the `organization` scope) 
 ### 12.3 Capabilities in the UI
 
 `GET /me` feeds a `useAccess()` hook and a `<Can capability="source.manage">` wrapper (S1 R15). Controls a user cannot use are hidden, or disabled with a tooltip naming the missing capability where hiding would confuse (for example a greyed "Edit source" on a page a Viewer is allowed to see). The server stays the authority.
+
+_As built (step 7):_ `useCan`/`Can` gate the access screens, the tenant page and the owning-group picker. Elsewhere controls stay visible and the server answers `403 CAPABILITY_REQUIRED` with a message naming the capability, which the UI shows as the error. Hiding controls across every page is left for step 9.
 
 ### 12.4 Access management
 
@@ -724,6 +726,27 @@ An independent review (fresh reviewer, no part in writing the code, verified aga
 | L-1…L-6 | low                 | Sockets checked once per connection; `/tenant/actors/resolve` names principals of any tenant; verifier ignores the key's `alg`; `/<slug>/api/mcp` 401 with sign-in; `useMe` cache never cleared; membership maps never evict                                                                  | —                                                                                                     |
 
 Test gaps named by the review: the IAM branches of the guard, hook, registry controller and MCP handler have no unit tests (they are covered only by the persona suite, which is not in CI and uses bearer tokens only); `JwtVerifier` has no algorithm test; `safeReturnTo` has no backslash case. Docs claims that do not match the code: §10.3 says `jose` (it is Node crypto) and that every cookie write is origin-checked (M-3); the operations page says signed-in people keep working while the identity server is down (H-2); §12.3 says controls are hidden by capability, but only the access screens use `Can`; §8.3 names `owner_principal_id` and `MCP_NEEDS_OWNER` (the code uses `owner_sub` and `MCP_TOKEN_WITHOUT_OWNER`); §9.2 mentions `iam.config.image`, which does not exist.
+
+### Hardening, 2026-11-05
+
+Every finding of the review is fixed or deliberately accepted:
+
+| #   | What changed                                                                                                                                                                                                                                                                                                                             |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| H-1 | The in-app assistant checks every tool call against the asking person's capabilities (`AssistantMcpService.refusal`), so it can do exactly what that person can. Chat bots (Slack, Teams…) have no signed-in person behind them: with sign-in on they can only use read tools. A configured role per bot is left for step 9.             |
+| H-2 | Membership lookups are single-flight per key, serve the last answer for up to 15 minutes when the identity server does not answer (with a warning in the log), and drop entries past that grace once a map holds 5,000. Past the grace, requests fail rather than trust old access. The group tree is still read level by level (cached). |
+| H-3 | A workspace is inserted with its tenant and owning group in the same statement; there is no moment in which it is in `local`.                                                                                                                                                                                                           |
+| M-1 | The sign-in return address uses the app's one `safeReturnTo` (`lib/return-to.ts`), which refuses `//`, `/\`, schemes and control characters (browsers drop tabs and newlines, turning `/\t/x` into `//x`).                                                                                                                              |
+| M-2 | With sign-in, `AccessGuard` overwrites every author field a request body carries (`createdBy`, `author`, `addedBy`, `closedBy`, `reviewedBy`, `updatedBy`, `approvedBy`, `resolvedBy`, `changedBy`, `actor`) with the signed-in actor; the case chronology now falls back to the actor instead of `user`.                                 |
+| M-3 | `AccessGuard` refuses cookie-authenticated `POST/PUT/PATCH/DELETE` from another origin on every route (`CROSS_ORIGIN`), not only in workspaces.                                                                                                                                                                                         |
+| M-4 | Accepted: workspace addresses are one URL space (`/<slug>/…`), so a taken address cannot be hidden. The message now says only "The address '…' is taken", not that a workspace exists.                                                                                                                                                  |
+| M-5 | The bootstrap gives `admins` Tenant admin once (`iam_tenants.admins_granted_at`); a revocation stays revoked.                                                                                                                                                                                                                            |
+| M-6 | The API refuses to start with `IAM_ENABLED=true` and no `CLASSIFYRE_INTERNAL_KEY` (the chart always sets one).                                                                                                                                                                                                                           |
+| M-7 | The setup job looks the first admin up with an exact username filter and asks for one large page elsewhere. The API's bootstrap looked organizations up with `search`, which matches names and domains, not aliases: a tenant whose name does not contain its alias was never found. It now pages through organizations.                 |
+| L-3 | The verifier refuses a token whose `alg` differs from the key's published `alg`.                                                                                                                                                                                                                                                         |
+| L-6 | Covered by H-2's eviction.                                                                                                                                                                                                                                                                                                               |
+
+L-1 (sockets checked once per connection), L-2 (`/tenant/actors/resolve` names a principal of any tenant if given its id), L-4 and L-5 stay open as low. New unit tests: the guard's signed-in branch (cross-origin cookie write, same-origin, bearer, author stamping, capability), the membership cache (single-flight, grace, refusal past it), the verifier's algorithm cases, the boot check, the assistant's refusal, and the return-address cases.
 
 ### Step 9 · Later
 

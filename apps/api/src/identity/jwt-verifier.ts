@@ -68,7 +68,7 @@ export class JwtVerifier {
     const algorithm = header.alg ? ALGORITHMS[header.alg] : undefined;
     if (!algorithm)
       throw new InvalidTokenError(`Unsupported algorithm ${header.alg}`);
-    const key = await this.keyFor(header.kid);
+    const key = await this.keyFor(header.kid, header.alg!);
     const signed = verify(
       algorithm.hash,
       Buffer.from(`${headerPart}.${payloadPart}`),
@@ -102,7 +102,10 @@ export class JwtVerifier {
     return claims;
   }
 
-  private async keyFor(kid: string | undefined): Promise<KeyObject> {
+  private async keyFor(
+    kid: string | undefined,
+    alg: string,
+  ): Promise<KeyObject> {
     if (!kid) throw new InvalidTokenError('Token names no key');
     let entry = this.keys.get(kid);
     if (!entry && Date.now() - this.lastFetch > REFETCH_INTERVAL_MS) {
@@ -110,6 +113,10 @@ export class JwtVerifier {
       entry = this.keys.get(kid);
     }
     if (!entry) throw new InvalidTokenError('Unknown signing key');
+    // A key published for one algorithm never verifies another.
+    if (entry.alg && entry.alg !== alg) {
+      throw new InvalidTokenError(`Key ${kid} is not for ${alg}`);
+    }
     return entry.key;
   }
 

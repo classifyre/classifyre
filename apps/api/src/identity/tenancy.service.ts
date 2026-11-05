@@ -306,7 +306,12 @@ export class TenancyService implements OnModuleDestroy {
     tenant: Tenant,
     adminsGroupId: string | null,
   ): Promise<void> {
-    if (adminsGroupId) {
+    const { rows: pending } = await this.pool.query(
+      `SELECT 1 FROM iam_tenants WHERE id = $1 AND admins_granted_at IS NULL`,
+      [tenant.id],
+    );
+    if (adminsGroupId && pending.length > 0) {
+      // The grant is unique, so two pods booting at once give it once.
       await this.addGrant({
         tenantId: tenant.id,
         subjectType: 'group',
@@ -316,6 +321,10 @@ export class TenancyService implements OnModuleDestroy {
         scopeId: tenant.id,
         createdBy: 'system:bootstrap',
       });
+      await this.pool.query(
+        `UPDATE iam_tenants SET admins_granted_at = now() WHERE id = $1`,
+        [tenant.id],
+      );
     }
     const { rowCount } = await this.pool.query(
       `UPDATE namespaces
@@ -371,18 +380,6 @@ export class TenancyService implements OnModuleDestroy {
         row.sub,
         { displayName: row.display_name, email: row.email },
       ]),
-    );
-  }
-
-  /** File a newly created workspace under its tenant and owning group. */
-  async assignWorkspace(
-    namespaceId: string,
-    tenantId: string,
-    ownerGroupId: string,
-  ): Promise<void> {
-    await this.pool.query(
-      `UPDATE namespaces SET tenant_id = $2, owner_group_id = $3 WHERE id = $1`,
-      [namespaceId, tenantId, ownerGroupId],
     );
   }
 

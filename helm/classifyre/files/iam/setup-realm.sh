@@ -19,15 +19,19 @@ until "$KC" config credentials --server "$IAM_INTERNAL_URL" --realm master \
 done
 
 # id of the first object at `path` whose `field` equals `value`, or empty.
+# Extra arguments narrow the listing (`-q username=x`); without them it asks
+# for one large page, since some listings default to 10 or 100 entries.
 # Plain bash: the server image is minimal and has no awk.
 find_id() {
   local path=$1 field=$2 value=$3 id val
+  shift 3
+  [ $# -eq 0 ] && set -- -q first=0 -q max=10000
   while IFS=, read -r id val; do
     if [ "$val" = "$value" ]; then
       echo "$id"
       return
     fi
-  done < <("$KC" get "$path" -r "$R" --fields "id,$field" --format csv --noquotes 2>/dev/null)
+  done < <("$KC" get "$path" -r "$R" "$@" --fields "id,$field" --format csv --noquotes 2>/dev/null)
 }
 
 echo "realm $R"
@@ -139,11 +143,11 @@ fi
 echo "first tenant admin $IAM_BOOTSTRAP_ADMIN"
 # Created once. Afterwards the person owns their account: the job never
 # resets the password or re-adds them to a group they were taken out of.
-if [ -z "$(find_id users username "$IAM_BOOTSTRAP_ADMIN")" ]; then
+if [ -z "$(find_id users username "$IAM_BOOTSTRAP_ADMIN" -q "username=$IAM_BOOTSTRAP_ADMIN" -q exact=true)" ]; then
   "$KC" create users -r "$R" -s "username=$IAM_BOOTSTRAP_ADMIN" -s enabled=true \
     ${IAM_BOOTSTRAP_ADMIN_EMAIL:+-s "email=$IAM_BOOTSTRAP_ADMIN_EMAIL"} \
     -s 'requiredActions=["UPDATE_PASSWORD"]'
-  USER_ID=$(find_id users username "$IAM_BOOTSTRAP_ADMIN")
+  USER_ID=$(find_id users username "$IAM_BOOTSTRAP_ADMIN" -q "username=$IAM_BOOTSTRAP_ADMIN" -q exact=true)
   "$KC" set-password -r "$R" --userid "$USER_ID" \
     --new-password "$IAM_BOOTSTRAP_ADMIN_PASSWORD" --temporary
   "$KC" create "organizations/$ORG_ID/members" -r "$R" -b "\"$USER_ID\""

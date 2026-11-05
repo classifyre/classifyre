@@ -149,4 +149,8 @@ so the realm setup job can still sign in.
 - **Major versions** are never proposed automatically.
 
 If the identity server is down, nobody can sign in. People already signed in
-keep working until their session needs renewing.
+keep working with the access they had until their session needs renewing,
+which happens every few minutes (`iam.accessTokenLifespanSeconds`, 5 minutes
+by default). Scripts with long-lived tokens and MCP agents keep working for up
+to 15 minutes; after that Classifyre refuses them rather than trust access it
+can no longer check.
