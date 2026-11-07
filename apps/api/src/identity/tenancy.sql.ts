@@ -91,10 +91,14 @@ CREATE TABLE IF NOT EXISTS public.iam_people (
   PRIMARY KEY (sub, tenant_id)
 );
 
--- Workspace categories belong to a tenant. NULL is shared by every tenant:
--- the built-in default category, and every category while sign-in is off.
+-- Workspace categories belong to a tenant, 'local' without sign-in. NULL is
+-- only the built-in default category, shared by every tenant.
 ALTER TABLE public.namespace_categories
   ADD COLUMN IF NOT EXISTS tenant_id uuid REFERENCES public.iam_tenants (id) ON DELETE CASCADE;
+-- Categories made without sign-in used to be NULL too, and so would show in
+-- every tenant (docs/prd/TEN §6).
+UPDATE public.namespace_categories SET tenant_id = '${LOCAL_TENANT_ID}'
+ WHERE tenant_id IS NULL AND id <> '00000000-0000-4000-8000-000000000001';
 DROP INDEX IF EXISTS public.namespace_categories_title_key;
 CREATE UNIQUE INDEX IF NOT EXISTS namespace_categories_tenant_title_key
   ON public.namespace_categories

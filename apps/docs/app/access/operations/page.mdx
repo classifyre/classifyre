@@ -1,7 +1,7 @@
 ---
 sidebarTitle: Running Sign-in
 title: Running Sign-in
-description: For operators — connecting a company directory, adding tenants, turning sign-in on for an existing install, off-boarding, backups and upgrades.
+description: For operators — connecting a company directory, adding tenants, turning sign-in on or off and moving workspaces, off-boarding, backups and upgrades.
 ---
 
 import { Callout } from "nextra/components";
@@ -123,20 +123,72 @@ group changes within a minute after that.
 
 ---
 
-## Turning sign-in on for an existing install
+## Turning sign-in on or off
 
-An instance that ran without sign-in can switch it on with an upgrade
-(`iam.enabled: true`). What happens:
+With sign-in on and with sign-in off, Classifyre shows different workspaces,
+so switching it never opens a tenant's data to everyone:
 
-- Every existing workspace and category moves into the first tenant. The
-  workspaces are owned by its `admins` group, which can then hand out access.
+- **Sign-in off** shows only the workspaces made without sign-in. Tenants'
+  workspaces are not listed, their addresses answer _not found_, and nothing
+  works on them in the background. They stay in the database untouched and
+  are back as they were when sign-in is turned on again.
+- **Sign-in on** shows only tenants' workspaces. Workspaces made without
+  sign-in stay out of sight until an operator moves them into a tenant.
+
+At startup the API logs how many workspaces the current mode does not show,
+for example `2 workspace(s) belong to sign-in tenants and are not shown while
+sign-in is off`. If you see that after an upgrade you did not mean to make,
+check `iam.enabled`.
+
+### Turning sign-in on for an existing install
+
+Upgrade with `iam.enabled: true`. Once the API is up, the first tenant
+exists; move the existing workspaces into it:
+
+```bash
+kubectl -n classifyre exec deploy/classifyre-api -- \
+  node dist/src/admin.js workspaces list
+kubectl -n classifyre exec deploy/classifyre-api -- \
+  node dist/src/admin.js workspaces move --to-tenant default --all
+```
+
+`default` is the first tenant's alias (`iam.bootstrap.tenant`); any other
+tenant can be named once one of its members has signed in. Name workspaces
+instead of `--all` to move only some. What happens:
+
+- The workspaces keep all their data. They are owned by the tenant's `admins`
+  group, or by the group you pass with `--owner-group <group id>`, and its
+  admins hand out access from there.
+- Categories stay behind: the workspaces are filed under _General_ until a
+  tenant admin files them again.
 - Names people typed in are kept on existing records. New changes are
   attributed to the signed-in person; a typed-in name is ignored.
 - MCP tokens created before have no owner and stop working. People create new
   ones after signing in; those act for them.
 - A sitemap is no longer allowed (`frontend.sitemap.enabled` must be off).
 
-Turning sign-in off again makes the instance open to anyone who reaches it.
+Running API pods show a move within a minute, and each one is in the
+tenant's **Activity**.
+
+### Moving workspaces out of a tenant
+
+To make a tenant's workspace reachable without sign-in, move it back:
+
+```bash
+kubectl -n classifyre exec deploy/classifyre-api -- \
+  node dist/src/admin.js workspaces move --to-local finance-ledger
+# or every workspace of one tenant:
+kubectl -n classifyre exec deploy/classifyre-api -- \
+  node dist/src/admin.js workspaces move --to-local --from acme --all
+```
+
+Access given to that one workspace is removed; access the tenant gave its
+groups no longer applies, because the workspace is not in the tenant
+anymore.
+
+A workspace moves from one tenant to another only through this step, never
+directly: moving it out and then in is two deliberate actions, each in the
+tenant's activity.
 
 ---
 
@@ -177,9 +229,8 @@ so the realm setup job can still sign in.
 ## Backups and upgrades
 
 <Callout type="warning">
-  The identity server's state is the `iam` database. Back it up with the rest
-  of PostgreSQL, and always before changing `iam.image.tag` across a minor
-  version.
+  The identity server's state is the `iam` database. Back it up with the rest of
+  PostgreSQL, and always before changing `iam.image.tag` across a minor version.
 </Callout>
 
 - **Patch versions** (26.8.1 → 26.8.2) are routine.

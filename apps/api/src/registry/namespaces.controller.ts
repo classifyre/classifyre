@@ -86,13 +86,13 @@ export class NamespacesController {
     return (await this.principal(request))?.tenant.id;
   }
 
-  /** With sign-in a workspace can only be filed under its tenant's categories. */
+  /** A workspace can only be filed under its tenant's categories (`local` without sign-in). */
   private async assertOwnCategories(
     request: FastifyRequest,
     categoryIds: string[] | undefined,
   ): Promise<void> {
+    if (!categoryIds?.length) return;
     const tenantId = await this.tenantId(request);
-    if (!tenantId || !categoryIds?.length) return;
     const own = new Set(
       (await this.registry.listCategories(tenantId)).map((c) => c.id),
     );
@@ -132,10 +132,10 @@ export class NamespacesController {
     @Req() request: FastifyRequest,
     @Body() body: CreateNamespaceInput,
   ): Promise<Namespace> {
+    await this.assertOwnCategories(request, body.categoryIds);
     const principal = await this.principal(request);
     if (!principal) return this.registry.create(body);
 
-    await this.assertOwnCategories(request, body.categoryIds);
     if (!body.ownerGroupId) {
       throw new BadRequestException(
         'ownerGroupId is required: every workspace is owned by one group of your tenant.',

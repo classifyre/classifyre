@@ -27,6 +27,8 @@ import {
   PUBLIC_SEARCH_PATH_OPTION,
 } from './namespace-registry.sql';
 import { LOCAL_TENANT_ID } from '../identity/tenancy.sql';
+import { iamEnabled } from '../identity/iam-config';
+import { workspaceScopeSql } from './workspace-scope';
 import { withDbRetry } from '../db/db-retry';
 import { isTransientDbError } from '../db/transient-db-error';
 import type {
@@ -167,6 +169,8 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
     max: 4,
   });
   private readonly resolveCache = new Map<string, ResolveCacheEntry>();
+  /** The workspaces this process may see at all; see {@link workspaceScopeSql}. */
+  private readonly scope = workspaceScopeSql();
   private readonly createdListeners = new Set<
     (e: NamespaceLifecycleEvent) => void | Promise<void>
   >();
@@ -226,7 +230,7 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
     const hit = this.pauseCache.get(namespaceId);
     if (hit && hit.expiresAt > Date.now()) return hit.paused;
     const { rows } = await this.pool.query<{ paused: boolean }>(
-      'SELECT paused FROM namespaces WHERE id = $1',
+      `SELECT paused FROM namespaces WHERE id = $1 AND ${this.scope}`,
       [namespaceId],
     );
     // A namespace that no longer resolves is not "paused": it is gone, and the
@@ -258,7 +262,7 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
           this.pool.query<NamespaceRow>(
             `SELECT id, slug, schema_name FROM namespaces
                WHERE ${byId ? 'id = $1' : 'slug = $1'}
-                 AND status = 'active'`,
+                 AND status = 'active' AND ${this.scope}`,
             [segment],
           ),
         { label: `namespace resolve '${segment}'` },
@@ -299,7 +303,7 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
   async list(): Promise<Namespace[]> {
     const { rows } = await this.pool.query<NamespaceRow>(
       `SELECT ${NAMESPACE_COLUMNS} FROM namespaces
-         WHERE status = 'active' ORDER BY created_at ASC`,
+         WHERE status = 'active' AND ${this.scope} ORDER BY created_at ASC`,
     );
     // One extra round trip for every workspace's categories rather than N, and
     // no join — the projection above is already wide and a join would multiply
@@ -311,7 +315,7 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
   async get(id: string): Promise<Namespace> {
     const { rows } = await this.pool.query<NamespaceRow>(
       `SELECT ${NAMESPACE_COLUMNS} FROM namespaces
-         WHERE id = $1 AND status = 'active'`,
+         WHERE id = $1 AND status = 'active' AND ${this.scope}`,
       [id],
     );
     if (!rows[0]) throw new NotFoundException(`Unknown namespace '${id}'`);
@@ -578,7 +582,8 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
       thumbnail_blob: Buffer | null;
       thumbnail_mime: string | null;
     }>(
-      "SELECT thumbnail_blob, thumbnail_mime FROM namespaces WHERE id = $1 AND status = 'active'",
+      `SELECT thumbnail_blob, thumbnail_mime FROM namespaces
+        WHERE id = $1 AND status = 'active' AND ${this.scope}`,
       [id],
     );
     const row = rows[0];
@@ -599,6 +604,12 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
   ): Promise<Namespace> {
     const name = input.name?.trim();
     if (!name) throw new BadRequestException('Namespace name is required');
+    if (iamEnabled() && !tenancy) {
+      // It would land in `local`, which sign-in never shows.
+      throw new BadRequestException(
+        'With sign-in every workspace is created in a tenant.',
+      );
+    }
 
     const slug = (input.slug ?? slugifyName(name)).toLowerCase();
     if (!SLUG_RE.test(slug)) {
@@ -772,7 +783,8 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
     try {
       ({ rows } = await this.pool.query<NamespaceRow>(
         `UPDATE namespaces SET ${sets.join(', ')}
-           WHERE id = $${values.length} RETURNING ${NAMESPACE_COLUMNS}`,
+           WHERE id = $${values.length} AND ${this.scope}
+           RETURNING ${NAMESPACE_COLUMNS}`,
         values,
       ));
     } catch (error) {
@@ -833,7 +845,7 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
     await this.pool.query(
       `UPDATE namespaces
          SET status = 'deleted', updated_at = now(), deleted_at = now()
-       WHERE id = $1`,
+       WHERE id = $1 AND ${this.scope}`,
       [id],
     );
     await this.notify(this.deletingListeners, ctx, 'delete');
@@ -869,6 +881,7 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
         WHERE status = 'deleted'
           AND deleted_at IS NOT NULL
           AND deleted_at < $1
+          AND ${this.scope}
         ORDER BY deleted_at ASC`,
       [cutoff],
     );
@@ -895,7 +908,7 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
       schema_name: string;
     }>(
       `SELECT slug, schema_name FROM namespaces
-        WHERE id = $1 AND status = 'deleted'`,
+        WHERE id = $1 AND status = 'deleted' AND ${this.scope}`,
       [id],
     );
     const row = rows[0];
@@ -910,7 +923,7 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
     );
 
     const deleted = await this.pool.query(
-      "DELETE FROM namespaces WHERE id = $1 AND status = 'deleted'",
+      `DELETE FROM namespaces WHERE id = $1 AND status = 'deleted' AND ${this.scope}`,
       [id],
     );
     if (deleted.rowCount === 0) return false;
@@ -933,8 +946,8 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
    * counted — the directory does not show them either).
    */
   /**
-   * Categories, with workspace counts. With `tenantId` (sign-in) only that
-   * tenant's categories plus the shared default, counting only its workspaces.
+   * Categories, with workspace counts: the tenant's own (`local` without
+   * sign-in) plus the shared default, counting only its workspaces.
    */
   async listCategories(tenantId?: string): Promise<NamespaceCategory[]> {
     const { rows } = await this.pool.query<{
@@ -951,11 +964,11 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
          LEFT JOIN namespace_category_members m ON m.category_id = c.id
          LEFT JOIN namespaces n
                 ON n.id = m.namespace_id AND n.status = 'active'
-               ${tenantId ? 'AND n.tenant_id = $1' : ''}
-        ${tenantId ? 'WHERE c.tenant_id = $1 OR c.tenant_id IS NULL' : ''}
+               AND n.tenant_id = $1
+        WHERE c.tenant_id = $1 OR c.tenant_id IS NULL
         GROUP BY c.id
         ORDER BY lower(c.title) ASC`,
-      tenantId ? [tenantId] : [],
+      [tenantId ?? LOCAL_TENANT_ID],
     );
     return rows.map((row) => toCategory(row));
   }
@@ -981,7 +994,7 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
           randomUUID(),
           title,
           input.description?.trim() || null,
-          tenantId ?? null,
+          tenantId ?? LOCAL_TENANT_ID,
         ],
       );
       return this.getCategory(rows[0].id, tenantId);
@@ -1014,14 +1027,15 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
     sets.push('updated_at = now()');
     values.push(id);
     const idParam = values.length;
-    // With sign-in a tenant changes only its own categories, never the shared default.
-    if (tenantId) values.push(tenantId);
+    // A tenant (`local` without sign-in) changes only its own categories, never
+    // the shared default.
+    values.push(tenantId ?? LOCAL_TENANT_ID);
 
     let rowCount: number | null;
     try {
       ({ rowCount } = await this.pool.query(
         `UPDATE namespace_categories SET ${sets.join(', ')}
-          WHERE id = $${idParam}${tenantId ? ` AND tenant_id = $${values.length}` : ''}`,
+          WHERE id = $${idParam} AND tenant_id = $${values.length}`,
         values,
       ));
     } catch (error) {
@@ -1048,10 +1062,8 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
       );
     }
     const { rowCount } = await this.pool.query(
-      tenantId
-        ? 'DELETE FROM namespace_categories WHERE id = $1 AND tenant_id = $2'
-        : 'DELETE FROM namespace_categories WHERE id = $1',
-      tenantId ? [id, tenantId] : [id],
+      'DELETE FROM namespace_categories WHERE id = $1 AND tenant_id = $2',
+      [id, tenantId ?? LOCAL_TENANT_ID],
     );
     if (!rowCount) throw new NotFoundException(`Unknown category '${id}'`);
     // The membership rows went with it (ON DELETE CASCADE); re-home whatever

@@ -426,8 +426,9 @@ export class IdentityService {
 
   /**
    * First-tenant setup when sign-in is turned on: the tenant row for the
-   * bootstrap organization, Tenant admin for its `admins` group (once), and every
-   * workspace that ran without sign-in moved into it.
+   * bootstrap organization and Tenant admin for its `admins` group (once).
+   * Workspaces made without sign-in stay in `local`, out of sight, until an
+   * operator moves them (src/admin.ts, docs/prd/TEN §6).
    */
   async bootstrap(): Promise<void> {
     const org = await this.membership.organizationByAlias(
@@ -442,8 +443,6 @@ export class IdentityService {
     }
     const tenant = await this.tenancy.ensureTenant(org);
     const admins = await this.adminsGroup(org.id);
-    // Workspaces move in either way; they get their owner once `admins` exists.
-    await this.tenancy.adoptLocalWorkspaces(tenant, admins?.id ?? null);
     if (!admins) {
       // The setup job creates it right after the organization: retried.
       throw new Error(

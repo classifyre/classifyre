@@ -248,6 +248,36 @@ check U12 "leaver can no longer sign in" "" "$(token leaver)"
 check U12 "leaver's token stopped working" 401 "$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $LEAVER_TOKEN" "$B/namespaces")"
 check U10 "contractor lost access after the end date" 404 "$(status contractor GET /fin-ledger/sources)"
 
+say "operator moves workspaces between a tenant and 'local' (docs/prd/TEN §6)"
+operator() { kubectl -n "$NS" exec "deploy/$REL-classifyre-api" -- sh -c "cd /workspace/apps/api && bun src/admin.ts $*"; }
+operator workspaces move --to-local fin-q3 >/dev/null
+check T0 "a workspace moved to 'local' leaves its tenant" "fin-ledger,sales-pipeline" "$(slugs admin)"
+sleep 6 # the registry's five-second resolve cache
+check T0 "and its address answers 404" 404 "$(status admin GET /fin-q3/sources)"
+check T0 "a move into another tenant is refused" 2 "$(operator workspaces move --to-tenant globex fin-ledger >/dev/null 2>&1; echo $?)"
+operator workspaces move --to-tenant default fin-q3 >/dev/null
+check T0 "moved back, the tenant sees it again" "fin-ledger,fin-q3,sales-pipeline" "$(slugs admin)"
+check T0 "access given to that one workspace did not come back" "" "$(slugs counsel)"
+EVENTS=$(get admin /tenant/audit-events)
+MOVES=$(echo "$EVENTS" | json "a=[e['action'] for e in d if (e.get('detail') or {}).get('slug')=='fin-q3']; print('yes' if {'workspace.moved_in','workspace.moved_out'} <= set(a) else a)")
+[ "$MOVES" = yes ] || MOVES="$MOVES; body: ${EVENTS:0:300}"
+check T0 "both moves are in the tenant's activity" yes "$MOVES"
+
+say "sign-in turned off by mistake (docs/prd/TEN §6)"
+operator workspaces move --to-local sales-pipeline >/dev/null
+helm upgrade "$REL" "$ROOT/helm/classifyre" -n "$NS" --reuse-values --set iam.enabled=false >/dev/null
+kubectl -n "$NS" rollout status "deploy/$REL-classifyre-api" --timeout=600s >/dev/null
+# The forward was bound to the replaced pod.
+kill "${PF_PIDS[0]}" 2>/dev/null || true
+kubectl -n "$NS" port-forward "svc/$REL-classifyre-api" "$API_PORT:8000" >/dev/null 2>&1 & PF_PIDS+=($!)
+until curl -s -m 3 "$B/ping" | grep -q pong; do sleep 2; done
+check T0 "without sign-in only workspaces made without it are listed" "sales-pipeline" "$(curl -s "$B/namespaces" | json "print(','.join(sorted(n['slug'] for n in d)))")"
+check T0 "a tenant's workspace answers 404 by its address" 404 "$(status - GET /fin-ledger/sources)"
+# The newest pod: right after a rollout `logs deploy/…` may still pick the old one.
+API_POD=$(kubectl -n "$NS" get pods --sort-by=.metadata.creationTimestamp -o name | grep "$REL-classifyre-api" | tail -1)
+HIDDEN=$(kubectl -n "$NS" logs "$API_POD" | grep -o '[0-9]* workspace(s) belong to sign-in tenants' | head -1)
+check T0 "the API says how many workspaces it hides" "2 workspace(s) belong to sign-in tenants" "${HIDDEN:-nothing logged in $API_POD}"
+
 say "results"
 printf '%s\n' "${RESULTS[@]}"
 if [ "$FAILED" = "1" ]; then echo "SOME CHECKS FAILED"; exit 1; fi

@@ -1,11 +1,11 @@
 # PRD TEN · Tenant isolation, operators and the cloud playground
 
-|                    |                                                                                                                                  |
-| ------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
-| **Status**         | Plan, 2026-11-07. Nothing built yet.                                                                                             |
-| **Size**           | L (5 phases, each its own PR or set of PRs)                                                                                      |
-| **Depends on**     | [IAM · Identity and access management](IAM-access-management.md) (steps 0–8c: tenants, grants, people and groups)               |
-| **Not in scope**   | billing, per-record rules, a second identity server, moving the all-in-one Docker image off its single database                  |
+|                  |                                                                                                                   |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------- |
+| **Status**       | Plan, 2026-11-07. Nothing built yet.                                                                              |
+| **Size**         | L (5 phases, each its own PR or set of PRs)                                                                       |
+| **Depends on**   | [IAM · Identity and access management](IAM-access-management.md) (steps 0–8c: tenants, grants, people and groups) |
+| **Not in scope** | billing, per-record rules, a second identity server, moving the all-in-one Docker image off its single database   |
 
 ## 1. Summary
 
@@ -35,45 +35,45 @@ flowchart LR
 
 ## 2. Today (facts this plan builds on)
 
-| Piece                     | Today                                                                                                                                                                      |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Database                  | One Postgres database (`DB_NAME`), embedded or CloudNativePG.                                                                                                              |
-| Workspace registry        | `public.namespaces` (raw SQL), with `tenant_id` and `owner_group_id` since IAM step 5.                                                                                     |
-| Workspace data            | One schema per workspace (`ns_<uuid>`), migrated with Prisma.                                                                                                              |
-| Connections               | `PrismaClientManager`: a pool per schema (`PRISMA_POOL_MAX`, default 16), at most `PRISMA_MAX_RESIDENT` (20) resident per pod with LRU eviction; pools open lazily.       |
-| Queues and locks          | pg-boss per workspace; advisory locks for worker leadership; `pg` pools in the registry, tenancy, scheduler, export.                                                       |
-| CLI jobs and notebooks    | CLI jobs get a `DATABASE_URL` for their workspace schema; notebook code never sees it (`cli/src/sources/custom/env.py`).                                                  |
-| Tenants                   | `public.iam_tenants`, `iam_grants`, `iam_audit_events`, `iam_people`, `iam_principals` in the same database.                                                              |
-| Turning sign-in on        | `adoptLocalWorkspaces` moves every workspace without a tenant into the first tenant.                                                                                       |
-| Turning sign-in off       | The API lists and opens **every** workspace, of every tenant.                                                                                                              |
-| Workspace addresses       | `/<slug>` is one URL space for all tenants, so a taken address shows that it exists somewhere (IAM review M-4, accepted).                                                 |
+| Piece                  | Today                                                                                                                                                               |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Database               | One Postgres database (`DB_NAME`), embedded or CloudNativePG.                                                                                                       |
+| Workspace registry     | `public.namespaces` (raw SQL), with `tenant_id` and `owner_group_id` since IAM step 5.                                                                              |
+| Workspace data         | One schema per workspace (`ns_<uuid>`), migrated with Prisma.                                                                                                       |
+| Connections            | `PrismaClientManager`: a pool per schema (`PRISMA_POOL_MAX`, default 16), at most `PRISMA_MAX_RESIDENT` (20) resident per pod with LRU eviction; pools open lazily. |
+| Queues and locks       | pg-boss per workspace; advisory locks for worker leadership; `pg` pools in the registry, tenancy, scheduler, export.                                                |
+| CLI jobs and notebooks | CLI jobs get a `DATABASE_URL` for their workspace schema; notebook code never sees it (`cli/src/sources/custom/env.py`).                                            |
+| Tenants                | `public.iam_tenants`, `iam_grants`, `iam_audit_events`, `iam_people`, `iam_principals` in the same database.                                                        |
+| Turning sign-in on     | Before phase 0: `adoptLocalWorkspaces` moved every workspace without a tenant into the first tenant. Removed in phase 0.                                            |
+| Turning sign-in off    | Before phase 0: the API listed and opened **every** workspace, of every tenant. Since phase 0 only `local` ones.                                                    |
+| Workspace addresses    | `/<slug>` is one URL space for all tenants, so a taken address shows that it exists somewhere (IAM review M-4, accepted).                                           |
 
 ## 3. Requirements
 
-| #   | Requirement                                                                                                                                                                         |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| R1  | With sign-in off, the API opens only the open database. No tenant's data is reachable, whatever is in the environment.                                                             |
-| R2  | With sign-in on, the API never opens the open database. Workspaces made without sign-in reach a tenant only by an explicit operator action, never by turning sign-in on.           |
-| R3  | Every database records its kind (`open`, `control`, `tenant`) and, for a tenant database, which tenant. The API refuses to start, or to serve a tenant, on a mismatch.              |
-| R4  | A tenant's data is in its own database: it can be backed up, restored, exported, moved to another server and deleted on its own.                                                    |
-| R5  | An idle tenant costs no connections. The connection budget rule of today still holds, now per server.                                                                               |
-| R6  | One upgrade migrates the control database and every tenant database. A tenant whose migration fails is unavailable on its own (503); the others keep working.                     |
-| R7  | Each tenant database has its own database role. No role can read another tenant's database.                                                                                         |
-| R8  | Operators create, suspend, resume and delete tenants and give them their first admins from Classifyre, without the identity server's console.                                     |
-| R9  | Operators see tenants, not their data. Entering a tenant's workspaces needs a grant inside that tenant, and is audited like any other access.                                     |
-| R10 | Workspace addresses are per tenant: two tenants can both have `/finance`, and nobody learns about another tenant's workspaces.                                                     |
-| R11 | Cloud (later): sign-up creates a tenant through the same provisioning as R8; a tenant admin connects the tenant's own identity providers; per-tenant limits.                      |
-| R12 | The all-in-one Docker image keeps one open database and never sees any of this.                                                                                                     |
+| #   | Requirement                                                                                                                                                              |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| R1  | With sign-in off, the API opens only the open database. No tenant's data is reachable, whatever is in the environment.                                                   |
+| R2  | With sign-in on, the API never opens the open database. Workspaces made without sign-in reach a tenant only by an explicit operator action, never by turning sign-in on. |
+| R3  | Every database records its kind (`open`, `control`, `tenant`) and, for a tenant database, which tenant. The API refuses to start, or to serve a tenant, on a mismatch.   |
+| R4  | A tenant's data is in its own database: it can be backed up, restored, exported, moved to another server and deleted on its own.                                         |
+| R5  | An idle tenant costs no connections. The connection budget rule of today still holds, now per server.                                                                    |
+| R6  | One upgrade migrates the control database and every tenant database. A tenant whose migration fails is unavailable on its own (503); the others keep working.            |
+| R7  | Each tenant database has its own database role. No role can read another tenant's database.                                                                              |
+| R8  | Operators create, suspend, resume and delete tenants and give them their first admins from Classifyre, without the identity server's console.                            |
+| R9  | Operators see tenants, not their data. Entering a tenant's workspaces needs a grant inside that tenant, and is audited like any other access.                            |
+| R10 | Workspace addresses are per tenant: two tenants can both have `/finance`, and nobody learns about another tenant's workspaces.                                           |
+| R11 | Cloud (later): sign-up creates a tenant through the same provisioning as R8; a tenant admin connects the tenant's own identity providers; per-tenant limits.             |
+| R12 | The all-in-one Docker image keeps one open database and never sees any of this.                                                                                          |
 
 ## 4. Design
 
 ### 4.1 Databases and what is in them
 
-| Database                     | Kind      | Holds                                                                                                                                                                                                                       |
-| ---------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `classifyre` (as today)      | `open`    | Everything it holds today, for sign-in off: registry, categories, workspace schemas. No `iam_*` tables are used.                                                                                                            |
-| `classifyre_control`         | `control` | Tenants (alias, organization id, status, database name, server, role, schema version, limits), the tenant routing, operators' audit trail, provisioning jobs, `iam_principals` (names for actor references). No workspace data. |
-| `classifyre_t_<id>`          | `tenant`  | One tenant: its registry (`namespaces`, categories), grants, tenant audit trail, `iam_people`, and its workspace schemas `ns_<uuid>`.                                                                                          |
+| Database                | Kind      | Holds                                                                                                                                                                                                                           |
+| ----------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `classifyre` (as today) | `open`    | Everything it holds today, for sign-in off: registry, categories, workspace schemas. No `iam_*` tables are used.                                                                                                                |
+| `classifyre_control`    | `control` | Tenants (alias, organization id, status, database name, server, role, schema version, limits), the tenant routing, operators' audit trail, provisioning jobs, `iam_principals` (names for actor references). No workspace data. |
+| `classifyre_t_<id>`     | `tenant`  | One tenant: its registry (`namespaces`, categories), grants, tenant audit trail, `iam_people`, and its workspace schemas `ns_<uuid>`.                                                                                           |
 
 A tenant database has **the same layout as the open database** plus the tenant tables. So the registry, the workspace migrations, pg-boss and every service that works on "the database" run unchanged on either; only which database they are pointed at changes. `<id>` is a short, stable id, not the alias, so renaming a tenant never renames a database.
 
@@ -170,15 +170,15 @@ flowchart TB
 
 ## 5. Phases
 
-| Phase | What                                                                                                                                                                                                                                                                                       | Size | Ships alone? |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- | ------------ |
+| Phase | What                                                                                                                                                                                                                                                                                      | Size | Ships alone? |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- | ------------ |
 | 0     | **Guard in today's single database** (§6): with sign-in off the API lists and opens only workspaces without a tenant; with sign-in on, workspaces without a tenant are no longer adopted automatically; database marker and boot check. Fixes the security problem now, before any split. | S    | yes          |
-| 1     | **Control and tenant databases**: provisioner interface (embedded and CloudNativePG), routing, `(database, schema)` pools, mode guard, migrations over tenants, the one-off migration of §4.9, PgBouncer option.                                                                         | L    | yes          |
+| 1     | **Control and tenant databases**: provisioner interface (embedded and CloudNativePG), routing, `(database, schema)` pools, mode guard, migrations over tenants, the one-off migration of §4.9, PgBouncer option.                                                                          | L    | yes          |
 | 2     | **Operators and the Platform page**: `classifyre-operator` role, `/platform`, create, suspend, resume, delete, admins, retry, import workspaces.                                                                                                                                          | M    | yes          |
-| 3     | **Per-tenant addresses** (R10), once slugs resolve in the tenant database; removes the M-4 exception.                                                                                                                                                                                      | S    | with 1       |
-| 4     | **Cloud playground**: sign-up, per-tenant identity providers with domain proof, limits.                                                                                                                                                                                                    | L    | yes          |
+| 3     | **Per-tenant addresses** (R10), once slugs resolve in the tenant database; removes the M-4 exception.                                                                                                                                                                                     | S    | with 1       |
+| 4     | **Cloud playground**: sign-up, per-tenant identity providers with domain proof, limits.                                                                                                                                                                                                   | L    | yes          |
 
-## 6. Phase 0 in detail (can start now)
+## 6. Phase 0 in detail (built 2026-11-07)
 
 The single database stays, but the two modes stop seeing each other:
 
@@ -188,17 +188,31 @@ The single database stays, but the two modes stop seeing each other:
 - The database gets its marker (`open` with a list of the tenants it also carries, for the phase 1 migration).
 - **Existing installs:** workspaces already adopted into a tenant stay in that tenant. On the dev stack that means all 31 workspaces are in `default`: with sign-in off they would disappear until moved back with the command, so the command comes with a `--to-local` direction.
 
-The operator command, for phase 0: `classifyre-admin workspaces move --to-tenant <alias> | --to-local <slug>...`, run in the API pod, recorded in the tenant audit trail.
+The operator command, for phase 0: `workspaces move --to-tenant <alias> | --to-local <slug>...`, run in the API pod, recorded in the tenant audit trail.
+
+### 6.1 As built
+
+| Piece                        | Where                                                          | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ---------------------------- | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Scope rule                   | `apps/api/src/registry/workspace-scope.ts`                     | `tenant_id = local` with sign-in off, `tenant_id <> local` with it on. Every registry read and write carries it (`resolve`, `list`, `get`, `isPaused`, thumbnail, update, delete, purge), so the request hook, lists, workers, exports and MCP follow it. Schema migrations stay unscoped, so every schema keeps up with upgrades in either mode.                                                                                                                                                                                                                                                                                               |
+| No creation outside a tenant | `NamespaceRegistryService.create`                              | With sign-in on, a workspace without a tenant is refused (it would land in `local`, which sign-in never shows).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Categories                   | `tenancy.sql.ts`, registry                                     | Categories made without sign-in now belong to `local` (backfilled once); NULL is only the shared default. Each mode lists, changes and files under only its own categories plus the default; the open mode can no longer rename the shared default.                                                                                                                                                                                                                                                                                                                                                                                             |
+| No adoption                  | `IdentityService.bootstrap`                                    | `adoptLocalWorkspaces` is removed.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Marker                       | `apps/api/src/database-kind.ts`                                | `public.classifyre_database (kind, tenant_id, created_at)`, written `open` at boot. The API refuses to start on any other kind, and logs how many workspaces the current mode hides. The planned "list of tenants it also carries" was not needed: `iam_tenants` already is that list.                                                                                                                                                                                                                                                                                                                                                          |
+| Operator command             | `apps/api/src/admin.ts`                                        | `node dist/src/admin.js workspaces list` and `workspaces move --to-tenant <alias> (--all \| <slug>...) [--owner-group <id>]` / `--to-local (--from <alias> --all \| <slug>...)`, run with `kubectl exec` (builds `DATABASE_URL` from the chart's `DB_*`). One transaction: tenant and owner change, workspace-scoped grants are deleted, memberships in another tenant's categories are dropped (falling back to the default), and `workspace.moved_out` / `workspace.moved_in` go into each tenant's activity as `system:operator`. Into a tenant only from `local`; the owner defaults to the group holding the bootstrap Tenant admin grant. |
+| Checks                       | `workspace-scope.spec.ts`, `admin.spec.ts`, persona suite `T0` | Unit: the predicate in both modes on every read, creation refused. Persona suite: move out hides the workspace and its address, a move between tenants is refused, moving back restores it without the workspace grant, both moves in the activity, then the release is upgraded with sign-in off: only the `local` workspace is listed, a tenant workspace's address is 404, and the hidden count is logged.                                                                                                                                                                                                                                   |
+
+The dev stack's 31 workspaces stay in `default`, so they keep working with sign-in on; with sign-in off the open side starts empty.
 
 ## 7. Alternatives considered
 
-| Option                                         | Why not                                                                                                                                                                                                      |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Keep one database, isolate by `tenant_id` only | Phase 0 makes it safe across modes, but a tenant cannot be backed up, moved or deleted on its own, one tenant's load and bloat hit all, and every new query is one missed `WHERE` away from a leak.           |
-| Row-level security in one database             | Strong if right, but every Prisma query runs through roles and settings per request, and one policy mistake leaks across tenants. Debugging and migrations get much harder.                                   |
-| A schema prefix per tenant in one database     | Workspaces are already schemas; tenants as name prefixes give no per-tenant role, backup or server placement, and the catalog grows with every workspace of every tenant.                                     |
-| A Postgres server per tenant                   | Strongest isolation, highest cost and operations load. Kept as an option per tenant (§4.4: the routing stores the server), not the default.                                                                    |
-| A realm per tenant in the identity server      | See §4.8: heavy per tenant, splits the code; organizations already give per-tenant providers.                                                                                                                 |
+| Option                                         | Why not                                                                                                                                                                                             |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Keep one database, isolate by `tenant_id` only | Phase 0 makes it safe across modes, but a tenant cannot be backed up, moved or deleted on its own, one tenant's load and bloat hit all, and every new query is one missed `WHERE` away from a leak. |
+| Row-level security in one database             | Strong if right, but every Prisma query runs through roles and settings per request, and one policy mistake leaks across tenants. Debugging and migrations get much harder.                         |
+| A schema prefix per tenant in one database     | Workspaces are already schemas; tenants as name prefixes give no per-tenant role, backup or server placement, and the catalog grows with every workspace of every tenant.                           |
+| A Postgres server per tenant                   | Strongest isolation, highest cost and operations load. Kept as an option per tenant (§4.4: the routing stores the server), not the default.                                                         |
+| A realm per tenant in the identity server      | See §4.8: heavy per tenant, splits the code; organizations already give per-tenant providers.                                                                                                       |
 
 ## 8. Risks and open questions
 
