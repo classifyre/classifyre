@@ -36,11 +36,8 @@
 {{- if .Values.frontend.sitemap.enabled -}}
 {{- fail "frontend.sitemap.enabled must be false when iam.enabled=true: a signed-in instance publishes no sitemap and allows no crawling" -}}
 {{- end -}}
-{{- if and (not .Values.iam.publicUrl) (empty .Values.ingress.host) -}}
-{{- fail "iam.enabled=true needs ingress.host (or iam.publicUrl and iam.appUrl) to know the URL people sign in at; set iam.enabled=false for an instance without sign-in" -}}
-{{- end -}}
 {{- if and (not .Values.iam.appUrl) (empty .Values.ingress.host) -}}
-{{- fail "iam.appUrl is required when ingress.host is empty" -}}
+{{- fail "iam.enabled=true needs ingress.host (or iam.appUrl) to know the URL people open Classifyre at; the identity server lives under it at <appUrl>/iam. Set iam.enabled=false for an instance without sign-in" -}}
 {{- end -}}
 {{- $validIamDbModes := list "shared" "external" -}}
 {{- if not (has .Values.iam.database.mode $validIamDbModes) -}}

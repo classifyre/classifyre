@@ -17,11 +17,16 @@ fi
 cd "$ROOT/apps/web"
 export IAM_ENABLED=true
 export IAM_REALM=classifyre
-# The identity server is port-forwarded by skaffold; the browser and this
-# server both reach it there.
-export IAM_ISSUER_URL=http://localhost:8180/iam/realms/classifyre
-export IAM_INTERNAL_URL=http://localhost:8180/iam
 export IAM_APP_URL=http://localhost:3000
+# The issuer is always the app's own address plus the proxied `/iam` path —
+# nothing separate to configure. Token calls go over the skaffold
+# port-forward instead, since the in-cluster DNS name only resolves
+# inside the cluster.
+export IAM_ISSUER_URL="$IAM_APP_URL/iam/realms/$IAM_REALM"
+export IAM_INTERNAL_URL=http://localhost:8280/iam
+# The dev values expose the admin console; mirror it so the local server's
+# `/iam` proxy forwards `/iam/admin` and the master realm too.
+export IAM_EXPOSE_ADMIN_CONSOLE=true
 export IAM_WEB_CLIENT_ID=classifyre-web
 export IAM_WEB_CLIENT_SECRET="$secret"
 exec bun dev

@@ -62,7 +62,10 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Everything but the sign-in routes themselves, Next's assets, the bundled
-  // documentation site and plain files (icons, manifest, robots.txt).
-  matcher: ["/((?!auth/|_next/|docs/|.*\\.[a-zA-Z0-9]+$).*)"],
+  // Everything but the sign-in routes, the identity server proxy, Next's
+  // assets, the bundled documentation site and plain files (icons, manifest,
+  // robots.txt). The `/iam` proxy serves Keycloak's own endpoints (account
+  // console, JS adapter); it must not send browsers to sign in for them —
+  // those requests carry no Classifyre session by design.
+  matcher: ["/((?!auth/|iam/|_next/|docs/|.*\\.[a-zA-Z0-9]+$).*)"],
 };

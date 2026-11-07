@@ -38,6 +38,11 @@ profiles:
 
   # Sign-in on top of `dev`: CLASSIFYRE_IAM=true ./scripts/dev/start.sh.
   # Listed after `dev` so its patches apply to the release `dev` defines.
+  # The browser reaches the identity server through the ingress
+  # (http://classifyre.localhost:8080/iam, routed to the web app's
+  # `/iam/[...path]` proxy). The local web server (`scripts/dev/web-iam.sh`)
+  # reaches it over the port-forward below, since the in-cluster DNS name
+  # only resolves inside the cluster.
   - name: iam
     activation:
       - env: CLASSIFYRE_IAM=true
@@ -52,7 +57,7 @@ profiles:
           resourceName: classifyre-iam
           namespace: classifyre-dev
           port: 8080
-          localPort: 8180
+          localPort: 8280
 
   # Same local cluster, but writable and pointed at the VPS demo instance's
   # database — so the public instance can stay in read-only demo mode while you
