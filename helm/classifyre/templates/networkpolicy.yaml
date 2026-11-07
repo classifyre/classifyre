@@ -112,8 +112,9 @@ spec:
 {{- if .Values.iam.enabled }}
 ---
 # Identity server NetworkPolicy
-# Ingress: same-namespace pods (API, web, setup job), the ingress controller,
-# and its own nodes (cluster cache). Egress: DNS, PostgreSQL, and HTTPS to
+# Ingress: same-namespace pods (API, web proxy, setup job) and its own nodes
+# (cluster cache). Browsers never reach it directly: the ingress sends `/iam`
+# to the web service, which proxies. Egress: DNS, PostgreSQL, and HTTPS to
 # external identity providers it brokers sign-in to.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -139,13 +140,8 @@ spec:
           port: 9000
         - protocol: TCP
           port: 7800
-    {{- if .Values.networkPolicy.ingressNamespaceSelector }}
-    - from:
-        - namespaceSelector: {{ .Values.networkPolicy.ingressNamespaceSelector | toJson }}
-      ports:
-        - protocol: TCP
-          port: 8080
-    {{- end }}
+    # No ingress-controller rule here on purpose: outside traffic reaches the
+    # identity server only through the web proxy, never directly.
   egress:
     - ports:
         - protocol: UDP

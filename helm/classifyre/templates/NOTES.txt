@@ -54,7 +54,7 @@ Database mode: {{ .Values.postgres.mode }}
 {{- end }}
 {{- if .Values.iam.enabled }}
 
-Sign-in (iam) is on. The identity server answers at {{ include "classifyre.iam.publicUrl" . }}.
+Sign-in (iam) is on. The identity server answers through the web app at {{ include "classifyre.iam.publicUrl" . }}.
   First tenant: {{ .Values.iam.bootstrap.tenant.name }} ({{ .Values.iam.bootstrap.tenant.alias }}), first admin: {{ .Values.iam.bootstrap.admin.username }}.
   Sign in to Classifyre as {{ .Values.iam.bootstrap.admin.username }} with this temporary password (changed at first sign-in):
     kubectl -n {{ .Release.Namespace }} get secret {{ include "classifyre.iam.secretName" . }} -o jsonpath='{.data.bootstrap-admin-password}' | base64 -d

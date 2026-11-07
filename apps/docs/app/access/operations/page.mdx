@@ -22,14 +22,17 @@ or in the company directory it is connected to, and access in Classifyre.
 ## The identity server's console
 
 Its own admin console is not reachable from outside the cluster unless
-`iam.exposeAdminConsole` is on. Reach it with a port-forward:
+`iam.exposeAdminConsole` is on. The identity server itself is only reachable
+through the web app (its `/iam` proxy); reach the console with a
+port-forward:
 
 ```bash
 kubectl -n classifyre port-forward svc/classifyre-iam 8080
 ```
 
-Then open [localhost:8080/iam/admin](http://localhost:8080/iam/admin/) and sign in as `admin`, with the
-password from:
+Then open [localhost:8080/iam/admin](http://localhost:8080/iam/admin/) — the
+forwarded port answers the same `/iam` path the web proxy serves — and sign in
+as `admin`, with the password from:
 
 ```bash
 kubectl -n classifyre get secret classifyre-iam \
@@ -46,35 +49,53 @@ A tenant is an **organization** in the identity server. The chart creates the
 first one (`iam.bootstrap.tenant`, default `default`) with a group `admins`
 whose members are tenant admins.
 
-To add a tenant, create an organization in the `classifyre` realm (its
-**alias** is how Classifyre names it), add its members, and give it a
-top-level group called `admins` with its first admins in it. The tenant
-appears in Classifyre the first time one of its members signs in, and its
-`admins` group then becomes tenant admin, once: if a tenant admin later takes
-that away, it stays away. A tenant admin gives everyone else access through
-the **Tenant access** page; until a grant exists, other members see no
-workspaces.
+**Tenant admins manage their own tenant in Classifyre**, on the Tenant access
+page: people, groups and access (see [People and groups](/access/people/)).
+The identity server's console is for operators only. It is not limited to one
+tenant: anyone who can change groups there can change every tenant's.
+
+**Creating a tenant is an operator task**, done in the console:
+
+1. **Organizations → Create organization**, with a name and an **alias**. The
+   alias is how Classifyre names the tenant and cannot change later.
+2. In the new organization, **Groups → Create group** named exactly `admins`
+   (at the top level), and add its first admins under **Members** and to that
+   group. Without an `admins` group nobody can manage the tenant.
+3. The tenant appears in Classifyre the first time one of its members signs
+   in. Its `admins` group then becomes tenant admin, once: if a tenant admin
+   later takes that away, it stays away. From there its admins manage
+   everything else themselves.
+
+A tenant admin of one tenant never sees or manages another tenant, and the
+Tenant access page shows only the tenant you signed in to. There is no screen
+for operators to manage all tenants yet.
 
 Do not delete an organization and create it again under the same alias: its
 members are refused with a message that an operator has to link the tenant
 again, so nobody inherits the old tenant's workspaces by accident.
 
-Groups live inside an organization (**Organizations → your tenant →
-Groups**). They can be nested: being in `/finance/ap-team` counts as being in
-`/finance`. Renaming or moving a group never breaks access, because grants
-point at the group itself, not its name.
-
-Groups made under the realm's own **Groups** menu belong to no tenant, so
-Classifyre does not list them and grants cannot use them. A person must be a
-**member of the organization** (Organizations → your tenant → Members) before
-anything else counts. Someone who signs in without being in any organization
-sees a page saying their account is not in a tenant yet, with a button to try
-again once they have been added.
+Groups are nested: being in `/finance/ap-team` counts as being in `/finance`.
+Renaming or moving a group never breaks access, because grants point at the
+group itself, not its name. Groups made under the realm's own **Groups** menu
+belong to no tenant, so Classifyre ignores them. Someone who signs in without
+being a member of any organization sees a page saying their account is not in
+a tenant yet.
 
 Roles and what they allow (capabilities such as managing sources or access)
-are not in the identity server at all. They live in Classifyre, and a tenant
-admin gives them to groups on the **Tenant access** page or a workspace's
-**Access** tab.
+are not in the identity server at all. They live in Classifyre.
+
+### When a company directory owns membership
+
+Managing people and groups from Classifyre needs two rights for the API's
+service account in the `classifyre` realm: `manage-organizations` (groups)
+and `manage-users` (members, new accounts, temporary passwords). Both apply
+to the whole realm, so Classifyre itself keeps every change inside the
+tenant of the person making it. Realm settings, clients and identity
+providers stay out of its reach.
+
+If your company directory decides who is in which group, set
+`iam.peopleManagement: false`. The chart then takes those two rights away
+again, and People and Groups become read-only in Classifyre.
 
 ---
 

@@ -44,8 +44,14 @@ CLASSIFYRE_IAM=true ./scripts/dev/start.sh
 ```
 
 The `iam` skaffold profile adds `helm/develop/values-dev-iam.yaml` and
-port-forwards the identity server to <http://localhost:8180/iam>. Its admin
-console is at <http://localhost:8180/iam/admin> (user `admin`, password in the
+port-forwards the identity server's service to `localhost:8280/iam` for the
+local web server's (`./scripts/dev/web-iam.sh`) token calls. The browser
+does not use the ingress for sign-in: the web app is not deployed in-cluster
+for local dev (`frontend.enabled: false`), so no ingress routes `/iam`.
+Instead it opens the local web server directly
+(<http://localhost:3000/iam>, its `/iam/[...path]` proxy), which is also the
+issuer in its tokens. The admin console is at
+<http://localhost:3000/iam/admin> (user `admin`, password in the
 `classifyre-iam` Secret, key `admin-password`). That account is the identity
 server's own and cannot sign in to Classifyre. Classifyre's first tenant admin
 is a different user, also called `admin`, in the `classifyre` realm, with a
@@ -56,8 +62,11 @@ Default → Members**, and to a group under **Organizations → Default → Grou
 Groups made under the realm's own **Groups** menu are not used by Classifyre;
 a user in no organization sees a "not in a tenant yet" page.
 
-Run the web app with sign-in in a second terminal (it reads the web client's
-secret from the cluster):
+Run the web app with sign-in in a second terminal. Its `/iam` proxy serves
+the browser and its server-side token calls need the identity server, so
+`web-iam.sh` points the issuer at the local server and the token calls at
+the skaffold port-forward. The script reads the web client's secret from
+the cluster:
 
 ```bash
 ./scripts/dev/web-iam.sh

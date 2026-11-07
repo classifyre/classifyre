@@ -17,9 +17,9 @@ ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 NS=${IAM_PERSONAS_NAMESPACE:-iam-personas}
 REL=personas
 API_PORT=${IAM_PERSONAS_API_PORT:-8814}
-# Not 8180: the dev stack (`skaffold dev` with the `iam` profile) already
-# forwards the identity server there; two forwards on one port race and the
-# token calls land on the wrong realm ("Invalid client").
+# Not 8280: the dev stack (`skaffold dev` with the `iam` profile) forwards
+# its identity server there for the local web app. Two forwards on one port
+# race and the token calls land on the dev realm instead of the suite's.
 IAM_PORT=${IAM_PERSONAS_IAM_PORT:-8182}
 B="http://127.0.0.1:${API_PORT}"
 KCURL="http://localhost:${IAM_PORT}/iam/realms/classifyre"
@@ -112,8 +112,19 @@ helm install "$REL" "$ROOT/helm/classifyre" -n "$NS" \
   --set api.embedding.enabled=false >/dev/null
 
 say "wait for the API, the identity server and the realm setup"
-until kubectl -n "$NS" get pods --no-headers 2>/dev/null | grep -q "api.*1/1"; do sleep 10; done
-until kubectl -n "$NS" get jobs --no-headers 2>/dev/null | grep -q Complete; do sleep 5; done
+# Give up after ten minutes and say why, instead of waiting forever on pods
+# the cluster cannot place (a full node is the usual cause).
+waited=0
+until kubectl -n "$NS" get pods --no-headers 2>/dev/null | grep -q "api.*1/1" &&
+  kubectl -n "$NS" get jobs --no-headers 2>/dev/null | grep -q Complete; do
+  if [ "$waited" -ge 600 ]; then
+    kubectl -n "$NS" get pods --no-headers 2>/dev/null
+    kubectl -n "$NS" get events --field-selector type=Warning --no-headers 2>/dev/null |
+      awk '{$1=$2=$3=""; print}' | sort -u | tail -5
+    echo "FAIL: the release did not come up within ten minutes"; exit 1
+  fi
+  sleep 10; waited=$((waited + 10))
+done
 # The API retries its tenant setup for about ten minutes, then gives up.
 for _ in $(seq 1 72); do
   LOGS=$(kubectl -n "$NS" logs "deploy/$REL-classifyre-api" --tail=500 2>/dev/null || true)

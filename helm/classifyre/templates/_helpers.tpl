@@ -706,18 +706,30 @@ identity server is named `iam` in every resource and value of this chart.
 {{- .Values.iam.path | trimSuffix "/" -}}
 {{- end -}}
 
-{{- /* Public URL people's browsers reach the identity server at; tokens carry it as their issuer. */ -}}
-{{- define "classifyre.iam.publicUrl" -}}
-{{- if .Values.iam.publicUrl -}}
-{{- .Values.iam.publicUrl | trimSuffix "/" -}}
+{{- define "classifyre.iam.appUrl" -}}
+{{- if .Values.iam.appUrl -}}
+{{- .Values.iam.appUrl | trimSuffix "/" -}}
 {{- else -}}
 {{- $scheme := ternary "https" "http" (gt (len .Values.ingress.tls) 0) -}}
-{{- printf "%s://%s%s" $scheme .Values.ingress.host (include "classifyre.iam.path" .) -}}
+{{- printf "%s://%s" $scheme .Values.ingress.host -}}
 {{- end -}}
+{{- end -}}
+
+{{- /* Public URL people reach the identity server at. Always the web app's
+     own address plus the proxied `/iam` path — the same way `/api` lives
+     wherever the web app is, with no separate host to configure. Tokens
+     carry it as their issuer. */ -}}
+{{- define "classifyre.iam.publicUrl" -}}
+{{- printf "%s%s" (include "classifyre.iam.appUrl" .) (include "classifyre.iam.path" .) -}}
 {{- end -}}
 
 {{- /* In-cluster URL for the API: keys, token checks and membership lookups. */ -}}
 {{- define "classifyre.iam.internalUrl" -}}
+{{- printf "http://%s:8080%s" (include "classifyre.iam.fullname" .) (include "classifyre.iam.path" .) -}}
+{{- end -}}
+
+{{- /* In-cluster URL of the identity server the web's `/iam/[...path]` route proxies to. */ -}}
+{{- define "classifyre.iam.serviceUrl" -}}
 {{- printf "http://%s:8080%s" (include "classifyre.iam.fullname" .) (include "classifyre.iam.path" .) -}}
 {{- end -}}
 
@@ -775,7 +787,10 @@ password
 {{- end -}}
 {{- end -}}
 
-{{- /* Environment the API and the web share to find the identity server. */ -}}
+{{- /* Environment the API and the web share to find the identity server.
+     The API talks to it directly in-cluster (JWKS, admin lookups); the web
+     also proxies browsers to it (route `/iam/[...path]`), so it gets the
+     service URL too. */ -}}
 {{- define "classifyre.iam.env" -}}
 - name: IAM_ENABLED
   value: {{ .Values.iam.enabled | quote }}
@@ -784,6 +799,8 @@ password
   value: {{ include "classifyre.iam.issuerUrl" . | quote }}
 - name: IAM_INTERNAL_URL
   value: {{ include "classifyre.iam.internalUrl" . | quote }}
+- name: IAM_SERVICE_URL
+  value: {{ include "classifyre.iam.serviceUrl" . | quote }}
 - name: IAM_REALM
   value: {{ .Values.iam.realm | quote }}
 - name: IAM_APP_URL
@@ -792,14 +809,7 @@ password
   value: {{ .Values.iam.bootstrap.tenant.alias | quote }}
 - name: IAM_PEOPLE_MANAGEMENT
   value: {{ .Values.iam.peopleManagement | quote }}
+- name: IAM_EXPOSE_ADMIN_CONSOLE
+  value: {{ .Values.iam.exposeAdminConsole | quote }}
 {{- end }}
-{{- end -}}
-
-{{- define "classifyre.iam.appUrl" -}}
-{{- if .Values.iam.appUrl -}}
-{{- .Values.iam.appUrl | trimSuffix "/" -}}
-{{- else -}}
-{{- $scheme := ternary "https" "http" (gt (len .Values.ingress.tls) 0) -}}
-{{- printf "%s://%s" $scheme .Values.ingress.host -}}
-{{- end -}}
 {{- end -}}

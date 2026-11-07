@@ -339,8 +339,8 @@ iam:
     repository: quay.io/keycloak/keycloak
     tag: "26.8.1"
   replicas: 1 # 2+ in production: distributed cache over a headless service
-  path: /iam # served on ingress.host, so no extra DNS name or certificate
-  exposeAdminConsole: false # /iam/admin and /iam/realms/master are blocked at the ingress unless true
+  path: /iam # served through the web app on ingress.host, so no extra DNS name or certificate
+  exposeAdminConsole: false # /iam/admin and /iam/realms/master are blocked at the web proxy unless true
   realm: classifyre
   tokenLifespan: 5m
   database:
@@ -357,13 +357,13 @@ iam:
   identityProviders: [] # OIDC/SAML brokers, mapper sync mode FORCE
 ```
 
-New templates: `iam-deployment.yaml`, `iam-service.yaml`, `iam-headless-service.yaml`, `iam-secrets.yaml`, `iam-database.yaml`, `iam-config-job.yaml`, `iam-ingress.yaml`, plus rules in `networkpolicy.yaml`. `deployment-api.yaml` and `deployment-web.yaml` get `IAM_ENABLED`, `IAM_ISSUER_URL` (public, used to check `iss`), `IAM_INTERNAL_URL` (in-cluster, used for JWKS and admin lookups), `IAM_REALM` and client secrets.
+New templates: `iam-deployment.yaml`, `iam-service.yaml`, `iam-headless-service.yaml`, `iam-secrets.yaml`, `iam-database.yaml`, `iam-config-job.yaml`, plus rules in `networkpolicy.yaml`. The identity server has no ingress of its own: the web app proxies it (route `/iam/[...path]`), the same way it proxies `/api`, so external systems keep one public entrance. `deployment-api.yaml` and `deployment-web.yaml` get `IAM_ENABLED`, `IAM_ISSUER_URL` (public, used to check `iss`), `IAM_INTERNAL_URL` (in-cluster, used for JWKS and admin lookups), `IAM_SERVICE_URL` (in-cluster, used by the web proxy), `IAM_REALM` and client secrets.
 
 Decisions:
 
 - **Own templates, not a sub-chart.** Keycloak is one container. The Bitnami chart's images are no longer freely published, the community `keycloakx` chart lags upstream, and the operator needs cluster-wide CRDs that a workload chart should not install. Our own `Deployment` keeps names under `iam` (H5).
 - **Separate database, same server.** Keycloak gets its own database `iam` with its own user, never the `classifyre` database, whose `public` schema holds the registry. For `cnpg` it is a `Database` resource on the existing cluster; for `embedded` an init step; for `external` the operator supplies it.
-- **Same host, path `/iam`.** `iam` is added to `RESERVED_PREFIXES` and `RESERVED_WEB_PREFIXES` in `namespace/namespace.constants.ts`, so no workspace can be called `iam`.
+- **Same host, path `/iam`.** `iam` is added to `RESERVED_PREFIXES` and `RESERVED_WEB_PREFIXES` in `namespace/namespace.constants.ts`, so no workspace can be called `iam`. The ingress sends `/iam` to the web service, whose `/iam/[...path]` route forwards to the ClusterIP identity server; nothing about Keycloak is reachable on its own port from outside.
 - **Upgrades use `strategy: Recreate`.** Keycloak minor upgrades need all nodes stopped. Sign-in is down for about a minute; issued tokens keep working because the API checks them against cached keys, and membership lookups fall back to the last answer for up to 15 minutes. Back up the `iam` database before minor upgrades (documented in `NOTES.txt` and the chart README).
 - **Structure as code, membership by people.** The `iam-config` hook Job applies the realm structure (clients, client scopes, mappers, flows, the `classifyre-operator` role) on every install and upgrade. Groups, users and organization membership are left to tenant admins and IdPs: the job never deletes what it does not own, which avoids the known `managed.group=full` deletion trap.
 - **Realm settings from the Keycloak guidance:** clients `classifyre-web` (confidential, used by the web server, authorization code + PKCE) and `classifyre-api` (audience; service account allowed to read users and groups only). _Full Scope Allowed_ off on every client. Implicit and password grants off. Access tokens 5 minutes. Brute-force detection on. Admin events with representation on. The master realm is never used by the application.
@@ -567,7 +567,7 @@ Left open:
 
 ### Step 4 · Chart: `iam`
 
-- Templates and values of §9.2, database per Postgres mode, `iam-config` Job with realm structure, ingress path `/iam` with admin paths blocked, network policies, `values.schema.json`, `validate-values.yaml` (H4, and `iam.enabled` requires `ingress.host`), `NOTES.txt`, chart README.
+- Templates and values of §9.2, database per Postgres mode, `iam-config` Job with realm structure, the web `/iam` proxy with admin paths blocked, network policies, `values.schema.json`, `validate-values.yaml` (H4, and `iam.enabled` requires `ingress.host`), `NOTES.txt`, chart README.
 - Dependabot `ignore` rule for Keycloak majors (§9.3). `iam` added to the reserved prefixes.
 - Dev stack: `skaffold.yaml` / dev values seed a `dev` tenant with groups `/finance`, `/finance/workspace-managers`, `/sales`, `/legal` and one invented user per persona in §7.
 - **Tests:** `helm template` with `iam.enabled` on and off for each Postgres mode; the `keycloak`-name grep (H5); the SEO conflict fails; `docker/` has no diff (H2).
@@ -575,12 +575,12 @@ Left open:
 
 **As built, 2026-11-04** (`helm/classifyre`):
 
-- **Templates:** `iam-secrets.yaml` (admin, database, both client secrets and the first admin's password, generated once and read back on upgrade), `iam-deployment.yaml` (server, service, headless service), `iam-setup-job.yaml` with `files/iam/setup-realm.sh`, `iam-ingress.yaml`, a network policy, the managed role and `Database` for CloudNativePG in `cnpg-cluster.yaml`, IAM environment for API, worker and web, and `NOTES.txt` lines with the first admin's password command.
+- **Templates:** `iam-secrets.yaml` (admin, database, both client secrets and the first admin's password, generated once and read back on upgrade), `iam-deployment.yaml` (server, service, headless service), `iam-setup-job.yaml` with `files/iam/setup-realm.sh`, a network policy, the managed role and `Database` for CloudNativePG in `cnpg-cluster.yaml`, IAM environment for API, worker and web, and `NOTES.txt` lines with the first admin's password command.
 - **Database:** `iam.database.mode: shared` gives the server its own `iam` role and database on the chart's PostgreSQL. On embedded PostgreSQL an init container creates both (it runs as the superuser) and keeps the password in step with the Secret. On CloudNativePG it is a managed role plus a `Database` resource (CNPG 1.25+). With an external PostgreSQL the chart refuses `shared` and asks for `iam.database.external.*`. `iam.database.poolMaxSize` (default 20) caps its connections.
-- **Ingress:** without `iam.exposeAdminConsole` only `/iam/realms/<realm>` and `/iam/resources` are routed, so the admin console and the master realm are not reachable from outside.
-- **Validation:** the sitemap together with IAM fails the install (H4). So does IAM without `ingress.host` or explicit `iam.publicUrl` / `iam.appUrl`, and `shared` on an external PostgreSQL.
+- **Web proxy:** without `iam.exposeAdminConsole` the `/iam/[...path]` route forwards only `/iam/realms/<realm>` and `/iam/resources`, so the admin console and the master realm are not reachable from outside. The ingress sends `/iam` to the web service; the identity server itself stays a ClusterIP service.
+- **Validation:** the sitemap together with IAM fails the install (H4). So does IAM without `ingress.host` or explicit `iam.appUrl` (the identity server is always `<appUrl>/iam`, never a separate host), and `shared` on an external PostgreSQL.
 - **Naming (H5):** the word appears only in the image reference and in the `kcadm.sh` path inside the setup script, which the image dictates.
-- **Dev:** `values-dev.yaml` sets `iam.enabled: false`; `CLASSIFYRE_IAM=true ./scripts/dev/start.sh` activates the `iam` skaffold profile, which adds `values-dev-iam.yaml` (public URL `http://localhost:8180/iam`, app URL `http://localhost:3000`, admin console exposed) and the port-forward. `skaffold diagnose` confirms the effective config with and without it.
+- **Dev:** `values-dev.yaml` sets `iam.enabled: false`; `CLASSIFYRE_IAM=true ./scripts/dev/start.sh` activates the `iam` skaffold profile, which adds `values-dev-iam.yaml` (public and app URLs are the local web server at `http://localhost:3000` — the web app is not deployed in-cluster for local dev, so its `/iam` proxy serves the browser — admin console exposed) and a port-forward of the identity server for the web server's token calls. `skaffold diagnose` confirms the effective config with and without it.
 - **Public demo:** `values-vps.yaml` and `values-vps-develop.yaml` set `iam.enabled: false`: the demo stays open and keeps its sitemap. Without it, their next deploy would have failed validation.
 - **Reserved:** `iam` can no longer be a workspace slug (API and API client).
 
@@ -665,7 +665,7 @@ Also: no token 401; a create without owner 400; a spoofed `X-Actor-Name` recorde
 - **401 in the browser:** `setUnauthorizedHandler` in `@workspace/api-client` (`http.ts`) renews once through `POST /auth/refresh` and retries, one renewal shared by every request that expired together; if renewal fails the page goes to sign-in. This matters in production, where the ingress sends `/api` straight to the API and the proxy never sees those calls.
 - **UI:** `ServerConfig.iamEnabled`; an account menu (name, tenant, sign out) in the header; `useMe()`, `useCan()` and `<Can capability>` from `GET /<ws>/me`; the case board shows the signed-in name instead of asking for one.
 - **SEO off (H4):** `isSitemapEnabled()` is false with `IAM_ENABLED=true`, which drives `robots.txt` (`Disallow: /`), the sitemap routes and every page's robots metadata.
-- **Locale routing** leaves `/auth/*` alone.
+- **Locale routing** leaves `/auth/*` and `/iam/*` alone.
 
 **Verified** with a production build of the web app (`next build`, run on port 3005 because another session's dev server held the checkout) against a throwaway release whose app URL was `http://localhost:3005`: `/` without a session → 307 to sign-in → 307 to the identity server with PKCE; signing in as the finance viewer in the browser landed on the workspace, which loaded its data through the API with the cookie; no session cookie was readable from JavaScript; the account menu showed "Ava Test · Tenant: Default · Sign out"; `POST /auth/refresh` answered 204; the directory listed only the finance workspace; `/me` said `oidc`, 12 capabilities, no `source.manage`; sign-out ended the identity server session (the next visit asked for a username again). The same build without sign-in: pages 200, `/auth/login` 404, no account menu, `/me` `iamEnabled: false` with every capability.
 

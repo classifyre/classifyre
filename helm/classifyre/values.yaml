@@ -1027,13 +1027,11 @@ iam:
     pullPolicy: IfNotPresent
   # -- Replicas. More than one forms a cluster over the headless service; minor upgrades still stop all of them.
   replicas: 1
-  # -- Path the identity server is served under, on `ingress.host`.
+  # -- Path the identity server is served under: the web app proxies it there, the same way it proxies `/api`. Always on the web app's own host — there is no separate public URL to configure.
   path: /iam
-  # -- Public URL of the identity server, e.g. `https://classifyre.example.com/iam`. Empty derives it from `ingress.host`, `ingress.tls` and `iam.path`.
-  publicUrl: ""
-  # -- URL people open Classifyre at, for sign-in redirects, e.g. `https://classifyre.example.com`. Empty derives it from `ingress.host` and `ingress.tls`.
+  # -- URL people open Classifyre at, for sign-in redirects, e.g. `https://classifyre.example.com`. Empty derives it from `ingress.host` and `ingress.tls`. The identity server lives under it at `<appUrl>/iam`.
   appUrl: ""
-  # -- Expose the identity server's own admin console (`<path>/admin`) and master realm at the ingress. Off routes only the `classifyre` realm.
+  # -- Expose the identity server's own admin console and master realm: the web proxy forwards only the `classifyre` realm and static files unless this is on, which also forwards `/iam/admin` and `/iam/realms/master`.
   exposeAdminConsole: false
   # -- Realm that holds users, tenants (organizations) and groups.
   realm: classifyre

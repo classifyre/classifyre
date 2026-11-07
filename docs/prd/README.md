@@ -15,6 +15,7 @@ These PRDs turn the findings of [palantir-use-case-gap-analysis.md](../../palant
 | [G0 · Safe defaults](G0-safe-defaults.md) | An instance without a login exposes every secret it found and runs notebook code for anyone | XS–S | M0 | — |
 | [S1 · Enterprise extension seams](S1-enterprise-extension-seams.md) | Makes the enterprise edition a module, not a fork of a fast-moving repository | S–M | M0 | F6 |
 | [IAM · Identity and access management](IAM-access-management.md) | Anyone who reaches an instance can do everything, and tenants and groups cannot be kept apart | L | after M0 | builds on F6 |
+| [TEN · Tenant isolation, operators and the cloud playground](TEN-tenant-isolation-and-cloud.md) | Turning sign-in off shows every tenant's workspaces, and nobody manages the tenants themselves | L | after IAM | — |
 | [G1 · PYTHON detector](G1-python-detector.md) | Rules and quality checks live in connector notebooks as TAG workarounds (67 of 68 GENESIS detectors) | M | M1 | C1, C2 |
 | [G3 · Domain events, webhooks, push, case export](G3-outbound-webhooks-notifications-export.md) | Nothing leaves the app: no webhook, no push, no case export | S–M | M1 | F1 |
 | [G2 · European detection coverage and bundles](G2-eu-detection-coverage.md) | National IDs for only 6 of 27 member states, no GDPR Art. 9 detection, no way to share detectors | S–M | M2 | F5 |
