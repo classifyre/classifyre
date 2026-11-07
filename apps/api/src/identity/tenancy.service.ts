@@ -2,12 +2,10 @@ import { randomUUID } from 'node:crypto';
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { Pool } from 'pg';
 import {
-  DEFAULT_CATEGORY_ID,
   PUBLIC_SEARCH_PATH_OPTION,
   publicConnectionString,
 } from '../registry/namespace-registry.sql';
 import type { RoleKey } from './roles';
-import { LOCAL_TENANT_ID } from './tenancy.sql';
 
 export interface Tenant {
   id: string;
@@ -359,44 +357,6 @@ export class TenancyService implements OnModuleDestroy {
       [tenantId],
     );
     return rows.length > 0;
-  }
-
-  /**
-   * Turning sign-in on for an instance that ran without it: workspaces in the
-   * `local` tenant move to the first tenant, owned by its `admins` group once
-   * that group exists. Idempotent.
-   */
-  async adoptLocalWorkspaces(
-    tenant: Tenant,
-    adminsGroupId: string | null,
-  ): Promise<void> {
-    const { rowCount } = await this.pool.query(
-      `UPDATE namespaces
-          SET tenant_id = $1, owner_group_id = COALESCE(owner_group_id, $2)
-        WHERE tenant_id = $3`,
-      [tenant.id, adminsGroupId, LOCAL_TENANT_ID],
-    );
-    if (rowCount) {
-      this.logger.log(
-        `Moved ${rowCount} workspace(s) without sign-in into tenant ${tenant.alias}`,
-      );
-    }
-    if (adminsGroupId) {
-      // Adopted before the group existed: with sign-in every created
-      // workspace has an owner, so only adopted ones can be without.
-      await this.pool.query(
-        `UPDATE namespaces SET owner_group_id = $2
-          WHERE tenant_id = $1 AND owner_group_id IS NULL`,
-        [tenant.id, adminsGroupId],
-      );
-    }
-    // Categories made without sign-in go with the workspaces; the default one
-    // stays shared.
-    await this.pool.query(
-      `UPDATE namespace_categories SET tenant_id = $1
-        WHERE tenant_id IS NULL AND id <> $2`,
-      [tenant.id, DEFAULT_CATEGORY_ID],
-    );
   }
 
   /** An account Classifyre created for this tenant (People → Add). */
