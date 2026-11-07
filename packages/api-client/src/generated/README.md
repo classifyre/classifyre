@@ -405,7 +405,7 @@ All URIs are relative to *http://localhost*
 *NotificationsApi* | [**notificationsControllerSetImportant**](docs/NotificationsApi.md#notificationscontrollersetimportant) | **PATCH** /notifications/{id}/important | Set notification importance
 *PlatformApi* | [**platformControllerAddAdmin**](docs/PlatformApi.md#platformcontrolleraddadmin) | **POST** /platform/tenants/{tenantId}/admins | Make someone a tenant admin, by email
 *PlatformApi* | [**platformControllerCreate**](docs/PlatformApi.md#platformcontrollercreate) | **POST** /platform/tenants | Create a tenant with its first admin
-*PlatformApi* | [**platformControllerImportWorkspaces**](docs/PlatformApi.md#platformcontrollerimportworkspaces) | **POST** /platform/tenants/{tenantId}/workspaces | Bring workspaces made without sign-in into a tenant
+*PlatformApi* | [**platformControllerImportWorkspaces**](docs/PlatformApi.md#platformcontrollerimportworkspaces) | **POST** /platform/tenants/{tenantId}/workspaces | Copy workspaces made without sign-in into a tenant
 *PlatformApi* | [**platformControllerLocalWorkspaces**](docs/PlatformApi.md#platformcontrollerlocalworkspaces) | **GET** /platform/workspaces/local | Workspaces made without sign-in, which can be brought into a tenant
 *PlatformApi* | [**platformControllerMe**](docs/PlatformApi.md#platformcontrollerme) | **GET** /platform/me | Whether the caller is an operator (403 when not)
 *PlatformApi* | [**platformControllerRemove**](docs/PlatformApi.md#platformcontrollerremove) | **DELETE** /platform/tenants/{tenantId} | Delete a tenant that has no workspaces left

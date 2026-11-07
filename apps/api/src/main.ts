@@ -24,6 +24,7 @@ import { InstanceSettingsService } from './instance-settings.service';
 import { PrismaExceptionFilter } from './filters/prisma-exception.filter';
 import { DbRetryInterceptor } from './interceptors/db-retry.interceptor';
 import { applyAllPendingMigrations } from './database-migrations';
+import { selectDatabaseForMode } from './database-mode';
 import { ClsService } from 'nestjs-cls';
 import { NamespaceRegistryService } from './registry/namespace-registry.service';
 import {
@@ -63,6 +64,8 @@ const BODY_LIMIT_BYTES = (() => {
 async function bootstrap() {
   // The all-in-one Docker image never uses sign-in (docs/prd §2 H2).
   assertIamAllowed();
+  // With sign-in, the control database rather than the open one.
+  selectDatabaseForMode();
   const logger = new Logger('Bootstrap');
   const port = process.env.PORT ?? 8000;
 

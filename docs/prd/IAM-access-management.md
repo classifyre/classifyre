@@ -807,7 +807,9 @@ The autopilot keeps `agent:autopilot` attribution and the `OBSERVE_ONLY` modes. 
 3. **Chat bots keep `chatMutationsAllowed`** (read-only with sign-in) until they get the same picker; a bot's role would be picked when the bot is configured (`agent.configure`).
 4. **Tests:** a persona check that an autopilot limited to Viewer runs reads but is refused writes; a check that changing the role takes effect on the next cycle without restarting anything. Estimated 2-3 days (picker + `principalForOwner` reuse + specs + persona checks).
 
-#### Step 9b · Platform operator console (U15, sized, not built)
+#### Step 9b · Platform operator console (U15, built as TEN phase 2)
+
+Built 2026-11-07 as the Platform page, see [TEN §4.7.1](TEN-tenant-isolation-and-cloud.md). The sizing below is kept for the record.
 
 The `platform-operator` role and the `platform.tenants.manage` capability exist in code; nothing calls them yet. To make U15 real:
 

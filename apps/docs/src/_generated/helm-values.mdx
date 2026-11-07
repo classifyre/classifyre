@@ -260,6 +260,7 @@
 | iam.bootstrap.tenant.alias | string | `"default"` | Alias of the first tenant (organization), created on install. |
 | iam.bootstrap.tenant.name | string | `"Default"` | Display name of the first tenant. |
 | iam.configJob | object | `{"resources":{"limits":{"memory":"512Mi"},"requests":{"cpu":"100m","memory":"256Mi"}}}` | Resources of the realm setup job. |
+| iam.controlDatabase | string | `"classifyre_control"` | Database the API works on with sign-in: tenants, grants and the list of workspaces. Each tenant's workspace data is in a database of its own (`classifyre_t_<tenant id>`, own login role), made on its first workspace. The database user needs `CREATEDB` and `CREATEROLE`, and new databases need the `vector` extension (superuser, or installed in `template1`). Without sign-in the API uses `postgres.*.database`, the open database, which never holds a tenant. |
 | iam.database.external.database | string | `"iam"` | External database name. |
 | iam.database.external.existingSecret | string | `""` | Secret holding the external database password. |
 | iam.database.external.existingSecretPasswordKey | string | `"password"` | Key of the password in `existingSecret`. |

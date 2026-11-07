@@ -10212,7 +10212,7 @@
             }
           }
         },
-        "summary": "Bring workspaces made without sign-in into a tenant",
+        "summary": "Copy workspaces made without sign-in into a tenant",
         "tags": [
           "Platform"
         ]
@@ -31665,15 +31665,26 @@
             "type": "string",
             "nullable": true
           },
+          "database": {
+            "type": "string",
+            "nullable": true,
+            "description": "The tenant's own database; null until its first workspace."
+          },
+          "upgradeError": {
+            "type": "string",
+            "nullable": true,
+            "description": "Why its last upgrade failed; its workspaces answer 503."
+          },
           "problem": {
             "type": "string",
             "nullable": true,
             "enum": [
               "ORGANIZATION_MISSING",
               "ORGANIZATION_REPLACED",
-              "NO_ADMINS_GROUP"
+              "NO_ADMINS_GROUP",
+              "UPGRADE_FAILED"
             ],
-            "description": "Why the tenant needs an operator: its organization was deleted or replaced in the identity server, or it has no top-level `admins` group."
+            "description": "Why the tenant needs an operator: its organization was deleted or replaced in the identity server, it has no top-level `admins` group, or its database could not be upgraded."
           }
         },
         "required": [
@@ -31686,6 +31697,8 @@
           "members",
           "admins",
           "lastActivityAt",
+          "database",
+          "upgradeError",
           "problem"
         ]
       },
@@ -31811,7 +31824,8 @@
       "ImportedWorkspacesDto": {
         "type": "object",
         "properties": {
-          "moved": {
+          "copied": {
+            "description": "Copied into the tenant; the open database keeps them.",
             "type": "array",
             "items": {
               "type": "string"
@@ -31819,7 +31833,7 @@
           }
         },
         "required": [
-          "moved"
+          "copied"
         ]
       },
       "StartRunnerDto": {

@@ -285,6 +285,12 @@ which each deployment sets on its own after including this block.
         secretKeyRef:
           name: {{ include "classifyre.apiMaskedConfigSecretName" . }}
           key: {{ include "classifyre.apiMaskedConfigSecretKey" . }}
+    {{- if .Values.iam.enabled }}
+    # With sign-in it upgrades the control database and every tenant's.
+    - name: IAM_ENABLED
+      value: "true"
+    {{- include "classifyre.tenantDatabases.env" . | nindent 4 }}
+    {{- end }}
     {{- if and (eq .Values.postgres.mode "external") .Values.postgres.external.existingSecret .Values.postgres.external.existingSecretUrlKey }}
     - name: DATABASE_URL
       valueFrom:
@@ -565,6 +571,7 @@ which each deployment sets on its own after including this block.
 {{- include "classifyre.telemetryEnv" . | nindent 0 }}
 {{- include "classifyre.iam.env" . | nindent 0 }}
 {{- if .Values.iam.enabled }}
+{{- include "classifyre.tenantDatabases.env" . | nindent 0 }}
 - name: IAM_API_CLIENT_ID
   value: classifyre-api
 - name: IAM_API_CLIENT_SECRET
@@ -791,6 +798,19 @@ password
      The API talks to it directly in-cluster (JWKS, admin lookups); the web
      also proxies browsers to it (route `/iam/[...path]`), so it gets the
      service URL too. */ -}}
+{{- /* With sign-in the API works on the control database and one database
+     per tenant (docs/prd/TEN §4.1). API pods and the migration init container
+     need the same values; the web app does not. */ -}}
+{{- define "classifyre.tenantDatabases.env" -}}
+- name: CLASSIFYRE_CONTROL_DATABASE
+  value: {{ .Values.iam.controlDatabase | quote }}
+- name: CLASSIFYRE_TENANT_DATABASE_KEY
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "classifyre.iam.secretName" . }}
+      key: tenant-database-key
+{{- end -}}
+
 {{- define "classifyre.iam.env" -}}
 - name: IAM_ENABLED
   value: {{ .Values.iam.enabled | quote }}

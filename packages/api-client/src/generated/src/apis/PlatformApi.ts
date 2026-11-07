@@ -174,7 +174,7 @@ export class PlatformApi extends runtime.BaseAPI {
     }
 
     /**
-     * Bring workspaces made without sign-in into a tenant
+     * Copy workspaces made without sign-in into a tenant
      */
     async platformControllerImportWorkspacesRaw(requestParameters: PlatformControllerImportWorkspacesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ImportedWorkspacesDto>> {
         if (requestParameters['tenantId'] == null) {
@@ -213,7 +213,7 @@ export class PlatformApi extends runtime.BaseAPI {
     }
 
     /**
-     * Bring workspaces made without sign-in into a tenant
+     * Copy workspaces made without sign-in into a tenant
      */
     async platformControllerImportWorkspaces(requestParameters: PlatformControllerImportWorkspacesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ImportedWorkspacesDto> {
         const response = await this.platformControllerImportWorkspacesRaw(requestParameters, initOverrides);

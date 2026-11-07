@@ -6,6 +6,7 @@ import {
   NotFoundException,
   OnModuleDestroy,
   OnModuleInit,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
@@ -29,6 +30,13 @@ import {
 import { LOCAL_TENANT_ID } from '../identity/tenancy.sql';
 import { iamEnabled } from '../identity/iam-config';
 import { workspaceScopeSql } from './workspace-scope';
+import {
+  dropTenantDatabase,
+  provisionTenantDatabase,
+  rememberWorkspace,
+  tenantDatabaseUrl,
+  workspaceDatabaseUrl,
+} from '../tenant-databases';
 import { withDbRetry } from '../db/db-retry';
 import { isTransientDbError } from '../db/transient-db-error';
 import type {
@@ -72,6 +80,7 @@ interface NamespaceRow {
   name: string;
   slug: string;
   schema_name: string;
+  tenant_id: string;
   description: string | null;
   has_thumbnail: boolean;
   paused: boolean;
@@ -90,7 +99,7 @@ interface NamespaceRow {
  * boolean and the bytes are streamed separately by the thumbnail endpoint.
  */
 const NAMESPACE_COLUMNS = `
-  id, name, slug, schema_name, description,
+  id, name, slug, schema_name, tenant_id, description,
   (thumbnail_blob IS NOT NULL) AS has_thumbnail,
   paused, paused_at, paused_reason,
   settings, external_links, created_at, updated_at, last_opened_at
@@ -168,6 +177,12 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
     options: PUBLIC_SEARCH_PATH_OPTION,
     max: 4,
   });
+  /**
+   * With sign-in, pools on tenant databases for the few queries that read
+   * workspace schemas directly (stats, the runner queue) and for creating and
+   * dropping them. Without sign-in workspaces are in this database.
+   */
+  private readonly tenantPools = new Map<string, Pool>();
   private readonly resolveCache = new Map<string, ResolveCacheEntry>();
   /** The workspaces this process may see at all; see {@link workspaceScopeSql}. */
   private readonly scope = workspaceScopeSql();
@@ -201,7 +216,27 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleDestroy(): Promise<void> {
-    await this.pool.end();
+    await Promise.all(
+      [this.pool, ...this.tenantPools.values()].map((pool) =>
+        pool.end().catch(() => undefined),
+      ),
+    );
+  }
+
+  /** The pool on the database that holds this workspace schema. */
+  private poolFor(schemaName: string): Pool {
+    if (!iamEnabled()) return this.pool;
+    const url = workspaceDatabaseUrl(schemaName);
+    let pool = this.tenantPools.get(url);
+    if (!pool) {
+      pool = new Pool({
+        connectionString: url,
+        options: PUBLIC_SEARCH_PATH_OPTION,
+        max: 2,
+      });
+      this.tenantPools.set(url, pool);
+    }
+    return pool;
   }
 
   onCreated(fn: (e: NamespaceLifecycleEvent) => void | Promise<void>): void {
@@ -253,14 +288,21 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
     if (hit && hit.expiresAt > Date.now()) return hit.context;
 
     const byId = UUID_RE.test(segment);
-    let rows: NamespaceRow[];
+    let rows: Array<
+      Pick<NamespaceRow, 'id' | 'slug' | 'schema_name' | 'tenant_id'> & {
+        migration_error: string | null;
+      }
+    >;
     try {
       // Every request on a page passes through here, so a momentary registry
       // hiccup would otherwise fail the whole view at once.
       ({ rows } = await withDbRetry(
         () =>
-          this.pool.query<NamespaceRow>(
-            `SELECT id, slug, schema_name FROM namespaces
+          this.pool.query(
+            `SELECT id, slug, schema_name, tenant_id,
+                    (SELECT t.migration_error FROM iam_tenants t
+                      WHERE t.id = namespaces.tenant_id) AS migration_error
+               FROM namespaces
                WHERE ${byId ? 'id = $1' : 'slug = $1'}
                  AND status = 'active' AND ${this.scope}`,
             [segment],
@@ -288,6 +330,13 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
       this.resolveCache.delete(segment);
       return null;
     }
+    if (row.migration_error) {
+      // Its tenant's upgrade failed at boot; the other tenants keep working.
+      throw new ServiceUnavailableException(
+        'This workspace is unavailable: its upgrade failed. An operator sees the error on the Platform page.',
+      );
+    }
+    rememberWorkspace(row.schema_name, row.tenant_id);
     const ctx: NamespaceLifecycleEvent = {
       namespaceId: row.id,
       slug: row.slug,
@@ -417,7 +466,9 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
           pendingSources: 0,
         };
         try {
-          const { rows } = await this.pool.query<NamespaceStatsSourceRow>(
+          const { rows } = await this.poolFor(
+            ns.schemaName,
+          ).query<NamespaceStatsSourceRow>(
             `SELECT s.runner_status AS "runnerStatus",
                     (SELECT r.status FROM "${ns.schemaName}".runners r
                      WHERE r.source_id = s.id
@@ -464,7 +515,9 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
     const counts = await Promise.all(
       namespaces.map(async (ns) => {
         try {
-          const { rows } = await this.pool.query<{ count: number }>(
+          const { rows } = await this.poolFor(ns.schemaName).query<{
+            count: number;
+          }>(
             `SELECT count(*)::int AS count FROM "${ns.schemaName}"."${table}" WHERE ${where}`,
           );
           return rows[0]?.count ?? 0;
@@ -522,7 +575,7 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
       namespaces.map(async (namespace) => {
         try {
           const schema = namespace.schemaName;
-          const { rows } = await this.pool.query<{
+          const { rows } = await this.poolFor(schema).query<{
             id: string;
             triggered_at: Date;
             lane: number;
@@ -659,8 +712,20 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
 
       try {
         await withDatabaseMigrationLock(async () => {
-          await this.pool.query(`CREATE SCHEMA IF NOT EXISTS "${schemaName}"`);
-          await deployForSchema(schemaName);
+          // With sign-in, into the tenant's own database, made on its first
+          // workspace (docs/prd/TEN §4.5).
+          if (iamEnabled() && tenancy) {
+            await provisionTenantDatabase(this.pool, tenancy.tenantId);
+          }
+          await this.poolFor(schemaName).query(
+            `CREATE SCHEMA IF NOT EXISTS "${schemaName}"`,
+          );
+          await deployForSchema(
+            schemaName,
+            iamEnabled() && tenancy
+              ? tenantDatabaseUrl(tenancy.tenantId)
+              : undefined,
+          );
           const activated = await this.pool.query<NamespaceRow>(
             `UPDATE namespaces SET status = 'active', updated_at = now()
                WHERE id = $1 RETURNING ${NAMESPACE_COLUMNS}`,
@@ -676,8 +741,12 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
             provisionError,
           )}`,
         );
-        await this.pool
-          .query(`DROP SCHEMA IF EXISTS "${schemaName}" CASCADE`)
+        await Promise.resolve()
+          .then(() =>
+            this.poolFor(schemaName).query(
+              `DROP SCHEMA IF EXISTS "${schemaName}" CASCADE`,
+            ),
+          )
           .catch(() => undefined);
         await this.pool
           .query('DELETE FROM namespaces WHERE id = $1', [id])
@@ -906,19 +975,24 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
     const { rows } = await this.pool.query<{
       slug: string;
       schema_name: string;
+      tenant_id: string;
     }>(
-      `SELECT slug, schema_name FROM namespaces
+      `SELECT slug, schema_name, tenant_id FROM namespaces
         WHERE id = $1 AND status = 'deleted' AND ${this.scope}`,
       [id],
     );
     const row = rows[0];
     if (!row) return false;
+    rememberWorkspace(row.schema_name, row.tenant_id);
+    const workspaceDb = this.poolFor(row.schema_name);
 
     // CASCADE because the schema owns its own tables and nothing outside it
     // references them; the registry row is the only external pointer and it
     // goes below.
-    await this.pool.query(`DROP SCHEMA IF EXISTS "${row.schema_name}" CASCADE`);
-    await this.pool.query(
+    await workspaceDb.query(
+      `DROP SCHEMA IF EXISTS "${row.schema_name}" CASCADE`,
+    );
+    await workspaceDb.query(
       `DROP SCHEMA IF EXISTS "${pgBossSchemaForId(id)}" CASCADE`,
     );
 
@@ -927,6 +1001,17 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
       [id],
     );
     if (deleted.rowCount === 0) return false;
+    // A deleted tenant keeps its database for its soft-deleted workspaces;
+    // it goes with the last of them.
+    if (iamEnabled()) {
+      const left = await this.pool.query(
+        `SELECT 1 FROM iam_tenants t
+          WHERE t.id = $1 AND t.deleted_at IS NOT NULL
+            AND NOT EXISTS (SELECT 1 FROM namespaces n WHERE n.tenant_id = t.id)`,
+        [row.tenant_id],
+      );
+      if (left.rowCount) await dropTenantDatabase(this.pool, row.tenant_id);
+    }
 
     this.resolveCache.delete(row.slug);
     this.resolveCache.delete(id);
@@ -1099,6 +1184,7 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
   }
 
   private toNamespace(row: NamespaceRow, categoryIds: string[]): Namespace {
+    rememberWorkspace(row.schema_name, row.tenant_id);
     return {
       id: row.id,
       name: row.name,

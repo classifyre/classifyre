@@ -13,6 +13,8 @@ const tenants = [
     members: 3,
     admins: [{ id: "u-ada", name: "Ada Kowalczyk", email: "ada@example.test" }],
     lastActivityAt: null,
+    database: "classifyre_t_acme",
+    upgradeError: null,
     problem: null,
   },
   {
@@ -25,7 +27,23 @@ const tenants = [
     members: 5,
     admins: [],
     lastActivityAt: null,
+    database: null,
+    upgradeError: null,
     problem: "NO_ADMINS_GROUP",
+  },
+  {
+    id: "t-initech",
+    alias: "initech",
+    name: "Initech",
+    status: "active",
+    createdAt: "2026-11-01T10:00:00.000Z",
+    workspaces: 1,
+    members: 1,
+    admins: [{ id: "u-bill", name: "Bill Persona", email: "bill@example.test" }],
+    lastActivityAt: null,
+    database: "classifyre_t_initech",
+    upgradeError: 'relation "sources" does not exist',
+    problem: "UPGRADE_FAILED",
   },
 ];
 
@@ -50,6 +68,13 @@ test("lists tenants with their status, problems and admins", async ({ mount }) =
   await expect(page.getByText("suspended", { exact: true })).toBeVisible();
   await expect(page.getByText("no admins group")).toBeVisible();
   await expect(page.getByText("Workspaces made without sign-in: 1.", { exact: false })).toBeVisible();
+});
+
+test("shows each tenant's database and a failed upgrade", async ({ mount }) => {
+  const page = await mount(<PlatformAdmin />);
+  await expect(page.getByText("classifyre_t_acme")).toBeVisible();
+  await expect(page.getByText("upgrade failed", { exact: true })).toBeVisible();
+  await expect(page.getByText('relation "sources" does not exist', { exact: false })).toBeVisible();
 });
 
 test("suggests an alias from the name", async ({ mount }) => {

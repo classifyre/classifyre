@@ -8,7 +8,12 @@ import {
   OnModuleDestroy,
 } from '@nestjs/common';
 import { Pool } from 'pg';
-import { moveWorkspaces, UsageError } from '../admin';
+import { prepareOpenDatabase } from '../database-migrations';
+import { openDatabaseUrl } from '../database-mode';
+import {
+  copyLocalWorkspacesToTenant,
+  TransferError,
+} from '../workspace-transfer';
 import {
   PUBLIC_SEARCH_PATH_OPTION,
   publicConnectionString,
@@ -33,7 +38,9 @@ export type TenantProblem =
   /** An organization with this alias exists, but it is not the tenant's. */
   | 'ORGANIZATION_REPLACED'
   /** Nobody can manage the tenant: it has no top-level `admins` group. */
-  | 'NO_ADMINS_GROUP';
+  | 'NO_ADMINS_GROUP'
+  /** Its database could not be upgraded at boot; its workspaces answer 503. */
+  | 'UPGRADE_FAILED';
 
 export interface PlatformTenant {
   id: string;
@@ -45,6 +52,9 @@ export interface PlatformTenant {
   members: number;
   admins: { id: string; name: string; email: string | null }[];
   lastActivityAt: Date | null;
+  /** Its own database; null until its first workspace. */
+  database: string | null;
+  upgradeError: string | null;
   problem: TenantProblem | null;
 }
 
@@ -60,12 +70,17 @@ export interface PlatformTenant {
  */
 @Injectable()
 export class PlatformService implements OnModuleDestroy {
-  /** For workspace imports, which move registry rows in one transaction. */
+  /** The control database, for copies into tenants and their databases. */
   private readonly pool = new Pool({
     connectionString: publicConnectionString(),
     options: PUBLIC_SEARCH_PATH_OPTION,
     max: 1,
   });
+  /**
+   * The open database, read only to list and copy workspaces made without
+   * sign-in when an operator brings them into a tenant (docs/prd/TEN R2).
+   */
+  private openPool: Pool | null = null;
 
   constructor(
     @Inject(IDENTITY) private readonly identity: IdentityService | null,
@@ -74,7 +89,18 @@ export class PlatformService implements OnModuleDestroy {
   ) {}
 
   async onModuleDestroy(): Promise<void> {
-    await this.pool.end();
+    await Promise.all([this.pool.end(), this.openPool?.end()]);
+  }
+
+  private open(): { pool: Pool; url: string } | null {
+    const url = openDatabaseUrl();
+    if (!url) return null;
+    this.openPool ??= new Pool({
+      connectionString: url,
+      options: PUBLIC_SEARCH_PATH_OPTION,
+      max: 1,
+    });
+    return { pool: this.openPool, url };
   }
 
   // ---- reads ---------------------------------------------------------------
@@ -106,7 +132,12 @@ export class PlatformService implements OnModuleDestroy {
           createdAt: tenant.createdAt,
           workspaces: tenant.workspaces,
           lastActivityAt: tenant.lastActivityAt,
+          database: tenant.databaseName,
+          upgradeError: tenant.upgradeError,
         };
+        const upgrade = tenant.upgradeError
+          ? ('UPGRADE_FAILED' as const)
+          : null;
         const org = tenant.orgId ? byId.get(tenant.orgId) : undefined;
         if (tenant.status === 'deleted' || !org) {
           return {
@@ -116,7 +147,7 @@ export class PlatformService implements OnModuleDestroy {
             problem:
               tenant.status === 'deleted'
                 ? null
-                : byAlias.has(tenant.alias)
+                : (upgrade ?? byAlias.has(tenant.alias))
                   ? ('ORGANIZATION_REPLACED' as const)
                   : ('ORGANIZATION_MISSING' as const),
           };
@@ -141,7 +172,7 @@ export class PlatformService implements OnModuleDestroy {
               name: nameOf(member),
               email: member.email,
             })),
-          problem: admins ? null : ('NO_ADMINS_GROUP' as const),
+          problem: upgrade ?? (admins ? null : ('NO_ADMINS_GROUP' as const)),
         };
       }),
     );
@@ -152,7 +183,10 @@ export class PlatformService implements OnModuleDestroy {
     { id: string; slug: string; name: string }[]
   > {
     this.directory();
-    const { rows } = await this.pool.query<{
+    const open = this.open();
+    if (!open) return [];
+    await prepareOpenDatabase(open.pool);
+    const { rows } = await open.pool.query<{
       id: string;
       slug: string;
       name: string;
@@ -336,6 +370,8 @@ export class PlatformService implements OnModuleDestroy {
       directory.forget(tenant.orgId);
     }
     await this.tenancy.markDeleted(tenant.id);
+    // Soft-deleted workspaces keep it until they are purged.
+    await this.tenancy.dropDatabaseIfUnused(tenant.id);
     for (const sub of createdHere) {
       const orgs =
         (await directory.read<{ id: string }[]>(
@@ -395,12 +431,15 @@ export class PlatformService implements OnModuleDestroy {
 
   // ---- workspaces ----------------------------------------------------------
 
-  /** Moves workspaces made without sign-in into a tenant (docs/prd/TEN §6). */
+  /**
+   * Copies workspaces made without sign-in into the tenant's database
+   * (docs/prd/TEN §4.9). The open database keeps them.
+   */
   async importWorkspaces(
     operator: Operator,
     tenantId: string,
     slugs: unknown,
-  ): Promise<{ moved: string[] }> {
+  ): Promise<{ copied: string[] }> {
     this.directory();
     const tenant = await this.requireTenant(tenantId);
     if (tenant.status === 'deleted') {
@@ -414,19 +453,25 @@ export class PlatformService implements OnModuleDestroy {
     ) {
       throw new BadRequestException('Pick the workspaces to bring in.');
     }
-    try {
-      const moved = await moveWorkspaces(
-        this.pool,
-        {
-          to: { tenant: tenant.alias },
-          slugs: slugs.map((slug) => slug.toLowerCase()),
-        },
-        operator.actor.ref,
+    const open = this.open();
+    if (!open) {
+      throw new ConflictException(
+        'The open database is not known to this installation (CLASSIFYRE_OPEN_DATABASE).',
       );
-      return { moved: moved.map((workspace) => workspace.slug) };
+    }
+    try {
+      const copied = await copyLocalWorkspacesToTenant(
+        { control: this.pool, open: open.pool, openUrl: open.url },
+        {
+          alias: tenant.alias,
+          slugs: slugs.map((slug) => slug.toLowerCase()),
+          actor: operator.actor.ref ?? `user:${operator.sub}`,
+        },
+      );
+      return { copied: copied.map((workspace) => workspace.slug) };
     } catch (error) {
-      // The command's own refusals name the workspaces; nothing else leaks.
-      if (error instanceof UsageError) {
+      // The copy's own refusals name the workspaces; nothing else leaks.
+      if (error instanceof TransferError) {
         throw new BadRequestException(error.message);
       }
       throw error;

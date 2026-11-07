@@ -7403,8 +7403,11 @@
     "problem": {
       "ORGANIZATION_MISSING": "organization deleted",
       "ORGANIZATION_REPLACED": "organization replaced",
-      "NO_ADMINS_GROUP": "no admins group"
+      "NO_ADMINS_GROUP": "no admins group",
+      "UPGRADE_FAILED": "upgrade failed"
     },
+    "database": "Database",
+    "upgradeError": "Its workspaces are unavailable until the next start upgrades its database: {{error}}",
     "admins": "Admins",
     "adminsTitle": "Admins of {{name}}",
     "adminsDescription": "Tenant admins manage the tenant's people, groups and access. A tenant always keeps at least one.",
@@ -7415,9 +7418,9 @@
     "adminRemoved": "{{name}} is no longer an admin",
     "import": "Bring in workspaces",
     "importTitle": "Bring workspaces into {{name}}",
-    "importDescription": "These workspaces were made without sign-in. Once in the tenant they keep all their data, are owned by its admins group, and are no longer reachable without sign-in.",
+    "importDescription": "These workspaces were made without sign-in. They are copied with all their data into the tenant's database, owned by its admins group. The originals stay where they are, for sign-in off.",
     "importConfirm": "Bring in {{count}}",
-    "imported": "Workspaces moved into {{name}}: {{count}}",
+    "imported": "Workspaces copied into {{name}}: {{count}}",
     "suspend": "Suspend",
     "suspendTitle": "Suspend {{name}}?",
     "suspendDescription": "Nobody in the tenant can work in Classifyre until it is resumed, and their agents stop too. Its data is kept, and scheduled scans keep running.",

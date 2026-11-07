@@ -10,7 +10,19 @@ import {
 } from './registry/namespace-registry.sql';
 import { WORKER_QUEUE_STATE_DDL } from './scheduler/worker-queue-state.sql';
 import { IAM_TABLES_DDL } from './identity/tenancy.sql';
-import { checkDatabaseKind, DATABASE_KIND_DDL } from './database-kind';
+import {
+  assertDatabaseKind,
+  checkDatabaseKind,
+  databaseKindDdl,
+  expectedDatabaseKind,
+} from './database-kind';
+import { ensureControlDatabase, selectDatabaseForMode } from './database-mode';
+import { iamEnabled } from './identity/iam-config';
+import {
+  provisionTenantDatabase,
+  rememberWorkspace,
+  tenantDatabaseUrl,
+} from './tenant-databases';
 
 const logger = new Logger('DatabaseMigrations');
 const MIGRATION_LOCK_SCOPE = 1_127_074_643;
@@ -51,6 +63,34 @@ export async function withDatabaseMigrationLock<T>(
   }
 }
 
+/**
+ * The tables of the database this process works on (the open one, or the
+ * control one with sign-in), and the check that it is that kind.
+ */
+async function prepareRegistry(client: PoolClient): Promise<void> {
+  await client.query(databaseKindDdl(expectedDatabaseKind()));
+  await client.query(REGISTRY_TABLE_DDL);
+  await client.query(IAM_TABLES_DDL);
+  await client.query(WORKER_QUEUE_STATE_DDL);
+  await checkDatabaseKind(client);
+}
+
+/**
+ * The open database's tables, seen from a process with sign-in on, before an
+ * operator copies workspaces into or out of it: a release that only ever ran
+ * with sign-in has never started on it. Refuses any database that is not the
+ * open one.
+ */
+export async function prepareOpenDatabase(
+  db: Pick<PoolClient, 'query'>,
+): Promise<void> {
+  await db.query(databaseKindDdl('open'));
+  await assertDatabaseKind(db, 'open');
+  await db.query(REGISTRY_TABLE_DDL);
+  await db.query(IAM_TABLES_DDL);
+  await db.query(WORKER_QUEUE_STATE_DDL);
+}
+
 /** Ensure the global namespace registry exists under the migration lock. */
 export async function ensureNamespaceRegistry(): Promise<void> {
   if (!process.env.DATABASE_URL) {
@@ -58,13 +98,9 @@ export async function ensureNamespaceRegistry(): Promise<void> {
       'Classifyre cannot initialize the namespace registry because DATABASE_URL is not set.',
     );
   }
-  await withDatabaseMigrationLock(async (client) => {
-    await client.query(DATABASE_KIND_DDL);
-    await client.query(REGISTRY_TABLE_DDL);
-    await client.query(IAM_TABLES_DDL);
-    await client.query(WORKER_QUEUE_STATE_DDL);
-    await checkDatabaseKind(client);
-  });
+  selectDatabaseForMode();
+  await ensureControlDatabase();
+  await withDatabaseMigrationLock(prepareRegistry);
 }
 
 function firstExistingPath(candidates: Array<string | undefined>): string {
@@ -115,14 +151,18 @@ function resolvePrismaCliPath(schemaPath: string): string {
 /**
  * Run `prisma migrate deploy` against a single Postgres schema.
  *
- * When `schema` is provided, `DATABASE_URL` is rewritten with `?schema=<schema>`
+ * When `schema` is provided, the database URL is rewritten with `?schema=<schema>`
  * so Prisma tracks state in an independent `_prisma_migrations` table inside
  * that schema and creates all (unqualified) tables there via `search_path`.
- * When omitted, the process `DATABASE_URL` is used verbatim (whatever schema it
- * already targets, defaulting to `public`).
+ * When omitted, the URL is used verbatim (whatever schema it already targets,
+ * defaulting to `public`). `databaseUrl` is the workspace's database: the
+ * process `DATABASE_URL` without sign-in, its tenant's database with it.
  */
-export async function deployForSchema(schema?: string): Promise<void> {
-  if (!process.env.DATABASE_URL) {
+export async function deployForSchema(
+  schema?: string,
+  databaseUrl: string | undefined = process.env.DATABASE_URL,
+): Promise<void> {
+  if (!databaseUrl) {
     throw new Error(
       'Classifyre cannot apply database migrations because DATABASE_URL is not set.',
     );
@@ -132,7 +172,6 @@ export async function deployForSchema(schema?: string): Promise<void> {
   const prismaCliPath = resolvePrismaCliPath(schemaPath);
   const apiDir = path.dirname(path.dirname(schemaPath));
 
-  let databaseUrl = process.env.DATABASE_URL;
   if (schema) {
     const url = new URL(databaseUrl);
     url.searchParams.set('schema', schema);
@@ -200,13 +239,90 @@ export async function deployForSchema(schema?: string): Promise<void> {
   });
 }
 
+interface WorkspaceToMigrate {
+  id: string;
+  schemaName: string;
+  tenantId: string;
+  provisioning: boolean;
+}
+
+async function migrateWorkspaces(
+  client: PoolClient,
+  workspaces: WorkspaceToMigrate[],
+  databaseUrl?: string,
+): Promise<void> {
+  for (const workspace of workspaces) {
+    await deployForSchema(workspace.schemaName, databaseUrl);
+    if (workspace.provisioning) {
+      await client.query(
+        "UPDATE namespaces SET status = 'active', updated_at = now() WHERE id = $1 AND status = 'provisioning'",
+        [workspace.id],
+      );
+    }
+  }
+}
+
+/**
+ * With sign-in: each tenant's database, then its workspaces, a few tenants at
+ * a time. A tenant that fails is recorded and answers 503 on its own; the
+ * others are upgraded and served (docs/prd/TEN §4.6).
+ */
+async function migrateTenants(
+  client: PoolClient,
+  workspaces: WorkspaceToMigrate[],
+): Promise<void> {
+  const byTenant = new Map<string, WorkspaceToMigrate[]>();
+  for (const workspace of workspaces) {
+    rememberWorkspace(workspace.schemaName, workspace.tenantId);
+    byTenant.set(workspace.tenantId, [
+      ...(byTenant.get(workspace.tenantId) ?? []),
+      workspace,
+    ]);
+  }
+  const queue = [...byTenant.entries()];
+  const concurrency = Math.max(
+    1,
+    Number.parseInt(process.env.TENANT_MIGRATION_CONCURRENCY ?? '', 10) || 4,
+  );
+  let failed = 0;
+  const runOne = async ([tenantId, items]: [string, WorkspaceToMigrate[]]) => {
+    try {
+      await provisionTenantDatabase(client, tenantId);
+      await migrateWorkspaces(client, items, tenantDatabaseUrl(tenantId));
+      await client.query(
+        'UPDATE iam_tenants SET migrated_at = now(), migration_error = NULL WHERE id = $1',
+        [tenantId],
+      );
+    } catch (error) {
+      failed += 1;
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error(`Tenant ${tenantId} could not be upgraded: ${message}`);
+      await client.query(
+        'UPDATE iam_tenants SET migration_error = $2 WHERE id = $1',
+        [tenantId, message.slice(0, 4000)],
+      );
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, queue.length) }, async () => {
+      for (let next = queue.shift(); next; next = queue.shift()) {
+        await runOne(next);
+      }
+    }),
+  );
+  logger.log(
+    `Upgraded ${byTenant.size - failed} of ${byTenant.size} tenant database(s)`,
+  );
+}
+
 /**
  * Pre-boot migration orchestrator for the multi-tenant model.
  *
- * 1. Bootstraps the `public.namespaces` registry table (idempotent DDL).
+ * 1. Bootstraps the `public.namespaces` registry table (idempotent DDL), on
+ *    the open database, or with sign-in on the control database.
  * 2. Reads every registered namespace and runs `migrate deploy` into its
- *    `ns_<slug>` schema, sequentially (bounded, one advisory-lock holder at a
- *    time on the shared database).
+ *    `ns_<uuid>` schema, sequentially without sign-in, per tenant database
+ *    with it.
  *
  * A fresh install has zero namespaces, so no tenant schema is migrated until
  * the first namespace is created (there is intentionally no default namespace).
@@ -225,44 +341,31 @@ export async function applyAllPendingMigrations(): Promise<void> {
     );
   }
 
+  selectDatabaseForMode();
+  await ensureControlDatabase();
   await withDatabaseMigrationLock(async (client) => {
-    let schemas: Array<{
-      id: string;
-      schemaName: string;
-      provisioning: boolean;
-    }> = [];
-
-    await client.query(DATABASE_KIND_DDL);
-    await client.query(REGISTRY_TABLE_DDL);
-    await client.query(IAM_TABLES_DDL);
-    await client.query(WORKER_QUEUE_STATE_DDL);
-    await checkDatabaseKind(client);
+    await prepareRegistry(client);
     // Namespace deletion is a soft-delete (status = 'deleted'): the tenant
     // schema and its data are retained, so there is nothing to drop on boot.
     const { rows } = await client.query<{
       id: string;
       schema_name: string;
       status: string;
+      tenant_id: string;
     }>(
-      "SELECT id, schema_name, status FROM namespaces WHERE status IN ('active', 'provisioning') ORDER BY created_at ASC",
+      "SELECT id, schema_name, status, tenant_id FROM namespaces WHERE status IN ('active', 'provisioning') ORDER BY created_at ASC",
     );
-    schemas = rows.map((r) => ({
+    const workspaces = rows.map((r) => ({
       id: r.id,
       schemaName: r.schema_name,
+      tenantId: r.tenant_id,
       provisioning: r.status === 'provisioning',
     }));
 
     logger.log(
-      `Namespace registry ready; migrating ${schemas.length} namespace schema(s)`,
+      `Namespace registry ready; migrating ${workspaces.length} namespace schema(s)`,
     );
-    for (const schema of schemas) {
-      await deployForSchema(schema.schemaName);
-      if (schema.provisioning) {
-        await client.query(
-          "UPDATE namespaces SET status = 'active', updated_at = now() WHERE id = $1 AND status = 'provisioning'",
-          [schema.id],
-        );
-      }
-    }
+    if (iamEnabled()) await migrateTenants(client, workspaces);
+    else await migrateWorkspaces(client, workspaces);
   });
 }

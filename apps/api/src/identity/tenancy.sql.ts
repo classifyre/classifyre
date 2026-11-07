@@ -33,6 +33,17 @@ ALTER TABLE public.iam_tenants
   ADD COLUMN IF NOT EXISTS suspended_at timestamptz;
 ALTER TABLE public.iam_tenants
   ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
+-- The tenant's own database (docs/prd/TEN §4.1), made before its first
+-- workspace. The last upgrade of its workspaces: a tenant whose upgrade
+-- failed answers 503 on its own while the others keep working (§4.6).
+ALTER TABLE public.iam_tenants
+  ADD COLUMN IF NOT EXISTS database_name text;
+ALTER TABLE public.iam_tenants
+  ADD COLUMN IF NOT EXISTS database_ready_at timestamptz;
+ALTER TABLE public.iam_tenants
+  ADD COLUMN IF NOT EXISTS migrated_at timestamptz;
+ALTER TABLE public.iam_tenants
+  ADD COLUMN IF NOT EXISTS migration_error text;
 
 -- A workspace belongs to exactly one tenant, and with sign-in on is owned by
 -- exactly one of its groups (an organization group id in the identity server).

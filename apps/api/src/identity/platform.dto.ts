@@ -52,14 +52,34 @@ export class PlatformTenantDto {
   @ApiProperty({
     type: String,
     nullable: true,
-    enum: ['ORGANIZATION_MISSING', 'ORGANIZATION_REPLACED', 'NO_ADMINS_GROUP'],
+    description: "The tenant's own database; null until its first workspace.",
+  })
+  database: string | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Why its last upgrade failed; its workspaces answer 503.',
+  })
+  upgradeError: string | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    enum: [
+      'ORGANIZATION_MISSING',
+      'ORGANIZATION_REPLACED',
+      'NO_ADMINS_GROUP',
+      'UPGRADE_FAILED',
+    ],
     description:
-      'Why the tenant needs an operator: its organization was deleted or replaced in the identity server, or it has no top-level `admins` group.',
+      'Why the tenant needs an operator: its organization was deleted or replaced in the identity server, it has no top-level `admins` group, or its database could not be upgraded.',
   })
   problem:
     | 'ORGANIZATION_MISSING'
     | 'ORGANIZATION_REPLACED'
     | 'NO_ADMINS_GROUP'
+    | 'UPGRADE_FAILED'
     | null;
 }
 
@@ -135,6 +155,9 @@ export class ImportWorkspacesDto {
 }
 
 export class ImportedWorkspacesDto {
-  @ApiProperty({ type: [String] })
-  moved: string[];
+  @ApiProperty({
+    type: [String],
+    description: 'Copied into the tenant; the open database keeps them.',
+  })
+  copied: string[];
 }

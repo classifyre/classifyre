@@ -257,8 +257,18 @@ describe('sign-in configuration', () => {
   it('refuses to start without the internal key (scan callbacks stay closed)', () => {
     expect(() => assertIamAllowed(env)).toThrow(/CLASSIFYRE_INTERNAL_KEY/);
     expect(() =>
-      assertIamAllowed({ ...env, CLASSIFYRE_INTERNAL_KEY: 'k' }),
+      assertIamAllowed({
+        ...env,
+        CLASSIFYRE_INTERNAL_KEY: 'k',
+        CLASSIFYRE_TENANT_DATABASE_KEY: 't',
+      }),
     ).not.toThrow();
+  });
+
+  it('refuses to start without the key of the tenant databases', () => {
+    expect(() =>
+      assertIamAllowed({ ...env, CLASSIFYRE_INTERNAL_KEY: 'k' }),
+    ).toThrow(/CLASSIFYRE_TENANT_DATABASE_KEY/);
   });
 });
 
