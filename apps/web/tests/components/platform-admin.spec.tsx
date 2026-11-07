@@ -45,6 +45,20 @@ const tenants = [
     upgradeError: 'relation "sources" does not exist',
     problem: "UPGRADE_FAILED",
   },
+  {
+    id: "t-hooli",
+    alias: "hooli",
+    name: "Hooli",
+    status: "active",
+    createdAt: "2026-11-01T10:00:00.000Z",
+    workspaces: 1,
+    members: 0,
+    admins: [],
+    lastActivityAt: null,
+    database: "classifyre_t_hooli",
+    upgradeError: null,
+    problem: "ORGANIZATION_MISSING",
+  },
 ];
 
 test.beforeEach(async ({ page }) => {
@@ -77,20 +91,23 @@ test("shows each tenant's database and a failed upgrade", async ({ mount }) => {
   await expect(page.getByText('relation "sources" does not exist', { exact: false })).toBeVisible();
 });
 
-test("suggests an alias from the name", async ({ mount }) => {
+test("offers only removal for a tenant whose organization was deleted", async ({ mount }) => {
   const page = await mount(<PlatformAdmin />);
-  await page.getByRole("button", { name: "New tenant" }).click();
-  await page.page().getByLabel("Name", { exact: true }).fill("Initech Holdings");
-  await expect(page.page().getByLabel("Alias")).toHaveValue("initech-holdings");
+  await page.getByRole("button", { name: "Actions for Hooli" }).click();
+  const menu = page.page().getByRole("menu");
+  await expect(menu.getByRole("menuitem")).toHaveCount(1);
+  await menu.getByRole("menuitem", { name: "Remove tenant data" }).click();
+  const dialog = page.page().getByRole("alertdialog");
+  const confirm = dialog.getByRole("button", { name: "Remove tenant data" });
+  await expect(confirm).toBeDisabled();
+  await dialog.getByLabel("Type hooli to confirm").fill("hooli");
+  await expect(confirm).toBeEnabled();
 });
 
-test("deletes only after the alias is typed", async ({ mount }) => {
+test("does not create tenants or change admins here", async ({ mount }) => {
   const page = await mount(<PlatformAdmin />);
+  await expect(page.getByRole("button", { name: "New tenant" })).toHaveCount(0);
   await page.getByRole("button", { name: "Actions for Acme" }).click();
-  await page.page().getByRole("menuitem", { name: "Delete tenant" }).click();
-  const dialog = page.page().getByRole("alertdialog");
-  const confirm = dialog.getByRole("button", { name: "Delete tenant" });
-  await expect(confirm).toBeDisabled();
-  await dialog.getByLabel("Type acme to confirm").fill("acme");
-  await expect(confirm).toBeEnabled();
+  await expect(page.page().getByRole("menuitem", { name: "Admins" })).toHaveCount(0);
+  await expect(page.page().getByRole("menuitem", { name: "Remove tenant data" })).toHaveCount(0);
 });

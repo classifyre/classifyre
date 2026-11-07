@@ -9,11 +9,7 @@ docs/AddCaseHypothesisRuleDto.md
 docs/AddEvidenceDto.md
 docs/AddExclusionDto.md
 docs/AddFindingDto.md
-docs/AddPersonDto.md
-docs/AddTenantAdminDto.md
 docs/AddThreadEntryDto.md
-docs/AddedPersonDto.md
-docs/AddedTenantAdminDto.md
 docs/AgentActivityItemDto.md
 docs/AgentActivityListResponseDto.md
 docs/AgentCapacityReportDto.md
@@ -188,7 +184,6 @@ docs/CreateExternalRunnerDto.md
 docs/CreateFindingDto.md
 docs/CreateGlossaryRelationDto.md
 docs/CreateGrantDto.md
-docs/CreateGroupDto.md
 docs/CreateInquiryDto.md
 docs/CreateManualEdgeDto.md
 docs/CreateMcpServerDto.md
@@ -196,9 +191,7 @@ docs/CreateMcpTokenDto.md
 docs/CreateNotebookExecutionDto.md
 docs/CreateSourceDto.md
 docs/CreateSupervisorGoalDto.md
-docs/CreateTenantDto.md
 docs/CreateThreadDto.md
-docs/CreatedTenantDto.md
 docs/CustomDetectorExampleDto.md
 docs/CustomDetectorExtractionsApi.md
 docs/CustomDetectorFileDto.md
@@ -367,7 +360,6 @@ docs/PatternExclusionCandidatesResponseDto.md
 docs/PatternLabelExclusionCandidateDto.md
 docs/PatternPreviewResponseDto.md
 docs/PayloadCursorEntryDto.md
-docs/PersonDto.md
 docs/PivotGraphDto.md
 docs/PlatformApi.md
 docs/PlatformMeDto.md
@@ -404,8 +396,6 @@ docs/RejectedBoardOpDto.md
 docs/RelationTypeDto.md
 docs/RelationTypesResponseDto.md
 docs/RematchResponseDto.md
-docs/RemovedPersonDto.md
-docs/RenameGroupDto.md
 docs/ReopenDecisionsDto.md
 docs/ReopenDecisionsResponseDto.md
 docs/ResolvedActorDto.md
@@ -546,7 +536,6 @@ docs/SupervisorGoalListDto.md
 docs/SupervisorJournalEntryDto.md
 docs/SupervisorJournalListDto.md
 docs/SupervisorStateDto.md
-docs/TemporaryPasswordDto.md
 docs/TenantAdminDto.md
 docs/TenantDto.md
 docs/TenantEventDto.md
@@ -658,11 +647,7 @@ src/models/AddCaseHypothesisRuleDto.ts
 src/models/AddEvidenceDto.ts
 src/models/AddExclusionDto.ts
 src/models/AddFindingDto.ts
-src/models/AddPersonDto.ts
-src/models/AddTenantAdminDto.ts
 src/models/AddThreadEntryDto.ts
-src/models/AddedPersonDto.ts
-src/models/AddedTenantAdminDto.ts
 src/models/AgentActivityItemDto.ts
 src/models/AgentActivityListResponseDto.ts
 src/models/AgentCapacityReportDto.ts
@@ -829,7 +814,6 @@ src/models/CreateExternalRunnerDto.ts
 src/models/CreateFindingDto.ts
 src/models/CreateGlossaryRelationDto.ts
 src/models/CreateGrantDto.ts
-src/models/CreateGroupDto.ts
 src/models/CreateInquiryDto.ts
 src/models/CreateManualEdgeDto.ts
 src/models/CreateMcpServerDto.ts
@@ -837,9 +821,7 @@ src/models/CreateMcpTokenDto.ts
 src/models/CreateNotebookExecutionDto.ts
 src/models/CreateSourceDto.ts
 src/models/CreateSupervisorGoalDto.ts
-src/models/CreateTenantDto.ts
 src/models/CreateThreadDto.ts
-src/models/CreatedTenantDto.ts
 src/models/CustomDetectorExampleDto.ts
 src/models/CustomDetectorFileDto.ts
 src/models/CustomDetectorResponseDto.ts
@@ -990,7 +972,6 @@ src/models/PatternExclusionCandidatesResponseDto.ts
 src/models/PatternLabelExclusionCandidateDto.ts
 src/models/PatternPreviewResponseDto.ts
 src/models/PayloadCursorEntryDto.ts
-src/models/PersonDto.ts
 src/models/PivotGraphDto.ts
 src/models/PlatformMeDto.ts
 src/models/PlatformTenantDto.ts
@@ -1026,8 +1007,6 @@ src/models/RejectedBoardOpDto.ts
 src/models/RelationTypeDto.ts
 src/models/RelationTypesResponseDto.ts
 src/models/RematchResponseDto.ts
-src/models/RemovedPersonDto.ts
-src/models/RenameGroupDto.ts
 src/models/ReopenDecisionsDto.ts
 src/models/ReopenDecisionsResponseDto.ts
 src/models/ResolvedActorDto.ts
@@ -1164,7 +1143,6 @@ src/models/SupervisorGoalListDto.ts
 src/models/SupervisorJournalEntryDto.ts
 src/models/SupervisorJournalListDto.ts
 src/models/SupervisorStateDto.ts
-src/models/TemporaryPasswordDto.ts
 src/models/TenantAdminDto.ts
 src/models/TenantDto.ts
 src/models/TenantEventDto.ts

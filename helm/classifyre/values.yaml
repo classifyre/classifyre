@@ -1035,8 +1035,6 @@ iam:
   exposeAdminConsole: false
   # -- Realm that holds users, tenants (organizations) and groups.
   realm: classifyre
-  # -- Tenant admins manage their tenant's people and groups in Classifyre (Tenant access → People, Groups). Gives the API's service account `manage-users` and `manage-organizations` in the realm; Classifyre keeps every change inside the caller's tenant. `false` keeps it read-only, for installs where a company directory owns membership.
-  peopleManagement: true
   # -- Database the API works on with sign-in: tenants, grants and the list of workspaces. Each tenant's workspace data is in a database of its own (`classifyre_t_<tenant id>`, own login role), made on its first workspace. The database user needs `CREATEDB` and `CREATEROLE`, and new databases need the `vector` extension (superuser, or installed in `template1`). Without sign-in the API uses `postgres.*.database`, the open database, which never holds a tenant.
   controlDatabase: classifyre_control
   # -- Access token lifetime in seconds. Short, because group changes take effect when tokens renew.

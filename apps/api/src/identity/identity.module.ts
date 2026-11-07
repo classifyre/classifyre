@@ -18,8 +18,6 @@ import { IDENTITY, IAM_CONFIG } from './identity.tokens';
 import { IdentityService } from './identity.service';
 import { MeController } from './me.controller';
 import { MembershipService } from './membership.service';
-import { TenantPeopleController } from './people.controller';
-import { PeopleService } from './people.service';
 import { PlatformController } from './platform.controller';
 import { PlatformService } from './platform.service';
 import { TenancyService } from './tenancy.service';
@@ -39,7 +37,6 @@ import { SocketAccessService } from './socket-access.service';
     AuditController,
     WorkspaceAccessController,
     TenantAccessController,
-    TenantPeopleController,
     PlatformController,
   ],
   providers: [
@@ -65,7 +62,6 @@ import { SocketAccessService } from './socket-access.service';
     },
     IamBootstrapService,
     AccessManagementService,
-    PeopleService,
     PlatformService,
     SocketAccessService,
   ],

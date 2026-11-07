@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Persona checks for sign-in and access (docs/prd/IAM-access-management.md §7,
-# step 8, people and groups of step 8c). Installs a throwaway release with sign-in on next to the dev stack,
+# step 8; people and groups live in the identity server). Installs a throwaway release with sign-in on next to the dev stack,
 # seeds groups and invented users, gives the grants of §7 through the API,
 # then checks what each persona can and cannot do. Exits non-zero on any
 # mismatch and removes everything afterwards (KEEP=1 keeps it for poking).
@@ -197,39 +197,21 @@ check H7 "another tenant gets 404" 404 "$(status outsider@globex GET /fin-ledger
 check H7 "no sign-in is 401" 401 "$(status - GET /namespaces)"
 check U10 "contractor works until the end date" 200 "$(status contractor GET /fin-ledger/sources)"
 
-say "people and groups, managed in Classifyre (step 8c)"
-req() { # req <method> <path> [body]: as the tenant admin, prints the body
-  # Like status(): no content type without a body (the JSON body parser 400s
-  # an empty body that carries one), so bodyless DELETEs and GETs are sent bare.
-  local method=$1 path=$2
-  if [ $# -ge 3 ]; then
-    curl -s -X "$method" -H "$(authed admin)" -H 'Content-Type: application/json' -d "$3" "$B$path"
-  else
-    curl -s -X "$method" -H "$(authed admin)" "$B$path"
-  fi
+say "people and groups live in the identity server; Classifyre only reads them"
+kc() { # kc <script>: kcadm as the identity server's admin, inside its pod
+  kubectl -n "$NS" exec -i "deploy/$REL-classifyre-iam" -c iam -- env ADMIN_PW="$ADMIN_PW" bash -s <<KC 2>/dev/null | tr -d '\r'
+K=/opt/keycloak/bin/kcadm.sh
+\$K config credentials --server http://localhost:8080/iam --realm master --user admin --password "\$ADMIN_PW" >/dev/null 2>&1
+$1
+KC
 }
-EAST=$(req POST /tenant/groups "{\"name\":\"east\",\"parentId\":\"$SALES\"}" | json "print(d.get('path','') + '|' + d.get('id',''))")
-check U17 "tenant admin creates a group inside /sales" "/sales/east" "${EAST%%|*}"
-EAST=${EAST#*|}
-NEWBIE=$(req POST /tenant/people '{"email":"newbie@example.test","firstName":"New","lastName":"Persona"}' \
-  | json "print(d['person']['id'] + '|' + ('yes' if d.get('temporaryPassword') else 'no'))")
-check U17 "adding a new person gives a temporary password" yes "${NEWBIE#*|}"
-NEWBIE=${NEWBIE%%|*}
-check U17 "tenant admin puts them in the group" 204 "$(status admin PUT "/tenant/groups/$EAST/members/$NEWBIE")"
-check U17 "the people list shows the group" yes "$(req GET /tenant/people | json "print('yes' if any(p['id']=='$NEWBIE' and '$EAST' in p['groupIds'] for p in d) else 'no')")"
-check U17 "a viewer cannot list or change people" 403 "$(status controller GET /tenant/people)"
-check U17 "a workspace manager cannot create groups" 403 "$(status manager POST /tenant/groups '{"name":"x"}')"
-check U17 "another tenant's person is refused like an unusable address" PERSON_UNAVAILABLE \
-  "$(req POST /tenant/people '{"email":"outsider@example.test","firstName":"O","lastName":"P"}' | json "print(d.get('code'))")"
-GLOBEX_ADMINS=$(kubectl -n "$NS" exec -i "deploy/$REL-classifyre-iam" -c iam -- env ADMIN_PW="$ADMIN_PW" GLOBEX="$GLOBEX" bash -c \
-  'K=/opt/keycloak/bin/kcadm.sh; $K config credentials --server http://localhost:8080/iam --realm master --user admin --password "$ADMIN_PW" >/dev/null 2>&1; $K create organizations/$GLOBEX/groups -r classifyre -s name=globex-team -i 2>/dev/null || $K get organizations/$GLOBEX/groups -r classifyre --fields id --format csv --noquotes | head -1' | tr -d '\r')
-check U17 "another tenant's group is not found" 404 "$(status admin PUT "/tenant/groups/$GLOBEX_ADMINS/members/$NEWBIE")"
-ME=$(req GET /tenant/people | json "print(next(p['id'] for p in d if p['isYou']))")
-check U17 "nobody removes themselves" 403 "$(status admin DELETE "/tenant/people/$ME")"
-check U17 "a group that owns workspaces cannot be deleted" GROUP_OWNS_WORKSPACES "$(req DELETE "/tenant/groups/$FIN" | json "print(d.get('code'))")"
-check U17 "removing a person made here deletes their account" True "$(req DELETE "/tenant/people/$NEWBIE" | json "print(d.get('accountDeleted'))")"
-check U17 "an empty group is deleted" 204 "$(status admin DELETE "/tenant/groups/$EAST")"
-check U17 "every change is in the tenant's activity" yes "$(req GET /tenant/audit-events | json "a=set(e['action'] for e in d); need=set(['group.created','person.added','group.member_added','person.removed','group.deleted']); print('yes' if need <= a else sorted(a))")"
+check U17 "people are not changed through Classifyre" 404 "$(status admin POST /tenant/people '{"email":"x@example.test"}')"
+check U17 "nor groups" 404 "$(status admin POST /tenant/groups '{"name":"x"}')"
+check U17 "the API's account in the identity server only reads" "view-organizations,view-users" "$(kc '$K get-roles -r classifyre --uusername service-account-classifyre-api --cclientid realm-management --effective --fields name --format csv --noquotes' | grep -E '^(view|manage)-(users|organizations)$' | sort | paste -sd, -)"
+# A group made and then removed in the identity server, with a grant on it.
+EAST=$(kc "\$K create organizations/$ACME/groups/$SALES/children -r classifyre -s name=east -i")
+grant group "$EAST" viewer tenant "$TENANT" >/dev/null
+kc "\$K delete organizations/$ACME/groups/$EAST -r classifyre" >/dev/null
 
 say "mover, leaver and the contractor's end date (one-minute cache)"
 kubectl -n "$NS" exec -i "deploy/$REL-classifyre-iam" -c iam -- env ADMIN_PW="$ADMIN_PW" \
@@ -247,6 +229,7 @@ check U11 "mover gained sales" 200 "$(status mover GET /sales-pipeline/sources)"
 check U12 "leaver can no longer sign in" "" "$(token leaver)"
 check U12 "leaver's token stopped working" 401 "$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $LEAVER_TOKEN" "$B/namespaces")"
 check U10 "contractor lost access after the end date" 404 "$(status contractor GET /fin-ledger/sources)"
+check U17 "a group removed in the identity server keeps its grant, shown as removed" "Removed group" "$(get admin /tenant/grants | json "print(next((g['subjectLabel'] for g in d if g['subjectId']=='$EAST'), 'no grant'))")"
 
 say "each tenant in its own database (docs/prd/TEN §4.1)"
 operator() { kubectl -n "$NS" exec "deploy/$REL-classifyre-api" -- sh -c "cd /workspace/apps/api && bun src/admin.ts $*"; }
@@ -297,14 +280,15 @@ tenant_id() { op GET /platform/tenants | json "print(next((t['id'] for t in d if
 check P "an operator in no tenant lists every tenant" "default,globex" "$(op GET /platform/tenants | json "print(','.join(sorted(t['alias'] for t in d)))")"
 check P "and sees no workspace" NO_TENANT "$(op GET /namespaces | json "print(d.get('code'))")"
 check P "a tenant member who is not an operator is refused" 403 "$(status controller GET /platform/tenants)"
-INITECH='{"name":"Initech","alias":"initech","adminEmail":"bill@example.test","adminFirstName":"Bill","adminLastName":"Persona"}'
-check P "creating a tenant gives its first admin a temporary password" yes "$(op POST /platform/tenants "$INITECH" | json "print('yes' if d.get('temporaryPassword') and d['tenant']['admins'][0]['email']=='bill@example.test' else d)")"
-check P "an alias is never used twice" ALIAS_TAKEN "$(op POST /platform/tenants "$INITECH" | json "print(d.get('code'))")"
+check P "tenants are not created through Classifyre" 404 "$(opstatus POST /platform/tenants '{"name":"Initech","alias":"initech"}')"
+# An operator makes the tenant in the identity server: organization, admins group, first admin.
+INITECH_ORG=$(kc '$K create organizations -r classifyre -s name=Initech -s alias=initech -s enabled=true -s "domains=[{\"name\":\"initech.example.test\"}]" -i')
+BILL=$(kc '$K create users -r classifyre -s username=bill -s email=bill@example.test -s firstName=Bill -s lastName=Persona -s enabled=true -i')
+kc "\$K create organizations/$INITECH_ORG/members -r classifyre -b '\"$BILL\"'" >/dev/null
+INITECH_ADMINS=$(kc "\$K create organizations/$INITECH_ORG/groups -r classifyre -s name=admins -i")
+kc "\$K update organizations/$INITECH_ORG/groups/$INITECH_ADMINS/members/$BILL -r classifyre -b '{}'" >/dev/null
+check P "a tenant made in the identity server is listed, with its admin" bill@example.test "$(op GET /platform/tenants | json "print(next((t['admins'][0]['email'] for t in d if t['alias']=='initech' and t['admins']), 'missing'))")"
 INITECH_ID=$(tenant_id initech)
-BILL=$(op GET /platform/tenants | json "print(next(t['admins'][0]['id'] for t in d if t['alias']=='initech'))")
-check P "the last admin cannot be removed" 403 "$(opstatus DELETE "/platform/tenants/$INITECH_ID/admins/$BILL")"
-check P "a second admin is added by email" yes "$(op POST "/platform/tenants/$INITECH_ID/admins" '{"email":"milton@example.test","firstName":"Milton","lastName":"Persona"}' | json "print('yes' if d.get('temporaryPassword') else d)")"
-check P "then the first can go" 204 "$(opstatus DELETE "/platform/tenants/$INITECH_ID/admins/$BILL")"
 GLOBEX_ID=$(tenant_id globex)
 check P "suspending a tenant" suspended "$(op POST "/platform/tenants/$GLOBEX_ID/suspend" | json "print(d['status'])")"
 check P "refuses its people" TENANT_SUSPENDED "$(get outsider /namespaces globex | json "print(d.get('code'))")"
@@ -314,12 +298,13 @@ check P "workspaces made without sign-in are offered for import" fin-q3-local "$
 check P "and copied into a tenant" fin-q3-local "$(op POST "/platform/tenants/$INITECH_ID/workspaces" '{"slugs":["fin-q3-local"]}' | json "print(','.join(d['copied']))")"
 INITECH_DB="classifyre_t_${INITECH_ID//-/}"
 check P "which gets the tenant its own database" "$INITECH_DB" "$(op GET /platform/tenants | json "print(next(t['database'] for t in d if t['alias']=='initech'))")"
-check P "a tenant with workspaces is not deleted" TENANT_HAS_WORKSPACES "$(op DELETE "/platform/tenants/$INITECH_ID?confirm=initech" | json "print(d.get('code'))")"
-pg classifyre_control "UPDATE namespaces SET status = 'deleted', deleted_at = now() WHERE slug = 'fin-q3-local'" >/dev/null
+check P "its data is not removed while its organization exists" ORGANIZATION_EXISTS "$(op DELETE "/platform/tenants/$INITECH_ID?confirm=initech" | json "print(d.get('code'))")"
+kc "\$K delete organizations/$INITECH_ORG -r classifyre; \$K delete users/$BILL -r classifyre" >/dev/null
+check P "an organization deleted in the identity server shows as missing" ORGANIZATION_MISSING "$(op GET /platform/tenants | json "print(next(t['problem'] for t in d if t['alias']=='initech'))")"
 check P "nor without its alias typed" 400 "$(opstatus DELETE "/platform/tenants/$INITECH_ID?confirm=initec")"
-check P "an empty tenant is deleted" 204 "$(opstatus DELETE "/platform/tenants/$INITECH_ID?confirm=initech")"
-check P "and stays listed as deleted, alias reserved" deleted "$(op GET /platform/tenants | json "print(next(t['status'] for t in d if t['alias']=='initech'))")"
-check P "its database stays while a deleted workspace is kept" 1 "$(pg postgres "SELECT count(*) FROM pg_database WHERE datname = '$INITECH_DB'")"
+check P "then its data is removed" 204 "$(opstatus DELETE "/platform/tenants/$INITECH_ID?confirm=initech")"
+check P "it stays listed as deleted, alias reserved" deleted "$(op GET /platform/tenants | json "print(next(t['status'] for t in d if t['alias']=='initech'))")"
+check P "with its database and workspaces gone" "0|0" "$(pg postgres "SELECT count(*) FROM pg_database WHERE datname = '$INITECH_DB'")|$(pg classifyre_control "SELECT count(*) FROM namespaces WHERE tenant_id = '$INITECH_ID'")"
 check P "the copy is in that tenant's activity" workspace.copied_in "$(pg classifyre_control "SELECT action FROM iam_audit_events WHERE tenant_id = '$INITECH_ID' AND action LIKE 'workspace.%'")"
 check P "globex's activity has the suspension and the resume" "tenant.resumed,tenant.suspended" "$(pg classifyre_control "SELECT string_agg(action, ',' ORDER BY action) FROM iam_audit_events WHERE tenant_id = '$GLOBEX_ID' AND action LIKE 'tenant.%'")"
 

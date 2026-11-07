@@ -2,13 +2,12 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowLeft, Building2, History, KeyRound, Trash2, Users, UsersRound } from "lucide-react";
+import { ArrowLeft, Building2, History, KeyRound, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   api,
   type GrantDto,
   type Namespace,
-  type PersonDto,
   type RoleDto,
   type TenantDto,
   type TenantEventDto,
@@ -34,8 +33,6 @@ import { ActorChip } from "@/components/actor-chip";
 import { useTranslation } from "@/hooks/use-translation";
 import { formatRelative } from "@/lib/date";
 import { extractApiErrorMessage } from "@/lib/extract-api-error-message";
-import { TenantGroups } from "./tenant-groups";
-import { TenantPeople } from "./tenant-people";
 
 type ScopeType = "tenant" | "group" | "workspace";
 
@@ -43,17 +40,16 @@ const TAB_TRIGGER_CLASS =
   "gap-2 px-1 text-xs font-mono uppercase tracking-[0.14em]";
 
 /**
- * The tenant admin's page (docs/prd §12.4, step 8c): the tenant's people and
- * groups, every grant (a role on the tenant, a group's workspaces or one
- * workspace), and the tenant's activity. Everything a tenant admin does
- * happens here; the identity server's own console is for operators.
+ * The tenant admin's page (docs/prd §12.4): every grant (a role on the
+ * tenant, a group's workspaces or one workspace) and the tenant's activity.
+ * People and groups are managed in the identity server (or the company
+ * directory behind it); Classifyre reads them and decides what they may do.
  */
 export function TenantAdmin() {
   const { t } = useTranslation();
   const [tenant, setTenant] = React.useState<TenantDto | null>(null);
   const [grants, setGrants] = React.useState<GrantDto[]>([]);
   const [groups, setGroups] = React.useState<TenantGroupDto[]>([]);
-  const [people, setPeople] = React.useState<PersonDto[]>([]);
   const [roles, setRoles] = React.useState<RoleDto[]>([]);
   const [workspaces, setWorkspaces] = React.useState<Namespace[]>([]);
   const [events, setEvents] = React.useState<TenantEventDto[]>([]);
@@ -67,21 +63,15 @@ export function TenantAdmin() {
         setDenied(true);
         return;
       }
-      const managesPeople = current.capabilities.includes("tenant.people.manage");
-      const [nextGrants, nextGroups, nextWorkspaces, nextPeople, nextRoles] =
-        await Promise.all([
-          api.access.tenantAccessControllerGrants(),
-          api.access.tenantAccessControllerGroups(),
-          api.namespaces.list(),
-          managesPeople
-            ? api.access.tenantPeopleControllerList()
-            : Promise.resolve([] as PersonDto[]),
-          api.access.tenantAccessControllerRoles(),
-        ]);
+      const [nextGrants, nextGroups, nextWorkspaces, nextRoles] = await Promise.all([
+        api.access.tenantAccessControllerGrants(),
+        api.access.tenantAccessControllerGroups(),
+        api.namespaces.list(),
+        api.access.tenantAccessControllerRoles(),
+      ]);
       setGrants(nextGrants);
       setGroups(nextGroups);
       setWorkspaces(nextWorkspaces);
-      setPeople(nextPeople);
       setRoles(nextRoles);
       if (current.capabilities.includes("tenant.audit.view")) {
         setEvents(await api.access.tenantAccessControllerEvents());
@@ -105,8 +95,6 @@ export function TenantAdmin() {
     }
   };
 
-  const managesPeople = tenant?.capabilities.includes("tenant.people.manage") ?? false;
-  const editable = managesPeople && (tenant?.peopleManagement ?? false);
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-6 p-4 sm:p-8">
@@ -125,27 +113,11 @@ export function TenantAdmin() {
       {denied ? (
         <p className="text-sm text-muted-foreground">{t("access.tenantDenied")}</p>
       ) : (
-        <Tabs
-          defaultValue={managesPeople ? "people" : "access"}
-          urlParam="tab"
-          className="gap-5"
-        >
+        <Tabs defaultValue="access" urlParam="tab" className="gap-5">
           <TabsList
             variant="line"
             className="h-auto w-full flex-wrap justify-start gap-x-6 gap-y-1 border-b-2 border-border pb-0"
           >
-            {managesPeople && (
-              <>
-                <TabsTrigger value="people" className={TAB_TRIGGER_CLASS}>
-                  <Users className="h-3.5 w-3.5" />
-                  {t("access.tabs.people")}
-                </TabsTrigger>
-                <TabsTrigger value="groups" className={TAB_TRIGGER_CLASS}>
-                  <UsersRound className="h-3.5 w-3.5" />
-                  {t("access.tabs.groups")}
-                </TabsTrigger>
-              </>
-            )}
             <TabsTrigger value="access" className={TAB_TRIGGER_CLASS}>
               <KeyRound className="h-3.5 w-3.5" />
               {t("access.tabs.access")}
@@ -158,33 +130,15 @@ export function TenantAdmin() {
             )}
           </TabsList>
 
-          {managesPeople && (
-            <>
-              <TabsContent value="people">
-                <TenantPeople
-                  people={people}
-                  groups={groups}
-                  editable={editable}
-                  onChanged={load}
-                />
-              </TabsContent>
-              <TabsContent value="groups">
-                <TenantGroups
-                  groups={groups}
-                  people={people}
-                  editable={editable}
-                  onChanged={load}
-                />
-              </TabsContent>
-            </>
-          )}
-
           <TabsContent value="access">
             <Card className="panel-card rounded-[6px]">
               <CardContent className="space-y-4 p-5">
-                <p className="text-xs font-mono uppercase tracking-[0.14em]">
-                  {t("access.tenantGrants")}
-                </p>
+                <div className="space-y-1">
+                  <p className="text-xs font-mono uppercase tracking-[0.14em]">
+                    {t("access.tenantGrants")}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{t("access.peopleElsewhere")}</p>
+                </div>
                 <ul className="divide-y divide-border rounded-[4px] border border-border">
                   {grants.map((grant) => (
                     <li

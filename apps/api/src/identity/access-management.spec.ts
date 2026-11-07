@@ -71,10 +71,14 @@ describe('AccessManagementService', () => {
           ],
         }),
     },
-    groupsOf: () =>
+    // `east` was just made in the identity server: only a fresh read has it.
+    groupsOf: (_p: Principal, fresh = false) =>
       Promise.resolve([
         { id: 'finance', name: 'finance', path: '/finance', parentId: null },
         { id: 'legal', name: 'legal', path: '/legal', parentId: null },
+        ...(fresh
+          ? [{ id: 'east', name: 'east', path: '/east', parentId: null }]
+          : []),
       ]),
     isMember: (_p: Principal, sub: string) => Promise.resolve(sub === 'u-ann'),
     ownerLineage: () => Promise.resolve(['finance']),
@@ -103,6 +107,15 @@ describe('AccessManagementService', () => {
     expect(added).toHaveLength(1);
     expect(events).toEqual(['grant.added']);
     expect(view.subjectLabel).toBe('/legal');
+  });
+
+  it('finds a group made in the identity server a moment ago', async () => {
+    const view = await service.addGrant(
+      principal,
+      { ...base, subjectId: 'east', roleKey: 'viewer' },
+      roleCaps('workspace-admin'),
+    );
+    expect(view.subjectLabel).toBe('/east');
   });
 
   it('refuses to give more than the author holds (no escalation)', async () => {

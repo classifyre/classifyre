@@ -334,7 +334,6 @@ export async function copyTenantWorkspacesToLocal(
 const TENANT_TABLES = [
   'iam_grants',
   'iam_audit_events',
-  'iam_people',
   'namespace_categories',
 ] as const;
 

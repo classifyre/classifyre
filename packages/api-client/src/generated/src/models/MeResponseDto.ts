@@ -91,7 +91,6 @@ export const MeResponseDtoCapabilitiesEnum = {
     McpTokenAdmin: 'mcp.token.admin',
     TenantWorkspaceCreate: 'tenant.workspace.create',
     TenantAccessManage: 'tenant.access.manage',
-    TenantPeopleManage: 'tenant.people.manage',
     TenantCategoriesManage: 'tenant.categories.manage',
     TenantAuditView: 'tenant.audit.view',
     PlatformTenantsManage: 'platform.tenants.manage'

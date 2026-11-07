@@ -18,13 +18,6 @@ export interface IamConfig {
   bootstrapTenantAlias: string;
   /** Origin of the Classifyre app; cookie-signed writes must come from it. */
   appOrigin: string | null;
-  /**
-   * Tenant admins manage people and groups in Classifyre (the chart then
-   * gives the API's service account `manage-users` and
-   * `manage-organizations`). Off: a company directory owns membership and
-   * Classifyre only reads it.
-   */
-  peopleManagement: boolean;
 }
 
 export function iamEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
@@ -80,7 +73,6 @@ export function readIamConfig(
     apiClientSecret: required('IAM_API_CLIENT_SECRET'),
     bootstrapTenantAlias: bootstrapTenant(env),
     appOrigin: originOf(env.IAM_APP_URL),
-    peopleManagement: env.IAM_PEOPLE_MANAGEMENT?.trim() !== 'false',
   };
 }
 

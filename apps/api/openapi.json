@@ -9463,36 +9463,6 @@
         "tags": [
           "Access"
         ]
-      },
-      "post": {
-        "operationId": "TenantPeopleController_createGroup",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateGroupDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TenantGroupDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Create a group, at the top or inside another",
-        "tags": [
-          "Access"
-        ]
       }
     },
     "/tenant/grants": {
@@ -9662,249 +9632,6 @@
         ]
       }
     },
-    "/tenant/people": {
-      "get": {
-        "operationId": "TenantPeopleController_list",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/PersonDto"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "summary": "Everyone in the tenant, with their groups",
-        "tags": [
-          "Access"
-        ]
-      },
-      "post": {
-        "description": "Creates an account with a temporary password (shown once), or adds an existing account that is in no tenant.",
-        "operationId": "TenantPeopleController_add",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AddPersonDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AddedPersonDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Add a person by email",
-        "tags": [
-          "Access"
-        ]
-      }
-    },
-    "/tenant/people/{userId}": {
-      "delete": {
-        "operationId": "TenantPeopleController_remove",
-        "parameters": [
-          {
-            "name": "userId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RemovedPersonDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Remove a person from the tenant, its groups and their grants",
-        "tags": [
-          "Access"
-        ]
-      }
-    },
-    "/tenant/people/{userId}/password": {
-      "post": {
-        "operationId": "TenantPeopleController_resetPassword",
-        "parameters": [
-          {
-            "name": "userId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TemporaryPasswordDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Give an account made here a new temporary password",
-        "tags": [
-          "Access"
-        ]
-      }
-    },
-    "/tenant/groups/{groupId}": {
-      "patch": {
-        "operationId": "TenantPeopleController_renameGroup",
-        "parameters": [
-          {
-            "name": "groupId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RenameGroupDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TenantGroupDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Rename a group",
-        "tags": [
-          "Access"
-        ]
-      },
-      "delete": {
-        "operationId": "TenantPeopleController_deleteGroup",
-        "parameters": [
-          {
-            "name": "groupId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": ""
-          }
-        },
-        "summary": "Delete a group and the groups below it, with their grants (refused while they own workspaces)",
-        "tags": [
-          "Access"
-        ]
-      }
-    },
-    "/tenant/groups/{groupId}/members/{userId}": {
-      "put": {
-        "operationId": "TenantPeopleController_addMember",
-        "parameters": [
-          {
-            "name": "groupId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "userId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": ""
-          }
-        },
-        "summary": "Put a person of the tenant into a group",
-        "tags": [
-          "Access"
-        ]
-      },
-      "delete": {
-        "operationId": "TenantPeopleController_removeMember",
-        "parameters": [
-          {
-            "name": "groupId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "userId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": ""
-          }
-        },
-        "summary": "Take a person out of a group",
-        "tags": [
-          "Access"
-        ]
-      }
-    },
     "/platform/me": {
       "get": {
         "operationId": "PlatformController_me",
@@ -9946,38 +9673,7 @@
             }
           }
         },
-        "summary": "Every tenant, with counts and its admins",
-        "tags": [
-          "Platform"
-        ]
-      },
-      "post": {
-        "description": "Creates the organization, its `admins` group and the first admin: an account in no tenant, or a new one with a temporary password (shown once).",
-        "operationId": "PlatformController_create",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateTenantDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CreatedTenantDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Create a tenant with its first admin",
+        "summary": "Every tenant, with counts and its admins (read from the identity server)",
         "tags": [
           "Platform"
         ]
@@ -10047,7 +9743,7 @@
     },
     "/platform/tenants/{tenantId}": {
       "delete": {
-        "description": "Pass the alias as `confirm`. The organization and the accounts made for it go; the alias stays reserved.",
+        "description": "Only after its organization was deleted in the identity server. Pass the alias as `confirm`. Its workspaces and their database go; the alias stays reserved.",
         "operationId": "PlatformController_remove",
         "parameters": [
           {
@@ -10072,81 +9768,7 @@
             "description": ""
           }
         },
-        "summary": "Delete a tenant that has no workspaces left",
-        "tags": [
-          "Platform"
-        ]
-      }
-    },
-    "/platform/tenants/{tenantId}/admins": {
-      "post": {
-        "description": "A member of the tenant, an account in no tenant, or a new account with a temporary password (shown once).",
-        "operationId": "PlatformController_addAdmin",
-        "parameters": [
-          {
-            "name": "tenantId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AddTenantAdminDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AddedTenantAdminDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Make someone a tenant admin, by email",
-        "tags": [
-          "Platform"
-        ]
-      }
-    },
-    "/platform/tenants/{tenantId}/admins/{userId}": {
-      "delete": {
-        "operationId": "PlatformController_removeAdmin",
-        "parameters": [
-          {
-            "name": "tenantId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "userId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": ""
-          }
-        },
-        "summary": "Take someone out of the tenant's admins",
+        "summary": "Remove a tenant whose organization was deleted",
         "tags": [
           "Platform"
         ]
@@ -30964,7 +30586,6 @@
                 "mcp.token.admin",
                 "tenant.workspace.create",
                 "tenant.access.manage",
-                "tenant.people.manage",
                 "tenant.categories.manage",
                 "tenant.audit.view",
                 "platform.tenants.manage"
@@ -31146,7 +30767,6 @@
                 "mcp.token.admin",
                 "tenant.workspace.create",
                 "tenant.access.manage",
-                "tenant.people.manage",
                 "tenant.categories.manage",
                 "tenant.audit.view",
                 "platform.tenants.manage"
@@ -31351,16 +30971,11 @@
                 "mcp.token.admin",
                 "tenant.workspace.create",
                 "tenant.access.manage",
-                "tenant.people.manage",
                 "tenant.categories.manage",
                 "tenant.audit.view",
                 "platform.tenants.manage"
               ]
             }
-          },
-          "peopleManagement": {
-            "type": "boolean",
-            "description": "True when people and groups are managed here; false when a company directory or the identity server owns them and they are read-only."
           },
           "operator": {
             "type": "boolean",
@@ -31372,7 +30987,6 @@
           "alias",
           "name",
           "capabilities",
-          "peopleManagement",
           "operator"
         ]
       },
@@ -31430,156 +31044,6 @@
           "alias",
           "name",
           "current"
-        ]
-      },
-      "PersonDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "description": "The person’s id in the identity server."
-          },
-          "username": {
-            "type": "string",
-            "example": "ada@example.test"
-          },
-          "email": {
-            "type": "string",
-            "nullable": true
-          },
-          "firstName": {
-            "type": "string",
-            "nullable": true
-          },
-          "lastName": {
-            "type": "string",
-            "nullable": true
-          },
-          "enabled": {
-            "type": "boolean"
-          },
-          "fromDirectory": {
-            "type": "boolean",
-            "description": "Brought by the tenant’s company directory, not added here."
-          },
-          "createdHere": {
-            "type": "boolean",
-            "description": "Classifyre created this account, so it can set a temporary password and deletes the account when the person leaves."
-          },
-          "groupIds": {
-            "description": "Groups the person is directly in.",
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "isYou": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "id",
-          "username",
-          "email",
-          "firstName",
-          "lastName",
-          "enabled",
-          "fromDirectory",
-          "createdHere",
-          "groupIds",
-          "isYou"
-        ]
-      },
-      "AddPersonDto": {
-        "type": "object",
-        "properties": {
-          "email": {
-            "type": "string",
-            "example": "ada@example.test"
-          },
-          "firstName": {
-            "type": "string",
-            "example": "Ada"
-          },
-          "lastName": {
-            "type": "string",
-            "example": "Kowalczyk"
-          }
-        },
-        "required": [
-          "email",
-          "firstName",
-          "lastName"
-        ]
-      },
-      "AddedPersonDto": {
-        "type": "object",
-        "properties": {
-          "person": {
-            "$ref": "#/components/schemas/PersonDto"
-          },
-          "temporaryPassword": {
-            "type": "string",
-            "nullable": true,
-            "description": "Only for a new account: shown once, changed by the person at first sign-in. Null when an existing account was added."
-          }
-        },
-        "required": [
-          "person",
-          "temporaryPassword"
-        ]
-      },
-      "RemovedPersonDto": {
-        "type": "object",
-        "properties": {
-          "accountDeleted": {
-            "type": "boolean",
-            "description": "The account was deleted too (Classifyre made it and it is in no other tenant)."
-          }
-        },
-        "required": [
-          "accountDeleted"
-        ]
-      },
-      "TemporaryPasswordDto": {
-        "type": "object",
-        "properties": {
-          "temporaryPassword": {
-            "type": "string",
-            "description": "Shown once; changed at first sign-in."
-          }
-        },
-        "required": [
-          "temporaryPassword"
-        ]
-      },
-      "CreateGroupDto": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "example": "managers"
-          },
-          "parentId": {
-            "type": "string",
-            "nullable": true,
-            "description": "Create it inside this group."
-          }
-        },
-        "required": [
-          "name"
-        ]
-      },
-      "RenameGroupDto": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "example": "finance"
-          }
-        },
-        "required": [
-          "name"
         ]
       },
       "PlatformMeDto": {
@@ -31700,89 +31164,6 @@
           "database",
           "upgradeError",
           "problem"
-        ]
-      },
-      "CreateTenantDto": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "example": "Acme"
-          },
-          "alias": {
-            "type": "string",
-            "example": "acme",
-            "description": "Lowercase letters, digits and dashes; how sign-in names the tenant. Cannot change later."
-          },
-          "adminEmail": {
-            "type": "string",
-            "example": "ada@example.test"
-          },
-          "adminFirstName": {
-            "type": "string",
-            "example": "Ada"
-          },
-          "adminLastName": {
-            "type": "string",
-            "example": "Kowalczyk"
-          }
-        },
-        "required": [
-          "name",
-          "alias",
-          "adminEmail",
-          "adminFirstName",
-          "adminLastName"
-        ]
-      },
-      "CreatedTenantDto": {
-        "type": "object",
-        "properties": {
-          "tenant": {
-            "$ref": "#/components/schemas/PlatformTenantDto"
-          },
-          "temporaryPassword": {
-            "type": "string",
-            "nullable": true,
-            "description": "The first admin's temporary password, shown once. Null when an existing account became the admin."
-          }
-        },
-        "required": [
-          "tenant",
-          "temporaryPassword"
-        ]
-      },
-      "AddTenantAdminDto": {
-        "type": "object",
-        "properties": {
-          "email": {
-            "type": "string",
-            "example": "ada@example.test"
-          },
-          "firstName": {
-            "type": "string",
-            "example": "Ada"
-          },
-          "lastName": {
-            "type": "string",
-            "example": "Kowalczyk"
-          }
-        },
-        "required": [
-          "email"
-        ]
-      },
-      "AddedTenantAdminDto": {
-        "type": "object",
-        "properties": {
-          "temporaryPassword": {
-            "type": "string",
-            "nullable": true,
-            "description": "Only for a new account: shown once, changed at first sign-in."
-          }
-        },
-        "required": [
-          "temporaryPassword"
         ]
       },
       "LocalWorkspaceDto": {

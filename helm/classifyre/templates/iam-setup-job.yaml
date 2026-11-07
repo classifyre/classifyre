@@ -55,8 +55,6 @@ spec:
               value: {{ .Values.iam.accessTokenLifespanSeconds | quote }}
             - name: IAM_TENANT_ALIAS
               value: {{ .Values.iam.bootstrap.tenant.alias | quote }}
-            - name: IAM_PEOPLE_MANAGEMENT
-              value: {{ .Values.iam.peopleManagement | quote }}
             - name: IAM_TENANT_NAME
               value: {{ .Values.iam.bootstrap.tenant.name | quote }}
             - name: IAM_BOOTSTRAP_ADMIN

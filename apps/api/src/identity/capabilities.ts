@@ -227,12 +227,6 @@ export const CAPABILITIES = [
     description: 'Manage grants across the tenant.',
   },
   {
-    id: 'tenant.people.manage',
-    scope: 'tenant',
-    description:
-      'Manage the tenant’s people and groups: add and remove people, create, rename and delete groups, change who is in them.',
-  },
-  {
     id: 'tenant.categories.manage',
     scope: 'tenant',
     description: 'Manage workspace categories.',

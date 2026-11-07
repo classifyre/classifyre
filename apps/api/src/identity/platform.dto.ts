@@ -83,61 +83,6 @@ export class PlatformTenantDto {
     | null;
 }
 
-export class CreateTenantDto {
-  @ApiProperty({ example: 'Acme' })
-  name: string;
-
-  @ApiProperty({
-    example: 'acme',
-    description:
-      'Lowercase letters, digits and dashes; how sign-in names the tenant. Cannot change later.',
-  })
-  alias: string;
-
-  @ApiProperty({ example: 'ada@example.test' })
-  adminEmail: string;
-
-  @ApiProperty({ example: 'Ada' })
-  adminFirstName: string;
-
-  @ApiProperty({ example: 'Kowalczyk' })
-  adminLastName: string;
-}
-
-export class CreatedTenantDto {
-  @ApiProperty({ type: PlatformTenantDto })
-  tenant: PlatformTenantDto;
-
-  @ApiProperty({
-    type: String,
-    nullable: true,
-    description:
-      "The first admin's temporary password, shown once. Null when an existing account became the admin.",
-  })
-  temporaryPassword: string | null;
-}
-
-export class AddTenantAdminDto {
-  @ApiProperty({ example: 'ada@example.test' })
-  email: string;
-
-  @ApiProperty({ example: 'Ada', required: false })
-  firstName?: string;
-
-  @ApiProperty({ example: 'Kowalczyk', required: false })
-  lastName?: string;
-}
-
-export class AddedTenantAdminDto {
-  @ApiProperty({
-    type: String,
-    nullable: true,
-    description:
-      'Only for a new account: shown once, changed at first sign-in.',
-  })
-  temporaryPassword: string | null;
-}
-
 export class LocalWorkspaceDto {
   @ApiProperty()
   id: string;
