@@ -16,6 +16,18 @@ export function useIamEnabled(): boolean {
  * and retry, or go to sign-in. The tokens never reach the browser; only the
  * server can renew.
  */
+/** Asked of the API as it is, so a role taken away counts within a minute. */
+async function isOperator(): Promise<boolean> {
+  try {
+    // Plain fetch, not the API client: a 401 here must not re-enter this handler.
+    const base = (process.env.NEXT_PUBLIC_API_URL || "/api").replace(/\/+$/, "");
+    const response = await fetch(`${base}/platform/me`, { credentials: "same-origin" });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
 export function IamProvider({
   enabled,
   children,
@@ -26,9 +38,16 @@ export function IamProvider({
   React.useEffect(() => {
     if (!enabled) return;
     setUnauthorizedHandler(async ({ code }) => {
-      // Signed in, but in no tenant or in several: a new session would be
-      // refused the same way, so say so instead of retrying.
-      if (code === "NO_TENANT" || code === "CHOOSE_TENANT") {
+      // Signed in, but in no tenant, in several or in a suspended one: a new
+      // session would be refused the same way, so say so instead of retrying.
+      // An operator in no tenant has the Platform page instead.
+      if (code === "NO_TENANT" || code === "CHOOSE_TENANT" || code === "TENANT_SUSPENDED") {
+        if (code === "NO_TENANT" && (await isOperator())) {
+          if (!window.location.pathname.startsWith("/platform")) {
+            window.location.assign("/platform/");
+          }
+          return false;
+        }
         window.location.assign(`/auth/no-tenant/?reason=${code}`);
         return false;
       }

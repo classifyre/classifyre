@@ -1072,6 +1072,8 @@ iam:
       username: admin
       # -- Email of the first tenant admin.
       email: ""
+      # -- Also make the first tenant admin an operator (realm role `classifyre-operator`), who manages every tenant on the Platform page (`/platform`). Given once, when the account is created.
+      operator: true
   # -- Resources of the identity server container.
   resources:
     requests:

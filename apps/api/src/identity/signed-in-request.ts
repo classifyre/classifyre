@@ -35,8 +35,8 @@ export const CROSS_ORIGIN_BODY = {
 export async function authenticateOr(
   authenticate: () => Promise<Principal>,
   send: {
-    unauthorized: (body: Record<string, unknown>) => unknown | Promise<unknown>;
-    unavailable: (body: Record<string, unknown>) => unknown | Promise<unknown>;
+    unauthorized: (body: Record<string, unknown>) => unknown;
+    unavailable: (body: Record<string, unknown>) => unknown;
   },
 ): Promise<Principal | null> {
   try {

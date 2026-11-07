@@ -6,12 +6,48 @@ import {
   publicConnectionString,
 } from '../registry/namespace-registry.sql';
 import type { RoleKey } from './roles';
+import { LOCAL_TENANT_ID } from './tenancy.sql';
+
+export type TenantStatus = 'active' | 'suspended' | 'deleted';
 
 export interface Tenant {
   id: string;
   alias: string;
   name: string;
   orgId: string | null;
+  status: TenantStatus;
+}
+
+interface TenantRow {
+  id: string;
+  alias: string;
+  name: string;
+  org_id: string | null;
+  suspended_at: Date | null;
+  deleted_at: Date | null;
+}
+
+const TENANT_COLUMNS = 'id, alias, name, org_id, suspended_at, deleted_at';
+
+function toTenant(row: TenantRow): Tenant {
+  return {
+    id: row.id,
+    alias: row.alias,
+    name: row.name,
+    orgId: row.org_id,
+    status: row.deleted_at
+      ? 'deleted'
+      : row.suspended_at
+        ? 'suspended'
+        : 'active',
+  };
+}
+
+/** A tenant as the Platform page lists it: no workspace content, only counts. */
+export interface TenantSummary extends Tenant {
+  createdAt: Date;
+  workspaces: number;
+  lastActivityAt: Date | null;
 }
 
 export type GrantScopeType = 'tenant' | 'group' | 'workspace';
@@ -63,22 +99,11 @@ export class TenancyService implements OnModuleDestroy {
   async tenantByAlias(alias: string): Promise<Tenant | null> {
     const hit = this.tenantsByAlias.get(alias);
     if (hit && hit.expiresAt > Date.now()) return hit.tenant;
-    const { rows } = await this.pool.query<{
-      id: string;
-      alias: string;
-      name: string;
-      org_id: string | null;
-    }>(`SELECT id, alias, name, org_id FROM iam_tenants WHERE alias = $1`, [
-      alias,
-    ]);
-    const tenant = rows[0]
-      ? {
-          id: rows[0].id,
-          alias: rows[0].alias,
-          name: rows[0].name,
-          orgId: rows[0].org_id,
-        }
-      : null;
+    const { rows } = await this.pool.query<TenantRow>(
+      `SELECT ${TENANT_COLUMNS} FROM iam_tenants WHERE alias = $1`,
+      [alias],
+    );
+    const tenant = rows[0] ? toTenant(rows[0]) : null;
     this.tenantsByAlias.set(alias, {
       tenant,
       expiresAt: Date.now() + TENANT_TTL_MS,
@@ -87,20 +112,98 @@ export class TenancyService implements OnModuleDestroy {
   }
 
   async tenantById(id: string): Promise<Tenant | null> {
-    const { rows } = await this.pool.query<{
-      id: string;
-      alias: string;
-      name: string;
-      org_id: string | null;
-    }>(`SELECT id, alias, name, org_id FROM iam_tenants WHERE id = $1`, [id]);
-    return rows[0]
-      ? {
-          id: rows[0].id,
-          alias: rows[0].alias,
-          name: rows[0].name,
-          orgId: rows[0].org_id,
-        }
-      : null;
+    const { rows } = await this.pool.query<TenantRow>(
+      `SELECT ${TENANT_COLUMNS} FROM iam_tenants WHERE id = $1`,
+      [id],
+    );
+    return rows[0] ? toTenant(rows[0]) : null;
+  }
+
+  /** Every tenant but `local`, with what the Platform page shows. */
+  async tenantSummaries(): Promise<TenantSummary[]> {
+    const { rows } = await this.pool.query<
+      TenantRow & {
+        created_at: Date;
+        workspaces: number;
+        last_activity_at: Date | null;
+      }
+    >(
+      `SELECT t.id, t.alias, t.name, t.org_id, t.suspended_at, t.deleted_at, t.created_at,
+              (SELECT count(*)::int FROM namespaces n
+                WHERE n.tenant_id = t.id AND n.status <> 'deleted') AS workspaces,
+              (SELECT max(e.occurred_at) FROM iam_audit_events e
+                WHERE e.tenant_id = t.id) AS last_activity_at
+         FROM iam_tenants t
+        WHERE t.id <> $1
+        ORDER BY lower(t.name)`,
+      [LOCAL_TENANT_ID],
+    );
+    return rows.map((row) => ({
+      ...toTenant(row),
+      createdAt: row.created_at,
+      workspaces: row.workspaces,
+      lastActivityAt: row.last_activity_at,
+    }));
+  }
+
+  /** Suspends (true) or resumes (false); false when nothing changed. */
+  async setSuspended(tenantId: string, suspended: boolean): Promise<boolean> {
+    const { rowCount } = await this.pool.query(
+      suspended
+        ? `UPDATE iam_tenants SET suspended_at = now()
+            WHERE id = $1 AND suspended_at IS NULL AND deleted_at IS NULL`
+        : `UPDATE iam_tenants SET suspended_at = NULL
+            WHERE id = $1 AND suspended_at IS NOT NULL AND deleted_at IS NULL`,
+      [tenantId],
+    );
+    this.tenantsByAlias.clear();
+    return Boolean(rowCount);
+  }
+
+  /**
+   * Marks a tenant deleted and drops what gave anyone access to it: grants and
+   * the record of accounts made here. Returns those accounts, for the caller
+   * to delete where they are in no other tenant.
+   */
+  async markDeleted(tenantId: string): Promise<string[]> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const { rowCount } = await client.query(
+        `UPDATE iam_tenants SET deleted_at = now(), suspended_at = COALESCE(suspended_at, now())
+          WHERE id = $1 AND deleted_at IS NULL`,
+        [tenantId],
+      );
+      if (!rowCount) {
+        await client.query('ROLLBACK');
+        return [];
+      }
+      await client.query('DELETE FROM iam_grants WHERE tenant_id = $1', [
+        tenantId,
+      ]);
+      const { rows } = await client.query<{ sub: string }>(
+        'DELETE FROM iam_people WHERE tenant_id = $1 RETURNING sub',
+        [tenantId],
+      );
+      await client.query('COMMIT');
+      return rows.map((row) => row.sub);
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+      this.tenantsByAlias.clear();
+    }
+  }
+
+  /** Removes a tenant row that never got anything: a creation rolled back. */
+  async forgetNewTenant(tenantId: string): Promise<void> {
+    await this.pool.query(
+      `DELETE FROM iam_tenants t WHERE t.id = $1
+          AND NOT EXISTS (SELECT 1 FROM namespaces n WHERE n.tenant_id = t.id)`,
+      [tenantId],
+    );
+    this.tenantsByAlias.clear();
   }
 
   /** The tenant for an organization, created on first sight. */

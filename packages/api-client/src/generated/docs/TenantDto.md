@@ -11,6 +11,7 @@ Name | Type
 `name` | string
 `capabilities` | Array&lt;string&gt;
 `peopleManagement` | boolean
+`operator` | boolean
 
 ## Example
 
@@ -24,6 +25,7 @@ const example = {
   "name": Default,
   "capabilities": null,
   "peopleManagement": null,
+  "operator": null,
 } satisfies TenantDto
 
 console.log(example)

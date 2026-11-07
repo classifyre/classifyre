@@ -123,6 +123,11 @@ export class TenantDto {
       'True when people and groups are managed here; false when a company directory or the identity server owns them and they are read-only.',
   })
   peopleManagement: boolean;
+
+  @ApiProperty({
+    description: 'The caller is also an operator: the Platform page is theirs.',
+  })
+  operator: boolean;
 }
 
 /** One tenant the caller belongs to, for the account menu (§12.2). */

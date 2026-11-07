@@ -25,6 +25,14 @@ ON CONFLICT (id) DO NOTHING;
 -- once and a tenant admin can take it away again.
 ALTER TABLE public.iam_tenants
   ADD COLUMN IF NOT EXISTS admins_granted_at timestamptz;
+-- Set by operators on the Platform page (docs/prd/TEN §4.7). Suspended: its
+-- people and their agents are refused, data kept. Deleted: its organization
+-- is gone; the row stays so the alias is never handed out again and the
+-- activity and soft-deleted workspaces keep their tenant.
+ALTER TABLE public.iam_tenants
+  ADD COLUMN IF NOT EXISTS suspended_at timestamptz;
+ALTER TABLE public.iam_tenants
+  ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
 
 -- A workspace belongs to exactly one tenant, and with sign-in on is owned by
 -- exactly one of its groups (an organization group id in the identity server).

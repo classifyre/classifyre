@@ -174,6 +174,8 @@ async function ownerFor(
 export async function moveWorkspaces(
   pool: Pool,
   request: MoveRequest,
+  /** Who moves them, for the tenants' activity: this command, or an operator on the Platform page. */
+  actor = ACTOR,
 ): Promise<Workspace[]> {
   const client = await pool.connect();
   try {
@@ -228,7 +230,7 @@ export async function moveWorkspaces(
             [
               randomUUID(),
               tenantId,
-              ACTOR,
+              actor,
               action,
               JSON.stringify({
                 namespaceId: workspace.id,

@@ -60,6 +60,7 @@ export class MembershipService {
   private readonly users = new Map<string, Cached<Membership>>();
   private readonly memberGroups = new Map<string, Cached<string[]>>();
   private readonly orgGroups = new Map<string, Cached<Map<string, OrgGroup>>>();
+  private readonly roles = new Map<string, Cached<string[]>>();
 
   constructor(
     private readonly config: IamConfig,
@@ -208,16 +209,39 @@ export class MembershipService {
    * domains, not aliases, so this pages through every organization.
    */
   async organizationByAlias(alias: string): Promise<Organization | null> {
+    return (
+      (await this.organizations()).find((org) => org.alias === alias) ?? null
+    );
+  }
+
+  /** Every organization of the realm, uncached (the Platform page). */
+  async organizations(): Promise<Organization[]> {
     const page = 500;
+    const all: Organization[] = [];
     for (let first = 0; ; first += page) {
       const found =
         (await this.get<Organization[]>(
           `/organizations?briefRepresentation=true&first=${first}&max=${page}`,
         )) ?? [];
-      const match = found.find((org) => org.alias === alias);
-      if (match) return { id: match.id, alias: match.alias, name: match.name };
-      if (found.length < page) return null;
+      all.push(...found.map(({ id, alias, name }) => ({ id, alias, name })));
+      if (found.length < page) return all;
     }
+  }
+
+  /**
+   * The person's realm roles, composite ones included, cached for a minute
+   * like their membership: an operator whose role is taken away loses the
+   * Platform page within a minute, not when their token expires.
+   */
+  async realmRoles(sub: string): Promise<string[]> {
+    return this.cached(this.roles, sub, async () => {
+      const roles =
+        (await this.get<{ name: string }[]>(
+          `/users/${encodeURIComponent(sub)}/role-mappings/realm/composite`,
+          true,
+        )) ?? [];
+      return roles.map((role) => role.name);
+    });
   }
 
   private lineage(tree: Map<string, OrgGroup>, id: string): string[] {
@@ -303,7 +327,9 @@ export class MembershipService {
       ? 'users'
       : map === this.memberGroups
         ? 'groups'
-        : 'tree';
+        : map === this.roles
+          ? 'roles'
+          : 'tree';
   }
 
   /** Drops entries past their grace period, so the caches cannot grow without bound. */

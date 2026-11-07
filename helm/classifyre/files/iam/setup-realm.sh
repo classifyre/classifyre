@@ -195,6 +195,10 @@ if [ -z "$(find_id users username "$IAM_BOOTSTRAP_ADMIN" -q "username=$IAM_BOOTS
     --new-password "$IAM_BOOTSTRAP_ADMIN_PASSWORD" --temporary
   "$KC" create "organizations/$ORG_ID/members" -r "$R" -b "\"$USER_ID\""
   "$KC" update "organizations/$ORG_ID/groups/$ADMINS_ID/members/$USER_ID" -r "$R" -b '{}'
+  # Someone has to open the Platform page on a fresh install (iam.bootstrap.admin.operator).
+  if [ "${IAM_BOOTSTRAP_ADMIN_OPERATOR:-false}" = "true" ]; then
+    "$KC" add-roles -r "$R" --uusername "$IAM_BOOTSTRAP_ADMIN" --rolename classifyre-operator
+  fi
 fi
 
 echo "done"

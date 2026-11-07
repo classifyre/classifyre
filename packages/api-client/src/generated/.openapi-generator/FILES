@@ -10,8 +10,10 @@ docs/AddEvidenceDto.md
 docs/AddExclusionDto.md
 docs/AddFindingDto.md
 docs/AddPersonDto.md
+docs/AddTenantAdminDto.md
 docs/AddThreadEntryDto.md
 docs/AddedPersonDto.md
+docs/AddedTenantAdminDto.md
 docs/AgentActivityItemDto.md
 docs/AgentActivityListResponseDto.md
 docs/AgentCapacityReportDto.md
@@ -194,7 +196,9 @@ docs/CreateMcpTokenDto.md
 docs/CreateNotebookExecutionDto.md
 docs/CreateSourceDto.md
 docs/CreateSupervisorGoalDto.md
+docs/CreateTenantDto.md
 docs/CreateThreadDto.md
+docs/CreatedTenantDto.md
 docs/CustomDetectorExampleDto.md
 docs/CustomDetectorExtractionsApi.md
 docs/CustomDetectorFileDto.md
@@ -303,6 +307,8 @@ docs/HealthApi.md
 docs/HealthControllerGetHealth200Response.md
 docs/HypothesisStatus.md
 docs/IdentityApi.md
+docs/ImportWorkspacesDto.md
+docs/ImportedWorkspacesDto.md
 docs/IngestEdgeDto.md
 docs/InquiriesApi.md
 docs/InquiryActivityDto.md
@@ -320,6 +326,7 @@ docs/LinkInquiriesDto.md
 docs/LinkThreadSupportDto.md
 docs/ListRunnersResponseDto.md
 docs/LiveQueryResponseDto.md
+docs/LocalWorkspaceDto.md
 docs/LocationDto.md
 docs/MaintenanceApi.md
 docs/MarkAllReadDto.md
@@ -362,6 +369,9 @@ docs/PatternPreviewResponseDto.md
 docs/PayloadCursorEntryDto.md
 docs/PersonDto.md
 docs/PivotGraphDto.md
+docs/PlatformApi.md
+docs/PlatformMeDto.md
+docs/PlatformTenantDto.md
 docs/PreviewCaseFindingFiltersDto.md
 docs/PreviewDiagnosticDto.md
 docs/PreviewInquiryDto.md
@@ -537,6 +547,7 @@ docs/SupervisorJournalEntryDto.md
 docs/SupervisorJournalListDto.md
 docs/SupervisorStateDto.md
 docs/TemporaryPasswordDto.md
+docs/TenantAdminDto.md
 docs/TenantDto.md
 docs/TenantEventDto.md
 docs/TenantGroupDto.md
@@ -633,6 +644,7 @@ src/apis/MaintenanceApi.ts
 src/apis/NamespacesApi.ts
 src/apis/NotebooksApi.ts
 src/apis/NotificationsApi.ts
+src/apis/PlatformApi.ts
 src/apis/RunnersApi.ts
 src/apis/SemanticApi.ts
 src/apis/SitemapApi.ts
@@ -647,8 +659,10 @@ src/models/AddEvidenceDto.ts
 src/models/AddExclusionDto.ts
 src/models/AddFindingDto.ts
 src/models/AddPersonDto.ts
+src/models/AddTenantAdminDto.ts
 src/models/AddThreadEntryDto.ts
 src/models/AddedPersonDto.ts
+src/models/AddedTenantAdminDto.ts
 src/models/AgentActivityItemDto.ts
 src/models/AgentActivityListResponseDto.ts
 src/models/AgentCapacityReportDto.ts
@@ -823,7 +837,9 @@ src/models/CreateMcpTokenDto.ts
 src/models/CreateNotebookExecutionDto.ts
 src/models/CreateSourceDto.ts
 src/models/CreateSupervisorGoalDto.ts
+src/models/CreateTenantDto.ts
 src/models/CreateThreadDto.ts
+src/models/CreatedTenantDto.ts
 src/models/CustomDetectorExampleDto.ts
 src/models/CustomDetectorFileDto.ts
 src/models/CustomDetectorResponseDto.ts
@@ -920,6 +936,8 @@ src/models/HarnessToolDto.ts
 src/models/HarnessToolsResponseDto.ts
 src/models/HealthControllerGetHealth200Response.ts
 src/models/HypothesisStatus.ts
+src/models/ImportWorkspacesDto.ts
+src/models/ImportedWorkspacesDto.ts
 src/models/IngestEdgeDto.ts
 src/models/InquiryActivityDto.ts
 src/models/InquiryLinkedCaseDto.ts
@@ -935,6 +953,7 @@ src/models/LinkInquiriesDto.ts
 src/models/LinkThreadSupportDto.ts
 src/models/ListRunnersResponseDto.ts
 src/models/LiveQueryResponseDto.ts
+src/models/LocalWorkspaceDto.ts
 src/models/LocationDto.ts
 src/models/MarkAllReadDto.ts
 src/models/MatchOptionCustomDetectorDto.ts
@@ -973,6 +992,8 @@ src/models/PatternPreviewResponseDto.ts
 src/models/PayloadCursorEntryDto.ts
 src/models/PersonDto.ts
 src/models/PivotGraphDto.ts
+src/models/PlatformMeDto.ts
+src/models/PlatformTenantDto.ts
 src/models/PreviewCaseFindingFiltersDto.ts
 src/models/PreviewDiagnosticDto.ts
 src/models/PreviewInquiryDto.ts
@@ -1144,6 +1165,7 @@ src/models/SupervisorJournalEntryDto.ts
 src/models/SupervisorJournalListDto.ts
 src/models/SupervisorStateDto.ts
 src/models/TemporaryPasswordDto.ts
+src/models/TenantAdminDto.ts
 src/models/TenantDto.ts
 src/models/TenantEventDto.ts
 src/models/TenantGroupDto.ts

@@ -63,6 +63,8 @@ spec:
               value: {{ .Values.iam.bootstrap.admin.username | quote }}
             - name: IAM_BOOTSTRAP_ADMIN_EMAIL
               value: {{ .Values.iam.bootstrap.admin.email | quote }}
+            - name: IAM_BOOTSTRAP_ADMIN_OPERATOR
+              value: {{ .Values.iam.bootstrap.admin.operator | quote }}
             {{- range $env, $key := dict "IAM_ADMIN_PASSWORD" "admin-password" "IAM_WEB_CLIENT_SECRET" "web-client-secret" "IAM_API_CLIENT_SECRET" "api-client-secret" "IAM_BOOTSTRAP_ADMIN_PASSWORD" "bootstrap-admin-password" }}
             - name: {{ $env }}
               valueFrom:

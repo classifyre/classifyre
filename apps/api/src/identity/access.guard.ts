@@ -12,7 +12,7 @@ import { resolveLocalRequestActor, SYSTEM_ACTOR, type Actor } from './actor';
 import { ActorContextService } from './actor-context.service';
 import type { Capability } from './capabilities';
 import { resolveRouteAccess } from './route-access';
-import type { IdentityService, Principal } from './identity.service';
+import type { IdentityService, Operator, Principal } from './identity.service';
 import { IDENTITY } from './identity.tokens';
 import {
   assertSameOrigin,
@@ -63,7 +63,10 @@ export class AccessGuard implements CanActivate {
         method: string;
         headers?: Record<string, unknown>;
         body?: unknown;
-        raw?: ActorRequest & { classifyrePrincipal?: Principal | null };
+        raw?: ActorRequest & {
+          classifyrePrincipal?: Principal | null;
+          classifyreOperator?: Operator | null;
+        };
       }
     >();
     const access = resolveRouteAccess(
@@ -97,6 +100,20 @@ export class AccessGuard implements CanActivate {
     if (access.kind === 'internal') {
       // Internal routes without the key: the internal-key guard has already
       // refused them wherever the key is enforced.
+      return true;
+    }
+
+    if (access.capability.startsWith('platform.')) {
+      // Operators belong to no tenant: the Platform routes ask only whether
+      // the person holds the operator role (docs/prd/TEN §4.7).
+      const operator = await this.authenticateOperator(request);
+      if (!operator) throw new CapabilityRequiredException(access.capability);
+      assertSameOrigin(
+        operator,
+        { method: request.method, headers: request.headers },
+        this.identity.config.appOrigin,
+      );
+      this.remember(request, operator.actor);
       return true;
     }
 
@@ -143,6 +160,17 @@ export class AccessGuard implements CanActivate {
 
   private inWorkspace(): boolean {
     return Boolean(this.actors.workspaceId());
+  }
+
+  private async authenticateOperator(request: {
+    headers?: Record<string, unknown>;
+    raw?: { classifyreOperator?: Operator | null };
+  }): Promise<Operator | null> {
+    try {
+      return await this.identity!.authenticateOperator(request.raw ?? request);
+    } catch (error) {
+      throwAuthenticationError(error);
+    }
   }
 
   private async authenticate(request: {

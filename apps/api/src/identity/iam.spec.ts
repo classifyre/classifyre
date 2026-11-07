@@ -271,7 +271,13 @@ describe('IdentityService', () => {
     IAM_API_CLIENT_ID: 'classifyre-api',
     IAM_API_CLIENT_SECRET: 's',
   })!;
-  const acme = { id: 't-acme', alias: 'acme', name: 'Acme', orgId: 'org-acme' };
+  const acme = {
+    id: 't-acme',
+    alias: 'acme',
+    name: 'Acme',
+    orgId: 'org-acme',
+    status: 'active' as const,
+  };
   const grants: Grant[] = [
     {
       id: 'g1',
@@ -289,9 +295,13 @@ describe('IdentityService', () => {
   let adminGrants: string[];
   let tenantOrg: string;
   let orgClaim: unknown;
+  let tenantStatus: 'active' | 'suspended' | 'deleted';
+  let realmRoles: string[];
 
   beforeEach(() => {
     orgClaim = ['acme'];
+    tenantStatus = 'active';
+    realmRoles = [];
     pending = false;
     adminGrants = [];
     tenantOrg = 'org-acme';
@@ -318,9 +328,13 @@ describe('IdentityService', () => {
         ]),
       ancestry: (_org: string, id: string) =>
         Promise.resolve(id === 'ap-team' ? ['ap-team', 'finance'] : [id]),
+      realmRoles: () => Promise.resolve(realmRoles),
     } as unknown as MembershipService;
     const tenancy = {
-      ensureTenant: () => Promise.resolve({ ...acme, orgId: tenantOrg }),
+      ensureTenant: () =>
+        Promise.resolve({ ...acme, orgId: tenantOrg, status: tenantStatus }),
+      tenantById: () =>
+        Promise.resolve({ ...acme, orgId: tenantOrg, status: tenantStatus }),
       adminsPending: () => Promise.resolve(pending),
       grantAdminsOnce: (_tenant: string, group: string) => {
         adminGrants.push(group);
@@ -365,6 +379,50 @@ describe('IdentityService', () => {
       ref: 'user:u1',
     });
     expect(principal.tenant.alias).toBe('acme');
+  });
+
+  it('refuses the people of a suspended or deleted tenant (TEN §4.7)', async () => {
+    for (const status of ['suspended', 'deleted'] as const) {
+      tenantStatus = status;
+      await expect(
+        service({ enabled: true, orgs: ['acme'] }).authenticate(request()),
+      ).rejects.toMatchObject({ code: 'TENANT_SUSPENDED' });
+    }
+  });
+
+  it("stops a suspended tenant's MCP agents too", async () => {
+    tenantStatus = 'suspended';
+    expect(
+      await service({ enabled: true, orgs: ['acme'] }).principalForOwner(
+        'u1',
+        'tok',
+        'ws-ledger',
+      ),
+    ).toBeNull();
+  });
+
+  it('lets an operator in without a tenant, and nobody else (TEN §4.7)', async () => {
+    orgClaim = [];
+    realmRoles = ['default-roles-classifyre', 'classifyre-operator'];
+    const operator = await service({
+      enabled: true,
+      orgs: [],
+    }).authenticateOperator(request());
+    expect(operator?.actor.ref).toBe('user:u1');
+
+    realmRoles = ['default-roles-classifyre'];
+    expect(
+      await service({ enabled: true, orgs: [] }).authenticateOperator(
+        request(),
+      ),
+    ).toBeNull();
+
+    realmRoles = ['classifyre-operator'];
+    expect(
+      await service({ enabled: false, orgs: [] }).authenticateOperator(
+        request(),
+      ),
+    ).toBeNull();
   });
 
   it('refuses a disabled account and one that left the tenant (U11, U12)', async () => {
