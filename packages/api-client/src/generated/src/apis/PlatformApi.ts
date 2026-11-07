@@ -15,10 +15,6 @@
 
 import * as runtime from '../runtime';
 import type {
-  AddTenantAdminDto,
-  AddedTenantAdminDto,
-  CreateTenantDto,
-  CreatedTenantDto,
   ImportWorkspacesDto,
   ImportedWorkspacesDto,
   LocalWorkspaceDto,
@@ -26,14 +22,6 @@ import type {
   PlatformTenantDto,
 } from '../models/index';
 import {
-    AddTenantAdminDtoFromJSON,
-    AddTenantAdminDtoToJSON,
-    AddedTenantAdminDtoFromJSON,
-    AddedTenantAdminDtoToJSON,
-    CreateTenantDtoFromJSON,
-    CreateTenantDtoToJSON,
-    CreatedTenantDtoFromJSON,
-    CreatedTenantDtoToJSON,
     ImportWorkspacesDtoFromJSON,
     ImportWorkspacesDtoToJSON,
     ImportedWorkspacesDtoFromJSON,
@@ -46,15 +34,6 @@ import {
     PlatformTenantDtoToJSON,
 } from '../models/index';
 
-export interface PlatformControllerAddAdminRequest {
-    tenantId: string;
-    addTenantAdminDto: AddTenantAdminDto;
-}
-
-export interface PlatformControllerCreateRequest {
-    createTenantDto: CreateTenantDto;
-}
-
 export interface PlatformControllerImportWorkspacesRequest {
     tenantId: string;
     importWorkspacesDto: ImportWorkspacesDto;
@@ -63,11 +42,6 @@ export interface PlatformControllerImportWorkspacesRequest {
 export interface PlatformControllerRemoveRequest {
     tenantId: string;
     confirm: string;
-}
-
-export interface PlatformControllerRemoveAdminRequest {
-    tenantId: string;
-    userId: string;
 }
 
 export interface PlatformControllerResumeRequest {
@@ -82,96 +56,6 @@ export interface PlatformControllerSuspendRequest {
  * 
  */
 export class PlatformApi extends runtime.BaseAPI {
-
-    /**
-     * A member of the tenant, an account in no tenant, or a new account with a temporary password (shown once).
-     * Make someone a tenant admin, by email
-     */
-    async platformControllerAddAdminRaw(requestParameters: PlatformControllerAddAdminRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AddedTenantAdminDto>> {
-        if (requestParameters['tenantId'] == null) {
-            throw new runtime.RequiredError(
-                'tenantId',
-                'Required parameter "tenantId" was null or undefined when calling platformControllerAddAdmin().'
-            );
-        }
-
-        if (requestParameters['addTenantAdminDto'] == null) {
-            throw new runtime.RequiredError(
-                'addTenantAdminDto',
-                'Required parameter "addTenantAdminDto" was null or undefined when calling platformControllerAddAdmin().'
-            );
-        }
-
-        const queryParameters: any = {};
-
-        const headerParameters: runtime.HTTPHeaders = {};
-
-        headerParameters['Content-Type'] = 'application/json';
-
-
-        let urlPath = `/platform/tenants/{tenantId}/admins`;
-        urlPath = urlPath.replace(`{${"tenantId"}}`, encodeURIComponent(String(requestParameters['tenantId'])));
-
-        const response = await this.request({
-            path: urlPath,
-            method: 'POST',
-            headers: headerParameters,
-            query: queryParameters,
-            body: AddTenantAdminDtoToJSON(requestParameters['addTenantAdminDto']),
-        }, initOverrides);
-
-        return new runtime.JSONApiResponse(response, (jsonValue) => AddedTenantAdminDtoFromJSON(jsonValue));
-    }
-
-    /**
-     * A member of the tenant, an account in no tenant, or a new account with a temporary password (shown once).
-     * Make someone a tenant admin, by email
-     */
-    async platformControllerAddAdmin(requestParameters: PlatformControllerAddAdminRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AddedTenantAdminDto> {
-        const response = await this.platformControllerAddAdminRaw(requestParameters, initOverrides);
-        return await response.value();
-    }
-
-    /**
-     * Creates the organization, its `admins` group and the first admin: an account in no tenant, or a new one with a temporary password (shown once).
-     * Create a tenant with its first admin
-     */
-    async platformControllerCreateRaw(requestParameters: PlatformControllerCreateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CreatedTenantDto>> {
-        if (requestParameters['createTenantDto'] == null) {
-            throw new runtime.RequiredError(
-                'createTenantDto',
-                'Required parameter "createTenantDto" was null or undefined when calling platformControllerCreate().'
-            );
-        }
-
-        const queryParameters: any = {};
-
-        const headerParameters: runtime.HTTPHeaders = {};
-
-        headerParameters['Content-Type'] = 'application/json';
-
-
-        let urlPath = `/platform/tenants`;
-
-        const response = await this.request({
-            path: urlPath,
-            method: 'POST',
-            headers: headerParameters,
-            query: queryParameters,
-            body: CreateTenantDtoToJSON(requestParameters['createTenantDto']),
-        }, initOverrides);
-
-        return new runtime.JSONApiResponse(response, (jsonValue) => CreatedTenantDtoFromJSON(jsonValue));
-    }
-
-    /**
-     * Creates the organization, its `admins` group and the first admin: an account in no tenant, or a new one with a temporary password (shown once).
-     * Create a tenant with its first admin
-     */
-    async platformControllerCreate(requestParameters: PlatformControllerCreateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CreatedTenantDto> {
-        const response = await this.platformControllerCreateRaw(requestParameters, initOverrides);
-        return await response.value();
-    }
 
     /**
      * Copy workspaces made without sign-in into a tenant
@@ -279,8 +163,8 @@ export class PlatformApi extends runtime.BaseAPI {
     }
 
     /**
-     * Pass the alias as `confirm`. The organization and the accounts made for it go; the alias stays reserved.
-     * Delete a tenant that has no workspaces left
+     * Only after its organization was deleted in the identity server. Pass the alias as `confirm`. Its workspaces and their database go; the alias stays reserved.
+     * Remove a tenant whose organization was deleted
      */
     async platformControllerRemoveRaw(requestParameters: PlatformControllerRemoveRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
         if (requestParameters['tenantId'] == null) {
@@ -320,55 +204,11 @@ export class PlatformApi extends runtime.BaseAPI {
     }
 
     /**
-     * Pass the alias as `confirm`. The organization and the accounts made for it go; the alias stays reserved.
-     * Delete a tenant that has no workspaces left
+     * Only after its organization was deleted in the identity server. Pass the alias as `confirm`. Its workspaces and their database go; the alias stays reserved.
+     * Remove a tenant whose organization was deleted
      */
     async platformControllerRemove(requestParameters: PlatformControllerRemoveRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.platformControllerRemoveRaw(requestParameters, initOverrides);
-    }
-
-    /**
-     * Take someone out of the tenant\'s admins
-     */
-    async platformControllerRemoveAdminRaw(requestParameters: PlatformControllerRemoveAdminRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
-        if (requestParameters['tenantId'] == null) {
-            throw new runtime.RequiredError(
-                'tenantId',
-                'Required parameter "tenantId" was null or undefined when calling platformControllerRemoveAdmin().'
-            );
-        }
-
-        if (requestParameters['userId'] == null) {
-            throw new runtime.RequiredError(
-                'userId',
-                'Required parameter "userId" was null or undefined when calling platformControllerRemoveAdmin().'
-            );
-        }
-
-        const queryParameters: any = {};
-
-        const headerParameters: runtime.HTTPHeaders = {};
-
-
-        let urlPath = `/platform/tenants/{tenantId}/admins/{userId}`;
-        urlPath = urlPath.replace(`{${"tenantId"}}`, encodeURIComponent(String(requestParameters['tenantId'])));
-        urlPath = urlPath.replace(`{${"userId"}}`, encodeURIComponent(String(requestParameters['userId'])));
-
-        const response = await this.request({
-            path: urlPath,
-            method: 'DELETE',
-            headers: headerParameters,
-            query: queryParameters,
-        }, initOverrides);
-
-        return new runtime.VoidApiResponse(response);
-    }
-
-    /**
-     * Take someone out of the tenant\'s admins
-     */
-    async platformControllerRemoveAdmin(requestParameters: PlatformControllerRemoveAdminRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
-        await this.platformControllerRemoveAdminRaw(requestParameters, initOverrides);
     }
 
     /**
@@ -446,7 +286,7 @@ export class PlatformApi extends runtime.BaseAPI {
     }
 
     /**
-     * Every tenant, with counts and its admins
+     * Every tenant, with counts and its admins (read from the identity server)
      */
     async platformControllerTenantsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<PlatformTenantDto>>> {
         const queryParameters: any = {};
@@ -467,7 +307,7 @@ export class PlatformApi extends runtime.BaseAPI {
     }
 
     /**
-     * Every tenant, with counts and its admins
+     * Every tenant, with counts and its admins (read from the identity server)
      */
     async platformControllerTenants(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<PlatformTenantDto>> {
         const response = await this.platformControllerTenantsRaw(initOverrides);

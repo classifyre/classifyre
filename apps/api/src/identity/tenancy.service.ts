@@ -172,11 +172,10 @@ export class TenancyService implements OnModuleDestroy {
   }
 
   /**
-   * Marks a tenant deleted and drops what gave anyone access to it: grants and
-   * the record of accounts made here. Returns those accounts, for the caller
-   * to delete where they are in no other tenant.
+   * Marks a tenant deleted, with its grants and the list of its workspaces
+   * (their data goes with its database). Returns how many workspaces went.
    */
-  async markDeleted(tenantId: string): Promise<string[]> {
+  async markDeleted(tenantId: string): Promise<number> {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
@@ -187,17 +186,17 @@ export class TenancyService implements OnModuleDestroy {
       );
       if (!rowCount) {
         await client.query('ROLLBACK');
-        return [];
+        return 0;
       }
       await client.query('DELETE FROM iam_grants WHERE tenant_id = $1', [
         tenantId,
       ]);
-      const { rows } = await client.query<{ sub: string }>(
-        'DELETE FROM iam_people WHERE tenant_id = $1 RETURNING sub',
+      const removed = await client.query(
+        'DELETE FROM namespaces WHERE tenant_id = $1',
         [tenantId],
       );
       await client.query('COMMIT');
-      return rows.map((row) => row.sub);
+      return removed.rowCount ?? 0;
     } catch (error) {
       await client.query('ROLLBACK').catch(() => undefined);
       throw error;
@@ -221,16 +220,6 @@ export class TenancyService implements OnModuleDestroy {
     if (!rowCount) return false;
     await dropTenantDatabase(this.pool, tenantId);
     return true;
-  }
-
-  /** Removes a tenant row that never got anything: a creation rolled back. */
-  async forgetNewTenant(tenantId: string): Promise<void> {
-    await this.pool.query(
-      `DELETE FROM iam_tenants t WHERE t.id = $1
-          AND NOT EXISTS (SELECT 1 FROM namespaces n WHERE n.tenant_id = t.id)`,
-      [tenantId],
-    );
-    this.tenantsByAlias.clear();
   }
 
   /** The tenant for an organization, created on first sight. */
@@ -487,69 +476,6 @@ export class TenancyService implements OnModuleDestroy {
       [tenantId],
     );
     return rows.length > 0;
-  }
-
-  /** An account Classifyre created for this tenant (People → Add). */
-  async rememberCreatedPerson(
-    sub: string,
-    tenantId: string,
-    createdBy: string | undefined,
-  ): Promise<void> {
-    await this.pool.query(
-      `INSERT INTO iam_people (sub, tenant_id, created_by) VALUES ($1, $2, $3)
-       ON CONFLICT (sub, tenant_id) DO NOTHING`,
-      [sub, tenantId, createdBy ?? null],
-    );
-  }
-
-  async createdHere(sub: string, tenantId: string): Promise<boolean> {
-    const { rows } = await this.pool.query(
-      `SELECT 1 FROM iam_people WHERE sub = $1 AND tenant_id = $2`,
-      [sub, tenantId],
-    );
-    return rows.length > 0;
-  }
-
-  /** Subjects of the accounts Classifyre created for this tenant. */
-  async createdPeople(tenantId: string): Promise<Set<string>> {
-    const { rows } = await this.pool.query<{ sub: string }>(
-      `SELECT sub FROM iam_people WHERE tenant_id = $1`,
-      [tenantId],
-    );
-    return new Set(rows.map((row) => row.sub));
-  }
-
-  async forgetCreatedPerson(sub: string, tenantId: string): Promise<void> {
-    await this.pool.query(
-      `DELETE FROM iam_people WHERE sub = $1 AND tenant_id = $2`,
-      [sub, tenantId],
-    );
-  }
-
-  /** Grants given to these groups or on their workspaces; returns how many went. */
-  async deleteGroupGrants(
-    tenantId: string,
-    groupIds: string[],
-  ): Promise<number> {
-    if (groupIds.length === 0) return 0;
-    const { rowCount } = await this.pool.query(
-      `DELETE FROM iam_grants
-        WHERE tenant_id = $1
-          AND ((subject_type = 'group' AND subject_id = ANY($2::text[]))
-            OR (scope_type = 'group' AND scope_id = ANY($2::text[])))`,
-      [tenantId, groupIds],
-    );
-    return rowCount ?? 0;
-  }
-
-  /** A person's own grants in a tenant (not their groups'). */
-  async deletePersonGrants(tenantId: string, sub: string): Promise<number> {
-    const { rowCount } = await this.pool.query(
-      `DELETE FROM iam_grants
-        WHERE tenant_id = $1 AND subject_type = 'user' AND subject_id = $2`,
-      [tenantId, sub],
-    );
-    return rowCount ?? 0;
   }
 
   /** Remember a person's name for their actor references. */

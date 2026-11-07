@@ -164,47 +164,6 @@ export class MembershipService {
   }
 
   /**
-   * Forget what is cached about an organization (its group tree) and,
-   * optionally, people in it, after a change made through this pod. Other
-   * pods follow within the cache's minute.
-   */
-  forget(orgId: string, subs: string[] = []): void {
-    this.orgGroups.delete(orgId);
-    for (const sub of subs) {
-      this.users.delete(sub);
-      this.memberGroups.delete(`${orgId}|${sub}`);
-    }
-  }
-
-  /**
-   * A write to the identity server's admin API (People and groups). Returns
-   * the response; the caller decides what a status means. Paths are relative
-   * to the realm and built by the caller from ids it has checked. `body` is
-   * sent as JSON (a plain string becomes a JSON string, as the members
-   * endpoint wants).
-   */
-  async send(
-    method: 'POST' | 'PUT' | 'DELETE',
-    path: string,
-    body?: unknown,
-  ): Promise<Response> {
-    return this.fetchImpl(`${this.config.adminUrl}${path}`, {
-      method,
-      headers: {
-        Authorization: `Bearer ${await this.token()}`,
-        ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
-      },
-      body: body === undefined ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout(LOOKUP_TIMEOUT_MS),
-    });
-  }
-
-  /** One admin read, uncached; null on 404. */
-  async read<T>(path: string): Promise<T | null> {
-    return this.get<T>(path, true);
-  }
-
-  /**
    * The organization with this alias. The server's `search` matches names and
    * domains, not aliases, so this pages through every organization.
    */

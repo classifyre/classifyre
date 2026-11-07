@@ -49,20 +49,24 @@ A tenant is an **organization** in the identity server. The chart creates the
 first one (`iam.bootstrap.tenant`, default `default`) with a group `admins`
 whose members are tenant admins.
 
-**Tenant admins manage their own tenant in Classifyre**, on the Tenant access
-page: people, groups and access (see [People and groups](/access/people/)).
-The identity server's console is for operators only. It is not limited to one
-tenant: anyone who can change groups there can change every tenant's.
+**Tenants, their people and groups are managed in the identity server**: by
+an operator in its console, or by the company directory connected to it (see
+[below](#connecting-a-company-directory)). Classifyre only reads them: its
+service account in the `classifyre` realm has `view-users` and
+`view-organizations`, nothing that changes anything. In Classifyre, tenant
+admins decide what groups may do (grants, on the Tenant access page), and
+operators see tenants on the **Platform** page (`/platform`, see
+[below](#the-platform-page)). A tenant admin of one tenant never sees another
+tenant, and the Tenant access page shows only the tenant you signed in to.
 
-**Operators manage tenants in Classifyre**, on the **Platform** page
-(`/platform`, see [below](#the-platform-page)). A tenant admin of one tenant
-never sees or manages another tenant, and the Tenant access page shows only
-the tenant you signed in to.
+To add a tenant, create an **organization** in the console (its alias is the
+tenant's), give it a top-level group named exactly `admins`, and add its
+first admin to that group. To add someone to a tenant, make them a member of
+the organization and of its groups. Changes count within a minute.
 
-An organization made in the console works too: it is listed on the Platform
-page, and becomes manageable once it has a top-level group named exactly
-`admins` with someone in it. That group becomes tenant admin once; if a
-tenant admin later takes that away, it stays away.
+A new organization is listed on the Platform page on its own. Its `admins`
+group becomes tenant admin once; if a tenant admin later takes that away, it
+stays away.
 
 Do not delete an organization and create it again under the same alias: its
 members are refused with a message that an operator has to link the tenant
@@ -70,26 +74,15 @@ again, so nobody inherits the old tenant's workspaces by accident.
 
 Groups are nested: being in `/finance/ap-team` counts as being in `/finance`.
 Renaming or moving a group never breaks access, because grants point at the
-group itself, not its name. Groups made under the realm's own **Groups** menu
+group itself, not its name. A deleted group's grants stay listed as
+**Removed group** until a tenant admin removes them; nobody gets anything
+from them. Groups made under the realm's own **Groups** menu
 belong to no tenant, so Classifyre ignores them. Someone who signs in without
 being a member of any organization sees a page saying their account is not in
 a tenant yet.
 
 Roles and what they allow (capabilities such as managing sources or access)
 are not in the identity server at all. They live in Classifyre.
-
-### When a company directory owns membership
-
-Managing people and groups from Classifyre needs two rights for the API's
-service account in the `classifyre` realm: `manage-organizations` (groups)
-and `manage-users` (members, new accounts, temporary passwords). Both apply
-to the whole realm, so Classifyre itself keeps every change inside the
-tenant of the person making it. Realm settings, clients and identity
-providers stay out of its reach.
-
-If your company directory decides who is in which group, set
-`iam.peopleManagement: false`. The chart then takes those two rights away
-again, and People and Groups become read-only in Classifyre.
 
 ---
 
@@ -131,13 +124,15 @@ An operator does not need to be in any tenant. Signed in without one, they
 land on the Platform page; one who is also in a tenant finds **Platform** in
 the account menu. What they can do there:
 
-| Action                  | What happens                                                                                                                                                                                                                 |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **New tenant**          | Creates the organization with its alias, the `admins` group and the first admin: an account that is in no tenant yet, or a new one with a temporary password shown once. If any step fails, nothing is left behind.       |
-| **Admins**              | Makes someone a tenant admin by email (someone in the tenant already, an account in no tenant, or a new account), or takes someone out of `admins`. The last admin always stays.                                             |
-| **Bring in workspaces** | Copies workspaces made without sign-in into the tenant's database, owned by its `admins` group. The originals stay. The same as `workspaces copy --to-tenant` below.                                                        |
-| **Suspend / Resume**    | A suspended tenant's people, and the MCP agents they created, are refused within a minute, with a page that says the tenant is suspended. Its data is kept and its scheduled scans keep running.                             |
-| **Delete tenant**       | Only once it has no workspaces left, and after its alias is typed. The organization goes, with everyone's membership in it, and so do the accounts Classifyre made for it if they are in no other tenant. Its database is dropped, or, while soft-deleted workspaces are kept, with the last of them. Cannot be undone. |
+| Action                  | What happens                                                                                                                                                                                         |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Bring in workspaces** | Copies workspaces made without sign-in into the tenant's database, owned by its `admins` group. The originals stay. The same as `workspaces copy --to-tenant` below.                                |
+| **Suspend / Resume**    | A suspended tenant's people, and the MCP agents they created, are refused within a minute, with a page that says the tenant is suspended. Its data is kept and its scheduled scans keep running.     |
+| **Remove tenant data**  | Only for a tenant whose organization was deleted in the identity server, and after its alias is typed. Its workspaces, their database and its grants are deleted. Cannot be undone.                 |
+
+Tenants, their admins and members are not made here: create the organization
+and its `admins` group in the console (see [Tenants and groups](#tenants-and-groups)),
+and the page lists it on its own.
 
 A deleted tenant stays listed as deleted: its activity is kept, and its
 alias is never given out again, so nobody inherits its history.
@@ -145,12 +140,8 @@ alias is never given out again, so nobody inherits its history.
 Operators see tenants, their admins and counts, **never what is inside their
 workspaces**. To look inside one, an operator needs a role in that tenant,
 given by its tenant admins like anyone else's. Everything an operator
-changes in a tenant is in that tenant's **Activity**, under the operator's
+does to a tenant is in that tenant's **Activity**, under the operator's
 name.
-
-Creating tenants and changing their admins needs `iam.peopleManagement` on
-(the default). With it off, the page lists tenants and suspends, resumes and
-imports, but tenants and their admins are managed in the console.
 
 The page lists a tenant with a warning when its organization was deleted or
 replaced in the console, or when it has no top-level `admins` group (fix

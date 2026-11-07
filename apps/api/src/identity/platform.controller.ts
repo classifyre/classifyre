@@ -18,10 +18,6 @@ import { Requires } from './access.decorators';
 import type { IdentityService, Operator } from './identity.service';
 import { IDENTITY } from './identity.tokens';
 import {
-  AddedTenantAdminDto,
-  AddTenantAdminDto,
-  CreatedTenantDto,
-  CreateTenantDto,
   ImportedWorkspacesDto,
   ImportWorkspacesDto,
   LocalWorkspaceDto,
@@ -69,26 +65,14 @@ export class PlatformController {
 
   @Get('tenants')
   @Requires('platform.tenants.manage')
-  @ApiOperation({ summary: 'Every tenant, with counts and its admins' })
+  @ApiOperation({
+    summary:
+      'Every tenant, with counts and its admins (read from the identity server)',
+  })
   @ApiOkResponse({ type: [PlatformTenantDto] })
   async tenants(@Req() request: FastifyRequest): Promise<PlatformTenantDto[]> {
     await this.operator(request);
     return this.platform.tenants();
-  }
-
-  @Post('tenants')
-  @Requires('platform.tenants.manage')
-  @ApiOperation({
-    summary: 'Create a tenant with its first admin',
-    description:
-      'Creates the organization, its `admins` group and the first admin: an account in no tenant, or a new one with a temporary password (shown once).',
-  })
-  @ApiOkResponse({ type: CreatedTenantDto })
-  async create(
-    @Req() request: FastifyRequest,
-    @Body() body: CreateTenantDto,
-  ): Promise<CreatedTenantDto> {
-    return this.platform.createTenant(await this.operator(request), body ?? {});
   }
 
   @Post('tenants/:tenantId/suspend')
@@ -129,9 +113,9 @@ export class PlatformController {
   @HttpCode(204)
   @Requires('platform.tenants.manage')
   @ApiOperation({
-    summary: 'Delete a tenant that has no workspaces left',
+    summary: 'Remove a tenant whose organization was deleted',
     description:
-      'Pass the alias as `confirm`. The organization and the accounts made for it go; the alias stays reserved.',
+      'Only after its organization was deleted in the identity server. Pass the alias as `confirm`. Its workspaces and their database go; the alias stays reserved.',
   })
   async remove(
     @Req() request: FastifyRequest,
@@ -142,42 +126,6 @@ export class PlatformController {
       await this.operator(request),
       tenantId,
       confirm,
-    );
-  }
-
-  @Post('tenants/:tenantId/admins')
-  @Requires('platform.tenants.manage')
-  @ApiOperation({
-    summary: 'Make someone a tenant admin, by email',
-    description:
-      'A member of the tenant, an account in no tenant, or a new account with a temporary password (shown once).',
-  })
-  @ApiOkResponse({ type: AddedTenantAdminDto })
-  async addAdmin(
-    @Req() request: FastifyRequest,
-    @Param('tenantId') tenantId: string,
-    @Body() body: AddTenantAdminDto,
-  ): Promise<AddedTenantAdminDto> {
-    return this.platform.addAdmin(
-      await this.operator(request),
-      tenantId,
-      body ?? {},
-    );
-  }
-
-  @Delete('tenants/:tenantId/admins/:userId')
-  @HttpCode(204)
-  @Requires('platform.tenants.manage')
-  @ApiOperation({ summary: "Take someone out of the tenant's admins" })
-  async removeAdmin(
-    @Req() request: FastifyRequest,
-    @Param('tenantId') tenantId: string,
-    @Param('userId') userId: string,
-  ): Promise<void> {
-    await this.platform.removeAdmin(
-      await this.operator(request),
-      tenantId,
-      userId,
     );
   }
 

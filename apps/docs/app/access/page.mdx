@@ -133,8 +133,10 @@ Access is given with **grants**:
 - **When creating a workspace**, you choose the group that owns it. Only
   groups you belong to and may create workspaces for are offered.
 
-Tenant admins also manage the tenant's **people and groups** on the same
-page: see [People and groups](/access/people/). Roles live only in
+**People and groups** are managed in the identity server, or in the company
+directory connected to it, not in Classifyre: see
+[Running sign-in](/access/operations/#tenants-and-groups). Classifyre reads
+them and decides, through grants, what they may do. Roles live only in
 Classifyre; there is nothing to set up in the identity server for them.
 
 The same is available through the API (`/<workspace>/access/…` and

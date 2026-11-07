@@ -98,21 +98,12 @@ fi
   -s implicitFlowEnabled=false \
   -s directAccessGrantsEnabled=false \
   -s fullScopeAllowed=false
-# Always: read users, organizations and their groups. With people management
-# (iam.peopleManagement) also change them, so tenant admins manage their
-# people and groups from Classifyre: manage-organizations for groups,
-# manage-users for members, accounts and temporary passwords. Both are
-# realm-wide; Classifyre keeps each change inside the caller's tenant.
-# Realm settings, clients and identity providers stay out of reach.
-READ_ROLES="view-users view-organizations"
-WRITE_ROLES="manage-users manage-organizations"
-if [ "${IAM_PEOPLE_MANAGEMENT:-true}" = "true" ]; then
-  GIVE="$READ_ROLES $WRITE_ROLES"
-  TAKE=""
-else
-  GIVE="$READ_ROLES"
-  TAKE="$WRITE_ROLES"
-fi
+# Read only: users, organizations and their groups, and people's realm
+# roles (operators). Tenants, people and groups are managed in the identity
+# server itself; the API never changes them. Write rights an older release
+# gave are taken away again.
+GIVE="view-users view-organizations"
+TAKE="manage-users manage-organizations"
 RM_ID=$(find_id clients clientId realm-management)
 # role_list <names...>: the roles as the JSON array the API takes.
 role_list() {

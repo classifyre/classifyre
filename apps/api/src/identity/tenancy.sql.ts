@@ -99,16 +99,9 @@ CREATE TABLE IF NOT EXISTS public.iam_audit_events (
 CREATE INDEX IF NOT EXISTS iam_audit_events_tenant_idx
   ON public.iam_audit_events (tenant_id, occurred_at DESC);
 
--- Accounts Classifyre created for a tenant (People → Add). Only these get
--- temporary passwords from Classifyre, and only these are deleted when they
--- leave their last tenant; accounts from a directory or an operator stay.
-CREATE TABLE IF NOT EXISTS public.iam_people (
-  sub        text NOT NULL,
-  tenant_id  uuid NOT NULL REFERENCES public.iam_tenants (id) ON DELETE CASCADE,
-  created_by text,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (sub, tenant_id)
-);
+-- People and groups are managed in the identity server; Classifyre no longer
+-- makes accounts, so it keeps no list of them.
+DROP TABLE IF EXISTS public.iam_people;
 
 -- Workspace categories belong to a tenant, 'local' without sign-in. NULL is
 -- only the built-in default category, shared by every tenant.

@@ -102,8 +102,9 @@ export class AccessManagementService {
     return tenants.sort((a, b) => a.name.localeCompare(b.name));
   }
 
+  /** For the access screens: always as the identity server has them now. */
   async groups(principal: Principal) {
-    const groups = await this.requireSignIn().groupsOf(principal);
+    const groups = await this.requireSignIn().groupsOf(principal, true);
     return groups.map(({ id, name, path, parentId }) => ({
       id,
       name,
@@ -173,7 +174,15 @@ export class AccessManagementService {
       );
     }
 
-    const groups = await identity.groupsOf(principal);
+    let groups = await identity.groupsOf(principal);
+    // Made in the identity server a moment ago: not in the cache yet.
+    const named = [
+      input.subjectType === 'group' ? input.subjectId : null,
+      input.scopeType === 'group' ? input.scopeId : null,
+    ];
+    if (named.some((id) => id && !groups.some((group) => group.id === id))) {
+      groups = await identity.groupsOf(principal, true);
+    }
     const groupIds = new Set(groups.map((group) => group.id));
     if (input.subjectType === 'group' && !groupIds.has(input.subjectId)) {
       throw new BadRequestException('That group is not part of this tenant.');
@@ -297,7 +306,7 @@ export class AccessManagementService {
   ): Promise<(T & GrantView)[]> {
     const identity = this.requireSignIn();
     const groups = new Map(
-      (await identity.groupsOf(principal)).map((g) => [g.id, g.path]),
+      (await identity.groupsOf(principal, true)).map((g) => [g.id, g.path]),
     );
     const people = await this.tenancy.principalNames(
       grants

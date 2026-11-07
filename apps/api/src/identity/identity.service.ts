@@ -415,8 +415,13 @@ export class IdentityService {
   }
 
   /** Every group of the principal's tenant. */
-  groupsOf(principal: Principal): Promise<OrgGroup[]> {
-    return this.membership.groups(principal.orgId);
+  /**
+   * The tenant's groups. `fresh` skips the minute's cache: groups are made,
+   * renamed and removed in the identity server, and an admin who just made
+   * one expects to find it here.
+   */
+  groupsOf(principal: Principal, fresh = false): Promise<OrgGroup[]> {
+    return this.membership.groups(principal.orgId, { fresh });
   }
 
   /** Whether a person (subject id) belongs to the principal's tenant. */

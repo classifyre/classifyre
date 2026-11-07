@@ -448,7 +448,6 @@ helm upgrade --install classifyre ./helm/classifyre \
 | iam.image.tag | string | `"26.8.1"` | Identity server image tag. Keep it a quoted string so Dependabot can bump it. |
 | iam.nodeSelector | object | `{}` | Node selector. |
 | iam.path | string | `"/iam"` | Path the identity server is served under: the web app proxies it there, the same way it proxies `/api`. Always on the web app's own host — there is no separate public URL to configure. |
-| iam.peopleManagement | bool | `true` | Tenant admins manage their tenant's people and groups in Classifyre (Tenant access → People, Groups). Gives the API's service account `manage-users` and `manage-organizations` in the realm; Classifyre keeps every change inside the caller's tenant. `false` keeps it read-only, for installs where a company directory owns membership. |
 | iam.realm | string | `"classifyre"` | Realm that holds users, tenants (organizations) and groups. |
 | iam.replicas | int | `1` | Replicas. More than one forms a cluster over the headless service; minor upgrades still stop all of them. |
 | iam.resources | object | `{"limits":{"memory":"1536Mi"},"requests":{"cpu":"250m","memory":"768Mi"}}` | Resources of the identity server container. |
