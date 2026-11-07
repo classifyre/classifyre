@@ -424,6 +424,7 @@ helm upgrade --install classifyre ./helm/classifyre \
 | iam.affinity | object | `{}` | Affinity. |
 | iam.appUrl | string | `""` | URL people open Classifyre at, for sign-in redirects, e.g. `https://classifyre.example.com`. Empty derives it from `ingress.host` and `ingress.tls`. The identity server lives under it at `<appUrl>/iam`. |
 | iam.bootstrap.admin.email | string | `""` | Email of the first tenant admin. |
+| iam.bootstrap.admin.operator | bool | `true` | Also make the first tenant admin an operator (realm role `classifyre-operator`), who manages every tenant on the Platform page (`/platform`). Given once, when the account is created. |
 | iam.bootstrap.admin.username | string | `"admin"` | Username of the first tenant admin. Its temporary password is in the `<release>-iam` Secret, key `bootstrap-admin-password`, and must be changed at first sign-in. |
 | iam.bootstrap.tenant.alias | string | `"default"` | Alias of the first tenant (organization), created on install. |
 | iam.bootstrap.tenant.name | string | `"Default"` | Display name of the first tenant. |

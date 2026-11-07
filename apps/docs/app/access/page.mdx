@@ -38,7 +38,8 @@ cannot see behaves as if it did not exist.
 Each person belongs to one tenant. Someone whose account is not in a tenant
 yet sees a page saying so, with **Try again** for once a tenant admin has added
 them. Someone in several tenants sees a page asking them to choose one;
-working in several tenants side by side is not available yet.
+working in several tenants side by side is not available yet. When an
+operator has suspended your tenant, a page says so; your data is kept.
 
 Your name and tenant are in the account menu in the top-right corner, with
 **Sign out**. Sessions renew themselves while you work; after a long break you
@@ -82,6 +83,11 @@ which grant gives you what.
 | **Workspace manager** | Create workspaces for their own group, and administer every workspace that group owns.                |
 | **Auditor**           | Read the tenant's audit trail and who has access, without seeing findings.                            |
 | **Tenant admin**      | Everything in the tenant.                                                                             |
+
+Above every tenant are **operators**, the people who run the installation.
+They create, suspend and delete tenants and choose their first admins on the
+Platform page, without seeing inside any workspace (see
+[Running Sign-in](/access/operations/#the-platform-page)).
 
 Investigator and Curator sit side by side: someone who needs both gets both.
 

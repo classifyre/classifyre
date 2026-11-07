@@ -34,7 +34,21 @@ export interface Principal {
 export type AuthenticationCode =
   | 'SIGN_IN_REQUIRED'
   | 'NO_TENANT'
-  | 'CHOOSE_TENANT';
+  | 'CHOOSE_TENANT'
+  | 'TENANT_SUSPENDED';
+
+/** The realm role that opens the Platform page (docs/prd/TEN §4.7). */
+export const OPERATOR_ROLE = 'classifyre-operator';
+
+/**
+ * Someone who manages tenants (docs/prd/TEN §4.7). Needs no tenant: an
+ * operator sees tenants, never their workspaces, unless also a member.
+ */
+export interface Operator {
+  sub: string;
+  actor: Actor;
+  via: 'bearer' | 'cookie';
+}
 
 export class AuthenticationError extends Error {
   constructor(
@@ -48,6 +62,7 @@ export class AuthenticationError extends Error {
 interface RequestLike {
   headers?: Record<string, unknown>;
   classifyrePrincipal?: Principal | null;
+  classifyreOperator?: Operator | null;
 }
 
 function header(headers: Record<string, unknown> | undefined, name: string) {
@@ -133,20 +148,7 @@ export class IdentityService {
    */
   async authenticate(request: RequestLike): Promise<Principal> {
     if (request.classifyrePrincipal) return request.classifyrePrincipal;
-    const found = tokenOf(request.headers);
-    if (!found) throw new AuthenticationError('Sign in to continue.');
-
-    let claims;
-    try {
-      claims = await this.verifier.verify(found.token);
-    } catch (error) {
-      if (error instanceof InvalidTokenError) {
-        throw new AuthenticationError(
-          `Sign-in not accepted: ${error.message}.`,
-        );
-      }
-      throw error;
-    }
+    const { claims, via } = await this.verified(request);
 
     const alias = tenantAliasOf(claims.organization);
     if (!alias) {
@@ -178,6 +180,14 @@ export class IdentityService {
           );
     }
     const tenant = await this.tenancy.ensureTenant(org);
+    if (tenant.status !== 'active') {
+      throw new AuthenticationError(
+        tenant.status === 'suspended'
+          ? 'This tenant is suspended. Its data is kept; an operator can resume it.'
+          : 'This tenant has been deleted.',
+        'TENANT_SUSPENDED',
+      );
+    }
     if (tenant.orgId !== org.id) {
       // An organization deleted and made again under the same alias is not
       // the tenant whose workspaces and grants carry that alias.
@@ -212,11 +222,68 @@ export class IdentityService {
       orgId: org.id,
       groupIds,
       grants,
-      via: found.via,
+      via,
     };
     request.classifyrePrincipal = principal;
     this.rememberName(claims.sub, displayName, member.email);
     return principal;
+  }
+
+  /**
+   * The operator of a request (Platform routes), verified once and kept on
+   * the request. Being in a tenant is not needed; holding
+   * {@link OPERATOR_ROLE} now, per the identity server, is.
+   */
+  async authenticateOperator(request: RequestLike): Promise<Operator | null> {
+    if (request.classifyreOperator !== undefined) {
+      return request.classifyreOperator;
+    }
+    const { claims, via } = await this.verified(request);
+    const member = await this.membership.membership(claims.sub);
+    const operator =
+      member.enabled && (await this.isOperator(claims.sub))
+        ? {
+            sub: claims.sub,
+            actor: {
+              id: `user:${claims.sub}`,
+              displayName: member.displayName,
+              kind: 'person' as const,
+              via: 'oidc' as const,
+              ref: `user:${claims.sub}`,
+            },
+            via,
+          }
+        : null;
+    request.classifyreOperator = operator;
+    if (operator) {
+      this.rememberName(claims.sub, member.displayName, member.email);
+    }
+    return operator;
+  }
+
+  async isOperator(sub: string): Promise<boolean> {
+    return (await this.membership.realmRoles(sub)).includes(OPERATOR_ROLE);
+  }
+
+  private async verified(request: RequestLike): Promise<{
+    claims: Awaited<ReturnType<JwtVerifier['verify']>>;
+    via: 'bearer' | 'cookie';
+  }> {
+    const found = tokenOf(request.headers);
+    if (!found) throw new AuthenticationError('Sign in to continue.');
+    try {
+      return {
+        claims: await this.verifier.verify(found.token),
+        via: found.via,
+      };
+    } catch (error) {
+      if (error instanceof InvalidTokenError) {
+        throw new AuthenticationError(
+          `Sign-in not accepted: ${error.message}.`,
+        );
+      }
+      throw error;
+    }
   }
 
   /** Tenants whose `admins` group already has Tenant admin, and when others were last checked. */
@@ -283,7 +350,7 @@ export class IdentityService {
     const tenant = tenancy
       ? await this.tenancy.tenantById(tenancy.tenantId)
       : null;
-    if (!tenant?.orgId) return null;
+    if (!tenant?.orgId || tenant.status !== 'active') return null;
     const member = await this.membership.membership(sub);
     if (
       !member.enabled ||

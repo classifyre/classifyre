@@ -7268,7 +7268,8 @@
     "tenant": "Tenant: {{name}}",
     "signOut": "Sign out",
     "tenantSettings": "Tenant access",
-    "switchTenant": "Switch tenant"
+    "switchTenant": "Switch tenant",
+    "platform": "Platform"
   },
   "access": {
     "title": "Access",
@@ -7369,5 +7370,65 @@
       "empty": "Nobody yet",
       "none": "No groups yet"
     }
+  },
+  "platform": {
+    "title": "Platform",
+    "description": "Every tenant of this installation. Create tenants with their first admin, change who their admins are, and suspend or delete them. You see tenants here, not what is in their workspaces.",
+    "denied": "This page is for operators of this installation. Ask whoever runs it to give you the classifyre-operator role.",
+    "loadFailed": "The tenants could not be loaded",
+    "failed": "That did not work",
+    "tenants": "Tenants",
+    "none": "No tenants yet.",
+    "create": "New tenant",
+    "createTitle": "Create a tenant",
+    "createDescription": "A tenant is one organization with its own people, groups and workspaces. Its first admin manages everything inside it from then on.",
+    "createdToast": "Tenant {{name}} created",
+    "createFailed": "The tenant could not be created",
+    "name": "Name",
+    "alias": "Alias",
+    "aliasHint": "The alias is how sign-in names the tenant: lowercase letters, digits and dashes. It cannot change later, and a deleted tenant's alias is never given out again.",
+    "firstAdmin": "First admin",
+    "counts": "Workspaces: {{workspaces}} · People: {{members}}",
+    "adminsAre": "Admins: {{names}}",
+    "noAdmins": "No admins",
+    "lastActivity": "Last change {{when}}",
+    "created": "Created {{when}}",
+    "localWaiting": "Workspaces made without sign-in: {{count}}. Bring them into a tenant from its menu.",
+    "actions": "Actions for {{name}}",
+    "status": {
+      "suspended": "suspended",
+      "deleted": "deleted",
+      "active": "active"
+    },
+    "problem": {
+      "ORGANIZATION_MISSING": "organization deleted",
+      "ORGANIZATION_REPLACED": "organization replaced",
+      "NO_ADMINS_GROUP": "no admins group"
+    },
+    "admins": "Admins",
+    "adminsTitle": "Admins of {{name}}",
+    "adminsDescription": "Tenant admins manage the tenant's people, groups and access. A tenant always keeps at least one.",
+    "addAdmin": "Add admin",
+    "addAdminHint": "Someone already in the tenant becomes an admin as they are. Anyone else gets an account in this tenant; a new account gets a temporary password.",
+    "adminAdded": "{{email}} is now an admin",
+    "removeAdmin": "Remove {{name}} from admins",
+    "adminRemoved": "{{name}} is no longer an admin",
+    "import": "Bring in workspaces",
+    "importTitle": "Bring workspaces into {{name}}",
+    "importDescription": "These workspaces were made without sign-in. Once in the tenant they keep all their data, are owned by its admins group, and are no longer reachable without sign-in.",
+    "importConfirm": "Bring in {{count}}",
+    "imported": "Workspaces moved into {{name}}: {{count}}",
+    "suspend": "Suspend",
+    "suspendTitle": "Suspend {{name}}?",
+    "suspendDescription": "Nobody in the tenant can work in Classifyre until it is resumed, and their agents stop too. Its data is kept, and scheduled scans keep running.",
+    "suspended": "{{name}} is suspended",
+    "resume": "Resume",
+    "resumed": "{{name}} is resumed",
+    "delete": "Delete tenant",
+    "deleteTitle": "Delete {{name}}?",
+    "deleteDescription": "Its organization is deleted in the identity server, and with it everyone's membership. Accounts made for it in Classifyre are deleted too. Its activity is kept, and its alias is never given out again. This cannot be undone.",
+    "deleteHasWorkspaces": "It still has {{count}} workspace(s). Its admins delete them, or an operator moves them out of the tenant, before it can be deleted.",
+    "deleteType": "Type {{alias}} to confirm",
+    "deleted": "{{name}} is deleted"
   }
 }

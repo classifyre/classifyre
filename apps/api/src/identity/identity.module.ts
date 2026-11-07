@@ -20,6 +20,8 @@ import { MeController } from './me.controller';
 import { MembershipService } from './membership.service';
 import { TenantPeopleController } from './people.controller';
 import { PeopleService } from './people.service';
+import { PlatformController } from './platform.controller';
+import { PlatformService } from './platform.service';
 import { TenancyService } from './tenancy.service';
 import { SocketAccessService } from './socket-access.service';
 
@@ -38,6 +40,7 @@ import { SocketAccessService } from './socket-access.service';
     WorkspaceAccessController,
     TenantAccessController,
     TenantPeopleController,
+    PlatformController,
   ],
   providers: [
     PrismaService,
@@ -63,6 +66,7 @@ import { SocketAccessService } from './socket-access.service';
     IamBootstrapService,
     AccessManagementService,
     PeopleService,
+    PlatformService,
     SocketAccessService,
   ],
   exports: [

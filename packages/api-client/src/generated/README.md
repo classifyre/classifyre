@@ -403,6 +403,16 @@ All URIs are relative to *http://localhost*
 *NotificationsApi* | [**notificationsControllerMarkAllRead**](docs/NotificationsApi.md#notificationscontrollermarkallread) | **PATCH** /notifications/mark-all-read | Mark all notifications as read
 *NotificationsApi* | [**notificationsControllerMarkRead**](docs/NotificationsApi.md#notificationscontrollermarkread) | **PATCH** /notifications/{id}/read | Mark a notification as read
 *NotificationsApi* | [**notificationsControllerSetImportant**](docs/NotificationsApi.md#notificationscontrollersetimportant) | **PATCH** /notifications/{id}/important | Set notification importance
+*PlatformApi* | [**platformControllerAddAdmin**](docs/PlatformApi.md#platformcontrolleraddadmin) | **POST** /platform/tenants/{tenantId}/admins | Make someone a tenant admin, by email
+*PlatformApi* | [**platformControllerCreate**](docs/PlatformApi.md#platformcontrollercreate) | **POST** /platform/tenants | Create a tenant with its first admin
+*PlatformApi* | [**platformControllerImportWorkspaces**](docs/PlatformApi.md#platformcontrollerimportworkspaces) | **POST** /platform/tenants/{tenantId}/workspaces | Bring workspaces made without sign-in into a tenant
+*PlatformApi* | [**platformControllerLocalWorkspaces**](docs/PlatformApi.md#platformcontrollerlocalworkspaces) | **GET** /platform/workspaces/local | Workspaces made without sign-in, which can be brought into a tenant
+*PlatformApi* | [**platformControllerMe**](docs/PlatformApi.md#platformcontrollerme) | **GET** /platform/me | Whether the caller is an operator (403 when not)
+*PlatformApi* | [**platformControllerRemove**](docs/PlatformApi.md#platformcontrollerremove) | **DELETE** /platform/tenants/{tenantId} | Delete a tenant that has no workspaces left
+*PlatformApi* | [**platformControllerRemoveAdmin**](docs/PlatformApi.md#platformcontrollerremoveadmin) | **DELETE** /platform/tenants/{tenantId}/admins/{userId} | Take someone out of the tenant\&#39;s admins
+*PlatformApi* | [**platformControllerResume**](docs/PlatformApi.md#platformcontrollerresume) | **POST** /platform/tenants/{tenantId}/resume | Resume a suspended tenant
+*PlatformApi* | [**platformControllerSuspend**](docs/PlatformApi.md#platformcontrollersuspend) | **POST** /platform/tenants/{tenantId}/suspend | Suspend a tenant: its people are refused, its data is kept
+*PlatformApi* | [**platformControllerTenants**](docs/PlatformApi.md#platformcontrollertenants) | **GET** /platform/tenants | Every tenant, with counts and its admins
 *RunnersApi* | [**cliRunnerControllerAugmentEdges**](docs/RunnersApi.md#clirunnercontrolleraugmentedges) | **POST** /runners/{runnerId}/augmentations/edges | Link assets and glossary terms, for a running connector
 *RunnersApi* | [**cliRunnerControllerAugmentTags**](docs/RunnersApi.md#clirunnercontrolleraugmenttags) | **POST** /runners/{runnerId}/augmentations/tags | Tag assets of other sources, for a running connector
 *RunnersApi* | [**cliRunnerControllerBulkDeleteRunners**](docs/RunnersApi.md#clirunnercontrollerbulkdeleterunners) | **POST** /runners/bulk-delete | Delete many scan records at once
@@ -518,8 +528,10 @@ All URIs are relative to *http://localhost*
 - [AddExclusionDto](docs/AddExclusionDto.md)
 - [AddFindingDto](docs/AddFindingDto.md)
 - [AddPersonDto](docs/AddPersonDto.md)
+- [AddTenantAdminDto](docs/AddTenantAdminDto.md)
 - [AddThreadEntryDto](docs/AddThreadEntryDto.md)
 - [AddedPersonDto](docs/AddedPersonDto.md)
+- [AddedTenantAdminDto](docs/AddedTenantAdminDto.md)
 - [AgentActivityItemDto](docs/AgentActivityItemDto.md)
 - [AgentActivityListResponseDto](docs/AgentActivityListResponseDto.md)
 - [AgentCapacityReportDto](docs/AgentCapacityReportDto.md)
@@ -694,7 +706,9 @@ All URIs are relative to *http://localhost*
 - [CreateNotebookExecutionDto](docs/CreateNotebookExecutionDto.md)
 - [CreateSourceDto](docs/CreateSourceDto.md)
 - [CreateSupervisorGoalDto](docs/CreateSupervisorGoalDto.md)
+- [CreateTenantDto](docs/CreateTenantDto.md)
 - [CreateThreadDto](docs/CreateThreadDto.md)
+- [CreatedTenantDto](docs/CreatedTenantDto.md)
 - [CustomDetectorExampleDto](docs/CustomDetectorExampleDto.md)
 - [CustomDetectorFileDto](docs/CustomDetectorFileDto.md)
 - [CustomDetectorResponseDto](docs/CustomDetectorResponseDto.md)
@@ -791,6 +805,8 @@ All URIs are relative to *http://localhost*
 - [HarnessToolsResponseDto](docs/HarnessToolsResponseDto.md)
 - [HealthControllerGetHealth200Response](docs/HealthControllerGetHealth200Response.md)
 - [HypothesisStatus](docs/HypothesisStatus.md)
+- [ImportWorkspacesDto](docs/ImportWorkspacesDto.md)
+- [ImportedWorkspacesDto](docs/ImportedWorkspacesDto.md)
 - [IngestEdgeDto](docs/IngestEdgeDto.md)
 - [InquiryActivityDto](docs/InquiryActivityDto.md)
 - [InquiryLinkedCaseDto](docs/InquiryLinkedCaseDto.md)
@@ -806,6 +822,7 @@ All URIs are relative to *http://localhost*
 - [LinkThreadSupportDto](docs/LinkThreadSupportDto.md)
 - [ListRunnersResponseDto](docs/ListRunnersResponseDto.md)
 - [LiveQueryResponseDto](docs/LiveQueryResponseDto.md)
+- [LocalWorkspaceDto](docs/LocalWorkspaceDto.md)
 - [LocationDto](docs/LocationDto.md)
 - [MarkAllReadDto](docs/MarkAllReadDto.md)
 - [MatchOptionCustomDetectorDto](docs/MatchOptionCustomDetectorDto.md)
@@ -844,6 +861,8 @@ All URIs are relative to *http://localhost*
 - [PayloadCursorEntryDto](docs/PayloadCursorEntryDto.md)
 - [PersonDto](docs/PersonDto.md)
 - [PivotGraphDto](docs/PivotGraphDto.md)
+- [PlatformMeDto](docs/PlatformMeDto.md)
+- [PlatformTenantDto](docs/PlatformTenantDto.md)
 - [PreviewCaseFindingFiltersDto](docs/PreviewCaseFindingFiltersDto.md)
 - [PreviewDiagnosticDto](docs/PreviewDiagnosticDto.md)
 - [PreviewInquiryDto](docs/PreviewInquiryDto.md)
@@ -1015,6 +1034,7 @@ All URIs are relative to *http://localhost*
 - [SupervisorJournalListDto](docs/SupervisorJournalListDto.md)
 - [SupervisorStateDto](docs/SupervisorStateDto.md)
 - [TemporaryPasswordDto](docs/TemporaryPasswordDto.md)
+- [TenantAdminDto](docs/TenantAdminDto.md)
 - [TenantDto](docs/TenantDto.md)
 - [TenantEventDto](docs/TenantEventDto.md)
 - [TenantGroupDto](docs/TenantGroupDto.md)

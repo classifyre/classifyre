@@ -49,6 +49,12 @@ export interface TenantDto {
      * @memberof TenantDto
      */
     peopleManagement: boolean;
+    /**
+     * The caller is also an operator: the Platform page is theirs.
+     * @type {boolean}
+     * @memberof TenantDto
+     */
+    operator: boolean;
 }
 
 
@@ -112,6 +118,7 @@ export function instanceOfTenantDto(value: object): value is TenantDto {
     if (!('name' in value) || value['name'] === undefined) return false;
     if (!('capabilities' in value) || value['capabilities'] === undefined) return false;
     if (!('peopleManagement' in value) || value['peopleManagement'] === undefined) return false;
+    if (!('operator' in value) || value['operator'] === undefined) return false;
     return true;
 }
 
@@ -130,6 +137,7 @@ export function TenantDtoFromJSONTyped(json: any, ignoreDiscriminator: boolean):
         'name': json['name'],
         'capabilities': json['capabilities'],
         'peopleManagement': json['peopleManagement'],
+        'operator': json['operator'],
     };
 }
 
@@ -149,6 +157,7 @@ export function TenantDtoToJSONTyped(value?: TenantDto | null, ignoreDiscriminat
         'name': value['name'],
         'capabilities': value['capabilities'],
         'peopleManagement': value['peopleManagement'],
+        'operator': value['operator'],
     };
 }
 

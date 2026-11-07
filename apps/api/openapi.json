@@ -9905,6 +9905,319 @@
         ]
       }
     },
+    "/platform/me": {
+      "get": {
+        "operationId": "PlatformController_me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformMeDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Whether the caller is an operator (403 when not)",
+        "tags": [
+          "Platform"
+        ]
+      }
+    },
+    "/platform/tenants": {
+      "get": {
+        "operationId": "PlatformController_tenants",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlatformTenantDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Every tenant, with counts and its admins",
+        "tags": [
+          "Platform"
+        ]
+      },
+      "post": {
+        "description": "Creates the organization, its `admins` group and the first admin: an account in no tenant, or a new one with a temporary password (shown once).",
+        "operationId": "PlatformController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTenantDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedTenantDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create a tenant with its first admin",
+        "tags": [
+          "Platform"
+        ]
+      }
+    },
+    "/platform/tenants/{tenantId}/suspend": {
+      "post": {
+        "operationId": "PlatformController_suspend",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformTenantDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Suspend a tenant: its people are refused, its data is kept",
+        "tags": [
+          "Platform"
+        ]
+      }
+    },
+    "/platform/tenants/{tenantId}/resume": {
+      "post": {
+        "operationId": "PlatformController_resume",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformTenantDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Resume a suspended tenant",
+        "tags": [
+          "Platform"
+        ]
+      }
+    },
+    "/platform/tenants/{tenantId}": {
+      "delete": {
+        "description": "Pass the alias as `confirm`. The organization and the accounts made for it go; the alias stays reserved.",
+        "operationId": "PlatformController_remove",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "confirm",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Delete a tenant that has no workspaces left",
+        "tags": [
+          "Platform"
+        ]
+      }
+    },
+    "/platform/tenants/{tenantId}/admins": {
+      "post": {
+        "description": "A member of the tenant, an account in no tenant, or a new account with a temporary password (shown once).",
+        "operationId": "PlatformController_addAdmin",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddTenantAdminDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddedTenantAdminDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Make someone a tenant admin, by email",
+        "tags": [
+          "Platform"
+        ]
+      }
+    },
+    "/platform/tenants/{tenantId}/admins/{userId}": {
+      "delete": {
+        "operationId": "PlatformController_removeAdmin",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Take someone out of the tenant's admins",
+        "tags": [
+          "Platform"
+        ]
+      }
+    },
+    "/platform/workspaces/local": {
+      "get": {
+        "operationId": "PlatformController_localWorkspaces",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LocalWorkspaceDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Workspaces made without sign-in, which can be brought into a tenant",
+        "tags": [
+          "Platform"
+        ]
+      }
+    },
+    "/platform/tenants/{tenantId}/workspaces": {
+      "post": {
+        "operationId": "PlatformController_importWorkspaces",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportWorkspacesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportedWorkspacesDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Bring workspaces made without sign-in into a tenant",
+        "tags": [
+          "Platform"
+        ]
+      }
+    },
     "/sources/{sourceId}/run": {
       "post": {
         "operationId": "CliRunnerController_startRunner",
@@ -31048,6 +31361,10 @@
           "peopleManagement": {
             "type": "boolean",
             "description": "True when people and groups are managed here; false when a company directory or the identity server owns them and they are read-only."
+          },
+          "operator": {
+            "type": "boolean",
+            "description": "The caller is also an operator: the Platform page is theirs."
           }
         },
         "required": [
@@ -31055,7 +31372,8 @@
           "alias",
           "name",
           "capabilities",
-          "peopleManagement"
+          "peopleManagement",
+          "operator"
         ]
       },
       "TenantEventDto": {
@@ -31262,6 +31580,246 @@
         },
         "required": [
           "name"
+        ]
+      },
+      "PlatformMeDto": {
+        "type": "object",
+        "properties": {
+          "operator": {
+            "type": "boolean",
+            "description": "Always true: the route answers only operators."
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "operator",
+          "name"
+        ]
+      },
+      "TenantAdminDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "example": "Ada Kowalczyk"
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "email"
+        ]
+      },
+      "PlatformTenantDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "alias": {
+            "type": "string",
+            "example": "acme"
+          },
+          "name": {
+            "type": "string",
+            "example": "Acme"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "suspended",
+              "deleted"
+            ]
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "workspaces": {
+            "type": "number",
+            "description": "Workspaces, soft-deleted ones not counted."
+          },
+          "members": {
+            "type": "number",
+            "description": "People in the organization."
+          },
+          "admins": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TenantAdminDto"
+            }
+          },
+          "lastActivityAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "problem": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "ORGANIZATION_MISSING",
+              "ORGANIZATION_REPLACED",
+              "NO_ADMINS_GROUP"
+            ],
+            "description": "Why the tenant needs an operator: its organization was deleted or replaced in the identity server, or it has no top-level `admins` group."
+          }
+        },
+        "required": [
+          "id",
+          "alias",
+          "name",
+          "status",
+          "createdAt",
+          "workspaces",
+          "members",
+          "admins",
+          "lastActivityAt",
+          "problem"
+        ]
+      },
+      "CreateTenantDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Acme"
+          },
+          "alias": {
+            "type": "string",
+            "example": "acme",
+            "description": "Lowercase letters, digits and dashes; how sign-in names the tenant. Cannot change later."
+          },
+          "adminEmail": {
+            "type": "string",
+            "example": "ada@example.test"
+          },
+          "adminFirstName": {
+            "type": "string",
+            "example": "Ada"
+          },
+          "adminLastName": {
+            "type": "string",
+            "example": "Kowalczyk"
+          }
+        },
+        "required": [
+          "name",
+          "alias",
+          "adminEmail",
+          "adminFirstName",
+          "adminLastName"
+        ]
+      },
+      "CreatedTenantDto": {
+        "type": "object",
+        "properties": {
+          "tenant": {
+            "$ref": "#/components/schemas/PlatformTenantDto"
+          },
+          "temporaryPassword": {
+            "type": "string",
+            "nullable": true,
+            "description": "The first admin's temporary password, shown once. Null when an existing account became the admin."
+          }
+        },
+        "required": [
+          "tenant",
+          "temporaryPassword"
+        ]
+      },
+      "AddTenantAdminDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "ada@example.test"
+          },
+          "firstName": {
+            "type": "string",
+            "example": "Ada"
+          },
+          "lastName": {
+            "type": "string",
+            "example": "Kowalczyk"
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "AddedTenantAdminDto": {
+        "type": "object",
+        "properties": {
+          "temporaryPassword": {
+            "type": "string",
+            "nullable": true,
+            "description": "Only for a new account: shown once, changed at first sign-in."
+          }
+        },
+        "required": [
+          "temporaryPassword"
+        ]
+      },
+      "LocalWorkspaceDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "name"
+        ]
+      },
+      "ImportWorkspacesDto": {
+        "type": "object",
+        "properties": {
+          "slugs": {
+            "example": [
+              "finance-ledger"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "slugs"
+        ]
+      },
+      "ImportedWorkspacesDto": {
+        "type": "object",
+        "properties": {
+          "moved": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "moved"
         ]
       },
       "StartRunnerDto": {

@@ -18,6 +18,13 @@ const ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const ADMINS = 'admins';
 
+/**
+ * Who acts in which tenant. A signed-in tenant admin, or an operator acting
+ * in a tenant from the Platform page (docs/prd/TEN §4.7): the same rules
+ * hold for both, and the change is in that tenant's activity either way.
+ */
+export type Acting = Pick<Principal, 'sub' | 'orgId' | 'tenant' | 'actor'>;
+
 export interface PersonView {
   id: string;
   username: string;
@@ -50,7 +57,7 @@ export class PeopleService {
 
   // ---- reads ---------------------------------------------------------------
 
-  async people(principal: Principal): Promise<PersonView[]> {
+  async people(principal: Acting): Promise<PersonView[]> {
     const directory = this.directory();
     const [members, groups, created] = await Promise.all([
       directory.members(principal.orgId),
@@ -89,7 +96,7 @@ export class PeopleService {
    * one tenant about another's people, and never puts someone in two tenants.
    */
   async addPerson(
-    principal: Principal,
+    principal: Acting,
     input: { email?: unknown; firstName?: unknown; lastName?: unknown },
   ): Promise<{ person: PersonView; temporaryPassword: string | null }> {
     const directory = this.writable();
@@ -176,7 +183,7 @@ export class PeopleService {
    * it is in no other tenant now.
    */
   async removePerson(
-    principal: Principal,
+    principal: Acting,
     userId: string,
   ): Promise<{ accountDeleted: boolean }> {
     const directory = this.writable();
@@ -237,7 +244,7 @@ export class PeopleService {
 
   /** A new temporary password, for accounts Classifyre made for this tenant. */
   async resetPassword(
-    principal: Principal,
+    principal: Acting,
     userId: string,
   ): Promise<{ temporaryPassword: string }> {
     this.writable();
@@ -261,7 +268,7 @@ export class PeopleService {
   // ---- groups --------------------------------------------------------------
 
   async createGroup(
-    principal: Principal,
+    principal: Acting,
     input: { name?: unknown; parentId?: unknown },
   ): Promise<OrgGroup> {
     const directory = this.writable();
@@ -301,7 +308,7 @@ export class PeopleService {
   }
 
   async renameGroup(
-    principal: Principal,
+    principal: Acting,
     groupId: string,
     input: { name?: unknown },
   ): Promise<OrgGroup> {
@@ -342,7 +349,7 @@ export class PeopleService {
    * or on their workspaces. A group that owns workspaces is kept: its
    * workspaces would belong to nobody.
    */
-  async deleteGroup(principal: Principal, groupId: string): Promise<void> {
+  async deleteGroup(principal: Acting, groupId: string): Promise<void> {
     const directory = this.writable();
     const org = principal.orgId;
     const groups = await directory.groups(org, { fresh: true });
@@ -382,7 +389,7 @@ export class PeopleService {
   }
 
   async addToGroup(
-    principal: Principal,
+    principal: Acting,
     groupId: string,
     userId: string,
   ): Promise<void> {
@@ -407,7 +414,7 @@ export class PeopleService {
   }
 
   async removeFromGroup(
-    principal: Principal,
+    principal: Acting,
     groupId: string,
     userId: string,
   ): Promise<void> {
@@ -459,7 +466,7 @@ export class PeopleService {
 
   /** The group, if it is one of the caller's organization; 404 otherwise. */
   private async requireGroup(
-    principal: Principal,
+    principal: Acting,
     groupId: string,
   ): Promise<OrgGroup> {
     if (!ID.test(groupId)) throw groupNotFound();
@@ -472,7 +479,7 @@ export class PeopleService {
 
   /** The person must be in the caller's organization; 404 otherwise. */
   private async requireMember(
-    principal: Principal,
+    principal: Acting,
     userId: string,
   ): Promise<void> {
     if (
@@ -494,7 +501,7 @@ export class PeopleService {
 
   /** Nobody removes themselves from admins, and admins never ends up empty. */
   private async keepAnAdmin(
-    principal: Principal,
+    principal: Acting,
     admins: OrgGroup,
     userId: string,
   ): Promise<void> {
@@ -538,7 +545,7 @@ export class PeopleService {
   }
 
   private event(
-    principal: Principal,
+    principal: Acting,
     action: string,
     detail: Record<string, unknown>,
   ): Promise<void> {

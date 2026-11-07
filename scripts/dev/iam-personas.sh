@@ -263,6 +263,51 @@ MOVES=$(echo "$EVENTS" | json "a=[e['action'] for e in d if (e.get('detail') or 
 [ "$MOVES" = yes ] || MOVES="$MOVES; body: ${EVENTS:0:300}"
 check T0 "both moves are in the tenant's activity" yes "$MOVES"
 
+say "operators manage tenants on the Platform page (docs/prd/TEN §4.7)"
+optoken() { # an operator's token names no tenant
+  curl -s -d client_id=persona-test -d username=operator -d password=persona-pass-1 \
+    -d grant_type=password -d scope=openid "$KCURL/protocol/openid-connect/token" \
+    | json "print((d or {}).get('access_token',''))"
+}
+op() { # op <method> <path> [body]: as the operator, prints the body
+  local args=(-s -X "$1" -H "Authorization: Bearer $(optoken)")
+  if [ $# -ge 3 ]; then args+=(-H 'Content-Type: application/json' -d "$3"); fi
+  curl "${args[@]}" "$B$2"
+}
+opstatus() { # opstatus <method> <path> [body]: as the operator, prints the status
+  local args=(-s -o /dev/null -w '%{http_code}' -X "$1" -H "Authorization: Bearer $(optoken)")
+  if [ $# -ge 3 ]; then args+=(-H 'Content-Type: application/json' -d "$3"); fi
+  curl "${args[@]}" "$B$2"
+}
+tenant_id() { op GET /platform/tenants | json "print(next((t['id'] for t in d if t['alias']=='$1'), ''))"; }
+check P "an operator in no tenant lists every tenant" "default,globex" "$(op GET /platform/tenants | json "print(','.join(sorted(t['alias'] for t in d)))")"
+check P "and sees no workspace" NO_TENANT "$(op GET /namespaces | json "print(d.get('code'))")"
+check P "a tenant member who is not an operator is refused" 403 "$(status controller GET /platform/tenants)"
+INITECH='{"name":"Initech","alias":"initech","adminEmail":"bill@example.test","adminFirstName":"Bill","adminLastName":"Persona"}'
+check P "creating a tenant gives its first admin a temporary password" yes "$(op POST /platform/tenants "$INITECH" | json "print('yes' if d.get('temporaryPassword') and d['tenant']['admins'][0]['email']=='bill@example.test' else d)")"
+check P "an alias is never used twice" ALIAS_TAKEN "$(op POST /platform/tenants "$INITECH" | json "print(d.get('code'))")"
+INITECH_ID=$(tenant_id initech)
+BILL=$(op GET /platform/tenants | json "print(next(t['admins'][0]['id'] for t in d if t['alias']=='initech'))")
+check P "the last admin cannot be removed" 403 "$(opstatus DELETE "/platform/tenants/$INITECH_ID/admins/$BILL")"
+check P "a second admin is added by email" yes "$(op POST "/platform/tenants/$INITECH_ID/admins" '{"email":"milton@example.test","firstName":"Milton","lastName":"Persona"}' | json "print('yes' if d.get('temporaryPassword') else d)")"
+check P "then the first can go" 204 "$(opstatus DELETE "/platform/tenants/$INITECH_ID/admins/$BILL")"
+GLOBEX_ID=$(tenant_id globex)
+check P "suspending a tenant" suspended "$(op POST "/platform/tenants/$GLOBEX_ID/suspend" | json "print(d['status'])")"
+check P "refuses its people" TENANT_SUSPENDED "$(get outsider /namespaces globex | json "print(d.get('code'))")"
+op POST "/platform/tenants/$GLOBEX_ID/resume" >/dev/null
+check P "and resuming lets them back in" 200 "$(status outsider@globex GET /namespaces)"
+operator workspaces move --to-local fin-q3 >/dev/null
+check P "workspaces made without sign-in are offered for import" fin-q3 "$(op GET /platform/workspaces/local | json "print(','.join(w['slug'] for w in d))")"
+check P "and brought into a tenant" fin-q3 "$(op POST "/platform/tenants/$INITECH_ID/workspaces" '{"slugs":["fin-q3"]}' | json "print(','.join(d['moved']))")"
+check P "a tenant with workspaces is not deleted" TENANT_HAS_WORKSPACES "$(op DELETE "/platform/tenants/$INITECH_ID?confirm=initech" | json "print(d.get('code'))")"
+operator workspaces move --to-local fin-q3 >/dev/null
+check P "nor without its alias typed" 400 "$(opstatus DELETE "/platform/tenants/$INITECH_ID?confirm=initec")"
+check P "an empty tenant is deleted" 204 "$(opstatus DELETE "/platform/tenants/$INITECH_ID?confirm=initech")"
+check P "and stays listed as deleted, alias reserved" deleted "$(op GET /platform/tenants | json "print(next(t['status'] for t in d if t['alias']=='initech'))")"
+operator workspaces move --to-tenant default fin-q3 >/dev/null
+check P "every operator change is in the tenant's activity" yes "$(get admin /tenant/audit-events | json "a=set(e['action'] for e in d); print('yes' if 'workspace.moved_in' in a else sorted(a))")"
+check P "globex's activity has the suspension and the resume" "tenant.resumed,tenant.suspended" "$(kubectl -n "$NS" exec "deploy/$REL-classifyre-postgres" -- psql -U postgres -d classifyre -tAc "SELECT string_agg(action, ',' ORDER BY action) FROM iam_audit_events WHERE tenant_id = '$GLOBEX_ID' AND action LIKE 'tenant.%'" | tr -d '[:space:]')"
+
 say "sign-in turned off by mistake (docs/prd/TEN §6)"
 operator workspaces move --to-local sales-pipeline >/dev/null
 helm upgrade "$REL" "$ROOT/helm/classifyre" -n "$NS" --reuse-values --set iam.enabled=false >/dev/null

@@ -82,6 +82,7 @@ export { AIApi } from "./generated/src/apis/AIApi";
 export { WorkerQueuesApi } from "./generated/src/apis/WorkerQueuesApi";
 export { IdentityApi } from "./generated/src/apis/IdentityApi";
 export { AccessApi } from "./generated/src/apis/AccessApi";
+export { PlatformApi } from "./generated/src/apis/PlatformApi";
 // Notebook DTOs must be listed by name: this file re-exports selectively,
 // so a generated model that is not named here is not importable from the
 // package root however cleanly codegen produced it.
@@ -385,6 +386,16 @@ export type {
   RemovedPersonDto,
   CreateGroupDto,
   RenameGroupDto,
+  PlatformMeDto,
+  PlatformTenantDto,
+  TenantAdminDto,
+  CreateTenantDto,
+  CreatedTenantDto,
+  AddTenantAdminDto,
+  AddedTenantAdminDto,
+  LocalWorkspaceDto,
+  ImportWorkspacesDto,
+  ImportedWorkspacesDto,
   ExplorePositionDto,
   ExploreLinkStarterDto,
   ExploreAssetRefDto,
@@ -1350,6 +1361,7 @@ import { GlossaryApi } from "./generated/src/apis/GlossaryApi";
 import { WorkerQueuesApi } from "./generated/src/apis/WorkerQueuesApi";
 import { IdentityApi } from "./generated/src/apis/IdentityApi";
 import { AccessApi } from "./generated/src/apis/AccessApi";
+import { PlatformApi } from "./generated/src/apis/PlatformApi";
 
 // Determine the correct base URL
 // In browser: use relative path /api which is proxied by Next.js
@@ -1397,6 +1409,7 @@ const RESERVED_ROUTE_PREFIXES = new Set([
   "sitemap", // per-namespace child sitemaps (/sitemap/<ns>/<file>.xml)
   "iam", // identity server, on the same host (helm iam.path)
   "tenant", // the caller's tenant (API, not workspace-scoped)
+  "platform", // operators' tenants (API) and the /platform page
 ]);
 
 /**
@@ -2016,6 +2029,7 @@ class ApiClient {
   public maintenance: MaintenanceApi;
   public identity: IdentityApi;
   public access: AccessApi;
+  public platform: PlatformApi;
 
   constructor(baseUrl?: string) {
     this.config = createConfiguration(baseUrl);
@@ -2048,6 +2062,7 @@ class ApiClient {
     this.maintenance = new MaintenanceApi();
     this.identity = new IdentityApi(this.config);
     this.access = new AccessApi(this.config);
+    this.platform = new PlatformApi(this.config);
   }
 
   /**

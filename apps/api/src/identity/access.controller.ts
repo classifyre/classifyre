@@ -182,6 +182,7 @@ export class TenantAccessController {
       name: principal.tenant.name,
       capabilities: [...this.identity!.tenantCapabilities(principal)].sort(),
       peopleManagement: this.identity!.config.peopleManagement,
+      operator: await this.identity!.isOperator(principal.sub),
     };
   }
 

@@ -55,7 +55,9 @@ user() {
     id=$(fid users username "$name")
   fi
   "$KC" set-password -r "$R" --userid "$id" --new-password persona-pass-1 >/dev/null 2>&1
-  "$KC" create "organizations/$org/members" -r "$R" -b "\"$id\"" >/dev/null 2>&1 || true
+  if [ -n "$org" ]; then
+    "$KC" create "organizations/$org/members" -r "$R" -b "\"$id\"" >/dev/null 2>&1 || true
+  fi
   if [ -n "$grp" ]; then
     "$KC" update "organizations/$org/groups/$grp/members/$id" -r "$R" -b '{}' >/dev/null 2>&1
   fi
@@ -90,3 +92,7 @@ echo "U_CONTRACTOR=$(user contractor "$ACME" "" Contractor)"
 echo "U_MOVER=$(user mover "$ACME" "$FIN" Mover)"
 echo "U_LEAVER=$(user leaver "$ACME" "$FIN" Leaver)"
 echo "U_OUTSIDER=$(user outsider "$GLOBEX" "" Outsider)"
+# An operator in no tenant (docs/prd/TEN §4.7): manages tenants, sees no workspace.
+OPERATOR=$(user operator "" "" Operator)
+"$KC" add-roles -r "$R" --uusername operator --rolename classifyre-operator >/dev/null 2>&1
+echo "U_OPERATOR=$OPERATOR"

@@ -29,6 +29,7 @@ export { MaintenanceApi } from './MaintenanceApi';
 export { NamespacesApi } from './NamespacesApi';
 export { NotebooksApi } from './NotebooksApi';
 export { NotificationsApi } from './NotificationsApi';
+export { PlatformApi } from './PlatformApi';
 export { RunnersApi } from './RunnersApi';
 export { SemanticApi } from './SemanticApi';
 export { SitemapApi } from './SitemapApi';

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Building2, LogOut, UserRound } from "lucide-react";
+import { Building2, LogOut, Server, UserRound } from "lucide-react";
 import { api, type TenantDto, type TenantMembershipDto } from "@workspace/api-client";
 import { Button } from "@workspace/ui/components/button";
 import {
@@ -94,6 +94,14 @@ export function AccountMenu() {
             <a href="/tenant/">
               <Building2 className="size-4" />
               {t("account.tenantSettings")}
+            </a>
+          </DropdownMenuItem>
+        )}
+        {tenant?.operator && (
+          <DropdownMenuItem asChild>
+            <a href="/platform/">
+              <Server className="size-4" />
+              {t("account.platform")}
             </a>
           </DropdownMenuItem>
         )}

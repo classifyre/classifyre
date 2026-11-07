@@ -3,7 +3,8 @@ import { ID_COOKIE, iamWebConfig } from "@/lib/iam/session";
 
 /**
  * Shown to someone who signed in but belongs to no tenant (API code
- * NO_TENANT) or to several (CHOOSE_TENANT). Renewing their session changes
+ * NO_TENANT), to several (CHOOSE_TENANT) or to a suspended one
+ * (TENANT_SUSPENDED). Renewing their session changes
  * nothing, so instead of an error the page says what is wrong and who can fix
  * it. A plain page outside the app: the app itself would only meet the same
  * 401 again.
@@ -14,11 +15,15 @@ const TEXT = {
     noTenant:
       "You are signed in, but your account is not in any tenant (organization) of Classifyre yet, so there is nothing to show you.",
     noTenantFix:
-      "Ask a tenant admin to add you to their organization in the identity server: Organizations → their tenant → Members. Being in a group of the realm is not enough.",
+      "Ask a tenant admin to add you on their Tenant access page (People → Add person), or an operator to make you the admin of a tenant.",
     severalTitle: "Choose one tenant",
     several:
       "Your account is in several tenants. Classifyre works in one tenant at a time.",
     severalFix: "Sign in again and choose the tenant you want to work in.",
+    suspendedTitle: "Tenant suspended",
+    suspended:
+      "Your tenant is suspended, so nobody in it can work in Classifyre right now. Its data is kept.",
+    suspendedFix: "An operator can resume it; ask whoever runs this installation.",
     signedInAs: "Signed in as",
     retry: "Try again",
     signOut: "Sign out",
@@ -28,11 +33,15 @@ const TEXT = {
     noTenant:
       "Sie sind angemeldet, aber Ihr Konto gehört noch zu keinem Mandanten (keiner Organisation) von Classifyre, daher gibt es hier nichts zu sehen.",
     noTenantFix:
-      "Bitten Sie einen Mandanten-Admin, Sie im Identitätsserver zu seiner Organisation hinzuzufügen: Organizations → Mandant → Members. Eine Gruppe des Realms reicht nicht.",
+      "Bitten Sie einen Mandanten-Admin, Sie auf seiner Seite Mandantenzugriff hinzuzufügen (Personen → Person hinzufügen), oder einen Betreiber, Sie zum Admin eines Mandanten zu machen.",
     severalTitle: "Einen Mandanten wählen",
     several:
       "Ihr Konto gehört zu mehreren Mandanten. Classifyre arbeitet immer in einem.",
     severalFix: "Melden Sie sich erneut an und wählen Sie den Mandanten.",
+    suspendedTitle: "Mandant gesperrt",
+    suspended:
+      "Ihr Mandant ist gesperrt, daher kann derzeit niemand darin in Classifyre arbeiten. Seine Daten bleiben erhalten.",
+    suspendedFix: "Ein Betreiber kann ihn wieder freigeben; fragen Sie, wer diese Installation betreibt.",
     signedInAs: "Angemeldet als",
     retry: "Erneut versuchen",
     signOut: "Abmelden",
@@ -44,7 +53,13 @@ export function GET(request: NextRequest) {
   const t = request.headers.get("accept-language")?.toLowerCase().startsWith("de")
     ? TEXT.de
     : TEXT.en;
-  const several = request.nextUrl.searchParams.get("reason") === "CHOOSE_TENANT";
+  const reason = request.nextUrl.searchParams.get("reason");
+  const [title, text, fix] =
+    reason === "CHOOSE_TENANT"
+      ? [t.severalTitle, t.several, t.severalFix]
+      : reason === "TENANT_SUSPENDED"
+        ? [t.suspendedTitle, t.suspended, t.suspendedFix]
+        : [t.title, t.noTenant, t.noTenantFix];
   const who = signedInName(request.cookies.get(ID_COOKIE)?.value);
 
   const html = `<!doctype html>
@@ -52,7 +67,7 @@ export function GET(request: NextRequest) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escape(several ? t.severalTitle : t.title)} · Classifyre</title>
+<title>${escape(title)} · Classifyre</title>
 <style>
   :root { color-scheme: light dark; --bg: #f6f5f2; --fg: #1a1a1a; --muted: #5f5f5f; --line: #d8d6d0; --button: #1a1a1a; --button-fg: #fff; }
   @media (prefers-color-scheme: dark) { :root { --bg: #161616; --fg: #eeeeec; --muted: #a3a3a0; --line: #333; --button: #eeeeec; --button-fg: #161616; } }
@@ -68,9 +83,9 @@ export function GET(request: NextRequest) {
 </head>
 <body>
 <main>
-  <h1>${escape(several ? t.severalTitle : t.title)}</h1>
-  <p>${escape(several ? t.several : t.noTenant)}</p>
-  <p>${escape(several ? t.severalFix : t.noTenantFix)}</p>
+  <h1>${escape(title)}</h1>
+  <p>${escape(text)}</p>
+  <p>${escape(fix)}</p>
   ${who ? `<p class="muted">${escape(t.signedInAs)} ${escape(who)}</p>` : ""}
   <div class="actions">
     <a class="primary" href="/auth/login/?returnTo=%2F">${escape(t.retry)}</a>

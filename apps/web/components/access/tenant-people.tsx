@@ -469,7 +469,7 @@ function RemovePersonDialog({
 }
 
 /** A temporary password, shown once: Classifyre does not keep it. */
-function PasswordDialog({
+export function PasswordDialog({
   password,
   onClose,
 }: {
