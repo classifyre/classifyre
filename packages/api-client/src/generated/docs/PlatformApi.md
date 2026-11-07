@@ -6,7 +6,7 @@ All URIs are relative to *http://localhost*
 |------------- | ------------- | -------------|
 | [**platformControllerAddAdmin**](PlatformApi.md#platformcontrolleraddadmin) | **POST** /platform/tenants/{tenantId}/admins | Make someone a tenant admin, by email |
 | [**platformControllerCreate**](PlatformApi.md#platformcontrollercreate) | **POST** /platform/tenants | Create a tenant with its first admin |
-| [**platformControllerImportWorkspaces**](PlatformApi.md#platformcontrollerimportworkspaces) | **POST** /platform/tenants/{tenantId}/workspaces | Bring workspaces made without sign-in into a tenant |
+| [**platformControllerImportWorkspaces**](PlatformApi.md#platformcontrollerimportworkspaces) | **POST** /platform/tenants/{tenantId}/workspaces | Copy workspaces made without sign-in into a tenant |
 | [**platformControllerLocalWorkspaces**](PlatformApi.md#platformcontrollerlocalworkspaces) | **GET** /platform/workspaces/local | Workspaces made without sign-in, which can be brought into a tenant |
 | [**platformControllerMe**](PlatformApi.md#platformcontrollerme) | **GET** /platform/me | Whether the caller is an operator (403 when not) |
 | [**platformControllerRemove**](PlatformApi.md#platformcontrollerremove) | **DELETE** /platform/tenants/{tenantId} | Delete a tenant that has no workspaces left |
@@ -158,7 +158,7 @@ No authorization required
 
 > ImportedWorkspacesDto platformControllerImportWorkspaces(tenantId, importWorkspacesDto)
 
-Bring workspaces made without sign-in into a tenant
+Copy workspaces made without sign-in into a tenant
 
 ### Example
 

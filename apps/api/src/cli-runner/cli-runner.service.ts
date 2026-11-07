@@ -27,6 +27,7 @@ import {
 import { AUTO_SCHEDULE_QUEUE } from '../scheduler/auto-schedule.constants';
 import { ClsService } from 'nestjs-cls';
 import { NamespaceRegistryService } from '../registry/namespace-registry.service';
+import { workspaceDatabaseUrl } from '../tenant-databases';
 import { NamespacePauseService } from '../namespace/namespace-pause.service';
 import { CohortWeightsService } from '../cohort/cohort-weights.service';
 import {
@@ -280,7 +281,9 @@ export class CliRunnerService {
     const schema = this.cls?.get<string>(CLS_SCHEMA);
     if (!schema || !process.env.DATABASE_URL) return undefined;
     try {
-      const url = new URL(process.env.DATABASE_URL);
+      // With sign-in, the tenant's database as the tenant's own role, which
+      // can open no other tenant's database (docs/prd/TEN R7).
+      const url = new URL(workspaceDatabaseUrl(schema));
       url.searchParams.set('schema', schema);
       return url.toString();
     } catch {

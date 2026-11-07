@@ -7,6 +7,7 @@ import {
 } from '../registry/namespace-registry.sql';
 import type { RoleKey } from './roles';
 import { LOCAL_TENANT_ID } from './tenancy.sql';
+import { dropTenantDatabase } from '../tenant-databases';
 
 export type TenantStatus = 'active' | 'suspended' | 'deleted';
 
@@ -48,6 +49,10 @@ export interface TenantSummary extends Tenant {
   createdAt: Date;
   workspaces: number;
   lastActivityAt: Date | null;
+  /** Its own database, once its first workspace made it (docs/prd/TEN §4.5). */
+  databaseName: string | null;
+  /** Why its last upgrade failed; its workspaces answer 503 until it works. */
+  upgradeError: string | null;
 }
 
 export type GrantScopeType = 'tenant' | 'group' | 'workspace';
@@ -126,9 +131,13 @@ export class TenancyService implements OnModuleDestroy {
         created_at: Date;
         workspaces: number;
         last_activity_at: Date | null;
+        database_name: string | null;
+        database_ready_at: Date | null;
+        migration_error: string | null;
       }
     >(
       `SELECT t.id, t.alias, t.name, t.org_id, t.suspended_at, t.deleted_at, t.created_at,
+              t.database_name, t.database_ready_at, t.migration_error,
               (SELECT count(*)::int FROM namespaces n
                 WHERE n.tenant_id = t.id AND n.status <> 'deleted') AS workspaces,
               (SELECT max(e.occurred_at) FROM iam_audit_events e
@@ -143,6 +152,8 @@ export class TenancyService implements OnModuleDestroy {
       createdAt: row.created_at,
       workspaces: row.workspaces,
       lastActivityAt: row.last_activity_at,
+      databaseName: row.database_ready_at ? row.database_name : null,
+      upgradeError: row.migration_error,
     }));
   }
 
@@ -194,6 +205,22 @@ export class TenancyService implements OnModuleDestroy {
       client.release();
       this.tenantsByAlias.clear();
     }
+  }
+
+  /**
+   * Drops a deleted tenant's database once no workspace of it is left, also
+   * no soft-deleted one; the purge of the last one calls this too.
+   */
+  async dropDatabaseIfUnused(tenantId: string): Promise<boolean> {
+    const { rowCount } = await this.pool.query(
+      `SELECT 1 FROM iam_tenants t
+        WHERE t.id = $1 AND t.deleted_at IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM namespaces n WHERE n.tenant_id = t.id)`,
+      [tenantId],
+    );
+    if (!rowCount) return false;
+    await dropTenantDatabase(this.pool, tenantId);
+    return true;
   }
 
   /** Removes a tenant row that never got anything: a creation rolled back. */

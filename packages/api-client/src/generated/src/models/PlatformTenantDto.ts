@@ -82,7 +82,19 @@ export interface PlatformTenantDto {
      */
     lastActivityAt: Date | null;
     /**
-     * Why the tenant needs an operator: its organization was deleted or replaced in the identity server, or it has no top-level `admins` group.
+     * The tenant's own database; null until its first workspace.
+     * @type {string}
+     * @memberof PlatformTenantDto
+     */
+    database: string | null;
+    /**
+     * Why its last upgrade failed; its workspaces answer 503.
+     * @type {string}
+     * @memberof PlatformTenantDto
+     */
+    upgradeError: string | null;
+    /**
+     * Why the tenant needs an operator: its organization was deleted or replaced in the identity server, it has no top-level `admins` group, or its database could not be upgraded.
      * @type {string}
      * @memberof PlatformTenantDto
      */
@@ -106,7 +118,8 @@ export type PlatformTenantDtoStatusEnum = typeof PlatformTenantDtoStatusEnum[key
 export const PlatformTenantDtoProblemEnum = {
     OrganizationMissing: 'ORGANIZATION_MISSING',
     OrganizationReplaced: 'ORGANIZATION_REPLACED',
-    NoAdminsGroup: 'NO_ADMINS_GROUP'
+    NoAdminsGroup: 'NO_ADMINS_GROUP',
+    UpgradeFailed: 'UPGRADE_FAILED'
 } as const;
 export type PlatformTenantDtoProblemEnum = typeof PlatformTenantDtoProblemEnum[keyof typeof PlatformTenantDtoProblemEnum];
 
@@ -124,6 +137,8 @@ export function instanceOfPlatformTenantDto(value: object): value is PlatformTen
     if (!('members' in value) || value['members'] === undefined) return false;
     if (!('admins' in value) || value['admins'] === undefined) return false;
     if (!('lastActivityAt' in value) || value['lastActivityAt'] === undefined) return false;
+    if (!('database' in value) || value['database'] === undefined) return false;
+    if (!('upgradeError' in value) || value['upgradeError'] === undefined) return false;
     if (!('problem' in value) || value['problem'] === undefined) return false;
     return true;
 }
@@ -147,6 +162,8 @@ export function PlatformTenantDtoFromJSONTyped(json: any, ignoreDiscriminator: b
         'members': json['members'],
         'admins': ((json['admins'] as Array<any>).map(TenantAdminDtoFromJSON)),
         'lastActivityAt': (json['lastActivityAt'] == null ? null : new Date(json['lastActivityAt'])),
+        'database': json['database'],
+        'upgradeError': json['upgradeError'],
         'problem': json['problem'],
     };
 }
@@ -171,6 +188,8 @@ export function PlatformTenantDtoToJSONTyped(value?: PlatformTenantDto | null, i
         'members': value['members'],
         'admins': ((value['admins'] as Array<any>).map(TenantAdminDtoToJSON)),
         'lastActivityAt': value['lastActivityAt'] == null ? value['lastActivityAt'] : value['lastActivityAt'].toISOString(),
+        'database': value['database'],
+        'upgradeError': value['upgradeError'],
         'problem': value['problem'],
     };
 }

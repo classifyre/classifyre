@@ -48,6 +48,12 @@ export function assertIamAllowed(env: NodeJS.ProcessEnv = process.env): void {
       'IAM_ENABLED=true needs CLASSIFYRE_INTERNAL_KEY to be set, so internal-only routes stay closed to signed-in people.',
     );
   }
+  // Each tenant's database has its own role, whose password comes from it.
+  if (iamEnabled(env) && !env.CLASSIFYRE_TENANT_DATABASE_KEY?.trim()) {
+    throw new Error(
+      'IAM_ENABLED=true needs CLASSIFYRE_TENANT_DATABASE_KEY to be set: each tenant has its own database, logged in with a password made from it.',
+    );
+  }
 }
 
 /** Null without sign-in. Throws when sign-in is on but incompletely configured. */

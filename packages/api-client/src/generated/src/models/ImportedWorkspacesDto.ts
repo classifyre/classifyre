@@ -20,18 +20,18 @@ import { mapValues } from '../runtime';
  */
 export interface ImportedWorkspacesDto {
     /**
-     * 
+     * Copied into the tenant; the open database keeps them.
      * @type {Array<string>}
      * @memberof ImportedWorkspacesDto
      */
-    moved: Array<string>;
+    copied: Array<string>;
 }
 
 /**
  * Check if a given object implements the ImportedWorkspacesDto interface.
  */
 export function instanceOfImportedWorkspacesDto(value: object): value is ImportedWorkspacesDto {
-    if (!('moved' in value) || value['moved'] === undefined) return false;
+    if (!('copied' in value) || value['copied'] === undefined) return false;
     return true;
 }
 
@@ -45,7 +45,7 @@ export function ImportedWorkspacesDtoFromJSONTyped(json: any, ignoreDiscriminato
     }
     return {
         
-        'moved': json['moved'],
+        'copied': json['copied'],
     };
 }
 
@@ -60,7 +60,7 @@ export function ImportedWorkspacesDtoToJSONTyped(value?: ImportedWorkspacesDto |
 
     return {
         
-        'moved': value['moved'],
+        'copied': value['copied'],
     };
 }
 

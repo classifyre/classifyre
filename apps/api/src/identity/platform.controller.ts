@@ -199,7 +199,7 @@ export class PlatformController {
   @HttpCode(200)
   @Requires('platform.tenants.manage')
   @ApiOperation({
-    summary: 'Bring workspaces made without sign-in into a tenant',
+    summary: 'Copy workspaces made without sign-in into a tenant',
   })
   @ApiOkResponse({ type: ImportedWorkspacesDto })
   async importWorkspaces(

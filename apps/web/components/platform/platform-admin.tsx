@@ -262,7 +262,19 @@ function TenantRow({
           {tenant.lastActivityAt
             ? t("platform.lastActivity", { when: formatRelative(tenant.lastActivityAt) })
             : t("platform.created", { when: formatRelative(tenant.createdAt) })}
+          {tenant.database && (
+            <>
+              {" · "}
+              {t("platform.database")}{" "}
+              <span className="font-mono">{tenant.database}</span>
+            </>
+          )}
         </p>
+        {tenant.upgradeError && (
+          <p className="text-xs text-destructive break-words">
+            {t("platform.upgradeError", { error: tenant.upgradeError })}
+          </p>
+        )}
       </div>
       {healthy && (
         <DropdownMenu>
@@ -617,11 +629,11 @@ function ImportDialog({
     if (!tenant) return;
     setBusy(true);
     try {
-      const { moved } = await api.platform.platformControllerImportWorkspaces({
+      const { copied } = await api.platform.platformControllerImportWorkspaces({
         tenantId: tenant.id,
         importWorkspacesDto: { slugs: [...chosen] },
       });
-      toast.success(t("platform.imported", { count: moved.length, name: tenant.name }));
+      toast.success(t("platform.imported", { count: copied.length, name: tenant.name }));
       onClose();
       await onImported();
     } catch (error) {

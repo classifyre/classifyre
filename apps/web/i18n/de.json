@@ -7403,8 +7403,11 @@
     "problem": {
       "ORGANIZATION_MISSING": "Organisation gelöscht",
       "ORGANIZATION_REPLACED": "Organisation ersetzt",
-      "NO_ADMINS_GROUP": "keine Admin-Gruppe"
+      "NO_ADMINS_GROUP": "keine Admin-Gruppe",
+      "UPGRADE_FAILED": "Aktualisierung fehlgeschlagen"
     },
+    "database": "Datenbank",
+    "upgradeError": "Seine Arbeitsbereiche sind nicht verfügbar, bis der nächste Start seine Datenbank aktualisiert: {{error}}",
     "admins": "Admins",
     "adminsTitle": "Admins von {{name}}",
     "adminsDescription": "Mandanten-Admins verwalten Personen, Gruppen und Zugriff des Mandanten. Ein Mandant behält immer mindestens einen.",
@@ -7415,9 +7418,9 @@
     "adminRemoved": "{{name}} ist kein Admin mehr",
     "import": "Arbeitsbereiche hereinholen",
     "importTitle": "Arbeitsbereiche in {{name}} holen",
-    "importDescription": "Diese Arbeitsbereiche wurden ohne Anmeldung angelegt. Im Mandanten behalten sie alle Daten, gehören seiner Admin-Gruppe und sind ohne Anmeldung nicht mehr erreichbar.",
+    "importDescription": "Diese Arbeitsbereiche wurden ohne Anmeldung angelegt. Sie werden mit allen Daten in die Datenbank des Mandanten kopiert und gehören seiner Admin-Gruppe. Die Originale bleiben, wo sie sind, für die Arbeit ohne Anmeldung.",
     "importConfirm": "{{count}} hereinholen",
-    "imported": "In {{name}} verschobene Arbeitsbereiche: {{count}}",
+    "imported": "In {{name}} kopierte Arbeitsbereiche: {{count}}",
     "suspend": "Sperren",
     "suspendTitle": "{{name}} sperren?",
     "suspendDescription": "Niemand im Mandanten kann in Classifyre arbeiten, bis er wieder freigegeben ist, und ihre Agenten stoppen ebenfalls. Seine Daten bleiben erhalten, geplante Scans laufen weiter.",

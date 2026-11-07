@@ -39,7 +39,7 @@ describe('PlatformService', () => {
   let orgs: { id: string; alias: string; name: string }[];
   let groups: Record<string, OrgGroup[]>;
   let members: Record<string, string[]>;
-  let tenants: (Tenant & { workspaces: number })[];
+  let tenants: (Tenant & { workspaces: number; upgradeError?: string })[];
   let created: Set<string>;
   let events: string[];
   let adminGrants: string[];
@@ -118,6 +118,8 @@ describe('PlatformService', () => {
         ...tenant,
         createdAt: new Date(0),
         lastActivityAt: null,
+        databaseName: null,
+        upgradeError: tenant.upgradeError ?? null,
       }));
     const tenancy = {
       tenantSummaries: () => Promise.resolve(summaries()),
@@ -159,6 +161,7 @@ describe('PlatformService', () => {
         );
         return Promise.resolve([...created]);
       },
+      dropDatabaseIfUnused: () => Promise.resolve(true),
       recordTenantEvent: (_t: string, _a: string, action: string) => {
         events.push(action);
         return Promise.resolve();
@@ -283,5 +286,14 @@ describe('PlatformService', () => {
       ['globex', 'NO_ADMINS_GROUP'],
       ['initech', 'NO_ADMINS_GROUP'],
     ]);
+  });
+
+  it('shows a tenant whose database could not be upgraded', async () => {
+    tenants[0] = { ...tenants[0], upgradeError: 'relation "x" does not exist' };
+    const [globex] = await service().tenants();
+    expect(globex).toMatchObject({
+      problem: 'UPGRADE_FAILED',
+      upgradeError: 'relation "x" does not exist',
+    });
   });
 });

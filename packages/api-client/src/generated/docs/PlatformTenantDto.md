@@ -15,6 +15,8 @@ Name | Type
 `members` | number
 `admins` | [Array&lt;TenantAdminDto&gt;](TenantAdminDto.md)
 `lastActivityAt` | Date
+`database` | string
+`upgradeError` | string
 `problem` | string
 
 ## Example
@@ -33,6 +35,8 @@ const example = {
   "members": null,
   "admins": null,
   "lastActivityAt": null,
+  "database": null,
+  "upgradeError": null,
   "problem": null,
 } satisfies PlatformTenantDto
 

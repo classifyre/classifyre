@@ -27,15 +27,24 @@ spec:
     {{- with .Values.postgres.cnpg.storage.storageClassName }}
     storageClass: {{ . | quote }}
     {{- end }}
-  {{- if and .Values.iam.enabled (eq .Values.iam.database.mode "shared") }}
-  # The identity server's own role; its database is the Database below.
+  {{- if .Values.iam.enabled }}
   managed:
     roles:
+      {{- if eq .Values.iam.database.mode "shared" }}
+      # The identity server's own role; its database is the Database below.
       - name: {{ .Values.iam.database.username | quote }}
         ensure: present
         login: true
         passwordSecret:
           name: {{ include "classifyre.iam.dbSecretName" . }}
+      {{- end }}
+      # With sign-in the API makes the control database and one database and
+      # role per tenant (docs/prd/TEN §4.5). Its password stays CloudNativePG's.
+      - name: {{ .Values.postgres.cnpg.user | quote }}
+        ensure: present
+        login: true
+        createdb: true
+        createrole: true
   {{- end }}
   bootstrap:
     initdb:
@@ -43,6 +52,12 @@ spec:
       owner: {{ .Values.postgres.cnpg.user | quote }}
       secret:
         name: {{ include "classifyre.databaseSecretName" . }}
+      {{- if .Values.iam.enabled }}
+      # Tenant databases are made from template1 and the API cannot create
+      # extensions here (no superuser), so they inherit it.
+      postInitTemplateSQL:
+        - CREATE EXTENSION IF NOT EXISTS vector
+      {{- end }}
       postInitApplicationSQL:
         - CREATE EXTENSION IF NOT EXISTS vector
         {{- if has "pg_stat_statements" .Values.postgres.cnpg.postgresql.sharedPreloadLibraries }}

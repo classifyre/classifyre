@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import type { DatabaseLane } from '../namespace/namespace.constants';
 import { serviceRole } from '../service-role';
+import { workspaceDatabaseUrl } from '../tenant-databases';
 
 interface NamespaceClients {
   interactive?: PrismaClient;
@@ -118,7 +119,9 @@ export class PrismaClientManager implements OnModuleDestroy {
       return existing;
     }
 
-    const rawUrl = new URL(process.env.DATABASE_URL ?? '');
+    // The open database without sign-in, the workspace's tenant database
+    // with it (docs/prd/TEN §4.3). Schema names are unique across databases.
+    const rawUrl = new URL(workspaceDatabaseUrl(schema));
     rawUrl.searchParams.delete('schema');
     // Pass config (not a Pool instance) so PrismaPg builds its own pool with its
     // bundled pg version — a foreign Pool fails PrismaPg's silent instanceof

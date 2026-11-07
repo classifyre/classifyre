@@ -6,7 +6,7 @@
 
 Name | Type
 ------------ | -------------
-`moved` | Array&lt;string&gt;
+`copied` | Array&lt;string&gt;
 
 ## Example
 
@@ -15,7 +15,7 @@ import type { ImportedWorkspacesDto } from '@workspace/api-client'
 
 // TODO: Update the object below with actual values
 const example = {
-  "moved": null,
+  "copied": null,
 } satisfies ImportedWorkspacesDto
 
 console.log(example)
