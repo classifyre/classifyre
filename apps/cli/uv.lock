@@ -1157,7 +1157,7 @@ requires-dist = [
     { name = "beautifulsoup4", specifier = ">=4.12.0" },
     { name = "classifyre-schemas", editable = "../../packages/schemas" },
     { name = "email-validator", specifier = ">=2.3.0" },
-    { name = "en-core-web-sm", url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl" },
+    { name = "en-core-web-sm", url = "https://huggingface.co/classifyre/en_core_web_sm/resolve/36818c1a75b5bac93b4f0df26b76da8d1149ce8c/en_core_web_sm-3.8.0-py3-none-any.whl" },
     { name = "jsonschema", specifier = ">=4.26.0" },
     { name = "lxml", specifier = ">=6.1.1" },
     { name = "pydantic", specifier = ">=2.13.4" },
@@ -2050,9 +2050,9 @@ wheels = [
 [[package]]
 name = "en-core-web-sm"
 version = "3.8.0"
-source = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl" }
+source = { url = "https://huggingface.co/classifyre/en_core_web_sm/resolve/36818c1a75b5bac93b4f0df26b76da8d1149ce8c/en_core_web_sm-3.8.0-py3-none-any.whl" }
 wheels = [
-    { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl", hash = "sha256:1932429db727d4bff3deed6b34cfc05df17794f4a52eeb26cf8928f7c1a0fb85" },
+    { url = "https://huggingface.co/classifyre/en_core_web_sm/resolve/36818c1a75b5bac93b4f0df26b76da8d1149ce8c/en_core_web_sm-3.8.0-py3-none-any.whl", hash = "sha256:1932429db727d4bff3deed6b34cfc05df17794f4a52eeb26cf8928f7c1a0fb85" },
 ]
 
 [[package]]
