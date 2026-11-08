@@ -33,10 +33,23 @@ set -euo pipefail
 K=/opt/keycloak/bin/kcadm.sh
 R=classifyre
 $K config credentials --server http://localhost:8080/iam --realm master --user admin --password "$ADMIN_PW" >/dev/null
-ORG=$($K get organizations -r $R --fields id,alias --format csv --noquotes | { grep ",$TENANT\$" || true; } | cut -d, -f1)
-[ -n "$ORG" ] || { echo "no organization '$TENANT' in realm $R" >&2; exit 1; }
+# The realm setup job runs next to the release and Helm does not wait for it:
+# wait for the realm and its first organization.
+ORG=""
+for _ in $(seq 1 60); do
+  ORG=$({ $K get organizations -r $R --fields id,alias --format csv --noquotes 2>/dev/null || true; } \
+    | { grep ",$TENANT\$" || true; } | cut -d, -f1)
+  [ -z "$ORG" ] || break
+  sleep 10
+done
+[ -n "$ORG" ] || { echo "no organization '$TENANT' in realm $R after 10 minutes" >&2; exit 1; }
 group_id() { $K get "organizations/$ORG/groups" -r $R --fields id,name --format csv --noquotes | { grep ",$1\$" || true; } | cut -d, -f1 | head -1; }
-ADMINS=$(group_id admins)
+ADMINS=""
+for _ in $(seq 1 30); do
+  ADMINS=$(group_id admins)
+  [ -z "$ADMINS" ] || break
+  sleep 10
+done
 [ -n "$ADMINS" ] || { echo "organization '$TENANT' has no admins group" >&2; exit 1; }
 VIEWERS=$(group_id smoke-viewers)
 [ -n "$VIEWERS" ] || VIEWERS=$($K create "organizations/$ORG/groups" -r $R -s name=smoke-viewers -i)

@@ -225,6 +225,24 @@ jobs:
         env:
           SMOKE_URL: https://staging.classifyre.com
 
+      # The API gives the first tenant's `admins` group Tenant admin once the
+      # realm setup job has made it; the smoke admin needs that to create a
+      # workspace.
+      - name: Wait for the sign-in tenants
+        if: steps.env.outputs.smoke == 'true'
+        env:
+          HELM_RELEASE_NAME: ${{ steps.env.outputs.release_name }}
+        run: |
+          set -euo pipefail
+          for _ in $(seq 1 60); do
+            if kubectl -n "${HELM_NAMESPACE}" logs deploy/"${HELM_RELEASE_NAME}-api" --tail=-1 2>/dev/null \
+              | grep -q "Sign-in tenants are set up"; then
+              echo "Sign-in tenants are set up"; exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::The API never set up the sign-in tenants"; exit 1
+
       - name: Seed the smoke run
         if: steps.env.outputs.smoke == 'true'
         env:
