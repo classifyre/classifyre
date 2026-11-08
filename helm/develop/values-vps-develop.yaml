@@ -48,6 +48,19 @@ api:
     # `helm --wait` from ever finishing on a fresh install.
     uvCache:
       enabled: false
+    # The smoke scan reads one small file with the secrets detector. The chart's
+    # 4Gi request (sized for real corpora and ML detectors) does not fit next
+    # to a prod scan on the shared node; the request is what the scheduler
+    # counts, so keep it small and leave the limit some room.
+    resources:
+      requests:
+        cpu: 250m
+        memory: 1Gi
+        ephemeral-storage: 2Gi
+      limits:
+        cpu: "1"
+        memory: 2Gi
+        ephemeral-storage: 6Gi
 
 
 frontend:

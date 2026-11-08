@@ -95,6 +95,8 @@ test("gives a group a role from the form", async ({ mount, page }) => {
   const calls = await mockAccess(page, ["workspace.view", "access.view", "access.manage"]);
   const card = await mount(<WorkspaceAccessCard />);
 
+  // The groups arrive with the grants: open the picker only once they are in.
+  await expect(card.getByText("/legal")).toBeVisible();
   await card.getByRole("combobox").first().click();
   await page.getByRole("option", { name: "/sales" }).click();
   await card.getByRole("button", { name: "Give access" }).click();
