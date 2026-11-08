@@ -8,7 +8,8 @@
  * (at least `workspace-admin`, which a spec checks), then declare it on the
  * routes (`@Requires` / `@AccessArea`) and MCP tools (`mcp-tool-capabilities.ts`).
  */
-export type CapabilityScope = 'workspace' | 'tenant' | 'platform';
+/** `public`: held only by visitors of the public tenant, never granted. */
+export type CapabilityScope = 'workspace' | 'tenant' | 'platform' | 'public';
 
 export interface CapabilityDefinition {
   id: string;

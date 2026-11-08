@@ -181,7 +181,10 @@ export class TenantAccessController {
       alias: principal.tenant.alias,
       name: principal.tenant.name,
       capabilities: [...this.identity!.tenantCapabilities(principal)].sort(),
-      operator: await this.identity!.isOperator(principal.sub),
+      operator: principal.visitor
+        ? false
+        : await this.identity!.isOperator(principal.sub),
+      visitor: principal.visitor ?? false,
     };
   }
 

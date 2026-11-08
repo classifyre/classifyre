@@ -74,7 +74,7 @@ export class AccessManagementService {
 
   roles() {
     return BUILT_IN_ROLES.filter(
-      (role) => role.key !== 'platform-operator',
+      (role) => role.scope === 'workspace' || role.scope === 'tenant',
     ).map((role) => ({
       key: role.key,
       title: role.title,
@@ -91,6 +91,7 @@ export class AccessManagementService {
   /** Every tenant the principal belongs to, for the account menu's switcher (§12.2). */
   async tenants(principal: Principal): Promise<Tenant[]> {
     const identity = this.requireSignIn();
+    if (principal.visitor) return [];
     const { organizations } = await identity.membership.membership(
       principal.sub,
     );

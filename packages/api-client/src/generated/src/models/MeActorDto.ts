@@ -53,7 +53,8 @@ export const MeActorDtoKindEnum = {
     Person: 'person',
     Agent: 'agent',
     Integration: 'integration',
-    System: 'system'
+    System: 'system',
+    Visitor: 'visitor'
 } as const;
 export type MeActorDtoKindEnum = typeof MeActorDtoKindEnum[keyof typeof MeActorDtoKindEnum];
 

@@ -1,3 +1,4 @@
+import type { ActorKind } from './actor';
 import { ApiProperty } from '@nestjs/swagger';
 import { CAPABILITY_IDS } from './capabilities';
 
@@ -12,8 +13,10 @@ export class MeActorDto {
   @ApiProperty({ type: String, nullable: true, example: 'Jordan Reyes' })
   displayName: string | null;
 
-  @ApiProperty({ enum: ['person', 'agent', 'integration', 'system'] })
-  kind: 'person' | 'agent' | 'integration' | 'system';
+  @ApiProperty({
+    enum: ['person', 'agent', 'integration', 'system', 'visitor'],
+  })
+  kind: ActorKind;
 
   @ApiProperty({
     enum: ['header', 'oidc', 'mcp-token', 'internal-key', 'autopilot', 'none'],

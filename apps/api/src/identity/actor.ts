@@ -4,7 +4,13 @@ import { isTypedActorRef, mcpTokenRef, systemRef } from './actor-ref';
 export const ACTOR_NAME_HEADER = 'x-actor-name';
 const MAX_ACTOR_CHARS = 64;
 
-export type ActorKind = 'person' | 'agent' | 'integration' | 'system';
+/** `visitor`: someone browsing the public tenant without signing in. */
+export type ActorKind =
+  | 'person'
+  | 'agent'
+  | 'integration'
+  | 'system'
+  | 'visitor';
 export type ActorVia =
   | 'header'
   | 'oidc'

@@ -122,6 +122,12 @@ export class TenantDto {
     description: 'The caller is also an operator: the Platform page is theirs.',
   })
   operator: boolean;
+
+  @ApiProperty({
+    description:
+      'The caller has not signed in and is browsing the public tenant, read-only.',
+  })
+  visitor: boolean;
 }
 
 /** One tenant the caller belongs to, for the account menu (§12.2). */

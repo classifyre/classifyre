@@ -16,6 +16,11 @@ export interface IamConfig {
   apiClientSecret: string;
   /** Alias of the tenant existing workspaces move to when sign-in is turned on. */
   bootstrapTenantAlias: string;
+  /**
+   * Alias of the public tenant: people who have not signed in read its
+   * workspaces (docs/prd/IAM step 8e). Null: everyone must sign in.
+   */
+  publicTenantAlias: string | null;
   /** Origin of the Classifyre app; cookie-signed writes must come from it. */
   appOrigin: string | null;
 }
@@ -72,6 +77,7 @@ export function readIamConfig(
     apiClientId: required('IAM_API_CLIENT_ID'),
     apiClientSecret: required('IAM_API_CLIENT_SECRET'),
     bootstrapTenantAlias: bootstrapTenant(env),
+    publicTenantAlias: publicTenant(env),
     appOrigin: originOf(env.IAM_APP_URL),
   };
 }
@@ -83,6 +89,17 @@ function originOf(url: string | undefined): string | null {
   } catch {
     return null;
   }
+}
+
+function publicTenant(env: NodeJS.ProcessEnv): string | null {
+  const alias = env.IAM_PUBLIC_TENANT?.trim();
+  if (!alias) return null;
+  if (alias === 'local') {
+    throw new Error(
+      "IAM_PUBLIC_TENANT cannot be 'local': that name is kept for workspaces made without sign-in.",
+    );
+  }
+  return alias;
 }
 
 /** `local` is the reserved tenant of workspaces made without sign-in. */

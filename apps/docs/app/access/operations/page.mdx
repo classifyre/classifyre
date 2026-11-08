@@ -149,6 +149,57 @@ those in the console), and when its database could not be upgraded (see
 [Backups and upgrades](#backups-and-upgrades)). It also shows each tenant's
 database, once its first workspace made one.
 
+
+---
+
+## The public tenant
+
+To let people browse one tenant without signing in, as on a public showcase,
+turn on a public tenant:
+
+```yaml
+iam:
+  public:
+    enabled: true
+    tenant: public # its alias; can be the first tenant, iam.bootstrap.tenant.alias
+    name: Public # display name when the setup job creates it
+```
+
+- The realm setup job creates its organization with an empty top-level
+  `admins` group when it does not exist. Add its editors to that group in the
+  console; the group gets Tenant admin the first time one of them signs in,
+  as in every tenant. When the public tenant is the first tenant, the first
+  admin edits it from the start.
+- Visitors hold the **Visitor** role on that tenant and nothing else: the read
+  capabilities of a Viewer without `access.view` (who has access) and without
+  MCP tokens, and no tenant capabilities. It is never offered when giving
+  access and cannot be granted.
+- A request with no credentials at all is a visitor. A request with a bad or
+  expired sign-in still answers _sign in again_, so a session is renewed, never
+  quietly dropped to a visitor.
+- Signed-in people work in their own tenant only, as without a public tenant.
+- **Suspend** the public tenant on the [Platform page](#the-platform-page) to
+  close it at once: visitors are sent to sign in again until it is resumed.
+- `frontend.sitemap.enabled` is allowed with sign-in only together with a
+  public tenant, and the sitemap then lists only its workspaces.
+- **Demo mode** (`api.env.DEMO_MODE: "true"`) still makes everything read-only
+  for everyone without the bypass key, editors included. Use it for a public
+  showcase whose content operators load with the bypass key; leave it off when
+  the public tenant's editors work in the app.
+
+To publish workspaces that were made without sign-in, copy them into the
+public tenant once (see [Turning sign-in on for an existing
+install](#turning-sign-in-on-for-an-existing-install)):
+
+```bash
+kubectl -n classifyre exec deploy/classifyre-api -- \
+  node dist/src/admin.js workspaces copy --to-tenant public --all
+```
+
+The all-in-one Docker image has no sign-in and no identity server, on
+purpose: everyone who reaches it uses every workspace, as if everything were
+public.
+
 ---
 
 ## Where the data is

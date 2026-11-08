@@ -20,12 +20,26 @@ names in timelines are whatever people type in.
 When it is on, people sign in, and what they can see and change depends on the
 groups they belong to.
 
-- **Kubernetes (Helm chart):** the chart installs the identity server and is
-  on by default; Classifyre starts asking people to sign in in a later
-  release. See [Kubernetes → Sign-in](/deployment/kubernetes/#sign-in) for
-  setting it up or turning it off.
+- **Kubernetes (Helm chart):** the chart installs the identity server and
+  turns sign-in on by default. See
+  [Kubernetes → Sign-in](/deployment/kubernetes/#sign-in) for setting it up or
+  turning it off.
 - **Docker (all-in-one image):** access management is never used. The image is
   meant for one person or a small trusted team on one machine.
+
+Who can open an installation depends on two switches of the chart, sign-in
+(`iam.enabled`) and a public tenant (`iam.public.enabled`):
+
+| Installation                                 | Without signing in                                   | Signed in                     |
+| -------------------------------------------- | ---------------------------------------------------- | ----------------------------- |
+| Docker all-in-one image                      | Everyone uses every workspace (there is no sign-in)  | –                             |
+| Helm, sign-in on (the default)               | Nothing: everyone is sent to sign in                 | Their own tenant's workspaces |
+| Helm, sign-in on, public tenant on           | One tenant's workspaces, read-only: [the public tenant](#the-public-tenant) | Their own tenant's workspaces |
+| Helm, sign-in off                            | Everyone uses every workspace, like the Docker image | –                             |
+
+**Demo mode** (`DEMO_MODE`) is a separate switch on top of any of these: it
+makes the whole installation read-only for everyone without the operator's
+bypass key, signed in or not.
 
 ---
 
@@ -45,6 +59,28 @@ Your name and tenant are in the account menu in the top-right corner, with
 **Sign out**. Sessions renew themselves while you work; after a long break you
 are asked to sign in again. Classifyre never shows your sign-in tokens to the
 page itself: they live in cookies only the server can read.
+
+
+### The public tenant
+
+An installation can make one tenant public (`iam.public.enabled`). Then
+opening Classifyre without signing in shows that tenant's workspaces instead of
+the sign-in page, with **Sign in** in the top-right corner:
+
+- Visitors **read**: workspaces, sources and their scans, assets, findings,
+  detectors, cases, inquiries, the glossary and entities. They cannot change
+  anything, see who has access, read the tenant's activity, or create MCP
+  tokens. Names in a workspace's timelines are shown as for anyone who can
+  open it.
+- **Signed in, you see only your own tenant.** People of other tenants never
+  see the public one mixed in, and visitors never see anything else. Only the
+  public tenant's own members see its workspaces signed in, with whatever
+  their roles allow; that is how it is edited.
+- Anything a crawler can reach is what a visitor can: with a public tenant the
+  sitemap may be on, and it lists only that tenant's workspaces.
+
+Operators set it up; see
+[Running sign-in → The public tenant](/access/operations/#the-public-tenant).
 
 ---
 

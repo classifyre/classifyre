@@ -134,6 +134,10 @@ Pass them with `-e NAME=value`, or with `--env-file`.
 | `TELEMETRY_DISABLED` / `DO_NOT_TRACK` | unset | Set either to `1` to disable [telemetry](/deployment/telemetry/). |
 | `CORS_ORIGIN` | same-origin | Only needed if the UI is served from another host. |
 
+The image has no sign-in and no identity server, on purpose: everyone who can
+reach it uses every workspace. For sign-in, tenants or a public tenant next to
+private ones, use the [Helm chart](/deployment/kubernetes/#sign-in).
+
 ### Database
 
 Leave unset to use the PostgreSQL inside the image.

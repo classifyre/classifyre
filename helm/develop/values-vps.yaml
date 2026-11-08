@@ -139,6 +139,29 @@ objectStorage:
   forcePathStyle: false
   existingSecret: classifyre-s3-credentials
 
-# The public demo stays open: no sign-in, so its sitemap can stay on.
+# Sign-in on, with the showcase tenant public (docs/prd/IAM step 8e): anyone
+# browses it without signing in, read-only, and the sitemap lists it; people
+# of other tenants see only their own. DEMO_MODE above keeps it read-only for
+# everyone without the bypass key, signed in or not.
+#
+# Switching an installation that ran without sign-in: the showcase workspaces
+# are in the open database, which sign-in does not use. After the deploy, copy
+# them into the tenant once, in an API pod:
+#   node dist/src/admin.js workspaces copy --to-tenant showcase --all
+# and check the node's free memory first: the identity server needs ~0.5-1 GiB.
 iam:
-  enabled: false
+  enabled: true
+  appUrl: https://showcase.classifyre.com
+  bootstrap:
+    tenant:
+      alias: showcase
+      name: Showcase
+  public:
+    enabled: true
+    tenant: showcase
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      memory: 1Gi

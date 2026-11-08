@@ -113,7 +113,9 @@
     "owningGroup": "Eigentümergruppe",
     "owningGroupPick": "Gruppe wählen, der er gehört",
     "owningGroupHint": "Mitglieder dieser Gruppe erhalten Zugriff gemäß ihren Freigaben.",
-    "owningGroupNone": "Sie können keine Arbeitsbereiche anlegen: Bitten Sie eine Mandanten-Admin, Sie zur Arbeitsbereichs-Verwaltung Ihrer Gruppe zu machen."
+    "owningGroupNone": "Sie können keine Arbeitsbereiche anlegen: Bitten Sie eine Mandanten-Admin, Sie zur Arbeitsbereichs-Verwaltung Ihrer Gruppe zu machen.",
+    "emptyPublicTitle": "Noch nichts veröffentlicht",
+    "emptyPublicDescription": "Arbeitsbereiche des öffentlichen Mandanten erscheinen hier, sobald sie veröffentlicht sind. Melden Sie sich an, um Ihre eigenen zu sehen."
   },
   "categories": {
     "label": "Kategorien",
@@ -7268,7 +7270,8 @@
     "signOut": "Abmelden",
     "tenantSettings": "Mandantenzugriff",
     "switchTenant": "Mandant wechseln",
-    "platform": "Plattform"
+    "platform": "Plattform",
+    "signIn": "Anmelden"
   },
   "access": {
     "title": "Zugriff",

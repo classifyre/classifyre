@@ -52,7 +52,11 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
-  if (request.nextUrl.pathname.startsWith("/api/")) return NextResponse.next();
+  // Not signed in: with a public tenant they browse it; the API answers them
+  // as visitors, read-only.
+  if (config.publicTenant || request.nextUrl.pathname.startsWith("/api/")) {
+    return NextResponse.next();
+  }
   const login = new URL("/auth/login", config.appUrl);
   login.searchParams.set(
     "returnTo",
