@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Building2, LogIn, LogOut, Server, UserRound, UsersRound } from "lucide-react";
+import { Building2, CircleUserRound, LogIn, LogOut, Server, UserRound, UsersRound } from "lucide-react";
 import { api, type TenantMembershipDto } from "@workspace/api-client";
 import { Button } from "@workspace/ui/components/button";
 import {
@@ -103,6 +103,12 @@ export function AccountMenu() {
             <DropdownMenuSeparator />
           </>
         )}
+        <DropdownMenuItem asChild>
+          <a href="/auth/account/" target="_blank" rel="noreferrer" data-testid="your-account">
+            <CircleUserRound className="size-4" />
+            {t("account.yourAccount")}
+          </a>
+        </DropdownMenuItem>
         {tenant?.capabilities.includes("tenant.access.manage") && (
           <DropdownMenuItem asChild>
             <a href="/tenant/">

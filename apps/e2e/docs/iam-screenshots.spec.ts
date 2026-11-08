@@ -295,6 +295,14 @@ test("Access docs screenshots", async ({ browser }) => {
     }
   });
 
+  await test.step("everyone's own account page", async () => {
+    const person = await signIn(browser, "tbrenner");
+    await person.page.goto("/auth/account/");
+    await expect(person.page.getByText("Personal info").first()).toBeVisible();
+    await shot(person.page, "account-page");
+    await person.context.close();
+  });
+
   await test.step("someone in no organization yet", async () => {
     const newcomer = await signIn(browser, "kstrand");
     await newcomer.page.waitForURL(/\/auth\/no-tenant\//, { timeout: 60_000 });

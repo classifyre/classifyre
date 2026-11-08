@@ -7272,7 +7272,8 @@
     "switchTenant": "Mandant wechseln",
     "platform": "Plattform",
     "signIn": "Anmelden",
-    "identityConsole": "Identitätskonsole"
+    "identityConsole": "Identitätskonsole",
+    "yourAccount": "Ihr Konto"
   },
   "access": {
     "title": "Zugriff",
