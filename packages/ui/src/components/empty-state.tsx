@@ -10,6 +10,8 @@ export interface EmptyStateProps {
   action?: {
     label: string;
     onClick: () => void;
+    /** `data-testid` of the action's button. */
+    testId?: string;
   };
   secondaryAction?: {
     label: string;
@@ -44,7 +46,9 @@ export function EmptyState({
       </p>
       {action && (
         <div className="flex gap-2">
-          <Button onClick={action.onClick}>{action.label}</Button>
+          <Button onClick={action.onClick} data-testid={action.testId}>
+            {action.label}
+          </Button>
           {secondaryAction && (
             <Button variant="outline" onClick={secondaryAction.onClick}>
               {secondaryAction.label}

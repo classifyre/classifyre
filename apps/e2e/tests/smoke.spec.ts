@@ -111,7 +111,11 @@ test.describe.serial("smoke with sign-in", () => {
 
   test("the admin creates a workspace", async () => {
     const { page, api } = admin;
-    await page.getByTestId("workspace-create").click();
+    // The header button, or the empty state's on an install with no workspaces.
+    await page
+      .locator('[data-testid="workspace-create"], [data-testid="workspace-create-first"]')
+      .first()
+      .click();
     const dialog = page.getByTestId("workspace-create-dialog");
     await dialog.getByTestId("workspace-create-name").fill(WORKSPACE_NAME);
     const owner = dialog.getByTestId("workspace-create-owner");

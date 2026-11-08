@@ -291,6 +291,7 @@ export default function LandingPage() {
                 action={{
                   label: t("workspaces.createAction"),
                   onClick: () => setCreateOpen(true),
+                  testId: "workspace-create-first",
                 }}
               />
             ) : (
