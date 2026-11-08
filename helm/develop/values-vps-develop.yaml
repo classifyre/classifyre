@@ -43,6 +43,11 @@ api:
     runnerLogs:
       accessModes:
         - ReadWriteOnce
+    # Each smoke run starts empty, so a dependency cache would never be warm,
+    # and its claim binds only when the first scan job uses it, which keeps
+    # `helm --wait` from ever finishing on a fresh install.
+    uvCache:
+      enabled: false
 
 
 frontend:
