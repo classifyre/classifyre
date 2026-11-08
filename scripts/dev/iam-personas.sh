@@ -109,7 +109,9 @@ helm install "$REL" "$ROOT/helm/classifyre" -n "$NS" \
   -f "$ROOT/helm/develop/values-dev.yaml" -f "$ROOT/helm/develop/values-dev-iam.yaml" \
   --set worker.replicaCount=0 --set ingress.enabled=false --set priorityClasses.create=false \
   --set postgres.embedded.persistence.enabled=false --set api.cliCache.enabled=false \
-  --set api.embedding.enabled=false >/dev/null
+  --set api.embedding.enabled=false \
+  `# Visitors of a public tenant are checked by the smoke test (apps/e2e).` \
+  --set iam.public.enabled=false >/dev/null
 
 say "wait for the API, the identity server and the realm setup"
 # Give up after ten minutes and say why, instead of waiting forever on pods
@@ -214,6 +216,9 @@ grant group "$EAST" viewer tenant "$TENANT" >/dev/null
 kc "\$K delete organizations/$ACME/groups/$EAST -r classifyre" >/dev/null
 
 say "mover, leaver and the contractor's end date (one-minute cache)"
+# Their token from before they leave: it must stop working within a minute.
+LEAVER_TOKEN=$(token leaver)
+[ -n "$LEAVER_TOKEN" ] || { echo "the leaver could not sign in before leaving" >&2; exit 1; }
 kubectl -n "$NS" exec -i "deploy/$REL-classifyre-iam" -c iam -- env ADMIN_PW="$ADMIN_PW" \
   ACME="$ACME" FIN="$FIN" SALES="$SALES" MOVER="$U_MOVER" LEAVER="$U_LEAVER" bash -s >/dev/null 2>&1 <<'EOF'
 KC=/opt/keycloak/bin/kcadm.sh
@@ -222,7 +227,6 @@ $KC delete organizations/$ACME/groups/$FIN/members/$MOVER -r classifyre
 $KC update organizations/$ACME/groups/$SALES/members/$MOVER -r classifyre -b '{}'
 $KC update users/$LEAVER -r classifyre -s enabled=false
 EOF
-LEAVER_TOKEN=$(token leaver 2>/dev/null || true)
 sleep 80
 check U11 "mover lost finance" 404 "$(status mover GET /fin-ledger/sources)"
 check U11 "mover gained sales" 200 "$(status mover GET /sales-pipeline/sources)"

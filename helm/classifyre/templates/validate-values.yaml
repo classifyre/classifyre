@@ -32,9 +32,13 @@
      "require" or "verify-full". The default "disable" is intentional for embedded/local installs. */ -}}
 
 {{- if .Values.iam.enabled -}}
-{{- /* Sign-in means a private instance: nothing in it is for crawlers (§2 H4). */ -}}
-{{- if .Values.frontend.sitemap.enabled -}}
-{{- fail "frontend.sitemap.enabled must be false when iam.enabled=true: a signed-in instance publishes no sitemap and allows no crawling" -}}
+{{- /* Sign-in means a private instance: nothing in it is for crawlers (§2 H4),
+     except a public tenant, which visitors and crawlers may read. */ -}}
+{{- if and .Values.frontend.sitemap.enabled (not .Values.iam.public.enabled) -}}
+{{- fail "frontend.sitemap.enabled needs iam.public.enabled when iam.enabled=true: only a public tenant is for crawlers" -}}
+{{- end -}}
+{{- if and .Values.iam.public.enabled (eq (toString .Values.iam.public.tenant) "local") -}}
+{{- fail "iam.public.tenant cannot be 'local': that name is kept for workspaces made without sign-in" -}}
 {{- end -}}
 {{- if and (not .Values.iam.appUrl) (empty .Values.ingress.host) -}}
 {{- fail "iam.enabled=true needs ingress.host (or iam.appUrl) to know the URL people open Classifyre at; the identity server lives under it at <appUrl>/iam. Set iam.enabled=false for an instance without sign-in" -}}

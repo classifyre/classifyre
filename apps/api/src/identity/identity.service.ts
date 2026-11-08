@@ -24,6 +24,11 @@ export interface Principal {
   grants: Grant[];
   /** How the token arrived: a cookie needs a same-origin check on writes. */
   via: 'bearer' | 'cookie';
+  /**
+   * Someone who has not signed in, browsing the public tenant: `sub` is
+   * empty, the only grant is Visitor on that tenant.
+   */
+  visitor?: true;
 }
 
 /**
@@ -148,6 +153,13 @@ export class IdentityService {
    */
   async authenticate(request: RequestLike): Promise<Principal> {
     if (request.classifyrePrincipal) return request.classifyrePrincipal;
+    // No credentials at all, never a bad or expired token: that one stays a
+    // 401, so the web renews the session instead of dropping to a visitor.
+    if (this.config.publicTenantAlias && !tokenOf(request.headers)) {
+      const visitor = await this.visitor();
+      request.classifyrePrincipal = visitor;
+      return visitor;
+    }
     const { claims, via } = await this.verified(request);
 
     const alias = tenantAliasOf(claims.organization);
@@ -226,6 +238,60 @@ export class IdentityService {
     };
     request.classifyrePrincipal = principal;
     this.rememberName(claims.sub, displayName, member.email);
+    return principal;
+  }
+
+  private visitorCache: { principal: Principal; until: number } | null = null;
+
+  /**
+   * The principal of everyone who has not signed in: Visitor on the public
+   * tenant, nothing else. Looked up at most once a minute.
+   */
+  private async visitor(): Promise<Principal> {
+    if (this.visitorCache && this.visitorCache.until > Date.now()) {
+      return this.visitorCache.principal;
+    }
+    const alias = this.config.publicTenantAlias!;
+    const org = await this.membership.organizationByAlias(alias);
+    const tenant = org ? await this.tenancy.ensureTenant(org) : null;
+    if (
+      !org ||
+      !tenant ||
+      tenant.status !== 'active' ||
+      tenant.orgId !== org.id
+    ) {
+      // Not set up (yet), suspended or replaced: nothing is public.
+      throw new AuthenticationError('Sign in to continue.');
+    }
+    const principal: Principal = {
+      sub: '',
+      actor: {
+        id: null,
+        displayName: null,
+        kind: 'visitor',
+        via: 'none',
+        // Nothing a visitor does is attributed to anyone; they only read.
+        ref: undefined,
+      },
+      tenant,
+      orgId: org.id,
+      groupIds: new Set(),
+      grants: [
+        {
+          id: 'visitor',
+          tenantId: tenant.id,
+          subjectType: 'user',
+          subjectId: '',
+          roleKey: 'visitor',
+          scopeType: 'tenant',
+          scopeId: tenant.id,
+          expiresAt: null,
+        },
+      ],
+      via: 'cookie',
+      visitor: true,
+    };
+    this.visitorCache = { principal, until: Date.now() + 60_000 };
     return principal;
   }
 

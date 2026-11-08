@@ -49,6 +49,12 @@ export interface TenantDto {
      * @memberof TenantDto
      */
     operator: boolean;
+    /**
+     * The caller has not signed in and is browsing the public tenant, read-only.
+     * @type {boolean}
+     * @memberof TenantDto
+     */
+    visitor: boolean;
 }
 
 
@@ -111,6 +117,7 @@ export function instanceOfTenantDto(value: object): value is TenantDto {
     if (!('name' in value) || value['name'] === undefined) return false;
     if (!('capabilities' in value) || value['capabilities'] === undefined) return false;
     if (!('operator' in value) || value['operator'] === undefined) return false;
+    if (!('visitor' in value) || value['visitor'] === undefined) return false;
     return true;
 }
 
@@ -129,6 +136,7 @@ export function TenantDtoFromJSONTyped(json: any, ignoreDiscriminator: boolean):
         'name': json['name'],
         'capabilities': json['capabilities'],
         'operator': json['operator'],
+        'visitor': json['visitor'],
     };
 }
 
@@ -148,6 +156,7 @@ export function TenantDtoToJSONTyped(value?: TenantDto | null, ignoreDiscriminat
         'name': value['name'],
         'capabilities': value['capabilities'],
         'operator': value['operator'],
+        'visitor': value['visitor'],
     };
 }
 

@@ -57,6 +57,12 @@ spec:
               value: {{ .Values.iam.bootstrap.tenant.alias | quote }}
             - name: IAM_TENANT_NAME
               value: {{ .Values.iam.bootstrap.tenant.name | quote }}
+            {{- if .Values.iam.public.enabled }}
+            - name: IAM_PUBLIC_TENANT
+              value: {{ .Values.iam.public.tenant | quote }}
+            - name: IAM_PUBLIC_TENANT_NAME
+              value: {{ .Values.iam.public.name | quote }}
+            {{- end }}
             - name: IAM_BOOTSTRAP_ADMIN
               value: {{ .Values.iam.bootstrap.admin.username | quote }}
             - name: IAM_BOOTSTRAP_ADMIN_EMAIL

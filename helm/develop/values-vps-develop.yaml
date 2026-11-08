@@ -119,10 +119,15 @@ objectStorage:
   enabled: false
 
 # Sign-in on: the smoke test signs in, creates a workspace and checks access.
-# The web app proxies the identity server at /iam on the same host.
+# The web app proxies the identity server at /iam on the same host. A public
+# tenant next to `default`, so the smoke test checks that visitors see it and
+# signed-in people of `default` never do.
 iam:
   enabled: true
   appUrl: https://staging.classifyre.com
+  public:
+    enabled: true
+    tenant: public
   resources:
     requests:
       cpu: 100m

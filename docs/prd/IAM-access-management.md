@@ -804,6 +804,27 @@ Step 8c is reversed. Classifyre had grown a second user and group manager next t
 
 **Removed:** `people.service.ts`, `people.controller.ts` and their spec, `/tenant/people*` and `/tenant/groups*` writes, `tenant.people.manage`, `iam_people` (dropped at boot), `iam.peopleManagement` and `IAM_PEOPLE_MANAGEMENT`, the write rights in `setup-realm.sh` (taken away again on upgrade), `MembershipService.send`/`read`/`forget`, the Platform's create tenant and admins routes and dialogs, the web People and Groups tabs, their component test, the docs page *People and groups*. About 4,300 lines of code and docs, plus 3,400 of generated client. The persona suite checks the read-only rights, 404 on the old routes, a group removed in the console showing as removed, a tenant made in the console appearing on the Platform page, and removal only after its organization is deleted.
 
+### Step 8e · A public tenant (2026-11-08)
+
+Asked for: one installation that is public and private at once, as the showcase needs. People who have not signed in browse public content; signed-in people see only their own tenant, never public content mixed in. Chart defaults stay `iam.enabled: true`, public off, demo off; the showcase runs sign-in, public and demo; the all-in-one Docker image keeps no sign-in at all (everything open, as if public).
+
+**Design chosen: the public area is a tenant.** `iam.public.enabled` + `iam.public.tenant` (alias, default `public`; it can be the first tenant). A request with no credentials at all becomes a **visitor**: a principal of that tenant whose only grant is the built-in, never-grantable role `visitor` (scope `public`): the workspace `.view` capabilities without `access.view`, no `mcp.token.own`, no tenant capabilities. Everything else is the existing machinery: the namespace hook checks the visitor like anyone (another tenant's workspace answers 404), capability checks refuse every write (403), data stays in the tenant's database.
+
+Considered and rejected: serving the open database to anonymous requests next to tenant databases in the same process. It would make the API open both kinds of database per request (the mode guard of TEN §4.2 would no longer hold), workers would enumerate two registries, and open-mode rights (everyone may do everything) would need a second permission model for anonymous writes. The tenant design needs one new role and one branch in `IdentityService.authenticate`.
+
+**Rules that keep it safe:**
+- Only a request with no token and no session cookie is a visitor; a bad or expired one stays a 401, so the web renews the session instead of silently showing public content.
+- The visitor principal is built from the public organization and tenant row, cached a minute. Missing, suspended, deleted or replaced: no visitors (401), so suspending the public tenant on the Platform page closes it.
+- Visitors carry no actor reference: nothing could be attributed to them, and they cannot write.
+- The sitemap is allowed with sign-in only with a public tenant (`validate-values.yaml`); it is reached through the namespace hook as a visitor, so it lists only the public tenant.
+- `DEMO_MODE` is unchanged: read-only for everyone without the bypass key, signed in or not.
+
+**Web:** the proxy no longer sends people without a session to sign in when `IAM_PUBLIC_TENANT` is set; `TenantDto.visitor` swaps the account menu for **Sign in** (`data-testid="sign-in"`) and gives the home page a visitor's empty state.
+
+**Chart:** `iam.public.*`, `IAM_PUBLIC_TENANT` for API and web, the realm setup job creates the public organization with an empty `admins` group unless it is the first tenant. Staging (smoke deploy) runs a separate `public` tenant; the showcase values make their first tenant, `showcase`, public, with demo on. Switching the showcase needs its workspaces copied from the open database once (`workspaces copy --to-tenant showcase --all`), documented in `values-vps.yaml`.
+
+**Checks:** `iam.spec.ts` (visitor principal and capabilities, other tenant's workspace null, a token never becomes a visitor, no public tenant or suspended: 401); the smoke test seeds `smoke-publisher` in the public tenant and checks the UI (Sign in, the public card, not the private one), read-only API answers, 404 for the private workspace, and that a signed-in person of `default` never sees the public workspace. Verified on the k3d dev stack 2026-11-08: 5 of 5 smoke checks.
+
 ### Step 9 · Later
 
 - Custom roles: tenant admins compose capability bundles (still no conditions).

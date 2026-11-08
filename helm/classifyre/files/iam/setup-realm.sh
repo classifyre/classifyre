@@ -174,6 +174,22 @@ if [ -z "$ADMINS_ID" ]; then
   ADMINS_ID=$(find_id "organizations/$ORG_ID/groups" name admins)
 fi
 
+# The public tenant (iam.public): visitors read its workspaces. Its editors
+# are added to its `admins` group in the console; when it is the first tenant,
+# that is the first admin.
+if [ -n "${IAM_PUBLIC_TENANT:-}" ] && [ "$IAM_PUBLIC_TENANT" != "$IAM_TENANT_ALIAS" ]; then
+  echo "public tenant $IAM_PUBLIC_TENANT"
+  PUBLIC_ID=$(find_id organizations alias "$IAM_PUBLIC_TENANT")
+  if [ -z "$PUBLIC_ID" ]; then
+    "$KC" create organizations -r "$R" -s "name=${IAM_PUBLIC_TENANT_NAME:-Public}" \
+      -s "alias=$IAM_PUBLIC_TENANT" -s enabled=true
+    PUBLIC_ID=$(find_id organizations alias "$IAM_PUBLIC_TENANT")
+  fi
+  if [ -z "$(find_id "organizations/$PUBLIC_ID/groups" name admins)" ]; then
+    "$KC" create "organizations/$PUBLIC_ID/groups" -r "$R" -s name=admins
+  fi
+fi
+
 echo "first tenant admin $IAM_BOOTSTRAP_ADMIN"
 # Created once. Afterwards the person owns their account: the job never
 # resets the password or re-adds them to a group they were taken out of.

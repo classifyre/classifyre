@@ -35,6 +35,11 @@ export interface IamWebConfig {
   /** Where people open Classifyre; callbacks and logout return here. */
   appUrl: string;
   secureCookies: boolean;
+  /**
+   * People who have not signed in browse the public tenant instead of being
+   * sent to sign in (IAM_PUBLIC_TENANT; docs/prd/IAM step 8e).
+   */
+  publicTenant: boolean;
 }
 
 export function iamWebConfig(
@@ -57,6 +62,7 @@ export function iamWebConfig(
     clientSecret: need("IAM_WEB_CLIENT_SECRET"),
     appUrl,
     secureCookies: appUrl.startsWith("https://"),
+    publicTenant: Boolean(env.IAM_PUBLIC_TENANT?.trim()),
   };
 }
 

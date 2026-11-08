@@ -1061,6 +1061,13 @@ iam:
       existingSecret: ""
       # -- Key of the password in `existingSecret`.
       existingSecretPasswordKey: password
+  public:
+    # -- Let people who have not signed in browse one tenant's workspaces, read-only, with **Sign in** at the top. They hold the Visitor role there: no access lists, no tenant activity, no MCP tokens. Signed-in people see only their own tenant, never the public one unless they belong to it. Off: everyone must sign in. Allows `frontend.sitemap.enabled`, which then lists only the public tenant.
+    enabled: false
+    # -- Alias of the public tenant. The setup job creates its organization with an empty top-level `admins` group when it does not exist; add its editors there in the identity server. Can be the first tenant's alias (`iam.bootstrap.tenant.alias`), so the first admin edits what visitors see.
+    tenant: public
+    # -- Display name of the public tenant when the setup job creates it.
+    name: Public
   bootstrap:
     tenant:
       # -- Alias of the first tenant (organization), created on install.

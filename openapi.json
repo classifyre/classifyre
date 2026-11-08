@@ -30508,7 +30508,8 @@
               "person",
               "agent",
               "integration",
-              "system"
+              "system",
+              "visitor"
             ]
           },
           "via": {
@@ -30980,6 +30981,10 @@
           "operator": {
             "type": "boolean",
             "description": "The caller is also an operator: the Platform page is theirs."
+          },
+          "visitor": {
+            "type": "boolean",
+            "description": "The caller has not signed in and is browsing the public tenant, read-only."
           }
         },
         "required": [
@@ -30987,7 +30992,8 @@
           "alias",
           "name",
           "capabilities",
-          "operator"
+          "operator",
+          "visitor"
         ]
       },
       "TenantEventDto": {

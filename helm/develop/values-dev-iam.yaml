@@ -9,6 +9,11 @@
 iam:
   enabled: true
   appUrl: http://localhost:3000
+  # Visitors who have not signed in browse the `public` tenant, read-only;
+  # signed-in people see only their own tenant (docs/prd/IAM step 8e).
+  public:
+    enabled: true
+    tenant: public
   # Dev only: the identity server's own admin console at
   # http://localhost:3000/iam/admin (user `admin`, password in the
   # classifyre-iam Secret, key admin-password).

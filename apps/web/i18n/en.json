@@ -113,7 +113,9 @@
     "owningGroup": "Owning group",
     "owningGroupPick": "Choose the group that owns it",
     "owningGroupHint": "Members of this group and its admins get access as their grants allow.",
-    "owningGroupNone": "You cannot create workspaces: ask a tenant admin to make you a workspace manager for your group."
+    "owningGroupNone": "You cannot create workspaces: ask a tenant admin to make you a workspace manager for your group.",
+    "emptyPublicTitle": "Nothing published yet",
+    "emptyPublicDescription": "Workspaces of the public tenant show here once they are published. Sign in to see your own."
   },
   "categories": {
     "label": "Categories",
@@ -7268,7 +7270,8 @@
     "signOut": "Sign out",
     "tenantSettings": "Tenant access",
     "switchTenant": "Switch tenant",
-    "platform": "Platform"
+    "platform": "Platform",
+    "signIn": "Sign in"
   },
   "access": {
     "title": "Access",

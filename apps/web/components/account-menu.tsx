@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Building2, LogOut, Server, UserRound } from "lucide-react";
+import { Building2, LogIn, LogOut, Server, UserRound } from "lucide-react";
 import { api, type TenantDto, type TenantMembershipDto } from "@workspace/api-client";
 import { Button } from "@workspace/ui/components/button";
 import {
@@ -20,7 +20,10 @@ function initials(name: string | null | undefined): string {
   return (parts[0]?.[0] ?? "?").concat(parts[1]?.[0] ?? "").toUpperCase();
 }
 
-/** The signed-in person, their tenant, and sign-out. Only rendered with sign-in. */
+/**
+ * The signed-in person, their tenant, and sign-out. Only rendered with sign-in.
+ * Someone browsing the public tenant without signing in gets Sign in instead.
+ */
 export function AccountMenu() {
   const { t } = useTranslation();
   const me = useMe();
@@ -48,6 +51,18 @@ export function AccountMenu() {
 
   const name = me?.actor.displayName ?? null;
   const others = (tenants ?? []).filter((member) => !member.current);
+  if (tenant?.visitor) {
+    const returnTo =
+      typeof window === "undefined" ? "/" : `${window.location.pathname}${window.location.search}`;
+    return (
+      <Button variant="outline" size="sm" asChild data-testid="sign-in">
+        <a href={`/auth/login/?returnTo=${encodeURIComponent(returnTo)}`}>
+          <LogIn className="size-4" />
+          {t("account.signIn")}
+        </a>
+      </Button>
+    );
+  }
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>

@@ -122,6 +122,15 @@ export const BUILT_IN_ROLES = [
     scope: 'platform',
     capabilities: ['platform.tenants.manage'],
   },
+  {
+    // People who have not signed in, on an installation with a public tenant
+    // (docs/prd/IAM §13 step 8e): they read its workspaces. Not who has
+    // access, not the tenant's activity, no MCP tokens; never granted.
+    key: 'visitor',
+    title: 'Visitor',
+    scope: 'public',
+    capabilities: VIEWS.filter((id) => id !== 'access.view'),
+  },
 ] as const satisfies readonly RoleDefinition[];
 
 export type RoleKey = (typeof BUILT_IN_ROLES)[number]['key'];

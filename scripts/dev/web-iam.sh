@@ -29,4 +29,9 @@ export IAM_INTERNAL_URL=http://localhost:8280/iam
 export IAM_EXPOSE_ADMIN_CONSOLE=true
 export IAM_WEB_CLIENT_ID=classifyre-web
 export IAM_WEB_CLIENT_SECRET="$secret"
+# Same public tenant as the API (iam.public in the dev values): visitors
+# browse it instead of being sent to sign in.
+IAM_PUBLIC_TENANT=$(kubectl --context k3d-classifyre -n "$NS" get deploy classifyre-api \
+  -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="IAM_PUBLIC_TENANT")].value}' 2>/dev/null || true)
+export IAM_PUBLIC_TENANT
 exec bun dev

@@ -34,9 +34,13 @@ export class SitemapController {
     @Inject(IAM_CONFIG) private readonly iam: IamConfig | null,
   ) {}
 
-  /** A signed-in instance is private: nothing in it is for crawlers (docs/prd §2 H4). */
+  /**
+   * A signed-in instance is private (docs/prd §2 H4), except its public
+   * tenant: the namespace hook lets a crawler, a visitor, reach only that
+   * tenant's workspaces.
+   */
   private assertPublic(): void {
-    if (this.iam) throw new NotFoundException();
+    if (this.iam && !this.iam.publicTenantAlias) throw new NotFoundException();
   }
 
   @Get()

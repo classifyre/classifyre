@@ -107,6 +107,7 @@ function groupByCategory(
 export default function LandingPage() {
   const { t } = useTranslation();
   const canCreate = useCanCreateWorkspace();
+  const visitor = useIsVisitor();
   const headingId = React.useId();
   const localePath = useLocalePath();
   const { removeBySlug } = useActiveNamespaces();
@@ -297,8 +298,10 @@ export default function LandingPage() {
             ) : (
               <EmptyState
                 icon={FolderOpen}
-                title={t("workspaces.emptyNoAccessTitle")}
-                description={t("workspaces.emptyNoAccessDescription")}
+                title={t(visitor ? "workspaces.emptyPublicTitle" : "workspaces.emptyNoAccessTitle")}
+                description={t(
+                  visitor ? "workspaces.emptyPublicDescription" : "workspaces.emptyNoAccessDescription",
+                )}
               />
             )}
           </Card>
@@ -440,6 +443,27 @@ export default function LandingPage() {
       </main>
     </div>
   );
+}
+
+/**
+ * Someone browsing the public tenant without signing in (IAM_PUBLIC_TENANT):
+ * the page speaks to them as a visitor, not as a member without access.
+ */
+function useIsVisitor(): boolean {
+  const iamEnabled = useIamEnabled();
+  const [visitor, setVisitor] = React.useState(false);
+  React.useEffect(() => {
+    if (!iamEnabled) return;
+    let active = true;
+    void api.access.tenantAccessControllerTenant().then(
+      (tenant) => active && setVisitor(tenant.visitor),
+      () => undefined,
+    );
+    return () => {
+      active = false;
+    };
+  }, [iamEnabled]);
+  return visitor;
 }
 
 /**
