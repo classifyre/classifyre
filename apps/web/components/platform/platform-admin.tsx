@@ -10,6 +10,7 @@ import {
   Play,
   Server,
   Trash2,
+  UsersRound,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -46,6 +47,7 @@ import {
 } from "@workspace/ui/components/dropdown-menu";
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
+import { useIamConsole } from "@/components/iam-session";
 import { useTranslation } from "@/hooks/use-translation";
 import { formatRelative } from "@/lib/date";
 import { extractApiErrorMessage } from "@/lib/extract-api-error-message";
@@ -59,6 +61,7 @@ import { extractApiErrorMessage } from "@/lib/extract-api-error-message";
  */
 export function PlatformAdmin() {
   const { t } = useTranslation();
+  const consoleOn = useIamConsole();
   const [tenants, setTenants] = React.useState<PlatformTenantDto[] | null>(null);
   const [local, setLocal] = React.useState<LocalWorkspaceDto[]>([]);
   const [denied, setDenied] = React.useState(false);
@@ -121,6 +124,19 @@ export function PlatformAdmin() {
           </h1>
         </div>
         <p className="max-w-2xl text-sm text-muted-foreground">{t("platform.description")}</p>
+        {consoleOn && !denied && (
+          <Button variant="outline" size="sm" asChild>
+            <a
+              href="/auth/console/"
+              target="_blank"
+              rel="noreferrer"
+              data-testid="platform-identity-console"
+            >
+              <UsersRound className="h-4 w-4" />
+              {t("platform.openConsole")}
+            </a>
+          </Button>
+        )}
       </div>
 
       {denied ? (
@@ -188,6 +204,7 @@ function TenantRow({
   onDelete: () => void;
 }) {
   const { t } = useTranslation();
+  const consoleOn = useIamConsole();
   const deleted = tenant.status === "deleted";
   // Gone from the identity server: its data can only be removed.
   const orphaned =
@@ -248,6 +265,18 @@ function TenantRow({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            {consoleOn && tenant.organizationId && (
+              <DropdownMenuItem asChild>
+                <a
+                  href={`/auth/console/?organization=${encodeURIComponent(tenant.organizationId)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <UsersRound className="h-4 w-4" />
+                  {t("platform.openInConsole")}
+                </a>
+              </DropdownMenuItem>
+            )}
             {orphaned ? (
               <DropdownMenuItem variant="destructive" onSelect={onDelete}>
                 <Trash2 className="h-4 w-4" />

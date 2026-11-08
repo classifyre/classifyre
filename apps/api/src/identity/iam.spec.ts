@@ -519,7 +519,7 @@ describe('IdentityService', () => {
     tenantOrg = 'org-old';
     await expect(
       service({ enabled: true, orgs: ['acme'] }).authenticate(request()),
-    ).rejects.toThrow(/link it again/);
+    ).rejects.toThrow(/organization that was deleted/);
   });
 
   it('tells a person in no tenant from one in several (NO_TENANT, CHOOSE_TENANT)', async () => {

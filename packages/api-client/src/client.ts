@@ -1607,6 +1607,11 @@ export interface Namespace {
   createdAt: string;
   updatedAt: string;
   lastOpenedAt: string | null;
+  /**
+   * With sign-in, what the caller may do in this workspace (from the list);
+   * absent without sign-in, where everything is allowed.
+   */
+  capabilities?: string[];
 }
 
 export interface CreateNamespaceInput {

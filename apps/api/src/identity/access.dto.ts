@@ -112,6 +112,14 @@ export class TenantDto {
   name: string;
 
   @ApiProperty({
+    type: String,
+    nullable: true,
+    description:
+      "The caller's own name, for the account menu; null for visitors.",
+  })
+  displayName: string | null;
+
+  @ApiProperty({
     enum: CAPABILITY_IDS,
     isArray: true,
     description: 'What the caller may do across the whole tenant.',
@@ -128,6 +136,14 @@ export class TenantDto {
       'The caller has not signed in and is browsing the public tenant, read-only.',
   })
   visitor: boolean;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description:
+      "The tenant's organization in the identity server, for operators' links to its identity console; null for everyone else.",
+  })
+  organizationId: string | null;
 }
 
 /** One tenant the caller belongs to, for the account menu (§12.2). */

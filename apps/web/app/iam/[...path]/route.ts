@@ -53,3 +53,15 @@ export function OPTIONS(request: NextRequest, context: RouteContext) {
 export function HEAD(request: NextRequest, context: RouteContext) {
   return proxy(request, context);
 }
+
+export function PUT(request: NextRequest, context: RouteContext) {
+  return proxy(request, context);
+}
+
+export function PATCH(request: NextRequest, context: RouteContext) {
+  return proxy(request, context);
+}
+
+export function DELETE(request: NextRequest, context: RouteContext) {
+  return proxy(request, context);
+}

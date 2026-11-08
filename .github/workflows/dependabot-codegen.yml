@@ -69,6 +69,7 @@ jobs:
             bun.lock
             apps/docs/src/_generated/helm-values.mdx
             apps/docs/src/_generated/mcp-catalog.json
+            apps/docs/src/_generated/access-catalog.json
             packages/api-client/src/generated
             apps/cli/src/models/generated_input.py
             apps/cli/src/models/generated_detectors.py

@@ -42,6 +42,8 @@ export type TenantProblem =
 export interface PlatformTenant {
   id: string;
   alias: string;
+  /** Its organization in the identity server; null once that is gone. */
+  organizationId: string | null;
   name: string;
   status: TenantStatus;
   createdAt: Date;
@@ -120,6 +122,7 @@ export class PlatformService implements OnModuleDestroy {
         const base = {
           id: tenant.id,
           alias: tenant.alias,
+          organizationId: tenant.orgId,
           name: tenant.name,
           status: tenant.status,
           createdAt: tenant.createdAt,
@@ -135,6 +138,7 @@ export class PlatformService implements OnModuleDestroy {
         if (tenant.status === 'deleted' || !org) {
           return {
             ...base,
+            organizationId: null,
             members: 0,
             admins: [],
             problem:

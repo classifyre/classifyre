@@ -1,0 +1,184 @@
+/* Classifyre's sign-in pages, on top of Keycloak's keycloak.v2 login theme.
+   The look is the landing's hero: the black signal panel with the string
+   board drifting behind (img/board.svg), a sharp-edged case-file card,
+   mono uppercase microtype and the lime accent for the one thing to press. */
+
+:root {
+  --keycloak-bg-logo-url: url("../img/board.svg");
+  --keycloak-card-top-color: var(--cl-accent);
+}
+
+html.login-pf,
+.login-pf body {
+  background-color: var(--cl-black);
+}
+
+.login-pf {
+  --pf-v5-global--FontFamily--text: var(--cl-font-sans);
+  --pf-v5-global--FontFamily--heading: var(--cl-font-display);
+  --pf-v5-global--FontFamily--monospace: var(--cl-font-mono);
+  --pf-v5-global--link--Color: var(--cl-accent);
+  --pf-v5-global--link--Color--hover: #ffffff;
+  --pf-v5-global--primary-color--100: var(--cl-accent);
+  --pf-v5-global--active-color--100: var(--cl-accent);
+  --pf-v5-global--BorderRadius--sm: 2px;
+  --pf-v5-global--BorderRadius--lg: 0;
+}
+
+.login-pf body {
+  font-family: var(--cl-font-sans);
+  color: var(--cl-paper);
+}
+
+/* The wordmark: the badge and the name, as in the app's header. */
+#kc-header-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+  font-family: var(--cl-font-display);
+  font-size: 1.6rem;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  color: #ffffff !important;
+}
+
+#kc-header-wrapper::before {
+  content: "";
+  display: block;
+  width: 4.5rem;
+  height: 4.5rem;
+  background: url("../img/logo.png") center / contain no-repeat;
+  filter: drop-shadow(0 0 40px rgb(183 255 0 / 0.3));
+}
+
+/* The case file. */
+.pf-v5-c-login__main {
+  background: rgb(10 10 10 / 0.86);
+  border: 2px solid rgb(255 255 255 / 0.25);
+  border-radius: 0;
+  box-shadow: none;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.pf-v5-c-login__main-header {
+  border-top-width: 3px;
+}
+
+#kc-page-title {
+  font-family: var(--cl-font-display);
+  font-size: 1.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  line-height: 1.1;
+  color: #ffffff;
+}
+
+/* Labels as case-file microtype. */
+.pf-v5-c-form__label-text,
+.pf-v5-c-check__label {
+  font-family: var(--cl-font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: rgb(255 255 255 / 0.7);
+}
+
+.pf-v5-c-check__label {
+  text-transform: none;
+  letter-spacing: 0.04em;
+}
+
+.pf-v5-c-form-control {
+  --pf-v5-c-form-control--BackgroundColor: rgb(255 255 255 / 0.04);
+  --pf-v5-c-form-control--before--BorderColor: rgb(255 255 255 / 0.25);
+  --pf-v5-c-form-control--before--BorderRadius: 2px;
+  --pf-v5-c-form-control--after--BorderColor: rgb(255 255 255 / 0.25);
+  --pf-v5-c-form-control--hover--after--BorderColor: rgb(255 255 255 / 0.6);
+  --pf-v5-c-form-control--focus--after--BorderColor: var(--cl-accent);
+  --pf-v5-c-form-control--focus--after--BorderBottomColor: var(--cl-accent);
+  --pf-v5-c-form-control--focus--after--BorderBottomWidth: 2px;
+  font-family: var(--cl-font-sans);
+}
+
+/* The one thing to press: lime, square, mono caps. */
+.pf-v5-c-button {
+  --pf-v5-c-button--BorderRadius: 0;
+  font-family: var(--cl-font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+}
+
+.pf-v5-c-button.pf-m-primary {
+  --pf-v5-c-button--m-primary--BackgroundColor: var(--cl-accent);
+  --pf-v5-c-button--m-primary--Color: var(--cl-black);
+  --pf-v5-c-button--m-primary--hover--BackgroundColor: #ffffff;
+  --pf-v5-c-button--m-primary--hover--Color: var(--cl-black);
+  --pf-v5-c-button--m-primary--focus--BackgroundColor: #ffffff;
+  --pf-v5-c-button--m-primary--focus--Color: var(--cl-black);
+  --pf-v5-c-button--m-primary--active--BackgroundColor: #ffffff;
+  --pf-v5-c-button--m-primary--active--Color: var(--cl-black);
+  padding-block: 0.8rem;
+}
+
+.pf-v5-c-button.pf-m-secondary,
+.pf-v5-c-button.pf-m-tertiary {
+  --pf-v5-c-button--m-secondary--Color: #ffffff;
+  --pf-v5-c-button--m-secondary--after--BorderColor: rgb(255 255 255 / 0.25);
+  --pf-v5-c-button--m-secondary--hover--Color: var(--cl-accent);
+  --pf-v5-c-button--m-secondary--hover--after--BorderColor: var(--cl-accent);
+  --pf-v5-c-button--m-tertiary--Color: #ffffff;
+  --pf-v5-c-button--m-tertiary--after--BorderColor: rgb(255 255 255 / 0.25);
+}
+
+/* The password field's eye and the "restart" button keep the input's frame. */
+.pf-v5-c-button.pf-m-control {
+  --pf-v5-c-button--m-control--BackgroundColor: rgb(255 255 255 / 0.04);
+  --pf-v5-c-button--m-control--after--BorderColor: rgb(255 255 255 / 0.25);
+  letter-spacing: 0;
+}
+
+:where(a, button, input, select):focus-visible {
+  outline: 3px solid var(--cl-accent);
+  outline-offset: 2px;
+}
+
+.pf-v5-c-login__main-footer-band {
+  border-top: 1px solid rgb(255 255 255 / 0.15);
+  color: rgb(255 255 255 / 0.6);
+}
+
+/* Exhibit stamps pinned to the corners of the file, as on the landing. */
+.pf-v5-c-login::before,
+.pf-v5-c-login::after {
+  position: fixed;
+  border: 2px solid rgb(255 255 255 / 0.22);
+  padding: 0.3rem 0.7rem;
+  font-family: var(--cl-font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  color: rgb(255 255 255 / 0.35);
+  pointer-events: none;
+}
+
+@media (min-width: 768px) {
+  .pf-v5-c-login::before {
+    content: "Exhibit A" / "";
+    top: 1.5rem;
+    left: 1.5rem;
+    transform: rotate(-6deg);
+  }
+
+  .pf-v5-c-login::after {
+    content: "Classifyre" / "";
+    right: 1.5rem;
+    bottom: 1.5rem;
+    transform: rotate(3deg);
+  }
+}

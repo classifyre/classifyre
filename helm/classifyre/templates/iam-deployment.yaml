@@ -26,6 +26,8 @@ spec:
         app.kubernetes.io/component: iam
       annotations:
         checksum/secret: {{ include (print $.Template.BasePath "/iam-secrets.yaml") . | sha256sum }}
+        # Keycloak caches themes: a changed theme needs a restart to show.
+        checksum/theme: {{ include (print $.Template.BasePath "/iam-theme-configmap.yaml") . | sha256sum }}
     spec:
       automountServiceAccountToken: false
       securityContext:
@@ -171,8 +173,19 @@ spec:
               port: management
             periodSeconds: 20
             failureThreshold: 6
+          volumeMounts:
+            # Classifyre's theme, as plain files: the image stays the stock one.
+            - name: theme
+              mountPath: /opt/keycloak/themes/classifyre
+              readOnly: true
           resources:
             {{- toYaml .Values.iam.resources | nindent 12 }}
+      volumes:
+        - name: theme
+          configMap:
+            name: {{ $fullname }}-theme
+            items:
+              {{- include "classifyre.iam.themeItems" . | nindent 14 }}
       {{- with .Values.iam.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

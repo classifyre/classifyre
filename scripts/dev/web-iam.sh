@@ -24,14 +24,16 @@ export IAM_APP_URL=http://localhost:3000
 # inside the cluster.
 export IAM_ISSUER_URL="$IAM_APP_URL/iam/realms/$IAM_REALM"
 export IAM_INTERNAL_URL=http://localhost:8280/iam
-# The dev values expose the admin console; mirror it so the local server's
-# `/iam` proxy forwards `/iam/admin` and the master realm too.
-export IAM_EXPOSE_ADMIN_CONSOLE=true
 export IAM_WEB_CLIENT_ID=classifyre-web
 export IAM_WEB_CLIENT_SECRET="$secret"
-# Same public tenant as the API (iam.public in the dev values): visitors
-# browse it instead of being sent to sign in.
-IAM_PUBLIC_TENANT=$(kubectl --context k3d-classifyre -n "$NS" get deploy classifyre-api \
-  -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="IAM_PUBLIC_TENANT")].value}' 2>/dev/null || true)
-export IAM_PUBLIC_TENANT
+# Same settings as the API's (the dev values): the public tenant visitors
+# browse, and which identity consoles the `/iam` proxy forwards.
+api_env() {
+  kubectl --context k3d-classifyre -n "$NS" get deploy classifyre-api \
+    -o jsonpath="{.spec.template.spec.containers[0].env[?(@.name==\"$1\")].value}" 2>/dev/null || true
+}
+IAM_PUBLIC_TENANT=$(api_env IAM_PUBLIC_TENANT)
+IAM_REALM_CONSOLE=$(api_env IAM_REALM_CONSOLE)
+IAM_EXPOSE_ADMIN_CONSOLE=$(api_env IAM_EXPOSE_ADMIN_CONSOLE)
+export IAM_PUBLIC_TENANT IAM_REALM_CONSOLE IAM_EXPOSE_ADMIN_CONSOLE
 exec bun dev

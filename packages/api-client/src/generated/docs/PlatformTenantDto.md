@@ -8,6 +8,7 @@ Name | Type
 ------------ | -------------
 `id` | string
 `alias` | string
+`organizationId` | string
 `name` | string
 `status` | string
 `createdAt` | Date
@@ -28,6 +29,7 @@ import type { PlatformTenantDto } from '@workspace/api-client'
 const example = {
   "id": null,
   "alias": acme,
+  "organizationId": null,
   "name": Acme,
   "status": null,
   "createdAt": null,

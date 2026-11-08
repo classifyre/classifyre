@@ -40,6 +40,12 @@ export interface PlatformTenantDto {
      */
     alias: string;
     /**
+     * Its organization in the identity server; null once that is gone.
+     * @type {string}
+     * @memberof PlatformTenantDto
+     */
+    organizationId: string | null;
+    /**
      * 
      * @type {string}
      * @memberof PlatformTenantDto
@@ -130,6 +136,7 @@ export type PlatformTenantDtoProblemEnum = typeof PlatformTenantDtoProblemEnum[k
 export function instanceOfPlatformTenantDto(value: object): value is PlatformTenantDto {
     if (!('id' in value) || value['id'] === undefined) return false;
     if (!('alias' in value) || value['alias'] === undefined) return false;
+    if (!('organizationId' in value) || value['organizationId'] === undefined) return false;
     if (!('name' in value) || value['name'] === undefined) return false;
     if (!('status' in value) || value['status'] === undefined) return false;
     if (!('createdAt' in value) || value['createdAt'] === undefined) return false;
@@ -155,6 +162,7 @@ export function PlatformTenantDtoFromJSONTyped(json: any, ignoreDiscriminator: b
         
         'id': json['id'],
         'alias': json['alias'],
+        'organizationId': json['organizationId'],
         'name': json['name'],
         'status': json['status'],
         'createdAt': (new Date(json['createdAt'])),
@@ -181,6 +189,7 @@ export function PlatformTenantDtoToJSONTyped(value?: PlatformTenantDto | null, i
         
         'id': value['id'],
         'alias': value['alias'],
+        'organizationId': value['organizationId'],
         'name': value['name'],
         'status': value['status'],
         'createdAt': value['createdAt'].toISOString(),

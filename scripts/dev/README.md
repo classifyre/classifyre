@@ -50,10 +50,12 @@ does not use the ingress for sign-in: the web app is not deployed in-cluster
 for local dev (`frontend.enabled: false`), so no ingress routes `/iam`.
 Instead it opens the local web server directly
 (<http://localhost:3000/iam>, its `/iam/[...path]` proxy), which is also the
-issuer in its tokens. The admin console is at
-<http://localhost:3000/iam/admin> (user `admin`, password in the
-`classifyre-iam` Secret, key `admin-password`). That account is the identity
-server's own and cannot sign in to Classifyre. Classifyre's first tenant admin
+issuer in its tokens. As in production, the app forwards only the
+`classifyre` realm's identity console (<http://localhost:3000/auth/console/>,
+for operators: realm role `classifyre-operator`). The master realm's admin
+console is on the port-forward, <http://localhost:8280/iam/admin> (user
+`admin`, password in the `classifyre-iam` Secret, key `admin-password`). That
+account is the identity server's own and cannot sign in to Classifyre. Classifyre's first tenant admin
 is a different user, also called `admin`, in the `classifyre` realm, with a
 temporary password under `bootstrap-admin-password` in the same Secret.
 

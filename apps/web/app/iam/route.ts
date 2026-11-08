@@ -27,3 +27,15 @@ export function OPTIONS(request: NextRequest) {
 export function HEAD(request: NextRequest) {
   return forwardIamRequest(request, []);
 }
+
+export function PUT(request: NextRequest) {
+  return forwardIamRequest(request, []);
+}
+
+export function PATCH(request: NextRequest) {
+  return forwardIamRequest(request, []);
+}
+
+export function DELETE(request: NextRequest) {
+  return forwardIamRequest(request, []);
+}

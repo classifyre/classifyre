@@ -38,6 +38,12 @@ export interface TenantDto {
      */
     name: string;
     /**
+     * The caller's own name, for the account menu; null for visitors.
+     * @type {string}
+     * @memberof TenantDto
+     */
+    displayName: string | null;
+    /**
      * What the caller may do across the whole tenant.
      * @type {Array<string>}
      * @memberof TenantDto
@@ -55,6 +61,12 @@ export interface TenantDto {
      * @memberof TenantDto
      */
     visitor: boolean;
+    /**
+     * The tenant's organization in the identity server, for operators' links to its identity console; null for everyone else.
+     * @type {string}
+     * @memberof TenantDto
+     */
+    organizationId: string | null;
 }
 
 
@@ -115,9 +127,11 @@ export function instanceOfTenantDto(value: object): value is TenantDto {
     if (!('id' in value) || value['id'] === undefined) return false;
     if (!('alias' in value) || value['alias'] === undefined) return false;
     if (!('name' in value) || value['name'] === undefined) return false;
+    if (!('displayName' in value) || value['displayName'] === undefined) return false;
     if (!('capabilities' in value) || value['capabilities'] === undefined) return false;
     if (!('operator' in value) || value['operator'] === undefined) return false;
     if (!('visitor' in value) || value['visitor'] === undefined) return false;
+    if (!('organizationId' in value) || value['organizationId'] === undefined) return false;
     return true;
 }
 
@@ -134,9 +148,11 @@ export function TenantDtoFromJSONTyped(json: any, ignoreDiscriminator: boolean):
         'id': json['id'],
         'alias': json['alias'],
         'name': json['name'],
+        'displayName': json['displayName'],
         'capabilities': json['capabilities'],
         'operator': json['operator'],
         'visitor': json['visitor'],
+        'organizationId': json['organizationId'],
     };
 }
 
@@ -154,9 +170,11 @@ export function TenantDtoToJSONTyped(value?: TenantDto | null, ignoreDiscriminat
         'id': value['id'],
         'alias': value['alias'],
         'name': value['name'],
+        'displayName': value['displayName'],
         'capabilities': value['capabilities'],
         'operator': value['operator'],
         'visitor': value['visitor'],
+        'organizationId': value['organizationId'],
     };
 }
 

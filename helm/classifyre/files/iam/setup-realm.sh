@@ -60,10 +60,41 @@ fi
   -s adminEventsEnabled=true \
   -s adminEventsDetailsEnabled=true
 
+# Classifyre's theme (iam.theme, mounted from the chart's ConfigMap), or
+# Keycloak's own when it is empty.
+"$KC" update "realms/$R" \
+  -s "loginTheme=${IAM_THEME:-keycloak.v2}" \
+  -s "adminTheme=${IAM_THEME:-keycloak.v2}" \
+  -s "accountTheme=${IAM_THEME:-keycloak.v3}"
+
 echo "role classifyre-operator"
 if ! "$KC" get roles/classifyre-operator -r "$R" >/dev/null 2>&1; then
   "$KC" create roles -r "$R" -s name=classifyre-operator \
     -s 'description=Creates and changes tenants. Sees no workspace content unless also granted.'
+fi
+
+# Operators manage people, groups, tenants and directories in the realm's
+# identity console (iam.realmConsole), so the role carries the console rights
+# of this realm, and none in the master realm. Everything realm-admin has but
+# impersonation: operators never act as someone inside a tenant. Taken away
+# again when the console is off.
+RM_ID=$(find_id clients clientId realm-management)
+CONSOLE_RIGHTS="view-realm manage-realm view-users manage-users query-users query-groups
+  view-organizations manage-organizations view-identity-providers manage-identity-providers
+  view-clients manage-clients query-clients create-client view-events manage-events
+  view-authorization manage-authorization query-realms"
+# shellcheck disable=SC2086 # word list on purpose
+if [ "${IAM_REALM_CONSOLE:-false}" = "true" ]; then
+  echo "operators manage the realm in its identity console"
+  for role in $CONSOLE_RIGHTS; do
+    "$KC" add-roles -r "$R" --rname classifyre-operator \
+      --cclientid realm-management --rolename "$role"
+  done
+else
+  for role in $CONSOLE_RIGHTS; do
+    "$KC" remove-roles -r "$R" --rname classifyre-operator \
+      --cclientid realm-management --rolename "$role" 2>/dev/null || true
+  done
 fi
 
 echo "client scope classifyre"
@@ -104,7 +135,6 @@ fi
 # gave are taken away again.
 GIVE="view-users view-organizations"
 TAKE="manage-users manage-organizations"
-RM_ID=$(find_id clients clientId realm-management)
 # role_list <names...>: the roles as the JSON array the API takes.
 role_list() {
   local first=1 role

@@ -7271,7 +7271,8 @@
     "tenantSettings": "Mandantenzugriff",
     "switchTenant": "Mandant wechseln",
     "platform": "Plattform",
-    "signIn": "Anmelden"
+    "signIn": "Anmelden",
+    "identityConsole": "Identitätskonsole"
   },
   "access": {
     "title": "Zugriff",
@@ -7287,7 +7288,7 @@
     "none": "Noch hat niemand Zugriff.",
     "group": "Gruppe",
     "pickGroup": "Gruppe wählen",
-    "groupsHint": "Gruppen gehören dem Mandanten: Ein Mandanten-Admin legt sie auf der Seite Mandantenzugriff an und ordnet Personen zu.",
+    "groupsHint": "Gruppen und ihre Personen werden im Identitätsserver gepflegt, von Ihren Betreibern oder Ihrem Firmenverzeichnis; hier erhält eine Gruppe Zugriff.",
     "role": "Rolle",
     "untilOptional": "Bis (optional)",
     "add": "Zugriff gewähren",
@@ -7311,7 +7312,9 @@
       "access": "Zugriff",
       "activity": "Aktivität"
     },
-    "peopleElsewhere": "Personen und Gruppen werden im Identitätsserver verwaltet oder im Firmenverzeichnis dahinter. Die Freigaben hier legen fest, was sie in Classifyre dürfen; eine umbenannte Gruppe behält ihre Freigaben, eine entfernte wird als entfernt angezeigt."
+    "peopleElsewhere": "Personen und Gruppen werden im Identitätsserver verwaltet oder im Firmenverzeichnis dahinter. Die Freigaben hier legen fest, was sie in Classifyre dürfen; eine umbenannte Gruppe behält ihre Freigaben, eine entfernte wird als entfernt angezeigt.",
+    "managePeople": "Personen und Gruppen verwalten",
+    "peopleByOperators": "Bitten Sie einen Betreiber dieser Installation, Personen hinzuzufügen oder Gruppen zu ändern."
   },
   "platform": {
     "title": "Plattform",
@@ -7357,6 +7360,8 @@
     "deleteDescription": "Seine Organisation ist im Identitätsserver nicht mehr vorhanden. Seine {{count}} Arbeitsbereich(e) und ihre Datenbank werden gelöscht, mit ihnen seine Freigaben. Seine Aktivität bleibt erhalten, und sein Kürzel wird nie wieder vergeben. Das lässt sich nicht rückgängig machen.",
     "deleteType": "Geben Sie {{alias}} zur Bestätigung ein",
     "deleted": "Die Daten von {{name}} sind entfernt",
-    "managedInIdentityServer": "Mandanten, ihre Personen und Gruppen werden im Identitätsserver angelegt (eine Organisation mit einer obersten Admin-Gruppe). Neue erscheinen hier von selbst."
+    "managedInIdentityServer": "Mandanten, ihre Personen und Gruppen werden im Identitätsserver angelegt (eine Organisation mit einer obersten Admin-Gruppe). Neue erscheinen hier von selbst.",
+    "openConsole": "Identitätskonsole öffnen",
+    "openInConsole": "In der Identitätskonsole öffnen"
   }
 }

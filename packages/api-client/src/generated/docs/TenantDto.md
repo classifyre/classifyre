@@ -9,9 +9,11 @@ Name | Type
 `id` | string
 `alias` | string
 `name` | string
+`displayName` | string
 `capabilities` | Array&lt;string&gt;
 `operator` | boolean
 `visitor` | boolean
+`organizationId` | string
 
 ## Example
 
@@ -23,9 +25,11 @@ const example = {
   "id": null,
   "alias": default,
   "name": Default,
+  "displayName": null,
   "capabilities": null,
   "operator": null,
   "visitor": null,
+  "organizationId": null,
 } satisfies TenantDto
 
 console.log(example)

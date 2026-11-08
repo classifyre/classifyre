@@ -113,12 +113,23 @@ export class NamespacesController {
     summary:
       'List the namespaces the caller can see (all of them without sign-in)',
   })
-  async list(@Req() request: FastifyRequest): Promise<Namespace[]> {
+  async list(
+    @Req() request: FastifyRequest,
+  ): Promise<(Namespace & { capabilities?: Capability[] })[]> {
+    const principal = await this.principal(request);
     const [namespaces, visible] = await Promise.all([
       this.registry.list(),
-      this.visibleIds(request),
+      principal ? this.identity!.visibleWorkspaces(principal) : null,
     ]);
-    return visible ? namespaces.filter((ns) => visible.has(ns.id)) : namespaces;
+    if (!visible) return namespaces;
+    // With sign-in, what the caller may do in each, so the directory offers
+    // only the controls that will work (deleting, for instance).
+    return namespaces.flatMap((ns) => {
+      const capabilities = visible.get(ns.id);
+      return capabilities
+        ? [{ ...ns, capabilities: [...capabilities].sort() }]
+        : [];
+    });
   }
 
   @Requires('tenant.workspace.create')

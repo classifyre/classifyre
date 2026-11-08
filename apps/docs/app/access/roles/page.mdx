@@ -1,0 +1,84 @@
+---
+title: Roles and rights
+sidebarTitle: Roles and rights
+description: Every role and every capability Classifyre checks, generated from the code — what each role allows, where it can be given, and the special roles nobody grants.
+---
+
+import { Callout } from "nextra/components";
+import { CapabilityMatrix, RoleTable } from "@/components/access/access-catalog";
+
+# Roles and rights
+
+A **capability** is one thing Classifyre allows, such as `source.manage`. A
+**role** is a fixed list of capabilities. A **grant** gives a group a role on
+a place: one workspace, the workspaces a group owns, or the whole tenant.
+Every API route and every MCP tool checks exactly one capability, so what a
+role allows is exactly the list below.
+
+<Callout type="info">
+  The tables on this page are generated from the API's own definitions
+  (`apps/api/src/identity/roles.ts` and `capabilities.ts`) every time the
+  API's client is generated, so they always match what Classifyre enforces.
+</Callout>
+
+## The roles
+
+<RoleTable />
+
+In plain words:
+
+| Role                  | For                                                                                                               |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| **Viewer**            | Reading everything in a workspace, and personal MCP tokens, which can only read too.                              |
+| **Investigator**      | A Viewer who also triages findings, tags assets, works on cases and inquiries, reviews leads and asks the assistant. |
+| **Curator**           | A Viewer who also writes and approves glossary terms, manages entities and decides duplicates.                    |
+| **Source manager**    | Connecting sources, running scans and managing detectors. Sees findings and assets, **not** cases or inquiries.    |
+| **Workspace admin**   | Everything in a workspace, settings and access included, except writing code.                                     |
+| **Code author**       | An add-on, next to another role: custom source notebooks and code detectors run code on your infrastructure.      |
+| **Workspace manager** | Creating workspaces for a group they belong to, and being Workspace admin on every workspace that group owns.     |
+| **Auditor**           | The tenant's audit trail and who has access, without seeing findings or content.                                  |
+| **Tenant admin**      | Everything in the tenant: every workspace, every grant, the tenant's activity.                                    |
+
+Roles sit side by side; none includes another by name. Someone who needs to
+investigate and curate gets both, through two groups or two grants to one
+group.
+
+### Roles nobody grants
+
+- **Platform operator** is not a grant. Operators are the people with the
+  realm role `classifyre-operator` in the identity server (see
+  [The Platform page](/access/operations/#the-platform-page)). They manage
+  tenants and, through the identity console, people and groups. They never
+  see inside a workspace unless a tenant also gives them a role.
+- **Visitor** is held by people who have not signed in, on an installation
+  with a [public tenant](/access/#the-public-tenant). It reads, but not who has
+  access, not the tenant's activity, and no MCP tokens. It is never offered.
+
+## Every capability, by role
+
+● means the role holds the capability. Workspace manager, Auditor and Tenant
+admin are given on the tenant or a group's workspaces; the others on any
+place.
+
+<CapabilityMatrix />
+
+## Where a grant applies
+
+| Given on                          | Reaches                                                                    | Where to give it                    |
+| --------------------------------- | -------------------------------------------------------------------------- | ----------------------------------- |
+| One workspace                     | That workspace                                                             | The workspace's **Settings → Access**, or **Tenant access** |
+| The workspaces of a group         | Every workspace owned by that group or by a group under it, now and later  | **Tenant access**                   |
+| The whole tenant                  | Every workspace of the tenant, and the tenant's own pages                  | **Tenant access**                   |
+
+A grant can end on a date (**Until**). After that it counts for nobody and
+stays listed until someone removes it.
+
+## Rules that always hold
+
+- **Access only adds up.** No grant takes anything away.
+- **Nobody gives more than they have.** A workspace admin cannot make anyone a
+  Code author, because writing code is not theirs to give.
+- **Creating a workspace needs membership.** A Workspace manager creates
+  workspaces only for a group they are in (or under); no grant lifts that.
+- **MCP tokens act as their creator**, and never beyond what the creator may
+  do at the moment the token is used.

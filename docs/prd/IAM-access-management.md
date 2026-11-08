@@ -825,6 +825,26 @@ Considered and rejected: serving the open database to anonymous requests next to
 
 **Checks:** `iam.spec.ts` (visitor principal and capabilities, other tenant's workspace null, a token never becomes a visitor, no public tenant or suspended: 401); the smoke test seeds `smoke-publisher` in the public tenant and checks the UI (Sign in, the public card, not the private one), read-only API answers, 404 for the private workspace, and that a signed-in person of `default` never sees the public workspace. Verified on the k3d dev stack 2026-11-08: 5 of 5 smoke checks.
 
+### Step 8f · Polish: the look, the identity console through the app, docs (2026-11-08)
+
+Asked for: the identity server in Classifyre's style (sign-in page on the landing hero's string board, the console with Classifyre's logo), links from the Access and Platform pages to managing people in the identity server, through the web app only; the Access docs rewritten around the real workflows with real screenshots; then a review of the whole feature.
+
+**Theme as files, never a custom image.** `helm/classifyre/files/iam/theme` holds a Keycloak theme `classifyre` (login on `keycloak.v2`, admin on `keycloak.v2`, account on `keycloak.v3`): CSS over PatternFly's tokens, the logo, the three brand fonts (latin subsets, OFL), and `board.svg`, the landing's pins and threads (`apps/blog/components/closing-board.tsx`) animated in CSS inside the SVG, so the sign-in page needs no script (`scripts/dev/iam-theme-board.py` generates it). A ConfigMap holds each file once; `items` mount `shared/` into every theme type under `/opt/keycloak/themes/classifyre` in the stock image. Keycloak caches theme files for 30 days under a path that changes only with its version, so the chart rewrites every reference to `?v=<hash of the theme>` and restarts the server on a change (`checksum/theme`). `iam.theme: ""` keeps Keycloak's look.
+
+**The realm's identity console through the app** (`iam.realmConsole`, default on). The `/iam` proxy forwards `admin/<realm>/console/…`, `admin/realms/<realm>/…` and `admin/serverinfo`; the master realm's console and API stay closed unless `iam.exposeAdminConsole`. The realm setup job makes `classifyre-operator` a composite of every `realm-management` role except `impersonation` (taken away again when the console is off), so operators manage people, groups, organizations and directories without acting as anyone. `/auth/console/?organization=<id>` redirects into the console (organization ids only, validated); the account menu (**Identity console**), the Platform page (header and each tenant) and Tenant access (**Manage people and groups**, for operators; others are told to ask one) link there. `TenantDto` and `PlatformTenantDto` carry `organizationId` (Tenant: operators only). The dev stack now runs like production: master console on the port-forward only.
+
+**Found and fixed while building it:**
+- The `/iam` proxy routes answered only GET/POST/OPTIONS/HEAD: every PUT and DELETE of the console (saving, deleting, adding to groups) failed, also with `exposeAdminConsole`. Added PUT, PATCH, DELETE.
+- The site-wide trailing-slash 308 also hits `/iam`, and Keycloak 404s some slashless endpoints with a slash (the consoles' translations). The proxy retries a 404 once without the slash (draining the first body; cancelling it hung for 30 s).
+- The account menu's name came from `/me`, which only exists inside a workspace: on the home page it was a 404 and the menu said "Signed in". `TenantDto.displayName` carries it.
+- The workspace list showed delete and Categories to people who would be refused (visitors, viewers). `GET /namespaces` now returns each workspace's `capabilities` with sign-in; the directory follows them and the tenant's `tenant.categories.manage`.
+- Stale texts from before 8d: the no-tenant page and the workspace Access hint still sent people to a People tab that no longer exists.
+- A replaced organization's error promised that "an operator has to link it again", which nothing can do; it now says the old organization only comes back from a backup.
+
+**Docs:** `apps/docs/app/access/` is now Overview (two places, building blocks, access always goes to groups, private and public tenants), Getting started (first password, first sign-in, console, groups, people, grants), Organizing people (a whole company: departments, subgroups, workspace managers, isolate and elevate someone, leavers, pitfalls), Roles and rights (generated from `roles.ts`/`capabilities.ts` by `bun run codegen` into `apps/docs/src/_generated/access-catalog.json`), and Running Sign-in (console, look, what happens when the identity server changes). Screenshots are real, from the dev stack, of an invented company (Brightwater Logistics), taken by `apps/e2e/docs/iam-screenshots.spec.ts` (`playwright.docs.config.ts`); `DOCS_SHOTS=a,b` re-takes some.
+
+**Open:** grants to one person (`subjectType: "user"`) remain in the API for scripts; the screens offer only groups.
+
 ### Step 9 · Later
 
 - Custom roles: tenant admins compose capability bundles (still no conditions).

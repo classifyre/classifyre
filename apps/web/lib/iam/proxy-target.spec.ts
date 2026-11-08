@@ -49,6 +49,26 @@ describe("identity server proxy target", () => {
     expect(allowedIamPath([], env)).toBe(false);
   });
 
+  it("forwards only the realm's own identity console with iam.realmConsole", () => {
+    const realmConsole = { ...env, IAM_REALM_CONSOLE: "true" };
+    expect(allowedIamPath(["admin", "classifyre", "console"], realmConsole)).toBe(true);
+    expect(allowedIamPath(["admin", "classifyre", "console", "whoami"], realmConsole)).toBe(true);
+    expect(allowedIamPath(["admin", "realms", "classifyre", "organizations"], realmConsole)).toBe(
+      true,
+    );
+    expect(allowedIamPath(["admin", "serverinfo"], realmConsole)).toBe(true);
+    // The master realm's console and API, and every other realm, stay closed.
+    expect(allowedIamPath(["admin", "master", "console"], realmConsole)).toBe(false);
+    expect(allowedIamPath(["admin", "realms", "master", "users"], realmConsole)).toBe(false);
+    expect(allowedIamPath(["admin", "realms"], realmConsole)).toBe(false);
+    expect(allowedIamPath(["admin", "classifyre", "other"], realmConsole)).toBe(false);
+    expect(allowedIamPath(["realms", "master", "protocol"], realmConsole)).toBe(false);
+    expect(allowedIamPath([], realmConsole)).toBe(false);
+    // Without the switch, none of it.
+    expect(allowedIamPath(["admin", "classifyre", "console"], env)).toBe(false);
+    expect(allowedIamPath(["admin", "realms", "classifyre", "users"], env)).toBe(false);
+  });
+
   it("forwards the admin console when the operator exposes it", () => {
     const exposed = { ...env, IAM_EXPOSE_ADMIN_CONSOLE: "true" };
     expect(allowedIamPath(["admin", "master", "console"], exposed)).toBe(true);
