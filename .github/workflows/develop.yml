@@ -60,7 +60,8 @@ env:
 jobs:
   deploy:
     name: Deploy ${{ inputs.image_tag || 'develop' }} → ${{ inputs.environment || 'classifyre-develop' }}
-    runs-on: ubuntu-latest
+    # Pinned: Playwright has no Chromium for ubuntu-latest (26.04) yet.
+    runs-on: ubuntu-24.04
 
     env:
       DOCKER_NAMESPACE: ${{ secrets.DOCKER_USERNAME }}
