@@ -58,7 +58,13 @@ fi
   -s bruteForceProtected=true \
   -s eventsEnabled=true \
   -s adminEventsEnabled=true \
-  -s adminEventsDetailsEnabled=true
+  -s adminEventsDetailsEnabled=true \
+  -s internationalizationEnabled=true \
+  -s 'supportedLocales=["en","de"]' \
+  -s defaultLocale=en
+# The languages are the web app's (apps/web/lib/locale-detection.ts LOCALES):
+# the sign-in pages follow the browser, or the app's language the web passes
+# (ui_locales), and offer a switch. The person's choice stays on their account.
 
 # Classifyre's theme (iam.theme, mounted from the chart's ConfigMap), or
 # Keycloak's own when it is empty.

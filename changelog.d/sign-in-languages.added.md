@@ -1,0 +1,1 @@
+The sign-in page now speaks English and German, like Classifyre: it opens in the language you were using, or your browser's, and has a language switch. Your choice there is kept on your account for the sign-in pages and emails such as a password reset.

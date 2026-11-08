@@ -7,6 +7,8 @@ import {
   safeReturnTo,
   seal,
 } from "@/lib/iam/session";
+import { signInLocale } from "@/lib/iam/sign-in-locale";
+import { LANGUAGE_COOKIE } from "@/lib/language-cookie";
 
 /**
  * Starts sign-in: authorization code with PKCE. `tenant` asks for one
@@ -22,8 +24,13 @@ export function GET(request: NextRequest) {
   const tenant = request.nextUrl.searchParams.get("tenant");
   const scope = `openid organization${tenant && /^[a-z0-9-]+$/i.test(tenant) ? `:${tenant}` : ""}`;
 
+  // The sign-in pages open in the app's language (the identity server has
+  // English and German, like the app, and offers a switch).
+  const locale = signInLocale(returnTo, request.cookies.get(LANGUAGE_COOKIE)?.value);
+
   const authorize = new URL(`${config.issuerUrl}/protocol/openid-connect/auth`);
   authorize.search = new URLSearchParams({
+    ...(locale ? { ui_locales: locale } : {}),
     client_id: config.clientId,
     response_type: "code",
     scope,

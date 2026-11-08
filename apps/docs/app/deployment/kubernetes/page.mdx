@@ -408,7 +408,7 @@ What the chart sets up:
 | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Identity server    | Deployment and Service `<release>-iam` (ClusterIP only), proxied by the web app under `iam.path` (default `/iam`)                                                             |
 | Its database       | An `iam` role and database on the chart's PostgreSQL (`iam.database.mode: shared`), or your own (`external`)                                                     |
-| Realm `classifyre` | Created and kept up to date by a job on every install and upgrade: the web and API clients, short-lived tokens (5 minutes), brute-force protection, audit events |
+| Realm `classifyre` | Created and kept up to date by a job on every install and upgrade: the web and API clients, short-lived tokens (5 minutes), brute-force protection, audit events, English and German |
 | First tenant       | `iam.bootstrap.tenant` (default `default`) with a group `admins`                                                                                                 |
 | Public tenant      | Only with `iam.public.enabled`: `iam.public.tenant` (default `public`) with an empty group `admins`, unless it is the first tenant                               |
 | First admin        | `iam.bootstrap.admin.username` (default `admin`), member of `admins`, with a temporary password, and an operator                                                  |
