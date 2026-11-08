@@ -86,8 +86,7 @@ export interface GrantDto {
  * @export
  */
 export const GrantDtoSubjectTypeEnum = {
-    Group: 'group',
-    User: 'user'
+    Group: 'group'
 } as const;
 export type GrantDtoSubjectTypeEnum = typeof GrantDtoSubjectTypeEnum[keyof typeof GrantDtoSubjectTypeEnum];
 

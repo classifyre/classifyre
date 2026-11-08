@@ -57,13 +57,14 @@ ALTER TABLE public.namespaces
   ADD COLUMN IF NOT EXISTS owner_group_id text;
 CREATE INDEX IF NOT EXISTS namespaces_tenant_idx ON public.namespaces (tenant_id);
 
--- A grant gives a group (or one person) a role on a scope: the whole tenant,
--- every workspace a group owns, or one workspace. Grants only add up.
+-- A grant gives a group a role on a scope: the whole tenant, every workspace
+-- a group owns, or one workspace. Grants only add up. Access always goes to
+-- groups; people get it by being in them (IAM step 8f).
 CREATE TABLE IF NOT EXISTS public.iam_grants (
   id           uuid PRIMARY KEY,
   tenant_id    uuid NOT NULL REFERENCES public.iam_tenants (id) ON DELETE CASCADE,
-  subject_type text NOT NULL CHECK (subject_type IN ('group', 'user')),
-  -- Organization group id, or the person's subject id.
+  subject_type text NOT NULL CHECK (subject_type = 'group'),
+  -- Organization group id.
   subject_id   text NOT NULL,
   role_key     text NOT NULL,
   scope_type   text NOT NULL CHECK (scope_type IN ('tenant', 'group', 'workspace')),
@@ -76,6 +77,11 @@ CREATE TABLE IF NOT EXISTS public.iam_grants (
 );
 CREATE INDEX IF NOT EXISTS iam_grants_subject_idx
   ON public.iam_grants (tenant_id, subject_type, subject_id);
+-- Grants to one person, which earlier builds allowed, are gone.
+DELETE FROM public.iam_grants WHERE subject_type <> 'group';
+ALTER TABLE public.iam_grants DROP CONSTRAINT IF EXISTS iam_grants_subject_type_check;
+ALTER TABLE public.iam_grants
+  ADD CONSTRAINT iam_grants_subject_type_check CHECK (subject_type = 'group');
 
 -- Names for user:<sub> actor references, refreshed when a person signs in,
 -- so the UI can show who changed something, also after they have left.

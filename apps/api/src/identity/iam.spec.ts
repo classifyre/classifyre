@@ -441,6 +441,15 @@ describe('IdentityService', () => {
       expect(principal.actor.kind).toBe('person');
     });
 
+    it('never makes a visitor of a request that brings credentials of another kind', async () => {
+      const basic = {
+        headers: { authorization: 'Basic dXNlcjpwYXNz' },
+      } as unknown as Parameters<IdentityService['authenticate']>[0];
+      await expect(
+        service({ enabled: true, orgs: [] }, publicConfig).authenticate(basic),
+      ).rejects.toMatchObject({ code: 'SIGN_IN_REQUIRED' });
+    });
+
     it('has no visitors without a public tenant, or while it is suspended', async () => {
       await expect(
         service({ enabled: true, orgs: [] }).authenticate(anonymous()),
@@ -455,11 +464,14 @@ describe('IdentityService', () => {
   });
 
   it('refuses the people of a suspended or deleted tenant (TEN §4.7)', async () => {
-    for (const status of ['suspended', 'deleted'] as const) {
+    for (const [status, code] of [
+      ['suspended', 'TENANT_SUSPENDED'],
+      ['deleted', 'TENANT_DELETED'],
+    ] as const) {
       tenantStatus = status;
       await expect(
         service({ enabled: true, orgs: ['acme'] }).authenticate(request()),
-      ).rejects.toMatchObject({ code: 'TENANT_SUSPENDED' });
+      ).rejects.toMatchObject({ code });
     }
   });
 

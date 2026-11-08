@@ -66,7 +66,7 @@ export interface GrantScope {
 export interface Grant extends GrantScope {
   id: string;
   tenantId: string;
-  subjectType: 'group' | 'user';
+  subjectType: 'group';
   subjectId: string;
   roleKey: RoleKey;
   expiresAt: Date | null;
@@ -255,16 +255,15 @@ export class TenancyService implements OnModuleDestroy {
       : null;
   }
 
-  /** Every live grant in a tenant whose subject is this person or one of their groups. */
+  /** Every live grant in a tenant to one of these groups. */
   async grantsFor(
     tenantId: string,
-    sub: string,
     groupIds: Iterable<string>,
   ): Promise<Grant[]> {
     const { rows } = await this.pool.query<{
       id: string;
       tenant_id: string;
-      subject_type: 'group' | 'user';
+      subject_type: 'group';
       subject_id: string;
       role_key: RoleKey;
       scope_type: GrantScopeType;
@@ -275,9 +274,8 @@ export class TenancyService implements OnModuleDestroy {
          FROM iam_grants
         WHERE tenant_id = $1
           AND (expires_at IS NULL OR expires_at > now())
-          AND ((subject_type = 'user' AND subject_id = $2)
-            OR (subject_type = 'group' AND subject_id = ANY($3::text[])))`,
-      [tenantId, sub, [...groupIds]],
+          AND subject_type = 'group' AND subject_id = ANY($2::text[])`,
+      [tenantId, [...groupIds]],
     );
     return rows.map((row) => ({
       id: row.id,
@@ -326,7 +324,7 @@ export class TenancyService implements OnModuleDestroy {
     const { rows } = await this.pool.query<{
       id: string;
       tenant_id: string;
-      subject_type: 'group' | 'user';
+      subject_type: 'group';
       subject_id: string;
       role_key: RoleKey;
       scope_type: GrantScopeType;

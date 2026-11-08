@@ -80,7 +80,6 @@ describe('AccessManagementService', () => {
           ? [{ id: 'east', name: 'east', path: '/east', parentId: null }]
           : []),
       ]),
-    isMember: (_p: Principal, sub: string) => Promise.resolve(sub === 'u-ann'),
     ownerLineage: () => Promise.resolve(['finance']),
   } as unknown as IdentityService;
 
@@ -138,8 +137,8 @@ describe('AccessManagementService', () => {
       { roleKey: 'viewer', subjectId: 'globex-sales' },
     ],
     [
-      'a person outside the tenant',
-      { roleKey: 'viewer', subjectType: 'user', subjectId: 'u-x' },
+      'one person instead of a group',
+      { roleKey: 'viewer', subjectType: 'user', subjectId: 'u-ann' },
     ],
     [
       'an expiry in the past',
@@ -155,13 +154,11 @@ describe('AccessManagementService', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('accepts a person of the tenant with an end date (U10)', async () => {
+  it('accepts a group for a while, with an end date (U10)', async () => {
     await service.addGrant(
       principal,
       {
         ...base,
-        subjectType: 'user',
-        subjectId: 'u-ann',
         roleKey: 'investigator',
         expiresAt: new Date(Date.now() + 42 * 86_400_000).toISOString(),
       },

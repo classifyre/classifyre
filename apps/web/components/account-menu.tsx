@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Building2, LogIn, LogOut, Server, UserRound, UsersRound } from "lucide-react";
-import { api, type TenantDto, type TenantMembershipDto } from "@workspace/api-client";
+import { api, type TenantMembershipDto } from "@workspace/api-client";
 import { Button } from "@workspace/ui/components/button";
 import {
   DropdownMenu,
@@ -13,6 +13,8 @@ import {
   DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu";
 import { useIamConsole } from "@/components/iam-session";
+import { useTenant } from "@/hooks/use-tenant";
+import { signOut } from "@/lib/iam/sign-out";
 import { useTranslation } from "@/hooks/use-translation";
 
 function initials(name: string | null | undefined): string {
@@ -27,15 +29,11 @@ function initials(name: string | null | undefined): string {
 export function AccountMenu() {
   const { t } = useTranslation();
   const consoleOn = useIamConsole();
-  const [tenant, setTenant] = React.useState<TenantDto | null>(null);
+  const tenant = useTenant();
   const [tenants, setTenants] = React.useState<TenantMembershipDto[] | null>(null);
 
   React.useEffect(() => {
     let active = true;
-    void api.access.tenantAccessControllerTenant().then(
-      (value) => active && setTenant(value),
-      () => undefined,
-    );
     // A person in several organizations picks one at sign-in (§12.2); the menu
     // lists the rest so they can switch without typing a URL.
     void api.access
@@ -134,11 +132,9 @@ export function AccountMenu() {
             </a>
           </DropdownMenuItem>
         )}
-        <DropdownMenuItem asChild>
-          <a href="/auth/logout/">
-            <LogOut className="size-4" />
-            {t("account.signOut")}
-          </a>
+        <DropdownMenuItem onSelect={signOut} data-testid="sign-out">
+          <LogOut className="size-4" />
+          {t("account.signOut")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

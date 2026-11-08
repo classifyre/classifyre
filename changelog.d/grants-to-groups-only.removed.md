@@ -1,0 +1,1 @@
+Access is now always given to groups: the API no longer accepts a grant to one person, and grants made to one person before are removed on upgrade. Put the person in a group in the identity server and give that group access instead.

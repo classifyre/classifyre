@@ -112,9 +112,10 @@ finance's workspaces" are grants, to different groups:
 up this way.
 
 <Callout type="info">
-  The screens only offer groups. The API also accepts one person's id in a
-  grant (`subjectType: "user"`), for scripts that need it; a group of one
-  person does the same job and stays visible in the identity server.
+  There is no way around it: the screens offer only groups, and the API
+  refuses a grant to one person. When one person needs something, make a
+  group for it (even a group of one); it stays visible in the identity
+  server, where people's access is reviewed.
 </Callout>
 
 ---
@@ -164,6 +165,10 @@ of the sign-in page, with **Sign in** in the top-right corner:
   detectors, cases, inquiries, the glossary and entities. They cannot change
   anything, see who has access, read the tenant's activity, or create MCP
   tokens.
+- A workspace's own history is part of reading it: visitors see **who
+  changed what** there, with the names of the public tenant's editors, as
+  anyone who can open the workspace does. Publish under names you are happy
+  to show.
 - **Signed in, you see only your own tenant.** People of other tenants never
   see the public one mixed in, and visitors never see anything else. The
   public tenant's own members sign in to edit it, with whatever their roles

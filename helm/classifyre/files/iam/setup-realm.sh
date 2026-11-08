@@ -73,28 +73,39 @@ if ! "$KC" get roles/classifyre-operator -r "$R" >/dev/null 2>&1; then
     -s 'description=Creates and changes tenants. Sees no workspace content unless also granted.'
 fi
 
-# Operators manage people, groups, tenants and directories in the realm's
-# identity console (iam.realmConsole), so the role carries the console rights
-# of this realm, and none in the master realm. Everything realm-admin has but
-# impersonation: operators never act as someone inside a tenant. Taken away
-# again when the console is off.
+# Operators manage people, groups, tenants and sign-in providers in the
+# realm's identity console (iam.realmConsole). The role carries only those
+# rights, in this realm: not the clients (their secrets), not the realm's own
+# settings, authentication flows or user federation, and not impersonation.
+# Those stay with the identity server's own admin (master realm). Rights an
+# earlier release gave beyond these are taken away again, and all of them
+# when the console is off.
 RM_ID=$(find_id clients clientId realm-management)
-CONSOLE_RIGHTS="view-realm manage-realm view-users manage-users query-users query-groups
+OPERATOR_RIGHTS="view-realm view-users manage-users query-users query-groups
   view-organizations manage-organizations view-identity-providers manage-identity-providers
-  view-clients manage-clients query-clients create-client view-events manage-events
-  view-authorization manage-authorization query-realms"
-# shellcheck disable=SC2086 # word list on purpose
+  view-events"
+NOT_OPERATOR_RIGHTS="manage-realm view-clients manage-clients query-clients create-client
+  manage-events view-authorization manage-authorization query-realms impersonation realm-admin"
+operator_role() { # add-roles|remove-roles <rights...>
+  local action=$1 role
+  shift
+  for role in "$@"; do
+    if [ "$action" = add-roles ]; then
+      "$KC" add-roles -r "$R" --rname classifyre-operator \
+        --cclientid realm-management --rolename "$role"
+    else # not held is fine
+      "$KC" remove-roles -r "$R" --rname classifyre-operator \
+        --cclientid realm-management --rolename "$role" >/dev/null 2>&1 || true
+    fi
+  done
+}
+# shellcheck disable=SC2086 # word lists on purpose
 if [ "${IAM_REALM_CONSOLE:-false}" = "true" ]; then
-  echo "operators manage the realm in its identity console"
-  for role in $CONSOLE_RIGHTS; do
-    "$KC" add-roles -r "$R" --rname classifyre-operator \
-      --cclientid realm-management --rolename "$role"
-  done
+  echo "operators manage people, organizations and providers in the identity console"
+  operator_role add-roles $OPERATOR_RIGHTS
+  operator_role remove-roles $NOT_OPERATOR_RIGHTS
 else
-  for role in $CONSOLE_RIGHTS; do
-    "$KC" remove-roles -r "$R" --rname classifyre-operator \
-      --cclientid realm-management --rolename "$role" 2>/dev/null || true
-  done
+  operator_role remove-roles $OPERATOR_RIGHTS $NOT_OPERATOR_RIGHTS
 fi
 
 echo "client scope classifyre"
@@ -191,11 +202,21 @@ if [ -n "$ORG_SCOPE_ID" ]; then
   "$KC" update "clients/$WEB_ID/optional-client-scopes/$ORG_SCOPE_ID" -r "$R" >/dev/null 2>&1 || true
 fi
 
+# create_organization <name> <alias> <value naming it>: organization names are
+# unique too, so another organization already called <name> is reported
+# plainly instead of as a bare conflict.
+create_organization() {
+  if [ -n "$(find_id organizations name "$1")" ]; then
+    echo "an organization named '$1' already exists with another alias; set $3 to another name" >&2
+    exit 1
+  fi
+  "$KC" create organizations -r "$R" -s "name=$1" -s "alias=$2" -s enabled=true
+}
+
 echo "tenant $IAM_TENANT_ALIAS"
 ORG_ID=$(find_id organizations alias "$IAM_TENANT_ALIAS")
 if [ -z "$ORG_ID" ]; then
-  "$KC" create organizations -r "$R" -s "name=$IAM_TENANT_NAME" -s "alias=$IAM_TENANT_ALIAS" \
-    -s enabled=true
+  create_organization "$IAM_TENANT_NAME" "$IAM_TENANT_ALIAS" iam.bootstrap.tenant.name
   ORG_ID=$(find_id organizations alias "$IAM_TENANT_ALIAS")
 fi
 ADMINS_ID=$(find_id "organizations/$ORG_ID/groups" name admins)
@@ -211,8 +232,7 @@ if [ -n "${IAM_PUBLIC_TENANT:-}" ] && [ "$IAM_PUBLIC_TENANT" != "$IAM_TENANT_ALI
   echo "public tenant $IAM_PUBLIC_TENANT"
   PUBLIC_ID=$(find_id organizations alias "$IAM_PUBLIC_TENANT")
   if [ -z "$PUBLIC_ID" ]; then
-    "$KC" create organizations -r "$R" -s "name=${IAM_PUBLIC_TENANT_NAME:-Public}" \
-      -s "alias=$IAM_PUBLIC_TENANT" -s enabled=true
+    create_organization "${IAM_PUBLIC_TENANT_NAME:-Public}" "$IAM_PUBLIC_TENANT" iam.public.name
     PUBLIC_ID=$(find_id organizations alias "$IAM_PUBLIC_TENANT")
   fi
   if [ -z "$(find_id "organizations/$PUBLIC_ID/groups" name admins)" ]; then

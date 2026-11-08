@@ -32,15 +32,17 @@ export interface Principal {
 }
 
 /**
- * Why a request is not signed in, as the API's 401 `code`. `NO_TENANT` and
- * `CHOOSE_TENANT` are signed-in people: renewing their session changes
- * nothing, so the web shows them a page instead of retrying.
+ * Why a request is not signed in, as the API's 401 `code`. All but
+ * `SIGN_IN_REQUIRED` are signed-in people whom renewing the session would not
+ * help, so the web shows them a page saying why instead of retrying.
  */
 export type AuthenticationCode =
   | 'SIGN_IN_REQUIRED'
   | 'NO_TENANT'
   | 'CHOOSE_TENANT'
-  | 'TENANT_SUSPENDED';
+  | 'TENANT_SUSPENDED'
+  | 'TENANT_DELETED'
+  | 'TENANT_REPLACED';
 
 /** The realm role that opens the Platform page (docs/prd/TEN §4.7). */
 export const OPERATOR_ROLE = 'classifyre-operator';
@@ -155,7 +157,11 @@ export class IdentityService {
     if (request.classifyrePrincipal) return request.classifyrePrincipal;
     // No credentials at all, never a bad or expired token: that one stays a
     // 401, so the web renews the session instead of dropping to a visitor.
-    if (this.config.publicTenantAlias && !tokenOf(request.headers)) {
+    if (
+      this.config.publicTenantAlias &&
+      header(request.headers, 'authorization') === undefined &&
+      !tokenOf(request.headers)
+    ) {
       const visitor = await this.visitor();
       request.classifyrePrincipal = visitor;
       return visitor;
@@ -193,27 +199,27 @@ export class IdentityService {
     }
     const tenant = await this.tenancy.ensureTenant(org);
     if (tenant.status !== 'active') {
-      throw new AuthenticationError(
-        tenant.status === 'suspended'
-          ? 'This tenant is suspended. Its data is kept; an operator can resume it.'
-          : 'This tenant has been deleted.',
-        'TENANT_SUSPENDED',
-      );
+      throw tenant.status === 'suspended'
+        ? new AuthenticationError(
+            'This tenant is suspended. Its data is kept; an operator can resume it.',
+            'TENANT_SUSPENDED',
+          )
+        : new AuthenticationError(
+            'This tenant has been deleted, with its workspaces.',
+            'TENANT_DELETED',
+          );
     }
     if (tenant.orgId !== org.id) {
       // An organization deleted and made again under the same alias is not
       // the tenant whose workspaces and grants carry that alias.
       throw new AuthenticationError(
         `Tenant '${alias}' belonged to an organization that was deleted, so its workspaces stay closed. Ask an operator: the deleted organization can only come back from a backup of the identity server.`,
+        'TENANT_REPLACED',
       );
     }
     await this.ensureAdmins(tenant, org.id);
     const groupIds = await this.membership.groupIds(claims.sub, org.id);
-    const grants = await this.tenancy.grantsFor(
-      tenant.id,
-      claims.sub,
-      groupIds,
-    );
+    const grants = await this.tenancy.grantsFor(tenant.id, groupIds);
 
     const displayName =
       (typeof claims.name === 'string' && claims.name) ||
@@ -241,16 +247,30 @@ export class IdentityService {
     return principal;
   }
 
-  private visitorCache: { principal: Principal; until: number } | null = null;
+  private visitorCache: {
+    principal: Principal | null;
+    until: number;
+  } | null = null;
 
   /**
    * The principal of everyone who has not signed in: Visitor on the public
-   * tenant, nothing else. Looked up at most once a minute.
+   * tenant, nothing else. Looked up at most once a minute, also when there
+   * is none (not set up, suspended), so anonymous requests never reach the
+   * identity server one by one.
    */
   private async visitor(): Promise<Principal> {
-    if (this.visitorCache && this.visitorCache.until > Date.now()) {
-      return this.visitorCache.principal;
+    if (!this.visitorCache || this.visitorCache.until <= Date.now()) {
+      this.visitorCache = {
+        principal: await this.lookUpVisitor(),
+        until: Date.now() + 60_000,
+      };
     }
+    const { principal } = this.visitorCache;
+    if (!principal) throw new AuthenticationError('Sign in to continue.');
+    return principal;
+  }
+
+  private async lookUpVisitor(): Promise<Principal | null> {
     const alias = this.config.publicTenantAlias!;
     const org = await this.membership.organizationByAlias(alias);
     const tenant = org ? await this.tenancy.ensureTenant(org) : null;
@@ -261,7 +281,7 @@ export class IdentityService {
       tenant.orgId !== org.id
     ) {
       // Not set up (yet), suspended or replaced: nothing is public.
-      throw new AuthenticationError('Sign in to continue.');
+      return null;
     }
     const principal: Principal = {
       sub: '',
@@ -280,7 +300,7 @@ export class IdentityService {
         {
           id: 'visitor',
           tenantId: tenant.id,
-          subjectType: 'user',
+          subjectType: 'group',
           subjectId: '',
           roleKey: 'visitor',
           scopeType: 'tenant',
@@ -288,10 +308,10 @@ export class IdentityService {
           expiresAt: null,
         },
       ],
+      // No credentials at all; it never writes, so no origin check applies.
       via: 'cookie',
       visitor: true,
     };
-    this.visitorCache = { principal, until: Date.now() + 60_000 };
     return principal;
   }
 
@@ -437,7 +457,7 @@ export class IdentityService {
       tenant,
       orgId: tenant.orgId,
       groupIds,
-      grants: await this.tenancy.grantsFor(tenant.id, sub, groupIds),
+      grants: await this.tenancy.grantsFor(tenant.id, groupIds),
       via: 'bearer',
     };
     const capabilities = await this.capabilitiesIn(principal, namespaceId);
@@ -488,15 +508,6 @@ export class IdentityService {
    */
   groupsOf(principal: Principal, fresh = false): Promise<OrgGroup[]> {
     return this.membership.groups(principal.orgId, { fresh });
-  }
-
-  /** Whether a person (subject id) belongs to the principal's tenant. */
-  async isMember(principal: Principal, sub: string): Promise<boolean> {
-    const member = await this.membership.membership(sub);
-    return (
-      member.enabled &&
-      member.organizations.some((org) => org.id === principal.orgId)
-    );
   }
 
   /** Every workspace of the principal's tenant they can see, with what they may do there. */

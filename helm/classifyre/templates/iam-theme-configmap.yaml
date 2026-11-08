@@ -15,13 +15,14 @@ metadata:
 {{- /* Keycloak serves theme files for 30 days under a path that changes only
      with its own version, so a changed theme would not reach browsers that
      cached the old one. The stylesheets, images and fonts the theme names are
-     asked for with the theme's hash instead (`login.css?v=<hash>`). */ -}}
+     asked for with the theme's hash instead (`login.css?v=<hash>`):
+     every reference followed by a quote, `)`, a space or the line's end. */ -}}
 {{- $version := include "classifyre.iam.themeHash" . }}
 binaryData:
   {{- range $path, $_ := .Files.Glob "files/iam/theme/**" }}
   {{- $content := $.Files.Get $path }}
   {{- if or (hasSuffix ".css" $path) (hasSuffix "theme.properties" $path) }}
-  {{- $content = regexReplaceAll "(?m)\\.(css|svg|png|woff2|ico)(\"\\)|[ \\t]|$)" $content (printf ".${1}?v=%s${2}" $version) }}
+  {{- $content = regexReplaceAll "(?m)\\.(css|svg|png|woff2|ico)([\"')]|[ \\t]|$)" $content (printf ".${1}?v=%s${2}" $version) }}
   {{- end }}
   {{ include "classifyre.iam.themeKey" $path }}: {{ $content | b64enc }}
   {{- end }}

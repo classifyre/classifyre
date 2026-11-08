@@ -160,6 +160,7 @@ export function WorkspaceCard({
                     onDelete(ns);
                   }}
                   aria-label={t("workspaces.deleteAria", { name: ns.name })}
+                  data-testid={`workspace-delete-${ns.slug}`}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>

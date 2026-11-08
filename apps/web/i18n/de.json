@@ -7363,5 +7363,25 @@
     "managedInIdentityServer": "Mandanten, ihre Personen und Gruppen werden im Identitätsserver angelegt (eine Organisation mit einer obersten Admin-Gruppe). Neue erscheinen hier von selbst.",
     "openConsole": "Identitätskonsole öffnen",
     "openInConsole": "In der Identitätskonsole öffnen"
+  },
+  "noTenantPage": {
+    "title": "Noch in keinem Mandanten",
+    "noTenant": "Sie sind angemeldet, aber Ihr Konto gehört noch zu keinem Mandanten (keiner Organisation) von Classifyre, daher gibt es hier nichts zu sehen.",
+    "noTenantFix": "Bitten Sie, wer diese Installation betreibt (einen Betreiber), Ihr Konto in der Identitätskonsole Ihrer Organisation hinzuzufügen, oder Ihre IT, wenn Konten aus dem Firmenverzeichnis kommen.",
+    "severalTitle": "Einen Mandanten wählen",
+    "several": "Ihr Konto gehört zu mehreren Mandanten. Classifyre arbeitet immer in einem.",
+    "severalFix": "Melden Sie sich erneut an und wählen Sie den Mandanten.",
+    "suspendedTitle": "Mandant gesperrt",
+    "suspended": "Ihr Mandant ist gesperrt, daher kann derzeit niemand darin in Classifyre arbeiten. Seine Daten bleiben erhalten.",
+    "suspendedFix": "Ein Betreiber kann ihn wieder freigeben; fragen Sie, wer diese Installation betreibt.",
+    "deletedTitle": "Mandant gelöscht",
+    "deleted": "Ihr Mandant wurde gelöscht, mit seinen Arbeitsbereichen.",
+    "deletedFix": "Wenn Sie zu einem anderen Mandanten gehören sollten, bitten Sie, wer diese Installation betreibt, Sie seiner Organisation hinzuzufügen.",
+    "replacedTitle": "Mandant geschlossen",
+    "replaced": "Die Organisation hinter Ihrem Mandanten wurde im Identitätsserver gelöscht und neu angelegt, daher bleiben seine Arbeitsbereiche geschlossen: Niemand erbt sie versehentlich.",
+    "replacedFix": "Fragen Sie, wer diese Installation betreibt (einen Betreiber). Die alte Organisation lässt sich nur aus einer Sicherung des Identitätsservers zurückholen.",
+    "signedInAs": "Angemeldet als",
+    "retry": "Erneut versuchen",
+    "signOut": "Abmelden"
   }
 }
