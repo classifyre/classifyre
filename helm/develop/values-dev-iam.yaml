@@ -14,10 +14,11 @@ iam:
   public:
     enabled: true
     tenant: public
-  # Dev only: the identity server's own admin console at
-  # http://localhost:3000/iam/admin (user `admin`, password in the
-  # classifyre-iam Secret, key admin-password).
-  exposeAdminConsole: true
+  # As in production: through the app only the realm's identity console
+  # (http://localhost:3000/auth/console/, for operators). The master realm's
+  # console is on the skaffold port-forward, http://localhost:8280/iam/admin
+  # (user `admin`, password in the classifyre-iam Secret, key admin-password).
+  exposeAdminConsole: false
   database:
     poolMaxSize: 5
   resources:

@@ -149,20 +149,21 @@ export function WorkspaceCard({
                 <Settings className="h-4 w-4" />
               </Link>
             </Button>
-            {onDelete && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-muted-foreground hover:text-destructive"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onDelete(ns);
-                }}
-                aria-label={t("workspaces.deleteAria", { name: ns.name })}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            )}
+            {onDelete &&
+              (ns.capabilities?.includes("workspace.delete") ?? true) && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-muted-foreground hover:text-destructive"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onDelete(ns);
+                  }}
+                  aria-label={t("workspaces.deleteAria", { name: ns.name })}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
           </div>
         </div>
 

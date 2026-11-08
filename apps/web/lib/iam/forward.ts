@@ -66,15 +66,28 @@ export async function forwardIamRequest(
     hadTrailingSlash,
   );
 
-  let upstream: Response;
-  try {
-    upstream = await fetch(targetUrl, {
+  const send = (url: URL) =>
+    fetch(url, {
       method: request.method,
       headers,
       body,
       cache: "no-store",
       redirect: "manual",
     });
+
+  let upstream: Response;
+  try {
+    upstream = await send(targetUrl);
+    // The app's site-wide trailing-slash redirect (next.config.mjs) also
+    // reaches `/iam`, so a slashless Keycloak endpoint (the consoles'
+    // translations, parts of the admin API) arrives here with a slash and
+    // 404s. Ask once more the way the browser first did.
+    if (upstream.status === 404 && hadTrailingSlash && segments.length > 0) {
+      await upstream.arrayBuffer();
+      upstream = await send(
+        upstreamIamUrl(base, segments, request.nextUrl.searchParams, false),
+      );
+    }
   } catch (error) {
     return Response.json(
       {

@@ -411,7 +411,8 @@ What the chart sets up:
 | Realm `classifyre` | Created and kept up to date by a job on every install and upgrade: the web and API clients, short-lived tokens (5 minutes), brute-force protection, audit events |
 | First tenant       | `iam.bootstrap.tenant` (default `default`) with a group `admins`                                                                                                 |
 | Public tenant      | Only with `iam.public.enabled`: `iam.public.tenant` (default `public`) with an empty group `admins`, unless it is the first tenant                               |
-| First admin        | `iam.bootstrap.admin.username` (default `admin`), member of `admins`, with a temporary password                                                                  |
+| First admin        | `iam.bootstrap.admin.username` (default `admin`), member of `admins`, with a temporary password, and an operator                                                  |
+| Theme              | Classifyre's look for the sign-in pages, the identity console and the account page, as plain files from a ConfigMap (`iam.theme`); the server image stays the stock one |
 
 Read the first admin's temporary password, which must be changed at first
 sign-in:
@@ -435,14 +436,16 @@ iam:
   appUrl: https://classifyre.example.com # Classifyre itself; sign-in lives at https://classifyre.example.com/iam
 ```
 
-Only the `classifyre` realm and the theme's static files are reachable
-through the web proxy. The identity server's own admin console and the
-master realm stay inside the cluster unless you set
-`iam.exposeAdminConsole: true`, which also forwards `/iam/admin` and
-`/iam/realms/master` through the proxy; reach it with
+Through the web proxy browsers reach the `classifyre` realm, the theme's
+static files and, for operators, that realm's **identity console** at
+`<appUrl>/iam/admin/classifyre/console/` (`iam.realmConsole`, on by default;
+Classifyre links to it as **Identity console**). The identity server's own
+master realm and its console stay inside the cluster unless you set
+`iam.exposeAdminConsole: true`. Reach them with
 `kubectl port-forward svc/classifyre-iam 8080` (`/iam` keeps its path, so
-open `http://localhost:8080/iam/admin`) and its `admin` user, whose
-password is under `admin-password` in the same Secret.
+open `http://localhost:8080/iam/admin`) and its `admin` user, whose password
+is under `admin-password` in the same Secret. See
+[Getting started](/access/getting-started/) for the first sign-in.
 
 ### Turning it off
 
@@ -453,8 +456,9 @@ iam:
 
 Without sign-in anyone who reaches the instance can use every workspace, as
 in the all-in-one Docker image, which never uses it. A sitemap
-(`frontend.sitemap.enabled`) is only allowed with sign-in off: a private
-instance publishes nothing for search engines.
+(`frontend.sitemap.enabled`) is only allowed with sign-in off, or with a
+public tenant, whose workspaces it then lists: a private instance publishes
+nothing for search engines.
 
 ### Upgrades and backups
 

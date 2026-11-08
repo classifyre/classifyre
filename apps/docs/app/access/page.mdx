@@ -1,7 +1,7 @@
 ---
 sidebarTitle: Overview
 title: Access & Sign-in
-description: How Classifyre decides who can see and change what — tenants, workspaces, groups, roles and capabilities.
+description: How Classifyre decides who can see and change what — tenants, workspaces, groups, roles and grants, and why access always goes to groups.
 ---
 
 import { Callout } from "nextra/components";
@@ -9,37 +9,113 @@ import { Callout } from "nextra/components";
 # Access & Sign-in
 
 <Callout type="info">
-  Sign-in is optional and comes with the Helm chart. This page describes how
-  access works once it is on.
+  Sign-in comes with the Helm chart and is on by default there. The
+  all-in-one Docker image never has it. New here? Start with
+  [Getting started](/access/getting-started/).
 </Callout>
 
-Access management is **optional**. When it is off, Classifyre works as it
-always has: anyone who can reach the instance can use every workspace, and
-names in timelines are whatever people type in.
+When sign-in is off, Classifyre works as it always has: anyone who can reach
+the instance can use every workspace, and names in timelines are whatever
+people type in. When it is on, people sign in, and what they can see and
+change depends on the **groups** they belong to.
 
-When it is on, people sign in, and what they can see and change depends on the
-groups they belong to.
-
-- **Kubernetes (Helm chart):** the chart installs the identity server and
-  turns sign-in on by default. See
-  [Kubernetes → Sign-in](/deployment/kubernetes/#sign-in) for setting it up or
-  turning it off.
-- **Docker (all-in-one image):** access management is never used. The image is
-  meant for one person or a small trusted team on one machine.
+![The Classifyre sign-in page: the case-file card on the black string board](./images/sign-in.png)
 
 Who can open an installation depends on two switches of the chart, sign-in
 (`iam.enabled`) and a public tenant (`iam.public.enabled`):
 
-| Installation                                 | Without signing in                                   | Signed in                     |
-| -------------------------------------------- | ---------------------------------------------------- | ----------------------------- |
-| Docker all-in-one image                      | Everyone uses every workspace (there is no sign-in)  | –                             |
-| Helm, sign-in on (the default)               | Nothing: everyone is sent to sign in                 | Their own tenant's workspaces |
-| Helm, sign-in on, public tenant on           | One tenant's workspaces, read-only: [the public tenant](#the-public-tenant) | Their own tenant's workspaces |
-| Helm, sign-in off                            | Everyone uses every workspace, like the Docker image | –                             |
+| Installation                       | Without signing in                                                          | Signed in                     |
+| ---------------------------------- | --------------------------------------------------------------------------- | ----------------------------- |
+| Docker all-in-one image            | Everyone uses every workspace (there is no sign-in)                         | –                             |
+| Helm, sign-in on (the default)     | Nothing: everyone is sent to sign in                                        | Their own tenant's workspaces |
+| Helm, sign-in on, public tenant on | One tenant's workspaces, read-only: [the public tenant](#the-public-tenant) | Their own tenant's workspaces |
+| Helm, sign-in off                  | Everyone uses every workspace, like the Docker image                        | –                             |
 
 **Demo mode** (`DEMO_MODE`) is a separate switch on top of any of these: it
 makes the whole installation read-only for everyone without the operator's
 bypass key, signed in or not.
+
+### Where to go next
+
+| You want to                                                     | Read                                                   |
+| --------------------------------------------------------------- | ------------------------------------------------------ |
+| Sign in the first time, find the first password, add people     | [Getting started](/access/getting-started/)            |
+| Set up departments, teams, readers, contractors                 | [Organizing people](/access/organizing/)               |
+| Know exactly what each role allows                              | [Roles and rights](/access/roles/)                     |
+| Run it: tenants, company directories, the public tenant, upkeep | [Running Sign-in](/access/operations/)                 |
+
+---
+
+## Two places, two jobs
+
+Sign-in is split between two systems, on purpose:
+
+| Kept in the **identity server** (its console, or your company directory) | Kept in **Classifyre**                               |
+| ------------------------------------------------------------------------ | ---------------------------------------------------- |
+| Who people are: accounts, passwords, two-factor, sessions                | What they may do: roles and grants                    |
+| Tenants (organizations) and who belongs to each                          | Which workspaces exist, and which group owns each one |
+| Groups and subgroups, and who is in them                                 | The audit trail of every change                       |
+
+Classifyre only **reads** the identity server, with a service account that
+cannot change anything there. People and groups are made in the identity
+server (or arrive from your company directory); Classifyre gives groups
+access. Operators reach the identity server's console from Classifyre itself,
+under **Identity console** in the account menu.
+
+---
+
+## The building blocks
+
+| Term           | What it is                                                                                                                                  |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Tenant**     | A company, or a department that runs as its own company. In the identity server it is an **organization**. Tenants never see each other.    |
+| **Workspace**  | Where sources, findings and investigations live. A workspace belongs to exactly one tenant and is **owned by one group**.                     |
+| **Group**      | People who belong together: a business unit (`/finance`), a team inside it (`/finance/accounts-payable`), or a group made only for access. |
+| **Role**       | A named set of things a person may do, such as _Viewer_ or _Investigator_. See [Roles and rights](/access/roles/).                          |
+| **Capability** | One thing Classifyre allows, such as `source.manage` or `case.edit`. A role is a list of capabilities.                                      |
+| **Grant**      | Gives a group a role: on one workspace, on every workspace a group owns, or on the whole tenant, optionally until a date.                   |
+
+Groups nest: someone in `/finance/accounts-payable` also counts as being in
+`/finance`, so a grant to `/finance` reaches them too.
+
+---
+
+## Access always goes to groups
+
+In Classifyre you never give a role to a person. You give it to a **group**,
+and you decide who has access by putting people in groups, in the identity
+server. A group carries no rights by itself and a role never names a team;
+a **grant** joins the two.
+
+This keeps access readable and safe:
+
+- **Who can do what is one list per workspace**, of groups, not hundreds of
+  names. **Settings → Access** shows it, and **Why can I…?** names the grant
+  behind any right.
+- **Joining and leaving follow the directory.** Someone who changes team, or
+  leaves, changes groups in one place; their access follows within a minute,
+  including the MCP agents they created.
+- **Access only adds up.** There are no rules that take something away: what
+  you can do is the sum of your groups' grants.
+
+So both "finance can read its workspaces" and "these five people manage
+finance's workspaces" are grants, to different groups:
+
+| To…                                                   | Put the person in a group…                     | …which has the grant                                     |
+| ----------------------------------------------------- | ---------------------------------------------- | -------------------------------------------------------- |
+| **Isolate** someone to one workspace                  | that has a grant on that workspace only        | e.g. `/legal` Viewer on _Finance ledger_                 |
+| **Elevate** someone for a while                       | made for it, given a grant with an end date    | e.g. `/contractors` Investigator until 20 Dec            |
+| Let someone **create** workspaces for their team      | an access group under the team                 | `/finance/workspace-managers` Workspace manager          |
+| Take everything back                                  | –: remove them from the group                  | the grant stays for everyone else in it                  |
+
+[Organizing people](/access/organizing/) walks through a whole company set
+up this way.
+
+<Callout type="info">
+  The screens only offer groups. The API also accepts one person's id in a
+  grant (`subjectType: "user"`), for scripts that need it; a group of one
+  person does the same job and stays visible in the identity server.
+</Callout>
 
 ---
 
@@ -49,93 +125,54 @@ With sign-in on, opening Classifyre takes you to its sign-in page. After
 signing in you see only the workspaces you have access to; a workspace you
 cannot see behaves as if it did not exist.
 
-Each person belongs to one tenant. Someone whose account is not in a tenant
-yet sees a page saying so, with **Try again** for once a tenant admin has added
-them. Someone in several tenants sees a page asking them to choose one;
-working in several tenants side by side is not available yet. When an
+Each person works in one tenant. Someone whose account is in no tenant yet
+sees a page saying so, with **Try again** for once an operator has added
+them. Someone in several tenants sees a page asking them to choose one, and
+finds the others under **Switch tenant** in the account menu. When an
 operator has suspended your tenant, a page says so; your data is kept.
 
 Your name and tenant are in the account menu in the top-right corner, with
-**Sign out**. Sessions renew themselves while you work; after a long break you
-are asked to sign in again. Classifyre never shows your sign-in tokens to the
-page itself: they live in cookies only the server can read.
+**Sign out**, and for the people allowed: **Tenant access** (tenant admins),
+**Platform** and **Identity console** (operators).
 
+![The account menu of an operator who is also a tenant admin](./images/account-menu.png)
+
+Sessions renew themselves while you work; after a long break you are asked
+to sign in again. Classifyre never shows your sign-in tokens to the page
+itself: they live in cookies only the server can read. Your password,
+two-factor and sessions are on your own account page in the identity server
+(`/iam/realms/classifyre/account`).
+
+---
+
+## Tenants: private and public
+
+Every tenant is **private**: only its own members see it, with whatever their
+groups' grants allow. Signed-in people only ever work in their own tenant;
+tenants are kept in databases of their own, so one never shows another's
+data.
 
 ### The public tenant
 
 An installation can make one tenant public (`iam.public.enabled`). Then
-opening Classifyre without signing in shows that tenant's workspaces instead of
-the sign-in page, with **Sign in** in the top-right corner:
+opening Classifyre without signing in shows that tenant's workspaces instead
+of the sign-in page, with **Sign in** in the top-right corner:
+
+![A visitor on the public tenant: its workspaces, read-only, and Sign in](./images/public-visitor.png)
 
 - Visitors **read**: workspaces, sources and their scans, assets, findings,
   detectors, cases, inquiries, the glossary and entities. They cannot change
   anything, see who has access, read the tenant's activity, or create MCP
-  tokens. Names in a workspace's timelines are shown as for anyone who can
-  open it.
+  tokens.
 - **Signed in, you see only your own tenant.** People of other tenants never
-  see the public one mixed in, and visitors never see anything else. Only the
-  public tenant's own members see its workspaces signed in, with whatever
-  their roles allow; that is how it is edited.
+  see the public one mixed in, and visitors never see anything else. The
+  public tenant's own members sign in to edit it, with whatever their roles
+  allow.
 - Anything a crawler can reach is what a visitor can: with a public tenant the
   sitemap may be on, and it lists only that tenant's workspaces.
 
 Operators set it up; see
-[Running sign-in → The public tenant](/access/operations/#the-public-tenant).
-
----
-
-## The building blocks
-
-| Term           | What it is                                                                                                                              |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| **Tenant**     | A company, or a department that runs as its own company. A tenant has its own workspaces, groups and people.                            |
-| **Workspace**  | Where sources, findings and investigations live. A workspace belongs to exactly one tenant and is owned by one group.                   |
-| **Group**      | People who belong together: a business unit (`finance`), a team inside it (`finance/ap-team`), or a group made only to hand out access. |
-| **Role**       | A named set of things a person may do, such as _Viewer_ or _Investigator_.                                                              |
-| **Capability** | One thing Classifyre allows, such as _change sources_ or _work on cases_. A role is a list of capabilities.                             |
-| **Grant**      | Gives a group (or one person) a role on a workspace, on every workspace a group owns, or on the whole tenant.                           |
-
-A group never carries permissions by itself, and a role never names a team. A
-**grant** joins the two. So "finance can read these workspaces" and "these
-five people manage finance workspaces" are both just grants, to different
-groups.
-
-Access only adds up. There are no rules that take something away: what you can
-do is the sum of your grants, and the workspace's **Access** settings will show
-which grant gives you what.
-
----
-
-## Roles
-
-| Role                  | Can                                                                                                   |
-| --------------------- | ----------------------------------------------------------------------------------------------------- |
-| **Viewer**            | Read everything in the workspace. Create personal MCP tokens, which can only read too.                |
-| **Investigator**      | Everything a Viewer can, plus triage findings, tag assets, work on cases and inquiries, review leads. |
-| **Curator**           | Everything a Viewer can, plus write and approve glossary terms, manage entities, decide duplicates.   |
-| **Source manager**    | Connect sources, run scans, manage detectors. Sees findings and assets, but not cases or inquiries.   |
-| **Workspace admin**   | Everything in the workspace, including settings and who has access. Not writing code.                 |
-| **Code author**       | An add-on for writing and running code: custom source notebooks and code detectors.                   |
-| **Workspace manager** | Create workspaces for their own group, and administer every workspace that group owns.                |
-| **Auditor**           | Read the tenant's audit trail and who has access, without seeing findings.                            |
-| **Tenant admin**      | Everything in the tenant.                                                                             |
-
-Above every tenant are **operators**, the people who run the installation.
-They create, suspend and delete tenants and choose their first admins on the
-Platform page, without seeing inside any workspace (see
-[Running Sign-in](/access/operations/#the-platform-page)).
-
-Investigator and Curator sit side by side: someone who needs both gets both.
-
-### Examples
-
-| Situation                                             | Grant                                                        |
-| ----------------------------------------------------- | ------------------------------------------------------------ |
-| Finance sees its own workspaces, sales sees its own   | Viewer for `finance` on finance's workspaces, same for sales |
-| A fraud team works cases but must not change sources  | Investigator on that workspace                               |
-| Only a few people may create finance workspaces       | Workspace manager for a `finance/workspace-managers` group   |
-| Legal needs a read-only look at one finance workspace | Viewer for `legal` on that one workspace                     |
-| A contractor investigates one workspace for six weeks | Investigator for that person, with an end date               |
+[Running Sign-in → The public tenant](/access/operations/#the-public-tenant).
 
 ---
 
@@ -143,7 +180,7 @@ Investigator and Curator sit side by side: someone who needs both gets both.
 
 An MCP token acts **as the person who created it**. An agent using your token
 can do what you can do in that workspace, and no more: if you can only read,
-your agent can only read. When your access changes, your tokens follow; when
+your agent can only read. When your groups change, your tokens follow; when
 you leave, they stop working.
 
 A token can still be narrowed further to a few tool groups when you create it
@@ -155,54 +192,18 @@ turned on has no owner and stops working: create a new one after signing in.
 
 ---
 
-## Giving access
-
-Access is given with **grants**:
-
-- **In a workspace**, under **Settings → Access**, workspace admins give a
-  group a role on that workspace, optionally until a date. Grants that come
-  from the tenant or from the group owning the workspace are listed as
-  inherited and can only be changed by a tenant admin.
-- **For the tenant**, on the **Tenant access** page (account menu, or
-  `/tenant`), tenant admins give roles on the whole tenant, on every workspace
-  a group owns, or on one workspace, and see the tenant's activity.
-- **When creating a workspace**, you choose the group that owns it. Only
-  groups you belong to and may create workspaces for are offered.
-
-**People and groups** are managed in the identity server, or in the company
-directory connected to it, not in Classifyre: see
-[Running sign-in](/access/operations/#tenants-and-groups). Classifyre reads
-them and decides, through grants, what they may do. Roles live only in
-Classifyre; there is nothing to set up in the identity server for them.
-
-The same is available through the API (`/<workspace>/access/…` and
-`/tenant/…`).
-
-Nobody can give more than they have: a workspace admin cannot make someone a
-code author, because writing code is not part of what a workspace admin may
-do. Grants can end on a date, for people who only need access for a while.
-
-To see why you can do something, **Settings → Access → Why can I…?** lists
-the grants that give it to you.
-
-Every grant given or removed, and every workspace created or deleted, is kept
-in the tenant's audit trail (`/tenant/audit-events`).
-
----
-
 ## Who changed what
 
 Every change made in a workspace is recorded in its **audit trail**, whether it
 came from the web app, the API or an agent through MCP. Each entry says:
 
-- **who** made the change: the name a person entered, or the MCP token an agent
-  used, or the autopilot;
+- **who** made the change: the signed-in person, the MCP token an agent used,
+  or the autopilot;
 - **what** changed: the source, case, detector or other item, and the action;
 - **which fields** were sent. Their values are never stored, so secrets and
   matched content stay out of the trail.
 
 Reading something is not recorded, and neither is the work scans report back.
-
 Without sign-in, a person's name is whatever they typed, so the trail shows
 who _said_ they made a change. With sign-in, it shows who did.
 
@@ -213,10 +214,12 @@ who _said_ they made a change. With sign-in, it shows who did.
   opens every change to it, newest first.
 - **For the whole workspace.** **Settings → Activity** lists every change in
   the workspace.
+- **For the tenant.** **Tenant access → Activity** lists every grant given or
+  removed and every workspace created or deleted, and what operators did to
+  the tenant.
 - **Through the API.** `GET /<workspace>/audit-events`, filtered by item
-  (`entityType`, `entityId`) or by author (`actor`).
+  (`entityType`, `entityId`) or by author (`actor`), and
+  `GET /tenant/audit-events`.
 
-Names are shown with what they are: a person, an MCP token (named after the
-token, also after it is deleted), an agent such as the autopilot, or the
-system. Without sign-in, hovering a person's name reminds you that it was
-typed in, not verified.
+Changes to people and groups are recorded by the identity server itself:
+**Events** and the organization's **Admin events** in its console.

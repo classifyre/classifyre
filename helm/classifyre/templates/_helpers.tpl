@@ -740,6 +740,39 @@ identity server is named `iam` in every resource and value of this chart.
 {{- printf "http://%s:8080%s" (include "classifyre.iam.fullname" .) (include "classifyre.iam.path" .) -}}
 {{- end -}}
 
+{{- /* ConfigMap key of a theme file: its path under files/iam/theme, with
+     `/` (not allowed in keys) as `__`. */ -}}
+{{- define "classifyre.iam.themeKey" -}}
+{{- trimPrefix "files/iam/theme/" . | replace "/" "__" -}}
+{{- end -}}
+
+{{- /* A short hash of every theme file: changes whenever the theme does. */ -}}
+{{- define "classifyre.iam.themeHash" -}}
+{{- $all := "" -}}
+{{- range $path, $_ := .Files.Glob "files/iam/theme/**" -}}
+{{- $all = printf "%s%s=%s;" $all $path ($.Files.Get $path | sha256sum) -}}
+{{- end -}}
+{{- $all | sha256sum | trunc 10 -}}
+{{- end -}}
+
+{{- /* Where each theme file lands under /opt/keycloak/themes/classifyre.
+     Files under shared/ (fonts, logo, brand styles) go into the resources
+     of every theme type, so the ConfigMap holds them once. */ -}}
+{{- define "classifyre.iam.themeItems" -}}
+{{- range $path, $_ := .Files.Glob "files/iam/theme/**" }}
+{{- $rel := trimPrefix "files/iam/theme/" $path }}
+{{- if hasPrefix "shared/" $rel }}
+{{- range $type := list "login" "admin" "account" }}
+- key: {{ include "classifyre.iam.themeKey" $path }}
+  path: {{ printf "%s/resources/%s" $type (trimPrefix "shared/" $rel) }}
+{{- end }}
+{{- else }}
+- key: {{ include "classifyre.iam.themeKey" $path }}
+  path: {{ $rel }}
+{{- end }}
+{{- end }}
+{{- end -}}
+
 {{- define "classifyre.iam.issuerUrl" -}}
 {{- printf "%s/realms/%s" (include "classifyre.iam.publicUrl" .) .Values.iam.realm -}}
 {{- end -}}
@@ -833,5 +866,7 @@ password
 {{- end }}
 - name: IAM_EXPOSE_ADMIN_CONSOLE
   value: {{ .Values.iam.exposeAdminConsole | quote }}
+- name: IAM_REALM_CONSOLE
+  value: {{ .Values.iam.realmConsole | quote }}
 {{- end }}
 {{- end -}}

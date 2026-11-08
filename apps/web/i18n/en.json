@@ -7271,7 +7271,8 @@
     "tenantSettings": "Tenant access",
     "switchTenant": "Switch tenant",
     "platform": "Platform",
-    "signIn": "Sign in"
+    "signIn": "Sign in",
+    "identityConsole": "Identity console"
   },
   "access": {
     "title": "Access",
@@ -7287,7 +7288,7 @@
     "none": "Nobody has access yet.",
     "group": "Group",
     "pickGroup": "Choose a group",
-    "groupsHint": "Groups are the tenant's own: a tenant admin creates them and puts people in them on the Tenant access page.",
+    "groupsHint": "Groups and their people are kept in the identity server, by your operators or your company directory; a group gets access here.",
     "role": "Role",
     "untilOptional": "Until (optional)",
     "add": "Give access",
@@ -7311,7 +7312,9 @@
       "access": "Access",
       "activity": "Activity"
     },
-    "peopleElsewhere": "People and groups are managed in the identity server, or the company directory behind it. Grants here decide what they may do in Classifyre; a renamed group keeps its grants, a removed one shows as removed."
+    "peopleElsewhere": "People and groups are managed in the identity server, or the company directory behind it. Grants here decide what they may do in Classifyre; a renamed group keeps its grants, a removed one shows as removed.",
+    "managePeople": "Manage people and groups",
+    "peopleByOperators": "Ask an operator of this installation to add people or change groups."
   },
   "platform": {
     "title": "Platform",
@@ -7357,6 +7360,8 @@
     "deleteDescription": "Its organization is gone from the identity server. Its {{count}} workspace(s) and their database are deleted, and its grants with them. Its activity is kept, and its alias is never given out again. This cannot be undone.",
     "deleteType": "Type {{alias}} to confirm",
     "deleted": "The data of {{name}} is removed",
-    "managedInIdentityServer": "Tenants, their people and groups are made in the identity server (an organization with a top-level admins group). New ones appear here on their own."
+    "managedInIdentityServer": "Tenants, their people and groups are made in the identity server (an organization with a top-level admins group). New ones appear here on their own.",
+    "openConsole": "Open the identity console",
+    "openInConsole": "Open in the identity console"
   }
 }

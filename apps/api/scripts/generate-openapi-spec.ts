@@ -15,6 +15,8 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from '../src/app.module';
 import { McpToolsCatalogService } from '../src/mcp-tools-catalog.service';
 import { MCP_CAPABILITY_GROUPS, MCP_PROMPTS } from '../src/mcp-catalog';
+import { CAPABILITIES } from '../src/identity/capabilities';
+import { BUILT_IN_ROLES } from '../src/identity/roles';
 import { mkdirSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
 
@@ -120,6 +122,30 @@ async function generateSpec() {
   writeFileSync(catalogPath, `${JSON.stringify(catalog, null, 2)}\n`);
   console.log(
     `🧰 MCP catalog: ${tools.length} tools in ${catalog.groups.length} groups → ${catalogPath}`,
+  );
+
+  // Roles and capabilities for the docs site (Access & Sign-in), from the
+  // definitions the API enforces, so the documented rights cannot drift.
+  const accessPath = join(
+    __dirname,
+    '../../docs/src/_generated/access-catalog.json',
+  );
+  const access = {
+    capabilities: CAPABILITIES.map(({ id, scope, description }) => ({
+      id,
+      scope,
+      description,
+    })),
+    roles: BUILT_IN_ROLES.map((role) => ({
+      key: role.key,
+      title: role.title,
+      scope: role.scope,
+      capabilities: [...role.capabilities],
+    })),
+  };
+  writeFileSync(accessPath, `${JSON.stringify(access, null, 2)}\n`);
+  console.log(
+    `🔑 Access catalog: ${access.roles.length} roles, ${access.capabilities.length} capabilities → ${accessPath}`,
   );
 
   await app.close();

@@ -176,15 +176,18 @@ export class TenantAccessController {
   @ApiOkResponse({ type: TenantDto })
   async tenant(@Req() request: FastifyRequest): Promise<TenantDto> {
     const principal = await this.principal(request);
+    const operator = principal.visitor
+      ? false
+      : await this.identity!.isOperator(principal.sub);
     return {
       id: principal.tenant.id,
       alias: principal.tenant.alias,
       name: principal.tenant.name,
+      displayName: principal.actor.displayName,
       capabilities: [...this.identity!.tenantCapabilities(principal)].sort(),
-      operator: principal.visitor
-        ? false
-        : await this.identity!.isOperator(principal.sub),
+      operator,
       visitor: principal.visitor ?? false,
+      organizationId: operator ? principal.orgId : null,
     };
   }
 

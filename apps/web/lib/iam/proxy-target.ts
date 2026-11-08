@@ -3,7 +3,8 @@
  * (docs/prd/IAM-access-management.md §9). The chart keeps Keycloak a
  * ClusterIP service; browsers reach it only here. The allow-list mirrors what
  * the old dedicated ingress did: the Classifyre realm and the theme's static
- * files, plus the admin console and the master realm when the operator turned
+ * files; the identity console of that realm with `iam.realmConsole`; and the
+ * whole admin console with the master realm when the operator turned
  * `iam.exposeAdminConsole` on.
  */
 
@@ -49,16 +50,32 @@ export function allowedIamPath(
   // console). Forward it only when the operator exposed the console —
   // otherwise it would advertise a path that 404s here.
   if (path.length === 0) return env.IAM_EXPOSE_ADMIN_CONSOLE === "true";
-  const [first, second, ...rest] = path;
+  const [first, second] = path;
   if (env.IAM_EXPOSE_ADMIN_CONSOLE === "true") {
     return first === "realms" || first === "resources" || first === "admin";
   }
-  if (first !== "realms" && first !== "resources") return false;
   // The master realm is the identity server's own administration; the realm
   // Classifyre uses is the only one browsers may touch.
   const realm = env.IAM_REALM?.trim() || undefined;
-  if (first === "realms" && (!realm || second !== realm || rest.length === 0)) {
-    return false;
+  if (!realm) return false;
+  if (first === "resources") return true;
+  if (first === "realms") return second === realm && path.length > 2;
+  if (first === "admin" && env.IAM_REALM_CONSOLE === "true") {
+    return realmConsolePath(path.slice(1), realm);
   }
-  return true;
+  return false;
+}
+
+/**
+ * The identity console of the Classifyre realm (`iam.realmConsole`): its page
+ * at `admin/<realm>/console/…` and the admin API it calls for that realm.
+ * Each call still needs a token of that realm with console rights, which only
+ * operators have; the master realm's console and API stay closed.
+ */
+function realmConsolePath(path: string[], realm: string): boolean {
+  const [first, second] = path;
+  if (first === realm) return second === "console";
+  if (first === "realms") return second === realm;
+  // Server version and providers, which the console reads on start.
+  return first === "serverinfo" && path.length === 1;
 }

@@ -28,6 +28,14 @@ export class PlatformTenantDto {
   @ApiProperty({ example: 'acme' })
   alias: string;
 
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description:
+      'Its organization in the identity server; null once that is gone.',
+  })
+  organizationId: string | null;
+
   @ApiProperty({ example: 'Acme' })
   name: string;
 

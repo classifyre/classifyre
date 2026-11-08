@@ -30927,6 +30927,11 @@
             "type": "string",
             "example": "Default"
           },
+          "displayName": {
+            "type": "string",
+            "nullable": true,
+            "description": "The caller's own name, for the account menu; null for visitors."
+          },
           "capabilities": {
             "type": "array",
             "description": "What the caller may do across the whole tenant.",
@@ -30985,15 +30990,22 @@
           "visitor": {
             "type": "boolean",
             "description": "The caller has not signed in and is browsing the public tenant, read-only."
+          },
+          "organizationId": {
+            "type": "string",
+            "nullable": true,
+            "description": "The tenant's organization in the identity server, for operators' links to its identity console; null for everyone else."
           }
         },
         "required": [
           "id",
           "alias",
           "name",
+          "displayName",
           "capabilities",
           "operator",
-          "visitor"
+          "visitor",
+          "organizationId"
         ]
       },
       "TenantEventDto": {
@@ -31100,6 +31112,11 @@
             "type": "string",
             "example": "acme"
           },
+          "organizationId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Its organization in the identity server; null once that is gone."
+          },
           "name": {
             "type": "string",
             "example": "Acme"
@@ -31160,6 +31177,7 @@
         "required": [
           "id",
           "alias",
+          "organizationId",
           "name",
           "status",
           "createdAt",

@@ -15,7 +15,7 @@ const TEXT = {
     noTenant:
       "You are signed in, but your account is not in any tenant (organization) of Classifyre yet, so there is nothing to show you.",
     noTenantFix:
-      "Ask a tenant admin to add you on their Tenant access page (People → Add person), or an operator to make you the admin of a tenant.",
+      "Ask whoever runs this installation (an operator) to add your account to your organization in the identity console, or your IT team if accounts come from your company directory.",
     severalTitle: "Choose one tenant",
     several:
       "Your account is in several tenants. Classifyre works in one tenant at a time.",
@@ -33,7 +33,7 @@ const TEXT = {
     noTenant:
       "Sie sind angemeldet, aber Ihr Konto gehört noch zu keinem Mandanten (keiner Organisation) von Classifyre, daher gibt es hier nichts zu sehen.",
     noTenantFix:
-      "Bitten Sie einen Mandanten-Admin, Sie auf seiner Seite Mandantenzugriff hinzuzufügen (Personen → Person hinzufügen), oder einen Betreiber, Sie zum Admin eines Mandanten zu machen.",
+      "Bitten Sie, wer diese Installation betreibt (einen Betreiber), Ihr Konto in der Identitätskonsole Ihrer Organisation hinzuzufügen, oder Ihre IT, wenn Konten aus dem Firmenverzeichnis kommen.",
     severalTitle: "Einen Mandanten wählen",
     several:
       "Ihr Konto gehört zu mehreren Mandanten. Classifyre arbeitet immer in einem.",

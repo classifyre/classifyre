@@ -1033,6 +1033,10 @@ iam:
   appUrl: ""
   # -- Expose the identity server's own admin console and master realm: the web proxy forwards only the `classifyre` realm and static files unless this is on, which also forwards `/iam/admin` and `/iam/realms/master`.
   exposeAdminConsole: false
+  # -- Forward the identity console of the `classifyre` realm through the web app, at `<appUrl>/iam/admin/<realm>/console/`, and give operators (realm role `classifyre-operator`) every right in that realm there but impersonation: people, groups, tenants, company directories. Classifyre links to it from the Platform and Tenant access pages. The master realm stays closed unless `exposeAdminConsole` is on. Off: the console is reached with a port-forward only.
+  realmConsole: true
+  # -- Theme of the sign-in pages, the identity console and the account page. `classifyre` is the chart's own (files/iam/theme), mounted from a ConfigMap into the stock image; empty keeps Keycloak's.
+  theme: classifyre
   # -- Realm that holds users, tenants (organizations) and groups.
   realm: classifyre
   # -- Database the API works on with sign-in: tenants, grants and the list of workspaces. Each tenant's workspace data is in a database of its own (`classifyre_t_<tenant id>`, own login role), made on its first workspace. The database user needs `CREATEDB` and `CREATEROLE`, and new databases need the `vector` extension (superuser, or installed in `template1`). Without sign-in the API uses `postgres.*.database`, the open database, which never holds a tenant.

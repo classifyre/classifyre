@@ -204,7 +204,7 @@ export class IdentityService {
       // An organization deleted and made again under the same alias is not
       // the tenant whose workspaces and grants carry that alias.
       throw new AuthenticationError(
-        `Tenant '${alias}' belongs to an organization that no longer exists. An operator has to link it again.`,
+        `Tenant '${alias}' belonged to an organization that was deleted, so its workspaces stay closed. Ask an operator: the deleted organization can only come back from a backup of the identity server.`,
       );
     }
     await this.ensureAdmins(tenant, org.id);

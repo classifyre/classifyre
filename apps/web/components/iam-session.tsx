@@ -4,10 +4,19 @@ import * as React from "react";
 import { setUnauthorizedHandler } from "@workspace/api-client";
 
 const IamEnabledContext = React.createContext(false);
+const IamConsoleContext = React.createContext(false);
 
 /** True when people sign in; available everywhere, also outside a workspace. */
 export function useIamEnabled(): boolean {
   return React.useContext(IamEnabledContext);
+}
+
+/**
+ * True when the realm's identity console is reachable through the app
+ * (`iam.realmConsole`): operators get links to it, via `/auth/console/`.
+ */
+export function useIamConsole(): boolean {
+  return React.useContext(IamConsoleContext);
 }
 
 /**
@@ -30,9 +39,11 @@ async function isOperator(): Promise<boolean> {
 
 export function IamProvider({
   enabled,
+  console: consoleEnabled = false,
   children,
 }: {
   enabled: boolean;
+  console?: boolean;
   children: React.ReactNode;
 }) {
   React.useEffect(() => {
@@ -69,6 +80,10 @@ export function IamProvider({
   }, [enabled]);
 
   return (
-    <IamEnabledContext.Provider value={enabled}>{children}</IamEnabledContext.Provider>
+    <IamEnabledContext.Provider value={enabled}>
+      <IamConsoleContext.Provider value={enabled && consoleEnabled}>
+        {children}
+      </IamConsoleContext.Provider>
+    </IamEnabledContext.Provider>
   );
 }

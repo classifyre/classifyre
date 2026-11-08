@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Building2, LogIn, LogOut, Server, UserRound } from "lucide-react";
+import { Building2, LogIn, LogOut, Server, UserRound, UsersRound } from "lucide-react";
 import { api, type TenantDto, type TenantMembershipDto } from "@workspace/api-client";
 import { Button } from "@workspace/ui/components/button";
 import {
@@ -12,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu";
-import { useMe } from "@/hooks/use-me";
+import { useIamConsole } from "@/components/iam-session";
 import { useTranslation } from "@/hooks/use-translation";
 
 function initials(name: string | null | undefined): string {
@@ -26,7 +26,7 @@ function initials(name: string | null | undefined): string {
  */
 export function AccountMenu() {
   const { t } = useTranslation();
-  const me = useMe();
+  const consoleOn = useIamConsole();
   const [tenant, setTenant] = React.useState<TenantDto | null>(null);
   const [tenants, setTenants] = React.useState<TenantMembershipDto[] | null>(null);
 
@@ -49,7 +49,8 @@ export function AccountMenu() {
     };
   }, []);
 
-  const name = me?.actor.displayName ?? null;
+  // From the tenant answer, which also works outside a workspace (`/me` is per workspace).
+  const name = tenant?.displayName ?? null;
   const others = (tenants ?? []).filter((member) => !member.current);
   if (tenant?.visitor) {
     const returnTo =
@@ -117,6 +118,19 @@ export function AccountMenu() {
             <a href="/platform/">
               <Server className="size-4" />
               {t("account.platform")}
+            </a>
+          </DropdownMenuItem>
+        )}
+        {tenant?.operator && consoleOn && (
+          <DropdownMenuItem asChild>
+            <a
+              href="/auth/console/"
+              target="_blank"
+              rel="noreferrer"
+              data-testid="identity-console"
+            >
+              <UsersRound className="size-4" />
+              {t("account.identityConsole")}
             </a>
           </DropdownMenuItem>
         )}

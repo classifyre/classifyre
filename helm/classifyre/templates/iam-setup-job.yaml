@@ -63,6 +63,10 @@ spec:
             - name: IAM_PUBLIC_TENANT_NAME
               value: {{ .Values.iam.public.name | quote }}
             {{- end }}
+            - name: IAM_THEME
+              value: {{ .Values.iam.theme | quote }}
+            - name: IAM_REALM_CONSOLE
+              value: {{ .Values.iam.realmConsole | quote }}
             - name: IAM_BOOTSTRAP_ADMIN
               value: {{ .Values.iam.bootstrap.admin.username | quote }}
             - name: IAM_BOOTSTRAP_ADMIN_EMAIL

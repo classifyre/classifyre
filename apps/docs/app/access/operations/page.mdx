@@ -19,20 +19,48 @@ or in the company directory it is connected to, and access in Classifyre.
 
 ---
 
-## The identity server's console
+## The identity console
 
-Its own admin console is not reachable from outside the cluster unless
-`iam.exposeAdminConsole` is on. The identity server itself is only reachable
-through the web app (its `/iam` proxy); reach the console with a
-port-forward:
+People, groups and tenants are managed in the identity server's console. For
+the `classifyre` realm it is served through the web app, like sign-in itself,
+at `<appUrl>/iam/admin/classifyre/console/` (`iam.realmConsole`, on by
+default). Operators open it from Classifyre: **Identity console** in the
+account menu, **Open the identity console** on the Platform page, **Open in
+the identity console** on a tenant there, and **Manage people and groups** on
+Tenant access. They are already signed in.
+
+![The Platform page, with the identity console a click away](../images/platform.png)
+
+What operators may do there comes from their realm role
+`classifyre-operator`: the chart gives it every right in the `classifyre`
+realm except **impersonation**, so an operator manages people, groups,
+organizations and company directories, but never signs in as someone else.
+Anyone else who finds the address is refused by the console itself.
+
+<Callout type="warning">
+  Whoever manages accounts can also reset someone's password and sign in as
+  them. Give `classifyre-operator` only to the people who run the
+  installation. The identity server records every change made in its console:
+  **Events → Admin events**, and on each organization its **Admin events**
+  tab.
+</Callout>
+
+With `iam.realmConsole: false` the console is not reachable through the web
+app at all; use the break-glass console below.
+
+### The identity server's own console
+
+The identity server also has its own administrator, `admin` in its **master**
+realm, which can change every realm. It is never reachable from outside the
+cluster unless `iam.exposeAdminConsole` is on. Use it only when no operator
+can sign in, with a port-forward:
 
 ```bash
 kubectl -n classifyre port-forward svc/classifyre-iam 8080
 ```
 
-Then open [localhost:8080/iam/admin](http://localhost:8080/iam/admin/) — the
-forwarded port answers the same `/iam` path the web proxy serves — and sign in
-as `admin`, with the password from:
+Then open [localhost:8080/iam/admin](http://localhost:8080/iam/admin/) and sign
+in as `admin`, with the password from:
 
 ```bash
 kubectl -n classifyre get secret classifyre-iam \
@@ -40,6 +68,16 @@ kubectl -n classifyre get secret classifyre-iam \
 ```
 
 Work in the **classifyre** realm. Leave the `master` realm alone.
+
+### The look
+
+The sign-in pages, the identity console and everyone's account page wear
+Classifyre's look (`iam.theme: classifyre`): the chart mounts the theme as
+plain files from a ConfigMap into the stock identity server image, which is
+never rebuilt. Set `iam.theme: ""` to keep the identity server's own look.
+A changed theme reaches browsers at once: its files are asked for under the
+theme's hash, while the identity server keeps the old ones cached for 30
+days.
 
 ---
 
@@ -62,27 +100,53 @@ tenant, and the Tenant access page shows only the tenant you signed in to.
 To add a tenant, create an **organization** in the console (its alias is the
 tenant's), give it a top-level group named exactly `admins`, and add its
 first admin to that group. To add someone to a tenant, make them a member of
-the organization and of its groups. Changes count within a minute.
+the organization and of its groups; [Getting started](/access/getting-started/#add-a-person)
+shows each step. Changes count within a minute.
 
 A new organization is listed on the Platform page on its own. Its `admins`
 group becomes tenant admin once; if a tenant admin later takes that away, it
 stays away.
 
-Do not delete an organization and create it again under the same alias: its
-members are refused with a message that an operator has to link the tenant
-again, so nobody inherits the old tenant's workspaces by accident.
+Do not delete an organization you want to keep (see
+[When things change in the identity server](#when-things-change-in-the-identity-server)).
 
 Groups are nested: being in `/finance/ap-team` counts as being in `/finance`.
-Renaming or moving a group never breaks access, because grants point at the
-group itself, not its name. A deleted group's grants stay listed as
-**Removed group** until a tenant admin removes them; nobody gets anything
-from them. Groups made under the realm's own **Groups** menu
-belong to no tenant, so Classifyre ignores them. Someone who signs in without
-being a member of any organization sees a page saying their account is not in
-a tenant yet.
+How to lay them out for a company is on
+[Organizing people](/access/organizing/).
 
 Roles and what they allow (capabilities such as managing sources or access)
 are not in the identity server at all. They live in Classifyre.
+
+---
+
+## When things change in the identity server
+
+Classifyre has no callbacks from the identity server. It reads it, keeps
+answers for a minute, and checks every signed-in request against them. So
+every change below counts **within a minute**, and nothing in Classifyre
+needs to be told.
+
+| In the identity server                     | In Classifyre                                                                                                                                       |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A group is **renamed**                     | Nothing changes: grants point at the group's id. The new name shows everywhere.                                                                     |
+| A group is **moved** under another parent  | Its people now count as being in the new parent and no longer in the old one: they gain and lose those grants.                                     |
+| A group is **deleted**                     | Its grants show as **Removed group** and give nobody anything until a tenant admin removes them. Workspaces it owned stay, reached by tenant-wide grants. |
+| A person is **removed from a group**       | They lose that group's access, and so do their MCP agents.                                                                                          |
+| A person is **disabled** or **deleted**    | They and every MCP token they made are refused. See [Off-boarding](#off-boarding-someone-urgently).                                                 |
+| A person is in **no organization**         | They see _Not in a tenant yet_ after signing in.                                                                                                    |
+| A person is in **several organizations**   | They choose one at sign-in and switch under **Switch tenant**; they work in one at a time.                                                         |
+| An organization's `admins` group is missing or renamed | The tenant shows a warning on the Platform page. Existing grants keep working; a new `admins` group gets Tenant admin only if the tenant never had it. |
+| A group is made under the realm's **Groups** menu | Ignored: it belongs to no tenant.                                                                                                       |
+| An organization is **deleted**             | Its people are refused and its workspaces stay closed. The Platform page marks the tenant; **Remove tenant data** deletes it for good.             |
+| It is made again **under the same alias**  | Still closed: the new organization is not the old tenant, so nobody inherits its workspaces by accident. Only a backup of the identity server's database brings the old organization back. |
+
+![Signed in, but in no organization yet](../images/no-tenant.png)
+
+**Suspending** a tenant is done in Classifyre, on the
+[Platform page](#the-platform-page): its people and their MCP agents are
+refused within a minute with a page saying so, its data is kept and its
+scheduled scans keep running, and **Resume** opens it again. Suspend rather
+than delete when in doubt.
 
 ---
 

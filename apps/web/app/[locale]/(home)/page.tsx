@@ -10,6 +10,7 @@ import {
   type Namespace,
   type NamespaceCategory,
   type NamespaceStats,
+  type TenantDto,
 } from "@workspace/api-client";
 import { Button } from "@workspace/ui/components/button";
 import { Card, CardContent } from "@workspace/ui/components/card";
@@ -107,7 +108,12 @@ function groupByCategory(
 export default function LandingPage() {
   const { t } = useTranslation();
   const canCreate = useCanCreateWorkspace();
-  const visitor = useIsVisitor();
+  const iamEnabled = useIamEnabled();
+  const iamTenant = useIamTenant();
+  const visitor = iamTenant?.visitor ?? false;
+  // Without sign-in everyone may; with it, as the tenant's grants say.
+  const canFileCategories =
+    !iamEnabled || (iamTenant?.capabilities.includes("tenant.categories.manage") ?? false);
   const headingId = React.useId();
   const localePath = useLocalePath();
   const { removeBySlug } = useActiveNamespaces();
@@ -238,12 +244,14 @@ export default function LandingPage() {
           </div>
           {namespaces && hasWorkspaces && (
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" asChild>
-                <Link href={localePath("/namespaces/categories")}>
-                  <Tags className="mr-2 h-4 w-4" />
-                  {t("categories.manage")}
-                </Link>
-              </Button>
+              {canFileCategories && (
+                <Button variant="outline" asChild>
+                  <Link href={localePath("/namespaces/categories")}>
+                    <Tags className="mr-2 h-4 w-4" />
+                    {t("categories.manage")}
+                  </Link>
+                </Button>
+              )}
               {canCreate && (
                 <Button
                   variant="default"
@@ -446,24 +454,24 @@ export default function LandingPage() {
 }
 
 /**
- * Someone browsing the public tenant without signing in (IAM_PUBLIC_TENANT):
- * the page speaks to them as a visitor, not as a member without access.
+ * The caller's tenant with sign-in: whether they are a visitor of the public
+ * tenant (the page then speaks to them as one) and what they may do across it.
  */
-function useIsVisitor(): boolean {
+function useIamTenant(): TenantDto | null {
   const iamEnabled = useIamEnabled();
-  const [visitor, setVisitor] = React.useState(false);
+  const [tenant, setTenant] = React.useState<TenantDto | null>(null);
   React.useEffect(() => {
     if (!iamEnabled) return;
     let active = true;
     void api.access.tenantAccessControllerTenant().then(
-      (tenant) => active && setVisitor(tenant.visitor),
+      (value) => active && setTenant(value),
       () => undefined,
     );
     return () => {
       active = false;
     };
   }, [iamEnabled]);
-  return visitor;
+  return tenant;
 }
 
 /**

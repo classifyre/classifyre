@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowLeft, Building2, History, KeyRound, Trash2 } from "lucide-react";
+import { ArrowLeft, Building2, History, KeyRound, Trash2, UsersRound } from "lucide-react";
 import { toast } from "sonner";
 import {
   api,
@@ -30,6 +30,7 @@ import {
   TabsTrigger,
 } from "@workspace/ui/components/tabs";
 import { ActorChip } from "@/components/actor-chip";
+import { useIamConsole } from "@/components/iam-session";
 import { useTranslation } from "@/hooks/use-translation";
 import { formatRelative } from "@/lib/date";
 import { extractApiErrorMessage } from "@/lib/extract-api-error-message";
@@ -47,6 +48,7 @@ const TAB_TRIGGER_CLASS =
  */
 export function TenantAdmin() {
   const { t } = useTranslation();
+  const consoleOn = useIamConsole();
   const [tenant, setTenant] = React.useState<TenantDto | null>(null);
   const [grants, setGrants] = React.useState<GrantDto[]>([]);
   const [groups, setGroups] = React.useState<TenantGroupDto[]>([]);
@@ -133,11 +135,29 @@ export function TenantAdmin() {
           <TabsContent value="access">
             <Card className="panel-card rounded-[6px]">
               <CardContent className="space-y-4 p-5">
-                <div className="space-y-1">
-                  <p className="text-xs font-mono uppercase tracking-[0.14em]">
-                    {t("access.tenantGrants")}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{t("access.peopleElsewhere")}</p>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="max-w-xl space-y-1">
+                    <p className="text-xs font-mono uppercase tracking-[0.14em]">
+                      {t("access.tenantGrants")}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {t("access.peopleElsewhere")}{" "}
+                      {!(consoleOn && tenant?.organizationId) && t("access.peopleByOperators")}
+                    </p>
+                  </div>
+                  {consoleOn && tenant?.organizationId && (
+                    <Button variant="outline" size="sm" asChild>
+                      <a
+                        href={`/auth/console/?organization=${encodeURIComponent(tenant.organizationId)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        data-testid="tenant-identity-console"
+                      >
+                        <UsersRound className="h-4 w-4" />
+                        {t("access.managePeople")}
+                      </a>
+                    </Button>
+                  )}
                 </div>
                 <ul className="divide-y divide-border rounded-[4px] border border-border">
                   {grants.map((grant) => (
