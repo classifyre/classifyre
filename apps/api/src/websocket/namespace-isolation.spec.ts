@@ -42,6 +42,7 @@ describe('WebSocket namespace isolation', () => {
     await expect(
       gateway.handleSubscribeNotifications(client as any),
     ).resolves.toEqual({ success: false, message: 'Unknown namespace' });
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- a jest.fn
     expect(refusing.canJoin).toHaveBeenCalledWith(
       client,
       'id-acme',
