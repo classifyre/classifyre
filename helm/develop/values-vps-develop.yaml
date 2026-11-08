@@ -3,12 +3,14 @@
 # classifyre-develop namespace on NodePort 30101 with :develop image tags.
 # Access: https://staging.classifyre.com/
 #
-# Develop shares the node with prod (see the budget in values-vps.yaml) and
-# is parked between test runs: api/web are scaled to 0 with their HPAs
-# removed (scale-down step in .github/workflows/develop.yml). Postgres and
-# worker stay up but on reduced requests below, so the prod namespace always
-# has room to schedule a scan. Develop postgres idles at ~50Mi, worker at
-# ~180Mi — neither needs the full-footprint defaults.
+# This is the smoke deploy (.github/workflows/develop.yml): installed fresh
+# with sign-in on, seeded (scripts/smoke/seed.sh), checked by the Playwright
+# smoke test (apps/e2e), then destroyed with its database
+# (scripts/smoke/destroy.sh), so nothing stays on the shared node.
+#
+# Develop shares the node with prod (see the budget in values-vps.yaml).
+# While a run is up, Postgres and the worker run on reduced requests below, so
+# the prod namespace keeps room to schedule a scan.
 
 api:
   image:
@@ -24,6 +26,14 @@ api:
   autoscaling:
     minReplicas: 1
     maxReplicas: 1
+
+  # The smoke test's folder, from the ConfigMap scripts/smoke/seed.sh makes.
+  localFolders:
+    - name: smoke
+      mountPath: /mnt/corpora/smoke
+      configMap:
+        name: classifyre-smoke-fixture
+        optional: true
 
   cliJobs:
     image:
@@ -90,6 +100,14 @@ telemetry:
 objectStorage:
   enabled: false
 
-# The public demo stays open: no sign-in, so its sitemap can stay on.
+# Sign-in on: the smoke test signs in, creates a workspace and checks access.
+# The web app proxies the identity server at /iam on the same host.
 iam:
-  enabled: false
+  enabled: true
+  appUrl: https://staging.classifyre.com
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      memory: 1Gi

@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# Seeds a release with sign-in for the smoke test (apps/e2e/tests/smoke.spec.ts):
+#   - the ConfigMap `classifyre-smoke-fixture`, mounted into scan jobs at
+#     /mnt/corpora/smoke by `api.localFolders` (one file with a fake secret);
+#   - in the identity server, `smoke-admin` (member of the first tenant's
+#     `admins` group) and `smoke-viewer` (member of a new `smoke-viewers`
+#     group), with new random passwords;
+#   - the Playwright env file with their credentials.
+# Idempotent: existing smoke users are replaced.
+#
+#   NS=classifyre-dev RELEASE=classifyre BASE_URL=http://localhost:3000 scripts/smoke/seed.sh
+set -euo pipefail
+
+ROOT=$(cd "$(dirname "$0")/../.." && pwd)
+NS=${NS:?set NS to the release namespace}
+RELEASE=${RELEASE:?set RELEASE to the Helm release}
+BASE_URL=${BASE_URL:?set BASE_URL to the URL people open Classifyre at}
+TENANT=${SMOKE_TENANT:-default}
+OUT=${OUT:-$ROOT/apps/e2e/.env}
+
+kubectl -n "$NS" create configmap classifyre-smoke-fixture \
+  --from-file="$ROOT/docker/fixtures/smoke/deploy-notes.txt" \
+  --dry-run=client -o yaml | kubectl -n "$NS" apply -f - >/dev/null
+
+ADMIN_PW=$(kubectl -n "$NS" get secret "$RELEASE-iam" -o jsonpath='{.data.admin-password}' | base64 -d)
+SMOKE_ADMIN_PASSWORD=$(openssl rand -hex 16)
+SMOKE_VIEWER_PASSWORD=$(openssl rand -hex 16)
+
+kubectl -n "$NS" exec -i "deploy/$RELEASE-iam" -c iam -- env \
+  ADMIN_PW="$ADMIN_PW" TENANT="$TENANT" \
+  A_PW="$SMOKE_ADMIN_PASSWORD" V_PW="$SMOKE_VIEWER_PASSWORD" bash -s <<'KC'
+set -euo pipefail
+K=/opt/keycloak/bin/kcadm.sh
+R=classifyre
+$K config credentials --server http://localhost:8080/iam --realm master --user admin --password "$ADMIN_PW" >/dev/null
+ORG=$($K get organizations -r $R --fields id,alias --format csv --noquotes | { grep ",$TENANT\$" || true; } | cut -d, -f1)
+[ -n "$ORG" ] || { echo "no organization '$TENANT' in realm $R" >&2; exit 1; }
+group_id() { $K get "organizations/$ORG/groups" -r $R --fields id,name --format csv --noquotes | { grep ",$1\$" || true; } | cut -d, -f1 | head -1; }
+ADMINS=$(group_id admins)
+[ -n "$ADMINS" ] || { echo "organization '$TENANT' has no admins group" >&2; exit 1; }
+VIEWERS=$(group_id smoke-viewers)
+[ -n "$VIEWERS" ] || VIEWERS=$($K create "organizations/$ORG/groups" -r $R -s name=smoke-viewers -i)
+person() { # person <username> <password> <group id>
+  local old id
+  old=$($K get users -r $R -q "username=$1" -q exact=true --fields id --format csv --noquotes | head -1)
+  [ -z "$old" ] || $K delete "users/$old" -r $R
+  id=$($K create users -r $R -s "username=$1" -s "email=$1@example.test" -s firstName=Smoke \
+    -s "lastName=$1" -s enabled=true -s emailVerified=true -i)
+  $K set-password -r $R --userid "$id" --new-password "$2"
+  $K create "organizations/$ORG/members" -r $R -b "\"$id\"" >/dev/null
+  $K update "organizations/$ORG/groups/$3/members/$id" -r $R -b '{}' >/dev/null
+}
+person smoke-admin "$A_PW" "$ADMINS"
+person smoke-viewer "$V_PW" "$VIEWERS"
+KC
+
+umask 077
+cat > "$OUT" <<ENV
+BASE_URL=$BASE_URL
+SMOKE_ADMIN_USER=smoke-admin
+SMOKE_ADMIN_PASSWORD=$SMOKE_ADMIN_PASSWORD
+SMOKE_VIEWER_USER=smoke-viewer
+SMOKE_VIEWER_PASSWORD=$SMOKE_VIEWER_PASSWORD
+SMOKE_VIEWERS_GROUP=/smoke-viewers
+SMOKE_FOLDER=/mnt/corpora/smoke
+ENV
+echo "Seeded $RELEASE in $NS; Playwright settings in $OUT"

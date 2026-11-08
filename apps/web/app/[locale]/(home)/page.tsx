@@ -244,7 +244,11 @@ export default function LandingPage() {
                 </Link>
               </Button>
               {canCreate && (
-                <Button variant="default" onClick={() => setCreateOpen(true)}>
+                <Button
+                  variant="default"
+                  data-testid="workspace-create"
+                  onClick={() => setCreateOpen(true)}
+                >
                   <Plus className="mr-2 h-4 w-4" />
                   {t("workspaces.new")}
                 </Button>

@@ -352,6 +352,13 @@ api:
       hostPath:
         path: /var/lib/classifyre/host-folders/downloads
         type: DirectoryOrCreate
+    # The smoke test's folder (scripts/smoke/seed.sh makes the ConfigMap);
+    # optional, so jobs start the same without it.
+    - name: smoke
+      mountPath: /mnt/corpora/smoke
+      configMap:
+        name: classifyre-smoke-fixture
+        optional: true
 
   cliJobs:
     enabled: true
