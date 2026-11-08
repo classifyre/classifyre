@@ -84,6 +84,7 @@ export function WorkspaceCard({
         }
       }}
       aria-label={t("workspaces.openAria", { name: ns.name })}
+      data-testid={`workspace-card-${ns.slug}`}
       className="group gap-0 overflow-hidden bg-card/95 py-0 shadow-none hover:translate-x-0 hover:translate-y-0 hover:shadow-none"
     >
       <div className="relative aspect-[16/8.5] overflow-hidden border-b bg-muted">

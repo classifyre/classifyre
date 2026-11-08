@@ -384,7 +384,7 @@ jobs:
         run: bash docker/scripts/smoke.sh
 
   deploy-develop:
-    name: Deploy → classifyre-develop
+    name: Smoke deploy → classifyre-develop
     needs: [docker]
     if: github.event_name == 'push' && github.ref_name == 'develop'
     uses: ./.github/workflows/develop.yml
@@ -392,7 +392,4 @@ jobs:
       environment: classifyre-develop
       image_tag: develop
       demo_mode: 'false'
-      # Deploy, verify the app is alive, then park it at zero replicas to free
-      # cluster resources. The next push redeploys from this scaled-down state.
-      scale_down: 'true'
     secrets: inherit

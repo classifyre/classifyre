@@ -195,7 +195,12 @@ export function CreateNamespaceDialog({
         onOpenChange(next);
       }}
     >
-      <DialogContent>
+      <DialogContent
+        data-testid="workspace-create-dialog"
+        // Taller than a laptop screen with every option shown: scroll, so
+        // the buttons stay reachable.
+        className="max-h-[90vh] overflow-y-auto"
+      >
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>{t("workspaces.createTitle")}</DialogTitle>
@@ -209,6 +214,7 @@ export function CreateNamespaceDialog({
               <Label htmlFor="ns-name">{t("common.name")}</Label>
               <Input
                 id="ns-name"
+                data-testid="workspace-create-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder={t("workspaces.namePlaceholder")}
@@ -237,12 +243,16 @@ export function CreateNamespaceDialog({
               <div className="grid gap-2">
                 <Label>{t("workspaces.owningGroup")}</Label>
                 <Select value={ownerGroupId} onValueChange={setOwnerGroupId}>
-                  <SelectTrigger>
+                  <SelectTrigger data-testid="workspace-create-owner">
                     <SelectValue placeholder={t("workspaces.owningGroupPick")} />
                   </SelectTrigger>
                   <SelectContent>
                     {owningGroups.map((group) => (
-                      <SelectItem key={group.id} value={group.id}>
+                      <SelectItem
+                        key={group.id}
+                        value={group.id}
+                        data-testid={`workspace-create-owner-${group.path}`}
+                      >
                         {group.path}
                       </SelectItem>
                     ))}
@@ -304,6 +314,7 @@ export function CreateNamespaceDialog({
             <Button
               type="submit"
               variant="default"
+              data-testid="workspace-create-submit"
               disabled={
                 (!name.trim() && !seed) ||
                 submitting ||
