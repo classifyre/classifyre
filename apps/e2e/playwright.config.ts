@@ -32,6 +32,10 @@ export default defineConfig({
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "retain-on-failure",
+    // Fail a step that cannot happen within a minute instead of waiting out
+    // the whole test; the scan waits are explicit polls with their own limits.
+    actionTimeout: 60_000,
+    navigationTimeout: 120_000,
   },
 
   projects: [
