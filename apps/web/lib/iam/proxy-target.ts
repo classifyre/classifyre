@@ -50,6 +50,16 @@ export function allowedIamPath(
   // console). Forward it only when the operator exposed the console —
   // otherwise it would advertise a path that 404s here.
   if (path.length === 0) return env.IAM_EXPOSE_ADMIN_CONSOLE === "true";
+  // Next decodes each segment after splitting on `/`, so `%2F` or `..` inside
+  // one would let the joined upstream URL walk out of the checked prefix
+  // (into the master realm). No Keycloak path needs either.
+  if (
+    path.some(
+      (segment) => /[/\\]/.test(segment) || segment === "." || segment === "..",
+    )
+  ) {
+    return false;
+  }
   const [first, second] = path;
   if (env.IAM_EXPOSE_ADMIN_CONSOLE === "true") {
     return first === "realms" || first === "resources" || first === "admin";
