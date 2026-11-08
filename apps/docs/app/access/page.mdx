@@ -139,16 +139,24 @@ finds the others under **Switch tenant** in the account menu. When an
 operator has suspended your tenant, a page says so; your data is kept.
 
 Your name and tenant are in the account menu in the top-right corner, with
-**Sign out**, and for the people allowed: **Tenant access** (tenant admins),
-**Platform** and **Identity console** (operators).
+**Your account** and **Sign out**, and for the people allowed: **Tenant
+access** (tenant admins), **Platform** and **Identity console** (operators).
 
 ![The account menu of an operator who is also a tenant admin](./images/account-menu.png)
 
 Sessions renew themselves while you work; after a long break you are asked
 to sign in again. Classifyre never shows your sign-in tokens to the page
-itself: they live in cookies only the server can read. Your password,
-two-factor and sessions are on your own account page in the identity server
-(`/iam/realms/classifyre/account`).
+itself: they live in cookies only the server can read.
+
+### Your account
+
+**Your account** in the account menu opens your own page in the identity
+server, in Classifyre's look: your name and email, your password and
+two-factor sign-in (**Account security**), the devices you are signed in on,
+and the language of the sign-in pages. Classifyre keeps no profile of its
+own; a new name shows in Classifyre at your next sign-in.
+
+![Your account page in the identity server](./images/account-page.png)
 
 ---
 

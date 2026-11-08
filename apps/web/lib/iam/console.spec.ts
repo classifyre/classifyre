@@ -1,4 +1,4 @@
-import { identityConsolePath } from "./console";
+import { accountPagePath, identityConsolePath } from "./console";
 
 const env = {
   IAM_ENABLED: "true",
@@ -30,5 +30,16 @@ describe("identity console link", () => {
     ).toBeNull();
     expect(identityConsolePath({ ...env, IAM_ENABLED: "false" })).toBeNull();
     expect(identityConsolePath({ ...env, IAM_REALM: "" })).toBeNull();
+  });
+});
+
+describe("account page link", () => {
+  it("opens the person's own account page in the realm, with sign-in only", () => {
+    expect(accountPagePath(env)).toBe("/iam/realms/classifyre/account/");
+    expect(accountPagePath({ ...env, IAM_REALM_CONSOLE: "false" })).toBe(
+      "/iam/realms/classifyre/account/",
+    );
+    expect(accountPagePath({ ...env, IAM_ENABLED: "false" })).toBeNull();
+    expect(accountPagePath({ ...env, IAM_REALM: "../master" })).toBeNull();
   });
 });

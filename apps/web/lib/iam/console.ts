@@ -19,3 +19,17 @@ export function identityConsolePath(
       : "organizations";
   return `/iam/admin/${realm}/console/#/${realm}/${view}`;
 }
+
+/**
+ * Path of the person's own account page behind the `/iam` proxy: name,
+ * email, password, two-factor, sessions and language, in Classifyre's look.
+ * Null without sign-in.
+ */
+export function accountPagePath(
+  env: Record<string, string | undefined>,
+): string | null {
+  if (env.IAM_ENABLED !== "true") return null;
+  const realm = env.IAM_REALM?.trim();
+  if (!realm || !/^[A-Za-z0-9_-]+$/.test(realm)) return null;
+  return `/iam/realms/${realm}/account/`;
+}

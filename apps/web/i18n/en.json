@@ -7272,7 +7272,8 @@
     "switchTenant": "Switch tenant",
     "platform": "Platform",
     "signIn": "Sign in",
-    "identityConsole": "Identity console"
+    "identityConsole": "Identity console",
+    "yourAccount": "Your account"
   },
   "access": {
     "title": "Access",
