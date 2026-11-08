@@ -10,7 +10,6 @@ import {
   type Namespace,
   type NamespaceCategory,
   type NamespaceStats,
-  type TenantDto,
 } from "@workspace/api-client";
 import { Button } from "@workspace/ui/components/button";
 import { Card, CardContent } from "@workspace/ui/components/card";
@@ -27,6 +26,7 @@ import {
 } from "@workspace/ui/components/alert-dialog";
 import { CreateNamespaceDialog } from "@/components/namespace/create-namespace-dialog";
 import { useIamEnabled } from "@/components/iam-session";
+import { useTenant } from "@/hooks/use-tenant";
 import { SectionHeading } from "@/components/section-heading";
 import { useTranslation } from "@/hooks/use-translation";
 import { useLocalePath } from "@/lib/app-path";
@@ -109,7 +109,7 @@ export default function LandingPage() {
   const { t } = useTranslation();
   const canCreate = useCanCreateWorkspace();
   const iamEnabled = useIamEnabled();
-  const iamTenant = useIamTenant();
+  const iamTenant = useTenant();
   const visitor = iamTenant?.visitor ?? false;
   // Without sign-in everyone may; with it, as the tenant's grants say.
   const canFileCategories =
@@ -245,7 +245,7 @@ export default function LandingPage() {
           {namespaces && hasWorkspaces && (
             <div className="flex flex-wrap gap-2">
               {canFileCategories && (
-                <Button variant="outline" asChild>
+                <Button variant="outline" asChild data-testid="workspace-categories">
                   <Link href={localePath("/namespaces/categories")}>
                     <Tags className="mr-2 h-4 w-4" />
                     {t("categories.manage")}
@@ -451,27 +451,6 @@ export default function LandingPage() {
       </main>
     </div>
   );
-}
-
-/**
- * The caller's tenant with sign-in: whether they are a visitor of the public
- * tenant (the page then speaks to them as one) and what they may do across it.
- */
-function useIamTenant(): TenantDto | null {
-  const iamEnabled = useIamEnabled();
-  const [tenant, setTenant] = React.useState<TenantDto | null>(null);
-  React.useEffect(() => {
-    if (!iamEnabled) return;
-    let active = true;
-    void api.access.tenantAccessControllerTenant().then(
-      (value) => active && setTenant(value),
-      () => undefined,
-    );
-    return () => {
-      active = false;
-    };
-  }, [iamEnabled]);
-  return tenant;
 }
 
 /**

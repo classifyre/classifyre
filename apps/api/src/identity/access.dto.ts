@@ -35,10 +35,14 @@ export class TenantGroupDto {
 }
 
 export class CreateGrantDto {
-  @ApiProperty({ enum: ['group', 'user'] })
-  subjectType: 'group' | 'user';
+  @ApiProperty({
+    enum: ['group'],
+    description:
+      'Access always goes to a group; people get it by being in one.',
+  })
+  subjectType: 'group';
 
-  @ApiProperty({ description: 'Group id, or the person’s subject id.' })
+  @ApiProperty({ description: 'Group id.' })
   subjectId: string;
 
   @ApiProperty({ example: 'viewer' })
@@ -70,8 +74,8 @@ export class GrantDto {
   @ApiProperty()
   id: string;
 
-  @ApiProperty({ enum: ['group', 'user'] })
-  subjectType: string;
+  @ApiProperty({ enum: ['group'] })
+  subjectType: 'group';
 
   @ApiProperty()
   subjectId: string;

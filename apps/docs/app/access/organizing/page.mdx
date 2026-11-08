@@ -152,15 +152,24 @@ remove them from the group. Changes count within a minute.
   changes.
 - **Moving a group changes what it inherits.** Move `/finance/accounts-payable`
   under `/operations` and its people are no longer in `/finance`: they lose
-  the finance Viewer grant, and gain whatever `/operations` has.
-- **Deleting a group ends its access.** Its grants stay listed as **Removed
-  group** and give nobody anything until a tenant admin removes them:
+  the finance Viewer grant, and gain whatever `/operations` has. Workspaces
+  the group owns move with it: grants on "the workspaces of `/finance`" stop
+  reaching them, grants on "the workspaces of `/operations`" start.
+- **Deleting a group ends its access.** In the identity console:
+
+  ![Deleting a group in the identity console](../images/console-delete-group.png)
+
+  Its grants stay listed as **Removed group** and give nobody anything until
+  a tenant admin removes them:
 
   ![A grant of a deleted group shows as Removed group](../images/removed-group.png)
 
-  A workspace whose owning group was deleted keeps working; grants on "the
-  workspaces of" that group then reach nobody, and its tenant admins still
-  have it.
+- **Do not delete a group that owns workspaces.** The workspaces keep working,
+  but they lose their place in the tree: grants on the workspaces of the
+  group's **parents** no longer reach them. Delete `/finance/accounts-payable`
+  while it owns a workspace, and `/finance`'s Viewer and Workspace manager
+  grants stop reaching that workspace; only tenant-wide grants (and grants on
+  the workspace itself) still do. Rename or keep the group instead.
 - **Only organization groups count.** Groups made under the identity
   console's own **Groups** menu belong to no tenant and are ignored.
 - **A workspace's owner is fixed when it is made.** Choose the group that

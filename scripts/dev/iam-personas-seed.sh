@@ -73,6 +73,7 @@ SALES=$(group "$ACME" "" sales)
 LEGAL=$(group "$ACME" "" legal)
 DATA=$(group "$ACME" "" data-engineering)
 AUDIT=$(group "$ACME" "" audit)
+CONTRACTORS=$(group "$ACME" "" contractors)
 
 # The chart's first admin: complete the profile so password sign-in works.
 ADMIN=$(fid users username admin)
@@ -80,7 +81,7 @@ ADMIN=$(fid users username admin)
 "$KC" update "users/$ADMIN" -r "$R" -s firstName=Tenant -s lastName=Admin \
   -s email=admin@example.test -s emailVerified=true -s 'requiredActions=[]' >/dev/null 2>&1
 
-echo "ACME=$ACME GLOBEX=$GLOBEX FIN=$FIN WM=$WM AP=$AP SALES=$SALES LEGAL=$LEGAL DATA=$DATA AUDIT=$AUDIT"
+echo "ACME=$ACME GLOBEX=$GLOBEX FIN=$FIN WM=$WM AP=$AP SALES=$SALES LEGAL=$LEGAL DATA=$DATA AUDIT=$AUDIT CONTRACTORS=$CONTRACTORS"
 echo "U_CONTROLLER=$(user controller "$ACME" "$FIN" Controller)"
 echo "U_MANAGER=$(user manager "$ACME" "$WM" Manager)"
 echo "U_INVESTIGATOR=$(user investigator "$ACME" "$AP" Investigator)"
@@ -88,7 +89,7 @@ echo "U_SALES=$(user seller "$ACME" "$SALES" Seller)"
 echo "U_LEGAL=$(user counsel "$ACME" "$LEGAL" Counsel)"
 echo "U_ENGINEER=$(user engineer "$ACME" "$DATA" Engineer)"
 echo "U_AUDITOR=$(user auditor "$ACME" "$AUDIT" Auditor)"
-echo "U_CONTRACTOR=$(user contractor "$ACME" "" Contractor)"
+echo "U_CONTRACTOR=$(user contractor "$ACME" "$CONTRACTORS" Contractor)"
 echo "U_MOVER=$(user mover "$ACME" "$FIN" Mover)"
 echo "U_LEAVER=$(user leaver "$ACME" "$FIN" Leaver)"
 echo "U_OUTSIDER=$(user outsider "$GLOBEX" "" Outsider)"

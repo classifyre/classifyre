@@ -32,17 +32,21 @@ Tenant access. They are already signed in.
 ![The Platform page, with the identity console a click away](../images/platform.png)
 
 What operators may do there comes from their realm role
-`classifyre-operator`: the chart gives it every right in the `classifyre`
-realm except **impersonation**, so an operator manages people, groups,
-organizations and company directories, but never signs in as someone else.
-Anyone else who finds the address is refused by the console itself.
+`classifyre-operator`, and the chart keeps it to what running tenants takes,
+in the `classifyre` realm only: **people** (accounts, passwords, sessions),
+**organizations** with their groups and members, **identity providers** for
+company directories, and reading the realm and its events. It does not
+include the realm's own settings, its clients and their secrets, sign-in
+flows, user federation (LDAP) or impersonation: those stay with the identity
+server's own administrator, below. Anyone without the role who finds the
+address is refused by the console itself.
 
 <Callout type="warning">
-  Whoever manages accounts can also reset someone's password and sign in as
-  them. Give `classifyre-operator` only to the people who run the
-  installation. The identity server records every change made in its console:
-  **Events → Admin events**, and on each organization its **Admin events**
-  tab.
+  Whoever manages accounts can reset someone's password and then sign in as
+  them, and can put anyone in any tenant's `admins` group. Give
+  `classifyre-operator` only to the people who run the installation. The
+  identity server records every change made in its console: **Events → Admin
+  events**, and on each organization its **Admin events** tab.
 </Callout>
 
 With `iam.realmConsole: false` the console is not reachable through the web
@@ -52,8 +56,9 @@ app at all; use the break-glass console below.
 
 The identity server also has its own administrator, `admin` in its **master**
 realm, which can change every realm. It is never reachable from outside the
-cluster unless `iam.exposeAdminConsole` is on. Use it only when no operator
-can sign in, with a port-forward:
+cluster unless `iam.exposeAdminConsole` is on. Use it when no operator can
+sign in, and for what operators may not change: realm settings, sign-in
+flows, user federation (LDAP). Reach it with a port-forward:
 
 ```bash
 kubectl -n classifyre port-forward svc/classifyre-iam 8080
@@ -129,16 +134,16 @@ needs to be told.
 | In the identity server                     | In Classifyre                                                                                                                                       |
 | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | A group is **renamed**                     | Nothing changes: grants point at the group's id. The new name shows everywhere.                                                                     |
-| A group is **moved** under another parent  | Its people now count as being in the new parent and no longer in the old one: they gain and lose those grants.                                     |
-| A group is **deleted**                     | Its grants show as **Removed group** and give nobody anything until a tenant admin removes them. Workspaces it owned stay, reached by tenant-wide grants. |
+| A group is **moved** under another parent  | Its people, and the workspaces it owns, now count as under the new parent and no longer under the old one: they gain and lose those grants. |
+| A group is **deleted**                     | Its grants show as **Removed group** and give nobody anything until a tenant admin removes them. Workspaces it owned stay, but grants on its parents' workspaces no longer reach them; tenant-wide grants and grants on the workspace itself still do. |
 | A person is **removed from a group**       | They lose that group's access, and so do their MCP agents.                                                                                          |
 | A person is **disabled** or **deleted**    | They and every MCP token they made are refused. See [Off-boarding](#off-boarding-someone-urgently).                                                 |
 | A person is in **no organization**         | They see _Not in a tenant yet_ after signing in.                                                                                                    |
 | A person is in **several organizations**   | They choose one at sign-in and switch under **Switch tenant**; they work in one at a time.                                                         |
 | An organization's `admins` group is missing or renamed | The tenant shows a warning on the Platform page. Existing grants keep working; a new `admins` group gets Tenant admin only if the tenant never had it. |
 | A group is made under the realm's **Groups** menu | Ignored: it belongs to no tenant.                                                                                                       |
-| An organization is **deleted**             | Its people are refused and its workspaces stay closed. The Platform page marks the tenant; **Remove tenant data** deletes it for good.             |
-| It is made again **under the same alias**  | Still closed: the new organization is not the old tenant, so nobody inherits its workspaces by accident. Only a backup of the identity server's database brings the old organization back. |
+| An organization is **deleted**             | Its people are refused and its workspaces stay closed. The Platform page marks the tenant; **Remove tenant data** deletes it for good, and its people then see _Tenant deleted_. |
+| It is made again **under the same alias**  | Still closed: the new organization is not the old tenant, so nobody inherits its workspaces by accident; its people see _Tenant closed_. Only a backup of the identity server's database brings the old organization back. |
 
 ![Signed in, but in no organization yet](../images/no-tenant.png)
 
@@ -153,7 +158,8 @@ than delete when in doubt.
 ## Connecting a company directory
 
 Instead of managing accounts by hand, connect the identity server to your
-company's directory (Entra ID, Okta, any OIDC or SAML provider, or LDAP):
+company's directory (Entra ID, Okta, any OIDC or SAML provider; LDAP is set up
+under **User federation** by the identity server's own administrator):
 
 - Add it under **Identity providers** in the `classifyre` realm and link it to
   the tenant's organization, so people of that company land in the right
@@ -243,7 +249,7 @@ iam:
   quietly dropped to a visitor.
 - Signed-in people work in their own tenant only, as without a public tenant.
 - **Suspend** the public tenant on the [Platform page](#the-platform-page) to
-  close it at once: visitors are sent to sign in again until it is resumed.
+  close it within a minute: visitors are sent to sign in until it is resumed.
 - `frontend.sitemap.enabled` is allowed with sign-in only together with a
   public tenant, and the sitemap then lists only its workspaces.
 - **Demo mode** (`api.env.DEMO_MODE: "true"`) still makes everything read-only

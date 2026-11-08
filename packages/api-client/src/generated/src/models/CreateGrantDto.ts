@@ -20,13 +20,13 @@ import { mapValues } from '../runtime';
  */
 export interface CreateGrantDto {
     /**
-     * 
+     * Access always goes to a group; people get it by being in one.
      * @type {string}
      * @memberof CreateGrantDto
      */
     subjectType: CreateGrantDtoSubjectTypeEnum;
     /**
-     * Group id, or the person’s subject id.
+     * Group id.
      * @type {string}
      * @memberof CreateGrantDto
      */
@@ -62,8 +62,7 @@ export interface CreateGrantDto {
  * @export
  */
 export const CreateGrantDtoSubjectTypeEnum = {
-    Group: 'group',
-    User: 'user'
+    Group: 'group'
 } as const;
 export type CreateGrantDtoSubjectTypeEnum = typeof CreateGrantDtoSubjectTypeEnum[keyof typeof CreateGrantDtoSubjectTypeEnum];
 

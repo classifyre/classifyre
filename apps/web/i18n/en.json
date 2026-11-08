@@ -7363,5 +7363,25 @@
     "managedInIdentityServer": "Tenants, their people and groups are made in the identity server (an organization with a top-level admins group). New ones appear here on their own.",
     "openConsole": "Open the identity console",
     "openInConsole": "Open in the identity console"
+  },
+  "noTenantPage": {
+    "title": "Not in a tenant yet",
+    "noTenant": "You are signed in, but your account is not in any tenant (organization) of Classifyre yet, so there is nothing to show you.",
+    "noTenantFix": "Ask whoever runs this installation (an operator) to add your account to your organization in the identity console, or your IT team if accounts come from your company directory.",
+    "severalTitle": "Choose one tenant",
+    "several": "Your account is in several tenants. Classifyre works in one tenant at a time.",
+    "severalFix": "Sign in again and choose the tenant you want to work in.",
+    "suspendedTitle": "Tenant suspended",
+    "suspended": "Your tenant is suspended, so nobody in it can work in Classifyre right now. Its data is kept.",
+    "suspendedFix": "An operator can resume it; ask whoever runs this installation.",
+    "deletedTitle": "Tenant deleted",
+    "deleted": "Your tenant has been deleted, with its workspaces.",
+    "deletedFix": "If you should be in another tenant, ask whoever runs this installation to add you to its organization.",
+    "replacedTitle": "Tenant closed",
+    "replaced": "The organization behind your tenant was deleted in the identity server and made again, so the tenant's workspaces stay closed: nobody inherits them by accident.",
+    "replacedFix": "Ask whoever runs this installation (an operator). The old organization can only come back from a backup of the identity server.",
+    "signedInAs": "Signed in as",
+    "retry": "Try again",
+    "signOut": "Sign out"
   }
 }

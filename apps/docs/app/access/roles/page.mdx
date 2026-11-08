@@ -10,8 +10,8 @@ import { CapabilityMatrix, RoleTable } from "@/components/access/access-catalog"
 # Roles and rights
 
 A **capability** is one thing Classifyre allows, such as `source.manage`. A
-**role** is a fixed list of capabilities. A **grant** gives a group a role on
-a place: one workspace, the workspaces a group owns, or the whole tenant.
+**role** is a fixed list of capabilities. A **grant** gives a **group** a role
+on a place: one workspace, the workspaces a group owns, or the whole tenant.
 Every API route and every MCP tool checks exactly one capability, so what a
 role allows is exactly the list below.
 
@@ -56,9 +56,9 @@ group.
 
 ## Every capability, by role
 
-● means the role holds the capability. Workspace manager, Auditor and Tenant
-admin are given on the tenant or a group's workspaces; the others on any
-place.
+● means the role holds the capability. Workspace manager is given on a
+group's workspaces or the whole tenant; Auditor and Tenant admin on the whole
+tenant only; the others on any place.
 
 <CapabilityMatrix />
 
@@ -79,6 +79,7 @@ stays listed until someone removes it.
 - **Nobody gives more than they have.** A workspace admin cannot make anyone a
   Code author, because writing code is not theirs to give.
 - **Creating a workspace needs membership.** A Workspace manager creates
-  workspaces only for a group they are in (or under); no grant lifts that.
+  workspaces only for a group they are in (or under). Only tenant admins may
+  create one for any group of the tenant.
 - **MCP tokens act as their creator**, and never beyond what the creator may
   do at the moment the token is used.

@@ -1,52 +1,26 @@
 import { NextResponse, type NextRequest } from "next/server";
+import de from "@/i18n/de.json";
+import en from "@/i18n/en.json";
 import { ID_COOKIE, iamWebConfig } from "@/lib/iam/session";
 
 /**
  * Shown to someone who signed in but belongs to no tenant (API code
- * NO_TENANT), to several (CHOOSE_TENANT) or to a suspended one
- * (TENANT_SUSPENDED). Renewing their session changes
+ * NO_TENANT), to several (CHOOSE_TENANT), or to one that is suspended,
+ * deleted or whose organization was replaced (TENANT_*). Texts in i18n
+ * (`noTenantPage`). Renewing their session changes
  * nothing, so instead of an error the page says what is wrong and who can fix
  * it. A plain page outside the app: the app itself would only meet the same
  * 401 again.
  */
-const TEXT = {
-  en: {
-    title: "Not in a tenant yet",
-    noTenant:
-      "You are signed in, but your account is not in any tenant (organization) of Classifyre yet, so there is nothing to show you.",
-    noTenantFix:
-      "Ask whoever runs this installation (an operator) to add your account to your organization in the identity console, or your IT team if accounts come from your company directory.",
-    severalTitle: "Choose one tenant",
-    several:
-      "Your account is in several tenants. Classifyre works in one tenant at a time.",
-    severalFix: "Sign in again and choose the tenant you want to work in.",
-    suspendedTitle: "Tenant suspended",
-    suspended:
-      "Your tenant is suspended, so nobody in it can work in Classifyre right now. Its data is kept.",
-    suspendedFix: "An operator can resume it; ask whoever runs this installation.",
-    signedInAs: "Signed in as",
-    retry: "Try again",
-    signOut: "Sign out",
-  },
-  de: {
-    title: "Noch in keinem Mandanten",
-    noTenant:
-      "Sie sind angemeldet, aber Ihr Konto gehört noch zu keinem Mandanten (keiner Organisation) von Classifyre, daher gibt es hier nichts zu sehen.",
-    noTenantFix:
-      "Bitten Sie, wer diese Installation betreibt (einen Betreiber), Ihr Konto in der Identitätskonsole Ihrer Organisation hinzuzufügen, oder Ihre IT, wenn Konten aus dem Firmenverzeichnis kommen.",
-    severalTitle: "Einen Mandanten wählen",
-    several:
-      "Ihr Konto gehört zu mehreren Mandanten. Classifyre arbeitet immer in einem.",
-    severalFix: "Melden Sie sich erneut an und wählen Sie den Mandanten.",
-    suspendedTitle: "Mandant gesperrt",
-    suspended:
-      "Ihr Mandant ist gesperrt, daher kann derzeit niemand darin in Classifyre arbeiten. Seine Daten bleiben erhalten.",
-    suspendedFix: "Ein Betreiber kann ihn wieder freigeben; fragen Sie, wer diese Installation betreibt.",
-    signedInAs: "Angemeldet als",
-    retry: "Erneut versuchen",
-    signOut: "Abmelden",
-  },
-} as const;
+const TEXT = { en: en.noTenantPage, de: de.noTenantPage } as const;
+
+const REASONS = {
+  CHOOSE_TENANT: ["severalTitle", "several", "severalFix"],
+  TENANT_SUSPENDED: ["suspendedTitle", "suspended", "suspendedFix"],
+  TENANT_DELETED: ["deletedTitle", "deleted", "deletedFix"],
+  TENANT_REPLACED: ["replacedTitle", "replaced", "replacedFix"],
+  NO_TENANT: ["title", "noTenant", "noTenantFix"],
+} as const satisfies Record<string, readonly (keyof typeof en.noTenantPage)[]>;
 
 export function GET(request: NextRequest) {
   if (!iamWebConfig()) return new NextResponse(null, { status: 404 });
@@ -54,12 +28,9 @@ export function GET(request: NextRequest) {
     ? TEXT.de
     : TEXT.en;
   const reason = request.nextUrl.searchParams.get("reason");
-  const [title, text, fix] =
-    reason === "CHOOSE_TENANT"
-      ? [t.severalTitle, t.several, t.severalFix]
-      : reason === "TENANT_SUSPENDED"
-        ? [t.suspendedTitle, t.suspended, t.suspendedFix]
-        : [t.title, t.noTenant, t.noTenantFix];
+  const keys =
+    reason && reason in REASONS ? REASONS[reason as keyof typeof REASONS] : REASONS.NO_TENANT;
+  const [title = "", text = "", fix = ""] = keys.map((key) => t[key]);
   const who = signedInName(request.cookies.get(ID_COOKIE)?.value);
 
   const html = `<!doctype html>
@@ -77,7 +48,8 @@ export function GET(request: NextRequest) {
   p { margin: 0 0 .9rem; }
   .muted { color: var(--muted); font-size: .9rem; }
   .actions { display: flex; gap: .75rem; margin-top: 1.5rem; flex-wrap: wrap; }
-  a { padding: .5rem 1rem; border: 2px solid var(--button); border-radius: 4px; color: var(--fg); text-decoration: none; }
+  a, button { padding: .5rem 1rem; border: 2px solid var(--button); border-radius: 4px; color: var(--fg); background: none; font: inherit; text-decoration: none; cursor: pointer; }
+  form { margin: 0; }
   a.primary { background: var(--button); color: var(--button-fg); }
 </style>
 </head>
@@ -89,7 +61,7 @@ export function GET(request: NextRequest) {
   ${who ? `<p class="muted">${escape(t.signedInAs)} ${escape(who)}</p>` : ""}
   <div class="actions">
     <a class="primary" href="/auth/login/?returnTo=%2F">${escape(t.retry)}</a>
-    <a href="/auth/logout/">${escape(t.signOut)}</a>
+    <form method="post" action="/auth/logout/"><button type="submit">${escape(t.signOut)}</button></form>
   </div>
 </main>
 </body>

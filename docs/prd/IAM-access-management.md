@@ -115,7 +115,7 @@ erDiagram
   GRANT {
     uuid id
     uuid tenant_id
-    string subject_type "group | user"
+    string subject_type "group (only, since step 8f)"
     string subject_id "Keycloak group id or user sub"
     string role_key
     string scope_type "tenant | group | workspace"
@@ -831,7 +831,7 @@ Asked for: the identity server in Classifyre's style (sign-in page on the landin
 
 **Theme as files, never a custom image.** `helm/classifyre/files/iam/theme` holds a Keycloak theme `classifyre` (login on `keycloak.v2`, admin on `keycloak.v2`, account on `keycloak.v3`): CSS over PatternFly's tokens, the logo, the three brand fonts (latin subsets, OFL), and `board.svg`, the landing's pins and threads (`apps/blog/components/closing-board.tsx`) animated in CSS inside the SVG, so the sign-in page needs no script (`scripts/dev/iam-theme-board.py` generates it). A ConfigMap holds each file once; `items` mount `shared/` into every theme type under `/opt/keycloak/themes/classifyre` in the stock image. Keycloak caches theme files for 30 days under a path that changes only with its version, so the chart rewrites every reference to `?v=<hash of the theme>` and restarts the server on a change (`checksum/theme`). `iam.theme: ""` keeps Keycloak's look.
 
-**The realm's identity console through the app** (`iam.realmConsole`, default on). The `/iam` proxy forwards `admin/<realm>/console/…`, `admin/realms/<realm>/…` and `admin/serverinfo`; the master realm's console and API stay closed unless `iam.exposeAdminConsole`. The realm setup job makes `classifyre-operator` a composite of every `realm-management` role except `impersonation` (taken away again when the console is off), so operators manage people, groups, organizations and directories without acting as anyone. `/auth/console/?organization=<id>` redirects into the console (organization ids only, validated); the account menu (**Identity console**), the Platform page (header and each tenant) and Tenant access (**Manage people and groups**, for operators; others are told to ask one) link there. `TenantDto` and `PlatformTenantDto` carry `organizationId` (Tenant: operators only). The dev stack now runs like production: master console on the port-forward only.
+**The realm's identity console through the app** (`iam.realmConsole`, default on). The `/iam` proxy forwards `admin/<realm>/console/…`, `admin/realms/<realm>/…` and `admin/serverinfo`; the master realm's console and API stay closed unless `iam.exposeAdminConsole`. The realm setup job makes `classifyre-operator` a composite of the `realm-management` roles running tenants takes (`view-realm`, users, groups, organizations, identity providers, `view-events`) and takes away anything more an earlier build gave (clients and their secrets, realm settings, flows, authorization, impersonation, `realm-admin`), and all of it when the console is off. Realm settings, sign-in flows and user federation stay with the master realm's admin (break-glass). `/auth/console/?organization=<id>` redirects into the console (organization ids only, validated); the account menu (**Identity console**), the Platform page (header and each tenant) and Tenant access (**Manage people and groups**, for operators; others are told to ask one) link there. `TenantDto` and `PlatformTenantDto` carry `organizationId` (Tenant: operators only). The dev stack now runs like production: master console on the port-forward only.
 
 **Found and fixed while building it:**
 - The `/iam` proxy routes answered only GET/POST/OPTIONS/HEAD: every PUT and DELETE of the console (saving, deleting, adding to groups) failed, also with `exposeAdminConsole`. Added PUT, PATCH, DELETE.
@@ -843,7 +843,16 @@ Asked for: the identity server in Classifyre's style (sign-in page on the landin
 
 **Docs:** `apps/docs/app/access/` is now Overview (two places, building blocks, access always goes to groups, private and public tenants), Getting started (first password, first sign-in, console, groups, people, grants), Organizing people (a whole company: departments, subgroups, workspace managers, isolate and elevate someone, leavers, pitfalls), Roles and rights (generated from `roles.ts`/`capabilities.ts` by `bun run codegen` into `apps/docs/src/_generated/access-catalog.json`), and Running Sign-in (console, look, what happens when the identity server changes). Screenshots are real, from the dev stack, of an invented company (Brightwater Logistics), taken by `apps/e2e/docs/iam-screenshots.spec.ts` (`playwright.docs.config.ts`); `DOCS_SHOTS=a,b` re-takes some.
 
-**Open:** grants to one person (`subjectType: "user"`) remain in the API for scripts; the screens offer only groups.
+**Review of the whole feature (2026-11-08), and what was done about it:**
+- High: `%2F` and `..` inside a catch-all segment (Next decodes after splitting) let the `/iam` proxy reach the master realm. Segments with `/`, `\`, `.` or `..` are refused (`allowedIamPath`), with tests; confirmed closed live.
+- Operator rights were near realm-admin (clients' secrets, flows, realm settings): narrowed as above.
+- **Access always goes to groups**, as the user asked: grants to one person are gone from the API (`subjectType` is `group` only, the control database deletes old per-person grants and checks `subject_type = 'group'`); the persona suite's contractor (U10) is in a `contractors` group, and a per-person grant is checked to answer 400.
+- Visitors: the lookup is cached for a minute also when there is no public tenant, so anonymous requests never reach the identity server one by one; a request with an `Authorization` header of any kind is never a visitor.
+- The proxy no longer sends Classifyre's own cookies to the identity server, forwards only the nearest proxy's `X-Forwarded-For` entry, and refuses bodies over 5 MB.
+- Sign-out is a POST from the app's own origin (`lib/iam/sign-out.ts`); a GET or another site's form no longer signs anyone out.
+- A deleted tenant answered `TENANT_SUSPENDED` (the page offered a resume that is refused) and a replaced organization answered `SIGN_IN_REQUIRED` (the web renewed the session instead of explaining): now `TENANT_DELETED` and `TENANT_REPLACED`, each with its page, whose texts moved into `i18n/en.json`/`de.json` (`noTenantPage`).
+- The setup job reports an organization name already taken instead of failing on a bare conflict; theme references in single quotes get the hash too; `GET /tenant` is asked once per page (`hooks/use-tenant.ts`); the namespaces list has a spec; gated buttons carry `data-testid`s.
+- Docs corrected: where Auditor and Tenant admin can be given (tenant only), tenant admins may create a workspace for any group, deleting or moving a group that owns workspaces changes which parent grants reach them, visitors see editors' names in a workspace's history, suspending the public tenant counts within a minute.
 
 ### Step 9 · Later
 

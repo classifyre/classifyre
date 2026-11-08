@@ -50,7 +50,10 @@ const AREAS: { title: string; prefixes: string[] }[] = [
 const WHERE: Record<string, string> = {
   workspace:
     "On one workspace, every workspace a group owns, or the whole tenant",
-  tenant: "On the whole tenant, or every workspace a group owns",
+  tenant: "On the whole tenant",
+  // The one tenant role that can also go on a group's workspaces
+  // (ROLE_SCOPES in apps/api/src/identity/access-management.service.ts).
+  "workspace-manager": "On every workspace a group owns, or the whole tenant",
   platform:
     "Not granted in Classifyre: the identity server's realm role `classifyre-operator`",
   public: "Never granted: people who have not signed in, on the public tenant",
@@ -83,7 +86,7 @@ export function RoleTable() {
                 <code>{role.key}</code>
               </TableCell>
               <TableCell className="text-sm text-muted-foreground">
-                {WHERE[role.scope]}
+                {WHERE[role.key] ?? WHERE[role.scope]}
               </TableCell>
               <TableCell className="text-right tabular-nums">
                 {role.capabilities.length}

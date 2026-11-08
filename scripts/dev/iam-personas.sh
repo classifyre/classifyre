@@ -165,7 +165,9 @@ grant group "$SALES" investigator group "$SALES" >/dev/null           # U4
 grant group "$LEGAL" viewer workspace "$WS_Q3" >/dev/null             # U6
 grant group "$AUDIT" auditor tenant "$TENANT" >/dev/null              # U9
 SOON=$(python3 -c "import datetime; print((datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(seconds=75)).isoformat())")
-grant user "$U_CONTRACTOR" investigator workspace "$WS_LEDGER" "$SOON" >/dev/null   # U10
+grant group "$CONTRACTORS" investigator workspace "$WS_LEDGER" "$SOON" >/dev/null  # U10
+check G "a grant to one person is refused: access goes to groups" 400 \
+  "$(status admin POST /tenant/grants "{\"subjectType\":\"user\",\"subjectId\":\"$U_CONTRACTOR\",\"roleKey\":\"viewer\",\"scopeType\":\"tenant\",\"scopeId\":\"$TENANT\"}")"
 
 say "checks"
 check U1 "finance viewer sees finance workspaces" "fin-ledger,fin-q3" "$(slugs controller)"

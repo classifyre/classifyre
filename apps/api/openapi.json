@@ -30817,8 +30817,7 @@
           "subjectType": {
             "type": "string",
             "enum": [
-              "group",
-              "user"
+              "group"
             ]
           },
           "subjectId": {
@@ -30875,13 +30874,13 @@
           "subjectType": {
             "type": "string",
             "enum": [
-              "group",
-              "user"
-            ]
+              "group"
+            ],
+            "description": "Access always goes to a group; people get it by being in one."
           },
           "subjectId": {
             "type": "string",
-            "description": "Group id, or the person’s subject id."
+            "description": "Group id."
           },
           "roleKey": {
             "type": "string",

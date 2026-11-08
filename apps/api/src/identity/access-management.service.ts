@@ -20,14 +20,15 @@ import {
 } from './tenancy.service';
 
 export interface GrantInput extends GrantScope {
-  subjectType: 'group' | 'user';
+  /** Always a group: people get access by being in one. */
+  subjectType: 'group';
   subjectId: string;
   roleKey: string;
   expiresAt?: string | null;
 }
 
 export interface GrantView extends Grant {
-  /** Group path or person's name, for people reading the list. */
+  /** Group path, for people reading the list. */
   subjectLabel: string;
   scopeLabel: string;
   /** True when the grant comes from the tenant or a group, not this workspace. */
@@ -166,6 +167,12 @@ export class AccessManagementService {
     granterCapabilities: ReadonlySet<Capability>,
   ): Promise<GrantView> {
     const identity = this.requireSignIn();
+    // The DTO says so too; a caller that skips validation still gets told.
+    if ((input.subjectType as string) !== 'group') {
+      throw new BadRequestException(
+        'Access is given to groups. Put the person in a group and give the group access.',
+      );
+    }
     const scopes = ROLE_SCOPES[input.roleKey];
     if (!scopes)
       throw new BadRequestException(`Unknown role '${input.roleKey}'`);
@@ -178,23 +185,15 @@ export class AccessManagementService {
     let groups = await identity.groupsOf(principal);
     // Made in the identity server a moment ago: not in the cache yet.
     const named = [
-      input.subjectType === 'group' ? input.subjectId : null,
+      input.subjectId,
       input.scopeType === 'group' ? input.scopeId : null,
     ];
     if (named.some((id) => id && !groups.some((group) => group.id === id))) {
       groups = await identity.groupsOf(principal, true);
     }
     const groupIds = new Set(groups.map((group) => group.id));
-    if (input.subjectType === 'group' && !groupIds.has(input.subjectId)) {
+    if (!groupIds.has(input.subjectId)) {
       throw new BadRequestException('That group is not part of this tenant.');
-    }
-    if (
-      input.subjectType === 'user' &&
-      !(await identity.isMember(principal, input.subjectId))
-    ) {
-      throw new BadRequestException(
-        'That person is not a member of this tenant.',
-      );
     }
     if (input.scopeType === 'group' && !groupIds.has(input.scopeId)) {
       throw new BadRequestException(
@@ -309,17 +308,9 @@ export class AccessManagementService {
     const groups = new Map(
       (await identity.groupsOf(principal, true)).map((g) => [g.id, g.path]),
     );
-    const people = await this.tenancy.principalNames(
-      grants
-        .filter((grant) => grant.subjectType === 'user')
-        .map((grant) => grant.subjectId),
-    );
     return grants.map((grant) => ({
       ...grant,
-      subjectLabel:
-        grant.subjectType === 'group'
-          ? (groups.get(grant.subjectId) ?? 'Removed group')
-          : (people.get(grant.subjectId)?.displayName ?? 'Former member'),
+      subjectLabel: groups.get(grant.subjectId) ?? 'Removed group',
       scopeLabel:
         grant.scopeType === 'tenant'
           ? principal.tenant.name

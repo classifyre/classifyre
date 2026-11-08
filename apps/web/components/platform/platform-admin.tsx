@@ -48,6 +48,7 @@ import {
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
 import { useIamConsole } from "@/components/iam-session";
+import { signOut } from "@/lib/iam/sign-out";
 import { useTranslation } from "@/hooks/use-translation";
 import { formatRelative } from "@/lib/date";
 import { extractApiErrorMessage } from "@/lib/extract-api-error-message";
@@ -110,10 +111,8 @@ export function PlatformAdmin() {
             <ArrowLeft className="h-4 w-4" /> {t("access.allWorkspaces")}
           </a>
         </Button>
-        <Button variant="ghost" size="sm" asChild>
-          <a href="/auth/logout/">
-            <LogOut className="h-4 w-4" /> {t("account.signOut")}
-          </a>
+        <Button variant="ghost" size="sm" onClick={signOut}>
+          <LogOut className="h-4 w-4" /> {t("account.signOut")}
         </Button>
       </div>
       <div className="space-y-2">
