@@ -28,7 +28,42 @@ export function grantApplies(
       return grant.scopeId === workspace.namespaceId;
     case 'group':
       return workspace.ownerLineage.includes(grant.scopeId);
+    case 'source':
+    case 'asset':
+      // A grant on one source or table gives nothing workspace-wide; its
+      // capabilities apply to that resource only (see dataGrantsInWorkspace).
+      return false;
   }
+}
+
+/** Sources and tables of one workspace the grants open to `capability`. */
+export interface ResourceGrants {
+  sourceIds: string[];
+  assetIds: string[];
+}
+
+/**
+ * The sources and tables of one workspace that resource grants (scope
+ * `source` / `asset`, id `<namespaceId>/<id>`) open to a capability. A grant
+ * on the whole workspace is not counted here: it is in the capability set.
+ */
+export function resourceGrantsInWorkspace(
+  grants: readonly (GrantScope & { roleKey: string })[],
+  namespaceId: string,
+  capability: Capability,
+): ResourceGrants {
+  const prefix = `${namespaceId}/`;
+  const sourceIds = new Set<string>();
+  const assetIds = new Set<string>();
+  for (const grant of grants) {
+    if (grant.scopeType !== 'source' && grant.scopeType !== 'asset') continue;
+    if (!grant.scopeId.startsWith(prefix)) continue;
+    if (!roleCapabilities(grant.roleKey).includes(capability)) continue;
+    const id = grant.scopeId.slice(prefix.length);
+    if (!id) continue;
+    (grant.scopeType === 'source' ? sourceIds : assetIds).add(id);
+  }
+  return { sourceIds: [...sourceIds], assetIds: [...assetIds] };
 }
 
 /** Every capability the grants give in one workspace. Grants only add up. */

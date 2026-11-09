@@ -109,6 +109,7 @@ export const TenantDtoCapabilitiesEnum = {
     AgentConfigure: 'agent.configure',
     AgentUse: 'agent.use',
     DataExport: 'data.export',
+    DataQuery: 'data.query',
     McpTokenOwn: 'mcp.token.own',
     McpTokenAdmin: 'mcp.token.admin',
     TenantWorkspaceCreate: 'tenant.workspace.create',

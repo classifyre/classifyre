@@ -158,7 +158,7 @@ Every REST route declares one with `@Requires('<capability>')`. Every MCP tool d
 | Investigations      | `case.view`, `case.edit`, `case.manage` (close, delete, cleanup), `inquiry.view`, `inquiry.edit`, `lead.review`                   |
 | Meaning             | `glossary.view`, `glossary.edit`, `glossary.approve`, `entity.view`, `entity.manage`, `correlation.review`                        |
 | Agents              | `agent.view`, `agent.configure` (harness, autopilot, AI providers, chat bots), `agent.use` (assistant, AI completion)             |
-| Data out            | `data.export` (CSV, case export, live queries)                                                                                    |
+| Data out            | `data.export` (CSV, case export, live queries), `data.query` (rows of tables with SQL, [DQ](DQ-data-query.md))                     |
 | Tokens              | `mcp.token.own` (create and revoke your own), `mcp.token.admin` (see and revoke everyone's in the workspace)                      |
 | Tenant              | `tenant.workspace.create` (scoped to an owning group), `tenant.access.manage`, `tenant.categories.manage`, `tenant.audit.view` |
 | Platform            | `platform.tenants.manage`                                                                                                         |
@@ -173,6 +173,7 @@ Every REST route declares one with `@Requires('<capability>')`. Every MCP tool d
 | **Source manager**       | workspace or group | Not built on Viewer: `workspace.view`, `source.*`, `detector.*`, `finding.view`, `asset.view`, `mcp.token.own`. No case or inquiry access (U3) |
 | **Workspace admin**      | workspace or group | everything workspace-scoped except `code.author`                                                                                               |
 | **Code author** (add-on) | workspace or group | `code.author` only. Combined with another role                                                                                                 |
+| **Data reader** (add-on) | workspace, group, **one source or one table** | `data.query` only. Combined with Viewer. The first role grantable on a single resource ([DQ §4](DQ-data-query.md#4-who-may-query-what)) |
 | **Workspace manager**    | tenant             | `tenant.workspace.create` for that group, and Workspace admin on every workspace the group owns. Tenant scope only: an access group (`/finance/workspace-managers`), never one workspace |
 | **Auditor**              | tenant             | `tenant.audit.view`, `access.view` and `workspace.view` (metadata only, no findings content; redaction by S1's content presenter is step 9)    |
 | **Tenant admin**         | tenant             | everything in the tenant, including `code.author`                                                                                              |
@@ -862,7 +863,7 @@ Asked for: the identity server in Classifyre's style (sign-in page on the landin
 
 - Custom roles: tenant admins compose capability bundles (still no conditions).
 - MCP sign-in with OAuth against the `iam` realm instead of pasted tokens.
-- Restricted cases: a case visible only to its members, inside a workspace. Needs record-level checks in services; the `ACCESS_POLICY` seam already takes a resource.
+- Restricted cases: a case visible only to its members, inside a workspace. Needs record-level checks in services; the `ACCESS_POLICY` seam already takes a resource. Its first user is data access ([DQ](DQ-data-query.md), 2026-11-09): grants with `scope_type` `source` / `asset` and `scope_id = <namespace id>/<id>`, evaluated per request by `resourceGrantsInWorkspace` and honoured by `IamAccessPolicy.check(actor, capability, resource)`.
 - Redaction by role through S1's content presenter (Auditor sees metadata, never matched content).
 - Membership change events from Keycloak to cut the 60-second cache delay.
 

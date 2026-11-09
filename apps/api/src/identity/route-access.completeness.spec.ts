@@ -100,12 +100,14 @@ describe('route access completeness', () => {
     expect(unknown).toEqual([]);
   });
 
-  it('keeps public routes to health and crawler files', () => {
+  it('keeps public routes to health, crawler files and the query callback', () => {
     const publicRoutes = routes
       .filter((route) => route.access?.kind === 'public')
       .map((route) => `${route.controller}.${route.handler}`)
       .sort();
     expect(publicRoutes).toEqual([
+      // A query job's result: checked against the run's own token instead.
+      'DataQueryController.receive',
       'HealthController.getHealth',
       'HealthController.ping',
       'SitemapController.getEntries',

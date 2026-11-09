@@ -55,9 +55,26 @@ export interface TenantSummary extends Tenant {
   upgradeError: string | null;
 }
 
-export type GrantScopeType = 'tenant' | 'group' | 'workspace';
+export type GrantScopeType =
+  | 'tenant'
+  | 'group'
+  | 'workspace'
+  | 'source'
+  | 'asset';
 
-/** Scope a grant applies to: the whole tenant, a group's workspaces, or one workspace. */
+/** The scopes a grant on one resource inside a workspace uses (data access). */
+export const RESOURCE_SCOPE_TYPES = ['source', 'asset'] as const;
+export type ResourceScopeType = (typeof RESOURCE_SCOPE_TYPES)[number];
+
+/** `<namespaceId>/<sourceId or assetId>`: the scope id of a resource grant. */
+export function resourceScopeId(namespaceId: string, resourceId: string) {
+  return `${namespaceId}/${resourceId}`;
+}
+
+/**
+ * Scope a grant applies to: the whole tenant, a group's workspaces, one
+ * workspace, or one source or table in a workspace (`<namespaceId>/<id>`).
+ */
 export interface GrantScope {
   scopeType: GrantScopeType;
   scopeId: string;

@@ -36,6 +36,7 @@ import { ActorContextService } from './actor-context.service';
 import { isCapability } from './capabilities';
 import type { IdentityService, Principal } from './identity.service';
 import { IDENTITY } from './identity.tokens';
+import { resourceScopeId } from './tenancy.service';
 
 /** The signed-in principal; a 409 when sign-in is off (nothing to manage). */
 function principalOf(
@@ -91,7 +92,8 @@ export class WorkspaceAccessController {
   @Post('grants')
   @Requires('access.manage')
   @ApiOperation({
-    summary: 'Give a group or a person a role on this workspace',
+    summary:
+      'Give a group a role on this workspace, or data access to one of its sources or tables',
     description:
       'You can only give a role whose capabilities you all hold here (no escalation).',
   })
@@ -101,14 +103,24 @@ export class WorkspaceAccessController {
     @Body() body: CreateGrantDto,
   ): Promise<GrantDto> {
     const principal = await this.principal(request);
+    const workspaceId = this.actors.workspaceId()!;
+    const onResource =
+      body.scopeType === 'source' || body.scopeType === 'asset';
+    if (onResource && !body.resourceId) {
+      throw new BadRequestException(
+        'A grant on one source or table needs resourceId.',
+      );
+    }
     return this.access.addGrant(
       principal,
       {
         subjectType: body.subjectType,
         subjectId: body.subjectId,
         roleKey: body.roleKey,
-        scopeType: 'workspace',
-        scopeId: this.actors.workspaceId()!,
+        scopeType: onResource ? body.scopeType! : 'workspace',
+        scopeId: onResource
+          ? resourceScopeId(workspaceId, body.resourceId!)
+          : workspaceId,
         expiresAt: body.expiresAt,
       },
       await this.policy.capabilities(principal.actor),

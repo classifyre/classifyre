@@ -34,6 +34,18 @@ import { formatAssetKind } from "@/lib/asset-kind";
 import { DetailBackButton } from "@/components/detail-back-button";
 import { useTranslation } from "@/hooks/use-translation";
 import { useEntityDocumentTitle } from "@/components/document-title-updater";
+import {
+  catalogTableFor,
+  fetchCatalog,
+  type QueryCatalog,
+} from "@/lib/data-query";
+
+// Monaco and the results grid: client-only, loaded when the Data tab opens.
+const AssetDataTab = dynamic(
+  () =>
+    import("@/components/data-query/asset-data-tab").then((m) => m.AssetDataTab),
+  { ssr: false },
+);
 
 // The canvas measures the DOM: client-only, loaded when the tab opens.
 const ExploreWorkspace = dynamic(
@@ -74,6 +86,19 @@ export default function AssetDetailPage() {
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // What SQL can read: the Data tab shows only for an asset that is a table.
+  const [queryCatalog, setQueryCatalog] = useState<QueryCatalog | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    fetchCatalog()
+      .then((catalog) => active && setQueryCatalog(catalog))
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
+  const queryTable = assetId ? catalogTableFor(queryCatalog, assetId) : null;
 
   useEffect(() => {
     let isActive = true;
@@ -303,7 +328,14 @@ export default function AssetDetailPage() {
         )}
 
       {lockedFilters && (
-        <Tabs defaultValue="findings" urlParam="tab" className="space-y-4">
+        <Tabs
+          // Remounted once the Data tab is known, so ?tab=data opens it: the
+          // tabs read the address when they mount.
+          key={queryTable ? "with-data" : "without-data"}
+          defaultValue="findings"
+          urlParam="tab"
+          className="space-y-4"
+        >
           <TabsList>
             <TabsTrigger value="findings">
               {t("correlation.findingsTab")}
@@ -311,6 +343,11 @@ export default function AssetDetailPage() {
             <TabsTrigger value="connections" data-testid="asset-connections-tab">
               {t("explore.assetTab")}
             </TabsTrigger>
+            {queryTable && (
+              <TabsTrigger value="data" data-testid="asset-data-tab-trigger">
+                {t("dataQuery.assetTab")}
+              </TabsTrigger>
+            )}
           </TabsList>
           <TabsContent value="findings" className="space-y-4">
             <Suspense>
@@ -337,6 +374,11 @@ export default function AssetDetailPage() {
               columns={columnNames(assetDetails.metadata)}
             />
           </TabsContent>
+          {queryTable && queryCatalog && (
+            <TabsContent value="data" className="space-y-4">
+              <AssetDataTab catalog={queryCatalog} table={queryTable} />
+            </TabsContent>
+          )}
         </Tabs>
       )}
     </div>

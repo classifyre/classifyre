@@ -49,11 +49,18 @@ export class CreateGrantDto {
   roleKey: string;
 
   @ApiPropertyOptional({
-    enum: ['tenant', 'group', 'workspace'],
+    enum: ['tenant', 'group', 'workspace', 'source', 'asset'],
     description:
-      'Tenant-level grants only: where the role applies. Workspace grants are always on that workspace.',
+      'Tenant-level grants: where the role applies. Workspace grants are on that workspace, ' +
+      'or with `source` / `asset` and `resourceId` on one source or table of it (data-reader only).',
   })
   scopeType?: GrantScopeType;
+
+  @ApiPropertyOptional({
+    description:
+      'Workspace grants with scopeType `source` or `asset`: the source or asset id.',
+  })
+  resourceId?: string;
 
   @ApiPropertyOptional({
     description:
@@ -86,7 +93,7 @@ export class GrantDto {
   @ApiProperty({ example: 'viewer' })
   roleKey: string;
 
-  @ApiProperty({ enum: ['tenant', 'group', 'workspace'] })
+  @ApiProperty({ enum: ['tenant', 'group', 'workspace', 'source', 'asset'] })
   scopeType: string;
 
   @ApiProperty()

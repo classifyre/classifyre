@@ -188,6 +188,7 @@
     "explore": "Explore",
     "findings": "Findings",
     "assets": "Assets",
+    "query": "SQL",
     "sources": "Sources",
     "detectors": "Custom Detectors",
     "investigations": "Investigations",
@@ -6652,6 +6653,12 @@
       "ogTitle": "Explore connections | Classifyre",
       "ogDescription": "Search, then follow lineage, duplicates, shared concepts and look-alikes — each link with its reason."
     },
+    "query": {
+      "title": "SQL — Query Your Tables",
+      "description": "Query the rows of the database, lakehouse and file tables you have access to with standard SQL, and join tables across sources.",
+      "ogTitle": "SQL over your tables | Classifyre",
+      "ogDescription": "Standard SQL over the tables you may read, joined across sources."
+    },
     "findings": {
       "title": "Findings — Triage Every Detection by Severity, Source & Detector",
       "description": "Triage every detection in one place — filter by severity, status, confidence, source and detector. Track PII, secrets, security issues and custom detections from open to resolved across every scan.",
@@ -7384,5 +7391,76 @@
     "signedInAs": "Signed in as",
     "retry": "Try again",
     "signOut": "Sign out"
+  },
+  "dataQuery": {
+    "title": "SQL",
+    "subtitle": "Query the rows of the tables you have access to with standard SQL. A query can join tables of different sources.",
+    "run": "Run",
+    "cancel": "Cancel",
+    "format": "Format",
+    "shortcut": "Ctrl/⌘ + Enter runs the query",
+    "status": {
+      "PENDING": "Queued",
+      "RUNNING": "Running",
+      "SUCCESS": "Done",
+      "ERROR": "Failed",
+      "TIMEOUT": "Timed out",
+      "CANCELLED": "Cancelled"
+    },
+    "elapsed": "{{seconds}} s",
+    "timings": "setup {{setup}} s · query {{query}} s",
+    "rows": "{{count}} rows",
+    "columns": "{{count}} columns",
+    "truncatedRows": "Showing the first {{count}} rows: the workspace's row limit.",
+    "truncatedBytes": "Showing the first {{count}} rows: the whole result is larger than the result limit.",
+    "noResult": "Run a query to see its rows here.",
+    "emptyResult": "The query returned no rows.",
+    "catalogTitle": "Tables",
+    "catalogSearch": "Filter tables and columns",
+    "onlyQueryable": "Only what I can query",
+    "catalogFailed": "The list of tables could not be loaded.",
+    "locked": "You cannot query this table. A workspace admin can give your group data access.",
+    "notQueryable": "Cannot be queried with SQL",
+    "noTables": "No tables to query yet. Scan a database, lakehouse or bucket source first.",
+    "partialAccess": "You can query {{count}} tables here, the ones with a play mark. The others need a data-reader grant.",
+    "disabledTitle": "SQL queries are off in this workspace",
+    "disabledBody": "A workspace admin can turn them on in Settings → Export & Import.",
+    "openInQuery": "Open in SQL",
+    "assetTab": "Data",
+    "assetLockedTitle": "No data access",
+    "assetLocked": "You can see this table but not its rows. A workspace admin can give your group the Data reader role on this table or its source.",
+    "export": {
+      "button": "Export",
+      "running": "Exporting…",
+      "xlsx": "Excel (.xlsx)",
+      "csv": "CSV",
+      "parquet": "Parquet",
+      "done": "Exported {{count}} rows.",
+      "truncated": "Exported the first {{count}} rows: the export row limit.",
+      "failed": "The export failed."
+    },
+    "access": {
+      "title": "Who can query this table",
+      "description": "Data access always goes to a group: the Data reader role on this table, on its whole source, or on the workspace.",
+      "none": "Nobody beyond workspace admins.",
+      "thisTable": "This table",
+      "wholeSource": "Its whole source",
+      "pickGroup": "Choose a group",
+      "give": "Give access",
+      "remove": "Remove access",
+      "added": "Access given",
+      "viewerNote": "Members also need a role that opens the workspace, such as Viewer."
+    },
+    "settings": {
+      "title": "SQL over tables",
+      "description": "Let people query the rows of this workspace's tables with SQL. Who may query which table follows their roles and data-reader grants. Every query is recorded in Activity.",
+      "enabled": "Answer SQL queries",
+      "maxRows": "Rows per result",
+      "timeout": "Time limit (seconds)",
+      "exportMaxRows": "Rows per export",
+      "save": "Save limits",
+      "saved": "Saved",
+      "changedBy": "Last changed by"
+    }
   }
 }

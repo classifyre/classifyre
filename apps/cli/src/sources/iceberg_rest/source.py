@@ -28,7 +28,7 @@ from urllib.parse import urlsplit
 from ...models.generated_input import IcebergRestInput, SamplingConfig
 from ...utils.duckdb_engine import load_extension
 from ..dependencies import require_module
-from ..duckdb_attached_base import CATALOG_ALIAS, DuckDBAttachedSource
+from ..duckdb_attached_base import DuckDBAttachedSource
 from ..tabular_utils import TableRef
 
 logger = logging.getLogger(__name__)
@@ -127,8 +127,10 @@ class IcebergRestSource(DuckDBAttachedSource):
             else:
                 token = self._masked("token") if mode == "token" else self._google_token()
                 secret.append(f"TOKEN {lit(token or '')}")
-            conn.execute(f"CREATE OR REPLACE SECRET iceberg_catalog ({', '.join(secret)})")
-            options += [f"ENDPOINT {lit(uri)}", "SECRET iceberg_catalog"]
+            conn.execute(
+                f"CREATE OR REPLACE SECRET {self._secret_name('iceberg_catalog')} ({', '.join(secret)})"
+            )
+            options += [f"ENDPOINT {lit(uri)}", f"SECRET {self._secret_name('iceberg_catalog')}"]
         elif mode == "sigv4":
             self._aws_secret(conn)
             if "s3tables" in host:
@@ -144,7 +146,7 @@ class IcebergRestSource(DuckDBAttachedSource):
             options.append("ACCESS_DELEGATION_MODE 'none'")
         self._storage_secrets(conn)
         warehouse = str(self._connection("warehouse") or "")
-        conn.execute(f"ATTACH {lit(warehouse)} AS {CATALOG_ALIAS} ({', '.join(options)})")
+        conn.execute(f"ATTACH {lit(warehouse)} AS {self._attach_alias} ({', '.join(options)})")
 
     def _aws_secret(self, conn: Any) -> None:
         lit = self._sql_literal
@@ -159,7 +161,9 @@ class IcebergRestSource(DuckDBAttachedSource):
         region = self._connection("sigv4_region")
         if region:
             parts.append(f"REGION {lit(str(region))}")
-        conn.execute(f"CREATE OR REPLACE SECRET iceberg_sigv4 ({', '.join(parts)})")
+        conn.execute(
+            f"CREATE OR REPLACE SECRET {self._secret_name('iceberg_sigv4')} ({', '.join(parts)})"
+        )
 
     def _storage_secrets(self, conn: Any) -> None:
         """Keys of the source's own for the table files, when the catalog vends none."""
@@ -179,12 +183,14 @@ class IcebergRestSource(DuckDBAttachedSource):
                 parts += [f"ENDPOINT {lit(parsed.netloc or parsed.path)}", "URL_STYLE 'path'"]
                 if parsed.scheme == "http":
                     parts.append("USE_SSL false")
-            conn.execute(f"CREATE OR REPLACE SECRET iceberg_storage ({', '.join(parts)})")
+            conn.execute(
+                f"CREATE OR REPLACE SECRET {self._secret_name('iceberg_storage')} ({', '.join(parts)})"
+            )
         azure = self._masked("storage_azure_connection_string")
         if azure:
             load_extension(conn, "azure")
             conn.execute(
-                f"CREATE OR REPLACE SECRET iceberg_azure (TYPE AZURE, CONNECTION_STRING {lit(azure)})"
+                f"CREATE OR REPLACE SECRET {self._secret_name('iceberg_azure')} (TYPE AZURE, CONNECTION_STRING {lit(azure)})"
             )
 
     def _google_token(self) -> str:

@@ -38,11 +38,17 @@ export interface CreateGrantDto {
      */
     roleKey: string;
     /**
-     * Tenant-level grants only: where the role applies. Workspace grants are always on that workspace.
+     * Tenant-level grants: where the role applies. Workspace grants are on that workspace, or with `source` / `asset` and `resourceId` on one source or table of it (data-reader only).
      * @type {string}
      * @memberof CreateGrantDto
      */
     scopeType?: CreateGrantDtoScopeTypeEnum;
+    /**
+     * Workspace grants with scopeType `source` or `asset`: the source or asset id.
+     * @type {string}
+     * @memberof CreateGrantDto
+     */
+    resourceId?: string;
     /**
      * Tenant-level grants only: the tenant id, owner group id or workspace id.
      * @type {string}
@@ -72,7 +78,9 @@ export type CreateGrantDtoSubjectTypeEnum = typeof CreateGrantDtoSubjectTypeEnum
 export const CreateGrantDtoScopeTypeEnum = {
     Tenant: 'tenant',
     Group: 'group',
-    Workspace: 'workspace'
+    Workspace: 'workspace',
+    Source: 'source',
+    Asset: 'asset'
 } as const;
 export type CreateGrantDtoScopeTypeEnum = typeof CreateGrantDtoScopeTypeEnum[keyof typeof CreateGrantDtoScopeTypeEnum];
 
@@ -101,6 +109,7 @@ export function CreateGrantDtoFromJSONTyped(json: any, ignoreDiscriminator: bool
         'subjectId': json['subjectId'],
         'roleKey': json['roleKey'],
         'scopeType': json['scopeType'] == null ? undefined : json['scopeType'],
+        'resourceId': json['resourceId'] == null ? undefined : json['resourceId'],
         'scopeId': json['scopeId'] == null ? undefined : json['scopeId'],
         'expiresAt': json['expiresAt'] == null ? undefined : (new Date(json['expiresAt'])),
     };
@@ -121,6 +130,7 @@ export function CreateGrantDtoToJSONTyped(value?: CreateGrantDto | null, ignoreD
         'subjectId': value['subjectId'],
         'roleKey': value['roleKey'],
         'scopeType': value['scopeType'],
+        'resourceId': value['resourceId'],
         'scopeId': value['scopeId'],
         'expiresAt': value['expiresAt'] == null ? value['expiresAt'] : value['expiresAt'].toISOString(),
     };

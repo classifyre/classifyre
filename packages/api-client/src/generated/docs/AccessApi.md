@@ -13,7 +13,7 @@ All URIs are relative to *http://localhost*
 | [**tenantAccessControllerRoles**](AccessApi.md#tenantaccesscontrollerroles) | **GET** /tenant/roles | The built-in roles and where each can be granted |
 | [**tenantAccessControllerTenant**](AccessApi.md#tenantaccesscontrollertenant) | **GET** /tenant | The caller’s tenant and what they may do across it |
 | [**tenantAccessControllerTenants**](AccessApi.md#tenantaccesscontrollertenants) | **GET** /tenant/tenants | Every tenant the caller belongs to, for switching (§12.2) |
-| [**workspaceAccessControllerAddGrant**](AccessApi.md#workspaceaccesscontrolleraddgrant) | **POST** /access/grants | Give a group or a person a role on this workspace |
+| [**workspaceAccessControllerAddGrant**](AccessApi.md#workspaceaccesscontrolleraddgrant) | **POST** /access/grants | Give a group a role on this workspace, or data access to one of its sources or tables |
 | [**workspaceAccessControllerExplain**](AccessApi.md#workspaceaccesscontrollerexplain) | **GET** /access/explain | Why can I do this? The grants that give you a capability here |
 | [**workspaceAccessControllerGrants**](AccessApi.md#workspaceaccesscontrollergrants) | **GET** /access/grants | Grants that reach this workspace, including inherited ones |
 | [**workspaceAccessControllerGroups**](AccessApi.md#workspaceaccesscontrollergroups) | **GET** /access/groups | Groups of this tenant, to grant access to |
@@ -565,7 +565,7 @@ No authorization required
 
 > GrantDto workspaceAccessControllerAddGrant(createGrantDto)
 
-Give a group or a person a role on this workspace
+Give a group a role on this workspace, or data access to one of its sources or tables
 
 You can only give a role whose capabilities you all hold here (no escalation).
 

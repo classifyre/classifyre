@@ -17,7 +17,7 @@ from urllib.parse import urlsplit
 from ...models.generated_input import DuckLakeInput, SamplingConfig
 from ...utils.duckdb_engine import load_extension
 from ..dependencies import require_module
-from ..duckdb_attached_base import CATALOG_ALIAS, DuckDBAttachedSource
+from ..duckdb_attached_base import DuckDBAttachedSource
 from ..tabular_utils import TableRef
 
 logger = logging.getLogger(__name__)
@@ -103,7 +103,7 @@ class DuckLakeSource(DuckDBAttachedSource):
         if self._connection("metadata_schema"):
             options.append(f"METADATA_SCHEMA {lit(self._connection('metadata_schema') or '')}")
         conn.execute(
-            f"ATTACH {lit('ducklake:' + catalog)} AS {CATALOG_ALIAS} ({', '.join(options)})"
+            f"ATTACH {lit('ducklake:' + catalog)} AS {self._attach_alias} ({', '.join(options)})"
         )
 
     def _storage_secrets(self, conn: Any) -> None:
@@ -122,18 +122,20 @@ class DuckLakeSource(DuckDBAttachedSource):
                 parts += [f"ENDPOINT {lit(parsed.netloc or parsed.path)}", "URL_STYLE 'path'"]
                 if parsed.scheme == "http":
                     parts.append("USE_SSL false")
-            conn.execute(f"CREATE OR REPLACE SECRET ducklake_s3 ({', '.join(parts)})")
+            conn.execute(
+                f"CREATE OR REPLACE SECRET {self._secret_name('ducklake_s3')} ({', '.join(parts)})"
+            )
         if self._masked("azure_connection_string"):
             load_extension(conn, "azure")
             conn.execute(
-                "CREATE OR REPLACE SECRET ducklake_azure (TYPE AZURE, "
+                f"CREATE OR REPLACE SECRET {self._secret_name('ducklake_azure')} (TYPE AZURE, "
                 f"CONNECTION_STRING {lit(self._masked('azure_connection_string') or '')})"
             )
         hmac_key, hmac_secret = self._masked("gcs_hmac_key_id"), self._masked("gcs_hmac_secret")
         if hmac_key and hmac_secret:
             load_extension(conn, "httpfs")
             conn.execute(
-                f"CREATE OR REPLACE SECRET ducklake_gcs (TYPE GCS, KEY_ID {lit(hmac_key)}, "
+                f"CREATE OR REPLACE SECRET {self._secret_name('ducklake_gcs')} (TYPE GCS, KEY_ID {lit(hmac_key)}, "
                 f"SECRET {lit(hmac_secret)})"
             )
 

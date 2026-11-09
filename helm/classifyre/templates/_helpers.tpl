@@ -527,6 +527,19 @@ which each deployment sets on its own after including this block.
   value: {{ .Values.api.cliJobs.cleanupPolicy | quote }}
 - name: K8S_CLI_JOB_WORKDIR
   value: {{ .Values.api.cliJobs.workDir | quote }}
+{{- with .Values.api.cliJobs.query }}
+- name: K8S_CLI_QUERY_JOB_MEMORY
+  value: {{ .memory | quote }}
+- name: K8S_CLI_QUERY_JOB_CPU
+  value: {{ .cpu | quote }}
+- name: K8S_CLI_QUERY_JOB_MAX_SPILL
+  value: {{ .maxSpill | quote }}
+{{- $queryPriority := include "classifyre.priorityClassName" (dict "name" .priorityClassName "root" $.root) }}
+{{- if $queryPriority }}
+- name: K8S_CLI_QUERY_JOB_PRIORITY_CLASS
+  value: {{ $queryPriority | quote }}
+{{- end }}
+{{- end }}
 {{- if .Values.api.cliJobs.huggingFace.existingSecret }}
 - name: HF_TOKEN_INSTANCE_SET
   value: "1"
@@ -662,6 +675,10 @@ Usage: {{ include "classifyre.priorityClassServiceName" . }}
 {{- printf "%s-%s" .Release.Name .Values.priorityClasses.batchName -}}
 {{- end -}}
 
+{{- define "classifyre.priorityClassInteractiveName" -}}
+{{- printf "%s-%s" .Release.Name .Values.priorityClasses.interactiveName -}}
+{{- end -}}
+
 {{/*
 Resolve a pod's priorityClassName, refusing to name a class this release has
 not created.
@@ -692,6 +709,8 @@ Usage: {{ include "classifyre.priorityClassName" (dict "name" .Values.api.priori
 {{- if $pc.create -}}{{- include "classifyre.priorityClassServiceName" .root -}}{{- end -}}
 {{- else if eq $name $pc.batchName -}}
 {{- if $pc.create -}}{{- include "classifyre.priorityClassBatchName" .root -}}{{- end -}}
+{{- else if eq $name $pc.interactiveName -}}
+{{- if $pc.create -}}{{- include "classifyre.priorityClassInteractiveName" .root -}}{{- end -}}
 {{- else -}}
 {{- $name -}}
 {{- end -}}

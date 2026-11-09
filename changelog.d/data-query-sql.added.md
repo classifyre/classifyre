@@ -1,0 +1,1 @@
+You can now query the rows of database, lakehouse and bucket tables with standard SQL, from a table's new Data tab or the new SQL page, and join tables across sources. It is off until a workspace admin turns it on in Settings → Export & Import, and with sign-in on the new Data reader role gives a group access to a whole workspace, one source or a single table.
