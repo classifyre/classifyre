@@ -18,7 +18,12 @@ import { transientDbErrorCode } from '../db/transient-db-error';
 import { InternalApiKeyService } from '../internal-api-key.service';
 import type { IdentityService } from '../identity/identity.service';
 import { CLS_ACTOR } from '../identity/actor-context.service';
-import { CLS_CAPABILITIES } from '../identity/iam-access-policy';
+import {
+  CLS_CAPABILITIES,
+  CLS_RESOURCE_GRANTS,
+} from '../identity/iam-access-policy';
+import { RESOURCE_GRANTABLE_CAPABILITIES } from '../identity/access-policy';
+import { resourceGrantsInWorkspace } from '../identity/grant-evaluation';
 import {
   assertSameOrigin,
   authenticateOr,
@@ -205,6 +210,9 @@ async function authorizeWorkspaceRequest(
 ): Promise<boolean> {
   if (internalApiKey.isInternalRequest(request.headers)) return true;
   if (request.url.split('?')[0] === '/mcp') return true;
+  // A query job posting its result: it holds no key and no sign-in, only the
+  // run's own token, which the route checks (data-query/query-run-token.ts).
+  if (isQueryRunCallback(request)) return true;
 
   const principal = await authenticateOr(
     () => identity.authenticate(request.raw),
@@ -243,7 +251,31 @@ async function authorizeWorkspaceRequest(
   }
   cls.set(CLS_ACTOR, principal.actor);
   cls.set(CLS_CAPABILITIES, capabilities);
+  cls.set(
+    CLS_RESOURCE_GRANTS,
+    Object.fromEntries(
+      RESOURCE_GRANTABLE_CAPABILITIES.map((capability) => [
+        capability,
+        resourceGrantsInWorkspace(principal.grants, ns.namespaceId, capability),
+      ]),
+    ),
+  );
   return true;
+}
+
+const QUERY_RUN_CALLBACK_RE = /^\/query-runs\/[0-9a-f-]{36}\/result$/i;
+
+/** The one unauthenticated workspace route: a query job's result callback. */
+export function isQueryRunCallback(request: {
+  url: string;
+  method: string;
+  headers: Record<string, unknown>;
+}): boolean {
+  return (
+    request.method === 'POST' &&
+    QUERY_RUN_CALLBACK_RE.test(request.url.split('?')[0]) &&
+    typeof request.headers['x-query-run-token'] === 'string'
+  );
 }
 
 /**

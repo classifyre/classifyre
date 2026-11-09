@@ -205,6 +205,15 @@ export const CAPABILITIES = [
     scope: 'workspace',
     description: 'Export data out of the workspace (CSV, archives).',
   },
+  {
+    // The rows themselves, not what was found in them. Given on a whole
+    // workspace by a role, or on one source or table by a data-reader grant
+    // (docs/prd/DQ-data-query.md §4).
+    id: 'data.query',
+    scope: 'workspace',
+    description:
+      'Query the rows of tables with SQL: every table here, or only the sources and tables a grant names.',
+  },
   // Tokens
   {
     id: 'mcp.token.own',

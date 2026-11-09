@@ -78,6 +78,7 @@ export { ChatBotsApi } from "./generated/src/apis/ChatBotsApi";
 export { EmbeddingsApi } from "./generated/src/apis/EmbeddingsApi";
 export { GlossaryApi } from "./generated/src/apis/GlossaryApi";
 export { NotebooksApi } from "./generated/src/apis/NotebooksApi";
+export { DataQueryApi } from "./generated/src/apis/DataQueryApi";
 export { AIApi } from "./generated/src/apis/AIApi";
 export { WorkerQueuesApi } from "./generated/src/apis/WorkerQueuesApi";
 export { IdentityApi } from "./generated/src/apis/IdentityApi";
@@ -374,6 +375,14 @@ export type {
   MeActorDto,
   GrantDto,
   CreateGrantDto,
+  QueryCatalogDto,
+  QueryCatalogSourceDto,
+  QueryCatalogTableDto,
+  QueryColumnDto,
+  QueryRunDto,
+  QueryRunErrorDto,
+  DataQuerySettingsDto,
+  UpdateDataQuerySettingsDto,
   RoleDto,
   TenantDto,
   TenantMembershipDto,
@@ -1326,6 +1335,7 @@ export type RunTestsResponseDto = {
 // Import API classes for the client
 import { SourcesApi } from "./generated/src/apis/SourcesApi";
 import { NotebooksApi } from "./generated/src/apis/NotebooksApi";
+import { DataQueryApi } from "./generated/src/apis/DataQueryApi";
 import { AIApi } from "./generated/src/apis/AIApi";
 import { AssetsApi } from "./generated/src/apis/AssetsApi";
 import { HealthApi } from "./generated/src/apis/HealthApi";
@@ -1997,6 +2007,7 @@ class ApiClient {
 
   public sources: SourcesApi;
   public notebooks: NotebooksApi;
+  public dataQuery: DataQueryApi;
   public ai: AIApi;
   public assets: AssetsApi;
   public health: HealthApi;
@@ -2031,6 +2042,7 @@ class ApiClient {
 
     this.sources = new SourcesApi(this.config);
     this.notebooks = new NotebooksApi(this.config);
+    this.dataQuery = new DataQueryApi(this.config);
     this.ai = new AIApi(this.config);
     this.assets = new AssetsApi(this.config);
     this.health = new HealthApi(this.config);

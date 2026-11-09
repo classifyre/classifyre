@@ -22,6 +22,7 @@ OUT=${OUT:-$ROOT/apps/e2e/.env}
 
 kubectl -n "$NS" create configmap classifyre-smoke-fixture \
   --from-file="$ROOT/docker/fixtures/smoke/deploy-notes.txt" \
+  --from-file="$ROOT/docker/fixtures/smoke/orders.csv" \
   --dry-run=client -o yaml | kubectl -n "$NS" apply -f - >/dev/null
 
 ADMIN_PW=$(kubectl -n "$NS" get secret "$RELEASE-iam" -o jsonpath='{.data.admin-password}' | base64 -d)

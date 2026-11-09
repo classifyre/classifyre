@@ -68,7 +68,7 @@ All URIs are relative to *http://localhost*
 *AccessApi* | [**tenantAccessControllerRoles**](docs/AccessApi.md#tenantaccesscontrollerroles) | **GET** /tenant/roles | The built-in roles and where each can be granted
 *AccessApi* | [**tenantAccessControllerTenant**](docs/AccessApi.md#tenantaccesscontrollertenant) | **GET** /tenant | The caller’s tenant and what they may do across it
 *AccessApi* | [**tenantAccessControllerTenants**](docs/AccessApi.md#tenantaccesscontrollertenants) | **GET** /tenant/tenants | Every tenant the caller belongs to, for switching (§12.2)
-*AccessApi* | [**workspaceAccessControllerAddGrant**](docs/AccessApi.md#workspaceaccesscontrolleraddgrant) | **POST** /access/grants | Give a group or a person a role on this workspace
+*AccessApi* | [**workspaceAccessControllerAddGrant**](docs/AccessApi.md#workspaceaccesscontrolleraddgrant) | **POST** /access/grants | Give a group a role on this workspace, or data access to one of its sources or tables
 *AccessApi* | [**workspaceAccessControllerExplain**](docs/AccessApi.md#workspaceaccesscontrollerexplain) | **GET** /access/explain | Why can I do this? The grants that give you a capability here
 *AccessApi* | [**workspaceAccessControllerGrants**](docs/AccessApi.md#workspaceaccesscontrollergrants) | **GET** /access/grants | Grants that reach this workspace, including inherited ones
 *AccessApi* | [**workspaceAccessControllerGroups**](docs/AccessApi.md#workspaceaccesscontrollergroups) | **GET** /access/groups | Groups of this tenant, to grant access to
@@ -237,6 +237,15 @@ All URIs are relative to *http://localhost*
 *CustomDetectorsApi* | [**customDetectorsControllerTrainingHistory**](docs/CustomDetectorsApi.md#customdetectorscontrollertraininghistory) | **GET** /custom-detectors/{id}/training-history | List training history for custom detector
 *CustomDetectorsApi* | [**customDetectorsControllerUpdate**](docs/CustomDetectorsApi.md#customdetectorscontrollerupdate) | **PATCH** /custom-detectors/{id} | Update custom detector
 *CustomDetectorsApi* | [**customDetectorsControllerUploadFile**](docs/CustomDetectorsApi.md#customdetectorscontrolleruploadfile) | **POST** /custom-detectors/{id}/files | Upload one file to a code detector
+*DataQueryApi* | [**dataQueryControllerCancel**](docs/DataQueryApi.md#dataquerycontrollercancel) | **POST** /query-runs/{id}/cancel | Stop one of your queries
+*DataQueryApi* | [**dataQueryControllerCreate**](docs/DataQueryApi.md#dataquerycontrollercreate) | **POST** /query-runs | Run one SELECT; poll the run for its status
+*DataQueryApi* | [**dataQueryControllerGet**](docs/DataQueryApi.md#dataquerycontrollerget) | **GET** /query-runs/{id} | One of your queries
+*DataQueryApi* | [**dataQueryControllerGetCatalog**](docs/DataQueryApi.md#dataquerycontrollergetcatalog) | **GET** /data-query/catalog | The tables you can query with SQL, and those you could with access
+*DataQueryApi* | [**dataQueryControllerGetSettings**](docs/DataQueryApi.md#dataquerycontrollergetsettings) | **GET** /data-query/settings | Whether this workspace answers SQL, and its limits
+*DataQueryApi* | [**dataQueryControllerList**](docs/DataQueryApi.md#dataquerycontrollerlist) | **GET** /query-runs | Your recent queries in this workspace
+*DataQueryApi* | [**dataQueryControllerReceive**](docs/DataQueryApi.md#dataquerycontrollerreceive) | **POST** /query-runs/{id}/result | Internal: a query job posts its result here
+*DataQueryApi* | [**dataQueryControllerResult**](docs/DataQueryApi.md#dataquerycontrollerresult) | **GET** /query-runs/{id}/result | The rows of a finished query (Arrow IPC stream), or its exported file
+*DataQueryApi* | [**dataQueryControllerUpdateSettings**](docs/DataQueryApi.md#dataquerycontrollerupdatesettings) | **PUT** /data-query/settings | Turn SQL queries on or off, and set their limits
 *DataTransferApi* | [**dataTransferControllerCancel**](docs/DataTransferApi.md#datatransfercontrollercancel) | **POST** /data-transfer/jobs/{id}/cancel | Ask a running transfer to stop
 *DataTransferApi* | [**dataTransferControllerDownload**](docs/DataTransferApi.md#datatransfercontrollerdownload) | **GET** /data-transfer/exports/{id}/download | Download a completed export archive
 *DataTransferApi* | [**dataTransferControllerJob**](docs/DataTransferApi.md#datatransfercontrollerjob) | **GET** /data-transfer/jobs/{id} | Poll one transfer job for progress
@@ -687,6 +696,7 @@ All URIs are relative to *http://localhost*
 - [CreateMcpServerDto](docs/CreateMcpServerDto.md)
 - [CreateMcpTokenDto](docs/CreateMcpTokenDto.md)
 - [CreateNotebookExecutionDto](docs/CreateNotebookExecutionDto.md)
+- [CreateQueryRunDto](docs/CreateQueryRunDto.md)
 - [CreateSourceDto](docs/CreateSourceDto.md)
 - [CreateSupervisorGoalDto](docs/CreateSupervisorGoalDto.md)
 - [CreateThreadDto](docs/CreateThreadDto.md)
@@ -695,6 +705,7 @@ All URIs are relative to *http://localhost*
 - [CustomDetectorResponseDto](docs/CustomDetectorResponseDto.md)
 - [CustomDetectorResponseDtoSourcesUsingInner](docs/CustomDetectorResponseDtoSourcesUsingInner.md)
 - [CustomDetectorTrainingRunDto](docs/CustomDetectorTrainingRunDto.md)
+- [DataQuerySettingsDto](docs/DataQuerySettingsDto.md)
 - [DataTransferJobDto](docs/DataTransferJobDto.md)
 - [DataTransferJobListDto](docs/DataTransferJobListDto.md)
 - [DecisionsToCaseDto](docs/DecisionsToCaseDto.md)
@@ -854,6 +865,13 @@ All URIs are relative to *http://localhost*
 - [PurgeSourceAssetsResponseDto](docs/PurgeSourceAssetsResponseDto.md)
 - [PutAssetChunksDto](docs/PutAssetChunksDto.md)
 - [PutBoardThumbnailDto](docs/PutBoardThumbnailDto.md)
+- [QueryCatalogDto](docs/QueryCatalogDto.md)
+- [QueryCatalogSourceDto](docs/QueryCatalogSourceDto.md)
+- [QueryCatalogTableDto](docs/QueryCatalogTableDto.md)
+- [QueryColumnDto](docs/QueryColumnDto.md)
+- [QueryLimitsDto](docs/QueryLimitsDto.md)
+- [QueryRunDto](docs/QueryRunDto.md)
+- [QueryRunErrorDto](docs/QueryRunErrorDto.md)
 - [QuickSearchAssetDto](docs/QuickSearchAssetDto.md)
 - [QuickSearchFindingDto](docs/QuickSearchFindingDto.md)
 - [QuickSearchRequestDto](docs/QuickSearchRequestDto.md)
@@ -1048,6 +1066,7 @@ All URIs are relative to *http://localhost*
 - [UpdateChatBotDto](docs/UpdateChatBotDto.md)
 - [UpdateCorrelationConfigDto](docs/UpdateCorrelationConfigDto.md)
 - [UpdateCustomDetectorDto](docs/UpdateCustomDetectorDto.md)
+- [UpdateDataQuerySettingsDto](docs/UpdateDataQuerySettingsDto.md)
 - [UpdateEdgeDto](docs/UpdateEdgeDto.md)
 - [UpdateEmbeddingSettingsDto](docs/UpdateEmbeddingSettingsDto.md)
 - [UpdateEmbeddingSettingsResponseDto](docs/UpdateEmbeddingSettingsResponseDto.md)

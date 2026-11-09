@@ -363,7 +363,7 @@ export class AccessApi extends runtime.BaseAPI {
 
     /**
      * You can only give a role whose capabilities you all hold here (no escalation).
-     * Give a group or a person a role on this workspace
+     * Give a group a role on this workspace, or data access to one of its sources or tables
      */
     async workspaceAccessControllerAddGrantRaw(requestParameters: WorkspaceAccessControllerAddGrantRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GrantDto>> {
         if (requestParameters['createGrantDto'] == null) {
@@ -395,7 +395,7 @@ export class AccessApi extends runtime.BaseAPI {
 
     /**
      * You can only give a role whose capabilities you all hold here (no escalation).
-     * Give a group or a person a role on this workspace
+     * Give a group a role on this workspace, or data access to one of its sources or tables
      */
     async workspaceAccessControllerAddGrant(requestParameters: WorkspaceAccessControllerAddGrantRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GrantDto> {
         const response = await this.workspaceAccessControllerAddGrantRaw(requestParameters, initOverrides);

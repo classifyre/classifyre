@@ -188,6 +188,7 @@
     "explore": "Erkunden",
     "findings": "Befunde",
     "assets": "Assets",
+    "query": "SQL",
     "sources": "Quellen",
     "detectors": "Custom-Detektoren",
     "investigations": "Ermittlungen",
@@ -6652,6 +6653,12 @@
       "ogTitle": "Verbindungen erkunden | Classifyre",
       "ogDescription": "Suchen, dann Herkunft, Duplikaten, gemeinsamen Begriffen und Ähnlichem folgen — jede Verbindung mit ihrem Grund."
     },
+    "query": {
+      "title": "SQL — Tabellen abfragen",
+      "description": "Fragen Sie die Zeilen der Datenbank-, Lakehouse- und Dateitabellen, auf die Sie Zugriff haben, mit Standard-SQL ab und verknüpfen Sie Tabellen über Quellen hinweg.",
+      "ogTitle": "SQL über Ihre Tabellen | Classifyre",
+      "ogDescription": "Standard-SQL über die Tabellen, die Sie lesen dürfen, quellenübergreifend verknüpft."
+    },
     "findings": {
       "title": "Funde — jede Erkennung nach Schweregrad, Quelle & Detektor triagieren",
       "description": "Triagieren Sie jede Erkennung an einem Ort — filtern Sie nach Schweregrad, Status, Konfidenz, Quelle und Detektor. Verfolgen Sie personenbezogene Daten, Geheimnisse, Sicherheitsprobleme und eigene Erkennungen von offen bis erledigt über alle Scans hinweg.",
@@ -7384,5 +7391,76 @@
     "signedInAs": "Angemeldet als",
     "retry": "Erneut versuchen",
     "signOut": "Abmelden"
+  },
+  "dataQuery": {
+    "title": "SQL",
+    "subtitle": "Fragen Sie die Zeilen der Tabellen, auf die Sie Zugriff haben, mit Standard-SQL ab. Eine Abfrage kann Tabellen verschiedener Quellen verknüpfen.",
+    "run": "Ausführen",
+    "cancel": "Abbrechen",
+    "format": "Formatieren",
+    "shortcut": "Strg/⌘ + Enter führt die Abfrage aus",
+    "status": {
+      "PENDING": "Wartet",
+      "RUNNING": "Läuft",
+      "SUCCESS": "Fertig",
+      "ERROR": "Fehlgeschlagen",
+      "TIMEOUT": "Zeit überschritten",
+      "CANCELLED": "Abgebrochen"
+    },
+    "elapsed": "{{seconds}} s",
+    "timings": "Vorbereitung {{setup}} s · Abfrage {{query}} s",
+    "rows": "{{count}} Zeilen",
+    "columns": "{{count}} Spalten",
+    "truncatedRows": "Es werden die ersten {{count}} Zeilen gezeigt: das Zeilenlimit des Arbeitsbereichs.",
+    "truncatedBytes": "Es werden die ersten {{count}} Zeilen gezeigt: das ganze Ergebnis ist größer als das Ergebnislimit.",
+    "noResult": "Führen Sie eine Abfrage aus, um hier ihre Zeilen zu sehen.",
+    "emptyResult": "Die Abfrage hat keine Zeilen geliefert.",
+    "catalogTitle": "Tabellen",
+    "catalogSearch": "Tabellen und Spalten filtern",
+    "onlyQueryable": "Nur was ich abfragen darf",
+    "catalogFailed": "Die Tabellenliste konnte nicht geladen werden.",
+    "locked": "Sie dürfen diese Tabelle nicht abfragen. Ein Admin des Arbeitsbereichs kann Ihrer Gruppe Datenzugriff geben.",
+    "notQueryable": "Nicht mit SQL abfragbar",
+    "noTables": "Noch keine Tabellen zum Abfragen. Scannen Sie zuerst eine Datenbank-, Lakehouse- oder Bucket-Quelle.",
+    "partialAccess": "Sie dürfen hier {{count}} Tabellen abfragen, die mit dem Abspielzeichen. Die anderen brauchen eine Datenleser-Freigabe.",
+    "disabledTitle": "SQL-Abfragen sind in diesem Arbeitsbereich aus",
+    "disabledBody": "Ein Admin des Arbeitsbereichs kann sie unter Einstellungen → Export & Import einschalten.",
+    "openInQuery": "In SQL öffnen",
+    "assetTab": "Daten",
+    "assetLockedTitle": "Kein Datenzugriff",
+    "assetLocked": "Sie sehen diese Tabelle, aber nicht ihre Zeilen. Ein Admin des Arbeitsbereichs kann Ihrer Gruppe die Rolle Datenleser für diese Tabelle oder ihre Quelle geben.",
+    "export": {
+      "button": "Exportieren",
+      "running": "Wird exportiert…",
+      "xlsx": "Excel (.xlsx)",
+      "csv": "CSV",
+      "parquet": "Parquet",
+      "done": "{{count}} Zeilen exportiert.",
+      "truncated": "Die ersten {{count}} Zeilen exportiert: das Zeilenlimit für Exporte.",
+      "failed": "Der Export ist fehlgeschlagen."
+    },
+    "access": {
+      "title": "Wer diese Tabelle abfragen darf",
+      "description": "Datenzugriff geht immer an eine Gruppe: die Rolle Datenleser für diese Tabelle, ihre ganze Quelle oder den Arbeitsbereich.",
+      "none": "Niemand außer den Admins des Arbeitsbereichs.",
+      "thisTable": "Diese Tabelle",
+      "wholeSource": "Ihre ganze Quelle",
+      "pickGroup": "Gruppe wählen",
+      "give": "Zugriff geben",
+      "remove": "Zugriff entfernen",
+      "added": "Zugriff gegeben",
+      "viewerNote": "Mitglieder brauchen außerdem eine Rolle, die den Arbeitsbereich öffnet, etwa Betrachter."
+    },
+    "settings": {
+      "title": "SQL über Tabellen",
+      "description": "Erlauben Sie, die Zeilen der Tabellen dieses Arbeitsbereichs mit SQL abzufragen. Wer welche Tabelle abfragen darf, folgt den Rollen und Datenleser-Freigaben. Jede Abfrage wird in der Aktivität festgehalten.",
+      "enabled": "SQL-Abfragen beantworten",
+      "maxRows": "Zeilen pro Ergebnis",
+      "timeout": "Zeitlimit (Sekunden)",
+      "exportMaxRows": "Zeilen pro Export",
+      "save": "Limits speichern",
+      "saved": "Gespeichert",
+      "changedBy": "Zuletzt geändert von"
+    }
   }
 }

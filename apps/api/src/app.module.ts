@@ -25,6 +25,7 @@ import { CustomDetectorExtractionsService } from './custom-detector-extractions.
 import { CustomDetectorTestsService } from './custom-detector-tests.service';
 import { CliRunnerModule } from './cli-runner/cli-runner.module';
 import { NotebookModule } from './notebook/notebook.module';
+import { DataQueryModule } from './data-query/data-query.module';
 import { WebSocketModule } from './websocket/websocket.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { MatchingModule } from './matching/matching.module';
@@ -133,6 +134,7 @@ import {
     NamespacePauseModule,
     CliRunnerModule,
     NotebookModule,
+    DataQueryModule,
     WebSocketModule,
     SchedulerModule,
     MatchingModule,

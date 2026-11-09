@@ -126,8 +126,15 @@ COPY packages/schemas /app/packages/schemas
 WORKDIR /app/apps/cli
 ENV UV_LINK_MODE=copy \
     UV_PYTHON_PREFERENCE=only-system
+# file-processing (DuckDB, pyarrow) and lineage (SQLGlot) are baked in rather
+# than installed on first use: a SQL query job (docs/prd/DQ-data-query.md) is
+# someone waiting in the browser, and the first query of a fresh volume used to
+# spend most of its time installing them. The DuckDB extensions those queries
+# and the table readers use are downloaded here too, into a read-only directory
+# the CLI loads from before it tries the shared extension cache or INSTALL.
 RUN uv venv --python /usr/local/bin/python3 .venv \
-    && uv sync --locked --no-dev
+    && uv sync --locked --no-dev --group file-processing --group lineage \
+    && .venv/bin/python -c "import duckdb; c = duckdb.connect(); c.execute(\"SET extension_directory = '/opt/duckdb-extensions'\"); [c.execute('INSTALL ' + e) for e in ('httpfs', 'postgres', 'mysql', 'sqlite', 'delta', 'iceberg', 'ducklake', 'azure', 'avro', 'excel')]"
 
 # ── web-final: standalone Next.js server ──────────────────────────────────────
 FROM node:${NODE_VERSION}-bookworm-slim AS web-final
@@ -175,6 +182,7 @@ FROM python:${PYTHON_VERSION} AS cli-final
 ARG TARGETARCH
 COPY --from=uv-bin /uv /uvx /usr/local/bin/
 COPY --from=cli-builder /app/apps/cli/.venv /app/apps/cli/.venv
+COPY --from=cli-builder /opt/duckdb-extensions /opt/duckdb-extensions
 COPY --from=cli-builder /app/apps/cli/src /app/apps/cli/src
 COPY --from=cli-builder /app/apps/cli/pyproject.toml /app/apps/cli/pyproject.toml
 COPY --from=cli-builder /app/apps/cli/uv.lock /app/apps/cli/uv.lock
@@ -194,6 +202,7 @@ RUN groupadd -g 10001 classifyre \
 ENV UV_LINK_MODE=copy \
     UV_CACHE_DIR=/cache/uv \
     CLASSIFYRE_CLI_AUTO_INSTALL_OPTIONAL_DEPS=1 \
+    CLASSIFYRE_DUCKDB_BAKED_EXTENSION_DIR=/opt/duckdb-extensions \
     PATH="/app/apps/cli/.venv/bin:${PATH}" \
     HOME=/home/classifyre
 # System dependencies that cannot come from uv:

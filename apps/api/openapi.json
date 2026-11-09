@@ -9330,7 +9330,7 @@
             }
           }
         },
-        "summary": "Give a group or a person a role on this workspace",
+        "summary": "Give a group a role on this workspace, or data access to one of its sources or tables",
         "tags": [
           "Access"
         ]
@@ -11838,6 +11838,269 @@
         "summary": "Stop a running execution",
         "tags": [
           "Notebooks"
+        ]
+      }
+    },
+    "/data-query/catalog": {
+      "get": {
+        "operationId": "DataQueryController_getCatalog",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryCatalogDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "The tables you can query with SQL, and those you could with access",
+        "tags": [
+          "Data query"
+        ]
+      }
+    },
+    "/data-query/settings": {
+      "get": {
+        "operationId": "DataQueryController_getSettings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataQuerySettingsDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Whether this workspace answers SQL, and its limits",
+        "tags": [
+          "Data query"
+        ]
+      },
+      "put": {
+        "operationId": "DataQueryController_updateSettings",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDataQuerySettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataQuerySettingsDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Turn SQL queries on or off, and set their limits",
+        "tags": [
+          "Data query"
+        ]
+      }
+    },
+    "/query-runs": {
+      "post": {
+        "description": "Runs as a short-lived job. Only tables you may query exist for the query; name them `<source>.<schema>.<table>` as the catalog lists them.",
+        "operationId": "DataQueryController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateQueryRunDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryRunDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Run one SELECT; poll the run for its status",
+        "tags": [
+          "Data query"
+        ]
+      },
+      "get": {
+        "operationId": "DataQueryController_list",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/QueryRunDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Your recent queries in this workspace",
+        "tags": [
+          "Data query"
+        ]
+      }
+    },
+    "/query-runs/{id}": {
+      "get": {
+        "operationId": "DataQueryController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryRunDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "One of your queries",
+        "tags": [
+          "Data query"
+        ]
+      }
+    },
+    "/query-runs/{id}/result": {
+      "get": {
+        "operationId": "DataQueryController_result",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "The rows of a finished query (Arrow IPC stream), or its exported file",
+        "tags": [
+          "Data query"
+        ]
+      },
+      "post": {
+        "operationId": "DataQueryController_receive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-query-run-token",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-query-run-meta",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Internal: a query job posts its result here",
+        "tags": [
+          "Data query"
+        ]
+      }
+    },
+    "/query-runs/{id}/cancel": {
+      "post": {
+        "operationId": "DataQueryController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryRunDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Stop one of your queries",
+        "tags": [
+          "Data query"
         ]
       }
     },
@@ -30583,6 +30846,7 @@
                 "agent.configure",
                 "agent.use",
                 "data.export",
+                "data.query",
                 "mcp.token.own",
                 "mcp.token.admin",
                 "tenant.workspace.create",
@@ -30764,6 +31028,7 @@
                 "agent.configure",
                 "agent.use",
                 "data.export",
+                "data.query",
                 "mcp.token.own",
                 "mcp.token.admin",
                 "tenant.workspace.create",
@@ -30836,7 +31101,9 @@
             "enum": [
               "tenant",
               "group",
-              "workspace"
+              "workspace",
+              "source",
+              "asset"
             ]
           },
           "scopeId": {
@@ -30891,9 +31158,15 @@
             "enum": [
               "tenant",
               "group",
-              "workspace"
+              "workspace",
+              "source",
+              "asset"
             ],
-            "description": "Tenant-level grants only: where the role applies. Workspace grants are always on that workspace."
+            "description": "Tenant-level grants: where the role applies. Workspace grants are on that workspace, or with `source` / `asset` and `resourceId` on one source or table of it (data-reader only)."
+          },
+          "resourceId": {
+            "type": "string",
+            "description": "Workspace grants with scopeType `source` or `asset`: the source or asset id."
           },
           "scopeId": {
             "type": "string",
@@ -30972,6 +31245,7 @@
                 "agent.configure",
                 "agent.use",
                 "data.export",
+                "data.query",
                 "mcp.token.own",
                 "mcp.token.admin",
                 "tenant.workspace.create",
@@ -35107,6 +35381,354 @@
         "required": [
           "revision",
           "mode"
+        ]
+      },
+      "QueryLimitsDto": {
+        "type": "object",
+        "properties": {
+          "maxRows": {
+            "type": "number"
+          },
+          "timeoutSeconds": {
+            "type": "number"
+          },
+          "exportMaxRows": {
+            "type": "number",
+            "description": "Rows an export may hold."
+          }
+        },
+        "required": [
+          "maxRows",
+          "timeoutSeconds",
+          "exportMaxRows"
+        ]
+      },
+      "QueryColumnDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "description": "Type as the source or Arrow names it."
+          }
+        },
+        "required": [
+          "name",
+          "type"
+        ]
+      },
+      "QueryCatalogTableDto": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string"
+          },
+          "sourceId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "description": "The asset's name as the rest of the app shows it."
+          },
+          "schema": {
+            "type": "string"
+          },
+          "table": {
+            "type": "string"
+          },
+          "sqlName": {
+            "type": "string",
+            "example": "shop_lake.shop.orders",
+            "description": "What to type in SQL: `<source>.<schema>.<table>`."
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QueryColumnDto"
+            }
+          },
+          "queryable": {
+            "type": "boolean",
+            "description": "The table can be read with SQL at all."
+          },
+          "canQuery": {
+            "type": "boolean",
+            "description": "You may query it now: SQL is on here, it is queryable, and a role or grant gives you access."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why it cannot be queried, when it cannot."
+          }
+        },
+        "required": [
+          "assetId",
+          "sourceId",
+          "name",
+          "schema",
+          "table",
+          "sqlName",
+          "columns",
+          "queryable",
+          "canQuery"
+        ]
+      },
+      "QueryCatalogSourceDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "sqlName": {
+            "type": "string",
+            "example": "shop_lake"
+          },
+          "queryable": {
+            "type": "boolean"
+          },
+          "tables": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QueryCatalogTableDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "type",
+          "sqlName",
+          "queryable",
+          "tables"
+        ]
+      },
+      "QueryCatalogDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "This workspace answers SQL queries."
+          },
+          "canQueryAll": {
+            "type": "boolean",
+            "description": "You may query every table here; false when only some sources or tables are granted."
+          },
+          "limits": {
+            "$ref": "#/components/schemas/QueryLimitsDto"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QueryCatalogSourceDto"
+            }
+          }
+        },
+        "required": [
+          "enabled",
+          "canQueryAll",
+          "limits",
+          "sources"
+        ]
+      },
+      "DataQuerySettingsDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "maxRows": {
+            "type": "number"
+          },
+          "timeoutSeconds": {
+            "type": "number"
+          },
+          "exportMaxRows": {
+            "type": "number"
+          },
+          "updatedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "updatedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "enabled",
+          "maxRows",
+          "timeoutSeconds",
+          "exportMaxRows"
+        ]
+      },
+      "UpdateDataQuerySettingsDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "maxRows": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 100000
+          },
+          "timeoutSeconds": {
+            "type": "number",
+            "minimum": 5,
+            "maximum": 900
+          },
+          "exportMaxRows": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 10000000
+          }
+        }
+      },
+      "CreateQueryRunDto": {
+        "type": "object",
+        "properties": {
+          "sql": {
+            "type": "string",
+            "example": "SELECT * FROM shop_lake.shop.orders LIMIT 100",
+            "description": "One SELECT over tables named `<source>.<schema>.<table>`."
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "xlsx",
+              "csv",
+              "parquet"
+            ],
+            "description": "Export the whole result (up to the export row limit) as a file instead of showing rows. Needs data.export."
+          }
+        },
+        "required": [
+          "sql"
+        ]
+      },
+      "QueryRunErrorDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "table_not_available",
+            "description": "invalid_sql, select_only, function_not_allowed, table_name_required, table_not_available, source_unavailable, execution_error, timeout, result_too_large, job_failed, no_result"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ]
+      },
+      "QueryRunDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "sql": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "RUNNING",
+              "SUCCESS",
+              "ERROR",
+              "TIMEOUT",
+              "CANCELLED"
+            ]
+          },
+          "actorRef": {
+            "type": "string",
+            "nullable": true
+          },
+          "assetIds": {
+            "description": "The tables it read, as assets.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "rowCount": {
+            "type": "number",
+            "nullable": true
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "truncatedReason": {
+            "type": "string",
+            "nullable": true,
+            "description": "`rows` (the row limit) or `bytes` (the result size limit)."
+          },
+          "columns": {
+            "nullable": true,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QueryColumnDto"
+            }
+          },
+          "timings": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "setupMs, executeMs, totalMs (inside the job)."
+          },
+          "error": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/QueryRunErrorDto"
+              }
+            ]
+          },
+          "resultBytes": {
+            "type": "number",
+            "nullable": true
+          },
+          "resultFormat": {
+            "type": "string",
+            "nullable": true,
+            "description": "Null for rows shown in the app; xlsx, csv or parquet for an export."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "startedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "sql",
+          "status",
+          "assetIds",
+          "truncated",
+          "createdAt"
         ]
       },
       "TriggerAutopilotDto": {

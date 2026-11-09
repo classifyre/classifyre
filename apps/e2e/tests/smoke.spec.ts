@@ -220,6 +220,109 @@ test.describe.serial("smoke with sign-in", () => {
     expect(write.status).toBe(403);
   });
 
+  // ── SQL over tables (docs/prd/DQ-data-query.md) ─────────────────────────
+  // The scan made the fixture's orders.csv a table asset.
+  type CatalogTable = { assetId: string; name: string; sqlName: string; canQuery: boolean };
+  type QueryRun = { id: string; status: string; rowCount: number | null; error: { code: string } | null };
+  const ordersTable = async (api: Api) => {
+    const catalog = await api.ok<{ sources: Array<{ tables: CatalogTable[] }> }>(
+      "GET",
+      `/${SLUG}/data-query/catalog`,
+    );
+    const table = catalog.sources.flatMap((s) => s.tables).find((t) => t.name === "orders.csv");
+    expect(table, "orders.csv in the SQL catalog").toBeTruthy();
+    return table!;
+  };
+  const finished = async (api: Api, id: string) => {
+    await expect
+      .poll(async () => (await api.ok<QueryRun>("GET", `/${SLUG}/query-runs/${id}`)).status, {
+        timeout: 5 * 60_000,
+        intervals: [2_000],
+      })
+      .toMatch(/^(SUCCESS|ERROR|TIMEOUT|CANCELLED)$/);
+    return api.ok<QueryRun>("GET", `/${SLUG}/query-runs/${id}`);
+  };
+
+  test("SQL is off until turned on; then the admin queries the table and exports it", async () => {
+    const { page, api } = admin;
+    const off = await api.call<{ code?: string }>("POST", `/${SLUG}/query-runs`, { sql: "SELECT 1" });
+    expect(off.status).toBe(409);
+    expect(off.body.code).toBe("DATA_QUERY_OFF");
+
+    await page.goto(`/${SLUG}/settings/?tab=data`);
+    await page.getByTestId("data-query-settings").getByRole("switch").click();
+    await expect
+      .poll(async () => (await api.ok<{ enabled: boolean }>("GET", `/${SLUG}/data-query/settings`)).enabled)
+      .toBe(true);
+
+    const table = await ordersTable(api);
+    expect(table.canQuery).toBe(true);
+    const sql = `SELECT region, sum(amount) AS total FROM ${table.sqlName} GROUP BY region ORDER BY region`;
+    await page.goto(`/${SLUG}/query/?sql=${encodeURIComponent(sql)}`);
+    await page.getByTestId("run-query").click();
+    // north, south, west
+    await expect(page.getByTestId("query-row-count")).toContainText("3", { timeout: 5 * 60_000 });
+    await expect(page.getByTestId("query-results")).toContainText("north");
+
+    // The same table as Excel, from the menu, downloaded by the browser.
+    const download = page.waitForEvent("download", { timeout: 5 * 60_000 });
+    await page.getByTestId("export-query").click();
+    await page.getByTestId("export-xlsx").click();
+    expect((await download).suggestedFilename()).toMatch(/\.xlsx$/);
+
+    // And as CSV through the API: the whole table, with its header.
+    const run = await api.ok<QueryRun>("POST", `/${SLUG}/query-runs`, {
+      sql: `SELECT * FROM ${table.sqlName} ORDER BY order_id`,
+      format: "csv",
+    });
+    expect((await finished(api, run.id)).rowCount).toBe(6);
+    const file = await page.request.fetch(`${BASE_URL}/api/${SLUG}/query-runs/${run.id}/result`);
+    expect(file.headers()["content-type"]).toContain("text/csv");
+    expect((await file.text()).split("\n")[0]).toBe("order_id,region,amount,placed_on");
+
+    // Nothing but SELECT, and nothing but the tables in the catalog.
+    const refused = await api.ok<QueryRun>("POST", `/${SLUG}/query-runs`, {
+      sql: "SELECT * FROM read_csv('/etc/passwd')",
+    });
+    expect(refused.error?.code).toBe("function_not_allowed");
+  });
+
+  test("a viewer sees the table locked until their group is given data access to it", async () => {
+    const before = await ordersTable(viewer.api);
+    expect(before.canQuery).toBe(false);
+    const refused = await viewer.api.call<{ code?: string }>("POST", `/${SLUG}/query-runs`, {
+      sql: `SELECT * FROM ${before.sqlName}`,
+    });
+    expect(refused.status).toBe(403);
+
+    const groups = await admin.api.ok<Array<{ id: string; path: string }>>("GET", `/${SLUG}/access/groups`);
+    const group = groups.find((g) => g.path === VIEWERS_GROUP)!;
+    await admin.api.ok("POST", `/${SLUG}/access/grants`, {
+      subjectType: "group",
+      subjectId: group.id,
+      roleKey: "data-reader",
+      scopeType: "asset",
+      resourceId: before.assetId,
+    });
+    await expect
+      .poll(async () => (await ordersTable(viewer.api)).canQuery, { timeout: 90_000, intervals: [5_000] })
+      .toBe(true);
+
+    const { page } = viewer;
+    await page.goto(`/${SLUG}/assets/${before.assetId}/?tab=data`);
+    await expect(page.getByTestId("asset-data-tab")).toBeVisible();
+    await page.getByTestId("run-query").click();
+    await expect(page.getByTestId("query-row-count")).toContainText("6", { timeout: 5 * 60_000 });
+    // Reading is not taking out: no export without data.export.
+    await expect(page.getByTestId("export-query")).toHaveCount(0);
+    const exported = await viewer.api.call<{ code?: string }>("POST", `/${SLUG}/query-runs`, {
+      sql: `SELECT * FROM ${before.sqlName}`,
+      format: "xlsx",
+    });
+    expect(exported.status).toBe(403);
+    expect(exported.body.code).toBe("EXPORT_NOT_ALLOWED");
+  });
+
   test("a visitor reads the public tenant, and it never mixes with signed-in tenants", async ({
     browser,
   }) => {

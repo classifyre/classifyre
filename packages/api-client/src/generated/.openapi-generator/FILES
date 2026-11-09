@@ -189,6 +189,7 @@ docs/CreateManualEdgeDto.md
 docs/CreateMcpServerDto.md
 docs/CreateMcpTokenDto.md
 docs/CreateNotebookExecutionDto.md
+docs/CreateQueryRunDto.md
 docs/CreateSourceDto.md
 docs/CreateSupervisorGoalDto.md
 docs/CreateThreadDto.md
@@ -200,6 +201,8 @@ docs/CustomDetectorResponseDtoSourcesUsingInner.md
 docs/CustomDetectorTestsApi.md
 docs/CustomDetectorTrainingRunDto.md
 docs/CustomDetectorsApi.md
+docs/DataQueryApi.md
+docs/DataQuerySettingsDto.md
 docs/DataTransferApi.md
 docs/DataTransferJobDto.md
 docs/DataTransferJobListDto.md
@@ -375,6 +378,13 @@ docs/PurgeQueuedJobsResponseDto.md
 docs/PurgeSourceAssetsResponseDto.md
 docs/PutAssetChunksDto.md
 docs/PutBoardThumbnailDto.md
+docs/QueryCatalogDto.md
+docs/QueryCatalogSourceDto.md
+docs/QueryCatalogTableDto.md
+docs/QueryColumnDto.md
+docs/QueryLimitsDto.md
+docs/QueryRunDto.md
+docs/QueryRunErrorDto.md
 docs/QuickSearchAssetDto.md
 docs/QuickSearchFindingDto.md
 docs/QuickSearchRequestDto.md
@@ -574,6 +584,7 @@ docs/UpdateCaseHypothesisRuleDto.md
 docs/UpdateChatBotDto.md
 docs/UpdateCorrelationConfigDto.md
 docs/UpdateCustomDetectorDto.md
+docs/UpdateDataQuerySettingsDto.md
 docs/UpdateEdgeDto.md
 docs/UpdateEmbeddingSettingsDto.md
 docs/UpdateEmbeddingSettingsResponseDto.md
@@ -618,6 +629,7 @@ src/apis/CorrelationReviewApi.ts
 src/apis/CustomDetectorExtractionsApi.ts
 src/apis/CustomDetectorTestsApi.ts
 src/apis/CustomDetectorsApi.ts
+src/apis/DataQueryApi.ts
 src/apis/DataTransferApi.ts
 src/apis/EmbeddingsApi.ts
 src/apis/EntitiesApi.ts
@@ -819,6 +831,7 @@ src/models/CreateManualEdgeDto.ts
 src/models/CreateMcpServerDto.ts
 src/models/CreateMcpTokenDto.ts
 src/models/CreateNotebookExecutionDto.ts
+src/models/CreateQueryRunDto.ts
 src/models/CreateSourceDto.ts
 src/models/CreateSupervisorGoalDto.ts
 src/models/CreateThreadDto.ts
@@ -827,6 +840,7 @@ src/models/CustomDetectorFileDto.ts
 src/models/CustomDetectorResponseDto.ts
 src/models/CustomDetectorResponseDtoSourcesUsingInner.ts
 src/models/CustomDetectorTrainingRunDto.ts
+src/models/DataQuerySettingsDto.ts
 src/models/DataTransferJobDto.ts
 src/models/DataTransferJobListDto.ts
 src/models/DecisionsToCaseDto.ts
@@ -986,6 +1000,13 @@ src/models/PurgeQueuedJobsResponseDto.ts
 src/models/PurgeSourceAssetsResponseDto.ts
 src/models/PutAssetChunksDto.ts
 src/models/PutBoardThumbnailDto.ts
+src/models/QueryCatalogDto.ts
+src/models/QueryCatalogSourceDto.ts
+src/models/QueryCatalogTableDto.ts
+src/models/QueryColumnDto.ts
+src/models/QueryLimitsDto.ts
+src/models/QueryRunDto.ts
+src/models/QueryRunErrorDto.ts
 src/models/QuickSearchAssetDto.ts
 src/models/QuickSearchFindingDto.ts
 src/models/QuickSearchRequestDto.ts
@@ -1180,6 +1201,7 @@ src/models/UpdateCaseHypothesisRuleDto.ts
 src/models/UpdateChatBotDto.ts
 src/models/UpdateCorrelationConfigDto.ts
 src/models/UpdateCustomDetectorDto.ts
+src/models/UpdateDataQuerySettingsDto.ts
 src/models/UpdateEdgeDto.ts
 src/models/UpdateEmbeddingSettingsDto.ts
 src/models/UpdateEmbeddingSettingsResponseDto.ts

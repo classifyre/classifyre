@@ -89,6 +89,15 @@ export const BUILT_IN_ROLES = [
     capabilities: WORKSPACE_ADMIN,
   },
   {
+    // Add-on to Viewer (or any role with workspace.view): reading table rows
+    // with SQL. Granted on a workspace, a group's workspaces, or one source or
+    // table (docs/prd/DQ-data-query.md §4).
+    key: 'data-reader',
+    title: 'Data reader',
+    scope: 'workspace',
+    capabilities: ['data.query'],
+  },
+  {
     // Add-on: combined with another role, never granted alone in practice.
     key: 'code-author',
     title: 'Code author',

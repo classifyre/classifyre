@@ -40,7 +40,24 @@ export interface AccessPolicy {
   capabilities(
     actor: Actor,
   ): ReadonlySet<Capability> | Promise<ReadonlySet<Capability>>;
+  /**
+   * The sources and tables of the current workspace that grants on single
+   * resources open to `capability`, beyond what {@link capabilities} gives
+   * workspace-wide. Empty when the policy has no such grants.
+   */
+  resourceGrants?(capability: Capability): ResourceGrants;
 }
+
+/** Sources and tables of one workspace opened to a capability by resource grants. */
+export interface ResourceGrants {
+  sourceIds: readonly string[];
+  assetIds: readonly string[];
+}
+
+/** Capabilities that can be granted on a single source or table. */
+export const RESOURCE_GRANTABLE_CAPABILITIES: readonly Capability[] = [
+  'data.query',
+];
 
 const ALL_CAPABILITIES: ReadonlySet<Capability> = new Set(CAPABILITY_IDS);
 

@@ -249,6 +249,47 @@ check T1 "the tenant's database holds its three workspaces" 3 "$(pg "$DEFAULT_DB
 check T1 "it is marked as that tenant's" "tenant|$DEFAULT_ID" "$(pg "$DEFAULT_DB" "SELECT kind || '|' || tenant_id FROM classifyre_database")"
 check T1 "its role opens no other database" "false,false" "$(pg postgres "SELECT string_agg(has_database_privilege('$DEFAULT_DB', d, 'CONNECT')::text, ',' ORDER BY d) FROM unnest(ARRAY['classifyre', 'classifyre_control']) AS d")"
 
+say "SQL over tables: who may query which table (docs/prd/DQ-data-query.md §4)"
+LEDGER_SCHEMA=$(pg classifyre_control "SELECT schema_name FROM namespaces WHERE slug = 'fin-ledger'")
+LAKE=00000000-0000-4000-8000-00000000d001
+ORDERS=00000000-0000-4000-8000-00000000d002
+PAYROLL=00000000-0000-4000-8000-00000000d003
+# A bucket source with two Delta tables, as a scan would have left them.
+pg "$DEFAULT_DB" "INSERT INTO $LEDGER_SCHEMA.sources (id, name, type, config, updated_at)
+  VALUES ('$LAKE', 'Ledger lake', 'S3_COMPATIBLE_STORAGE',
+  '{\"type\":\"S3_COMPATIBLE_STORAGE\",\"required\":{\"bucket\":\"ledger\"}}', now());
+  INSERT INTO $LEDGER_SCHEMA.assets (id, hash, checksum, name, external_url, asset_type, source_type, source_id, metadata, updated_at)
+  SELECT id, id, id, name, 's3://ledger/' || key, 'table', 'S3_COMPATIBLE_STORAGE', '$LAKE',
+    jsonb_build_object('object_key', key, 'table_format', 'delta', 'columns', '[{\"name\":\"id\",\"type\":\"long\"}]'::jsonb), now()
+  FROM (VALUES ('$ORDERS', 'orders', 'ap/orders'), ('$PAYROLL', 'payroll', 'hr/payroll')) AS t(id, name, key)" >/dev/null
+data_grant() { # data_grant <group> <role> <asset|source> <id>: a grant body on one resource
+  printf '{"subjectType":"group","subjectId":"%s","roleKey":"%s","scopeType":"%s","resourceId":"%s"}' "$1" "$2" "$3" "$4"
+}
+can_query() { # can_query <user> <sql name>: yes / no / absent
+  get "$1" /fin-ledger/data-query/catalog | json "t=[t for s in d.get('sources',[]) for t in s['tables'] if t['sqlName']=='$2']; print(('yes' if t[0]['canQuery'] else 'no') if t else 'absent')"
+}
+run_code() { # run_code <user> <sql> [format]: the run's status and error code, or the refusal's code
+  post "$1" /fin-ledger/query-runs "{\"sql\":\"$2\"${3:+,\"format\":\"$3\"}}" \
+    | json "e=d.get('error'); print((d.get('status') or '') + ':' + ((e.get('code') if isinstance(e, dict) else None) or d.get('code') or ''))"
+}
+check D "SQL is off until a workspace admin turns it on" ":DATA_QUERY_OFF" "$(run_code admin "SELECT * FROM ledger_lake.ap.orders")"
+check D "a viewer cannot turn it on" 403 "$(status controller PUT /fin-ledger/data-query/settings '{"enabled":true}')"
+check D "a workspace admin can" true "$(curl -s -X PUT -H "$(authed admin)" -H 'Content-Type: application/json' -d '{"enabled":true}' "$B/fin-ledger/data-query/settings" | json "print(str(d.get('enabled')).lower())")"
+check D "the tenant admin may query every table" "yes,yes" "$(can_query admin ledger_lake.ap.orders),$(can_query admin ledger_lake.hr.payroll)"
+check D "a viewer sees the tables, locked" "no,no" "$(can_query controller ledger_lake.ap.orders),$(can_query controller ledger_lake.hr.payroll)"
+check D "and is refused without a job" ":NO_QUERYABLE_TABLES" "$(run_code controller "SELECT * FROM ledger_lake.ap.orders")"
+check D "a viewer cannot give data access" 403 "$(status controller POST /fin-ledger/access/grants "$(data_grant "$AP" data-reader asset "$ORDERS")")"
+check D "a workspace admin gives the AP team one table" 201 "$(status admin POST /fin-ledger/access/grants "$(data_grant "$AP" data-reader asset "$ORDERS")")"
+check D "only data-reader is given on a single table" 400 "$(status admin POST /fin-ledger/access/grants "$(data_grant "$AP" viewer asset "$ORDERS")")"
+check D "and data engineering the whole source" 201 "$(status admin POST /fin-ledger/access/grants "$(data_grant "$DATA" data-reader source "$LAKE")")"
+check D "the AP investigator may query that table only" "yes,no" "$(can_query investigator ledger_lake.ap.orders),$(can_query investigator ledger_lake.hr.payroll)"
+check D "the other table is refused before any job" "ERROR:table_not_available" "$(run_code investigator "SELECT * FROM ledger_lake.hr.payroll")"
+check D "files and table functions are refused too" "ERROR:function_not_allowed" "$(run_code investigator "SELECT * FROM read_csv('/etc/passwd')")"
+check D "the source grant opens both tables" "yes,yes" "$(can_query engineer ledger_lake.ap.orders),$(can_query engineer ledger_lake.hr.payroll)"
+check D "exporting needs data.export as well" ":EXPORT_NOT_ALLOWED" "$(run_code investigator "SELECT * FROM ledger_lake.ap.orders" xlsx)"
+check D "the grants are listed with the workspace's" "asset,source" "$(get admin /fin-ledger/access/grants | json "print(','.join(sorted(g['scopeType'] for g in d if g['roleKey']=='data-reader')))")"
+check D "another tenant gets 404" 404 "$(status outsider@globex GET /fin-ledger/data-query/catalog)"
+
 say "operator copies workspaces between a tenant and the open database (docs/prd/TEN §4.9)"
 operator workspaces copy --to-local fin-q3 >/dev/null
 check T0 "a copy to the open database leaves the tenant's in place" "fin-ledger,fin-q3,sales-pipeline" "$(slugs admin)"

@@ -43,12 +43,23 @@ class DuckDBAttachedSource(BaseTabularSource):
         self.runner_id = runner_id or "local-run"
         self._duck: Any = None
         self._duck_lock = threading.Lock()
+        #: The name ``_attach`` attaches the catalog under, and the prefix of
+        #: the secrets it creates. A scan keeps the default; a SQL query that
+        #: joins several sources gives each its own (src/query/bindings.py).
+        self._attach_alias = CATALOG_ALIAS
 
     # ── Attaching ────────────────────────────────────────────────────────
 
     @abstractmethod
     def _attach(self, conn: Any) -> None:
-        """Load extensions, create secrets and ``ATTACH`` the catalog as ``catalog``."""
+        """Load extensions, create secrets and ``ATTACH`` the catalog as
+        :attr:`_attach_alias` (``catalog`` unless a query renamed it)."""
+
+    def _secret_name(self, name: str) -> str:
+        """A secret name that cannot collide with another source's in one DuckDB."""
+        if self._attach_alias == CATALOG_ALIAS:
+            return name
+        return f"{self._attach_alias}_{name}"
 
     @abstractmethod
     def _require_duckdb(self) -> Any:

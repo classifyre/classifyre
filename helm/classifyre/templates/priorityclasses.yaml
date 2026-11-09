@@ -20,4 +20,15 @@ value: {{ .Values.priorityClasses.batchValue }}
 preemptionPolicy: Never
 globalDefault: false
 description: "Batch CLI Job workloads priority class"
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: {{ include "classifyre.priorityClassInteractiveName" . }}
+  labels:
+    {{- include "classifyre.commonLabels" . | nindent 4 }}
+value: {{ .Values.priorityClasses.interactiveValue }}
+preemptionPolicy: Never
+globalDefault: false
+description: "Interactive CLI Jobs (SQL queries) priority class"
 {{- end }}

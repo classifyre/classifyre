@@ -501,6 +501,17 @@ api:
           - ALL
 
   cliJobs:
+    # -- SQL query jobs (docs/prd/DQ-data-query.md). Each query is one short-lived Job.
+    query:
+      # -- Memory of one query Job (request = limit). DuckDB is given 70 % of it
+      # -- and spills the rest of a large sort, join or aggregate to disk.
+      memory: 2Gi
+      # -- CPU limit of one query Job; DuckDB uses as many threads as whole cores.
+      cpu: "1"
+      # -- Priority class of query Jobs (`priorityClasses.interactiveName` by default).
+      priorityClassName: interactive
+      # -- How much a query may spill to the pod's disk before it is stopped.
+      maxSpill: 10GiB
     # -- Enable Kubernetes-backed CLI jobs.
     enabled: true
     # -- Namespace used for CLI jobs. Empty means release namespace.
@@ -1347,6 +1358,13 @@ priorityClasses:
   batchName: batch-low-priority
   # -- Numeric priority value for batch workloads.
   batchValue: 1000
+  # -- Priority class name for interactive CLI Jobs: SQL queries someone is
+  # -- waiting for in the browser. Between service and batch, so a query is
+  # -- scheduled before queued scans; preemptionPolicy Never, so it never
+  # -- evicts a running scan to get its place.
+  interactiveName: interactive
+  # -- Numeric priority value for interactive CLI Jobs.
+  interactiveValue: 5000
 
 telemetry:
   # -- Enable OpenTelemetry instrumentation for API, web, and CLI components.

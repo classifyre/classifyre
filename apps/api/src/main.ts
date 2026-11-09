@@ -91,6 +91,17 @@ async function bootstrap() {
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
 
+  // A query job posts its result as an Arrow IPC stream (docs/prd/DQ §5);
+  // the route stores the bytes as they came.
+  app
+    .getHttpAdapter()
+    .getInstance()
+    .addContentTypeParser(
+      'application/vnd.apache.arrow.stream',
+      { parseAs: 'buffer' },
+      (_request, body, done) => done(null, body),
+    );
+
   // Uploads follow the same rule as JSON bodies: no size ceiling. `files: 1`
   // stays because these routes accept exactly one file per request.
   await app.register(multipart, {

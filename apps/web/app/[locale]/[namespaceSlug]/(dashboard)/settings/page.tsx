@@ -40,6 +40,7 @@ import { ChatBotsCard } from "@/components/chat-bots-card";
 import { HuggingFaceSettingsCard } from "@/components/huggingface-settings-card";
 import { VersionSettingsSection } from "@/components/version-update-notifier";
 import { DataTransferCard } from "@/components/data-transfer/data-transfer-card";
+import { DataQuerySettingsCard } from "@/components/data-query/data-query-settings-card";
 import { CleanupCard } from "@/components/maintenance/cleanup-card";
 import { FeatureSwitchesCard } from "@/components/maintenance/feature-switches-card";
 import { PauseWorkspaceCard } from "@/components/namespace/pause-workspace-card";
@@ -416,8 +417,9 @@ export default function SettingsPage() {
 
         <TabsContent
           value="data"
-          className="duration-300 animate-in fade-in-50 slide-in-from-bottom-1"
+          className="space-y-6 duration-300 animate-in fade-in-50 slide-in-from-bottom-1"
         >
+          <DataQuerySettingsCard />
           <DataTransferCard />
         </TabsContent>
 

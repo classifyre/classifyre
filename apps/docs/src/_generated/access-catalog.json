@@ -176,6 +176,11 @@
       "description": "Export data out of the workspace (CSV, archives)."
     },
     {
+      "id": "data.query",
+      "scope": "workspace",
+      "description": "Query the rows of tables with SQL: every table here, or only the sources and tables a grant names."
+    },
+    {
       "id": "mcp.token.own",
       "scope": "workspace",
       "description": "Create and revoke your own MCP tokens."
@@ -337,8 +342,17 @@
         "agent.configure",
         "agent.use",
         "data.export",
+        "data.query",
         "mcp.token.own",
         "mcp.token.admin"
+      ]
+    },
+    {
+      "key": "data-reader",
+      "title": "Data reader",
+      "scope": "workspace",
+      "capabilities": [
+        "data.query"
       ]
     },
     {
@@ -389,6 +403,7 @@
         "agent.configure",
         "agent.use",
         "data.export",
+        "data.query",
         "mcp.token.own",
         "mcp.token.admin"
       ]
@@ -443,6 +458,7 @@
         "agent.configure",
         "agent.use",
         "data.export",
+        "data.query",
         "mcp.token.own",
         "mcp.token.admin",
         "tenant.workspace.create",

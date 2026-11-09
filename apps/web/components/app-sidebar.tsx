@@ -37,6 +37,7 @@ import {
   ScanSearch,
   Bot,
   ArrowLeft,
+  TerminalSquare,
   type LucideIcon,
 } from "lucide-react";
 
@@ -54,6 +55,7 @@ const NAV_GROUPS: NavGroup[] = [
       { titleKey: "nav.overview", href: "/discovery", icon: LayoutDashboard },
       { titleKey: "nav.findings", href: "/findings", icon: SearchCheck },
       { titleKey: "nav.assets", href: "/assets", icon: FileText },
+      { titleKey: "nav.query", href: "/query", icon: TerminalSquare },
     ],
   },
   {

@@ -96,7 +96,9 @@ export type GrantDtoSubjectTypeEnum = typeof GrantDtoSubjectTypeEnum[keyof typeo
 export const GrantDtoScopeTypeEnum = {
     Tenant: 'tenant',
     Group: 'group',
-    Workspace: 'workspace'
+    Workspace: 'workspace',
+    Source: 'source',
+    Asset: 'asset'
 } as const;
 export type GrantDtoScopeTypeEnum = typeof GrantDtoScopeTypeEnum[keyof typeof GrantDtoScopeTypeEnum];
 

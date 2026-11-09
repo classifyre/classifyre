@@ -9,6 +9,10 @@ datasource db {
 model Source {
   id                         String                      @id @default(uuid())
   name                       String
+  /// How SQL names this source's tables: `<sqlName>.<schema>.<table>`.
+  /// Assigned from the name on first use and kept when the source is renamed,
+  /// so saved queries keep working (docs/prd/DQ-data-query.md §5).
+  sqlName                    String?                     @unique @map("sql_name")
   description                String?                     @db.Text
   type                       AssetType
   config                     Json
@@ -151,6 +155,70 @@ enum AutoSchedulePhase {
  * and auditable after the notebook has moved on, so it records the exact source
  * that ran rather than pointing at a row someone will edit five minutes later.
  */
+/// One SQL query over the tables of this workspace, run as a short-lived CLI
+/// job (docs/prd/DQ-data-query.md). The result is kept for a day, then dropped.
+model QueryRun {
+  id              String         @id @default(uuid())
+  sql             String         @db.Text
+  status          QueryRunStatus @default(PENDING)
+  /// Who ran it: an actor reference (`user:<sub>`, a self-declared name, …).
+  actorRef        String?        @map("actor_ref")
+  /// The tables the SQL names, as assets and their sources: what was read.
+  assetIds        String[]       @map("asset_ids")
+  sourceIds       String[]       @map("source_ids")
+  rowCount        Int?           @map("row_count")
+  truncated       Boolean        @default(false)
+  truncatedReason String?        @map("truncated_reason")
+  /// `[{ name, type }]`, in result order.
+  columns         Json?
+  /// `{ setupMs, executeMs, totalMs }` from the job; `queuedMs` from the API.
+  timings         Json?
+  /// `{ code, message }` when it failed.
+  error           Json?
+  /// Arrow IPC stream, or the exported file. Dropped with the row when it expires.
+  result          Bytes?
+  /// Null for rows shown in the app; `xlsx`, `csv` or `parquet` for an export.
+  resultFormat    String?        @map("result_format")
+  resultBytes     Int?           @map("result_bytes")
+  jobName         String?        @map("job_name")
+  jobNamespace    String?        @map("job_namespace")
+  /// sha256 of the token the job posts its result with; cleared once it has.
+  callbackTokenHash String?      @map("callback_token_hash")
+  startedAt       DateTime?      @map("started_at")
+  finishedAt      DateTime?      @map("finished_at")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  expiresAt       DateTime       @map("expires_at")
+
+  @@index([actorRef, createdAt(sort: Desc)])
+  @@index([status])
+  @@index([expiresAt])
+  @@map("query_runs")
+}
+
+enum QueryRunStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  ERROR
+  TIMEOUT
+  CANCELLED
+}
+
+/// Whether this workspace answers SQL over its tables, and the limits.
+/// One row (`id = 'default'`); off until an admin turns it on.
+model DataQuerySettings {
+  id             String   @id @default("default")
+  enabled        Boolean  @default(false)
+  maxRows        Int      @default(10000) @map("max_rows")
+  timeoutSeconds Int      @default(120) @map("timeout_seconds")
+  /// Rows an export (Excel, CSV, Parquet) may hold; Excel stops at 1,048,575.
+  exportMaxRows  Int      @default(1000000) @map("export_max_rows")
+  updatedBy      String?  @map("updated_by")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@map("data_query_settings")
+}
+
 model NotebookExecution {
   id           String                  @id @default(uuid())
   // Null for a code detector's cell/all runs, which need no source.

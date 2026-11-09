@@ -36,14 +36,14 @@ The project is designed for a **microkernel pattern** where:
 - Zero coupling between core and plugin implementations
 - Plugins self-register via decorator pattern
 
-See `docs/architecture/PLUGIN_SYSTEM.md` for complete plugin interface definitions.
+Design documents live in `docs/prd/` (index: `docs/prd/README.md`).
 
 ### Key Architectural Decisions
 
 - **Single Database**: PostgreSQL for all data (assets, jobs, secrets with pgcrypto)
 - **Job Queue**: PostgreSQL-based (LISTEN/NOTIFY or polling pattern, not Redis)
 - **Processing**: Kubernetes Jobs for ephemeral CPU/GPU workers
-- **Frontend**: Static export from Next.js (no Node.js runtime needed)
+- **Frontend**: Next.js standalone server (`output: "standalone"`, it proxies the API and sign-in); only the docs site (`apps/docs`) is a static export
 
 ## Development Commands
 
@@ -214,7 +214,7 @@ Kubernetes Jobs.
 
 - Use React 19 features (no legacy patterns)
 - Turbopack for fast dev builds
-- Static export for production (`next build` generates static files)
+- Standalone build for production (`next build` with `output: "standalone"`); new top-level route prefixes go into the negative lookahead in `next.config.mjs`
 - Import UI components from `@workspace/ui/components/*`
 - Use `next-themes` for dark mode
 
@@ -272,15 +272,15 @@ When building Docker images:
 - Multi-stage builds minimize image size
 - Frontend builds to static files (no Node.js runtime)
 - Backend uses Python 3.11 slim base
-- See `docs/architecture/BUILD.md` for complete build process
+- See the root `Dockerfile` and `docker/` for the build
 
 ## Key Documentation Files
 
 - `base-plan.md` - Original architecture vision and competitor analysis
 - `README.md` - shadcn/ui monorepo template usage
-- `docs/architecture/ARCHITECTURE.md` - System architecture overview
-- `docs/architecture/PLUGIN_SYSTEM.md` - Plugin interface specifications
-- `docs/architecture/BUILD.md` - Docker build and deployment guide
+- `docs/prd/README.md` - Index of the design PRDs (IAM, tenants, data query, …)
+- `docs/prd/DQ-data-query.md` - SQL over asset tables: CLI query jobs (`apps/cli/src/query/`), API (`apps/api/src/data-query/`), grants on single sources and tables
+- `apps/docs/` - User-facing documentation (Nextra, static export)
 
 ## Working in This Codebase
 

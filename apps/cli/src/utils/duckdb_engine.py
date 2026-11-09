@@ -37,6 +37,8 @@ from .payload import BinarySource, as_binary_io, is_bytes
 logger = logging.getLogger(__name__)
 
 EXTENSION_DIR_ENV = "CLASSIFYRE_DUCKDB_EXTENSION_DIR"
+#: Extensions the CLI image ships with (Dockerfile, cli-builder), read-only.
+BAKED_EXTENSION_DIR_ENV = "CLASSIFYRE_DUCKDB_BAKED_EXTENSION_DIR"
 EXTENSION_REPOSITORY_ENV = "CLASSIFYRE_DUCKDB_EXTENSION_REPOSITORY"
 
 _COPY_CHUNK_BYTES = 1024 * 1024
@@ -101,10 +103,41 @@ COMMUNITY_EXTENSIONS = frozenset({"paimon", "hudi"})
 COMMUNITY_REPOSITORY_ENV = "CLASSIFYRE_DUCKDB_COMMUNITY_REPOSITORY"
 
 
+#: Extensions whose file is named differently from what LOAD takes.
+_EXTENSION_FILES = {
+    "postgres": "postgres_scanner",
+    "mysql": "mysql_scanner",
+    "sqlite": "sqlite_scanner",
+}
+
+
+def baked_extension_path(conn: Any, name: str) -> str | None:
+    """The image's own copy of an extension for this DuckDB, if it has one.
+
+    Laid out as INSTALL lays it out: ``<dir>/<version>/<platform>/<name>.duckdb_extension``.
+    """
+    root = os.environ.get(BAKED_EXTENSION_DIR_ENV, "").strip()
+    if not root:
+        return None
+    try:
+        version = conn.execute("SELECT version()").fetchone()[0]
+        platform = conn.execute("PRAGMA platform").fetchone()[0]
+    except Exception:
+        return None
+    folder = Path(root) / str(version) / str(platform)
+    for file_name in (name, _EXTENSION_FILES.get(name, name)):
+        path = folder / f"{file_name}.duckdb_extension"
+        if path.is_file():
+            return str(path)
+    return None
+
+
 def load_extension(conn: Any, name: str) -> None:
     """Load ``name`` into ``conn``, installing it first when it is not on disk.
 
-    Community extensions install from DuckDB's community repository, or from
+    The image's own copy comes first (no download, no shared volume needed),
+    then the extension directory, then an INSTALL. Community extensions install
+    from DuckDB's community repository, or from
     ``CLASSIFYRE_DUCKDB_COMMUNITY_REPOSITORY`` where a mirror stands in for it.
     """
     try:
@@ -112,6 +145,13 @@ def load_extension(conn: Any, name: str) -> None:
         return
     except Exception as first_error:
         load_error: Exception = first_error
+    baked = baked_extension_path(conn, name)
+    if baked:
+        try:
+            conn.execute(f"LOAD {sql_literal(baked)}")
+            return
+        except Exception as exc:
+            logger.debug("Baked DuckDB extension %s did not load: %s", baked, exc)
     with _install_lock:
         try:
             if name not in _installed:

@@ -43,13 +43,25 @@ const ROLE_SCOPES: Record<string, GrantScopeType[]> = Object.fromEntries(
     role.key,
     role.key === 'workspace-manager'
       ? ['group', 'tenant']
-      : role.scope === 'workspace'
-        ? ['workspace', 'group', 'tenant']
-        : role.scope === 'tenant'
-          ? ['tenant']
-          : [],
+      : role.key === 'data-reader'
+        ? // Data access is the one thing given on a single source or table.
+          ['workspace', 'group', 'tenant', 'source', 'asset']
+        : role.scope === 'workspace'
+          ? ['workspace', 'group', 'tenant']
+          : role.scope === 'tenant'
+            ? ['tenant']
+            : [],
   ]),
 );
+
+function isResourceScope(scopeType: GrantScopeType): boolean {
+  return scopeType === 'source' || scopeType === 'asset';
+}
+
+/** The workspace a resource grant's scope id (`<namespaceId>/<id>`) is in. */
+function resourceWorkspace(scopeId: string): string {
+  return scopeId.split('/')[0] ?? '';
+}
 
 /**
  * Giving and removing access (docs/prd §10 item 11, §12.4). A grant can never
@@ -123,12 +135,16 @@ export class AccessManagementService {
     const identity = this.requireSignIn();
     const lineage = await identity.ownerLineage(principal, namespaceId);
     const grants = (await this.tenancy.listGrants(principal.tenant.id)).filter(
-      (grant) => grantApplies(grant, { namespaceId, ownerLineage: lineage }),
+      (grant) =>
+        grantApplies(grant, { namespaceId, ownerLineage: lineage }) ||
+        (isResourceScope(grant.scopeType) &&
+          resourceWorkspace(grant.scopeId) === namespaceId),
     );
     return this.label(
       principal,
       grants,
-      (grant) => grant.scopeType !== 'workspace',
+      (grant) =>
+        grant.scopeType !== 'workspace' && !isResourceScope(grant.scopeType),
     );
   }
 
@@ -203,10 +219,22 @@ export class AccessManagementService {
     if (input.scopeType === 'tenant' && input.scopeId !== principal.tenant.id) {
       throw new BadRequestException('A tenant grant is on your own tenant.');
     }
-    if (input.scopeType === 'workspace') {
-      const tenancy = await this.tenancy.workspaceTenancy(input.scopeId);
+    if (input.scopeType === 'workspace' || isResourceScope(input.scopeType)) {
+      const namespaceId =
+        input.scopeType === 'workspace'
+          ? input.scopeId
+          : resourceWorkspace(input.scopeId);
+      if (
+        isResourceScope(input.scopeType) &&
+        !/^[^/]+\/[^/]+$/.test(input.scopeId)
+      ) {
+        throw new BadRequestException(
+          'A grant on a source or table is scoped as <workspace id>/<id>.',
+        );
+      }
+      const tenancy = await this.tenancy.workspaceTenancy(namespaceId);
       if (tenancy?.tenantId !== principal.tenant.id) {
-        throw new NotFoundException(`Unknown namespace '${input.scopeId}'`);
+        throw new NotFoundException(`Unknown namespace '${namespaceId}'`);
       }
     }
 
@@ -279,7 +307,12 @@ export class AccessManagementService {
     if (
       !grant ||
       (onlyWorkspace &&
-        (grant.scopeType !== 'workspace' || grant.scopeId !== onlyWorkspace))
+        !(
+          (grant.scopeType === 'workspace' &&
+            grant.scopeId === onlyWorkspace) ||
+          (isResourceScope(grant.scopeType) &&
+            resourceWorkspace(grant.scopeId) === onlyWorkspace)
+        ))
     ) {
       throw new NotFoundException('No such grant here.');
     }
@@ -316,7 +349,11 @@ export class AccessManagementService {
           ? principal.tenant.name
           : grant.scopeType === 'group'
             ? `Workspaces of ${groups.get(grant.scopeId) ?? 'a removed group'}`
-            : 'This workspace',
+            : grant.scopeType === 'source'
+              ? 'One source'
+              : grant.scopeType === 'asset'
+                ? 'One table'
+                : 'This workspace',
       ...(inherited ? { inherited: inherited(grant) } : {}),
     }));
   }

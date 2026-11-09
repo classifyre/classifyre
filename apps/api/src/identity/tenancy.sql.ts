@@ -82,6 +82,12 @@ DELETE FROM public.iam_grants WHERE subject_type <> 'group';
 ALTER TABLE public.iam_grants DROP CONSTRAINT IF EXISTS iam_grants_subject_type_check;
 ALTER TABLE public.iam_grants
   ADD CONSTRAINT iam_grants_subject_type_check CHECK (subject_type = 'group');
+-- Data access can be given on one source or one table of a workspace; the
+-- scope id is then '<namespace id>/<source or asset id>' (docs/prd/DQ §4).
+ALTER TABLE public.iam_grants DROP CONSTRAINT IF EXISTS iam_grants_scope_type_check;
+ALTER TABLE public.iam_grants
+  ADD CONSTRAINT iam_grants_scope_type_check
+  CHECK (scope_type IN ('tenant', 'group', 'workspace', 'source', 'asset'));
 
 -- Names for user:<sub> actor references, refreshed when a person signs in,
 -- so the UI can show who changed something, also after they have left.
