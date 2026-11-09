@@ -8,8 +8,23 @@ from typing import Any
 
 import pytest
 
+from src.query.runner import RESULT_MARKER, ensure_dependencies, run_query, run_query_command
+from src.utils.uv_sync import auto_install_enabled, sync_group
+
+# DuckDB, pyarrow (file-processing) and SQLGlot (lineage) are optional groups.
+# Register them with the shared installer, which re-syncs the venv with every
+# group it knows of: a group synced only by the test script is unknown to it,
+# and the first on-demand install by another test (another group, --no-dev)
+# would remove it mid-run.
+if auto_install_enabled():
+    for _group in ("file-processing", "lineage"):
+        sync_group(_group)
+try:
+    ensure_dependencies()
+except Exception as exc:  # auto-install off and the groups absent
+    pytest.skip(f"query dependencies unavailable: {exc}", allow_module_level=True)
+
 from src.query.gate import QueryRefusedError, TableName, validate
-from src.query.runner import RESULT_MARKER, run_query, run_query_command
 
 duckdb = pytest.importorskip("duckdb")
 pa = pytest.importorskip("pyarrow")
