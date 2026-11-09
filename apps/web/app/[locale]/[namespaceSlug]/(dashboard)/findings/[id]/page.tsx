@@ -68,6 +68,7 @@ import { FindingExtractionCard } from "@/components/finding-extraction-card";
 import { FindingMetadataCard } from "@/components/finding-metadata-card";
 import { FindingMeaningCard } from "@/components/glossary/meaning-card";
 import { useTranslation } from "@/hooks/use-translation";
+import { ChangedBy } from "@/components/audit-history";
 
 type FindingHistoryEntry = NonNullable<FindingResponseDto["history"]>[number];
 type DetectorType = FindingResponseDto["detectorType"];
@@ -361,6 +362,7 @@ export default function FindingDetailPage() {
                 {finding.status?.toString().replace("_", " ") || "OPEN"}
               </StatusBadge>
             </div>
+            <ChangedBy entityType="findings" entityId={finding.id} />
             <p className="text-muted-foreground">
               {detectorLabel} •{" "}
               {finding.findingType || t("findings.detail.detectedIssue")}

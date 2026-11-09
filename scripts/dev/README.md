@@ -35,6 +35,59 @@ Two modes:
 | `dev` (default) | embedded Postgres in-cluster    | per `helm/develop/values-dev.yaml` | Normal feature work on throwaway local data         |
 | `dev-vps-db`    | the **VPS instance's** Postgres | forced off            | Administer the public showcase while it stays read-only |
 
+## Sign-in (iam)
+
+Sign-in is off on the dev stack by default. Start with it on:
+
+```bash
+CLASSIFYRE_IAM=true ./scripts/dev/start.sh
+```
+
+The `iam` skaffold profile adds `helm/develop/values-dev-iam.yaml` and
+port-forwards the identity server's service to `localhost:8280/iam` for the
+local web server's (`./scripts/dev/web-iam.sh`) token calls. The browser
+does not use the ingress for sign-in: the web app is not deployed in-cluster
+for local dev (`frontend.enabled: false`), so no ingress routes `/iam`.
+Instead it opens the local web server directly
+(<http://localhost:3000/iam>, its `/iam/[...path]` proxy), which is also the
+issuer in its tokens. As in production, the app forwards only the
+`classifyre` realm's identity console (<http://localhost:3000/auth/console/>,
+for operators: realm role `classifyre-operator`). The master realm's admin
+console is on the port-forward, <http://localhost:8280/iam/admin> (user
+`admin`, password in the `classifyre-iam` Secret, key `admin-password`). That
+account is the identity server's own and cannot sign in to Classifyre. Classifyre's first tenant admin
+is a different user, also called `admin`, in the `classifyre` realm, with a
+temporary password under `bootstrap-admin-password` in the same Secret.
+
+To add a person, create the user, then add them under **Organizations →
+Default → Members**, and to a group under **Organizations → Default → Groups**.
+Groups made under the realm's own **Groups** menu are not used by Classifyre;
+a user in no organization sees a "not in a tenant yet" page.
+
+Run the web app with sign-in in a second terminal. Its `/iam` proxy serves
+the browser and its server-side token calls need the identity server, so
+`web-iam.sh` points the issuer at the local server and the token calls at
+the skaffold port-forward. The script reads the web client's secret from
+the cluster:
+
+```bash
+./scripts/dev/web-iam.sh
+```
+
+Starting again without `CLASSIFYRE_IAM=true` turns it off; the `iam` database
+and the `classifyre-iam` Secret both stay for next time (the identity server
+keeps the admin password it was first started with, so the two must match).
+Turning sign-in on moves every workspace into the `default` tenant, owned by
+its `admins` group; with sign-in off they are all visible again as before.
+
+To check every access case of the plan at once, run the persona suite. It
+installs its own throwaway release next to the dev stack, so it never touches
+your workspaces:
+
+```bash
+./scripts/dev/iam-personas.sh
+```
+
 ## Prerequisites
 
 Docker, the latest stable k3d, kubectl, Helm, the latest stable Skaffold, and

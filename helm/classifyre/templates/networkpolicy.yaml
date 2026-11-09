@@ -98,4 +98,63 @@ spec:
       ports:
         - protocol: TCP
           port: {{ .Values.api.service.port }}
+    {{- if .Values.iam.enabled }}
+    # Identity server: the web signs people in and renews their tokens
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "classifyre.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: iam
+      ports:
+        - protocol: TCP
+          port: 8080
+    {{- end }}
+{{- if .Values.iam.enabled }}
+---
+# Identity server NetworkPolicy
+# Ingress: same-namespace pods (API, web proxy, setup job) and its own nodes
+# (cluster cache). Browsers never reach it directly: the ingress sends `/iam`
+# to the web service, which proxies. Egress: DNS, PostgreSQL, and HTTPS to
+# external identity providers it brokers sign-in to.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "classifyre.iam.fullname" . }}
+  labels:
+    {{- include "classifyre.commonLabels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "classifyre.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: iam
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 9000
+        - protocol: TCP
+          port: 7800
+    # No ingress-controller rule here on purpose: outside traffic reaches the
+    # identity server only through the web proxy, never directly.
+  egress:
+    - ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - ports:
+        - protocol: TCP
+          port: {{ include "classifyre.iam.dbPort" . | int }}
+    - to:
+        - podSelector: {}
+    - ports:
+        - protocol: TCP
+          port: 443
+{{- end }}
 {{- end }}

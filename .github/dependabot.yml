@@ -153,6 +153,13 @@ updates:
     groups:
       helm-non-major:
         update-types: [minor, patch]
+    # values.yaml image tags are tracked here too (repository + quoted tag),
+    # including the identity server under `iam.image`. Its majors change the
+    # realm setup (files/iam/setup-realm.sh) and the database schema, so they
+    # are upgraded on purpose, not by a weekly PR.
+    ignore:
+      - dependency-name: quay.io/keycloak/keycloak
+        update-types: ["version-update:semver-major"]
 
   # ── Helm: otel-receiver ─────────────────────────────────────────────────────
   - package-ecosystem: helm

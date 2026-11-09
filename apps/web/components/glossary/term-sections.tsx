@@ -65,6 +65,7 @@ import {
   TermPicker,
   TermStatusBadge,
 } from "./glossary-ui";
+import { ActorChip } from "@/components/actor-chip";
 
 const RELATION_TYPES: RelationType[] = [
   "BROADER",
@@ -577,7 +578,11 @@ export function TermBindings({ term }: { term: TermDetail }) {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
-                    {binding.approvedBy ?? binding.createdBy ?? binding.origin.toLowerCase()}
+                    {binding.approvedBy || binding.createdBy ? (
+                      <ActorChip actorRef={binding.approvedBy ?? binding.createdBy} />
+                    ) : (
+                      binding.origin.toLowerCase()
+                    )}
                     {binding.packKey && ` · ${binding.packKey}`}
                   </TableCell>
                   <TableCell>

@@ -1206,6 +1206,11 @@ model McpAccessToken {
   // MCP_CAPABILITY_GROUPS ids. Existing tokens stay NULL on migration so
   // nothing that already worked starts failing.
   toolGroupIds Json?     @map("tool_group_ids")
+  /// With sign-in, the person the token acts for (identity server subject id).
+  /// The token can do what its owner can do in this workspace, checked on every
+  /// call. NULL for tokens created without sign-in; those stop working when
+  /// sign-in is turned on.
+  ownerSub     String?   @map("owner_sub")
   lastUsedAt   DateTime? @map("last_used_at")
   revokedAt    DateTime? @map("revoked_at")
   createdAt    DateTime  @default(now()) @map("created_at")
@@ -1213,6 +1218,7 @@ model McpAccessToken {
 
   @@index([revokedAt])
   @@index([lastUsedAt])
+  @@index([ownerSub])
   @@map("mcp_access_tokens")
 }
 
@@ -1821,7 +1827,7 @@ model CorrelationPairVerdict {
   scoreAtVerdict Decimal            @map("score_at_verdict") @db.Decimal(4, 3)
   batchId        String             @map("batch_id")
   note           String?            @db.Text
-  /// `ai-autopilot` when an agent decided it, the operator otherwise. The
+  /// `agent:autopilot` when an agent decided it, the operator otherwise. The
   /// review queue counts human work separately: an agent clearing the safe
   /// band must not make "work remaining" look like a person did it.
   decidedBy      String?            @map("decided_by")
@@ -4233,4 +4239,35 @@ model ExploreView {
 
   @@index([updatedAt])
   @@map("explore_views")
+}
+
+/// Append-only trail of successful changes in this workspace
+/// (docs/prd/IAM-access-management.md §11.1). Written by the audit
+/// interceptor for REST and by the MCP handler for tool calls; never updated.
+/// Records which fields were sent, never their values.
+model AuditEvent {
+  id         String   @id @default(uuid())
+  occurredAt DateTime @default(now()) @map("occurred_at")
+  /// Actor reference (identity/actor-ref.ts); null when nobody can be named.
+  actor      String?
+  /// How the actor was identified: header | mcp-token | internal-key | autopilot | none
+  via        String
+  /// rest | mcp
+  channel    String
+  /// The capability the change needed, e.g. `source.manage`.
+  capability String
+  /// `PATCH /sources/:id` for REST, the tool name for MCP.
+  operation  String
+  /// What was changed, e.g. `source`; null for bulk operations.
+  entityType String?  @map("entity_type")
+  entityId   String?  @map("entity_id")
+  /// Top-level input keys of the change.
+  fields     String[] @default([])
+  /// HTTP status of the response (REST only).
+  status     Int?
+
+  @@index([entityType, entityId, occurredAt(sort: Desc)])
+  @@index([occurredAt(sort: Desc)])
+  @@index([actor, occurredAt(sort: Desc)])
+  @@map("audit_events")
 }

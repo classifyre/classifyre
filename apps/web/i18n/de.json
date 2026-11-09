@@ -25,6 +25,8 @@
     "loadFailed": "Arbeitsbereiche konnten nicht geladen werden",
     "emptyTitle": "Noch keine Arbeitsbereiche",
     "emptyDescription": "Erstelle deinen ersten Arbeitsbereich, um Daten zu erfassen und zu klassifizieren.",
+    "emptyNoAccessTitle": "Noch keine Workspaces für Sie",
+    "emptyNoAccessDescription": "Sie gehören zu diesem Mandanten, aber keine Ihrer Gruppen hat Zugriff auf einen Workspace. Bitten Sie einen Mandanten-Admin, Ihrer Gruppe eine Rolle darin zu geben.",
     "createAction": "Arbeitsbereich erstellen",
     "local": "Lokal",
     "lastOpened": "Zuletzt geöffnet",
@@ -107,7 +109,13 @@
     "pausedBannerDescription": "Scans, Pläne, KI-Harness-Zyklen und Duplikatprüfungen sind gestoppt. Bis zum Fortsetzen ist alles schreibgeschützt.",
     "pausedBannerReason": "Grund: {{reason}}",
     "pausedBannerAction": "In den Einstellungen fortsetzen",
-    "allWorkspaces": "Alle Arbeitsbereiche"
+    "allWorkspaces": "Alle Arbeitsbereiche",
+    "owningGroup": "Eigentümergruppe",
+    "owningGroupPick": "Gruppe wählen, der er gehört",
+    "owningGroupHint": "Mitglieder dieser Gruppe erhalten Zugriff gemäß ihren Freigaben.",
+    "owningGroupNone": "Sie können keine Arbeitsbereiche anlegen: Bitten Sie eine Mandanten-Admin, Sie zur Arbeitsbereichs-Verwaltung Ihrer Gruppe zu machen.",
+    "emptyPublicTitle": "Noch nichts veröffentlicht",
+    "emptyPublicDescription": "Arbeitsbereiche des öffentlichen Mandanten erscheinen hier, sobald sie veröffentlicht sind. Melden Sie sich an, um Ihre eigenen zu sehen."
   },
   "categories": {
     "label": "Kategorien",
@@ -735,7 +743,9 @@
       "chat": "Chat-Bots",
       "data": "Export & Import",
       "workers": "Worker",
-      "cleanup": "Bereinigung"
+      "cleanup": "Bereinigung",
+      "activity": "Aktivität",
+      "access": "Zugriff"
     },
     "cleanup": {
       "title": "Speicher & Bereinigung",
@@ -5417,7 +5427,6 @@
   "fingerprints": {
     "tabTune": "Korrelation justieren"
   },
-  "lineage": {},
   "harness": {
     "title": "Harness-KI-Autopilot",
     "subtitle": "Autonome Steuerungsebene",
@@ -5985,6 +5994,7 @@
     "enabledHint": "Bot verbinden und Nachrichten beantworten.",
     "allowMutations": "Änderungen erlauben",
     "allowMutationsHint": "Wenn deaktiviert, ist der Bot schreibgeschützt: Er kann lesen, aber nie erstellen, ändern oder löschen.",
+    "allowMutationsSignIn": "Mit Anmeldung sind Bots immer schreibgeschützt: Hinter einer Chat-Nachricht steht keine angemeldete Person.",
     "capabilityGroups": "Fähigkeiten",
     "capabilityGroupsHint": "Welche Tool-Gruppen der Bot nutzen darf. Standardmäßig sind alle aktiviert.",
     "agents": "Autopilot-Agenten",
@@ -7223,5 +7233,156 @@
       "saved": "Labels gespeichert. Die Entitätswerte werden neu erzeugt.",
       "add": "Label hinzufügen"
     }
+  },
+  "actors": {
+    "autopilot": "Autopilot",
+    "system": "System",
+    "mcpToken": "MCP-Token",
+    "person": "Jemand",
+    "selfDeclared": "Von der Person eingegebener Name; ohne Anmeldung nicht geprüft",
+    "viaToken": "Über das MCP-Token {{token}} ausgeführt",
+    "via": "über {{token}}",
+    "kinds": {
+      "user": "Angemeldete Person",
+      "name": "Person",
+      "mcp": "MCP-Token",
+      "agent": "Agent",
+      "system": "System"
+    }
+  },
+  "audit": {
+    "createdBy": "Erstellt von",
+    "lastChangedBy": "Zuletzt geändert von",
+    "history": "Verlauf",
+    "historyTitle": "Verlauf",
+    "historyDescription": "Jede Änderung an diesem Element, neueste zuerst. Gespeichert werden nur Feldnamen, nie ihre Werte.",
+    "mcpTool": "MCP · {{tool}}",
+    "fields": "Felder: {{fields}}",
+    "empty": "Noch keine Änderungen erfasst.",
+    "loadMore": "Mehr laden",
+    "activityTitle": "Aktivität",
+    "activityDescription": "Jede Änderung in diesem Arbeitsbereich, aus der Web-App, der API oder von Agenten über MCP. Lesezugriffe werden nicht erfasst."
+  },
+  "account": {
+    "menu": "Konto",
+    "signedIn": "Angemeldet",
+    "tenant": "Mandant: {{name}}",
+    "signOut": "Abmelden",
+    "tenantSettings": "Mandantenzugriff",
+    "switchTenant": "Mandant wechseln",
+    "platform": "Plattform",
+    "signIn": "Anmelden",
+    "identityConsole": "Identitätskonsole",
+    "yourAccount": "Ihr Konto"
+  },
+  "access": {
+    "title": "Zugriff",
+    "description": "Wer diesen Arbeitsbereich öffnen kann und was erlaubt ist. Freigaben des Mandanten oder der Eigentümergruppe sind geerbt und können nur von Mandanten-Admins geändert werden.",
+    "loadFailed": "Zugriff konnte nicht geladen werden.",
+    "removed": "Zugriff für {{subject}} entfernt.",
+    "removeFailed": "Zugriff konnte nicht entfernt werden.",
+    "added": "Zugriff gewährt.",
+    "addFailed": "Zugriff konnte nicht gewährt werden.",
+    "until": "bis {{date}}",
+    "inherited": "Geerbt",
+    "remove": "Zugriff entfernen",
+    "none": "Noch hat niemand Zugriff.",
+    "group": "Gruppe",
+    "pickGroup": "Gruppe wählen",
+    "groupsHint": "Gruppen und ihre Personen werden im Identitätsserver gepflegt, von Ihren Betreibern oder Ihrem Firmenverzeichnis; hier erhält eine Gruppe Zugriff.",
+    "role": "Rolle",
+    "untilOptional": "Bis (optional)",
+    "add": "Zugriff gewähren",
+    "whyTitle": "Warum darf ich …?",
+    "pickCapability": "Etwas wählen, das Sie dürfen",
+    "becauseOf": "{{subject}} als {{role}} auf {{scope}}",
+    "allWorkspaces": "Alle Arbeitsbereiche",
+    "tenantTitle": "Mandant",
+    "tenantDenied": "Nur Mandanten-Admins verwalten den Zugriff für den ganzen Mandanten.",
+    "tenantGrants": "Zugriff im ganzen Mandanten",
+    "scope": "Gilt für",
+    "scopes": {
+      "tenant": "Den ganzen Mandanten",
+      "group": "Arbeitsbereiche einer Gruppe",
+      "workspace": "Einen Arbeitsbereich"
+    },
+    "ownedBy": "Arbeitsbereiche von",
+    "workspace": "Arbeitsbereich",
+    "pickScope": "Wählen",
+    "tabs": {
+      "access": "Zugriff",
+      "activity": "Aktivität"
+    },
+    "peopleElsewhere": "Personen und Gruppen werden im Identitätsserver verwaltet oder im Firmenverzeichnis dahinter. Die Freigaben hier legen fest, was sie in Classifyre dürfen; eine umbenannte Gruppe behält ihre Freigaben, eine entfernte wird als entfernt angezeigt.",
+    "managePeople": "Personen und Gruppen verwalten",
+    "peopleByOperators": "Bitten Sie einen Betreiber dieser Installation, Personen hinzuzufügen oder Gruppen zu ändern."
+  },
+  "platform": {
+    "title": "Plattform",
+    "description": "Alle Mandanten dieser Installation mit ihren Admins, gelesen aus dem Identitätsserver. Sperren und entsperren Sie Mandanten, holen Sie ohne Anmeldung angelegte Arbeitsbereiche herein und entfernen Sie die Daten eines Mandanten, dessen Organisation gelöscht wurde. Sie sehen hier Mandanten, nicht den Inhalt ihrer Arbeitsbereiche.",
+    "denied": "Diese Seite ist für Betreiber dieser Installation. Bitten Sie den Betreiber, Ihnen die Rolle classifyre-operator zu geben.",
+    "loadFailed": "Die Mandanten konnten nicht geladen werden",
+    "failed": "Das hat nicht geklappt",
+    "tenants": "Mandanten",
+    "none": "Noch keine Mandanten.",
+    "counts": "Arbeitsbereiche: {{workspaces}} · Personen: {{members}}",
+    "adminsAre": "Admins: {{names}}",
+    "noAdmins": "Keine Admins",
+    "lastActivity": "Letzte Änderung {{when}}",
+    "created": "Angelegt {{when}}",
+    "localWaiting": "Ohne Anmeldung angelegte Arbeitsbereiche: {{count}}. Holen Sie sie über das Menü eines Mandanten hinein.",
+    "actions": "Aktionen für {{name}}",
+    "status": {
+      "suspended": "gesperrt",
+      "deleted": "gelöscht",
+      "active": "aktiv"
+    },
+    "problem": {
+      "ORGANIZATION_MISSING": "Organisation gelöscht",
+      "ORGANIZATION_REPLACED": "Organisation ersetzt",
+      "NO_ADMINS_GROUP": "keine Admin-Gruppe",
+      "UPGRADE_FAILED": "Aktualisierung fehlgeschlagen"
+    },
+    "database": "Datenbank",
+    "upgradeError": "Seine Arbeitsbereiche sind nicht verfügbar, bis der nächste Start seine Datenbank aktualisiert: {{error}}",
+    "import": "Arbeitsbereiche hereinholen",
+    "importTitle": "Arbeitsbereiche in {{name}} holen",
+    "importDescription": "Diese Arbeitsbereiche wurden ohne Anmeldung angelegt. Sie werden mit allen Daten in die Datenbank des Mandanten kopiert und gehören seiner Admin-Gruppe. Die Originale bleiben, wo sie sind, für die Arbeit ohne Anmeldung.",
+    "importConfirm": "{{count}} hereinholen",
+    "imported": "In {{name}} kopierte Arbeitsbereiche: {{count}}",
+    "suspend": "Sperren",
+    "suspendTitle": "{{name}} sperren?",
+    "suspendDescription": "Niemand im Mandanten kann in Classifyre arbeiten, bis er wieder freigegeben ist, und ihre Agenten stoppen ebenfalls. Seine Daten bleiben erhalten, geplante Scans laufen weiter.",
+    "suspended": "{{name}} ist gesperrt",
+    "resume": "Freigeben",
+    "resumed": "{{name}} ist wieder freigegeben",
+    "delete": "Mandantendaten entfernen",
+    "deleteTitle": "Daten von {{name}} entfernen?",
+    "deleteDescription": "Seine Organisation ist im Identitätsserver nicht mehr vorhanden. Seine {{count}} Arbeitsbereich(e) und ihre Datenbank werden gelöscht, mit ihnen seine Freigaben. Seine Aktivität bleibt erhalten, und sein Kürzel wird nie wieder vergeben. Das lässt sich nicht rückgängig machen.",
+    "deleteType": "Geben Sie {{alias}} zur Bestätigung ein",
+    "deleted": "Die Daten von {{name}} sind entfernt",
+    "managedInIdentityServer": "Mandanten, ihre Personen und Gruppen werden im Identitätsserver angelegt (eine Organisation mit einer obersten Admin-Gruppe). Neue erscheinen hier von selbst.",
+    "openConsole": "Identitätskonsole öffnen",
+    "openInConsole": "In der Identitätskonsole öffnen"
+  },
+  "noTenantPage": {
+    "title": "Noch in keinem Mandanten",
+    "noTenant": "Sie sind angemeldet, aber Ihr Konto gehört noch zu keinem Mandanten (keiner Organisation) von Classifyre, daher gibt es hier nichts zu sehen.",
+    "noTenantFix": "Bitten Sie, wer diese Installation betreibt (einen Betreiber), Ihr Konto in der Identitätskonsole Ihrer Organisation hinzuzufügen, oder Ihre IT, wenn Konten aus dem Firmenverzeichnis kommen.",
+    "severalTitle": "Einen Mandanten wählen",
+    "several": "Ihr Konto gehört zu mehreren Mandanten. Classifyre arbeitet immer in einem.",
+    "severalFix": "Melden Sie sich erneut an und wählen Sie den Mandanten.",
+    "suspendedTitle": "Mandant gesperrt",
+    "suspended": "Ihr Mandant ist gesperrt, daher kann derzeit niemand darin in Classifyre arbeiten. Seine Daten bleiben erhalten.",
+    "suspendedFix": "Ein Betreiber kann ihn wieder freigeben; fragen Sie, wer diese Installation betreibt.",
+    "deletedTitle": "Mandant gelöscht",
+    "deleted": "Ihr Mandant wurde gelöscht, mit seinen Arbeitsbereichen.",
+    "deletedFix": "Wenn Sie zu einem anderen Mandanten gehören sollten, bitten Sie, wer diese Installation betreibt, Sie seiner Organisation hinzuzufügen.",
+    "replacedTitle": "Mandant geschlossen",
+    "replaced": "Die Organisation hinter Ihrem Mandanten wurde im Identitätsserver gelöscht und neu angelegt, daher bleiben seine Arbeitsbereiche geschlossen: Niemand erbt sie versehentlich.",
+    "replacedFix": "Fragen Sie, wer diese Installation betreibt (einen Betreiber). Die alte Organisation lässt sich nur aus einer Sicherung des Identitätsservers zurückholen.",
+    "signedInAs": "Angemeldet als",
+    "retry": "Erneut versuchen",
+    "signOut": "Abmelden"
   }
 }

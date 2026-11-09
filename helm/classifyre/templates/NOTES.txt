@@ -52,3 +52,19 @@ Database mode: {{ .Values.postgres.mode }}
   !! NOTE: Telemetry is enabled but telemetry.otlpEndpoint is empty.
   !! Set telemetry.otlpEndpoint to the URL of your OTel Collector or disable telemetry.
 {{- end }}
+{{- if .Values.iam.enabled }}
+
+Sign-in (iam) is on. The identity server answers through the web app at {{ include "classifyre.iam.publicUrl" . }}.
+  First tenant: {{ .Values.iam.bootstrap.tenant.name }} ({{ .Values.iam.bootstrap.tenant.alias }}), first admin: {{ .Values.iam.bootstrap.admin.username }}.
+  Sign in to Classifyre as {{ .Values.iam.bootstrap.admin.username }} with this temporary password (changed at first sign-in):
+    kubectl -n {{ .Release.Namespace }} get secret {{ include "classifyre.iam.secretName" . }} -o jsonpath='{.data.bootstrap-admin-password}' | base64 -d
+  Not the key admin-password: that one is the identity server's own administrator
+  (user admin in its master realm), for its admin console only, not for Classifyre.
+  People join a tenant as members of its organization (Organizations → tenant →
+  Members) and get access through that organization's groups, not realm groups.
+  !! Back up the {{ include "classifyre.iam.dbName" . }} database before upgrading iam.image.tag across a minor version:
+  !! the identity server cannot roll its database back.
+{{- else }}
+
+  !! NOTE: iam.enabled=false — there is no sign-in. Anyone who reaches this instance can use every workspace.
+{{- end }}

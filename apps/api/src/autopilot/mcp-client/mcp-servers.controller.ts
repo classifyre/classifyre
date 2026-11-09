@@ -17,8 +17,10 @@ import {
   McpServerTestResultDto,
   UpdateMcpServerDto,
 } from './mcp-server.dto';
+import { AccessArea } from '../../identity/access.decorators';
 
 @ApiTags('autopilot')
+@AccessArea({ view: 'agent.view', change: 'agent.configure' })
 @Controller('autopilot/mcp-servers')
 export class McpServersController {
   constructor(private readonly servers: McpServersService) {}

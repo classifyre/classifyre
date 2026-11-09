@@ -32,6 +32,12 @@ export interface McpTokenResponseDto {
      */
     name: string;
     /**
+     * With sign-in, the person the token acts for (actor reference `user:<sub>`); null for tokens made without sign-in.
+     * @type {string}
+     * @memberof McpTokenResponseDto
+     */
+    owner: string | null;
+    /**
      * Masked token preview shown in settings after creation.
      * @type {string}
      * @memberof McpTokenResponseDto
@@ -81,6 +87,7 @@ export interface McpTokenResponseDto {
 export function instanceOfMcpTokenResponseDto(value: object): value is McpTokenResponseDto {
     if (!('id' in value) || value['id'] === undefined) return false;
     if (!('name' in value) || value['name'] === undefined) return false;
+    if (!('owner' in value) || value['owner'] === undefined) return false;
     if (!('tokenPreview' in value) || value['tokenPreview'] === undefined) return false;
     if (!('isActive' in value) || value['isActive'] === undefined) return false;
     if (!('createdAt' in value) || value['createdAt'] === undefined) return false;
@@ -100,6 +107,7 @@ export function McpTokenResponseDtoFromJSONTyped(json: any, ignoreDiscriminator:
         
         'id': json['id'],
         'name': json['name'],
+        'owner': json['owner'],
         'tokenPreview': json['tokenPreview'],
         'isActive': json['isActive'],
         'toolGroupIds': json['toolGroupIds'] == null ? undefined : json['toolGroupIds'],
@@ -123,6 +131,7 @@ export function McpTokenResponseDtoToJSONTyped(value?: McpTokenResponseDto | nul
         
         'id': value['id'],
         'name': value['name'],
+        'owner': value['owner'],
         'tokenPreview': value['tokenPreview'],
         'isActive': value['isActive'],
         'toolGroupIds': value['toolGroupIds'],

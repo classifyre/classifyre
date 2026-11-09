@@ -56,6 +56,7 @@ import {
   UpdateEmbeddingSettingsDto,
   UpdateEmbeddingSettingsResponseDto,
 } from './dto/embedding-settings.dto';
+import { AccessArea, Requires } from '../identity/access.decorators';
 
 /**
  * Knobs the settings page exposes. Deliberately narrower than
@@ -86,6 +87,7 @@ const EXPOSED_FIELDS = [
 ] as const satisfies readonly (keyof ResolvedEmbeddingConfig)[];
 
 @ApiTags('embeddings')
+@AccessArea({ view: 'workspace.view', change: 'workspace.settings' })
 @Controller()
 export class EmbeddingController {
   constructor(
@@ -340,6 +342,7 @@ export class EmbeddingController {
     };
   }
 
+  @Requires('finding.view')
   @Get('findings/:findingId/similar')
   @ApiOperation({
     summary: 'Find semantically similar findings with ranking evidence',
@@ -352,6 +355,7 @@ export class EmbeddingController {
     return this.embeddings.similarFindings(findingId, query.limit);
   }
 
+  @Requires('asset.view')
   @Get('embeddings/boilerplate-clusters')
   @ApiOperation({
     summary:
@@ -383,6 +387,7 @@ export class EmbeddingController {
     return { scheduled: await this.queue.scheduleRecalibration() };
   }
 
+  @Requires('asset.view')
   @Get('sources/:sourceId/boilerplate-clusters')
   @ApiOperation({
     summary:

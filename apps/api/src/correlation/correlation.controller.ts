@@ -25,8 +25,10 @@ import {
   UpdateCorrelationConfigDto,
   ValueOccurrencesResponseDto,
 } from '../dto/correlation.dto';
+import { AccessArea, Requires } from '../identity/access.decorators';
 
 @ApiTags('correlation')
+@AccessArea({ view: 'asset.view', change: 'correlation.review' })
 @Controller()
 export class CorrelationController {
   constructor(
@@ -120,6 +122,7 @@ export class CorrelationController {
     return config;
   }
 
+  @Requires('case.edit')
   @Post('correlation/case-action')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -164,6 +167,7 @@ export class CorrelationController {
     };
   }
 
+  @Requires('finding.view')
   @Get('findings/occurrences')
   @ApiOperation({
     summary: 'Where else a normalized finding value appears (reverse index)',

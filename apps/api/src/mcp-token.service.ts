@@ -27,12 +27,22 @@ type ParsedToken = {
 
 type GeneratedToken = ParsedToken;
 
+/** Whose tokens a call may see or change; see {@link McpTokenService.listTokens}. */
+export interface TokenScope {
+  ownerSub?: string;
+}
+
+function inScope(token: { ownerSub: string | null }, scope: TokenScope) {
+  return !scope.ownerSub || token.ownerSub === scope.ownerSub;
+}
+
 type StoredMcpAccessToken = {
   id: string;
   name: string;
   tokenHash: string;
   tokenPreview: string;
   toolGroupIds: string[] | null;
+  ownerSub: string | null;
   lastUsedAt: Date | null;
   revokedAt: Date | null;
   createdAt: Date;
@@ -57,8 +67,13 @@ export class McpTokenService {
     return (this.prisma as any).mcpAccessToken;
   }
 
-  async listTokens(): Promise<McpTokenResponseDto[]> {
+  /**
+   * `scope.ownerSub` limits every call to one person's tokens (sign-in, without
+   * `mcp.token.admin`); no scope means every token of the workspace.
+   */
+  async listTokens(scope: TokenScope = {}): Promise<McpTokenResponseDto[]> {
     const rows = await this.tokenModel.findMany({
+      ...(scope.ownerSub ? { where: { ownerSub: scope.ownerSub } } : {}),
       orderBy: [{ revokedAt: 'asc' }, { updatedAt: 'desc' }],
     });
     return rows.map((row) => this.toResponse(row));
@@ -66,6 +81,7 @@ export class McpTokenService {
 
   async createToken(
     dto: CreateMcpTokenDto,
+    ownerSub: string | null = null,
   ): Promise<McpTokenCreatedResponseDto> {
     const generated = this.generateToken();
     const token = await this.tokenModel.create({
@@ -75,6 +91,7 @@ export class McpTokenService {
         tokenHash: this.hashToken(generated.raw),
         tokenPreview: this.buildPreview(generated),
         toolGroupIds: this.normalizeToolGroupIds(dto.toolGroupIds),
+        ownerSub,
       },
     });
     return {
@@ -86,11 +103,12 @@ export class McpTokenService {
   async updateToken(
     id: string,
     dto: UpdateMcpTokenDto,
+    scope: TokenScope = {},
   ): Promise<McpTokenResponseDto> {
     const existing = await this.tokenModel.findUnique({
       where: { id },
     });
-    if (!existing) {
+    if (!existing || !inScope(existing, scope)) {
       throw new NotFoundException(`MCP token ${id} not found`);
     }
 
@@ -130,12 +148,15 @@ export class McpTokenService {
     return [...new Set(ids)];
   }
 
-  async deleteToken(id: string): Promise<{ deleted: true }> {
+  async deleteToken(
+    id: string,
+    scope: TokenScope = {},
+  ): Promise<{ deleted: true }> {
     const existing = await this.tokenModel.findUnique({
       where: { id },
-      select: { id: true },
+      select: { id: true, ownerSub: true },
     });
-    if (!existing) {
+    if (!existing || !inScope(existing, scope)) {
       throw new NotFoundException(`MCP token ${id} not found`);
     }
 
@@ -180,6 +201,7 @@ export class McpTokenService {
       tokenPreview: token.tokenPreview,
       isActive: token.revokedAt === null,
       toolGroupIds: token.toolGroupIds ?? null,
+      owner: token.ownerSub ? `user:${token.ownerSub}` : null,
       lastUsedAt: token.lastUsedAt,
       revokedAt: token.revokedAt,
       createdAt: token.createdAt,

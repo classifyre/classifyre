@@ -1012,6 +1012,103 @@ ingress:
   # -- TLS configuration for ingress.
   tls: []
 
+iam:
+  # Sign-in and access management (docs/prd/IAM-access-management.md). With it
+  # off, anyone who reaches the instance can do everything. On by default in
+  # this chart; the all-in-one Docker image never uses it.
+  # -- Turn sign-in and access management on. Off restores open access.
+  enabled: true
+  image:
+    # -- Identity server image repository.
+    repository: quay.io/keycloak/keycloak
+    # -- Identity server image tag. Keep it a quoted string so Dependabot can bump it.
+    tag: "26.8.1"
+    # -- Image pull policy.
+    pullPolicy: IfNotPresent
+  # -- Replicas. More than one forms a cluster over the headless service; minor upgrades still stop all of them.
+  replicas: 1
+  # -- Path the identity server is served under: the web app proxies it there, the same way it proxies `/api`. Always on the web app's own host — there is no separate public URL to configure.
+  path: /iam
+  # -- URL people open Classifyre at, for sign-in redirects, e.g. `https://classifyre.example.com`. Empty derives it from `ingress.host` and `ingress.tls`. The identity server lives under it at `<appUrl>/iam`.
+  appUrl: ""
+  # -- Expose the identity server's own admin console and master realm: the web proxy forwards only the `classifyre` realm and static files unless this is on, which also forwards `/iam/admin` and `/iam/realms/master`.
+  exposeAdminConsole: false
+  # -- Forward the identity console of the `classifyre` realm through the web app, at `<appUrl>/iam/admin/<realm>/console/`, and give operators (realm role `classifyre-operator`) the rights running tenants takes there: people, organizations and their groups, identity providers. Realm settings, clients, sign-in flows, user federation and impersonation stay with the identity server's own admin. Classifyre links to it from the Platform and Tenant access pages. The master realm stays closed unless `exposeAdminConsole` is on. Off: the console is reached with a port-forward only.
+  realmConsole: true
+  # -- Theme of the sign-in pages, the identity console and the account page. `classifyre` is the chart's own (files/iam/theme), mounted from a ConfigMap into the stock image; empty keeps Keycloak's.
+  theme: classifyre
+  # -- Realm that holds users, tenants (organizations) and groups.
+  realm: classifyre
+  # -- Database the API works on with sign-in: tenants, grants and the list of workspaces. Each tenant's workspace data is in a database of its own (`classifyre_t_<tenant id>`, own login role), made on its first workspace. The database user needs `CREATEDB` and `CREATEROLE`, and new databases need the `vector` extension (superuser, or installed in `template1`). Without sign-in the API uses `postgres.*.database`, the open database, which never holds a tenant.
+  controlDatabase: classifyre_control
+  # -- Access token lifetime in seconds. Short, because group changes take effect when tokens renew.
+  accessTokenLifespanSeconds: 300
+  database:
+    # -- `shared`: an `iam` database and role on the chart's PostgreSQL (embedded or cnpg). `external`: your own database, below.
+    mode: shared
+    # -- Database name (shared mode).
+    name: iam
+    # -- Database role (shared mode).
+    username: iam
+    # -- Most connections the identity server opens (KC_DB_POOL_MAX_SIZE). Counts against PostgreSQL's `max_connections` next to the API's pools.
+    poolMaxSize: 20
+    external:
+      # -- External database host.
+      host: ""
+      # -- External database port.
+      port: 5432
+      # -- External database name.
+      database: iam
+      # -- External database user.
+      username: iam
+      # -- Secret holding the external database password.
+      existingSecret: ""
+      # -- Key of the password in `existingSecret`.
+      existingSecretPasswordKey: password
+  public:
+    # -- Let people who have not signed in browse one tenant's workspaces, read-only, with **Sign in** at the top. They hold the Visitor role there: no access lists, no tenant activity, no MCP tokens. Signed-in people see only their own tenant, never the public one unless they belong to it. Off: everyone must sign in. Allows `frontend.sitemap.enabled`, which then lists only the public tenant.
+    enabled: false
+    # -- Alias of the public tenant. The setup job creates its organization with an empty top-level `admins` group when it does not exist; add its editors there in the identity server. Can be the first tenant's alias (`iam.bootstrap.tenant.alias`), so the first admin edits what visitors see.
+    tenant: public
+    # -- Display name of the public tenant when the setup job creates it.
+    name: Public
+  bootstrap:
+    tenant:
+      # -- Alias of the first tenant (organization), created on install.
+      alias: default
+      # -- Display name of the first tenant.
+      name: Default
+    admin:
+      # -- Username of the first tenant admin. Its temporary password is in the `<release>-iam` Secret, key `bootstrap-admin-password`, and must be changed at first sign-in.
+      username: admin
+      # -- Email of the first tenant admin.
+      email: ""
+      # -- Also make the first tenant admin an operator (realm role `classifyre-operator`), who manages every tenant on the Platform page (`/platform`). Given once, when the account is created.
+      operator: true
+  # -- Resources of the identity server container.
+  resources:
+    requests:
+      cpu: 250m
+      memory: 768Mi
+    limits:
+      memory: 1536Mi
+  # -- Resources of the realm setup job.
+  configJob:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 512Mi
+  # -- Extra environment variables for the identity server (`KC_*` options).
+  extraEnv: []
+  # -- Node selector.
+  nodeSelector: {}
+  # -- Tolerations.
+  tolerations: []
+  # -- Affinity.
+  affinity: {}
+
 postgres:
   # -- PostgreSQL mode: external, cnpg, or embedded.
   mode: embedded

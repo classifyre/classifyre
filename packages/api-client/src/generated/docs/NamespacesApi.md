@@ -7,8 +7,9 @@ All URIs are relative to *http://localhost*
 | [**namespacesControllerCreate**](NamespacesApi.md#namespacescontrollercreate) | **POST** /namespaces | Create a namespace (provisions its Postgres schema + migrations) |
 | [**namespacesControllerCreateCategory**](NamespacesApi.md#namespacescontrollercreatecategory) | **POST** /namespaces/categories | Create a workspace category |
 | [**namespacesControllerGet**](NamespacesApi.md#namespacescontrollerget) | **GET** /namespaces/{id} | Get a namespace by id |
-| [**namespacesControllerList**](NamespacesApi.md#namespacescontrollerlist) | **GET** /namespaces | List all namespaces |
+| [**namespacesControllerList**](NamespacesApi.md#namespacescontrollerlist) | **GET** /namespaces | List the namespaces the caller can see (all of them without sign-in) |
 | [**namespacesControllerListCategories**](NamespacesApi.md#namespacescontrollerlistcategories) | **GET** /namespaces/categories | List workspace categories with workspace counts |
+| [**namespacesControllerOwningGroups**](NamespacesApi.md#namespacescontrollerowninggroups) | **GET** /namespaces/owning-groups | Groups the caller may create workspaces for (empty without sign-in) |
 | [**namespacesControllerRemove**](NamespacesApi.md#namespacescontrollerremove) | **DELETE** /namespaces/{id} | Soft-delete a namespace (hidden from listings; data retained) |
 | [**namespacesControllerRemoveCategory**](NamespacesApi.md#namespacescontrollerremovecategory) | **DELETE** /namespaces/categories/{categoryId} | Delete a category (its workspaces fall back to the default category) |
 | [**namespacesControllerStats**](NamespacesApi.md#namespacescontrollerstats) | **GET** /namespaces/stats | Per-namespace source rollups (total + failing + running + pending) |
@@ -23,6 +24,8 @@ All URIs are relative to *http://localhost*
 > namespacesControllerCreate()
 
 Create a namespace (provisions its Postgres schema + migrations)
+
+With sign-in, &#x60;ownerGroupId&#x60; is required: a group of your tenant that you belong to and may create workspaces for (GET /namespaces/owning-groups).
 
 ### Example
 
@@ -201,7 +204,7 @@ No authorization required
 
 > namespacesControllerList()
 
-List all namespaces
+List the namespaces the caller can see (all of them without sign-in)
 
 ### Example
 
@@ -275,6 +278,63 @@ async function example() {
 
   try {
     const data = await api.namespacesControllerListCategories();
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+This endpoint does not need any parameter.
+
+### Return type
+
+`void` (Empty response body)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: Not defined
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## namespacesControllerOwningGroups
+
+> namespacesControllerOwningGroups()
+
+Groups the caller may create workspaces for (empty without sign-in)
+
+### Example
+
+```ts
+import {
+  Configuration,
+  NamespacesApi,
+} from '@workspace/api-client';
+import type { NamespacesControllerOwningGroupsRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new NamespacesApi();
+
+  try {
+    const data = await api.namespacesControllerOwningGroups();
     console.log(data);
   } catch (error) {
     console.error(error);

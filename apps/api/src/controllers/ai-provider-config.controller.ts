@@ -46,6 +46,7 @@ import {
 import { EmbeddingService } from '../embedding/embedding.service';
 import { EmbeddingRebuildService } from '../embedding/embedding-rebuild.service';
 import { EmbeddingConfigService } from '../embedding/embedding-config.service';
+import { AccessArea } from '../identity/access.decorators';
 
 const TEST_MESSAGES = [
   {
@@ -61,6 +62,7 @@ const TEST_MESSAGES = [
 ];
 
 @ApiTags('AI Provider Configs')
+@AccessArea({ view: 'agent.view', change: 'agent.configure' })
 @Controller('ai-provider-configs')
 export class AiProviderConfigController {
   constructor(

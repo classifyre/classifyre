@@ -40,8 +40,10 @@ import {
   FindingsDiscoveryResponseDto,
   FindingsDiscoveryStatsDto,
 } from './dto/findings-discovery-response.dto';
+import { AccessArea, Requires } from './identity/access.decorators';
 
 @ApiTags('findings')
+@AccessArea({ view: 'finding.view', change: 'finding.triage' })
 @Controller('findings')
 export class FindingsController {
   constructor(
@@ -132,6 +134,7 @@ export class FindingsController {
     return this.findingsService.getStats(sourceId);
   }
 
+  @Requires('finding.view')
   @Post('assets/severity-counts')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -172,6 +175,7 @@ export class FindingsController {
   }
 
   @BlockWhenPaused()
+  @Requires('finding.view')
   @Post('discovery/refresh')
   @ApiOperation({
     summary: 'Queue a full rebuild of the pre-aggregated finding statistics',

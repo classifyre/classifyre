@@ -2,6 +2,8 @@
 
 import * as React from "react";
 import { setActorName } from "@workspace/api-client";
+import { useServerConfig } from "@/components/server-config-provider";
+import { useMe } from "@/hooks/use-me";
 
 const KEY = "classifyre.actorName";
 const listeners = new Set<() => void>();
@@ -15,12 +17,14 @@ function read(): string | null {
 }
 
 /**
- * The self-declared display name (PRD §5.12, open question Q1). The app has
- * no user model yet, so a person types a name once; it lives in this browser
- * and rides on every API request as `X-Actor-Name`. Attribution, not
- * authorisation — anyone can claim any name.
+ * The display name your edits carry. Without sign-in it is self-declared
+ * (PRD §5.12): typed once, kept in this browser and sent as `X-Actor-Name` —
+ * attribution, not authorisation. With sign-in it is the signed-in person's
+ * name and cannot be changed here; the API ignores the header anyway.
  */
 export function useActorName(): [string | null, (name: string) => void] {
+  const { iamEnabled } = useServerConfig();
+  const me = useMe();
   const name = React.useSyncExternalStore(
     (listener) => {
       listeners.add(listener);
@@ -48,7 +52,12 @@ export function useActorName(): [string | null, (name: string) => void] {
     for (const listener of listeners) listener();
   }, []);
 
+  if (iamEnabled) return [me?.actor.displayName ?? null, ignoreRename];
   return [name, update];
+}
+
+function ignoreRename(): void {
+  // With sign-in the name comes from the identity server.
 }
 
 /** Call once at startup so requests carry the name before any hook renders. */

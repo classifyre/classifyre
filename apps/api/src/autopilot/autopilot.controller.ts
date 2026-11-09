@@ -42,8 +42,10 @@ import {
   TriggerAutopilotResponseDto,
   UpdateAgentMemoryDto,
 } from './dto/autopilot.dto';
+import { AccessArea } from '../identity/access.decorators';
 
 @ApiTags('autopilot')
+@AccessArea({ view: 'agent.view', change: 'agent.configure' })
 @Controller('autopilot')
 export class AutopilotController {
   constructor(private readonly autopilot: AutopilotService) {}

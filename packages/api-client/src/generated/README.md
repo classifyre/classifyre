@@ -59,6 +59,21 @@ All URIs are relative to *http://localhost*
 *AIProviderConfigsApi* | [**aiProviderConfigControllerRemove**](docs/AIProviderConfigsApi.md#aiproviderconfigcontrollerremove) | **DELETE** /ai-provider-configs/{id} | Delete an AI provider configuration
 *AIProviderConfigsApi* | [**aiProviderConfigControllerTest**](docs/AIProviderConfigsApi.md#aiproviderconfigcontrollertest) | **POST** /ai-provider-configs/{id}/test | Test an AI provider configuration
 *AIProviderConfigsApi* | [**aiProviderConfigControllerUpdate**](docs/AIProviderConfigsApi.md#aiproviderconfigcontrollerupdate) | **PUT** /ai-provider-configs/{id} | Update an AI provider configuration
+*AccessApi* | [**tenantAccessControllerAddGrant**](docs/AccessApi.md#tenantaccesscontrolleraddgrant) | **POST** /tenant/grants | Give a group or a person a role on the tenant, a group’s workspaces or one workspace
+*AccessApi* | [**tenantAccessControllerEvents**](docs/AccessApi.md#tenantaccesscontrollerevents) | **GET** /tenant/audit-events | Tenant-level changes: grants, workspaces created or deleted
+*AccessApi* | [**tenantAccessControllerGrants**](docs/AccessApi.md#tenantaccesscontrollergrants) | **GET** /tenant/grants | Every grant of the tenant
+*AccessApi* | [**tenantAccessControllerGroups**](docs/AccessApi.md#tenantaccesscontrollergroups) | **GET** /tenant/groups | 
+*AccessApi* | [**tenantAccessControllerRemoveGrant**](docs/AccessApi.md#tenantaccesscontrollerremovegrant) | **DELETE** /tenant/grants/{id} | Remove any grant of the tenant
+*AccessApi* | [**tenantAccessControllerResolve**](docs/AccessApi.md#tenantaccesscontrollerresolve) | **GET** /tenant/actors/resolve | Display names for actor references, outside any workspace
+*AccessApi* | [**tenantAccessControllerRoles**](docs/AccessApi.md#tenantaccesscontrollerroles) | **GET** /tenant/roles | The built-in roles and where each can be granted
+*AccessApi* | [**tenantAccessControllerTenant**](docs/AccessApi.md#tenantaccesscontrollertenant) | **GET** /tenant | The caller’s tenant and what they may do across it
+*AccessApi* | [**tenantAccessControllerTenants**](docs/AccessApi.md#tenantaccesscontrollertenants) | **GET** /tenant/tenants | Every tenant the caller belongs to, for switching (§12.2)
+*AccessApi* | [**workspaceAccessControllerAddGrant**](docs/AccessApi.md#workspaceaccesscontrolleraddgrant) | **POST** /access/grants | Give a group or a person a role on this workspace
+*AccessApi* | [**workspaceAccessControllerExplain**](docs/AccessApi.md#workspaceaccesscontrollerexplain) | **GET** /access/explain | Why can I do this? The grants that give you a capability here
+*AccessApi* | [**workspaceAccessControllerGrants**](docs/AccessApi.md#workspaceaccesscontrollergrants) | **GET** /access/grants | Grants that reach this workspace, including inherited ones
+*AccessApi* | [**workspaceAccessControllerGroups**](docs/AccessApi.md#workspaceaccesscontrollergroups) | **GET** /access/groups | Groups of this tenant, to grant access to
+*AccessApi* | [**workspaceAccessControllerRemoveGrant**](docs/AccessApi.md#workspaceaccesscontrollerremovegrant) | **DELETE** /access/grants/{id} | Remove a grant made on this workspace
+*AccessApi* | [**workspaceAccessControllerRoles**](docs/AccessApi.md#workspaceaccesscontrollerroles) | **GET** /access/roles | The built-in roles and what each one allows
 *AssetsApi* | [**assetsControllerGetAsset**](docs/AssetsApi.md#assetscontrollergetasset) | **GET** /assets/{id} | Get asset by ID
 *AssetsApi* | [**assetsControllerGetReferencingFindings**](docs/AssetsApi.md#assetscontrollergetreferencingfindings) | **GET** /assets/{id}/referencing-findings | Findings recorded on assets that point at this one
 *AssetsApi* | [**searchAssetsControllerExportAssets**](docs/AssetsApi.md#searchassetscontrollerexportassets) | **GET** /search/assets/export | Export assets (with findings) as CSV
@@ -324,6 +339,9 @@ All URIs are relative to *http://localhost*
 *GraphApi* | [**graphControllerUpdateEdge**](docs/GraphApi.md#graphcontrollerupdateedge) | **PATCH** /graph/edges/{id} | Rename an edge relation type
 *HealthApi* | [**healthControllerGetHealth**](docs/HealthApi.md#healthcontrollergethealth) | **GET** / | Health check
 *HealthApi* | [**healthControllerPing**](docs/HealthApi.md#healthcontrollerping) | **GET** /ping | Ping endpoint
+*IdentityApi* | [**auditControllerList**](docs/IdentityApi.md#auditcontrollerlist) | **GET** /audit-events | Changes made in this workspace, newest first
+*IdentityApi* | [**auditControllerResolve**](docs/IdentityApi.md#auditcontrollerresolve) | **GET** /actors/resolve | Display names for actor references
+*IdentityApi* | [**meControllerMe**](docs/IdentityApi.md#mecontrollerme) | **GET** /me | Who is calling, and what they may do in this workspace
 *InquiriesApi* | [**inquiriesControllerCreate**](docs/InquiriesApi.md#inquiriescontrollercreate) | **POST** /inquiries | Create an inquiry (a saved query) and seed its matches
 *InquiriesApi* | [**inquiriesControllerFindOne**](docs/InquiriesApi.md#inquiriescontrollerfindone) | **GET** /inquiries/{id} | Get an inquiry
 *InquiriesApi* | [**inquiriesControllerList**](docs/InquiriesApi.md#inquiriescontrollerlist) | **GET** /inquiries | List inquiries (with match counts)
@@ -351,8 +369,9 @@ All URIs are relative to *http://localhost*
 *NamespacesApi* | [**namespacesControllerCreate**](docs/NamespacesApi.md#namespacescontrollercreate) | **POST** /namespaces | Create a namespace (provisions its Postgres schema + migrations)
 *NamespacesApi* | [**namespacesControllerCreateCategory**](docs/NamespacesApi.md#namespacescontrollercreatecategory) | **POST** /namespaces/categories | Create a workspace category
 *NamespacesApi* | [**namespacesControllerGet**](docs/NamespacesApi.md#namespacescontrollerget) | **GET** /namespaces/{id} | Get a namespace by id
-*NamespacesApi* | [**namespacesControllerList**](docs/NamespacesApi.md#namespacescontrollerlist) | **GET** /namespaces | List all namespaces
+*NamespacesApi* | [**namespacesControllerList**](docs/NamespacesApi.md#namespacescontrollerlist) | **GET** /namespaces | List the namespaces the caller can see (all of them without sign-in)
 *NamespacesApi* | [**namespacesControllerListCategories**](docs/NamespacesApi.md#namespacescontrollerlistcategories) | **GET** /namespaces/categories | List workspace categories with workspace counts
+*NamespacesApi* | [**namespacesControllerOwningGroups**](docs/NamespacesApi.md#namespacescontrollerowninggroups) | **GET** /namespaces/owning-groups | Groups the caller may create workspaces for (empty without sign-in)
 *NamespacesApi* | [**namespacesControllerRemove**](docs/NamespacesApi.md#namespacescontrollerremove) | **DELETE** /namespaces/{id} | Soft-delete a namespace (hidden from listings; data retained)
 *NamespacesApi* | [**namespacesControllerRemoveCategory**](docs/NamespacesApi.md#namespacescontrollerremovecategory) | **DELETE** /namespaces/categories/{categoryId} | Delete a category (its workspaces fall back to the default category)
 *NamespacesApi* | [**namespacesControllerStats**](docs/NamespacesApi.md#namespacescontrollerstats) | **GET** /namespaces/stats | Per-namespace source rollups (total + failing + running + pending)
@@ -375,6 +394,13 @@ All URIs are relative to *http://localhost*
 *NotificationsApi* | [**notificationsControllerMarkAllRead**](docs/NotificationsApi.md#notificationscontrollermarkallread) | **PATCH** /notifications/mark-all-read | Mark all notifications as read
 *NotificationsApi* | [**notificationsControllerMarkRead**](docs/NotificationsApi.md#notificationscontrollermarkread) | **PATCH** /notifications/{id}/read | Mark a notification as read
 *NotificationsApi* | [**notificationsControllerSetImportant**](docs/NotificationsApi.md#notificationscontrollersetimportant) | **PATCH** /notifications/{id}/important | Set notification importance
+*PlatformApi* | [**platformControllerImportWorkspaces**](docs/PlatformApi.md#platformcontrollerimportworkspaces) | **POST** /platform/tenants/{tenantId}/workspaces | Copy workspaces made without sign-in into a tenant
+*PlatformApi* | [**platformControllerLocalWorkspaces**](docs/PlatformApi.md#platformcontrollerlocalworkspaces) | **GET** /platform/workspaces/local | Workspaces made without sign-in, which can be brought into a tenant
+*PlatformApi* | [**platformControllerMe**](docs/PlatformApi.md#platformcontrollerme) | **GET** /platform/me | Whether the caller is an operator (403 when not)
+*PlatformApi* | [**platformControllerRemove**](docs/PlatformApi.md#platformcontrollerremove) | **DELETE** /platform/tenants/{tenantId} | Remove a tenant whose organization was deleted
+*PlatformApi* | [**platformControllerResume**](docs/PlatformApi.md#platformcontrollerresume) | **POST** /platform/tenants/{tenantId}/resume | Resume a suspended tenant
+*PlatformApi* | [**platformControllerSuspend**](docs/PlatformApi.md#platformcontrollersuspend) | **POST** /platform/tenants/{tenantId}/suspend | Suspend a tenant: its people are refused, its data is kept
+*PlatformApi* | [**platformControllerTenants**](docs/PlatformApi.md#platformcontrollertenants) | **GET** /platform/tenants | Every tenant, with counts and its admins (read from the identity server)
 *RunnersApi* | [**cliRunnerControllerAugmentEdges**](docs/RunnersApi.md#clirunnercontrolleraugmentedges) | **POST** /runners/{runnerId}/augmentations/edges | Link assets and glossary terms, for a running connector
 *RunnersApi* | [**cliRunnerControllerAugmentTags**](docs/RunnersApi.md#clirunnercontrolleraugmenttags) | **POST** /runners/{runnerId}/augmentations/tags | Tag assets of other sources, for a running connector
 *RunnersApi* | [**cliRunnerControllerBulkDeleteRunners**](docs/RunnersApi.md#clirunnercontrollerbulkdeleterunners) | **POST** /runners/bulk-delete | Delete many scan records at once
@@ -540,6 +566,7 @@ All URIs are relative to *http://localhost*
 - [AssistantControllerRespondRequestMessagesInner](docs/AssistantControllerRespondRequestMessagesInner.md)
 - [AttachFindingsDto](docs/AttachFindingsDto.md)
 - [AttachFindingsResponseDto](docs/AttachFindingsResponseDto.md)
+- [AuditEventDto](docs/AuditEventDto.md)
 - [AutopilotStatsDto](docs/AutopilotStatsDto.md)
 - [BoardEndpointDto](docs/BoardEndpointDto.md)
 - [BoardItemDto](docs/BoardItemDto.md)
@@ -654,6 +681,7 @@ All URIs are relative to *http://localhost*
 - [CreateExternalRunnerDto](docs/CreateExternalRunnerDto.md)
 - [CreateFindingDto](docs/CreateFindingDto.md)
 - [CreateGlossaryRelationDto](docs/CreateGlossaryRelationDto.md)
+- [CreateGrantDto](docs/CreateGrantDto.md)
 - [CreateInquiryDto](docs/CreateInquiryDto.md)
 - [CreateManualEdgeDto](docs/CreateManualEdgeDto.md)
 - [CreateMcpServerDto](docs/CreateMcpServerDto.md)
@@ -749,6 +777,7 @@ All URIs are relative to *http://localhost*
 - [GlossarySchemeRefDto](docs/GlossarySchemeRefDto.md)
 - [GlossaryTermDto](docs/GlossaryTermDto.md)
 - [GlossaryTermUsageDto](docs/GlossaryTermUsageDto.md)
+- [GrantDto](docs/GrantDto.md)
 - [GraphEdgeDto](docs/GraphEdgeDto.md)
 - [GraphNodeDto](docs/GraphNodeDto.md)
 - [GraphResponseDto](docs/GraphResponseDto.md)
@@ -757,6 +786,8 @@ All URIs are relative to *http://localhost*
 - [HarnessToolsResponseDto](docs/HarnessToolsResponseDto.md)
 - [HealthControllerGetHealth200Response](docs/HealthControllerGetHealth200Response.md)
 - [HypothesisStatus](docs/HypothesisStatus.md)
+- [ImportWorkspacesDto](docs/ImportWorkspacesDto.md)
+- [ImportedWorkspacesDto](docs/ImportedWorkspacesDto.md)
 - [IngestEdgeDto](docs/IngestEdgeDto.md)
 - [InquiryActivityDto](docs/InquiryActivityDto.md)
 - [InquiryLinkedCaseDto](docs/InquiryLinkedCaseDto.md)
@@ -772,6 +803,7 @@ All URIs are relative to *http://localhost*
 - [LinkThreadSupportDto](docs/LinkThreadSupportDto.md)
 - [ListRunnersResponseDto](docs/ListRunnersResponseDto.md)
 - [LiveQueryResponseDto](docs/LiveQueryResponseDto.md)
+- [LocalWorkspaceDto](docs/LocalWorkspaceDto.md)
 - [LocationDto](docs/LocationDto.md)
 - [MarkAllReadDto](docs/MarkAllReadDto.md)
 - [MatchOptionCustomDetectorDto](docs/MatchOptionCustomDetectorDto.md)
@@ -787,6 +819,8 @@ All URIs are relative to *http://localhost*
 - [McpTokenResponseDto](docs/McpTokenResponseDto.md)
 - [McpToolParameterDto](docs/McpToolParameterDto.md)
 - [McpToolSummaryDto](docs/McpToolSummaryDto.md)
+- [MeActorDto](docs/MeActorDto.md)
+- [MeResponseDto](docs/MeResponseDto.md)
 - [NotebookCellDto](docs/NotebookCellDto.md)
 - [NotebookDto](docs/NotebookDto.md)
 - [NotebookExecutionDto](docs/NotebookExecutionDto.md)
@@ -807,6 +841,8 @@ All URIs are relative to *http://localhost*
 - [PatternPreviewResponseDto](docs/PatternPreviewResponseDto.md)
 - [PayloadCursorEntryDto](docs/PayloadCursorEntryDto.md)
 - [PivotGraphDto](docs/PivotGraphDto.md)
+- [PlatformMeDto](docs/PlatformMeDto.md)
+- [PlatformTenantDto](docs/PlatformTenantDto.md)
 - [PreviewCaseFindingFiltersDto](docs/PreviewCaseFindingFiltersDto.md)
 - [PreviewDiagnosticDto](docs/PreviewDiagnosticDto.md)
 - [PreviewInquiryDto](docs/PreviewInquiryDto.md)
@@ -841,6 +877,7 @@ All URIs are relative to *http://localhost*
 - [RematchResponseDto](docs/RematchResponseDto.md)
 - [ReopenDecisionsDto](docs/ReopenDecisionsDto.md)
 - [ReopenDecisionsResponseDto](docs/ReopenDecisionsResponseDto.md)
+- [ResolvedActorDto](docs/ResolvedActorDto.md)
 - [RetireOutOfScopeFindingsDto](docs/RetireOutOfScopeFindingsDto.md)
 - [RevertResultDto](docs/RevertResultDto.md)
 - [ReviewCaseLeadDto](docs/ReviewCaseLeadDto.md)
@@ -868,6 +905,7 @@ All URIs are relative to *http://localhost*
 - [ReviewSourceNodeDto](docs/ReviewSourceNodeDto.md)
 - [ReviewWaterfallDto](docs/ReviewWaterfallDto.md)
 - [ReviewWaterfallRowDto](docs/ReviewWaterfallRowDto.md)
+- [RoleDto](docs/RoleDto.md)
 - [RunnerAssetFindingSummaryDto](docs/RunnerAssetFindingSummaryDto.md)
 - [RunnerAssetItemDto](docs/RunnerAssetItemDto.md)
 - [RunnerAssetProgressDto](docs/RunnerAssetProgressDto.md)
@@ -973,6 +1011,11 @@ All URIs are relative to *http://localhost*
 - [SupervisorJournalEntryDto](docs/SupervisorJournalEntryDto.md)
 - [SupervisorJournalListDto](docs/SupervisorJournalListDto.md)
 - [SupervisorStateDto](docs/SupervisorStateDto.md)
+- [TenantAdminDto](docs/TenantAdminDto.md)
+- [TenantDto](docs/TenantDto.md)
+- [TenantEventDto](docs/TenantEventDto.md)
+- [TenantGroupDto](docs/TenantGroupDto.md)
+- [TenantMembershipDto](docs/TenantMembershipDto.md)
 - [TestConnectionResponseDto](docs/TestConnectionResponseDto.md)
 - [TextCoverageDto](docs/TextCoverageDto.md)
 - [ThreadEntriesResponseDto](docs/ThreadEntriesResponseDto.md)

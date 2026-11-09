@@ -1,0 +1,40 @@
+
+# TenantMembershipDto
+
+
+## Properties
+
+Name | Type
+------------ | -------------
+`id` | string
+`alias` | string
+`name` | string
+`current` | boolean
+
+## Example
+
+```typescript
+import type { TenantMembershipDto } from '@workspace/api-client'
+
+// TODO: Update the object below with actual values
+const example = {
+  "id": null,
+  "alias": default,
+  "name": Default,
+  "current": null,
+} satisfies TenantMembershipDto
+
+console.log(example)
+
+// Convert the instance to a JSON string
+const exampleJSON: string = JSON.stringify(example)
+console.log(exampleJSON)
+
+// Parse the JSON string back to an object
+const exampleParsed = JSON.parse(exampleJSON) as TenantMembershipDto
+console.log(exampleParsed)
+```
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+

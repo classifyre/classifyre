@@ -11,6 +11,7 @@ import { RunnerDto, RunnerLogEntryDto } from '../cli-runner/dto';
 import { ClsService } from 'nestjs-cls';
 import { CLS_SCHEMA } from '../namespace/namespace.constants';
 import { NamespaceRegistryService } from '../registry/namespace-registry.service';
+import { SocketAccessService } from '../identity/socket-access.service';
 
 @WebSocketGateway({
   cors: {
@@ -37,6 +38,7 @@ export class RunnerEventsGateway
   constructor(
     private readonly cls: ClsService,
     private readonly namespaces: NamespaceRegistryService,
+    private readonly socketAccess: SocketAccessService,
   ) {}
 
   handleConnection(client: Socket) {
@@ -139,6 +141,15 @@ export class RunnerEventsGateway
     if (typeof slug !== 'string') return null;
     const namespace = await this.namespaces.resolve(slug);
     if (!namespace) return null;
+    if (
+      !(await this.socketAccess.canJoin(
+        client,
+        namespace.namespaceId,
+        'source.view',
+      ))
+    ) {
+      return null;
+    }
     client.data['classifyreSchema'] = namespace.schemaName;
     return namespace.schemaName;
   }

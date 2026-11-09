@@ -15,6 +15,7 @@ import { useBoard, useBoardStore, useUi, useUiStore } from "../store/board-conte
 import { resolveComment } from "../store/commands";
 import type { BoardNode } from "../store/projection";
 import { initialsOf } from "../store/selectors";
+import { ActorChip } from "@/components/actor-chip";
 
 /**
  * A comment pin (PRD §5.6): a DISCUSSION thread anchored to an item, a finding
@@ -154,7 +155,11 @@ function CommentThread({
           entries.map((entry) => (
             <div key={entry.id} className="space-y-0.5">
               <div className="flex items-baseline gap-2 text-[11px] text-muted-foreground">
-                <span className="font-semibold text-foreground">{entry.author ?? t("caseBoard.someone")}</span>
+                {entry.author ? (
+                  <ActorChip actorRef={entry.author} />
+                ) : (
+                  <span className="font-semibold text-foreground">{t("caseBoard.someone")}</span>
+                )}
                 <span>{formatDistanceToNowStrict(new Date(entry.createdAt), { addSuffix: true })}</span>
               </div>
               <p className="text-sm whitespace-pre-wrap">{entry.body}</p>

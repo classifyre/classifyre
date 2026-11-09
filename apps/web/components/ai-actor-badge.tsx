@@ -4,8 +4,8 @@ import { Sparkles } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 import { useTranslation } from "@/hooks/use-translation";
 
-/** Actor identifier the autopilot stamps on every mutation (mirrors the API). */
-export const AI_ACTOR = "ai-autopilot";
+/** Actor reference the autopilot stamps on every mutation (mirrors the API). */
+export const AI_ACTOR = "agent:autopilot";
 
 export function isAiActor(actor?: string | null): boolean {
   return actor === AI_ACTOR;

@@ -77,6 +77,7 @@ import { useEntityDocumentTitle } from "@/components/document-title-updater";
 import { useFormatDuration } from "@/hooks/use-format-duration";
 import { summarizeTextCoverage } from "@/lib/text-coverage";
 import { CohortSelectionCard } from "@/components/cohort-yield";
+import { ChangedBy } from "@/components/audit-history";
 
 const EMPTY_CHARTS: SearchAssetsChartsResponseDto = {
   totals: {
@@ -489,6 +490,12 @@ export default function SourceViewPage() {
                   {source.description}
                 </p>
               )}
+              <ChangedBy
+                entityType="sources"
+                entityId={source.id}
+                createdAt={source.createdAt}
+                className="mt-1"
+              />
             </div>
           </div>
         </div>

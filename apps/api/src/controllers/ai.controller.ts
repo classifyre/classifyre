@@ -19,8 +19,10 @@ import {
   AiCompleteRequestDto,
   AiCompleteResponseDto,
 } from '../dto/ai-complete.dto';
+import { Requires } from '../identity/access.decorators';
 
 @ApiTags('AI')
+@Requires('agent.use')
 @Controller('ai')
 export class AiController {
   constructor(private readonly aiClient: AiClientService) {}

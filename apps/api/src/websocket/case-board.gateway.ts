@@ -8,7 +8,8 @@ import { Server, Socket } from 'socket.io';
 import { ClsService } from 'nestjs-cls';
 import { CLS_SCHEMA } from '../namespace/namespace.constants';
 import { NamespaceRegistryService } from '../registry/namespace-registry.service';
-import { parseActorName } from '../actor-name.decorator';
+import { SocketAccessService } from '../identity/socket-access.service';
+import { parseActorName } from '../identity/actor';
 import type {
   BoardChangedEvent,
   CaseBoardEvents,
@@ -52,6 +53,7 @@ export class CaseBoardGateway implements OnGatewayDisconnect, CaseBoardEvents {
   constructor(
     private readonly cls: ClsService,
     private readonly namespaces: NamespaceRegistryService,
+    private readonly socketAccess: SocketAccessService,
   ) {}
 
   @SubscribeMessage('subscribe')
@@ -73,7 +75,16 @@ export class CaseBoardGateway implements OnGatewayDisconnect, CaseBoardEvents {
     }
     await client.join(room);
     const members = this.presence.get(room) ?? new Map<string, string>();
-    members.set(client.id, parseActorName(body?.actor) ?? '');
+    // With sign-in the board shows who signed in, not a name the client sends.
+    const principal = client.data['classifyrePrincipal'] as
+      | { actor: { displayName: string | null; ref?: string } }
+      | undefined;
+    members.set(
+      client.id,
+      principal
+        ? (principal.actor.displayName ?? principal.actor.ref ?? '')
+        : (parseActorName(body?.actor) ?? ''),
+    );
     this.presence.set(room, members);
     this.broadcastPresence(room);
     return { success: true };
@@ -126,6 +137,15 @@ export class CaseBoardGateway implements OnGatewayDisconnect, CaseBoardEvents {
     if (typeof slug !== 'string') return null;
     const namespace = await this.namespaces.resolve(slug);
     if (!namespace) return null;
+    if (
+      !(await this.socketAccess.canJoin(
+        client,
+        namespace.namespaceId,
+        'case.view',
+      ))
+    ) {
+      return null;
+    }
     client.data['classifyreSchema'] = namespace.schemaName;
     return namespace.schemaName;
   }

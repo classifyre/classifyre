@@ -3,12 +3,14 @@
 # classifyre-develop namespace on NodePort 30101 with :develop image tags.
 # Access: https://staging.classifyre.com/
 #
-# Develop shares the node with prod (see the budget in values-vps.yaml) and
-# is parked between test runs: api/web are scaled to 0 with their HPAs
-# removed (scale-down step in .github/workflows/develop.yml). Postgres and
-# worker stay up but on reduced requests below, so the prod namespace always
-# has room to schedule a scan. Develop postgres idles at ~50Mi, worker at
-# ~180Mi — neither needs the full-footprint defaults.
+# This is the smoke deploy (.github/workflows/develop.yml): installed fresh
+# with sign-in on, seeded (scripts/smoke/seed.sh), checked by the Playwright
+# smoke test (apps/e2e), then destroyed with its database
+# (scripts/smoke/destroy.sh), so nothing stays on the shared node.
+#
+# Develop shares the node with prod (see the budget in values-vps.yaml).
+# While a run is up, Postgres and the worker run on reduced requests below, so
+# the prod namespace keeps room to schedule a scan.
 
 api:
   image:
@@ -25,6 +27,14 @@ api:
     minReplicas: 1
     maxReplicas: 1
 
+  # The smoke test's folder, from the ConfigMap scripts/smoke/seed.sh makes.
+  localFolders:
+    - name: smoke
+      mountPath: /mnt/corpora/smoke
+      configMap:
+        name: classifyre-smoke-fixture
+        optional: true
+
   cliJobs:
     image:
       repository: classifyre/cli
@@ -33,6 +43,24 @@ api:
     runnerLogs:
       accessModes:
         - ReadWriteOnce
+    # Each smoke run starts empty, so a dependency cache would never be warm,
+    # and its claim binds only when the first scan job uses it, which keeps
+    # `helm --wait` from ever finishing on a fresh install.
+    uvCache:
+      enabled: false
+    # The smoke scan reads one small file with the secrets detector. The chart's
+    # 4Gi request (sized for real corpora and ML detectors) does not fit next
+    # to a prod scan on the shared node; the request is what the scheduler
+    # counts, so keep it small and leave the limit some room.
+    resources:
+      requests:
+        cpu: 250m
+        memory: 1Gi
+        ephemeral-storage: 2Gi
+      limits:
+        cpu: "1"
+        memory: 2Gi
+        ephemeral-storage: 6Gi
 
 
 frontend:
@@ -89,3 +117,20 @@ telemetry:
 
 objectStorage:
   enabled: false
+
+# Sign-in on: the smoke test signs in, creates a workspace and checks access.
+# The web app proxies the identity server at /iam on the same host. A public
+# tenant next to `default`, so the smoke test checks that visitors see it and
+# signed-in people of `default` never do.
+iam:
+  enabled: true
+  appUrl: https://staging.classifyre.com
+  public:
+    enabled: true
+    tenant: public
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      memory: 1Gi

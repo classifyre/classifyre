@@ -1,7 +1,16 @@
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  Optional,
+} from '@nestjs/common';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { McpServerFactoryService } from '../mcp-server.factory';
+import { ACCESS_POLICY, type AccessPolicy } from '../identity/access-policy';
+import { currentActor } from '../identity/actor-context.service';
+import { mcpToolCapability } from '../identity/mcp-tool-capabilities';
 
 /** Catalog entry for one MCP tool, as needed by the assistant loop. */
 export interface AssistantMcpTool {
@@ -31,7 +40,28 @@ export class AssistantMcpService implements OnModuleDestroy {
   private clientPromise: Promise<Client> | null = null;
   private toolCache: AssistantMcpTool[] | null = null;
 
-  constructor(private readonly mcpServerFactory: McpServerFactoryService) {}
+  constructor(
+    private readonly mcpServerFactory: McpServerFactoryService,
+    @Optional()
+    @Inject(ACCESS_POLICY)
+    private readonly policy?: AccessPolicy,
+  ) {}
+
+  /**
+   * The assistant acts for the person asking, so a tool runs only when that
+   * person holds its capability, exactly as for an external MCP client. The
+   * in-process server is shared and unrestricted; this is where it is bounded.
+   */
+  private async refusal(name: string): Promise<string | null> {
+    if (!this.policy) return null;
+    const tool = (await this.listTools()).find((t) => t.name === name);
+    const capability = mcpToolCapability(name, tool?.readOnly ?? false);
+    if (!capability) return `Tool ${name} is not available.`;
+    const decision = await this.policy.check(currentActor(), capability);
+    return decision.allow
+      ? null
+      : `Not allowed: ${name} needs the ${capability} capability, which you do not have here.`;
+  }
 
   private getClient(): Promise<Client> {
     this.clientPromise ??= this.connect().catch((error) => {
@@ -109,6 +139,8 @@ export class AssistantMcpService implements OnModuleDestroy {
     input: Record<string, unknown>,
   ): Promise<AssistantMcpCallResult> {
     try {
+      const refused = await this.refusal(name);
+      if (refused) return { ok: false, result: refused };
       const client = await this.getClient();
       const response = await client.callTool({ name, arguments: input });
       const textContent = Array.isArray(response.content)

@@ -14,6 +14,7 @@ import {
   WorkerQueueRegistryService,
   type PausedQueuesSnapshot,
 } from './worker-queue-registry.service';
+import { workspaceDatabaseUrl } from '../tenant-databases';
 
 /**
  * One live pg-boss subscription, re-established on resume without
@@ -179,7 +180,7 @@ export class PgBossService implements OnApplicationShutdown {
   ): Promise<PgBossInstance> {
     const { PgBoss } = await import('pg-boss');
     const boss = new PgBoss({
-      connectionString: process.env.DATABASE_URL,
+      connectionString: workspaceDatabaseUrl(schema),
       max: 5,
       schema: pgBossSchemaForId(namespaceId),
       // How often finished jobs are actually collected.

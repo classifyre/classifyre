@@ -10,7 +10,7 @@ describe('AgentSearchService — open hypotheses', () => {
     id: '11111111-1111-4111-8111-111111111111',
     title: 'Key reuse',
     testablePredicate: 'A key-shaped token appears after rotation.',
-    createdBy: 'ai-autopilot',
+    createdBy: 'agent:autopilot',
     createdAt: new Date('2026-07-01T00:00:00Z'),
     entries: [{ body: 'Newest statement' }],
     ...over,
@@ -19,7 +19,7 @@ describe('AgentSearchService — open hypotheses', () => {
     id: 'case-1',
     title: 'Leaked credentials',
     severity: 'HIGH',
-    createdBy: 'ai-autopilot',
+    createdBy: 'agent:autopilot',
     threads: [hypothesis()],
     ...over,
   });
@@ -103,7 +103,7 @@ describe('AgentSearchService — open hypotheses', () => {
           hypothesis({ id: 'operator-thread', createdBy: null }),
           hypothesis({
             id: 'ai-thread-in-operator',
-            createdBy: 'ai-autopilot',
+            createdBy: 'agent:autopilot',
           }),
         ],
       }),

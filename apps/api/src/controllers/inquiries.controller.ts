@@ -35,6 +35,7 @@ import {
 import { InquiryTimelineResponseDto } from '../dto/inquiry-activity.dto';
 import { activityTypes } from '../activity-page';
 import { AllowInDemoMode } from '../demo-mode.decorator';
+import { AccessArea, Requires } from '../identity/access.decorators';
 
 class RematchResponseDto {
   @ApiProperty({ description: 'Findings newly recorded as matches' })
@@ -42,6 +43,7 @@ class RematchResponseDto {
 }
 
 @ApiTags('inquiries')
+@AccessArea({ view: 'inquiry.view', change: 'inquiry.edit' })
 @Controller('inquiries')
 export class InquiriesController {
   constructor(private readonly inquiries: InquiriesService) {}
@@ -159,6 +161,7 @@ export class InquiriesController {
     );
   }
 
+  @Requires('inquiry.view')
   @Post(':id/seen')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({

@@ -12,7 +12,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { ActorName } from '../actor-name.decorator';
+import { ActorRef } from '../identity/actor-ref.decorator';
 import { AllowInDemoMode } from '../demo-mode.decorator';
 import { ReadOnlyEndpoint } from '../db/read-only-endpoint.decorator';
 import { PrismaService } from '../prisma.service';
@@ -32,6 +32,7 @@ import {
   PreviewCaseFindingFiltersDto,
   UpdateCaseFindingFilterDto,
 } from '../dto/case-cleanup.dto';
+import { AccessArea } from '../identity/access.decorators';
 
 /** No global ValidationPipe: a form or MCP "true" arrives as text. */
 function flag(value: unknown): boolean {
@@ -44,6 +45,7 @@ function flag(value: unknown): boolean {
  * filters, case-wide or per watch.
  */
 @ApiTags('cases')
+@AccessArea({ view: 'case.view', change: 'case.manage' })
 @Controller('cases/:id')
 export class CaseCleanupController {
   constructor(
@@ -127,7 +129,7 @@ export class CaseCleanupController {
   addFilters(
     @Param('id') id: string,
     @Body() dto: AddCaseFindingFiltersDto,
-    @ActorName() actor: string | undefined,
+    @ActorRef() actor: string | undefined,
   ): Promise<CaseFindingFiltersChangeResponseDto> {
     return this.filters.add(id, dto, actor);
   }
@@ -142,7 +144,7 @@ export class CaseCleanupController {
     @Param('id') id: string,
     @Param('filterId') filterId: string,
     @Body() dto: UpdateCaseFindingFilterDto,
-    @ActorName() actor: string | undefined,
+    @ActorRef() actor: string | undefined,
   ): Promise<CaseFindingFiltersChangeResponseDto> {
     return this.filters.update(id, filterId, dto, actor);
   }
@@ -157,7 +159,7 @@ export class CaseCleanupController {
   removeFilter(
     @Param('id') id: string,
     @Param('filterId') filterId: string,
-    @ActorName() actor: string | undefined,
+    @ActorRef() actor: string | undefined,
   ): Promise<CaseFindingFilterDto[]> {
     return this.filters.remove(id, filterId, actor);
   }
@@ -172,7 +174,7 @@ export class CaseCleanupController {
   async clearEscalations(
     @Param('id') id: string,
     @Body() dto: ClearCaseEscalationsDto,
-    @ActorName() actor: string | undefined,
+    @ActorRef() actor: string | undefined,
   ): Promise<ClearCaseEscalationsResponseDto> {
     const found = await this.prisma.case.findUnique({
       where: { id },

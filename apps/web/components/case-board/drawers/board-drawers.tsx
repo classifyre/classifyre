@@ -57,6 +57,7 @@ import { locateLead } from "../store/leads";
 import { useVisibleCentre } from "../hooks/use-visible-centre";
 import type { Bubble } from "../store/types";
 import { BoardCanvas, BOARD_DRAG_MIME } from "../board-canvas";
+import { ActorName } from "@/components/actor-chip";
 
 /**
  * The board's side panel (D4, revised): every former case tab, plus details,
@@ -704,7 +705,7 @@ function SnapshotsDrawer({ caseId }: { caseId: string }) {
                 </p>
                 <p className="text-[11px] text-muted-foreground">
                   {new Date(snap.createdAt).toLocaleString()} · v{snap.version}
-                  {snap.createdBy ? ` · ${snap.createdBy}` : ""}
+                  {snap.createdBy && <ActorName actorRef={snap.createdBy}>{(name) => ` · ${name}`}</ActorName>}
                 </p>
               </div>
               <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={() => void open(snap.id)}>

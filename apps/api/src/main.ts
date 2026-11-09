@@ -13,10 +13,18 @@ import underPressure from '@fastify/under-pressure';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { McpServerFactoryService } from './mcp-server.factory';
 import { McpTokenService } from './mcp-token.service';
+import { ActorContextService } from './identity/actor-context.service';
+import { ACCESS_POLICY, type AccessPolicy } from './identity/access-policy';
+import { integrationFromMcpToken } from './identity/actor';
+import { assertIamAllowed } from './identity/iam-config';
+import type { IdentityService } from './identity/identity.service';
+import { IDENTITY } from './identity/identity.tokens';
+import { CLS_CAPABILITIES } from './identity/iam-access-policy';
 import { InstanceSettingsService } from './instance-settings.service';
 import { PrismaExceptionFilter } from './filters/prisma-exception.filter';
 import { DbRetryInterceptor } from './interceptors/db-retry.interceptor';
 import { applyAllPendingMigrations } from './database-migrations';
+import { selectDatabaseForMode } from './database-mode';
 import { ClsService } from 'nestjs-cls';
 import { NamespaceRegistryService } from './registry/namespace-registry.service';
 import {
@@ -54,6 +62,10 @@ const BODY_LIMIT_BYTES = (() => {
 })();
 
 async function bootstrap() {
+  // The all-in-one Docker image never uses sign-in (docs/prd §2 H2).
+  assertIamAllowed();
+  // With sign-in, the control database rather than the open one.
+  selectDatabaseForMode();
   const logger = new Logger('Bootstrap');
   const port = process.env.PORT ?? 8000;
 
@@ -259,15 +271,19 @@ async function bootstrap() {
   const prismaClientManager = app.get(PrismaClientManager);
   const internalApiKey = app.get(InternalApiKeyService);
   const demoMode = app.get(DemoModeService);
+  const actors = app.get(ActorContextService);
+  const accessPolicy = app.get<AccessPolicy>(ACCESS_POLICY);
 
   // Resolve the leading `/<slug>` into a tenant context (404 on unknown slug)
   // before any route runs. `/<slug>/mcp` was already rewritten to `/mcp`.
+  const identity = app.get<IdentityService | null>(IDENTITY);
   registerNamespaceHook(
     fastify,
     namespaceRegistry,
     cls,
     prismaClientManager,
     internalApiKey,
+    identity,
   );
 
   const mcpHandler = async (request: any, reply: any) => {
@@ -308,7 +324,12 @@ async function bootstrap() {
         return;
       }
 
-      let authorizedToken: { toolGroupIds: string[] | null };
+      let authorizedToken: {
+        id: string;
+        name: string;
+        toolGroupIds: string[] | null;
+        ownerSub: string | null;
+      };
       try {
         authorizedToken = await mcpTokenService.authorizeBearerToken(
           request.headers.authorization,
@@ -324,11 +345,41 @@ async function bootstrap() {
         return;
       }
 
+      let actor = integrationFromMcpToken(authorizedToken);
+      let capabilities = await accessPolicy.capabilities(actor);
+      if (identity) {
+        // With sign-in a token acts for its owner, as they are right now.
+        const owner = authorizedToken.ownerSub
+          ? await identity.principalForOwner(
+              authorizedToken.ownerSub,
+              authorizedToken.id,
+              ns.namespaceId,
+            )
+          : null;
+        if (!owner) {
+          reply.code(401).send({
+            error: 'Unauthorized',
+            code: authorizedToken.ownerSub
+              ? 'MCP_OWNER_NO_ACCESS'
+              : 'MCP_TOKEN_WITHOUT_OWNER',
+            message: authorizedToken.ownerSub
+              ? 'The person this token belongs to no longer has access to this workspace.'
+              : 'This token was created before sign-in and has no owner. Sign in and create a new one.',
+          });
+          return;
+        }
+        actor = owner.principal.actor;
+        capabilities = owner.capabilities;
+        cls.set(CLS_CAPABILITIES, capabilities);
+      }
+      actors.set(actor);
+
       reply.hijack();
 
       try {
         const server = mcpServerFactory.createServer({
           toolGroupIds: authorizedToken.toolGroupIds,
+          capabilities,
         });
         const transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: undefined,

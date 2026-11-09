@@ -1001,9 +1001,10 @@ describe('CustomDetectorsService', () => {
 
   it('rejects xlsx uploads as an unsupported file type', () => {
     const { service } = createService();
-    const payload = fs.readFileSync(
-      path.resolve(__dirname, '../../e2e/assets/phishing_dataset.xlsx'),
-    );
+    // The start of a zip container, which an .xlsx file is.
+    const payload = Buffer.from([
+      0x50, 0x4b, 0x03, 0x04, 0x14, 0x00, 0x06, 0x00,
+    ]);
 
     expect(() =>
       service.parseTrainingExamplesUpload(payload, 'phishing_dataset.xlsx'),

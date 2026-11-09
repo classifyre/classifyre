@@ -1,0 +1,1 @@
+Sign-in is harder to misuse: the identity server's own master realm can no longer be reached through crafted addresses, operators' rights in the identity console are limited to people, organizations and directories, signing out can no longer be triggered from another website, and people of a deleted tenant, or of one whose organization was replaced, now see a page that says so.
