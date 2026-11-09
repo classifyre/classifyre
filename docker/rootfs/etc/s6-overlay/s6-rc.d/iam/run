@@ -26,7 +26,7 @@ print("DB_HOST=" + shlex.quote(u.hostname or "127.0.0.1"))
 print("DB_PORT=" + shlex.quote(str(u.port or 5432)))
 print("DB_USER=" + shlex.quote(unquote(u.username or "postgres")))
 print("DB_PASSWORD=" + shlex.quote(unquote(u.password or "")))
-# The server's maintenance database: Classifyre's own may not exist yet.
+# The maintenance database of the server: the Classifyre one may not exist yet.
 print("MAINTENANCE_URL=" + shlex.quote(u._replace(path="/postgres").geturl()))
 ')"
 
