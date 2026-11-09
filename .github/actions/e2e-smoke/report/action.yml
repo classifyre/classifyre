@@ -1,0 +1,16 @@
+name: Upload the smoke report
+description: The Playwright report and traces of the smoke test, kept two weeks.
+inputs:
+  name:
+    description: Artifact name
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: actions/upload-artifact@v7
+      with:
+        name: ${{ inputs.name }}
+        path: |
+          apps/e2e/playwright-report/
+          apps/e2e/test-results/
+        retention-days: 14

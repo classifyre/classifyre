@@ -1,0 +1,20 @@
+name: Set up the smoke test
+description: >
+  Installs the Playwright smoke test (apps/e2e) and Chromium. The same test
+  runs against the Helm release (develop.yml) and the all-in-one Docker image
+  (ci.yml, through docker/scripts/smoke.sh); upload its report with
+  .github/actions/e2e-smoke/report.
+runs:
+  using: composite
+  steps:
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+      with:
+        bun-version-file: package.json
+
+    - name: Install the smoke test
+      shell: bash
+      run: |
+        set -euo pipefail
+        bun install --frozen-lockfile --filter @classifyre/e2e
+        cd apps/e2e && bunx playwright install --with-deps chromium

@@ -246,38 +246,53 @@ jobs:
       - name: Seed the smoke run
         if: steps.env.outputs.smoke == 'true'
         env:
+          SMOKE_TARGET: k8s
           NS: ${{ env.HELM_NAMESPACE }}
           RELEASE: ${{ steps.env.outputs.release_name }}
           BASE_URL: https://staging.classifyre.com
         run: bash scripts/smoke/seed.sh
 
-      - name: Setup Bun
+      # The same Playwright smoke test as the all-in-one image's (ci.yml).
+      - name: Set up the smoke test
         if: steps.env.outputs.smoke == 'true'
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version-file: package.json
-
-      - name: Install the smoke test
-        if: steps.env.outputs.smoke == 'true'
-        run: |
-          set -euo pipefail
-          bun install --frozen-lockfile --filter @classifyre/e2e
-          cd apps/e2e && bunx playwright install --with-deps chromium
+        uses: ./.github/actions/e2e-smoke
 
       - name: Run the smoke test
         if: steps.env.outputs.smoke == 'true'
         working-directory: apps/e2e
+        env:
+          SMOKE_RUN: k8s${{ github.run_id }}
+          SMOKE_KEEP_WORKSPACE: "1"
         run: bunx playwright test
+
+      # "It works until you restart it": restart what holds state in memory,
+      # then check the workspace and its findings are still there.
+      - name: Restart the release
+        if: steps.env.outputs.smoke == 'true'
+        env:
+          HELM_RELEASE_NAME: ${{ steps.env.outputs.release_name }}
+        run: |
+          set -euo pipefail
+          for deployment in api web iam; do
+            kubectl -n "${HELM_NAMESPACE}" rollout restart deployment/"${HELM_RELEASE_NAME}-${deployment}"
+          done
+          for deployment in api web iam; do
+            kubectl -n "${HELM_NAMESPACE}" rollout status deployment/"${HELM_RELEASE_NAME}-${deployment}" --timeout=10m
+          done
+
+      - name: Check the data survived the restart
+        if: steps.env.outputs.smoke == 'true'
+        working-directory: apps/e2e
+        env:
+          SMOKE_RUN: k8s${{ github.run_id }}
+          SMOKE_AFTER_RESTART: "1"
+        run: bunx playwright test --grep @after-restart
 
       - name: Upload the smoke report
         if: always() && steps.env.outputs.smoke == 'true'
-        uses: actions/upload-artifact@v7
+        uses: ./.github/actions/e2e-smoke/report
         with:
           name: smoke-report
-          path: |
-            apps/e2e/playwright-report/
-            apps/e2e/test-results/
-          retention-days: 14
 
       - name: Show the release on failure
         if: failure() && steps.env.outputs.smoke == 'true'
