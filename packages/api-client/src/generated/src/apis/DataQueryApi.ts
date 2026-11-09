@@ -370,7 +370,7 @@ export class DataQueryApi extends runtime.BaseAPI {
     }
 
     /**
-     * Turn SQL queries on or off, and set their limits
+     * Set the limits of SQL queries in this workspace
      */
     async dataQueryControllerUpdateSettingsRaw(requestParameters: DataQueryControllerUpdateSettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<DataQuerySettingsDto>> {
         if (requestParameters['updateDataQuerySettingsDto'] == null) {
@@ -401,7 +401,7 @@ export class DataQueryApi extends runtime.BaseAPI {
     }
 
     /**
-     * Turn SQL queries on or off, and set their limits
+     * Set the limits of SQL queries in this workspace
      */
     async dataQueryControllerUpdateSettings(requestParameters: DataQueryControllerUpdateSettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<DataQuerySettingsDto> {
         const response = await this.dataQueryControllerUpdateSettingsRaw(requestParameters, initOverrides);

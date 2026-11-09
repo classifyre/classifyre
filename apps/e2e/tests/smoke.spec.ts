@@ -243,18 +243,8 @@ test.describe.serial("smoke with sign-in", () => {
     return api.ok<QueryRun>("GET", `/${SLUG}/query-runs/${id}`);
   };
 
-  test("SQL is off until turned on; then the admin queries the table and exports it", async () => {
+  test("the admin queries the table straight away and exports it", async () => {
     const { page, api } = admin;
-    const off = await api.call<{ code?: string }>("POST", `/${SLUG}/query-runs`, { sql: "SELECT 1" });
-    expect(off.status).toBe(409);
-    expect(off.body.code).toBe("DATA_QUERY_OFF");
-
-    await page.goto(`/${SLUG}/settings/?tab=data`);
-    await page.getByTestId("data-query-settings").getByRole("switch").click();
-    await expect
-      .poll(async () => (await api.ok<{ enabled: boolean }>("GET", `/${SLUG}/data-query/settings`)).enabled)
-      .toBe(true);
-
     const table = await ordersTable(api);
     expect(table.canQuery).toBe(true);
     const sql = `SELECT region, sum(amount) AS total FROM ${table.sqlName} GROUP BY region ORDER BY region`;

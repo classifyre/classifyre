@@ -127,15 +127,6 @@ export class QueryRunService {
       );
     }
     const settings = await this.catalog.settings();
-    if (!settings.enabled) {
-      throw new ConflictException({
-        statusCode: 409,
-        error: 'Conflict',
-        code: 'DATA_QUERY_OFF',
-        message:
-          'SQL queries are off in this workspace. A workspace admin can turn them on in Settings → Export & Import.',
-      });
-    }
     const actor = this.actors.current();
     if (exportFormat) {
       // A file leaves the app: that is data.export, on top of the right to

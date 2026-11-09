@@ -74,7 +74,7 @@ export class DataQueryController {
 
   @Put('data-query/settings')
   @Requires('workspace.settings')
-  @ApiOperation({ summary: 'Turn SQL queries on or off, and set their limits' })
+  @ApiOperation({ summary: 'Set the limits of SQL queries in this workspace' })
   @ApiOkResponse({ type: DataQuerySettingsDto })
   updateSettings(
     @Body() body: UpdateDataQuerySettingsDto,

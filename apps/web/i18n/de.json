@@ -7406,8 +7406,6 @@
     "notQueryable": "Nicht mit SQL abfragbar",
     "noTables": "Noch keine Tabellen zum Abfragen. Scannen Sie zuerst eine Datenbank-, Lakehouse- oder Bucket-Quelle.",
     "partialAccess": "Sie dürfen hier {{count}} Tabellen abfragen, die mit dem Abspielzeichen. Die anderen brauchen eine Datenleser-Freigabe.",
-    "disabledTitle": "SQL-Abfragen sind in diesem Arbeitsbereich aus",
-    "disabledBody": "Ein Admin des Arbeitsbereichs kann sie unter Einstellungen → Export & Import einschalten.",
     "openInQuery": "In SQL öffnen",
     "assetTab": "Daten",
     "assetLockedTitle": "Kein Datenzugriff",
@@ -7436,8 +7434,7 @@
     },
     "settings": {
       "title": "SQL über Tabellen",
-      "description": "Erlauben Sie, die Zeilen der Tabellen dieses Arbeitsbereichs mit SQL abzufragen. Wer welche Tabelle abfragen darf, folgt den Rollen und Datenleser-Freigaben. Jede Abfrage wird in der Aktivität festgehalten.",
-      "enabled": "SQL-Abfragen beantworten",
+      "description": "Grenzen für SQL über die Tabellen dieses Arbeitsbereichs. Wer welche Tabelle abfragen darf, folgt den Rollen und Datenleser-Freigaben. Jede Abfrage wird in der Aktivität festgehalten.",
       "maxRows": "Zeilen pro Ergebnis",
       "timeout": "Zeitlimit (Sekunden)",
       "exportMaxRows": "Zeilen pro Export",

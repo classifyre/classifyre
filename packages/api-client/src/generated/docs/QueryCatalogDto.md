@@ -6,7 +6,6 @@
 
 Name | Type
 ------------ | -------------
-`enabled` | boolean
 `canQueryAll` | boolean
 `limits` | [QueryLimitsDto](QueryLimitsDto.md)
 `sources` | [Array&lt;QueryCatalogSourceDto&gt;](QueryCatalogSourceDto.md)
@@ -18,7 +17,6 @@ import type { QueryCatalogDto } from '@workspace/api-client'
 
 // TODO: Update the object below with actual values
 const example = {
-  "enabled": null,
   "canQueryAll": null,
   "limits": null,
   "sources": null,
