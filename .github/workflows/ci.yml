@@ -168,6 +168,9 @@ jobs:
             exit 1
           fi
 
+      - name: The identity server is the same version in Docker and Helm
+        run: bash scripts/check-keycloak-version.sh
+
       - name: Lint
         if: success() || failure()
         run: bun run lint
@@ -357,20 +360,23 @@ jobs:
             IMAGE_NS=${{ secrets.DOCKER_USERNAME }}
           build-contexts: |
             models=${{ github.workspace }}/models
+            iam=${{ github.workspace }}/helm/classifyre/files/iam
           cache-from: type=registry,ref=${{ format('{0}/all-in-one:build-cache', secrets.DOCKER_USERNAME) }}
           cache-to: type=registry,ref=${{ format('{0}/all-in-one:build-cache', secrets.DOCKER_USERNAME) }},mode=max,image-manifest=true
 
   # ── Smoke test ──────────────────────────────────────────────────────────────
-  # Boots the image and scans a fixture corpus end to end. A health check only
-  # proves the API answers; this proves the part that actually breaks — the
-  # Python subprocess, the detector pool, and the REST callback that writes
-  # findings back — plus that the data survives a restart.
+  # Boots the image and runs the same Playwright smoke test as the Helm
+  # release (develop.yml): sign in, create a workspace, scan a folder end to
+  # end (the Python subprocess, the detector pool and the REST callback that
+  # writes findings back), access, SQL and notifications — then restarts the
+  # container and checks the data survived.
   smoke:
     name: Smoke test the all-in-one image
     needs: [all-in-one]
     if: always() && !cancelled() && needs['all-in-one'].result == 'success'
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # Playwright has no Chromium for ubuntu-latest (26.04) yet.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
 
     steps:
       - name: Checkout
@@ -382,10 +388,19 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Set up the smoke test
+        uses: ./.github/actions/e2e-smoke
+
       - name: Run the smoke test
         env:
           IMAGE: ${{ format('{0}/all-in-one:{1}', secrets.DOCKER_USERNAME, needs['all-in-one'].outputs.tag) }}
         run: bash docker/scripts/smoke.sh
+
+      - name: Upload the smoke report
+        if: always()
+        uses: ./.github/actions/e2e-smoke/report
+        with:
+          name: smoke-report-all-in-one
 
   deploy-develop:
     name: Smoke deploy → classifyre-develop

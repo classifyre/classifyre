@@ -2,9 +2,9 @@
 #
 # Sizes the container to the machine it landed on, then hands off to s6.
 #
-# The all-in-one runs four memory-hungry things side by side — Postgres, the
-# Node API (which also forks an ONNX embedding child), the Next.js server, and a
-# Python scan process — inside one memory limit. The Kubernetes defaults assume
+# The all-in-one runs five memory-hungry things side by side — Postgres, the
+# Node API (which also forks an ONNX embedding child), the Next.js server, the
+# identity server (Java), and a Python scan process — inside one memory limit. The Kubernetes defaults assume
 # each of those has a pod to itself, so running them unchanged on a laptop is
 # how you get an OOM kill or a stall. Everything below derives a budget from the
 # container's real limits and splits it.
@@ -145,7 +145,8 @@ EFFECTIVE_HEAP_MB="$(printf '%s' "${NODE_OPTIONS}" \
 # permanent 503s. The API's fair share here is what is left once Postgres, the
 # web server and one scan subprocess are accounted for.
 if [ -z "${UNDER_PRESSURE_MAX_RSS_BYTES:-}" ]; then
-  api_share_mb=$(( TOTAL_MB - PG_SHARED_MB - 256 - 1536 - 256 ))
+  # Postgres, web, one scan subprocess, Caddy/s6, and the identity server.
+  api_share_mb=$(( TOTAL_MB - PG_SHARED_MB - 256 - 1536 - 256 - 768 ))
   rss_mb=$(( api_share_mb * 875 / 1000 ))
 
   # Lift it clear of the heap ceiling, or the JS heap alone would trip the
@@ -258,6 +259,55 @@ if [ -z "${CLASSIFYRE_INTERNAL_KEY:-}" ]; then
   export CLASSIFYRE_INTERNAL_KEY="$(head -c 32 /dev/urandom | base64 | tr -d '\n')"
 fi
 
+# ── Sign-in ───────────────────────────────────────────────────────────────────
+# Sign-in is always on, here too: the identity server runs beside the API, and
+# its realm is set up on every start (s6 service iam-setup). The address
+# people open matters: the identity server signs its tokens for it and only
+# sends people back to it, so a different host or port needs CLASSIFYRE_URL.
+default CLASSIFYRE_URL "http://localhost:${PORT_HTTP}"
+CLASSIFYRE_URL="${CLASSIFYRE_URL%/}"
+# One login for trying it out: the first tenant admin of Classifyre and the
+# identity server's own administrator. Change it after signing in.
+default CLASSIFYRE_ADMIN_USER     "classifyre"
+default CLASSIFYRE_ADMIN_PASSWORD "classifyre"
+
+# Machine secrets nobody types: generated once and kept beside the data, like
+# the credential key. The tenant database key derives every tenant database's
+# password, so it must survive restarts.
+iam_secrets="${CLASSIFYRE_IAM_SECRETS_FILE:-/var/lib/classifyre/iam.secrets}"
+if [ ! -s "$iam_secrets" ]; then
+  mkdir -p "$(dirname "$iam_secrets")"
+  rand() { head -c 32 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 40; }
+  ( umask 077 && {
+      printf 'IAM_API_CLIENT_SECRET=%s\n' "$(rand)"
+      printf 'IAM_WEB_CLIENT_SECRET=%s\n' "$(rand)"
+      printf 'CLASSIFYRE_TENANT_DATABASE_KEY=%s\n' "$(rand)"
+    } > "$iam_secrets" )
+  log "Generated the identity server's client secrets and the tenant database key in ${iam_secrets}."
+fi
+while IFS='=' read -r name value; do
+  [ -n "$name" ] && default "$name" "$value"
+done < "$iam_secrets"
+
+default IAM_REALM                "classifyre"
+default IAM_APP_URL              "${CLASSIFYRE_URL}"
+default IAM_ISSUER_URL           "${CLASSIFYRE_URL}/iam/realms/${IAM_REALM}"
+default IAM_INTERNAL_URL         "http://127.0.0.1:${IAM_PORT:-8180}/iam"
+default IAM_SERVICE_URL          "${IAM_INTERNAL_URL}"
+default IAM_API_CLIENT_ID        "classifyre-api"
+default IAM_WEB_CLIENT_ID        "classifyre-web"
+default IAM_BOOTSTRAP_TENANT     "default"
+default IAM_REALM_CONSOLE        "true"
+default IAM_EXPOSE_ADMIN_CONSOLE "false"
+# Plain http (a laptop, http://localhost:3000) cannot ask the identity server
+# for HTTPS: it would refuse every sign-in from outside the container.
+case "${CLASSIFYRE_URL}" in
+  https://*) default IAM_SSL_REQUIRED "external" ;;
+  *)         default IAM_SSL_REQUIRED "none" ;;
+esac
+# The identity server's Java heap: small and fixed, it holds one realm.
+default JAVA_OPTS_KC_HEAP        "-Xms64m -Xmx${CLASSIFYRE_IAM_HEAP_MB:-512}m"
+
 # ── Runtime directories ───────────────────────────────────────────────────────
 # The Dockerfile creates these, but a mount replaces whatever the image had at
 # that path: a named volume is seeded from the image, a *bind* mount is not — it
@@ -284,6 +334,6 @@ log "memory=${TOTAL_MB}MB cpus=${CPUS} shm=${SHM_MB}MB"
 log "node heap=${EFFECTIVE_HEAP_MB}MB rss guard=${guard_mb}MB"
 log "postgres shared_buffers=${PG_SHARED_BUFFERS} work_mem=${PG_WORK_MEM} effective_cache_size=${PG_EFFECTIVE_CACHE_SIZE}"
 log "scans: ${MAX_CONCURRENT_RUNNERS} concurrent, ${CLASSIFYRE_MAX_POOL_WORKERS} worker(s) each"
-log "listening on :${PORT_HTTP}"
+log "listening on :${PORT_HTTP}, for ${CLASSIFYRE_URL}"
 
 exec /init "$@"

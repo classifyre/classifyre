@@ -14,6 +14,9 @@
 #   <ns>/web:<tag>   → /app/web      the built Next.js standalone server
 #   <ns>/cli:<tag>   → /app/apps/cli the Python venv and sources
 #   build-context `models` → the pre-fetched embedding model
+#   build-context `iam`    → helm/classifyre/files/iam: the realm setup and
+#                            the identity server's theme, the same files the
+#                            Helm chart ships, so both look and behave alike
 #
 # Composing the three published service images, rather than re-building from
 # source, is what keeps this image and the Kubernetes ones provably identical:
@@ -47,6 +50,12 @@ ARG PG_MAJOR=18
 FROM ghcr.io/astral-sh/uv:0.13.6 AS uv-bin
 FROM caddy:2.11.7 AS caddy-bin
 FROM node:24.22.2-bookworm-slim AS node-bin
+# The identity server: the stock distribution, the same version as the Helm
+# chart's iam.image.tag (scripts/check-keycloak-version.sh keeps them equal),
+# run on a Java 21 runtime. Temurin builds against an old glibc, so its JRE
+# runs on this bookworm base unchanged.
+FROM quay.io/keycloak/keycloak:26.8.1 AS keycloak-bin
+FROM eclipse-temurin:21.0.13_9-jre AS jre-bin
 
 # ── The application, already built ────────────────────────────────────────────
 FROM ${IMAGE_NS}/api:${BASE_TAG} AS api-image
@@ -58,6 +67,9 @@ FROM ${IMAGE_NS}/cli:${BASE_TAG} AS cli-image
 # Baking it is what lets EMBEDDING_ALLOW_REMOTE_MODELS default to false: the
 # first scan embeds immediately, offline, instead of blocking on a download.
 FROM models AS models-source
+
+# Realm setup and theme, injected as a context: --build-context iam=helm/classifyre/files/iam
+FROM iam AS iam-source
 
 # ── runtime ───────────────────────────────────────────────────────────────────
 # Based on the same image the CLI is, so the virtualenv's interpreter, its
@@ -143,9 +155,24 @@ COPY --from=uv-bin /uv /uvx /usr/local/bin/
 
 RUN set -eux; node --version; caddy version; uv --version; git --version; ssh -V
 
+# ── Identity server ───────────────────────────────────────────────────────────
+# Sign-in is always on, here too: Keycloak runs as one more supervised process,
+# on loopback, behind the web app's /iam proxy exactly as in the Helm chart.
+ENV JAVA_HOME=/opt/java/openjdk
+COPY --from=jre-bin /opt/java/openjdk /opt/java/openjdk
+COPY --from=keycloak-bin /opt/keycloak /opt/keycloak
+COPY --from=iam-source setup-realm.sh /opt/classifyre/iam/setup-realm.sh
+COPY --from=iam-source theme /opt/classifyre/iam/theme
+# Build-time options are fixed here so every start is `start --optimized`
+# (seconds rather than a rebuild on each boot). Health and metrics stay off:
+# nothing reads them, and they would open a second port.
+RUN set -eux; \
+    /opt/keycloak/bin/kc.sh build --db=postgres --http-relative-path=/iam --cache=local; \
+    /opt/java/openjdk/bin/java -version
+
 # ── s6-overlay ────────────────────────────────────────────────────────────────
-# One container, five processes: postgres, api, web, caddy, and a one-shot
-# first-run bootstrap. s6 supervises them, restarts what dies, and forwards
+# One container, six processes: postgres, the identity server, api, web,
+# caddy, and two one-shots (the realm setup and the first-run workspace). s6 supervises them, restarts what dies, and forwards
 # signals — which is what makes `docker stop` and `docker restart` behave.
 RUN set -eux; \
     case "${TARGETARCH}" in \
@@ -190,6 +217,10 @@ ENV HOME=/home/classifyre \
 COPY --from=models-source / /opt/classifyre/models
 COPY rootfs/ /
 COPY entrypoint.sh /entrypoint.sh
+# The theme, laid out the way the chart mounts it (shared files into each
+# theme type's resources) and with cache-busting refs.
+RUN bash /opt/classifyre/install-iam-theme.sh \
+      /opt/classifyre/iam/theme /opt/keycloak/themes/classifyre
 
 # ── Users, directories, permissions ───────────────────────────────────────────
 # uid 10001 matches all three service images and the chart's podSecurityContext,
@@ -219,7 +250,7 @@ RUN set -eux; \
     chown -R 10001:10001 \
       /app/apps/cli /app/packages "${UV_CACHE_DIR}" "${EMBEDDING_CACHE_DIR}" \
       "${RUNNER_LOG_DIR}" "${PLAYWRIGHT_BROWSERS_PATH}" /home/classifyre \
-      /var/lib/classifyre/tmp; \
+      /var/lib/classifyre/tmp /opt/keycloak/data; \
     chmod +x /entrypoint.sh /opt/classifyre/*.sh; \
     find /etc/s6-overlay/s6-rc.d -type f \( -name run -o -name up -o -name finish \) -exec chmod +x {} +
 
@@ -245,7 +276,8 @@ ENV PORT_HTTP=3000 \
     CLASSIFYRE_CLI_AUTO_INSTALL_OPTIONAL_DEPS=1 \
     CLASSIFYRE_PLAYWRIGHT_INSTALL_WITH_DEPS=0 \
     CLASSIFYRE_BOOTSTRAP_NAMESPACE=default \
-    CLASSIFYRE_ALLINONE=1
+    CLASSIFYRE_ALLINONE=1 \
+    IAM_PORT=8180
 
 EXPOSE 3000
 

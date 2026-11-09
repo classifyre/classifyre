@@ -14,12 +14,12 @@ R="$IAM_REALM"
 
 tries=0
 until "$KC" config credentials --server "$IAM_INTERNAL_URL" --realm master \
-  --user admin --password "$IAM_ADMIN_PASSWORD" >/dev/null 2>&1; do
+  --user "${IAM_ADMIN_USER:-admin}" --password "$IAM_ADMIN_PASSWORD" >/dev/null 2>&1; do
   tries=$((tries + 1))
   if [ "$tries" -ge 120 ]; then
     # Ten minutes. A server that is up but refuses the password was first
     # started with another one (its database outlived the Secret).
-    echo "cannot sign in to the identity server as admin after 10 minutes." >&2
+    echo "cannot sign in to the identity server as ${IAM_ADMIN_USER:-admin} after 10 minutes." >&2
     echo "If its pod is ready, the admin password in the Secret (key admin-password) is not" >&2
     echo "the one its database was created with: put the original back, or reset it there." >&2
     exit 1
@@ -56,6 +56,7 @@ fi
   -s duplicateEmailsAllowed=false \
   -s "accessTokenLifespan=$IAM_ACCESS_TOKEN_LIFESPAN" \
   -s bruteForceProtected=true \
+  -s "sslRequired=${IAM_SSL_REQUIRED:-external}" \
   -s eventsEnabled=true \
   -s adminEventsEnabled=true \
   -s adminEventsDetailsEnabled=true \
@@ -249,13 +250,26 @@ fi
 echo "first tenant admin $IAM_BOOTSTRAP_ADMIN"
 # Created once. Afterwards the person owns their account: the job never
 # resets the password or re-adds them to a group they were taken out of.
+# The password is temporary (changed at first sign-in) unless
+# IAM_BOOTSTRAP_ADMIN_TEMPORARY=false, as in the all-in-one image, whose
+# documented password people change themselves under Your account.
+if [ "${IAM_BOOTSTRAP_ADMIN_TEMPORARY:-true}" = "true" ]; then
+  REQUIRED='["UPDATE_PASSWORD"]'
+  TEMPORARY=--temporary
+else
+  REQUIRED='[]'
+  TEMPORARY=
+fi
 if [ -z "$(find_id users username "$IAM_BOOTSTRAP_ADMIN" -q "username=$IAM_BOOTSTRAP_ADMIN" -q exact=true)" ]; then
   "$KC" create users -r "$R" -s "username=$IAM_BOOTSTRAP_ADMIN" -s enabled=true \
     ${IAM_BOOTSTRAP_ADMIN_EMAIL:+-s "email=$IAM_BOOTSTRAP_ADMIN_EMAIL"} \
-    -s 'requiredActions=["UPDATE_PASSWORD"]'
+    ${IAM_BOOTSTRAP_ADMIN_EMAIL:+-s emailVerified=true} \
+    ${IAM_BOOTSTRAP_ADMIN_FIRST_NAME:+-s "firstName=$IAM_BOOTSTRAP_ADMIN_FIRST_NAME"} \
+    ${IAM_BOOTSTRAP_ADMIN_LAST_NAME:+-s "lastName=$IAM_BOOTSTRAP_ADMIN_LAST_NAME"} \
+    -s "requiredActions=$REQUIRED"
   USER_ID=$(find_id users username "$IAM_BOOTSTRAP_ADMIN" -q "username=$IAM_BOOTSTRAP_ADMIN" -q exact=true)
   "$KC" set-password -r "$R" --userid "$USER_ID" \
-    --new-password "$IAM_BOOTSTRAP_ADMIN_PASSWORD" --temporary
+    --new-password "$IAM_BOOTSTRAP_ADMIN_PASSWORD" $TEMPORARY
   "$KC" create "organizations/$ORG_ID/members" -r "$R" -b "\"$USER_ID\""
   "$KC" update "organizations/$ORG_ID/groups/$ADMINS_ID/members/$USER_ID" -r "$R" -b '{}'
   # Someone has to open the Platform page on a fresh install (iam.bootstrap.admin.operator).

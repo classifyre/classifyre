@@ -8,10 +8,15 @@ import {
 } from "@playwright/test";
 
 /**
- * The deploy smoke test, against a release with sign-in on
- * (.github/workflows/develop.yml, or the k3d dev stack locally). The seed
- * (scripts/smoke/seed.sh) made two people in the identity server and mounted
- * a folder with one file holding a fake secret into the scan jobs.
+ * The smoke test, one spec for every way Classifyre ships: the Helm release
+ * (.github/workflows/develop.yml, or the k3d dev stack locally) and the
+ * all-in-one Docker image (docker/scripts/smoke.sh). Sign-in is always on. The
+ * seed (scripts/smoke/seed.sh) made two people in the identity server and put
+ * a folder with one file holding a fake secret where scans can read it.
+ *
+ * Run twice around a restart: first everything, keeping the workspace
+ * (SMOKE_KEEP_WORKSPACE=1, SMOKE_RUN fixed), then `--grep @after-restart` with
+ * SMOKE_AFTER_RESTART=1, which checks it survived and removes it.
  *
  * Selectors are data-testid or the identity server's own form ids, never
  * visible text, so a translation change cannot break it.
@@ -33,7 +38,8 @@ const PUBLISHER = process.env.SMOKE_PUBLISHER_USER
   : null;
 const FOLDER = env("SMOKE_FOLDER", "/mnt/corpora/smoke");
 
-const RUN = Date.now().toString(36);
+const RUN = process.env.SMOKE_RUN || Date.now().toString(36);
+const AFTER_RESTART = process.env.SMOKE_AFTER_RESTART === "1";
 const WORKSPACE_NAME = `Smoke ${RUN}`;
 const SLUG = `smoke-${RUN}`;
 const SOURCE_NAME = `Smoke folder ${RUN}`;
@@ -107,11 +113,9 @@ async function createWorkspace(
     .click();
   const dialog = page.getByTestId("workspace-create-dialog");
   await dialog.getByTestId("workspace-create-name").fill(name);
-  const owner = dialog.getByTestId("workspace-create-owner");
-  if (await owner.isVisible()) {
-    await owner.click();
-    await page.getByTestId("workspace-create-owner-/admins").click();
-  }
+  // Every workspace is owned by a group; the admin's is /admins.
+  await dialog.getByTestId("workspace-create-owner").click();
+  await page.getByTestId("workspace-create-owner-/admins").click();
   await dialog.getByTestId("workspace-create-submit").click();
   await expect(dialog).toBeHidden({ timeout: 120_000 });
 
@@ -132,9 +136,27 @@ test.describe.serial("smoke with sign-in", () => {
   });
 
   test.afterAll(async () => {
-    if (workspaceId) await admin.api.call("DELETE", `/namespaces/${workspaceId}`);
+    if (workspaceId && process.env.SMOKE_KEEP_WORKSPACE !== "1") {
+      await admin.api.call("DELETE", `/namespaces/${workspaceId}`);
+    }
     await viewer?.context.close();
     await admin?.context.close();
+  });
+
+  test("after a restart the workspace and its findings are still there @after-restart", async () => {
+    test.skip(!AFTER_RESTART, "runs once the deployment restarted (SMOKE_AFTER_RESTART=1)");
+    const workspaces = await admin.api.ok<Array<{ id: string; slug: string }>>("GET", "/namespaces");
+    const kept = workspaces.find((ws) => ws.slug === SLUG);
+    expect(kept, `workspace ${SLUG} after the restart`).toBeTruthy();
+    workspaceId = kept!.id;
+    await expect
+      .poll(
+        async () => (await admin.api.ok<{ total: number }>("GET", `/${SLUG}/findings/stats`)).total,
+        { timeout: 2 * 60_000, intervals: [5_000] },
+      )
+      .toBeGreaterThanOrEqual(1);
+    await admin.page.goto(`/${SLUG}/sources`);
+    await expect(admin.page.getByText(SOURCE_NAME, { exact: true }).first()).toBeVisible();
   });
 
   test("without signing in: sign-in required, or only the public tenant", async () => {
