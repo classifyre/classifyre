@@ -103,7 +103,7 @@ _FORBIDDEN_NODES: tuple[type, ...] = (
 def _function_name(node: exp.Func) -> str:
     if isinstance(node, exp.Anonymous):
         return str(node.name).upper()
-    return node.sql_name().upper()
+    return str(node.sql_name()).upper()
 
 
 def _cte_names(tree: exp.Expression) -> set[str]:
