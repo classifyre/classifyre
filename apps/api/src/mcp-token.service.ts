@@ -32,7 +32,7 @@ export interface TokenScope {
   ownerSub?: string;
 }
 
-function inScope(token: { ownerSub: string | null }, scope: TokenScope) {
+function inScope(token: { ownerSub: string }, scope: TokenScope) {
   return !scope.ownerSub || token.ownerSub === scope.ownerSub;
 }
 
@@ -42,7 +42,7 @@ type StoredMcpAccessToken = {
   tokenHash: string;
   tokenPreview: string;
   toolGroupIds: string[] | null;
-  ownerSub: string | null;
+  ownerSub: string;
   lastUsedAt: Date | null;
   revokedAt: Date | null;
   createdAt: Date;
@@ -68,7 +68,7 @@ export class McpTokenService {
   }
 
   /**
-   * `scope.ownerSub` limits every call to one person's tokens (sign-in, without
+   * `scope.ownerSub` limits every call to one person's tokens (anyone without
    * `mcp.token.admin`); no scope means every token of the workspace.
    */
   async listTokens(scope: TokenScope = {}): Promise<McpTokenResponseDto[]> {
@@ -81,7 +81,7 @@ export class McpTokenService {
 
   async createToken(
     dto: CreateMcpTokenDto,
-    ownerSub: string | null = null,
+    ownerSub: string,
   ): Promise<McpTokenCreatedResponseDto> {
     const generated = this.generateToken();
     const token = await this.tokenModel.create({
@@ -201,7 +201,7 @@ export class McpTokenService {
       tokenPreview: token.tokenPreview,
       isActive: token.revokedAt === null,
       toolGroupIds: token.toolGroupIds ?? null,
-      owner: token.ownerSub ? `user:${token.ownerSub}` : null,
+      owner: `user:${token.ownerSub}`,
       lastUsedAt: token.lastUsedAt,
       revokedAt: token.revokedAt,
       createdAt: token.createdAt,

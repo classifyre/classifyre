@@ -46,17 +46,4 @@ describe('NamespacesController.list', () => {
     ]);
     expect(listed[1].capabilities).toEqual(['workspace.view']);
   });
-
-  it('lists everything, without capabilities, when sign-in is off', async () => {
-    const controller = new NamespacesController(
-      registry,
-      {} as TenancyService,
-      null,
-    );
-
-    const listed = await controller.list(request);
-
-    expect(listed).toHaveLength(3);
-    expect(listed[0].capabilities).toBeUndefined();
-  });
 });

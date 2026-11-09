@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Inject,
   Param,
@@ -36,21 +37,23 @@ export class McpSettingsController {
     @Inject(ACCESS_POLICY) private readonly policy: AccessPolicy,
   ) {}
 
-  /** The signed-in person's subject id; null without sign-in. */
-  private signedInSub(): string | null {
+  /** The signed-in person's subject id: tokens always belong to a person. */
+  private signedInSub(): string {
     const actor = this.actors.current();
-    return actor.via === 'oidc' && actor.id?.startsWith('user:')
-      ? actor.id.slice('user:'.length)
-      : null;
+    if (actor.via !== 'oidc' || !actor.id?.startsWith('user:')) {
+      throw new ForbiddenException(
+        'MCP tokens belong to a signed-in person; sign in to manage them.',
+      );
+    }
+    return actor.id.slice('user:'.length);
   }
 
   /**
-   * With sign-in a person sees and changes their own tokens only, unless they
-   * hold `mcp.token.admin` for the workspace (docs/prd §8.3).
+   * A person sees and changes their own tokens only, unless they hold
+   * `mcp.token.admin` for the workspace (docs/prd §8.3).
    */
   private async scope(): Promise<TokenScope> {
     const sub = this.signedInSub();
-    if (!sub) return {};
     const capabilities = await this.policy.capabilities(this.actors.current());
     return capabilities.has('mcp.token.admin') ? {} : { ownerSub: sub };
   }

@@ -10,7 +10,7 @@ import { Reflector } from '@nestjs/core';
 import { lastValueFrom, of } from 'rxjs';
 import { InternalOnly } from '../internal-only.decorator';
 import { AccessArea, Requires } from './access.decorators';
-import { parseActorName, type Actor } from './actor';
+import type { Actor } from './actor';
 import { parseActorRef } from './actor-ref';
 import { AuditInterceptor, routeEntity } from './audit.interceptor';
 import type { AuditEventInput, AuditTrailService } from './audit-trail.service';
@@ -33,12 +33,6 @@ describe('actor references', () => {
     ['note: urgent', { kind: 'name', id: 'note: urgent' }],
   ])('parses %s', (ref, expected) => {
     expect(parseActorRef(ref)).toEqual(expected);
-  });
-
-  it('refuses a self-declared name that would pass as a typed reference', () => {
-    expect(parseActorName('agent:autopilot')).toBeUndefined();
-    expect(parseActorName('system:scheduler')).toBeUndefined();
-    expect(parseActorName('Ops: night shift')).toBe('Ops: night shift');
   });
 });
 
@@ -115,11 +109,11 @@ describe('AuditInterceptor', () => {
   } as unknown as AuditTrailService;
   const interceptor = new AuditInterceptor(new Reflector(), audit);
   const actor: Actor = {
-    id: null,
+    id: 'user:u1',
     displayName: 'Jordan Reyes',
     kind: 'person',
-    via: 'header',
-    ref: 'Jordan Reyes',
+    via: 'oidc',
+    ref: 'user:u1',
   };
 
   async function call(

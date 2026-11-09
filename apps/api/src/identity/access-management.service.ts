@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ConflictException,
   ForbiddenException,
   Inject,
   Injectable,
@@ -72,18 +71,8 @@ function resourceWorkspace(scopeId: string): string {
 export class AccessManagementService {
   constructor(
     private readonly tenancy: TenancyService,
-    @Inject(IDENTITY) private readonly identity: IdentityService | null,
+    @Inject(IDENTITY) readonly identity: IdentityService,
   ) {}
-
-  /** The identity service; a 409 explaining why when sign-in is off. */
-  requireSignIn(): IdentityService {
-    if (!this.identity) {
-      throw new ConflictException(
-        'Sign-in is off: everyone can do everything, so there is no access to manage.',
-      );
-    }
-    return this.identity;
-  }
 
   roles() {
     return BUILT_IN_ROLES.filter(
@@ -97,13 +86,12 @@ export class AccessManagementService {
   }
 
   tenantEvents(principal: Principal) {
-    this.requireSignIn();
     return this.tenancy.tenantEvents(principal.tenant.id);
   }
 
   /** Every tenant the principal belongs to, for the account menu's switcher (§12.2). */
   async tenants(principal: Principal): Promise<Tenant[]> {
-    const identity = this.requireSignIn();
+    const identity = this.identity;
     if (principal.visitor) return [];
     const { organizations } = await identity.membership.membership(
       principal.sub,
@@ -118,7 +106,7 @@ export class AccessManagementService {
 
   /** For the access screens: always as the identity server has them now. */
   async groups(principal: Principal) {
-    const groups = await this.requireSignIn().groupsOf(principal, true);
+    const groups = await this.identity.groupsOf(principal, true);
     return groups.map(({ id, name, path, parentId }) => ({
       id,
       name,
@@ -132,7 +120,7 @@ export class AccessManagementService {
     principal: Principal,
     namespaceId: string,
   ): Promise<GrantView[]> {
-    const identity = this.requireSignIn();
+    const identity = this.identity;
     const lineage = await identity.ownerLineage(principal, namespaceId);
     const grants = (await this.tenancy.listGrants(principal.tenant.id)).filter(
       (grant) =>
@@ -161,10 +149,7 @@ export class AccessManagementService {
     namespaceId: string,
     capability: Capability,
   ): Promise<GrantView[]> {
-    const lineage = await this.requireSignIn().ownerLineage(
-      principal,
-      namespaceId,
-    );
+    const lineage = await this.identity.ownerLineage(principal, namespaceId);
     const giving = principal.grants.filter(
       (grant) =>
         grantApplies(grant, { namespaceId, ownerLineage: lineage }) &&
@@ -182,7 +167,7 @@ export class AccessManagementService {
     input: GrantInput,
     granterCapabilities: ReadonlySet<Capability>,
   ): Promise<GrantView> {
-    const identity = this.requireSignIn();
+    const identity = this.identity;
     // The DTO says so too; a caller that skips validation still gets told.
     if ((input.subjectType as string) !== 'group') {
       throw new BadRequestException(
@@ -302,7 +287,6 @@ export class AccessManagementService {
     id: string,
     onlyWorkspace?: string,
   ): Promise<void> {
-    this.requireSignIn();
     const grant = await this.tenancy.grantById(principal.tenant.id, id);
     if (
       !grant ||
@@ -337,7 +321,7 @@ export class AccessManagementService {
     grants: T[],
     inherited?: (grant: T) => boolean,
   ): Promise<(T & GrantView)[]> {
-    const identity = this.requireSignIn();
+    const identity = this.identity;
     const groups = new Map(
       (await identity.groupsOf(principal, true)).map((g) => [g.id, g.path]),
     );

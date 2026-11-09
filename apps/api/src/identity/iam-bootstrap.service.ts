@@ -23,12 +23,10 @@ export class IamBootstrapService
   private readonly logger = new Logger(IamBootstrapService.name);
   private timer: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(
-    @Inject(IDENTITY) private readonly identity: IdentityService | null,
-  ) {}
+  constructor(@Inject(IDENTITY) private readonly identity: IdentityService) {}
 
   onApplicationBootstrap(): void {
-    if (this.identity) this.attempt(1);
+    this.attempt(1);
   }
 
   onApplicationShutdown(): void {
@@ -37,7 +35,7 @@ export class IamBootstrapService
 
   private attempt(n: number): void {
     void this.identity
-      ?.bootstrap()
+      .bootstrap()
       .then(() => this.logger.log('Sign-in tenants are set up'))
       .catch((error: unknown) => {
         if (n >= MAX_ATTEMPTS) {

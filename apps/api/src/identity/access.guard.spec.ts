@@ -78,17 +78,31 @@ describe('AccessGuard', () => {
     set: (actor: Actor) => {
       current = actor;
     },
+    workspaceId: () => 'ws-1',
   } as unknown as ActorContextService;
   const internalKey = {
     isInternalRequest: (headers?: Record<string, unknown>) =>
       headers?.['x-internal'] === 'yes',
+  };
+  const person: Actor = {
+    id: 'user:u1',
+    ref: 'user:u1',
+    displayName: 'Jordan Reyes',
+    kind: 'person',
+    via: 'oidc',
+  };
+  const identity = {
+    config: { appOrigin: null },
+    authenticate: () =>
+      Promise.resolve({ actor: person, via: 'bearer', grants: [] }),
+    tenantCapabilities: () => new Set(),
   };
   const guard = new AccessGuard(
     new Reflector(),
     actors,
     internalKey as never,
     policy,
-    null,
+    identity as never,
   );
 
   beforeEach(() => {
@@ -139,18 +153,13 @@ describe('AccessGuard', () => {
     );
   });
 
-  it('resolves the actor from X-Actor-Name and leaves it on the request', async () => {
+  it('takes the actor from the token, never from X-Actor-Name', async () => {
     const { context, request } = contextFor(SampleController, 'list', 'GET', {
-      'x-actor-name': encodeURIComponent('Jordan Reyes'),
+      'x-actor-name': 'Someone Else',
     });
     await guard.canActivate(context);
-    expect(current).toMatchObject({
-      kind: 'person',
-      via: 'header',
-      displayName: 'Jordan Reyes',
-      ref: 'Jordan Reyes',
-    });
-    expect(request.classifyreActor).toBe(current);
+    expect(current).toBe(person);
+    expect(request.classifyreActor).toBe(person);
   });
 
   it('marks internal-key callers as the system actor', async () => {
@@ -162,7 +171,7 @@ describe('AccessGuard', () => {
   });
 });
 
-describe('AccessGuard with sign-in', () => {
+describe('AccessGuard on signed-in writes', () => {
   const APP = 'https://classifyre.example';
   const actor: Actor = {
     id: 'user:u1',

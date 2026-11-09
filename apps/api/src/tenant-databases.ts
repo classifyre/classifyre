@@ -2,7 +2,6 @@ import { createHmac } from 'node:crypto';
 import { Client, type Pool } from 'pg';
 import { assertDatabaseKind, databaseKindDdl } from './database-kind';
 import { withDatabase } from './database-mode';
-import { iamEnabled } from './identity/iam-config';
 import { publicConnectionString } from './registry/namespace-registry.sql';
 
 /**
@@ -69,12 +68,10 @@ export function rememberWorkspace(schemaName: string, tenantId: string): void {
 }
 
 /**
- * Connection string for a workspace schema: the open database without
- * sign-in, its tenant's database with it. Never falls back to the control
+ * Connection string for a workspace schema: its tenant's database. Never falls back to the control
  * database: a workspace whose tenant is unknown here is an error.
  */
 export function workspaceDatabaseUrl(schemaName: string): string {
-  if (!iamEnabled()) return publicConnectionString();
   const tenantId = workspaceTenants.get(schemaName);
   if (!tenantId) {
     throw new Error(

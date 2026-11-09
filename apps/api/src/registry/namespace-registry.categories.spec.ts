@@ -163,7 +163,7 @@ describe('NamespaceRegistryService categories', () => {
   it('never deletes the default category — it is the fallback', async () => {
     const { service } = buildService();
     await expect(
-      service.removeCategory(DEFAULT_CATEGORY_ID),
+      service.removeCategory(DEFAULT_CATEGORY_ID, 'tenant-1'),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 });

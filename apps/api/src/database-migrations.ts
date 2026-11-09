@@ -9,15 +9,13 @@ import {
   PUBLIC_SEARCH_PATH_OPTION,
 } from './registry/namespace-registry.sql';
 import { WORKER_QUEUE_STATE_DDL } from './scheduler/worker-queue-state.sql';
-import { IAM_TABLES_DDL } from './identity/tenancy.sql';
+import { IAM_TABLES_DDL, OPEN_DATABASE_DDL } from './identity/tenancy.sql';
 import {
   assertDatabaseKind,
   checkDatabaseKind,
   databaseKindDdl,
-  expectedDatabaseKind,
 } from './database-kind';
 import { ensureControlDatabase, selectDatabaseForMode } from './database-mode';
-import { iamEnabled } from './identity/iam-config';
 import {
   provisionTenantDatabase,
   rememberWorkspace,
@@ -64,11 +62,10 @@ export async function withDatabaseMigrationLock<T>(
 }
 
 /**
- * The tables of the database this process works on (the open one, or the
- * control one with sign-in), and the check that it is that kind.
+ * The tables of the control database, and the check that it is that kind.
  */
 async function prepareRegistry(client: PoolClient): Promise<void> {
-  await client.query(databaseKindDdl(expectedDatabaseKind()));
+  await client.query(databaseKindDdl('control'));
   await client.query(REGISTRY_TABLE_DDL);
   await client.query(IAM_TABLES_DDL);
   await client.query(WORKER_QUEUE_STATE_DDL);
@@ -76,10 +73,9 @@ async function prepareRegistry(client: PoolClient): Promise<void> {
 }
 
 /**
- * The open database's tables, seen from a process with sign-in on, before an
- * operator copies workspaces into or out of it: a release that only ever ran
- * with sign-in has never started on it. Refuses any database that is not the
- * open one.
+ * The open database's tables, before an operator copies its workspaces into a
+ * tenant: an install from before sign-in existed has no tenant columns yet.
+ * Refuses any database that is not the open one.
  */
 export async function prepareOpenDatabase(
   db: Pick<PoolClient, 'query'>,
@@ -87,6 +83,7 @@ export async function prepareOpenDatabase(
   await db.query(databaseKindDdl('open'));
   await assertDatabaseKind(db, 'open');
   await db.query(REGISTRY_TABLE_DDL);
+  await db.query(OPEN_DATABASE_DDL);
   await db.query(IAM_TABLES_DDL);
   await db.query(WORKER_QUEUE_STATE_DDL);
 }
@@ -155,8 +152,8 @@ function resolvePrismaCliPath(schemaPath: string): string {
  * so Prisma tracks state in an independent `_prisma_migrations` table inside
  * that schema and creates all (unqualified) tables there via `search_path`.
  * When omitted, the URL is used verbatim (whatever schema it already targets,
- * defaulting to `public`). `databaseUrl` is the workspace's database: the
- * process `DATABASE_URL` without sign-in, its tenant's database with it.
+ * defaulting to `public`). `databaseUrl` is the workspace's database, its
+ * tenant's.
  */
 export async function deployForSchema(
   schema?: string,
@@ -318,11 +315,10 @@ async function migrateTenants(
 /**
  * Pre-boot migration orchestrator for the multi-tenant model.
  *
- * 1. Bootstraps the `public.namespaces` registry table (idempotent DDL), on
- *    the open database, or with sign-in on the control database.
+ * 1. Bootstraps the `public.namespaces` registry table (idempotent DDL) on
+ *    the control database.
  * 2. Reads every registered namespace and runs `migrate deploy` into its
- *    `ns_<uuid>` schema, sequentially without sign-in, per tenant database
- *    with it.
+ *    `ns_<uuid>` schema, per tenant database.
  *
  * A fresh install has zero namespaces, so no tenant schema is migrated until
  * the first namespace is created (there is intentionally no default namespace).
@@ -365,7 +361,6 @@ export async function applyAllPendingMigrations(): Promise<void> {
     logger.log(
       `Namespace registry ready; migrating ${workspaces.length} namespace schema(s)`,
     );
-    if (iamEnabled()) await migrateTenants(client, workspaces);
-    else await migrateWorkspaces(client, workspaces);
+    await migrateTenants(client, workspaces);
   });
 }

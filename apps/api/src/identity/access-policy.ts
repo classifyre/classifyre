@@ -1,6 +1,5 @@
-import { Injectable } from '@nestjs/common';
 import type { Actor } from './actor';
-import { CAPABILITY_IDS, type Capability } from './capabilities';
+import type { Capability } from './capabilities';
 
 export const ACCESS_POLICY = Symbol('ACCESS_POLICY');
 
@@ -58,20 +57,3 @@ export interface ResourceGrants {
 export const RESOURCE_GRANTABLE_CAPABILITIES: readonly Capability[] = [
   'data.query',
 ];
-
-const ALL_CAPABILITIES: ReadonlySet<Capability> = new Set(CAPABILITY_IDS);
-
-/**
- * The policy without IAM: everyone may do everything, exactly as before
- * access control existed.
- */
-@Injectable()
-export class LocalAccessPolicy implements AccessPolicy {
-  check(): AccessDecision {
-    return { allow: true };
-  }
-
-  capabilities(): ReadonlySet<Capability> {
-    return ALL_CAPABILITIES;
-  }
-}

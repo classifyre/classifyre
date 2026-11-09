@@ -225,7 +225,6 @@ describe('grant evaluation', () => {
 
 describe('sign-in configuration', () => {
   const env = {
-    IAM_ENABLED: 'true',
     IAM_ISSUER_URL: `${ISSUER}/`,
     IAM_INTERNAL_URL: 'http://classifyre-iam:8080/iam',
     IAM_REALM: 'classifyre',
@@ -234,8 +233,8 @@ describe('sign-in configuration', () => {
     IAM_APP_URL: 'https://classifyre.example/',
   };
 
-  it('is off unless IAM_ENABLED=true', () => {
-    expect(readIamConfig({})).toBeNull();
+  it('refuses to start without the identity server settings', () => {
+    expect(() => readIamConfig({})).toThrow(/IAM_REALM/);
   });
 
   it('reads the chart environment', () => {
@@ -247,11 +246,15 @@ describe('sign-in configuration', () => {
     });
   });
 
-  it('refuses to start in the all-in-one Docker image', () => {
-    expect(() => assertIamAllowed({ ...env, ENVIRONMENT: 'docker' })).toThrow(
-      /not supported in the all-in-one Docker image/,
-    );
-    expect(() => assertIamAllowed({ ENVIRONMENT: 'docker' })).not.toThrow();
+  it('starts in the all-in-one Docker image too', () => {
+    expect(() =>
+      assertIamAllowed({
+        ...env,
+        ENVIRONMENT: 'docker',
+        CLASSIFYRE_INTERNAL_KEY: 'k',
+        CLASSIFYRE_TENANT_DATABASE_KEY: 't',
+      }),
+    ).not.toThrow();
   });
 
   it('refuses to start without the internal key (scan callbacks stay closed)', () => {
@@ -274,13 +277,12 @@ describe('sign-in configuration', () => {
 
 describe('IdentityService', () => {
   const config = readIamConfig({
-    IAM_ENABLED: 'true',
     IAM_ISSUER_URL: ISSUER,
     IAM_INTERNAL_URL: 'http://iam',
     IAM_REALM: 'classifyre',
     IAM_API_CLIENT_ID: 'classifyre-api',
     IAM_API_CLIENT_SECRET: 's',
-  })!;
+  });
   const acme = {
     id: 't-acme',
     alias: 'acme',

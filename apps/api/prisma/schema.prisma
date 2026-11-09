@@ -1274,11 +1274,9 @@ model McpAccessToken {
   // MCP_CAPABILITY_GROUPS ids. Existing tokens stay NULL on migration so
   // nothing that already worked starts failing.
   toolGroupIds Json?     @map("tool_group_ids")
-  /// With sign-in, the person the token acts for (identity server subject id).
-  /// The token can do what its owner can do in this workspace, checked on every
-  /// call. NULL for tokens created without sign-in; those stop working when
-  /// sign-in is turned on.
-  ownerSub     String?   @map("owner_sub")
+  /// The person the token acts for (identity server subject id). The token can
+  /// do what its owner can do in this workspace, checked on every call.
+  ownerSub     String    @map("owner_sub")
   lastUsedAt   DateTime? @map("last_used_at")
   revokedAt    DateTime? @map("revoked_at")
   createdAt    DateTime  @default(now()) @map("created_at")
@@ -3934,8 +3932,6 @@ model ChatBot {
   capabilityGroups     String[]     @default([]) @map("capability_groups")
   // AgentKinds the bot may steer via autopilot tools; empty = all.
   agentKinds           String[]     @default([]) @map("agent_kinds")
-  // When false every mutating tool resolves OBSERVE_ONLY (read-only bot).
-  allowMutations       Boolean      @default(true) @map("allow_mutations")
   // Connector status, mirrored by ChatGatewayService.
   lastError            String?      @map("last_error") @db.Text
   lastConnectedAt      DateTime?    @map("last_connected_at")

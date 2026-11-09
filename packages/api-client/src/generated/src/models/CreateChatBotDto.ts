@@ -61,12 +61,6 @@ export interface CreateChatBotDto {
      * @memberof CreateChatBotDto
      */
     agentKinds?: Array<CreateChatBotDtoAgentKindsEnum>;
-    /**
-     * 
-     * @type {boolean}
-     * @memberof CreateChatBotDto
-     */
-    allowMutations?: boolean;
 }
 
 
@@ -120,7 +114,6 @@ export function CreateChatBotDtoFromJSONTyped(json: any, ignoreDiscriminator: bo
         'enabled': json['enabled'] == null ? undefined : json['enabled'],
         'capabilityGroups': json['capabilityGroups'] == null ? undefined : json['capabilityGroups'],
         'agentKinds': json['agentKinds'] == null ? undefined : json['agentKinds'],
-        'allowMutations': json['allowMutations'] == null ? undefined : json['allowMutations'],
     };
 }
 
@@ -142,7 +135,6 @@ export function CreateChatBotDtoToJSONTyped(value?: CreateChatBotDto | null, ign
         'enabled': value['enabled'],
         'capabilityGroups': value['capabilityGroups'],
         'agentKinds': value['agentKinds'],
-        'allowMutations': value['allowMutations'],
     };
 }
 

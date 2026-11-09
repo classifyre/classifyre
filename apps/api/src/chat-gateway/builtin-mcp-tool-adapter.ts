@@ -8,10 +8,12 @@ export const BUILTIN_MCP_PREFIX = 'mcp.builtin.';
 /** AgentContext.state key carrying the chat bot's effective permissions. */
 export const CHAT_BOT_STATE_KEY = 'chat:bot';
 
-/** Per-turn bot permissions stashed in AgentContext.state by the chat agent. */
+/**
+ * Per-turn bot settings stashed in AgentContext.state by the chat agent. A
+ * chat message has no signed-in person behind it, so a bot only ever reads.
+ */
 export interface ChatBotState {
   id: string;
-  allowMutations: boolean;
   agentKinds: string[];
 }
 
@@ -22,7 +24,6 @@ export function chatBotState(tc: ToolContext): ChatBotState | null {
   if (typeof v.id !== 'string') return null;
   return {
     id: v.id,
-    allowMutations: v.allowMutations === true,
     agentKinds: Array.isArray(v.agentKinds)
       ? v.agentKinds.filter((k): k is string => typeof k === 'string')
       : [],
@@ -40,11 +41,10 @@ export interface BuiltinRemoteTool {
 /**
  * Adapt one built-in Classifyre MCP tool into a harness Tool, namespaced as
  * `mcp.builtin.<name>`. Read tools (readOnlyHint) run ungated; everything else
- * is treated as mutating (fail-closed) and only runs for a caller that has
- * declared itself authorised — a chat bot whose bot record allows mutations, or
- * a run that set the bridge flag (see {@link bridgeMutationsAllowed}). For any
- * other caller the gate resolves OBSERVE_ONLY, so the dispatcher records the
- * call without executing it.
+ * is treated as mutating (fail-closed) and only runs for a run that set the
+ * bridge flag (see {@link bridgeMutationsAllowed}). For any other caller,
+ * chat bots included, the gate resolves OBSERVE_ONLY, so the dispatcher
+ * records the call without executing it.
  */
 export function adaptBuiltinMcpTool(opts: {
   remote: BuiltinRemoteTool;
@@ -68,10 +68,9 @@ export function adaptBuiltinMcpTool(opts: {
       ? undefined
       : (_input, tc: ToolContext) =>
           Promise.resolve({
-            mode:
-              chatBotState(tc)?.allowMutations || bridgeMutationsAllowed(tc)
-                ? AiManagementMode.MANAGED
-                : AiManagementMode.OBSERVE_ONLY,
+            mode: bridgeMutationsAllowed(tc)
+              ? AiManagementMode.MANAGED
+              : AiManagementMode.OBSERVE_ONLY,
             entityType: 'system' as const,
           }),
     handler: async (input) => opts.call(opts.remote.name, input),

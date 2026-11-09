@@ -82,11 +82,9 @@ export class McpTokenResponseDto {
 
   @ApiProperty({
     description:
-      'With sign-in, the person the token acts for (actor reference `user:<sub>`); null for tokens made without sign-in.',
-    type: String,
-    nullable: true,
+      'The person the token acts for (actor reference `user:<sub>`).',
   })
-  owner: string | null;
+  owner: string;
 
   @ApiProperty({
     description: 'Masked token preview shown in settings after creation.',

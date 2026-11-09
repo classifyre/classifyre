@@ -76,10 +76,7 @@ export interface CreateNamespaceInput {
   externalLinks?: NamespaceExternalLinkInput[];
   /** Categories to file it under. Defaults to the built-in default category. */
   categoryIds?: string[];
-  /**
-   * With sign-in: the group of the caller's tenant that owns the workspace.
-   * Ignored without sign-in.
-   */
+  /** Required: the group of the caller's tenant that owns the workspace. */
   ownerGroupId?: string;
 }
 

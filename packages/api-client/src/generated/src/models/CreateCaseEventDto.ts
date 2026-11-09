@@ -61,12 +61,6 @@ export interface CreateCaseEventDto {
      * @memberof CreateCaseEventDto
      */
     evidenceIds?: Array<string>;
-    /**
-     * Actor recorded as createdBy
-     * @type {string}
-     * @memberof CreateCaseEventDto
-     */
-    createdBy?: string;
 }
 
 
@@ -107,7 +101,6 @@ export function CreateCaseEventDtoFromJSONTyped(json: any, ignoreDiscriminator: 
         'confidence': json['confidence'] == null ? undefined : json['confidence'],
         'findingIds': json['findingIds'] == null ? undefined : json['findingIds'],
         'evidenceIds': json['evidenceIds'] == null ? undefined : json['evidenceIds'],
-        'createdBy': json['createdBy'] == null ? undefined : json['createdBy'],
     };
 }
 
@@ -129,7 +122,6 @@ export function CreateCaseEventDtoToJSONTyped(value?: CreateCaseEventDto | null,
         'confidence': value['confidence'],
         'findingIds': value['findingIds'],
         'evidenceIds': value['evidenceIds'],
-        'createdBy': value['createdBy'],
     };
 }
 

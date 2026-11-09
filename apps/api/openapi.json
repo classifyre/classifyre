@@ -8694,13 +8694,13 @@
             "description": ""
           }
         },
-        "summary": "List the namespaces the caller can see (all of them without sign-in)",
+        "summary": "List the namespaces the caller can see",
         "tags": [
           "Namespaces"
         ]
       },
       "post": {
-        "description": "With sign-in, `ownerGroupId` is required: a group of your tenant that you belong to and may create workspaces for (GET /namespaces/owning-groups).",
+        "description": "`ownerGroupId` is required: a group of your tenant that you belong to and may create workspaces for (GET /namespaces/owning-groups).",
         "operationId": "NamespacesController_create",
         "parameters": [],
         "responses": {
@@ -8723,7 +8723,7 @@
             "description": ""
           }
         },
-        "summary": "Groups the caller may create workspaces for (empty without sign-in)",
+        "summary": "Groups the caller may create workspaces for",
         "tags": [
           "Namespaces"
         ]
@@ -9769,72 +9769,6 @@
           }
         },
         "summary": "Remove a tenant whose organization was deleted",
-        "tags": [
-          "Platform"
-        ]
-      }
-    },
-    "/platform/workspaces/local": {
-      "get": {
-        "operationId": "PlatformController_localWorkspaces",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/LocalWorkspaceDto"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "summary": "Workspaces made without sign-in, which can be brought into a tenant",
-        "tags": [
-          "Platform"
-        ]
-      }
-    },
-    "/platform/tenants/{tenantId}/workspaces": {
-      "post": {
-        "operationId": "PlatformController_importWorkspaces",
-        "parameters": [
-          {
-            "name": "tenantId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ImportWorkspacesDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ImportedWorkspacesDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Copy workspaces made without sign-in into a tenant",
         "tags": [
           "Platform"
         ]
@@ -17770,10 +17704,6 @@
                 "$ref": "#/components/schemas/BulkUpdateSourcesSamplingDto"
               }
             ]
-          },
-          "updatedBy": {
-            "type": "string",
-            "description": "Who made the change. Recorded on the SOURCE_CONFIG_CHANGED notification a sampling change raises."
           }
         }
       },
@@ -23264,8 +23194,7 @@
           },
           "owner": {
             "type": "string",
-            "description": "With sign-in, the person the token acts for (actor reference `user:<sub>`); null for tokens made without sign-in.",
-            "nullable": true
+            "description": "The person the token acts for (actor reference `user:<sub>`)."
           },
           "tokenPreview": {
             "type": "string",
@@ -23357,8 +23286,7 @@
           },
           "owner": {
             "type": "string",
-            "description": "With sign-in, the person the token acts for (actor reference `user:<sub>`); null for tokens made without sign-in.",
-            "nullable": true
+            "description": "The person the token acts for (actor reference `user:<sub>`)."
           },
           "tokenPreview": {
             "type": "string",
@@ -24253,9 +24181,6 @@
           "assignee": {
             "type": "string"
           },
-          "createdBy": {
-            "type": "string"
-          },
           "inquiryIds": {
             "description": "Link these questions to the new case (guides)",
             "type": "array",
@@ -24889,9 +24814,6 @@
           },
           "note": {
             "type": "string"
-          },
-          "addedBy": {
-            "type": "string"
           }
         },
         "required": [
@@ -24932,9 +24854,6 @@
             "items": {
               "type": "string"
             }
-          },
-          "addedBy": {
-            "type": "string"
           }
         },
         "required": [
@@ -25002,9 +24921,6 @@
           "conclusion": {
             "type": "string",
             "description": "Final conclusion — required to close the case"
-          },
-          "closedBy": {
-            "type": "string"
           },
           "keepInquiries": {
             "type": "boolean",
@@ -26973,9 +26889,6 @@
           },
           "description": {
             "type": "string"
-          },
-          "createdBy": {
-            "type": "string"
           }
         },
         "required": [
@@ -28020,9 +27933,6 @@
             "type": "string",
             "description": "Display colour (hypothesis cards and chips on the case board)",
             "maxLength": 32
-          },
-          "createdBy": {
-            "type": "string"
           }
         },
         "required": [
@@ -28060,9 +27970,6 @@
           "color": {
             "type": "string",
             "nullable": true
-          },
-          "actor": {
-            "type": "string"
           }
         }
       },
@@ -28149,9 +28056,6 @@
             "type": "object",
             "nullable": true,
             "additionalProperties": true
-          },
-          "author": {
-            "type": "string"
           }
         },
         "required": [
@@ -29540,10 +29444,6 @@
               "$ref": "#/components/schemas/ExplorePositionDto"
             },
             "description": "Node id → where it was dragged to"
-          },
-          "createdBy": {
-            "type": "string",
-            "description": "Who saved it"
           }
         }
       },
@@ -29595,10 +29495,6 @@
               "type": "string"
             }
           },
-          "allowMutations": {
-            "type": "boolean",
-            "description": "When false, every mutating tool is recorded observe-only and never executed."
-          },
           "lastError": {
             "type": "string",
             "nullable": true,
@@ -29627,7 +29523,6 @@
           "appTokenPreview",
           "capabilityGroups",
           "agentKinds",
-          "allowMutations",
           "lastError",
           "lastConnectedAt",
           "createdAt",
@@ -29681,10 +29576,6 @@
                 "DUPLICATES"
               ]
             }
-          },
-          "allowMutations": {
-            "type": "boolean",
-            "default": true
           }
         },
         "required": [
@@ -29729,9 +29620,6 @@
                 "DUPLICATES"
               ]
             }
-          },
-          "allowMutations": {
-            "type": "boolean"
           }
         }
       },
@@ -30140,9 +30028,6 @@
               "DISMISS"
             ]
           },
-          "reviewedBy": {
-            "type": "string"
-          },
           "reason": {
             "type": "string",
             "description": "Why the lead was dismissed"
@@ -30186,9 +30071,6 @@
               "ACCEPT",
               "DISMISS"
             ]
-          },
-          "reviewedBy": {
-            "type": "string"
           },
           "reason": {
             "type": "string",
@@ -30322,10 +30204,6 @@
             "items": {
               "type": "string"
             }
-          },
-          "createdBy": {
-            "type": "string",
-            "description": "Actor recorded as createdBy"
           }
         },
         "required": [
@@ -30374,9 +30252,6 @@
           "verified": {
             "type": "boolean",
             "description": "Explicitly mark the event verified"
-          },
-          "updatedBy": {
-            "type": "string"
           }
         }
       },
@@ -30778,7 +30653,6 @@
           "via": {
             "type": "string",
             "enum": [
-              "header",
               "oidc",
               "mcp-token",
               "internal-key",
@@ -30800,10 +30674,6 @@
         "properties": {
           "actor": {
             "$ref": "#/components/schemas/MeActorDto"
-          },
-          "iamEnabled": {
-            "type": "boolean",
-            "description": "True when sign-in and access management are on. Without it every visitor holds every capability."
           },
           "capabilities": {
             "type": "array",
@@ -30860,7 +30730,6 @@
         },
         "required": [
           "actor",
-          "iamEnabled",
           "capabilities"
         ]
       },
@@ -31461,57 +31330,6 @@
           "database",
           "upgradeError",
           "problem"
-        ]
-      },
-      "LocalWorkspaceDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "slug": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "slug",
-          "name"
-        ]
-      },
-      "ImportWorkspacesDto": {
-        "type": "object",
-        "properties": {
-          "slugs": {
-            "example": [
-              "finance-ledger"
-            ],
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        },
-        "required": [
-          "slugs"
-        ]
-      },
-      "ImportedWorkspacesDto": {
-        "type": "object",
-        "properties": {
-          "copied": {
-            "description": "Copied into the tenant; the open database keeps them.",
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        },
-        "required": [
-          "copied"
         ]
       },
       "StartRunnerDto": {
@@ -40358,10 +40176,6 @@
           },
           "refId": {
             "type": "string"
-          },
-          "author": {
-            "type": "string",
-            "description": "Operator identity recorded as approver. Defaults to the X-Actor-Name header or \"operator\"."
           }
         },
         "required": [

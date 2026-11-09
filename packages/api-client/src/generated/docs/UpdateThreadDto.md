@@ -11,7 +11,6 @@ Name | Type
 `confidence` | number
 `testablePredicate` | string
 `color` | string
-`actor` | string
 
 ## Example
 
@@ -25,7 +24,6 @@ const example = {
   "confidence": null,
   "testablePredicate": null,
   "color": null,
-  "actor": null,
 } satisfies UpdateThreadDto
 
 console.log(example)

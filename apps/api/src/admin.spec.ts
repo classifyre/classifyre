@@ -1,9 +1,9 @@
-import { parseCopy, parseSplit, UsageError } from './admin';
+import { parseCopy, parseCreate, UsageError } from './admin';
 
 describe('workspaces copy arguments', () => {
   it('copies named workspaces into a tenant', () => {
     expect(parseCopy(['--to-tenant', 'acme', 'Finance', 'q3'])).toEqual({
-      to: { tenant: 'acme' },
+      tenant: 'acme',
       slugs: ['finance', 'q3'],
       ownerGroupId: undefined,
     });
@@ -11,25 +11,16 @@ describe('workspaces copy arguments', () => {
 
   it('copies every workspace made without sign-in into a tenant', () => {
     expect(parseCopy(['--to-tenant', 'acme', '--all'])).toMatchObject({
-      to: { tenant: 'acme' },
+      tenant: 'acme',
       slugs: 'all',
-    });
-  });
-
-  it('copies named tenant workspaces to the open database', () => {
-    expect(parseCopy(['--to-local', 'finance'])).toMatchObject({
-      to: 'local',
-      slugs: ['finance'],
     });
   });
 
   it.each([
     [[], 'Say where to'],
+    [['--to-local', 'finance'], 'Unknown option'],
     [['--to-tenant', 'acme'], 'Name the workspaces, or pass --all'],
     [['--to-tenant', 'acme', '--all', 'finance'], 'Name the workspaces'],
-    [['--to-tenant', 'local', '--all'], 'Use --to-local'],
-    [['--to-local', '--all'], 'named workspaces only'],
-    [['--to-local', '--owner-group', 'g1', 'finance'], 'no owner group'],
     [['--to-tenant', '--all'], '--to-tenant needs a value'],
     [['--to-tenant', 'acme', '--force', 'finance'], 'Unknown option'],
   ])('refuses %j', (args, message) => {
@@ -38,10 +29,35 @@ describe('workspaces copy arguments', () => {
   });
 });
 
-describe('tenants split arguments', () => {
-  it('removes the copied originals unless told to keep them', () => {
-    expect(parseSplit([])).toEqual({ keepSource: false });
-    expect(parseSplit(['--keep-source'])).toEqual({ keepSource: true });
-    expect(() => parseSplit(['--all'])).toThrow(UsageError);
+describe('workspaces create arguments', () => {
+  it('names the workspace after its slug unless told', () => {
+    expect(parseCreate(['--tenant', 'default', '--slug', 'Demo'])).toEqual({
+      tenant: 'default',
+      slug: 'demo',
+      name: 'demo',
+      ownerGroupId: undefined,
+    });
+    expect(
+      parseCreate([
+        '--tenant',
+        'default',
+        '--slug',
+        'demo',
+        '--name',
+        'Demo',
+        '--owner-group',
+        'g1',
+      ]),
+    ).toMatchObject({ name: 'Demo', ownerGroupId: 'g1' });
+  });
+
+  it.each([
+    [['--slug', 'demo'], 'needs --tenant and --slug'],
+    [['--tenant', 'default'], 'needs --tenant and --slug'],
+    [['--tenant'], '--tenant needs a value'],
+    [['--tenant', 'default', '--slug', 'demo', '--all'], 'Unknown option'],
+  ])('refuses %j', (args, message) => {
+    expect(() => parseCreate(args)).toThrow(UsageError);
+    expect(() => parseCreate(args)).toThrow(message);
   });
 });

@@ -1,5 +1,6 @@
 import { config } from 'dotenv';
 import { resolve } from 'path';
+import { selectDatabaseForMode } from '../src/database-mode';
 
 console.log('[setup-env] DATABASE_URL before load:', process.env.DATABASE_URL);
 const preservedEnv = new Map(
@@ -17,6 +18,11 @@ config({ path: resolve(__dirname, '../.env.test.local'), override: true });
 for (const [key, value] of preservedEnv) {
   process.env[key] = value;
 }
+
+// Sign-in is always on: the control database next to the configured one,
+// and a key for the tenant database's role (test/test-identity.ts).
+process.env.CLASSIFYRE_TENANT_DATABASE_KEY ??= 'e2e-tenant-database-key';
+selectDatabaseForMode();
 console.log(
   '[setup-env] DATABASE_URL after restore:',
   process.env.DATABASE_URL?.substring(0, 120),

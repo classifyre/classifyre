@@ -1,4 +1,8 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  ApiHideProperty,
+  ApiProperty,
+  ApiPropertyOptional,
+} from '@nestjs/swagger';
 import {
   ArrayMaxSize,
   IsArray,
@@ -42,7 +46,8 @@ export class ReviewCaseLeadDto {
   @IsIn(['ACCEPT', 'DISMISS'])
   action!: 'ACCEPT' | 'DISMISS';
 
-  @ApiPropertyOptional()
+  // Set by the server from the signed-in person; never sent by clients.
+  @ApiHideProperty()
   @IsOptional()
   @IsString()
   reviewedBy?: string;

@@ -17,7 +17,6 @@ Name | Type
 `termsIncludeNarrower` | boolean
 `title` | string
 `description` | string
-`createdBy` | string
 
 ## Example
 
@@ -37,7 +36,6 @@ const example = {
   "termsIncludeNarrower": null,
   "title": null,
   "description": null,
-  "createdBy": null,
 } satisfies CreateInquiryDto
 
 console.log(example)

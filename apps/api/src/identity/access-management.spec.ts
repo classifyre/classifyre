@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ConflictException,
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
@@ -199,10 +198,8 @@ describe('AccessManagementService', () => {
     expect(events).toEqual(['grant.removed']);
   });
 
-  it('says there is nothing to manage without sign-in', () => {
-    const off = new AccessManagementService(tenancy, null);
-    expect(() => off.requireSignIn()).toThrow(ConflictException);
-    expect(off.roles().map((role) => role.key)).not.toContain(
+  it('never offers the operator role as a grant', () => {
+    expect(service.roles().map((role) => role.key)).not.toContain(
       'platform-operator',
     );
   });

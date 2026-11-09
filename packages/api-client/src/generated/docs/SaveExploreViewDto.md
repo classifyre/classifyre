@@ -14,7 +14,6 @@ Name | Type
 `depth` | number
 `direction` | string
 `positions` | [{ [key: string]: ExplorePositionDto; }](ExplorePositionDto.md)
-`createdBy` | string
 
 ## Example
 
@@ -31,7 +30,6 @@ const example = {
   "depth": null,
   "direction": null,
   "positions": null,
-  "createdBy": null,
 } satisfies SaveExploreViewDto
 
 console.log(example)

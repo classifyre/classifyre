@@ -1,6 +1,5 @@
 import {
   Body,
-  ConflictException,
   Controller,
   Delete,
   ForbiddenException,
@@ -17,13 +16,7 @@ import type { FastifyRequest } from 'fastify';
 import { Requires } from './access.decorators';
 import type { IdentityService, Operator } from './identity.service';
 import { IDENTITY } from './identity.tokens';
-import {
-  ImportedWorkspacesDto,
-  ImportWorkspacesDto,
-  LocalWorkspaceDto,
-  PlatformMeDto,
-  PlatformTenantDto,
-} from './platform.dto';
+import { PlatformMeDto, PlatformTenantDto } from './platform.dto';
 import { PlatformService } from './platform.service';
 
 /**
@@ -36,16 +29,11 @@ import { PlatformService } from './platform.service';
 @Controller('platform')
 export class PlatformController {
   constructor(
-    @Inject(IDENTITY) private readonly identity: IdentityService | null,
+    @Inject(IDENTITY) private readonly identity: IdentityService,
     private readonly platform: PlatformService,
   ) {}
 
   private async operator(request: FastifyRequest): Promise<Operator> {
-    if (!this.identity) {
-      throw new ConflictException(
-        'Sign-in is off: there are no tenants to manage.',
-      );
-    }
     const operator = await this.identity.authenticateOperator(request.raw);
     // The guard already refused anyone else; this only narrows the type.
     if (!operator) throw new ForbiddenException();
@@ -126,39 +114,6 @@ export class PlatformController {
       await this.operator(request),
       tenantId,
       confirm,
-    );
-  }
-
-  @Get('workspaces/local')
-  @Requires('platform.tenants.manage')
-  @ApiOperation({
-    summary:
-      'Workspaces made without sign-in, which can be brought into a tenant',
-  })
-  @ApiOkResponse({ type: [LocalWorkspaceDto] })
-  async localWorkspaces(
-    @Req() request: FastifyRequest,
-  ): Promise<LocalWorkspaceDto[]> {
-    await this.operator(request);
-    return this.platform.localWorkspaces();
-  }
-
-  @Post('tenants/:tenantId/workspaces')
-  @HttpCode(200)
-  @Requires('platform.tenants.manage')
-  @ApiOperation({
-    summary: 'Copy workspaces made without sign-in into a tenant',
-  })
-  @ApiOkResponse({ type: ImportedWorkspacesDto })
-  async importWorkspaces(
-    @Req() request: FastifyRequest,
-    @Param('tenantId') tenantId: string,
-    @Body() body: ImportWorkspacesDto,
-  ): Promise<ImportedWorkspacesDto> {
-    return this.platform.importWorkspaces(
-      await this.operator(request),
-      tenantId,
-      body?.slugs,
     );
   }
 }

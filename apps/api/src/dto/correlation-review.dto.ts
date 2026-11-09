@@ -632,7 +632,9 @@ export class ReviewDecisionsResponseDto {
   @ApiPropertyOptional({ nullable: true, type: String })
   nextCursor!: string | null;
   @ApiProperty() total!: number;
-  @ApiProperty({ description: 'Confirmed duplicates not yet taken into a case or an inquiry' })
+  @ApiProperty({
+    description: 'Confirmed duplicates not yet taken into a case or an inquiry',
+  })
   unactioned!: number;
   @ApiProperty({ description: 'Counts by verdict across the whole namespace' })
   byVerdict!: Record<string, number>;
