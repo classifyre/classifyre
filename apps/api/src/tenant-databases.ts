@@ -109,6 +109,17 @@ export async function provisionTenantDatabase(
       ? `ALTER ROLE "${name}" WITH LOGIN PASSWORD ${literal}`
       : `CREATE ROLE "${name}" WITH LOGIN PASSWORD ${literal}`,
   );
+  // Since PostgreSQL 16 a user that is not a superuser — every managed
+  // Postgres, and the CI database — can only make a database owned by a role
+  // it can SET ROLE to ("must be able to SET ROLE"). It created the role, so
+  // it may grant the role to itself. A superuser needs no grant, and one that
+  // cannot be given (a role made by someone else) leaves CREATE DATABASE to
+  // report the real problem.
+  try {
+    await control.query(`GRANT "${name}" TO CURRENT_USER`);
+  } catch {
+    /* see above */
+  }
   const database = await control.query(
     'SELECT 1 FROM pg_database WHERE datname = $1',
     [name],
