@@ -208,6 +208,14 @@ embedding model injected as a build context. `ENVIRONMENT=docker` is what puts
 the API in single-host mode, where scans run as local subprocesses rather than
 Kubernetes Jobs.
 
+Sign-in (IAM, Keycloak) is always on, in both: there is no `iam.enabled` and no
+`IAM_ENABLED`. The all-in-one image also runs Keycloak (stock distribution plus
+a Temurin JRE, realm setup and theme from `helm/classifyre/files/iam` as the
+`iam` build context) and signs in as `classifyre`/`classifyre`. Keep its
+Keycloak `FROM` tag equal to `iam.image.tag` (`scripts/check-keycloak-version.sh`).
+One Playwright smoke test (`apps/e2e`) covers the chart and the image
+(`scripts/smoke/seed.sh` with `SMOKE_TARGET=k8s|docker`).
+
 ## Code Style and Patterns
 
 ### Frontend (Next.js/React)

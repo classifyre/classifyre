@@ -40,7 +40,7 @@ Later phases add column masking (driven by the PII findings Classifyre already h
 | R5  | One query can join tables of several sources.                                                                                                       |
 | R6  | Every query is attributed and the tables it read are recorded (audit).                                                                              |
 | R7  | Results are bounded (rows, bytes, time) and the bound is visible; nothing is silently cut.                                                         |
-| R8  | Off by default per workspace. Works with sign-in off (everyone who reaches the workspace), and with sign-in on (grants).                           |
+| R8  | *(Changed 2026-11-09.)* No per-workspace switch: sign-in is always on, so grants (`data.query`, Data reader on a workspace, source or table) are the only gate. Workspace admins query straight away. |
 | R9  | Reuses the CLI's connection code and the job machinery; no second engine, no long-lived worker to run in phase 1.                                  |
 
 ## 4. Who may query what
@@ -51,9 +51,9 @@ Later phases add column masking (driven by the PII findings Classifyre already h
 
 **Scopes.** A data-reader grant can be on the tenant, a group's workspaces, a workspace — or on **one source** or **one table** of a workspace. The last two are the first grants on single resources (`iam_grants.scope_type` `source` / `asset`, `scope_id = <namespace id>/<source or asset id>`). They never give anything workspace-wide (`grantApplies` is false for them); the namespace hook works out, per request, which sources and tables they open (`resourceGrantsInWorkspace`) and `IamAccessPolicy.check(actor, capability, resource)` honours them. Grants go to groups only, as since IAM step 8f: a one-person need is a small group.
 
-**Sign-in off.** `LocalAccessPolicy` gives everything, so the workspace setting is the only switch.
+**Sign-in off.** *(Gone 2026-11-09: sign-in is always on.)*
 
-**The setting.** `data_query_settings.enabled` (per workspace, default off), with `max_rows` (10,000) and `timeout_seconds` (120). Changed with `workspace.settings`.
+**The settings.** `data_query_settings` (per workspace): `max_rows` (10,000), `timeout_seconds` (120) and `export_max_rows`. Changed with `workspace.settings`. *(The `enabled` switch was dropped 2026-11-09, migration `20261110090200_data_query_always_on`.)*
 
 **What a person sees.** The catalog lists every table-shaped asset. A table is `canQuery` when the setting is on, DuckDB can read it, and a role or grant covers it. Tables someone cannot query are listed (locked) only if they hold `asset.view`.
 

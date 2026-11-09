@@ -145,10 +145,10 @@ postgres:
   embedded:
     password: changeme
 
-# No host name, so no sign-in: anyone who reaches the NodePort can use every
-# workspace. Fine on a laptop; see Sign-in below before sharing it.
+# Sign-in is always on, and it needs the address people open: here the
+# NodePort. See Sign-in below.
 iam:
-  enabled: false
+  appUrl: http://localhost:30100
 ```
 
 ### Install the chart
@@ -388,14 +388,13 @@ ingress:
 
 ## Sign-in
 
-The chart ships sign-in and access management, under the name `iam`, and
-turns it on by default. It runs an identity server next to Classifyre on the
+The chart ships sign-in and access management, under the name `iam`, and it
+is always on. It runs an identity server next to Classifyre on the
 same host, at `https://<your-host>/iam`. See
 [Access & Sign-in](/access/) for what people can do once signed in.
 
 <Callout type="info">
-  With `iam.enabled: true` everyone signs in to the web app and the API keeps
-  tenants apart. To let people browse one tenant without signing in, turn on a
+  Everyone signs in to the web app and the API keeps tenants apart. To let people browse one tenant without signing in, turn on a
   public tenant (`iam.public.enabled`; see
   [Running sign-in → The public tenant](/access/operations/#the-public-tenant)).
   Tenants, people and groups are managed in the identity server; Classifyre
@@ -447,18 +446,12 @@ open `http://localhost:8080/iam/admin`) and its `admin` user, whose password
 is under `admin-password` in the same Secret. See
 [Getting started](/access/getting-started/) for the first sign-in.
 
-### Turning it off
+### Sitemap
 
-```yaml
-iam:
-  enabled: false
-```
-
-Without sign-in anyone who reaches the instance can use every workspace, as
-in the all-in-one Docker image, which never uses it. A sitemap
-(`frontend.sitemap.enabled`) is only allowed with sign-in off, or with a
-public tenant, whose workspaces it then lists: a private instance publishes
-nothing for search engines.
+A sitemap (`frontend.sitemap.enabled`) is only allowed with a public tenant,
+whose workspaces it then lists: a private instance publishes nothing for
+search engines. There is no `iam.enabled` any more: a release that still
+sets it fails with a message, so remove it from your values.
 
 ### Upgrades and backups
 
