@@ -5,6 +5,35 @@ compiled at release time from per-PR fragments in `changelog.d/` (see
 `changelog.d/README.md`). Commit messages and PR titles are never used as
 release notes.
 
+## [0.7.4] - 2026-11-09
+
+### Added
+
+- With sign-in on, workspace admins manage who has access under **Settings → Access**, tenant admins manage access across the tenant on the **Tenant access** page, and new workspaces are created for an owning group you belong to. **Why can I…?** shows which grant gives you a permission, and MCP tokens show whose access they carry.
+- The Helm chart now installs an identity server for sign-in (`iam`, on by default), with its own database, a first tenant and a first admin. It is reached through the web app at `/iam`, so there is no separate address to configure. Installs without `ingress.host` must set `iam.appUrl`, or turn sign-in off with `iam.enabled: false`; a sitemap is only allowed with sign-in off.
+- Sign-in now looks like Classifyre: the sign-in page sits on the same animated board of evidence pins as our landing page, and the identity console and everyone's account page carry the Classifyre logo, type and colours. Operators open the identity console straight from Classifyre (**Identity console** in the account menu, and on the Platform and Tenant access pages) to add people, groups and tenants, without a port-forward; the identity server's own master realm stays closed. The workspace list now only offers the actions each person may take, the account menu shows your name everywhere, and the Access & Sign-in docs walk through the first sign-in, organizing a company with groups, and every role and right, with screenshots.
+- Operators now see every tenant on a new **Platform** page: its admins, workspaces, database and any problem. They suspend and resume tenants, copy in workspaces made without sign-in, and remove the data of a tenant whose organization was deleted. Tenants, their people and groups are created in the identity server, which Classifyre only reads. Operators hold the `classifyre-operator` role, which the Helm chart gives its first admin (`iam.bootstrap.admin.operator`); they see tenants, not what is inside them. People of a suspended tenant see a page saying so.
+- An installation with sign-in can now make one tenant public (`iam.public.enabled`, `iam.public.tenant` in the Helm chart). People who have not signed in browse its workspaces read-only, with **Sign in** at the top; once signed in, everyone sees only their own tenant, never the public one mixed in. Visitors cannot change anything, see who has access, or create MCP tokens, and the sitemap, now allowed with a public tenant, lists only it. It is off by default; the all-in-one Docker image still has no sign-in at all.
+- The sign-in page now speaks English and German, like Classifyre: it opens in the language you were using, or your browser's, and has a language switch. Your choice there is kept on your account for the sign-in pages and emails such as a password reset.
+- With sign-in on, every tenant now has a PostgreSQL database of its own, with its own login, next to a control database that holds the tenants, their access and the list of their workspaces. A tenant can be backed up, restored and deleted on its own, and a tenant whose upgrade fails is unavailable on its own while the others keep working; the Platform page shows each tenant's database and any upgrade error. The chart's database user needs `CREATEDB` and `CREATEROLE` (`iam.controlDatabase` names the control database). Installs that turned sign-in on before this move their tenants once with `node dist/src/admin.js tenants split`.
+- With sign-in on (Helm `iam.enabled`), people sign in to the web app, see only the workspaces their groups give them, and find their name, tenant and **Sign out** in the account menu. People and groups are managed in the identity server, or a company directory connected to it; Classifyre only reads them and decides what they may do. Sessions renew themselves; tokens stay in server-only cookies. A signed-in instance is never offered to search engines.
+- Every change in a workspace is now recorded with who made it: sources, inquiries, detectors, findings, glossary terms and cases show who created them and who changed them last, **History** lists every change to an item, and **Settings → Activity** shows the whole workspace. Changes made by agents through MCP are attributed to the token they used, and only the names of changed fields are kept, never their values.
+- **Your account** in the account menu opens your own account page, in Classifyre's look: change your name, email, password and two-factor sign-in, see where you are signed in, and pick the language of the sign-in pages.
+
+### Changed
+
+- Items created by the autopilot are now attributed to `agent:autopilot` instead of `ai-autopilot`; existing items are converted when you upgrade. Scripts that filter on the old value need updating.
+- With sign-in on, the identity server is reached through the web app at `/iam`, like every other external path; there is no separate ingress, port, or public URL for it anymore. The old `iam.publicUrl` value is gone — the address is always `<iam.appUrl>/iam`, so existing installs only need it removed from their values if they set it.
+- Turning sign-in off no longer opens every tenant's workspaces to anyone: without sign-in Classifyre uses only the database of workspaces made without it, and tenants' workspaces are in their own databases, out of its reach. Turning sign-in on no longer moves existing workspaces into the first tenant either; an operator copies them in with `node dist/src/admin.js workspaces copy` in an API pod or **Bring in workspaces** on the Platform page, and can copy a workspace out of a tenant the same way. Each copy is in the tenant's activity.
+
+### Removed
+
+- Access is now always given to groups: the API no longer accepts a grant to one person, and grants made to one person before are removed on upgrade. Put the person in a group in the identity server and give that group access instead.
+
+### Security
+
+- Sign-in is harder to misuse: the identity server's own master realm can no longer be reached through crafted addresses, operators' rights in the identity console are limited to people, organizations and directories, signing out can no longer be triggered from another website, and people of a deleted tenant, or of one whose organization was replaced, now see a page that says so.
+
 ## [0.7.3] - 2026-11-03
 
 ### Added
