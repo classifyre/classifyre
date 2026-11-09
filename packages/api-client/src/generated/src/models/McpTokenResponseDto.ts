@@ -32,11 +32,11 @@ export interface McpTokenResponseDto {
      */
     name: string;
     /**
-     * With sign-in, the person the token acts for (actor reference `user:<sub>`); null for tokens made without sign-in.
+     * The person the token acts for (actor reference `user:<sub>`).
      * @type {string}
      * @memberof McpTokenResponseDto
      */
-    owner: string | null;
+    owner: string;
     /**
      * Masked token preview shown in settings after creation.
      * @type {string}

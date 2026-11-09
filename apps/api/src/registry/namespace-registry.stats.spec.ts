@@ -39,6 +39,8 @@ function buildService(sourceRows: NamespaceStatsSourceRow[]) {
   // The service owns a real pg Pool built in a field initialiser; swap it for
   // the stub rather than opening a connection in a unit test.
   (service as unknown as { pool: unknown }).pool = { query, end: jest.fn() };
+  // Workspace schemas live in tenant databases; the stub answers for them too.
+  (service as unknown as { poolFor: unknown }).poolFor = () => ({ query });
   return service;
 }
 

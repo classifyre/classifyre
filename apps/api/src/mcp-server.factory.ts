@@ -264,22 +264,12 @@ RETIRE: after augment_sources() completes without error/abort and without ctx.se
 Read inputs with cohort=False semantics inside augment_sources() (the default there); in extract() a query_assets() call declares partial coverage unless cohort=False.`;
 
 /**
- * Who a tool call acts as: the token's actor reference, set by the MCP
- * handler. `mcp` only where no handler ran (specs).
+ * Who a tool call acts as: the person the token acts for, set by the MCP
+ * handler. An agent cannot name another author. `mcp` only where no handler
+ * ran (specs).
  */
 function toolAuthor(): string {
   return currentActorRef() ?? 'mcp';
-}
-
-/**
- * The author of a tool that lets the caller name one (`createdBy`). With
- * sign-in it is always the person the token acts for: an agent cannot claim
- * to be someone else. Without sign-in a named author is kept, as before.
- */
-function claimedAuthor(claimed: string | undefined): string {
-  const actor = currentActor();
-  if (actor.ref?.startsWith('user:')) return actor.ref;
-  return claimed ?? toolAuthor();
 }
 
 /** The `id` of the object a tool returned as JSON text, if any. */
@@ -3803,7 +3793,6 @@ export class McpServerFactoryService {
         inputSchema: {
           title: z.string().max(500),
           description: z.string().optional(),
-          createdBy: z.string().optional(),
           ...matcherShape,
         },
         annotations: {
@@ -3815,7 +3804,7 @@ export class McpServerFactoryService {
         jsonResult(
           await this.inquiriesService.create({
             ...dto,
-            createdBy: claimedAuthor(dto.createdBy),
+            createdBy: toolAuthor(),
           } as any),
         ),
     );
@@ -4019,7 +4008,6 @@ export class McpServerFactoryService {
             .enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'])
             .optional(),
           assignee: z.string().optional(),
-          createdBy: z.string().optional(),
           inquiryIds: z.array(z.string()).optional(),
           removeGoneFindings: z
             .boolean()
@@ -4047,7 +4035,7 @@ export class McpServerFactoryService {
         jsonResult(
           await this.casesService.create({
             ...dto,
-            createdBy: claimedAuthor(dto.createdBy),
+            createdBy: toolAuthor(),
           } as any),
         ),
     );
@@ -4844,7 +4832,6 @@ export class McpServerFactoryService {
             .enum(['PROPOSED', 'SUPPORTED', 'REFUTED', 'INCONCLUSIVE'])
             .optional(),
           confidence: z.number().min(0).max(1).optional(),
-          createdBy: z.string().optional(),
         },
         annotations: {
           readOnlyHint: false,
@@ -4857,7 +4844,7 @@ export class McpServerFactoryService {
           await this.caseThreadsService.create(caseId, {
             kind: kind ?? CaseThreadKind.HYPOTHESIS,
             ...rest,
-            createdBy: claimedAuthor(rest.createdBy),
+            createdBy: toolAuthor(),
           }),
         );
       },

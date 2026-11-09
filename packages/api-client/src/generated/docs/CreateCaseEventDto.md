@@ -13,7 +13,6 @@ Name | Type
 `confidence` | number
 `findingIds` | Array&lt;string&gt;
 `evidenceIds` | Array&lt;string&gt;
-`createdBy` | string
 
 ## Example
 
@@ -29,7 +28,6 @@ const example = {
   "confidence": null,
   "findingIds": null,
   "evidenceIds": null,
-  "createdBy": null,
 } satisfies CreateCaseEventDto
 
 console.log(example)

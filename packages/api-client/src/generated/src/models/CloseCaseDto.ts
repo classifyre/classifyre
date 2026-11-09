@@ -26,12 +26,6 @@ export interface CloseCaseDto {
      */
     conclusion: string;
     /**
-     * 
-     * @type {string}
-     * @memberof CloseCaseDto
-     */
-    closedBy?: string;
-    /**
      * Keep the linked inquiries active. By default closing archives them; an answered case whose inquiries are standing checks (they catch next year's occurrence) should keep them.
      * @type {boolean}
      * @memberof CloseCaseDto
@@ -58,7 +52,6 @@ export function CloseCaseDtoFromJSONTyped(json: any, ignoreDiscriminator: boolea
     return {
         
         'conclusion': json['conclusion'],
-        'closedBy': json['closedBy'] == null ? undefined : json['closedBy'],
         'keepInquiries': json['keepInquiries'] == null ? undefined : json['keepInquiries'],
     };
 }
@@ -75,7 +68,6 @@ export function CloseCaseDtoToJSONTyped(value?: CloseCaseDto | null, ignoreDiscr
     return {
         
         'conclusion': value['conclusion'],
-        'closedBy': value['closedBy'],
         'keepInquiries': value['keepInquiries'],
     };
 }

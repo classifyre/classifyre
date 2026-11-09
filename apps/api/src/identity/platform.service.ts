@@ -7,12 +7,6 @@ import {
   OnModuleDestroy,
 } from '@nestjs/common';
 import { Pool } from 'pg';
-import { prepareOpenDatabase } from '../database-migrations';
-import { openDatabaseUrl } from '../database-mode';
-import {
-  copyLocalWorkspacesToTenant,
-  TransferError,
-} from '../workspace-transfer';
 import {
   PUBLIC_SEARCH_PATH_OPTION,
   publicConnectionString,
@@ -20,7 +14,6 @@ import {
 import type { IdentityService, Operator } from './identity.service';
 import { IDENTITY } from './identity.tokens';
 import type { MembershipService, OrgMember } from './membership.service';
-import { LOCAL_TENANT_ID } from './tenancy.sql';
 import {
   TenancyService,
   type Tenant,
@@ -59,7 +52,7 @@ export interface PlatformTenant {
 
 /**
  * Tenants, for operators (docs/prd/TEN §4.7): list them, suspend and resume
- * them, bring workspaces made without sign-in into one, and remove one whose
+ * them, and remove one whose
  * organization was deleted. Tenants, their people and groups are made in the
  * identity server; the API only reads it. Operators see tenants, never what
  * is inside their workspaces.
@@ -72,30 +65,13 @@ export class PlatformService implements OnModuleDestroy {
     options: PUBLIC_SEARCH_PATH_OPTION,
     max: 1,
   });
-  /**
-   * The open database, read only to list and copy workspaces made without
-   * sign-in when an operator brings them into a tenant (docs/prd/TEN R2).
-   */
-  private openPool: Pool | null = null;
-
   constructor(
-    @Inject(IDENTITY) private readonly identity: IdentityService | null,
+    @Inject(IDENTITY) private readonly identity: IdentityService,
     private readonly tenancy: TenancyService,
   ) {}
 
   async onModuleDestroy(): Promise<void> {
-    await Promise.all([this.pool.end(), this.openPool?.end()]);
-  }
-
-  private open(): { pool: Pool; url: string } | null {
-    const url = openDatabaseUrl();
-    if (!url) return null;
-    this.openPool ??= new Pool({
-      connectionString: url,
-      options: PUBLIC_SEARCH_PATH_OPTION,
-      max: 1,
-    });
-    return { pool: this.openPool, url };
+    await this.pool.end();
   }
 
   // ---- reads ---------------------------------------------------------------
@@ -175,26 +151,6 @@ export class PlatformService implements OnModuleDestroy {
     );
   }
 
-  /** Workspaces made without sign-in, which an operator can bring into a tenant. */
-  async localWorkspaces(): Promise<
-    { id: string; slug: string; name: string }[]
-  > {
-    this.directory();
-    const open = this.open();
-    if (!open) return [];
-    await prepareOpenDatabase(open.pool);
-    const { rows } = await open.pool.query<{
-      id: string;
-      slug: string;
-      name: string;
-    }>(
-      `SELECT id, slug, name FROM namespaces
-        WHERE tenant_id = $1 AND status <> 'deleted' ORDER BY slug`,
-      [LOCAL_TENANT_ID],
-    );
-    return rows;
-  }
-
   // ---- tenants -------------------------------------------------------------
 
   /**
@@ -261,55 +217,6 @@ export class PlatformService implements OnModuleDestroy {
     );
   }
 
-  // ---- workspaces ----------------------------------------------------------
-
-  /**
-   * Copies workspaces made without sign-in into the tenant's database
-   * (docs/prd/TEN §4.9). The open database keeps them.
-   */
-  async importWorkspaces(
-    operator: Operator,
-    tenantId: string,
-    slugs: unknown,
-  ): Promise<{ copied: string[] }> {
-    this.directory();
-    const tenant = await this.requireTenant(tenantId);
-    if (tenant.status === 'deleted') {
-      throw new ConflictException('This tenant has been deleted.');
-    }
-    if (
-      !Array.isArray(slugs) ||
-      slugs.length === 0 ||
-      slugs.length > 500 ||
-      !slugs.every((slug) => typeof slug === 'string')
-    ) {
-      throw new BadRequestException('Pick the workspaces to bring in.');
-    }
-    const open = this.open();
-    if (!open) {
-      throw new ConflictException(
-        'The open database is not known to this installation (CLASSIFYRE_OPEN_DATABASE).',
-      );
-    }
-    try {
-      const copied = await copyLocalWorkspacesToTenant(
-        { control: this.pool, open: open.pool, openUrl: open.url },
-        {
-          alias: tenant.alias,
-          slugs: slugs.map((slug) => slug.toLowerCase()),
-          actor: operator.actor.ref ?? `user:${operator.sub}`,
-        },
-      );
-      return { copied: copied.map((workspace) => workspace.slug) };
-    } catch (error) {
-      // The copy's own refusals name the workspaces; nothing else leaks.
-      if (error instanceof TransferError) {
-        throw new BadRequestException(error.message);
-      }
-      throw error;
-    }
-  }
-
   // ---- helpers -------------------------------------------------------------
 
   private async tenantView(tenantId: string): Promise<PlatformTenant> {
@@ -322,7 +229,7 @@ export class PlatformService implements OnModuleDestroy {
 
   private async requireTenant(tenantId: string): Promise<Tenant> {
     const tenant =
-      typeof tenantId === 'string' && tenantId !== LOCAL_TENANT_ID
+      typeof tenantId === 'string'
         ? await this.tenancy.tenantById(tenantId).catch(() => null)
         : null;
     if (!tenant) throw new NotFoundException('No such tenant.');
@@ -330,11 +237,6 @@ export class PlatformService implements OnModuleDestroy {
   }
 
   private directory(): MembershipService {
-    if (!this.identity) {
-      throw new ConflictException(
-        'Sign-in is off: there are no tenants to manage.',
-      );
-    }
     return this.identity.membership;
   }
 }

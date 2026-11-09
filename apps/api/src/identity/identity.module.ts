@@ -1,7 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import { ClsService } from 'nestjs-cls';
 import { PrismaService } from '../prisma.service';
-import { ACCESS_POLICY, LocalAccessPolicy } from './access-policy';
+import { ACCESS_POLICY } from './access-policy';
 import {
   TenantAccessController,
   WorkspaceAccessController,
@@ -25,10 +25,9 @@ import { SocketAccessService } from './socket-access.service';
 
 /**
  * Who is acting, what they may do, and what they changed
- * (docs/prd/IAM-access-management.md). Without sign-in the policy is
- * {@link LocalAccessPolicy}: everything is allowed, and {@link IDENTITY} is
- * null. With it, {@link IamAccessPolicy} reads what the namespace hook
- * computed from the principal's grants.
+ * (docs/prd/IAM-access-management.md). Sign-in is always on:
+ * {@link IamAccessPolicy} reads what the namespace hook computed from the
+ * principal's grants.
  */
 @Global()
 @Module({
@@ -49,16 +48,13 @@ import { SocketAccessService } from './socket-access.service';
     {
       provide: IDENTITY,
       inject: [IAM_CONFIG, TenancyService],
-      useFactory: (config: IamConfig | null, tenancy: TenancyService) =>
-        config
-          ? new IdentityService(config, new MembershipService(config), tenancy)
-          : null,
+      useFactory: (config: IamConfig, tenancy: TenancyService) =>
+        new IdentityService(config, new MembershipService(config), tenancy),
     },
     {
       provide: ACCESS_POLICY,
-      inject: [IAM_CONFIG, ClsService],
-      useFactory: (config: IamConfig | null, cls: ClsService) =>
-        config ? new IamAccessPolicy(cls) : new LocalAccessPolicy(),
+      inject: [ClsService],
+      useFactory: (cls: ClsService) => new IamAccessPolicy(cls),
     },
     IamBootstrapService,
     AccessManagementService,

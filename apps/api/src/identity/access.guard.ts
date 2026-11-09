@@ -8,7 +8,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import { InternalApiKeyService } from '../internal-api-key.service';
 import { ACCESS_POLICY, type AccessPolicy } from './access-policy';
-import { resolveLocalRequestActor, SYSTEM_ACTOR, type Actor } from './actor';
+import { SYSTEM_ACTOR, type Actor } from './actor';
 import { ActorContextService } from './actor-context.service';
 import type { Capability } from './capabilities';
 import { resolveRouteAccess } from './route-access';
@@ -52,7 +52,7 @@ export class AccessGuard implements CanActivate {
     private readonly actors: ActorContextService,
     private readonly internalApiKey: InternalApiKeyService,
     @Inject(ACCESS_POLICY) private readonly policy: AccessPolicy,
-    @Inject(IDENTITY) private readonly identity: IdentityService | null,
+    @Inject(IDENTITY) private readonly identity: IdentityService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -77,21 +77,7 @@ export class AccessGuard implements CanActivate {
     );
     if (!access) throw new CapabilityRequiredException(null);
 
-    if (!this.identity) {
-      const actor = resolveLocalRequestActor(
-        request.headers,
-        this.internalApiKey,
-      );
-      this.remember(request, actor);
-      if (access.kind !== 'capability') return true;
-      const decision = await this.policy.check(actor, access.capability);
-      if (!decision.allow) {
-        throw new CapabilityRequiredException(access.capability);
-      }
-      return true;
-    }
-
-    // Sign-in on: the actor is whoever the token says, never a header.
+    // The actor is whoever the token says, never a header.
     if (this.internalApiKey.isInternalRequest(request.headers)) {
       this.remember(request, SYSTEM_ACTOR);
       return true;
@@ -124,6 +110,7 @@ export class AccessGuard implements CanActivate {
       this.identity.config.appOrigin,
     );
     this.remember(request, principal.actor);
+    // Visitors name nobody; they cannot write either.
     if (principal.actor.ref) {
       stampAuthorFields(request.body, principal.actor.ref);
     }
@@ -167,7 +154,7 @@ export class AccessGuard implements CanActivate {
     raw?: { classifyreOperator?: Operator | null };
   }): Promise<Operator | null> {
     try {
-      return await this.identity!.authenticateOperator(request.raw ?? request);
+      return await this.identity.authenticateOperator(request.raw ?? request);
     } catch (error) {
       throwAuthenticationError(error);
     }
@@ -178,7 +165,7 @@ export class AccessGuard implements CanActivate {
     raw?: { classifyrePrincipal?: Principal | null };
   }): Promise<Principal> {
     try {
-      return await this.identity!.authenticate(request.raw ?? request);
+      return await this.identity.authenticate(request.raw ?? request);
     } catch (error) {
       throwAuthenticationError(error);
     }

@@ -6,7 +6,6 @@ import {
   publicConnectionString,
 } from '../registry/namespace-registry.sql';
 import type { RoleKey } from './roles';
-import { LOCAL_TENANT_ID } from './tenancy.sql';
 import { dropTenantDatabase } from '../tenant-databases';
 
 export type TenantStatus = 'active' | 'suspended' | 'deleted';
@@ -141,7 +140,7 @@ export class TenancyService implements OnModuleDestroy {
     return rows[0] ? toTenant(rows[0]) : null;
   }
 
-  /** Every tenant but `local`, with what the Platform page shows. */
+  /** Every tenant, with what the Platform page shows. */
   async tenantSummaries(): Promise<TenantSummary[]> {
     const { rows } = await this.pool.query<
       TenantRow & {
@@ -160,9 +159,7 @@ export class TenancyService implements OnModuleDestroy {
               (SELECT max(e.occurred_at) FROM iam_audit_events e
                 WHERE e.tenant_id = t.id) AS last_activity_at
          FROM iam_tenants t
-        WHERE t.id <> $1
         ORDER BY lower(t.name)`,
-      [LOCAL_TENANT_ID],
     );
     return rows.map((row) => ({
       ...toTenant(row),

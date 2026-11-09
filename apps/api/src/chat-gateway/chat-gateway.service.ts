@@ -148,7 +148,6 @@ export class ChatGatewayService implements OnModuleDestroy {
         appTokenEnc: true,
         capabilityGroups: true,
         agentKinds: true,
-        allowMutations: true,
       },
       orderBy: { id: 'asc' },
     });

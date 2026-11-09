@@ -303,8 +303,6 @@ docs/HealthApi.md
 docs/HealthControllerGetHealth200Response.md
 docs/HypothesisStatus.md
 docs/IdentityApi.md
-docs/ImportWorkspacesDto.md
-docs/ImportedWorkspacesDto.md
 docs/IngestEdgeDto.md
 docs/InquiriesApi.md
 docs/InquiryActivityDto.md
@@ -322,7 +320,6 @@ docs/LinkInquiriesDto.md
 docs/LinkThreadSupportDto.md
 docs/ListRunnersResponseDto.md
 docs/LiveQueryResponseDto.md
-docs/LocalWorkspaceDto.md
 docs/LocationDto.md
 docs/MaintenanceApi.md
 docs/MarkAllReadDto.md
@@ -932,8 +929,6 @@ src/models/HarnessToolDto.ts
 src/models/HarnessToolsResponseDto.ts
 src/models/HealthControllerGetHealth200Response.ts
 src/models/HypothesisStatus.ts
-src/models/ImportWorkspacesDto.ts
-src/models/ImportedWorkspacesDto.ts
 src/models/IngestEdgeDto.ts
 src/models/InquiryActivityDto.ts
 src/models/InquiryLinkedCaseDto.ts
@@ -949,7 +944,6 @@ src/models/LinkInquiriesDto.ts
 src/models/LinkThreadSupportDto.ts
 src/models/ListRunnersResponseDto.ts
 src/models/LiveQueryResponseDto.ts
-src/models/LocalWorkspaceDto.ts
 src/models/LocationDto.ts
 src/models/MarkAllReadDto.ts
 src/models/MatchOptionCustomDetectorDto.ts

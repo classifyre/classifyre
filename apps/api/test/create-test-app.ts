@@ -17,6 +17,11 @@ import {
   namespaceRewriteUrl,
   type NamespaceRawRequest,
 } from '../src/namespace/namespace-request.hook';
+import {
+  ensureTestTenant,
+  signedInAsTester,
+  TEST_OWNER_GROUP,
+} from './test-identity';
 
 const TEST_NAMESPACE_SLUG =
   process.env.TEST_NAMESPACE_SLUG?.trim() || 'e2e-tests';
@@ -90,7 +95,9 @@ export async function createTestApp(
     '[createTestApp] DATABASE_URL:',
     process.env.DATABASE_URL?.substring(0, 120),
   );
-  let builder = Test.createTestingModule({ imports: [AppModule] });
+  let builder = signedInAsTester(
+    Test.createTestingModule({ imports: [AppModule] }),
+  );
   if (configure) {
     builder = configure(builder);
   }
@@ -188,11 +195,14 @@ async function ensureLocalNamespace(
   );
   if (existing) return existing;
 
-  return registry.create({
-    name: TEST_NAMESPACE_NAME,
-    slug: TEST_NAMESPACE_SLUG,
-    description: 'Shared namespace for API integration tests',
-  });
+  return registry.create(
+    {
+      name: TEST_NAMESPACE_NAME,
+      slug: TEST_NAMESPACE_SLUG,
+      description: 'Shared namespace for API integration tests',
+    },
+    { tenantId: await ensureTestTenant(), ownerGroupId: TEST_OWNER_GROUP },
+  );
 }
 
 async function ensureRemoteNamespace(baseUrl: string): Promise<Namespace> {

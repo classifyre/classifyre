@@ -1,14 +1,13 @@
 import { AiManagementMode } from '@prisma/client';
 import { MCP_CAPABILITY_GROUPS } from '../mcp-catalog';
 import type { Tool } from '../autopilot/tools/tool.types';
-import { BUILTIN_MCP_PREFIX, chatBotState } from './builtin-mcp-tool-adapter';
+import { BUILTIN_MCP_PREFIX } from './builtin-mcp-tool-adapter';
 
 /**
  * Autopilot investigation tools a chat bot may use directly (cases,
  * hypotheses, evidence, inquiries). Curated: graph-edge and memory tools stay
- * agent-only. Their own gates key on autopilot enablement; in a chat turn
- * that is overridden by the bot's allowMutations (see withChatBotGate) —
- * a human asking in chat is manual operation, not an autonomous cycle.
+ * agent-only. In a chat turn their writes are recorded, never run (see
+ * withChatBotGate).
  */
 export const CHAT_INVESTIGATION_TOOL_NAMES = [
   'cases.list',
@@ -30,22 +29,10 @@ export const CHAT_INVESTIGATION_TOOL_NAMES = [
 ] as const;
 
 /**
- * Whether a bot's chat turns may change anything. A chat message has no
- * signed-in person behind it, so with sign-in on a bot only reads, whatever
- * its allowMutations flag says (docs/prd/IAM-access-management.md, H-1).
- */
-export function chatMutationsAllowed(
-  bot: { allowMutations: boolean },
-  signInOn: boolean,
-): boolean {
-  return bot.allowMutations && !signInOn;
-}
-
-/**
- * In a chat turn the ONLY mutation gate that matters is the bot's
- * allowMutations flag: the operator asked in person, so autopilot
- * enablement settings do not apply. Preserves the original gate's
- * entity/decision metadata, overrides just the mode. Read tools pass through.
+ * A chat turn never changes anything: a chat message has no signed-in person
+ * behind it (docs/prd/IAM-access-management.md, H-1). Mutating tools resolve
+ * OBSERVE_ONLY whatever the autopilot settings say, so the dispatcher records
+ * the call without running it. Read tools pass through.
  */
 export function withChatBotGate(tool: Tool): Tool {
   if (tool.sideEffect === 'read') return tool;
@@ -56,12 +43,7 @@ export function withChatBotGate(tool: Tool): Tool {
         mode: AiManagementMode.MANAGED,
         entityType: 'system' as const,
       };
-      return {
-        ...base,
-        mode: chatBotState(tc)?.allowMutations
-          ? AiManagementMode.MANAGED
-          : AiManagementMode.OBSERVE_ONLY,
-      };
+      return { ...base, mode: AiManagementMode.OBSERVE_ONLY };
     },
   };
 }

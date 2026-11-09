@@ -25,12 +25,6 @@ export interface AttachFindingsDto {
      * @memberof AttachFindingsDto
      */
     findingIds: Array<string>;
-    /**
-     * 
-     * @type {string}
-     * @memberof AttachFindingsDto
-     */
-    addedBy?: string;
 }
 
 /**
@@ -52,7 +46,6 @@ export function AttachFindingsDtoFromJSONTyped(json: any, ignoreDiscriminator: b
     return {
         
         'findingIds': json['findingIds'],
-        'addedBy': json['addedBy'] == null ? undefined : json['addedBy'],
     };
 }
 
@@ -68,7 +61,6 @@ export function AttachFindingsDtoToJSONTyped(value?: AttachFindingsDto | null, i
     return {
         
         'findingIds': value['findingIds'],
-        'addedBy': value['addedBy'],
     };
 }
 

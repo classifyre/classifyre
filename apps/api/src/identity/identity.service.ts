@@ -574,10 +574,10 @@ export class IdentityService {
   }
 
   /**
-   * First-tenant setup when sign-in is turned on: the tenant row for the
-   * bootstrap organization and Tenant admin for its `admins` group (once).
-   * Workspaces made without sign-in stay in `local`, out of sight, until an
-   * operator moves them (src/admin.ts, docs/prd/TEN §6).
+   * First-tenant setup: the tenant row for the bootstrap organization and
+   * Tenant admin for its `admins` group (once). Workspaces of installs from
+   * before sign-in was always on stay in their open database until an
+   * operator copies them (src/admin.ts, docs/prd/TEN §6).
    */
   async bootstrap(): Promise<void> {
     const org = await this.membership.organizationByAlias(

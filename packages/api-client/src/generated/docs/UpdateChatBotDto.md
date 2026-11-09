@@ -12,7 +12,6 @@ Name | Type
 `enabled` | boolean
 `capabilityGroups` | Array&lt;string&gt;
 `agentKinds` | Array&lt;string&gt;
-`allowMutations` | boolean
 
 ## Example
 
@@ -27,7 +26,6 @@ const example = {
   "enabled": null,
   "capabilityGroups": null,
   "agentKinds": null,
-  "allowMutations": null,
 } satisfies UpdateChatBotDto
 
 console.log(example)

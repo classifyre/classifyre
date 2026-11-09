@@ -121,12 +121,6 @@ export interface UpsertGlossaryTermDto {
      * @memberof UpsertGlossaryTermDto
      */
     refId?: string;
-    /**
-     * Operator identity recorded as approver. Defaults to the X-Actor-Name header or "operator".
-     * @type {string}
-     * @memberof UpsertGlossaryTermDto
-     */
-    author?: string;
 }
 
 
@@ -198,7 +192,6 @@ export function UpsertGlossaryTermDtoFromJSONTyped(json: any, ignoreDiscriminato
         'createNew': json['createNew'] == null ? undefined : json['createNew'],
         'refType': json['refType'] == null ? undefined : json['refType'],
         'refId': json['refId'] == null ? undefined : json['refId'],
-        'author': json['author'] == null ? undefined : json['author'],
     };
 }
 
@@ -230,7 +223,6 @@ export function UpsertGlossaryTermDtoToJSONTyped(value?: UpsertGlossaryTermDto |
         'createNew': value['createNew'],
         'refType': value['refType'],
         'refId': value['refId'],
-        'author': value['author'],
     };
 }
 

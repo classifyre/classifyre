@@ -38,12 +38,12 @@ import type { IdentityService, Principal } from './identity.service';
 import { IDENTITY } from './identity.tokens';
 import { resourceScopeId } from './tenancy.service';
 
-/** The signed-in principal; a 409 when sign-in is off (nothing to manage). */
+/** The signed-in principal. */
 function principalOf(
   access: AccessManagementService,
   request: FastifyRequest,
 ): Promise<Principal> {
-  return access.requireSignIn().authenticate(request.raw);
+  return access.identity.authenticate(request.raw);
 }
 
 /** Who has access to this workspace, and why (docs/prd §12.4). */
@@ -173,7 +173,7 @@ export class TenantAccessController {
   constructor(
     private readonly access: AccessManagementService,
     private readonly actors: ActorDirectoryService,
-    @Inject(IDENTITY) private readonly identity: IdentityService | null,
+    @Inject(IDENTITY) private readonly identity: IdentityService,
   ) {}
 
   private principal(request: FastifyRequest): Promise<Principal> {
@@ -190,13 +190,13 @@ export class TenantAccessController {
     const principal = await this.principal(request);
     const operator = principal.visitor
       ? false
-      : await this.identity!.isOperator(principal.sub);
+      : await this.identity.isOperator(principal.sub);
     return {
       id: principal.tenant.id,
       alias: principal.tenant.alias,
       name: principal.tenant.name,
       displayName: principal.actor.displayName,
-      capabilities: [...this.identity!.tenantCapabilities(principal)].sort(),
+      capabilities: [...this.identity.tenantCapabilities(principal)].sort(),
       operator,
       visitor: principal.visitor ?? false,
       organizationId: operator ? principal.orgId : null,
@@ -251,7 +251,7 @@ export class TenantAccessController {
         scopeId: body.scopeId,
         expiresAt: body.expiresAt,
       },
-      this.identity!.tenantCapabilities(principal),
+      this.identity.tenantCapabilities(principal),
     );
   }
 

@@ -83,7 +83,7 @@ export function registerNamespaceHook(
   cls: ClsService,
   prismaManager: PrismaClientManager,
   internalApiKey: InternalApiKeyService,
-  identity: IdentityService | null = null,
+  identity: IdentityService,
 ): void {
   const logger = new Logger('NamespaceHook');
 
@@ -147,7 +147,6 @@ export function registerNamespaceHook(
     }
 
     if (
-      identity &&
       !(await authorizeWorkspaceRequest(
         identity,
         cls,

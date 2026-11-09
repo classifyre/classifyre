@@ -14,7 +14,6 @@ Name | Type
 `appTokenPreview` | string
 `capabilityGroups` | Array&lt;string&gt;
 `agentKinds` | Array&lt;string&gt;
-`allowMutations` | boolean
 `lastError` | string
 `lastConnectedAt` | Date
 `createdAt` | Date
@@ -35,7 +34,6 @@ const example = {
   "appTokenPreview": xapp…9Qz,
   "capabilityGroups": null,
   "agentKinds": null,
-  "allowMutations": null,
   "lastError": null,
   "lastConnectedAt": null,
   "createdAt": null,

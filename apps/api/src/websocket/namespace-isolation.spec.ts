@@ -18,8 +18,15 @@ describe('WebSocket namespace isolation', () => {
     get: jest.fn((key: string) => (key === CLS_SCHEMA ? 'ns_acme' : undefined)),
   };
 
-  // Sign-in off: every socket may join.
-  const open = new SocketAccessService(null);
+  // A signed-in person who may view the workspace.
+  const open = new SocketAccessService({
+    authenticate: () =>
+      Promise.resolve({
+        actor: { displayName: 'Maria K.', ref: 'user:maria' },
+      }),
+    capabilitiesIn: () =>
+      Promise.resolve(new Set(['workspace.view', 'case.view', 'source.view'])),
+  } as never);
 
   beforeEach(() => jest.clearAllMocks());
 
@@ -122,7 +129,7 @@ describe('WebSocket namespace isolation', () => {
       const socket = client('socket-3');
 
       await expect(
-        gateway.subscribe(socket as any, { caseId, actor: 'Maria%20K.' }),
+        gateway.subscribe(socket as any, { caseId }),
       ).resolves.toEqual({ success: true });
 
       expect(socket.join).toHaveBeenCalledWith(`ns_acme:case-board:${caseId}`);

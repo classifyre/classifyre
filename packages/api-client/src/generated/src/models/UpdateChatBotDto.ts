@@ -55,12 +55,6 @@ export interface UpdateChatBotDto {
      * @memberof UpdateChatBotDto
      */
     agentKinds?: Array<UpdateChatBotDtoAgentKindsEnum>;
-    /**
-     * 
-     * @type {boolean}
-     * @memberof UpdateChatBotDto
-     */
-    allowMutations?: boolean;
 }
 
 
@@ -101,7 +95,6 @@ export function UpdateChatBotDtoFromJSONTyped(json: any, ignoreDiscriminator: bo
         'enabled': json['enabled'] == null ? undefined : json['enabled'],
         'capabilityGroups': json['capabilityGroups'] == null ? undefined : json['capabilityGroups'],
         'agentKinds': json['agentKinds'] == null ? undefined : json['agentKinds'],
-        'allowMutations': json['allowMutations'] == null ? undefined : json['allowMutations'],
     };
 }
 
@@ -122,7 +115,6 @@ export function UpdateChatBotDtoToJSONTyped(value?: UpdateChatBotDto | null, ign
         'enabled': value['enabled'],
         'capabilityGroups': value['capabilityGroups'],
         'agentKinds': value['agentKinds'],
-        'allowMutations': value['allowMutations'],
     };
 }
 

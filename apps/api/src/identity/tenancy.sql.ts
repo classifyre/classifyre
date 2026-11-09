@@ -3,24 +3,47 @@
  * namespace registry in `public`. Idempotent DDL, run at boot right after
  * {@link REGISTRY_TABLE_DDL} under the same migration lock.
  *
- * There is always at least one tenant: `local`, which owns every workspace
- * while sign-in is off. Code never branches on "is there a tenant".
+ * Sign-in is always on, so every workspace belongs to a real tenant. The
+ * `local` tenant survives only in the open database of installs that ran
+ * without sign-in, as the source of `admin workspaces copy --to-tenant`.
  */
 export const LOCAL_TENANT_ID = '00000000-0000-4000-8000-0000000000aa';
 
-export const IAM_TABLES_DDL = `
+/**
+ * The open database's tenant columns, run before {@link IAM_TABLES_DDL} when
+ * an operator copies its workspaces into a tenant: an install from before
+ * sign-in existed has none of them yet.
+ */
+export const OPEN_DATABASE_DDL = `
 CREATE TABLE IF NOT EXISTS public.iam_tenants (
   id         uuid PRIMARY KEY,
-  -- The organization's alias in the identity server; 'local' without sign-in.
   alias      text NOT NULL UNIQUE,
   name       text NOT NULL,
-  -- The organization's id in the identity server; NULL for 'local'.
   org_id     text UNIQUE,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 INSERT INTO public.iam_tenants (id, alias, name)
 VALUES ('${LOCAL_TENANT_ID}', 'local', 'Local')
 ON CONFLICT (id) DO NOTHING;
+ALTER TABLE public.namespaces
+  ADD COLUMN IF NOT EXISTS tenant_id uuid REFERENCES public.iam_tenants (id);
+UPDATE public.namespaces SET tenant_id = '${LOCAL_TENANT_ID}' WHERE tenant_id IS NULL;
+ALTER TABLE public.namespace_categories
+  ADD COLUMN IF NOT EXISTS tenant_id uuid REFERENCES public.iam_tenants (id) ON DELETE CASCADE;
+UPDATE public.namespace_categories SET tenant_id = '${LOCAL_TENANT_ID}'
+ WHERE tenant_id IS NULL AND id <> '00000000-0000-4000-8000-000000000001';
+`;
+
+export const IAM_TABLES_DDL = `
+CREATE TABLE IF NOT EXISTS public.iam_tenants (
+  id         uuid PRIMARY KEY,
+  -- The organization's alias in the identity server.
+  alias      text NOT NULL UNIQUE,
+  name       text NOT NULL,
+  -- The organization's id in the identity server.
+  org_id     text UNIQUE,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
 -- When the tenant's 'admins' group got Tenant admin, so the bootstrap gives it
 -- once and a tenant admin can take it away again.
 ALTER TABLE public.iam_tenants
@@ -45,13 +68,12 @@ ALTER TABLE public.iam_tenants
 ALTER TABLE public.iam_tenants
   ADD COLUMN IF NOT EXISTS migration_error text;
 
--- A workspace belongs to exactly one tenant, and with sign-in on is owned by
--- exactly one of its groups (an organization group id in the identity server).
+-- A workspace belongs to exactly one tenant and is owned by exactly one of
+-- its groups (an organization group id in the identity server).
 ALTER TABLE public.namespaces
   ADD COLUMN IF NOT EXISTS tenant_id uuid REFERENCES public.iam_tenants (id);
-UPDATE public.namespaces SET tenant_id = '${LOCAL_TENANT_ID}' WHERE tenant_id IS NULL;
 ALTER TABLE public.namespaces
-  ALTER COLUMN tenant_id SET DEFAULT '${LOCAL_TENANT_ID}',
+  ALTER COLUMN tenant_id DROP DEFAULT,
   ALTER COLUMN tenant_id SET NOT NULL;
 ALTER TABLE public.namespaces
   ADD COLUMN IF NOT EXISTS owner_group_id text;
@@ -115,16 +137,19 @@ CREATE INDEX IF NOT EXISTS iam_audit_events_tenant_idx
 -- makes accounts, so it keeps no list of them.
 DROP TABLE IF EXISTS public.iam_people;
 
--- Workspace categories belong to a tenant, 'local' without sign-in. NULL is
--- only the built-in default category, shared by every tenant.
+-- Workspace categories belong to a tenant. NULL is only the built-in default
+-- category, shared by every tenant.
 ALTER TABLE public.namespace_categories
   ADD COLUMN IF NOT EXISTS tenant_id uuid REFERENCES public.iam_tenants (id) ON DELETE CASCADE;
--- Categories made without sign-in used to be NULL too, and so would show in
--- every tenant (docs/prd/TEN §6).
-UPDATE public.namespace_categories SET tenant_id = '${LOCAL_TENANT_ID}'
- WHERE tenant_id IS NULL AND id <> '00000000-0000-4000-8000-000000000001';
 DROP INDEX IF EXISTS public.namespace_categories_title_key;
 CREATE UNIQUE INDEX IF NOT EXISTS namespace_categories_tenant_title_key
   ON public.namespace_categories
      (COALESCE(tenant_id, '${LOCAL_TENANT_ID}'::uuid), lower(title));
+
+-- Sign-in is always on: the 'local' tenant of workspaces made without it stays
+-- only where something still belongs to it (the open database).
+DELETE FROM public.iam_tenants t
+ WHERE t.id = '${LOCAL_TENANT_ID}'
+   AND NOT EXISTS (SELECT 1 FROM public.namespaces n WHERE n.tenant_id = t.id)
+   AND NOT EXISTS (SELECT 1 FROM public.namespace_categories c WHERE c.tenant_id = t.id);
 `;

@@ -378,9 +378,9 @@ All URIs are relative to *http://localhost*
 *NamespacesApi* | [**namespacesControllerCreate**](docs/NamespacesApi.md#namespacescontrollercreate) | **POST** /namespaces | Create a namespace (provisions its Postgres schema + migrations)
 *NamespacesApi* | [**namespacesControllerCreateCategory**](docs/NamespacesApi.md#namespacescontrollercreatecategory) | **POST** /namespaces/categories | Create a workspace category
 *NamespacesApi* | [**namespacesControllerGet**](docs/NamespacesApi.md#namespacescontrollerget) | **GET** /namespaces/{id} | Get a namespace by id
-*NamespacesApi* | [**namespacesControllerList**](docs/NamespacesApi.md#namespacescontrollerlist) | **GET** /namespaces | List the namespaces the caller can see (all of them without sign-in)
+*NamespacesApi* | [**namespacesControllerList**](docs/NamespacesApi.md#namespacescontrollerlist) | **GET** /namespaces | List the namespaces the caller can see
 *NamespacesApi* | [**namespacesControllerListCategories**](docs/NamespacesApi.md#namespacescontrollerlistcategories) | **GET** /namespaces/categories | List workspace categories with workspace counts
-*NamespacesApi* | [**namespacesControllerOwningGroups**](docs/NamespacesApi.md#namespacescontrollerowninggroups) | **GET** /namespaces/owning-groups | Groups the caller may create workspaces for (empty without sign-in)
+*NamespacesApi* | [**namespacesControllerOwningGroups**](docs/NamespacesApi.md#namespacescontrollerowninggroups) | **GET** /namespaces/owning-groups | Groups the caller may create workspaces for
 *NamespacesApi* | [**namespacesControllerRemove**](docs/NamespacesApi.md#namespacescontrollerremove) | **DELETE** /namespaces/{id} | Soft-delete a namespace (hidden from listings; data retained)
 *NamespacesApi* | [**namespacesControllerRemoveCategory**](docs/NamespacesApi.md#namespacescontrollerremovecategory) | **DELETE** /namespaces/categories/{categoryId} | Delete a category (its workspaces fall back to the default category)
 *NamespacesApi* | [**namespacesControllerStats**](docs/NamespacesApi.md#namespacescontrollerstats) | **GET** /namespaces/stats | Per-namespace source rollups (total + failing + running + pending)
@@ -403,8 +403,6 @@ All URIs are relative to *http://localhost*
 *NotificationsApi* | [**notificationsControllerMarkAllRead**](docs/NotificationsApi.md#notificationscontrollermarkallread) | **PATCH** /notifications/mark-all-read | Mark all notifications as read
 *NotificationsApi* | [**notificationsControllerMarkRead**](docs/NotificationsApi.md#notificationscontrollermarkread) | **PATCH** /notifications/{id}/read | Mark a notification as read
 *NotificationsApi* | [**notificationsControllerSetImportant**](docs/NotificationsApi.md#notificationscontrollersetimportant) | **PATCH** /notifications/{id}/important | Set notification importance
-*PlatformApi* | [**platformControllerImportWorkspaces**](docs/PlatformApi.md#platformcontrollerimportworkspaces) | **POST** /platform/tenants/{tenantId}/workspaces | Copy workspaces made without sign-in into a tenant
-*PlatformApi* | [**platformControllerLocalWorkspaces**](docs/PlatformApi.md#platformcontrollerlocalworkspaces) | **GET** /platform/workspaces/local | Workspaces made without sign-in, which can be brought into a tenant
 *PlatformApi* | [**platformControllerMe**](docs/PlatformApi.md#platformcontrollerme) | **GET** /platform/me | Whether the caller is an operator (403 when not)
 *PlatformApi* | [**platformControllerRemove**](docs/PlatformApi.md#platformcontrollerremove) | **DELETE** /platform/tenants/{tenantId} | Remove a tenant whose organization was deleted
 *PlatformApi* | [**platformControllerResume**](docs/PlatformApi.md#platformcontrollerresume) | **POST** /platform/tenants/{tenantId}/resume | Resume a suspended tenant
@@ -797,8 +795,6 @@ All URIs are relative to *http://localhost*
 - [HarnessToolsResponseDto](docs/HarnessToolsResponseDto.md)
 - [HealthControllerGetHealth200Response](docs/HealthControllerGetHealth200Response.md)
 - [HypothesisStatus](docs/HypothesisStatus.md)
-- [ImportWorkspacesDto](docs/ImportWorkspacesDto.md)
-- [ImportedWorkspacesDto](docs/ImportedWorkspacesDto.md)
 - [IngestEdgeDto](docs/IngestEdgeDto.md)
 - [InquiryActivityDto](docs/InquiryActivityDto.md)
 - [InquiryLinkedCaseDto](docs/InquiryLinkedCaseDto.md)
@@ -814,7 +810,6 @@ All URIs are relative to *http://localhost*
 - [LinkThreadSupportDto](docs/LinkThreadSupportDto.md)
 - [ListRunnersResponseDto](docs/ListRunnersResponseDto.md)
 - [LiveQueryResponseDto](docs/LiveQueryResponseDto.md)
-- [LocalWorkspaceDto](docs/LocalWorkspaceDto.md)
 - [LocationDto](docs/LocationDto.md)
 - [MarkAllReadDto](docs/MarkAllReadDto.md)
 - [MatchOptionCustomDetectorDto](docs/MatchOptionCustomDetectorDto.md)

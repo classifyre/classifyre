@@ -23,7 +23,6 @@ Name | Type
 `createNew` | boolean
 `refType` | string
 `refId` | string
-`author` | string
 
 ## Example
 
@@ -49,7 +48,6 @@ const example = {
   "createNew": null,
   "refType": null,
   "refId": null,
-  "author": null,
 } satisfies UpsertGlossaryTermDto
 
 console.log(example)

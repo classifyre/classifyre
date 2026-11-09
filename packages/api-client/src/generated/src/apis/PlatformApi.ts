@@ -15,29 +15,15 @@
 
 import * as runtime from '../runtime';
 import type {
-  ImportWorkspacesDto,
-  ImportedWorkspacesDto,
-  LocalWorkspaceDto,
   PlatformMeDto,
   PlatformTenantDto,
 } from '../models/index';
 import {
-    ImportWorkspacesDtoFromJSON,
-    ImportWorkspacesDtoToJSON,
-    ImportedWorkspacesDtoFromJSON,
-    ImportedWorkspacesDtoToJSON,
-    LocalWorkspaceDtoFromJSON,
-    LocalWorkspaceDtoToJSON,
     PlatformMeDtoFromJSON,
     PlatformMeDtoToJSON,
     PlatformTenantDtoFromJSON,
     PlatformTenantDtoToJSON,
 } from '../models/index';
-
-export interface PlatformControllerImportWorkspacesRequest {
-    tenantId: string;
-    importWorkspacesDto: ImportWorkspacesDto;
-}
 
 export interface PlatformControllerRemoveRequest {
     tenantId: string;
@@ -56,82 +42,6 @@ export interface PlatformControllerSuspendRequest {
  * 
  */
 export class PlatformApi extends runtime.BaseAPI {
-
-    /**
-     * Copy workspaces made without sign-in into a tenant
-     */
-    async platformControllerImportWorkspacesRaw(requestParameters: PlatformControllerImportWorkspacesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ImportedWorkspacesDto>> {
-        if (requestParameters['tenantId'] == null) {
-            throw new runtime.RequiredError(
-                'tenantId',
-                'Required parameter "tenantId" was null or undefined when calling platformControllerImportWorkspaces().'
-            );
-        }
-
-        if (requestParameters['importWorkspacesDto'] == null) {
-            throw new runtime.RequiredError(
-                'importWorkspacesDto',
-                'Required parameter "importWorkspacesDto" was null or undefined when calling platformControllerImportWorkspaces().'
-            );
-        }
-
-        const queryParameters: any = {};
-
-        const headerParameters: runtime.HTTPHeaders = {};
-
-        headerParameters['Content-Type'] = 'application/json';
-
-
-        let urlPath = `/platform/tenants/{tenantId}/workspaces`;
-        urlPath = urlPath.replace(`{${"tenantId"}}`, encodeURIComponent(String(requestParameters['tenantId'])));
-
-        const response = await this.request({
-            path: urlPath,
-            method: 'POST',
-            headers: headerParameters,
-            query: queryParameters,
-            body: ImportWorkspacesDtoToJSON(requestParameters['importWorkspacesDto']),
-        }, initOverrides);
-
-        return new runtime.JSONApiResponse(response, (jsonValue) => ImportedWorkspacesDtoFromJSON(jsonValue));
-    }
-
-    /**
-     * Copy workspaces made without sign-in into a tenant
-     */
-    async platformControllerImportWorkspaces(requestParameters: PlatformControllerImportWorkspacesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ImportedWorkspacesDto> {
-        const response = await this.platformControllerImportWorkspacesRaw(requestParameters, initOverrides);
-        return await response.value();
-    }
-
-    /**
-     * Workspaces made without sign-in, which can be brought into a tenant
-     */
-    async platformControllerLocalWorkspacesRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<LocalWorkspaceDto>>> {
-        const queryParameters: any = {};
-
-        const headerParameters: runtime.HTTPHeaders = {};
-
-
-        let urlPath = `/platform/workspaces/local`;
-
-        const response = await this.request({
-            path: urlPath,
-            method: 'GET',
-            headers: headerParameters,
-            query: queryParameters,
-        }, initOverrides);
-
-        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(LocalWorkspaceDtoFromJSON));
-    }
-
-    /**
-     * Workspaces made without sign-in, which can be brought into a tenant
-     */
-    async platformControllerLocalWorkspaces(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<LocalWorkspaceDto>> {
-        const response = await this.platformControllerLocalWorkspacesRaw(initOverrides);
-        return await response.value();
-    }
 
     /**
      * Whether the caller is an operator (403 when not)

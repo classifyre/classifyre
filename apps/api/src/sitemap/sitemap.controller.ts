@@ -31,16 +31,16 @@ import { IAM_CONFIG } from '../identity/identity.tokens';
 export class SitemapController {
   constructor(
     private readonly sitemapService: SitemapService,
-    @Inject(IAM_CONFIG) private readonly iam: IamConfig | null,
+    @Inject(IAM_CONFIG) private readonly iam: IamConfig,
   ) {}
 
   /**
-   * A signed-in instance is private (docs/prd §2 H4), except its public
-   * tenant: the namespace hook lets a crawler, a visitor, reach only that
-   * tenant's workspaces.
+   * An instance is private (docs/prd §2 H4), except its public tenant: the
+   * namespace hook lets a crawler, a visitor, reach only that tenant's
+   * workspaces.
    */
   private assertPublic(): void {
-    if (this.iam && !this.iam.publicTenantAlias) throw new NotFoundException();
+    if (!this.iam.publicTenantAlias) throw new NotFoundException();
   }
 
   @Get()
