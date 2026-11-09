@@ -53,7 +53,7 @@ describe('WebSocket namespace isolation', () => {
     expect(refusing.canJoin).toHaveBeenCalledWith(
       client,
       'id-acme',
-      'workspace.view',
+      'notification.view',
     );
     expect(client.join).not.toHaveBeenCalled();
   });
@@ -93,7 +93,7 @@ describe('WebSocket namespace isolation', () => {
     expect(client.join).not.toHaveBeenCalled();
   });
 
-  it('emits notifications only to the current schema room', () => {
+  it("emits notifications only to the current schema's group and person rooms", () => {
     const gateway = new NotificationEventsGateway(
       cls as any,
       registry as any,
@@ -103,12 +103,14 @@ describe('WebSocket namespace isolation', () => {
     const to = jest.fn(() => ({ emit }));
     gateway.server = { to } as any;
 
-    gateway.emitNotificationDeleted('notification-1');
-
-    expect(to).toHaveBeenCalledWith('ns_acme:notifications');
+    gateway.emitNotificationDeleted('user:ada', 'notification-1');
+    expect(to).toHaveBeenCalledWith('ns_acme:notifications:p:user:ada');
     expect(emit).toHaveBeenCalledWith('notification:deleted', {
       id: 'notification-1',
     });
+
+    gateway.emitNotificationCreated({ id: 'n2' } as any, ['finance']);
+    expect(to).toHaveBeenCalledWith(['ns_acme:notifications:g:finance']);
   });
 
   describe('case board', () => {

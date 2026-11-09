@@ -20,7 +20,9 @@ import type { IdentityService } from '../identity/identity.service';
 import { CLS_ACTOR } from '../identity/actor-context.service';
 import {
   CLS_CAPABILITIES,
+  CLS_PERSON,
   CLS_RESOURCE_GRANTS,
+  type ClsPerson,
 } from '../identity/iam-access-policy';
 import { RESOURCE_GRANTABLE_CAPABILITIES } from '../identity/access-policy';
 import { resourceGrantsInWorkspace } from '../identity/grant-evaluation';
@@ -250,6 +252,12 @@ async function authorizeWorkspaceRequest(
   }
   cls.set(CLS_ACTOR, principal.actor);
   cls.set(CLS_CAPABILITIES, capabilities);
+  if (principal.actor.id?.startsWith('user:')) {
+    cls.set<ClsPerson>(CLS_PERSON, {
+      actorRef: principal.actor.id,
+      groupIds: await identity.groupLineage(principal),
+    });
+  }
   cls.set(
     CLS_RESOURCE_GRANTS,
     Object.fromEntries(

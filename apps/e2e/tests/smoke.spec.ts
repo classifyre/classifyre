@@ -186,6 +186,21 @@ test.describe.serial("smoke with sign-in", () => {
 
     await page.goto(`/${SLUG}/sources`);
     await expect(page.getByText(SOURCE_NAME, { exact: true }).first()).toBeVisible();
+
+    // "First scan complete" went to the workspace's owning group, which the
+    // admin is in (notifications go to groups).
+    await expect
+      .poll(
+        async () =>
+          (
+            await api.ok<{ notifications: Array<{ type: string; sourceId?: string | null }> }>(
+              "GET",
+              `/${SLUG}/notifications`,
+            )
+          ).notifications.some((n) => n.type === "SOURCE" && n.sourceId === sourceId),
+        { timeout: 60_000, intervals: [5_000] },
+      )
+      .toBe(true);
   });
 
   test("a viewer sees the workspace only once given access, and only reads", async ({ browser }) => {
@@ -340,8 +355,10 @@ test.describe.serial("smoke with sign-in", () => {
       expect(listed, "a signed-in tenant's workspace").not.toContain(SLUG);
       expect((await visitor.call("GET", `/${SLUG}/sources`)).status).toBe(404);
       expect((await visitor.call("GET", `/${PUBLIC_SLUG}/sources`)).status).toBe(200);
-      // Read-only, and not who has access.
+      // Read-only, not who has access, and no notifications: those go to
+      // groups, and a visitor is in none.
       expect((await visitor.call("GET", `/${PUBLIC_SLUG}/access/grants`)).status).toBe(403);
+      expect((await visitor.call("GET", `/${PUBLIC_SLUG}/notifications`)).status).toBe(403);
       const write = await visitor.call("POST", `/${PUBLIC_SLUG}/sources`, {
         type: "LOCAL_FOLDER",
         name: "Not allowed",

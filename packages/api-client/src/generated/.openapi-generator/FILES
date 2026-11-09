@@ -345,6 +345,7 @@ docs/NotebookExecutionDto.md
 docs/NotebookScaffoldDto.md
 docs/NotebookTemplateDto.md
 docs/NotebooksApi.md
+docs/NotificationAudienceDto.md
 docs/NotificationListResponseDto.md
 docs/NotificationResponseDto.md
 docs/NotificationsApi.md
@@ -593,6 +594,7 @@ docs/UpdateMcpServerDto.md
 docs/UpdateMcpTokenDto.md
 docs/UpdateNotebookDto.md
 docs/UpdateNotebookResponseDto.md
+docs/UpdateNotificationAudienceDto.md
 docs/UpdateNotificationImportanceDto.md
 docs/UpdateRunnerAssetStatusDto.md
 docs/UpdateSourceDto.md
@@ -966,6 +968,7 @@ src/models/NotebookDto.ts
 src/models/NotebookExecutionDto.ts
 src/models/NotebookScaffoldDto.ts
 src/models/NotebookTemplateDto.ts
+src/models/NotificationAudienceDto.ts
 src/models/NotificationListResponseDto.ts
 src/models/NotificationResponseDto.ts
 src/models/NotificationsControllerDeleteNotification200Response.ts
@@ -1207,6 +1210,7 @@ src/models/UpdateMcpServerDto.ts
 src/models/UpdateMcpTokenDto.ts
 src/models/UpdateNotebookDto.ts
 src/models/UpdateNotebookResponseDto.ts
+src/models/UpdateNotificationAudienceDto.ts
 src/models/UpdateNotificationImportanceDto.ts
 src/models/UpdateRunnerAssetStatusDto.ts
 src/models/UpdateSourceDto.ts

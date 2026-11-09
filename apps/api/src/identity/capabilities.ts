@@ -45,6 +45,12 @@ export const CAPABILITIES = [
     scope: 'workspace',
     description: 'Export, import or copy workspace data.',
   },
+  {
+    id: 'notification.view',
+    scope: 'workspace',
+    description:
+      'Get the notifications sent to your groups in the workspace, and mark them read, important or dismissed for yourself.',
+  },
   // Access
   {
     id: 'access.view',

@@ -16,15 +16,19 @@
 import * as runtime from '../runtime';
 import type {
   MarkAllReadDto,
+  NotificationAudienceDto,
   NotificationListResponseDto,
   NotificationResponseDto,
   NotificationsControllerDeleteNotification200Response,
   NotificationsControllerMarkAllRead200Response,
+  UpdateNotificationAudienceDto,
   UpdateNotificationImportanceDto,
 } from '../models/index';
 import {
     MarkAllReadDtoFromJSON,
     MarkAllReadDtoToJSON,
+    NotificationAudienceDtoFromJSON,
+    NotificationAudienceDtoToJSON,
     NotificationListResponseDtoFromJSON,
     NotificationListResponseDtoToJSON,
     NotificationResponseDtoFromJSON,
@@ -33,6 +37,8 @@ import {
     NotificationsControllerDeleteNotification200ResponseToJSON,
     NotificationsControllerMarkAllRead200ResponseFromJSON,
     NotificationsControllerMarkAllRead200ResponseToJSON,
+    UpdateNotificationAudienceDtoFromJSON,
+    UpdateNotificationAudienceDtoToJSON,
     UpdateNotificationImportanceDtoFromJSON,
     UpdateNotificationImportanceDtoToJSON,
 } from '../models/index';
@@ -62,6 +68,11 @@ export interface NotificationsControllerMarkReadRequest {
     id: string;
 }
 
+export interface NotificationsControllerSetAudienceRequest {
+    type: NotificationsControllerSetAudienceTypeEnum;
+    updateNotificationAudienceDto: UpdateNotificationAudienceDto;
+}
+
 export interface NotificationsControllerSetImportantRequest {
     id: string;
     updateNotificationImportanceDto: UpdateNotificationImportanceDto;
@@ -73,7 +84,39 @@ export interface NotificationsControllerSetImportantRequest {
 export class NotificationsApi extends runtime.BaseAPI {
 
     /**
-     * Delete a notification
+     * An empty list means the workspace\'s owning group. A notification keeps the groups it was sent to.
+     * Which groups get each kind of notification
+     */
+    async notificationsControllerAudiencesRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<NotificationAudienceDto>>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/notifications/audiences`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(NotificationAudienceDtoFromJSON));
+    }
+
+    /**
+     * An empty list means the workspace\'s owning group. A notification keeps the groups it was sent to.
+     * Which groups get each kind of notification
+     */
+    async notificationsControllerAudiences(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<NotificationAudienceDto>> {
+        const response = await this.notificationsControllerAudiencesRaw(initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Hides it for you only; everyone else in its groups keeps it.
+     * Dismiss a notification
      */
     async notificationsControllerDeleteNotificationRaw(requestParameters: NotificationsControllerDeleteNotificationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<NotificationsControllerDeleteNotification200Response>> {
         if (requestParameters['id'] == null) {
@@ -102,7 +145,8 @@ export class NotificationsApi extends runtime.BaseAPI {
     }
 
     /**
-     * Delete a notification
+     * Hides it for you only; everyone else in its groups keeps it.
+     * Dismiss a notification
      */
     async notificationsControllerDeleteNotification(requestParameters: NotificationsControllerDeleteNotificationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<NotificationsControllerDeleteNotification200Response> {
         const response = await this.notificationsControllerDeleteNotificationRaw(requestParameters, initOverrides);
@@ -181,8 +225,8 @@ export class NotificationsApi extends runtime.BaseAPI {
     }
 
     /**
-     * Marks all unread notifications as read. Optional filters can narrow the update.
-     * Mark all notifications as read
+     * Marks every unread notification you get as read, for you. Optional filters can narrow the update.
+     * Mark all your notifications as read
      */
     async notificationsControllerMarkAllReadRaw(requestParameters: NotificationsControllerMarkAllReadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<NotificationsControllerMarkAllRead200Response>> {
         if (requestParameters['markAllReadDto'] == null) {
@@ -213,8 +257,8 @@ export class NotificationsApi extends runtime.BaseAPI {
     }
 
     /**
-     * Marks all unread notifications as read. Optional filters can narrow the update.
-     * Mark all notifications as read
+     * Marks every unread notification you get as read, for you. Optional filters can narrow the update.
+     * Mark all your notifications as read
      */
     async notificationsControllerMarkAllRead(requestParameters: NotificationsControllerMarkAllReadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<NotificationsControllerMarkAllRead200Response> {
         const response = await this.notificationsControllerMarkAllReadRaw(requestParameters, initOverrides);
@@ -255,6 +299,55 @@ export class NotificationsApi extends runtime.BaseAPI {
      */
     async notificationsControllerMarkRead(requestParameters: NotificationsControllerMarkReadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<NotificationResponseDto> {
         const response = await this.notificationsControllerMarkReadRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Groups of your tenant; an empty list sends it to the owning group again. Applies to notifications made from now on.
+     * Choose which groups get a kind of notification
+     */
+    async notificationsControllerSetAudienceRaw(requestParameters: NotificationsControllerSetAudienceRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<NotificationAudienceDto>> {
+        if (requestParameters['type'] == null) {
+            throw new runtime.RequiredError(
+                'type',
+                'Required parameter "type" was null or undefined when calling notificationsControllerSetAudience().'
+            );
+        }
+
+        if (requestParameters['updateNotificationAudienceDto'] == null) {
+            throw new runtime.RequiredError(
+                'updateNotificationAudienceDto',
+                'Required parameter "updateNotificationAudienceDto" was null or undefined when calling notificationsControllerSetAudience().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/notifications/audiences/{type}`;
+        urlPath = urlPath.replace(`{${"type"}}`, encodeURIComponent(String(requestParameters['type'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'PUT',
+            headers: headerParameters,
+            query: queryParameters,
+            body: UpdateNotificationAudienceDtoToJSON(requestParameters['updateNotificationAudienceDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => NotificationAudienceDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Groups of your tenant; an empty list sends it to the owning group again. Applies to notifications made from now on.
+     * Choose which groups get a kind of notification
+     */
+    async notificationsControllerSetAudience(requestParameters: NotificationsControllerSetAudienceRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<NotificationAudienceDto> {
+        const response = await this.notificationsControllerSetAudienceRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -328,3 +421,13 @@ export const NotificationsControllerListNotificationsSeverityEnum = {
     Info: 'INFO'
 } as const;
 export type NotificationsControllerListNotificationsSeverityEnum = typeof NotificationsControllerListNotificationsSeverityEnum[keyof typeof NotificationsControllerListNotificationsSeverityEnum];
+/**
+ * @export
+ */
+export const NotificationsControllerSetAudienceTypeEnum = {
+    Scan: 'SCAN',
+    Finding: 'FINDING',
+    Source: 'SOURCE',
+    System: 'SYSTEM'
+} as const;
+export type NotificationsControllerSetAudienceTypeEnum = typeof NotificationsControllerSetAudienceTypeEnum[keyof typeof NotificationsControllerSetAudienceTypeEnum];

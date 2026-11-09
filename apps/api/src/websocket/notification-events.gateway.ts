@@ -51,11 +51,23 @@ export class NotificationEventsGateway
     this.logger.log(`WebSocket client disconnected: ${client.id}`);
   }
 
+  /**
+   * A socket joins its workspace's notification rooms: one per group the
+   * person is in (with the groups above), where new notifications sent to
+   * those groups arrive, and the person's own, where their read, importance
+   * and dismissals arrive. Visitors are in no group and are refused.
+   */
   @SubscribeMessage('subscribe:notifications')
   async handleSubscribeNotifications(client: Socket) {
     const schema = await this.resolveClientSchema(client);
     if (!schema) return { success: false, message: 'Unknown namespace' };
-    await client.join(this.room(schema));
+    const person = await this.socketAccess.person(client);
+    if (!person) return { success: false, message: 'Not signed in' };
+    await client.join([
+      this.room(schema),
+      this.personRoom(schema, person.actorRef),
+      ...person.groupIds.map((groupId) => this.groupRoom(schema, groupId)),
+    ]);
     this.logger.log(`Client ${client.id} subscribed to notifications`);
     return { success: true, message: 'Subscribed to notifications' };
   }
@@ -64,34 +76,45 @@ export class NotificationEventsGateway
   async handleUnsubscribeNotifications(client: Socket) {
     const schema = await this.resolveClientSchema(client);
     if (!schema) return { success: false, message: 'Unknown namespace' };
-    await client.leave(this.room(schema));
+    for (const room of client.rooms) {
+      if (room.startsWith(this.room(schema))) await client.leave(room);
+    }
     this.logger.log(`Client ${client.id} unsubscribed from notifications`);
     return { success: true, message: 'Unsubscribed from notifications' };
   }
 
-  emitNotificationCreated(notification: NotificationResponseDto) {
+  /** A new notification, to the groups it was sent to. */
+  emitNotificationCreated(
+    notification: NotificationResponseDto,
+    groupIds: string[],
+  ) {
+    if (!groupIds.length) return;
+    const schema = this.currentSchema();
     this.server
-      .to(this.room(this.currentSchema()))
+      .to(groupIds.map((groupId) => this.groupRoom(schema, groupId)))
       .emit('notification:created', notification);
   }
 
-  emitNotificationUpdated(notification: NotificationResponseDto) {
+  /** One person's read or importance changed, on their own sockets. */
+  emitNotificationUpdated(
+    actorRef: string,
+    notification: NotificationResponseDto,
+  ) {
     this.server
-      .to(this.room(this.currentSchema()))
+      .to(this.personRoom(this.currentSchema(), actorRef))
       .emit('notification:updated', notification);
   }
 
-  emitNotificationDeleted(notificationId: string) {
+  /** One person dismissed a notification, on their own sockets. */
+  emitNotificationDeleted(actorRef: string, notificationId: string) {
     this.server
-      .to(this.room(this.currentSchema()))
-      .emit('notification:deleted', {
-        id: notificationId,
-      });
+      .to(this.personRoom(this.currentSchema(), actorRef))
+      .emit('notification:deleted', { id: notificationId });
   }
 
-  emitNotificationsChanged(payload?: { updated?: number }) {
+  emitNotificationsChanged(actorRef: string, payload?: { updated?: number }) {
     this.server
-      .to(this.room(this.currentSchema()))
+      .to(this.personRoom(this.currentSchema(), actorRef))
       .emit('notifications:changed', payload ?? {});
   }
 
@@ -113,6 +136,14 @@ export class NotificationEventsGateway
     return `${schema}:notifications`;
   }
 
+  private groupRoom(schema: string, groupId: string): string {
+    return `${this.room(schema)}:g:${groupId}`;
+  }
+
+  private personRoom(schema: string, actorRef: string): string {
+    return `${this.room(schema)}:p:${actorRef}`;
+  }
+
   private async resolveClientSchema(client: Socket): Promise<string | null> {
     const cached = client.data['classifyreSchema'];
     if (typeof cached === 'string') return cached;
@@ -124,7 +155,7 @@ export class NotificationEventsGateway
       !(await this.socketAccess.canJoin(
         client,
         namespace.namespaceId,
-        'workspace.view',
+        'notification.view',
       ))
     ) {
       return null;

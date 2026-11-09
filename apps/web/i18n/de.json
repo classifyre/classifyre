@@ -7442,5 +7442,25 @@
       "saved": "Gespeichert",
       "changedBy": "Zuletzt geändert von"
     }
+  },
+
+  "notificationAudiences": {
+    "title": "Wer Benachrichtigungen erhält",
+    "description": "Benachrichtigungen gehen an Gruppen: standardmäßig an die Gruppe, der dieser Arbeitsbereich gehört, samt Untergruppen. Hier wählen Sie für eine Art von Benachrichtigung andere Gruppen; jede Benachrichtigung behält die Gruppen, an die sie ging, und jede Person markiert sie für sich als gelesen.",
+    "owningGroup": "Besitzende Gruppe",
+    "add": "Gruppe hinzufügen",
+    "remove": "Nicht mehr an {{group}} senden",
+    "reset": "Nur besitzende Gruppe",
+    "saved": "Gespeichert. Neue Benachrichtigungen gehen an diese Gruppen.",
+    "saveFailed": "Konnte nicht speichern, wer sie erhält",
+    "loadFailed": "Konnte nicht laden, wer Benachrichtigungen erhält",
+    "notForYou": "Benachrichtigungen gehen an die Gruppen eines Arbeitsbereichs. Melden Sie sich an, um die an Ihre Gruppen zu erhalten.",
+    "removedGroup": "Entfernte Gruppe",
+    "types": {
+      "SCAN": "Scans",
+      "FINDING": "Funde",
+      "SOURCE": "Quellen",
+      "SYSTEM": "System"
+    }
   }
 }

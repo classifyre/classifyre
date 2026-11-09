@@ -4126,6 +4126,80 @@
         ]
       }
     },
+    "/notifications/audiences": {
+      "get": {
+        "description": "An empty list means the workspace's owning group. A notification keeps the groups it was sent to.",
+        "operationId": "NotificationsController_audiences",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NotificationAudienceDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Which groups get each kind of notification",
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
+    "/notifications/audiences/{type}": {
+      "put": {
+        "description": "Groups of your tenant; an empty list sends it to the owning group again. Applies to notifications made from now on.",
+        "operationId": "NotificationsController_setAudience",
+        "parameters": [
+          {
+            "name": "type",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "enum": [
+                "SCAN",
+                "FINDING",
+                "SOURCE",
+                "SYSTEM"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNotificationAudienceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationAudienceDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Choose which groups get a kind of notification",
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
     "/notifications": {
       "get": {
         "description": "Retrieve notifications with optional filters and pagination.",
@@ -4249,7 +4323,7 @@
     },
     "/notifications/mark-all-read": {
       "patch": {
-        "description": "Marks all unread notifications as read. Optional filters can narrow the update.",
+        "description": "Marks every unread notification you get as read, for you. Optional filters can narrow the update.",
         "operationId": "NotificationsController_markAllRead",
         "parameters": [],
         "requestBody": {
@@ -4292,7 +4366,7 @@
             }
           }
         },
-        "summary": "Mark all notifications as read",
+        "summary": "Mark all your notifications as read",
         "tags": [
           "Notifications"
         ]
@@ -4376,6 +4450,7 @@
     },
     "/notifications/{id}": {
       "delete": {
+        "description": "Hides it for you only; everyone else in its groups keeps it.",
         "operationId": "NotificationsController_deleteNotification",
         "parameters": [
           {
@@ -4391,7 +4466,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Notification deleted",
+            "description": "Notification dismissed for you",
             "content": {
               "application/json": {
                 "schema": {
@@ -4407,7 +4482,7 @@
             }
           }
         },
-        "summary": "Delete a notification",
+        "summary": "Dismiss a notification",
         "tags": [
           "Notifications"
         ]
@@ -22387,6 +22462,55 @@
           }
         }
       },
+      "NotificationAudienceDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "SCAN",
+              "FINDING",
+              "SOURCE",
+              "SYSTEM"
+            ]
+          },
+          "groupIds": {
+            "description": "Group ids that get this kind; empty means the workspace's owning group.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "updatedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "updatedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "type",
+          "groupIds"
+        ]
+      },
+      "UpdateNotificationAudienceDto": {
+        "type": "object",
+        "properties": {
+          "groupIds": {
+            "description": "Group ids of your tenant; empty sends it to the workspace's owning group.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "groupIds"
+        ]
+      },
       "NotificationResponseDto": {
         "type": "object",
         "properties": {
@@ -30686,6 +30810,7 @@
                 "workspace.pause",
                 "workspace.delete",
                 "workspace.transfer",
+                "notification.view",
                 "access.view",
                 "access.manage",
                 "source.view",
@@ -30867,6 +30992,7 @@
                 "workspace.pause",
                 "workspace.delete",
                 "workspace.transfer",
+                "notification.view",
                 "access.view",
                 "access.manage",
                 "source.view",
@@ -31084,6 +31210,7 @@
                 "workspace.pause",
                 "workspace.delete",
                 "workspace.transfer",
+                "notification.view",
                 "access.view",
                 "access.manage",
                 "source.view",

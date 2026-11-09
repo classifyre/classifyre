@@ -288,6 +288,23 @@ check D "exporting needs data.export as well" ":EXPORT_NOT_ALLOWED" "$(run_code 
 check D "the grants are listed with the workspace's" "asset,source" "$(get admin /fin-ledger/access/grants | json "print(','.join(sorted(g['scopeType'] for g in d if g['roleKey']=='data-reader')))")"
 check D "another tenant gets 404" 404 "$(status outsider@globex GET /fin-ledger/data-query/catalog)"
 
+say "notifications go to groups (docs/prd/IAM §6.4)"
+pg "$DEFAULT_DB" "INSERT INTO $LEDGER_SCHEMA.notifications (id, type, severity, title, message, audience_group_ids, updated_at)
+  VALUES ('00000000-0000-4000-8000-00000000a001', 'SCAN', 'INFO', 'to-owner', 'm', '{}', now()),
+         ('00000000-0000-4000-8000-00000000a002', 'SOURCE', 'INFO', 'to-data', 'm', ARRAY['$DATA'], now())" >/dev/null
+seen() { get "$1" /fin-ledger/notifications | json "print(','.join(sorted(n['title'] for n in d.get('notifications', []))) or '-')"; }
+check N "the owning group gets what is sent to no group in particular" to-owner "$(seen controller)"
+check N "so do members of its subgroups" to-owner "$(seen investigator)"
+check N "a chosen group gets what is sent to it, and only that" to-data "$(seen engineer)"
+check N "a role alone does not make anyone a recipient" - "$(seen admin)"
+status controller PATCH /fin-ledger/notifications/00000000-0000-4000-8000-00000000a001/read >/dev/null
+unread() { get "$1" /fin-ledger/notifications | json "print(d.get('unreadCount'))"; }
+check N "reading it is each person's own" "0,1" "$(unread controller),$(unread investigator)"
+check N "nobody marks what was not sent to them" 404 "$(status controller PATCH /fin-ledger/notifications/00000000-0000-4000-8000-00000000a002/read)"
+check N "a viewer cannot choose who gets them" 403 "$(status controller PUT /fin-ledger/notifications/audiences/SCAN "{\"groupIds\":[\"$AP\"]}")"
+check N "a workspace admin can" 200 "$(status admin PUT /fin-ledger/notifications/audiences/SCAN "{\"groupIds\":[\"$AP\"]}")"
+check N "only groups of the tenant" 400 "$(status admin PUT /fin-ledger/notifications/audiences/SCAN '{"groupIds":["no-such-group"]}')"
+
 say "operator commands (docs/prd/TEN §4.9)"
 check T0 "copies go only into a tenant" 2 "$(operator workspaces copy --to-local fin-q3 >/dev/null 2>&1; echo $?)"
 check T0 "a copy into an unknown tenant is refused" 2 "$(operator workspaces copy --to-tenant nowhere --all >/dev/null 2>&1; echo $?)"
