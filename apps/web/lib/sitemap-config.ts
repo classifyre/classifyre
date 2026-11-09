@@ -179,16 +179,17 @@ function readEnv(name: string): string | undefined {
   return value && value.length > 0 ? value : undefined;
 }
 
-/** Whether this deployment publishes a sitemap and invites crawlers. */
 /**
- * Crawling is invited only when asked for, and never with sign-in on: a
- * signed-in instance is private, whatever SITEMAP_ENABLED says (docs/prd
- * IAM §2 H4). This one switch drives robots.txt, the sitemap routes and every
+ * Whether this deployment publishes a sitemap and invites crawlers: only when
+ * asked for, and only with a public tenant that visitors read without signing
+ * in. Everything else is private, whatever SITEMAP_ENABLED says (docs/prd IAM
+ * §2 H4). This one switch drives robots.txt, the sitemap routes and every
  * page's robots metadata.
  */
 export function isSitemapEnabled(): boolean {
   return (
-    readEnv("SITEMAP_ENABLED") === "true" && readEnv("IAM_ENABLED") !== "true"
+    readEnv("SITEMAP_ENABLED") === "true" &&
+    Boolean(readEnv("IAM_PUBLIC_TENANT")?.trim())
   );
 }
 

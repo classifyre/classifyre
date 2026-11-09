@@ -1,7 +1,6 @@
 import { accountPagePath, identityConsolePath } from "./console";
 
 const env = {
-  IAM_ENABLED: "true",
   IAM_REALM_CONSOLE: "true",
   IAM_REALM: "classifyre",
 };
@@ -24,22 +23,20 @@ describe("identity console link", () => {
     );
   });
 
-  it("is off without sign-in or without the realm console", () => {
+  it("is off without the realm console", () => {
     expect(
       identityConsolePath({ ...env, IAM_REALM_CONSOLE: "false" }),
     ).toBeNull();
-    expect(identityConsolePath({ ...env, IAM_ENABLED: "false" })).toBeNull();
     expect(identityConsolePath({ ...env, IAM_REALM: "" })).toBeNull();
   });
 });
 
 describe("account page link", () => {
-  it("opens the person's own account page in the realm, with sign-in only", () => {
+  it("opens the person's own account page in the realm", () => {
     expect(accountPagePath(env)).toBe("/iam/realms/classifyre/account/");
     expect(accountPagePath({ ...env, IAM_REALM_CONSOLE: "false" })).toBe(
       "/iam/realms/classifyre/account/",
     );
-    expect(accountPagePath({ ...env, IAM_ENABLED: "false" })).toBeNull();
     expect(accountPagePath({ ...env, IAM_REALM: "../master" })).toBeNull();
   });
 });

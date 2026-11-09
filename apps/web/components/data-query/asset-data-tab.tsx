@@ -6,7 +6,6 @@ import { ExternalLink, Lock } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { useTranslation } from "@/hooks/use-translation";
 import { useNamespace } from "@/components/namespace-provider";
-import { useIamEnabled } from "@/components/iam-session";
 import { useCan } from "@/hooks/use-me";
 import type { QueryCatalog, QueryCatalogTable } from "@/lib/data-query";
 import { QueryWorkbench } from "./query-workbench";
@@ -26,7 +25,6 @@ export function AssetDataTab({
 }) {
   const { t } = useTranslation();
   const { nsHref, namespace } = useNamespace();
-  const iam = useIamEnabled();
   const canManage = useCan("access.manage");
   const sql = `SELECT *\nFROM ${table.sqlName}\nLIMIT 100`;
 
@@ -66,7 +64,7 @@ export function AssetDataTab({
           />
         </>
       )}
-      {iam && canManage && namespace?.id && (
+      {canManage && namespace?.id && (
         <DataAccessPanel
           workspaceId={namespace.id}
           assetId={table.assetId}

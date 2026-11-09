@@ -7,7 +7,6 @@ import { useNamespace } from "@/components/namespace-provider";
 import { getWebSocketUrl } from "@/hooks/use-notifications-websocket";
 import { useTranslation } from "@/hooks/use-translation";
 import { useBoardStore } from "../store/board-context";
-import { useActorName } from "./use-actor-name";
 
 interface BoardChangedEvent {
   caseId: string;
@@ -32,7 +31,6 @@ export function useBoardSocket(caseId: string): void {
   const store = useBoardStore();
   const { t } = useTranslation();
   const { slug } = useNamespace();
-  const [actor] = useActorName();
   const socketRef = React.useRef<Socket | null>(null);
   const tRef = React.useRef(t);
   tRef.current = t;
@@ -47,7 +45,7 @@ export function useBoardSocket(caseId: string): void {
     });
     socketRef.current = socket;
     const subscribe = () =>
-      socket.emit("subscribe", { caseId, actor: actor ? encodeURIComponent(actor) : undefined });
+      socket.emit("subscribe", { caseId });
 
     socket.on("connect", subscribe);
     socket.on("changed", (event: BoardChangedEvent) => {
@@ -70,5 +68,5 @@ export function useBoardSocket(caseId: string): void {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [caseId, slug, store, actor]);
+  }, [caseId, slug, store]);
 }

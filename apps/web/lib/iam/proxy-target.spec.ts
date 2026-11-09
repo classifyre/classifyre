@@ -5,7 +5,6 @@ import {
 } from "./proxy-target";
 
 const env = {
-  IAM_ENABLED: "true",
   IAM_INTERNAL_URL: "http://classifyre-iam:8080/iam/",
   IAM_SERVICE_URL: "http://other:8080/iam",
   IAM_REALM: "classifyre",
@@ -26,7 +25,7 @@ describe("identity server proxy target", () => {
     ).toBeNull();
   });
 
-  it("is off without sign-in", () => {
+  it("forwards nothing without a configured realm or upstream", () => {
     expect(upstreamIamBaseUrl({})).toBeNull();
     expect(allowedIamPath(["realms", "classifyre"], {})).toBe(false);
   });

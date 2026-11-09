@@ -9,9 +9,8 @@ import {
 
 /**
  * Who the current person is in the active workspace and what they may do
- * there (`GET /<workspace>/me`, docs/prd §12.3). Without sign-in every
- * capability is present, so hiding controls by capability changes nothing.
- * Fetched once per workspace and shared by every caller.
+ * there (`GET /<workspace>/me`, docs/prd §12.3). Fetched once per workspace
+ * and shared by every caller.
  */
 const cache = new Map<string, Promise<MeResponseDto>>();
 

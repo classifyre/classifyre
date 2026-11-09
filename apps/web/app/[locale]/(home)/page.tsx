@@ -25,7 +25,6 @@ import {
   AlertDialogTitle,
 } from "@workspace/ui/components/alert-dialog";
 import { CreateNamespaceDialog } from "@/components/namespace/create-namespace-dialog";
-import { useIamEnabled } from "@/components/iam-session";
 import { useTenant } from "@/hooks/use-tenant";
 import { SectionHeading } from "@/components/section-heading";
 import { useTranslation } from "@/hooks/use-translation";
@@ -108,12 +107,11 @@ function groupByCategory(
 export default function LandingPage() {
   const { t } = useTranslation();
   const canCreate = useCanCreateWorkspace();
-  const iamEnabled = useIamEnabled();
   const iamTenant = useTenant();
   const visitor = iamTenant?.visitor ?? false;
-  // Without sign-in everyone may; with it, as the tenant's grants say.
+  // As the tenant's grants say.
   const canFileCategories =
-    !iamEnabled || (iamTenant?.capabilities.includes("tenant.categories.manage") ?? false);
+    iamTenant?.capabilities.includes("tenant.categories.manage") ?? false;
   const headingId = React.useId();
   const localePath = useLocalePath();
   const { removeBySlug } = useActiveNamespaces();
@@ -454,18 +452,13 @@ export default function LandingPage() {
 }
 
 /**
- * Without sign-in anyone may create a workspace. With it, only someone who
- * may create for at least one group (docs/prd §8.2); until that is known the
- * button stays hidden rather than flicker in for people who cannot use it.
+ * Only someone who may create for at least one group (docs/prd §8.2); until
+ * that is known the button stays hidden rather than flicker in for people who
+ * cannot use it.
  */
 function useCanCreateWorkspace(): boolean {
-  const iamEnabled = useIamEnabled();
-  const [canCreate, setCanCreate] = React.useState(!iamEnabled);
+  const [canCreate, setCanCreate] = React.useState(false);
   React.useEffect(() => {
-    if (!iamEnabled) {
-      setCanCreate(true);
-      return;
-    }
     let active = true;
     void api.namespaces.owningGroups().then(
       (groups) => active && setCanCreate(groups.length > 0),
@@ -474,6 +467,6 @@ function useCanCreateWorkspace(): boolean {
     return () => {
       active = false;
     };
-  }, [iamEnabled]);
+  }, []);
   return canCreate;
 }

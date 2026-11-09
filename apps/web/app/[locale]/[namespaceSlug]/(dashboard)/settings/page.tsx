@@ -49,7 +49,6 @@ import { WorkerQueuesCard } from "@/components/worker-queues-card";
 import { useTranslation } from "@/hooks/use-translation";
 import { AuditEventList } from "@/components/audit-history";
 import { WorkspaceAccessCard } from "@/components/access/workspace-access-card";
-import { useIamEnabled } from "@/components/iam-session";
 import { useCan } from "@/hooks/use-me";
 
 type SettingsDraft = {
@@ -118,7 +117,6 @@ const TAB_TRIGGER_CLASS =
 
 export default function SettingsPage() {
   const { t } = useTranslation();
-  const iamEnabled = useIamEnabled();
   const canSeeAccess = useCan("access.view");
   const { settings, loading, saving, error, updateSettings } =
     useInstanceSettings();
@@ -242,7 +240,7 @@ export default function SettingsPage() {
             <Database className="h-3.5 w-3.5" />
             {t("settings.tabs.cleanup")}
           </TabsTrigger>
-          {iamEnabled && canSeeAccess && (
+          {canSeeAccess && (
             <TabsTrigger value="access" className={TAB_TRIGGER_CLASS}>
               <ShieldCheck className="h-3.5 w-3.5" />
               {t("settings.tabs.access")}
@@ -438,7 +436,7 @@ export default function SettingsPage() {
           <FeatureSwitchesCard />
           <CleanupCard />
         </TabsContent>
-        {iamEnabled && canSeeAccess && (
+        {canSeeAccess && (
           <TabsContent
             value="access"
             className="space-y-6 duration-300 animate-in fade-in-50 slide-in-from-bottom-1"

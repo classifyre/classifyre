@@ -9,8 +9,7 @@ export function identityConsolePath(
   env: Record<string, string | undefined>,
   organizationId?: string | null,
 ): string | null {
-  if (env.IAM_ENABLED !== "true" || env.IAM_REALM_CONSOLE !== "true")
-    return null;
+  if (env.IAM_REALM_CONSOLE !== "true") return null;
   const realm = env.IAM_REALM?.trim();
   if (!realm || !/^[A-Za-z0-9_-]+$/.test(realm)) return null;
   const view =
@@ -23,12 +22,11 @@ export function identityConsolePath(
 /**
  * Path of the person's own account page behind the `/iam` proxy: name,
  * email, password, two-factor, sessions and language, in Classifyre's look.
- * Null without sign-in.
+ * Null when the realm is not configured.
  */
 export function accountPagePath(
   env: Record<string, string | undefined>,
 ): string | null {
-  if (env.IAM_ENABLED !== "true") return null;
   const realm = env.IAM_REALM?.trim();
   if (!realm || !/^[A-Za-z0-9_-]+$/.test(realm)) return null;
   return `/iam/realms/${realm}/account/`;

@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
  */
 export function GET() {
   const config = iamWebConfig();
-  const path = config ? accountPagePath(process.env) : null;
+  const path = accountPagePath(process.env);
   if (!path) return new NextResponse(null, { status: 404 });
-  return NextResponse.redirect(new URL(path, config!.appUrl), 307);
+  return NextResponse.redirect(new URL(path, config.appUrl), 307);
 }

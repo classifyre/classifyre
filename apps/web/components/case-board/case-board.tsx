@@ -28,7 +28,8 @@ import { FindingFilterDialog } from "@/components/case-cleanup/finding-filter-di
 import { useFullBleedHeight } from "@/hooks/use-full-bleed-height";
 import { useTranslation } from "@/hooks/use-translation";
 import { BoardProviders, useBoard, useBoardStore, useUi, useUiStore } from "./store/board-context";
-import { createBoardStore } from "./store/board-store";
+import { createBoardStore, setBoardActor } from "./store/board-store";
+import { useMe } from "@/hooks/use-me";
 import { createUiStore, writePanelWidth } from "./store/ui-store";
 import { addNote, combine, moveItems, resetFindingPositions, type Move } from "./store/commands";
 import { parseFindingNodeId } from "./store/relations";
@@ -39,7 +40,6 @@ import { CommandPalette } from "./ui/command-palette";
 import { BoardDrawers } from "./drawers/board-drawers";
 import { PanelRail } from "./ui/panel-rail";
 import { useVisibleCentre } from "./hooks/use-visible-centre";
-import { primeActorName } from "./hooks/use-actor-name";
 import { elkLayout } from "./hooks/elk-layout";
 import { layoutBox } from "./hooks/use-auto-place";
 import { boardFileName, exportBoardPng, untilMeasured } from "./hooks/export-board";
@@ -61,10 +61,12 @@ const POLL_MS = 60_000;
  */
 export function CaseBoard({ caseId }: { caseId: string }) {
   const { demoMode } = useServerConfig();
-  const [stores] = React.useState(() => {
-    primeActorName();
-    return { board: createBoardStore(caseId, { demo: demoMode }), ui: createUiStore() };
-  });
+  const me = useMe();
+  React.useEffect(() => setBoardActor(me?.actor.id), [me]);
+  const [stores] = React.useState(() => ({
+    board: createBoardStore(caseId, { demo: demoMode }),
+    ui: createUiStore(),
+  }));
   React.useEffect(() => stores.board.getState().connect(), [stores]);
 
   return (

@@ -1,4 +1,4 @@
-import { getActorName, getNamespacedApiBaseUrl } from "@workspace/api-client";
+import { getNamespacedApiBaseUrl } from "@workspace/api-client";
 
 /**
  * The glossary's semantic layer (docs/prd/SL1–SL5): terms with kinds, keys and
@@ -44,8 +44,6 @@ export async function request<T>(
   options: { query?: Query; body?: unknown } = {},
 ): Promise<T> {
   const headers: Record<string, string> = {};
-  const actor = getActorName();
-  if (actor) headers["X-Actor-Name"] = encodeURIComponent(actor);
   if (options.body !== undefined) headers["Content-Type"] = "application/json";
   const response = await fetch(
     `${getNamespacedApiBaseUrl()}${path}${queryString(options.query)}`,

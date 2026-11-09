@@ -15,7 +15,6 @@ jest.mock("@workspace/api-client", () => ({
       caseBoardControllerApplyOps: (arg: { applyBoardOpsDto: { ops: BoardOp[] } }) => mockApplyOps(arg),
     },
   },
-  getActorName: () => "tester",
   ResponseError: class ResponseError extends Error {},
 }));
 

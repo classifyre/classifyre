@@ -13,7 +13,6 @@ import {
  */
 export function POST(request: NextRequest) {
   const config = iamWebConfig();
-  if (!config) return new NextResponse(null, { status: 404 });
   if (!sameOrigin(request, config.appUrl)) {
     return new NextResponse(null, { status: 403 });
   }
@@ -38,7 +37,6 @@ export function POST(request: NextRequest) {
 /** An old bookmark or a link: back to the app, still signed in. */
 export function GET() {
   const config = iamWebConfig();
-  if (!config) return new NextResponse(null, { status: 404 });
   return NextResponse.redirect(`${config.appUrl}/`, 303);
 }
 
