@@ -1,0 +1,267 @@
+#!/usr/bin/env bash
+# Sets up the identity server's `classifyre` realm (docs/prd/IAM-access-management.md §9.2).
+#
+# Runs on every install and upgrade, with kcadm.sh from the same image as the
+# server, so the setup always matches the server version. Every step is
+# "ensure": it creates what is missing and updates what it owns. It never
+# deletes anything, and it never touches group membership or users other than
+# the first tenant admin: people are managed by tenant admins and identity
+# providers, not by the chart.
+set -euo pipefail
+
+KC=/opt/keycloak/bin/kcadm.sh
+R="$IAM_REALM"
+
+tries=0
+until "$KC" config credentials --server "$IAM_INTERNAL_URL" --realm master \
+  --user admin --password "$IAM_ADMIN_PASSWORD" >/dev/null 2>&1; do
+  tries=$((tries + 1))
+  if [ "$tries" -ge 120 ]; then
+    # Ten minutes. A server that is up but refuses the password was first
+    # started with another one (its database outlived the Secret).
+    echo "cannot sign in to the identity server as admin after 10 minutes." >&2
+    echo "If its pod is ready, the admin password in the Secret (key admin-password) is not" >&2
+    echo "the one its database was created with: put the original back, or reset it there." >&2
+    exit 1
+  fi
+  echo "waiting for the identity server at $IAM_INTERNAL_URL"
+  sleep 5
+done
+
+# id of the first object at `path` whose `field` equals `value`, or empty.
+# Extra arguments narrow the listing (`-q username=x`); without them it asks
+# for one large page, since some listings default to 10 or 100 entries.
+# Plain bash: the server image is minimal and has no awk.
+find_id() {
+  local path=$1 field=$2 value=$3 id val
+  shift 3
+  [ $# -eq 0 ] && set -- -q first=0 -q max=10000
+  while IFS=, read -r id val; do
+    if [ "$val" = "$value" ]; then
+      echo "$id"
+      return
+    fi
+  done < <("$KC" get "$path" -r "$R" "$@" --fields "id,$field" --format csv --noquotes 2>/dev/null)
+}
+
+echo "realm $R"
+if ! "$KC" get "realms/$R" >/dev/null 2>&1; then
+  "$KC" create realms -s "realm=$R" -s enabled=true
+fi
+"$KC" update "realms/$R" \
+  -s displayName=Classifyre \
+  -s organizationsEnabled=true \
+  -s registrationAllowed=false \
+  -s loginWithEmailAllowed=true \
+  -s duplicateEmailsAllowed=false \
+  -s "accessTokenLifespan=$IAM_ACCESS_TOKEN_LIFESPAN" \
+  -s bruteForceProtected=true \
+  -s eventsEnabled=true \
+  -s adminEventsEnabled=true \
+  -s adminEventsDetailsEnabled=true \
+  -s internationalizationEnabled=true \
+  -s 'supportedLocales=["en","de"]' \
+  -s defaultLocale=en
+# The languages are the web app's (apps/web/lib/locale-detection.ts LOCALES):
+# the sign-in pages follow the browser, or the app's language the web passes
+# (ui_locales), and offer a switch. The person's choice stays on their account.
+
+# Classifyre's theme (iam.theme, mounted from the chart's ConfigMap), or
+# Keycloak's own when it is empty.
+"$KC" update "realms/$R" \
+  -s "loginTheme=${IAM_THEME:-keycloak.v2}" \
+  -s "adminTheme=${IAM_THEME:-keycloak.v2}" \
+  -s "accountTheme=${IAM_THEME:-keycloak.v3}"
+
+echo "role classifyre-operator"
+if ! "$KC" get roles/classifyre-operator -r "$R" >/dev/null 2>&1; then
+  "$KC" create roles -r "$R" -s name=classifyre-operator \
+    -s 'description=Creates and changes tenants. Sees no workspace content unless also granted.'
+fi
+
+# Operators manage people, groups, tenants and sign-in providers in the
+# realm's identity console (iam.realmConsole). The role carries only those
+# rights, in this realm: not the clients (their secrets), not the realm's own
+# settings, authentication flows or user federation, and not impersonation.
+# Those stay with the identity server's own admin (master realm). Rights an
+# earlier release gave beyond these are taken away again, and all of them
+# when the console is off.
+RM_ID=$(find_id clients clientId realm-management)
+OPERATOR_RIGHTS="view-realm view-users manage-users query-users query-groups
+  view-organizations manage-organizations view-identity-providers manage-identity-providers
+  view-events"
+NOT_OPERATOR_RIGHTS="manage-realm view-clients manage-clients query-clients create-client
+  manage-events view-authorization manage-authorization query-realms impersonation realm-admin"
+operator_role() { # add-roles|remove-roles <rights...>
+  local action=$1 role
+  shift
+  for role in "$@"; do
+    if [ "$action" = add-roles ]; then
+      "$KC" add-roles -r "$R" --rname classifyre-operator \
+        --cclientid realm-management --rolename "$role"
+    else # not held is fine
+      "$KC" remove-roles -r "$R" --rname classifyre-operator \
+        --cclientid realm-management --rolename "$role" >/dev/null 2>&1 || true
+    fi
+  done
+}
+# shellcheck disable=SC2086 # word lists on purpose
+if [ "${IAM_REALM_CONSOLE:-false}" = "true" ]; then
+  echo "operators manage people, organizations and providers in the identity console"
+  operator_role add-roles $OPERATOR_RIGHTS
+  operator_role remove-roles $NOT_OPERATOR_RIGHTS
+else
+  operator_role remove-roles $OPERATOR_RIGHTS $NOT_OPERATOR_RIGHTS
+fi
+
+echo "client scope classifyre"
+SCOPE_ID=$(find_id client-scopes name classifyre)
+if [ -z "$SCOPE_ID" ]; then
+  "$KC" create client-scopes -r "$R" -s name=classifyre -s protocol=openid-connect \
+    -s 'attributes."include.in.token.scope"=true'
+  SCOPE_ID=$(find_id client-scopes name classifyre)
+fi
+# Tokens for the web are meant for the API: the API refuses any other audience.
+if [ -z "$(find_id "client-scopes/$SCOPE_ID/protocol-mappers/models" name classifyre-api-audience)" ]; then
+  "$KC" create "client-scopes/$SCOPE_ID/protocol-mappers/models" -r "$R" \
+    -s name=classifyre-api-audience -s protocol=openid-connect \
+    -s protocolMapper=oidc-audience-mapper \
+    -s 'config."included.client.audience"=classifyre-api' \
+    -s 'config."access.token.claim"=true' \
+    -s 'config."id.token.claim"=false'
+fi
+ORG_SCOPE_ID=$(find_id client-scopes name organization)
+
+echo "client classifyre-api"
+API_ID=$(find_id clients clientId classifyre-api)
+if [ -z "$API_ID" ]; then
+  "$KC" create clients -r "$R" -s clientId=classifyre-api
+  API_ID=$(find_id clients clientId classifyre-api)
+fi
+"$KC" update "clients/$API_ID" -r "$R" \
+  -s publicClient=false \
+  -s "secret=$IAM_API_CLIENT_SECRET" \
+  -s serviceAccountsEnabled=true \
+  -s standardFlowEnabled=false \
+  -s implicitFlowEnabled=false \
+  -s directAccessGrantsEnabled=false \
+  -s fullScopeAllowed=false
+# Read only: users, organizations and their groups, and people's realm
+# roles (operators). Tenants, people and groups are managed in the identity
+# server itself; the API never changes them. Write rights an older release
+# gave are taken away again.
+GIVE="view-users view-organizations"
+TAKE="manage-users manage-organizations"
+# role_list <names...>: the roles as the JSON array the API takes.
+role_list() {
+  local first=1 role
+  echo "["
+  for role in "$@"; do
+    [ "$first" = 1 ] || echo ","
+    first=0
+    "$KC" get "clients/$RM_ID/roles/$role" -r "$R"
+  done
+  echo "]"
+}
+# shellcheck disable=SC2086 # word lists on purpose
+for role in $GIVE; do
+  "$KC" add-roles -r "$R" --uusername service-account-classifyre-api \
+    --cclientid realm-management --rolename "$role"
+done
+# With full scope off, a role the account holds only reaches its token when
+# the client's scope maps it too.
+# shellcheck disable=SC2086
+role_list $GIVE | "$KC" create "clients/$API_ID/scope-mappings/clients/$RM_ID" -r "$R" -f - >/dev/null
+if [ -n "$TAKE" ]; then
+  echo "people management off: the API's service account only reads"
+  # shellcheck disable=SC2086
+  for role in $TAKE; do
+    "$KC" remove-roles -r "$R" --uusername service-account-classifyre-api \
+      --cclientid realm-management --rolename "$role" 2>/dev/null || true
+  done
+  # shellcheck disable=SC2086
+  role_list $TAKE | "$KC" delete "clients/$API_ID/scope-mappings/clients/$RM_ID" -r "$R" -f - >/dev/null 2>&1 || true
+fi
+
+echo "client classifyre-web"
+WEB_ID=$(find_id clients clientId classifyre-web)
+if [ -z "$WEB_ID" ]; then
+  "$KC" create clients -r "$R" -s clientId=classifyre-web
+  WEB_ID=$(find_id clients clientId classifyre-web)
+fi
+"$KC" update "clients/$WEB_ID" -r "$R" \
+  -s name=Classifyre \
+  -s publicClient=false \
+  -s "secret=$IAM_WEB_CLIENT_SECRET" \
+  -s standardFlowEnabled=true \
+  -s implicitFlowEnabled=false \
+  -s directAccessGrantsEnabled=false \
+  -s serviceAccountsEnabled=false \
+  -s fullScopeAllowed=false \
+  -s "rootUrl=$IAM_APP_URL" \
+  -s "redirectUris=[\"$IAM_APP_URL/auth/callback\"]" \
+  -s "webOrigins=[\"$IAM_APP_URL\"]" \
+  -s 'attributes."pkce.code.challenge.method"=S256' \
+  -s "attributes.\"post.logout.redirect.uris\"=$IAM_APP_URL/*"
+"$KC" update "clients/$WEB_ID/default-client-scopes/$SCOPE_ID" -r "$R" >/dev/null
+if [ -n "$ORG_SCOPE_ID" ]; then
+  "$KC" update "clients/$WEB_ID/optional-client-scopes/$ORG_SCOPE_ID" -r "$R" >/dev/null 2>&1 || true
+fi
+
+# create_organization <name> <alias> <value naming it>: organization names are
+# unique too, so another organization already called <name> is reported
+# plainly instead of as a bare conflict.
+create_organization() {
+  if [ -n "$(find_id organizations name "$1")" ]; then
+    echo "an organization named '$1' already exists with another alias; set $3 to another name" >&2
+    exit 1
+  fi
+  "$KC" create organizations -r "$R" -s "name=$1" -s "alias=$2" -s enabled=true
+}
+
+echo "tenant $IAM_TENANT_ALIAS"
+ORG_ID=$(find_id organizations alias "$IAM_TENANT_ALIAS")
+if [ -z "$ORG_ID" ]; then
+  create_organization "$IAM_TENANT_NAME" "$IAM_TENANT_ALIAS" iam.bootstrap.tenant.name
+  ORG_ID=$(find_id organizations alias "$IAM_TENANT_ALIAS")
+fi
+ADMINS_ID=$(find_id "organizations/$ORG_ID/groups" name admins)
+if [ -z "$ADMINS_ID" ]; then
+  "$KC" create "organizations/$ORG_ID/groups" -r "$R" -s name=admins
+  ADMINS_ID=$(find_id "organizations/$ORG_ID/groups" name admins)
+fi
+
+# The public tenant (iam.public): visitors read its workspaces. Its editors
+# are added to its `admins` group in the console; when it is the first tenant,
+# that is the first admin.
+if [ -n "${IAM_PUBLIC_TENANT:-}" ] && [ "$IAM_PUBLIC_TENANT" != "$IAM_TENANT_ALIAS" ]; then
+  echo "public tenant $IAM_PUBLIC_TENANT"
+  PUBLIC_ID=$(find_id organizations alias "$IAM_PUBLIC_TENANT")
+  if [ -z "$PUBLIC_ID" ]; then
+    create_organization "${IAM_PUBLIC_TENANT_NAME:-Public}" "$IAM_PUBLIC_TENANT" iam.public.name
+    PUBLIC_ID=$(find_id organizations alias "$IAM_PUBLIC_TENANT")
+  fi
+  if [ -z "$(find_id "organizations/$PUBLIC_ID/groups" name admins)" ]; then
+    "$KC" create "organizations/$PUBLIC_ID/groups" -r "$R" -s name=admins
+  fi
+fi
+
+echo "first tenant admin $IAM_BOOTSTRAP_ADMIN"
+# Created once. Afterwards the person owns their account: the job never
+# resets the password or re-adds them to a group they were taken out of.
+if [ -z "$(find_id users username "$IAM_BOOTSTRAP_ADMIN" -q "username=$IAM_BOOTSTRAP_ADMIN" -q exact=true)" ]; then
+  "$KC" create users -r "$R" -s "username=$IAM_BOOTSTRAP_ADMIN" -s enabled=true \
+    ${IAM_BOOTSTRAP_ADMIN_EMAIL:+-s "email=$IAM_BOOTSTRAP_ADMIN_EMAIL"} \
+    -s 'requiredActions=["UPDATE_PASSWORD"]'
+  USER_ID=$(find_id users username "$IAM_BOOTSTRAP_ADMIN" -q "username=$IAM_BOOTSTRAP_ADMIN" -q exact=true)
+  "$KC" set-password -r "$R" --userid "$USER_ID" \
+    --new-password "$IAM_BOOTSTRAP_ADMIN_PASSWORD" --temporary
+  "$KC" create "organizations/$ORG_ID/members" -r "$R" -b "\"$USER_ID\""
+  "$KC" update "organizations/$ORG_ID/groups/$ADMINS_ID/members/$USER_ID" -r "$R" -b '{}'
+  # Someone has to open the Platform page on a fresh install (iam.bootstrap.admin.operator).
+  if [ "${IAM_BOOTSTRAP_ADMIN_OPERATOR:-false}" = "true" ]; then
+    "$KC" add-roles -r "$R" --uusername "$IAM_BOOTSTRAP_ADMIN" --rolename classifyre-operator
+  fi
+fi
+
+echo "done"

@@ -1,0 +1,44 @@
+/* Classifyre's type and colours (packages/ui/src/styles/globals.css), for the
+   identity server's pages. Shared by the sign-in pages, the identity console
+   and the account page: the chart mounts shared/ into each of them.
+   Fonts: IBM Plex Sans, IBM Plex Mono and Archivo Black, latin subsets, under
+   the SIL Open Font License 1.1 (fonts/LICENSE.txt). */
+
+@font-face {
+  font-family: "Classifyre Sans";
+  src: url("../fonts/ibm-plex-sans-latin.woff2") format("woff2");
+  font-weight: 400 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Classifyre Mono";
+  src: url("../fonts/ibm-plex-mono-400-latin.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Classifyre Mono";
+  src: url("../fonts/ibm-plex-mono-600-latin.woff2") format("woff2");
+  font-weight: 600 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Classifyre Display";
+  src: url("../fonts/archivo-black-latin.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+
+:root {
+  --cl-black: #0a0a0a;
+  --cl-paper: #f5f5f5;
+  --cl-accent: #b7ff00;
+  /* The accent as text on light panels, where lime is unreadable. */
+  --cl-accent-ink: #4d6b00;
+  --cl-font-sans: "Classifyre Sans", "IBM Plex Sans", system-ui, sans-serif;
+  --cl-font-mono: "Classifyre Mono", "IBM Plex Mono", ui-monospace, monospace;
+  --cl-font-display: "Classifyre Display", "Archivo Black", "Arial Black", sans-serif;
+}

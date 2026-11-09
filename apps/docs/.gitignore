@@ -7,3 +7,5 @@ src/_generated/*
 !src/_generated/helm-values.mdx
 # the MCP tool catalog, written by the API's `bun run codegen` (openapi:generate)
 !src/_generated/mcp-catalog.json
+# roles and capabilities, written by the same codegen from the API's definitions
+!src/_generated/access-catalog.json

@@ -1,0 +1,29 @@
+{{- if .Values.iam.enabled }}
+{{- /* Classifyre's theme for the identity server's sign-in pages, console and
+     account page (files/iam/theme). Plain files mounted into the stock
+     Keycloak image at /opt/keycloak/themes/classifyre; Keycloak loads folder
+     themes at start, without a build step. Every file is stored once; the
+     ones under shared/ are mounted into each theme type (see
+     classifyre.iam.themeItems). */ -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "classifyre.iam.fullname" . }}-theme
+  labels:
+    {{- include "classifyre.commonLabels" . | nindent 4 }}
+    app.kubernetes.io/component: iam
+{{- /* Keycloak serves theme files for 30 days under a path that changes only
+     with its own version, so a changed theme would not reach browsers that
+     cached the old one. The stylesheets, images and fonts the theme names are
+     asked for with the theme's hash instead (`login.css?v=<hash>`):
+     every reference followed by a quote, `)`, a space or the line's end. */ -}}
+{{- $version := include "classifyre.iam.themeHash" . }}
+binaryData:
+  {{- range $path, $_ := .Files.Glob "files/iam/theme/**" }}
+  {{- $content := $.Files.Get $path }}
+  {{- if or (hasSuffix ".css" $path) (hasSuffix "theme.properties" $path) }}
+  {{- $content = regexReplaceAll "(?m)\\.(css|svg|png|woff2|ico)([\"')]|[ \\t]|$)" $content (printf ".${1}?v=%s${2}" $version) }}
+  {{- end }}
+  {{ include "classifyre.iam.themeKey" $path }}: {{ $content | b64enc }}
+  {{- end }}
+{{- end }}

@@ -64,6 +64,7 @@ import {
 import { FindingsTable } from "@/components/findings-table";
 import { RetireOutOfScopeFindings } from "@/components/retire-out-of-scope-findings";
 import { narrowsDetector } from "@/lib/detector-narrowing";
+import { ChangedBy } from "@/components/audit-history";
 
 // The generated DTO is out-of-sync with the server — pipeline detectors carry
 // pipelineSchema rather than config/method. Extend locally until codegen is refreshed.
@@ -375,6 +376,12 @@ export default function CustomDetectorDetailsPage() {
               <CardDescription className="font-mono text-xs">
                 {detector.key}
               </CardDescription>
+              <ChangedBy
+                entityType="custom-detectors"
+                entityId={detector.id}
+                createdAt={detector.createdAt}
+                className="mt-1"
+              />
             </div>
           </div>
         </CardHeader>

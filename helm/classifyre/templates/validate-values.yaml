@@ -30,3 +30,30 @@
 
 {{- /* Production reminder: when postgres.mode=external, set postgres.connection.sslMode to
      "require" or "verify-full". The default "disable" is intentional for embedded/local installs. */ -}}
+
+{{- if .Values.iam.enabled -}}
+{{- /* Sign-in means a private instance: nothing in it is for crawlers (§2 H4),
+     except a public tenant, which visitors and crawlers may read. */ -}}
+{{- if and .Values.frontend.sitemap.enabled (not .Values.iam.public.enabled) -}}
+{{- fail "frontend.sitemap.enabled needs iam.public.enabled when iam.enabled=true: only a public tenant is for crawlers" -}}
+{{- end -}}
+{{- if and .Values.iam.public.enabled (eq (toString .Values.iam.public.tenant) "local") -}}
+{{- fail "iam.public.tenant cannot be 'local': that name is kept for workspaces made without sign-in" -}}
+{{- end -}}
+{{- if and (not .Values.iam.appUrl) (empty .Values.ingress.host) -}}
+{{- fail "iam.enabled=true needs ingress.host (or iam.appUrl) to know the URL people open Classifyre at; the identity server lives under it at <appUrl>/iam. Set iam.enabled=false for an instance without sign-in" -}}
+{{- end -}}
+{{- $validIamDbModes := list "shared" "external" -}}
+{{- if not (has .Values.iam.database.mode $validIamDbModes) -}}
+{{- fail (printf "iam.database.mode must be one of: %s" (join ", " $validIamDbModes)) -}}
+{{- end -}}
+{{- if and (eq .Values.iam.database.mode "shared") (eq .Values.postgres.mode "external") -}}
+{{- fail "iam.database.mode=shared needs postgres.mode embedded or cnpg; with an external PostgreSQL set iam.database.mode=external and iam.database.external.*" -}}
+{{- end -}}
+{{- if and (eq .Values.iam.database.mode "external") (or (empty .Values.iam.database.external.host) (empty .Values.iam.database.external.existingSecret)) -}}
+{{- fail "iam.database.mode=external needs iam.database.external.host and iam.database.external.existingSecret" -}}
+{{- end -}}
+{{- if not (regexMatch "^/[a-z0-9-]+$" .Values.iam.path) -}}
+{{- fail "iam.path must be one path segment such as /iam" -}}
+{{- end -}}
+{{- end -}}

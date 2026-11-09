@@ -6,6 +6,7 @@ import { pipeline } from 'node:stream/promises';
 import type { FastifyReply } from 'fastify';
 import { ClsService } from 'nestjs-cls';
 import { CLS_SCHEMA } from '../namespace/namespace.constants';
+import { workspaceDatabaseUrl } from '../tenant-databases';
 
 export interface CsvStreamColumn {
   /** Row key produced by the SQL query. */
@@ -71,7 +72,7 @@ export class PgStreamService implements OnModuleDestroy {
       this.pools.set(schema, existing);
       return existing;
     }
-    const rawUrl = new URL(process.env.DATABASE_URL ?? '');
+    const rawUrl = new URL(workspaceDatabaseUrl(schema));
     rawUrl.searchParams.delete('schema');
     const pool = new Pool({
       connectionString: rawUrl.toString(),

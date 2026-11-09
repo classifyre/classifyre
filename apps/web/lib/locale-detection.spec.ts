@@ -454,6 +454,7 @@ describe("next.config.mjs locale table", () => {
     it("leaves route handlers and file metadata alone", () => {
       for (const path of [
         "api/health",
+        "iam/realms/classifyre",
         "_next/static/x.js",
         "sitemap/acme/pages.xml",
         "sitemap.xml",

@@ -9,7 +9,7 @@ describe("returnTo", () => {
   });
 
   it("refuses anything that leaves the app", () => {
-    for (const bad of ["https://evil.test", "//evil.test/x", "/\\evil.test", "javascript:alert(1)", "/javascript:alert(1)", "", null, undefined]) {
+    for (const bad of ["https://evil.test", "//evil.test/x", "/\\evil.test", "javascript:alert(1)", "/javascript:alert(1)", "/\t/evil.test", "/\n/evil.test", "", null, undefined]) {
       expect(safeReturnTo(bad)).toBeNull();
     }
   });

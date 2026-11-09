@@ -1,0 +1,480 @@
+{
+  "capabilities": [
+    {
+      "id": "workspace.view",
+      "scope": "workspace",
+      "description": "Open the workspace and read its settings and activity."
+    },
+    {
+      "id": "workspace.settings",
+      "scope": "workspace",
+      "description": "Change workspace settings, embeddings, maintenance and background queues."
+    },
+    {
+      "id": "workspace.pause",
+      "scope": "workspace",
+      "description": "Pause and resume the workspace."
+    },
+    {
+      "id": "workspace.delete",
+      "scope": "workspace",
+      "description": "Delete the workspace."
+    },
+    {
+      "id": "workspace.transfer",
+      "scope": "workspace",
+      "description": "Export, import or copy workspace data."
+    },
+    {
+      "id": "access.view",
+      "scope": "workspace",
+      "description": "See who has access to the workspace."
+    },
+    {
+      "id": "access.manage",
+      "scope": "workspace",
+      "description": "Give and remove access to the workspace."
+    },
+    {
+      "id": "source.view",
+      "scope": "workspace",
+      "description": "Read sources, their notebooks and their scans."
+    },
+    {
+      "id": "source.manage",
+      "scope": "workspace",
+      "description": "Create, change and delete sources."
+    },
+    {
+      "id": "source.run",
+      "scope": "workspace",
+      "description": "Start, stop and re-run scans."
+    },
+    {
+      "id": "source.purge",
+      "scope": "workspace",
+      "description": "Remove the assets or findings a source produced."
+    },
+    {
+      "id": "finding.view",
+      "scope": "workspace",
+      "description": "Read findings, extractions and their evidence."
+    },
+    {
+      "id": "finding.triage",
+      "scope": "workspace",
+      "description": "Change finding status and severity, alone or in bulk."
+    },
+    {
+      "id": "asset.view",
+      "scope": "workspace",
+      "description": "Read assets, lineage, connections and duplicates."
+    },
+    {
+      "id": "asset.tag",
+      "scope": "workspace",
+      "description": "Tag assets, add or remove connections, save explore views."
+    },
+    {
+      "id": "detector.view",
+      "scope": "workspace",
+      "description": "Read detectors, their tests and training history."
+    },
+    {
+      "id": "detector.manage",
+      "scope": "workspace",
+      "description": "Create, change and delete detectors and their tests."
+    },
+    {
+      "id": "detector.train",
+      "scope": "workspace",
+      "description": "Train detectors and give them feedback."
+    },
+    {
+      "id": "code.author",
+      "scope": "workspace",
+      "description": "Write and run code: custom source notebooks and code detectors."
+    },
+    {
+      "id": "case.view",
+      "scope": "workspace",
+      "description": "Read cases, their boards, threads and timelines."
+    },
+    {
+      "id": "case.edit",
+      "scope": "workspace",
+      "description": "Create cases and work on them."
+    },
+    {
+      "id": "case.manage",
+      "scope": "workspace",
+      "description": "Close, reopen, clean up and delete cases."
+    },
+    {
+      "id": "inquiry.view",
+      "scope": "workspace",
+      "description": "Read inquiries and their matches."
+    },
+    {
+      "id": "inquiry.edit",
+      "scope": "workspace",
+      "description": "Create, change and delete inquiries."
+    },
+    {
+      "id": "lead.review",
+      "scope": "workspace",
+      "description": "Propose, accept and dismiss case leads."
+    },
+    {
+      "id": "glossary.view",
+      "scope": "workspace",
+      "description": "Read the glossary, bindings and semantic links."
+    },
+    {
+      "id": "glossary.edit",
+      "scope": "workspace",
+      "description": "Write glossary terms, schemes, relations and bindings."
+    },
+    {
+      "id": "glossary.approve",
+      "scope": "workspace",
+      "description": "Approve glossary terms, bindings and suggestions."
+    },
+    {
+      "id": "entity.view",
+      "scope": "workspace",
+      "description": "Read entities and their values."
+    },
+    {
+      "id": "entity.manage",
+      "scope": "workspace",
+      "description": "Create, merge and change entities."
+    },
+    {
+      "id": "correlation.review",
+      "scope": "workspace",
+      "description": "Decide duplicates and change correlation settings."
+    },
+    {
+      "id": "agent.view",
+      "scope": "workspace",
+      "description": "Read agent configuration, runs, memory and AI providers."
+    },
+    {
+      "id": "agent.configure",
+      "scope": "workspace",
+      "description": "Configure agents, AI providers, MCP servers and chat bots."
+    },
+    {
+      "id": "agent.use",
+      "scope": "workspace",
+      "description": "Ask the assistant and use AI completion."
+    },
+    {
+      "id": "data.export",
+      "scope": "workspace",
+      "description": "Export data out of the workspace (CSV, archives)."
+    },
+    {
+      "id": "mcp.token.own",
+      "scope": "workspace",
+      "description": "Create and revoke your own MCP tokens."
+    },
+    {
+      "id": "mcp.token.admin",
+      "scope": "workspace",
+      "description": "See and revoke every MCP token of the workspace."
+    },
+    {
+      "id": "tenant.workspace.create",
+      "scope": "tenant",
+      "description": "Create workspaces for a group you belong to."
+    },
+    {
+      "id": "tenant.access.manage",
+      "scope": "tenant",
+      "description": "Manage grants across the tenant."
+    },
+    {
+      "id": "tenant.categories.manage",
+      "scope": "tenant",
+      "description": "Manage workspace categories."
+    },
+    {
+      "id": "tenant.audit.view",
+      "scope": "tenant",
+      "description": "Read the tenant audit trail."
+    },
+    {
+      "id": "platform.tenants.manage",
+      "scope": "platform",
+      "description": "Create and change tenants."
+    }
+  ],
+  "roles": [
+    {
+      "key": "viewer",
+      "title": "Viewer",
+      "scope": "workspace",
+      "capabilities": [
+        "workspace.view",
+        "access.view",
+        "source.view",
+        "finding.view",
+        "asset.view",
+        "detector.view",
+        "case.view",
+        "inquiry.view",
+        "glossary.view",
+        "entity.view",
+        "agent.view",
+        "mcp.token.own"
+      ]
+    },
+    {
+      "key": "investigator",
+      "title": "Investigator",
+      "scope": "workspace",
+      "capabilities": [
+        "workspace.view",
+        "access.view",
+        "source.view",
+        "finding.view",
+        "asset.view",
+        "detector.view",
+        "case.view",
+        "inquiry.view",
+        "glossary.view",
+        "entity.view",
+        "agent.view",
+        "mcp.token.own",
+        "agent.use",
+        "finding.triage",
+        "asset.tag",
+        "case.edit",
+        "inquiry.edit",
+        "lead.review"
+      ]
+    },
+    {
+      "key": "curator",
+      "title": "Curator",
+      "scope": "workspace",
+      "capabilities": [
+        "workspace.view",
+        "access.view",
+        "source.view",
+        "finding.view",
+        "asset.view",
+        "detector.view",
+        "case.view",
+        "inquiry.view",
+        "glossary.view",
+        "entity.view",
+        "agent.view",
+        "mcp.token.own",
+        "agent.use",
+        "glossary.edit",
+        "glossary.approve",
+        "entity.manage",
+        "correlation.review"
+      ]
+    },
+    {
+      "key": "source-manager",
+      "title": "Source manager",
+      "scope": "workspace",
+      "capabilities": [
+        "workspace.view",
+        "mcp.token.own",
+        "source.view",
+        "source.manage",
+        "source.run",
+        "source.purge",
+        "detector.view",
+        "detector.manage",
+        "detector.train",
+        "finding.view",
+        "asset.view"
+      ]
+    },
+    {
+      "key": "workspace-admin",
+      "title": "Workspace admin",
+      "scope": "workspace",
+      "capabilities": [
+        "workspace.view",
+        "workspace.settings",
+        "workspace.pause",
+        "workspace.delete",
+        "workspace.transfer",
+        "access.view",
+        "access.manage",
+        "source.view",
+        "source.manage",
+        "source.run",
+        "source.purge",
+        "finding.view",
+        "finding.triage",
+        "asset.view",
+        "asset.tag",
+        "detector.view",
+        "detector.manage",
+        "detector.train",
+        "case.view",
+        "case.edit",
+        "case.manage",
+        "inquiry.view",
+        "inquiry.edit",
+        "lead.review",
+        "glossary.view",
+        "glossary.edit",
+        "glossary.approve",
+        "entity.view",
+        "entity.manage",
+        "correlation.review",
+        "agent.view",
+        "agent.configure",
+        "agent.use",
+        "data.export",
+        "mcp.token.own",
+        "mcp.token.admin"
+      ]
+    },
+    {
+      "key": "code-author",
+      "title": "Code author",
+      "scope": "workspace",
+      "capabilities": [
+        "code.author"
+      ]
+    },
+    {
+      "key": "workspace-manager",
+      "title": "Workspace manager",
+      "scope": "tenant",
+      "capabilities": [
+        "tenant.workspace.create",
+        "workspace.view",
+        "workspace.settings",
+        "workspace.pause",
+        "workspace.delete",
+        "workspace.transfer",
+        "access.view",
+        "access.manage",
+        "source.view",
+        "source.manage",
+        "source.run",
+        "source.purge",
+        "finding.view",
+        "finding.triage",
+        "asset.view",
+        "asset.tag",
+        "detector.view",
+        "detector.manage",
+        "detector.train",
+        "case.view",
+        "case.edit",
+        "case.manage",
+        "inquiry.view",
+        "inquiry.edit",
+        "lead.review",
+        "glossary.view",
+        "glossary.edit",
+        "glossary.approve",
+        "entity.view",
+        "entity.manage",
+        "correlation.review",
+        "agent.view",
+        "agent.configure",
+        "agent.use",
+        "data.export",
+        "mcp.token.own",
+        "mcp.token.admin"
+      ]
+    },
+    {
+      "key": "auditor",
+      "title": "Auditor",
+      "scope": "tenant",
+      "capabilities": [
+        "tenant.audit.view",
+        "access.view",
+        "workspace.view"
+      ]
+    },
+    {
+      "key": "tenant-admin",
+      "title": "Tenant admin",
+      "scope": "tenant",
+      "capabilities": [
+        "workspace.view",
+        "workspace.settings",
+        "workspace.pause",
+        "workspace.delete",
+        "workspace.transfer",
+        "access.view",
+        "access.manage",
+        "source.view",
+        "source.manage",
+        "source.run",
+        "source.purge",
+        "finding.view",
+        "finding.triage",
+        "asset.view",
+        "asset.tag",
+        "detector.view",
+        "detector.manage",
+        "detector.train",
+        "code.author",
+        "case.view",
+        "case.edit",
+        "case.manage",
+        "inquiry.view",
+        "inquiry.edit",
+        "lead.review",
+        "glossary.view",
+        "glossary.edit",
+        "glossary.approve",
+        "entity.view",
+        "entity.manage",
+        "correlation.review",
+        "agent.view",
+        "agent.configure",
+        "agent.use",
+        "data.export",
+        "mcp.token.own",
+        "mcp.token.admin",
+        "tenant.workspace.create",
+        "tenant.access.manage",
+        "tenant.categories.manage",
+        "tenant.audit.view"
+      ]
+    },
+    {
+      "key": "platform-operator",
+      "title": "Platform operator",
+      "scope": "platform",
+      "capabilities": [
+        "platform.tenants.manage"
+      ]
+    },
+    {
+      "key": "visitor",
+      "title": "Visitor",
+      "scope": "public",
+      "capabilities": [
+        "workspace.view",
+        "source.view",
+        "finding.view",
+        "asset.view",
+        "detector.view",
+        "case.view",
+        "inquiry.view",
+        "glossary.view",
+        "entity.view",
+        "agent.view"
+      ]
+    }
+  ]
+}

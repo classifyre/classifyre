@@ -3,8 +3,10 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CaseworkSummaryService } from '../casework-summary.service';
 import { CaseworkSummaryDto } from '../dto/casework-summary.dto';
 import { ReadOnlyEndpoint } from '../db/read-only-endpoint.decorator';
+import { AccessArea } from '../identity/access.decorators';
 
 @ApiTags('cases')
+@AccessArea({ view: 'case.view', change: 'case.edit' })
 @Controller('casework')
 export class CaseworkController {
   constructor(private readonly casework: CaseworkSummaryService) {}

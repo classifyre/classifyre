@@ -1,6 +1,7 @@
 import type { LanguageSetting } from "./locale-detection";
 
-const COOKIE_NAME = "classifyre-language";
+export const LANGUAGE_COOKIE = "classifyre-language";
+const COOKIE_NAME = LANGUAGE_COOKIE;
 const MAX_AGE_SECONDS = 365 * 24 * 60 * 60;
 
 const VALID_VALUES = new Set<string>(["AUTOMATIC", "ENGLISH", "GERMAN"]);

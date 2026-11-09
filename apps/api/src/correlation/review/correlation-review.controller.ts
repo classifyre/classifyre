@@ -36,6 +36,7 @@ import {
   UndoBatchResponseDto,
   UndoLogResponseDto,
 } from '../../dto/correlation-review.dto';
+import { AccessArea } from '../../identity/access.decorators';
 
 /**
  * The fingerprints review queue: patterns, then clusters, then one pair.
@@ -45,6 +46,7 @@ import {
  * page it fed was unusable on a real corpus.
  */
 @ApiTags('correlation-review')
+@AccessArea({ view: 'asset.view', change: 'correlation.review' })
 @Controller('correlation/review')
 export class CorrelationReviewController {
   constructor(private readonly review: CorrelationReviewService) {}

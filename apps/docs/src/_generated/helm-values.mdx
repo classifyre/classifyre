@@ -251,6 +251,43 @@
 | frontend.tolerations | list | `[]` | Web scheduling: tolerations. |
 | frontend.topologySpreadConstraints | list | `[]` | Web topology spread constraints. When empty, a default hostname spread is applied. |
 | fullnameOverride | string | `""` | Fully override release-based resource names. |
+| iam.accessTokenLifespanSeconds | int | `300` | Access token lifetime in seconds. Short, because group changes take effect when tokens renew. |
+| iam.affinity | object | `{}` | Affinity. |
+| iam.appUrl | string | `""` | URL people open Classifyre at, for sign-in redirects, e.g. `https://classifyre.example.com`. Empty derives it from `ingress.host` and `ingress.tls`. The identity server lives under it at `<appUrl>/iam`. |
+| iam.bootstrap.admin.email | string | `""` | Email of the first tenant admin. |
+| iam.bootstrap.admin.operator | bool | `true` | Also make the first tenant admin an operator (realm role `classifyre-operator`), who manages every tenant on the Platform page (`/platform`). Given once, when the account is created. |
+| iam.bootstrap.admin.username | string | `"admin"` | Username of the first tenant admin. Its temporary password is in the `<release>-iam` Secret, key `bootstrap-admin-password`, and must be changed at first sign-in. |
+| iam.bootstrap.tenant.alias | string | `"default"` | Alias of the first tenant (organization), created on install. |
+| iam.bootstrap.tenant.name | string | `"Default"` | Display name of the first tenant. |
+| iam.configJob | object | `{"resources":{"limits":{"memory":"512Mi"},"requests":{"cpu":"100m","memory":"256Mi"}}}` | Resources of the realm setup job. |
+| iam.controlDatabase | string | `"classifyre_control"` | Database the API works on with sign-in: tenants, grants and the list of workspaces. Each tenant's workspace data is in a database of its own (`classifyre_t_<tenant id>`, own login role), made on its first workspace. The database user needs `CREATEDB` and `CREATEROLE`, and new databases need the `vector` extension (superuser, or installed in `template1`). Without sign-in the API uses `postgres.*.database`, the open database, which never holds a tenant. |
+| iam.database.external.database | string | `"iam"` | External database name. |
+| iam.database.external.existingSecret | string | `""` | Secret holding the external database password. |
+| iam.database.external.existingSecretPasswordKey | string | `"password"` | Key of the password in `existingSecret`. |
+| iam.database.external.host | string | `""` | External database host. |
+| iam.database.external.port | int | `5432` | External database port. |
+| iam.database.external.username | string | `"iam"` | External database user. |
+| iam.database.mode | string | `"shared"` | `shared`: an `iam` database and role on the chart's PostgreSQL (embedded or cnpg). `external`: your own database, below. |
+| iam.database.name | string | `"iam"` | Database name (shared mode). |
+| iam.database.poolMaxSize | int | `20` | Most connections the identity server opens (KC_DB_POOL_MAX_SIZE). Counts against PostgreSQL's `max_connections` next to the API's pools. |
+| iam.database.username | string | `"iam"` | Database role (shared mode). |
+| iam.enabled | bool | `true` | Turn sign-in and access management on. Off restores open access. |
+| iam.exposeAdminConsole | bool | `false` | Expose the identity server's own admin console and master realm: the web proxy forwards only the `classifyre` realm and static files unless this is on, which also forwards `/iam/admin` and `/iam/realms/master`. |
+| iam.extraEnv | list | `[]` | Extra environment variables for the identity server (`KC_*` options). |
+| iam.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy. |
+| iam.image.repository | string | `"quay.io/keycloak/keycloak"` | Identity server image repository. |
+| iam.image.tag | string | `"26.8.1"` | Identity server image tag. Keep it a quoted string so Dependabot can bump it. |
+| iam.nodeSelector | object | `{}` | Node selector. |
+| iam.path | string | `"/iam"` | Path the identity server is served under: the web app proxies it there, the same way it proxies `/api`. Always on the web app's own host — there is no separate public URL to configure. |
+| iam.public.enabled | bool | `false` | Let people who have not signed in browse one tenant's workspaces, read-only, with **Sign in** at the top. They hold the Visitor role there: no access lists, no tenant activity, no MCP tokens. Signed-in people see only their own tenant, never the public one unless they belong to it. Off: everyone must sign in. Allows `frontend.sitemap.enabled`, which then lists only the public tenant. |
+| iam.public.name | string | `"Public"` | Display name of the public tenant when the setup job creates it. |
+| iam.public.tenant | string | `"public"` | Alias of the public tenant. The setup job creates its organization with an empty top-level `admins` group when it does not exist; add its editors there in the identity server. Can be the first tenant's alias (`iam.bootstrap.tenant.alias`), so the first admin edits what visitors see. |
+| iam.realm | string | `"classifyre"` | Realm that holds users, tenants (organizations) and groups. |
+| iam.realmConsole | bool | `true` | Forward the identity console of the `classifyre` realm through the web app, at `<appUrl>/iam/admin/<realm>/console/`, and give operators (realm role `classifyre-operator`) the rights running tenants takes there: people, organizations and their groups, identity providers. Realm settings, clients, sign-in flows, user federation and impersonation stay with the identity server's own admin. Classifyre links to it from the Platform and Tenant access pages. The master realm stays closed unless `exposeAdminConsole` is on. Off: the console is reached with a port-forward only. |
+| iam.replicas | int | `1` | Replicas. More than one forms a cluster over the headless service; minor upgrades still stop all of them. |
+| iam.resources | object | `{"limits":{"memory":"1536Mi"},"requests":{"cpu":"250m","memory":"768Mi"}}` | Resources of the identity server container. |
+| iam.theme | string | `"classifyre"` | Theme of the sign-in pages, the identity console and the account page. `classifyre` is the chart's own (files/iam/theme), mounted from a ConfigMap into the stock image; empty keeps Keycloak's. |
+| iam.tolerations | list | `[]` | Tolerations. |
 | imagePullSecrets | list | `[]` | Image pull secrets for all workloads. |
 | ingress.annotations | object | `{}` | Shared ingress annotations (nginx-specific rewrite annotations are applied to API ingress automatically). |
 | ingress.className | string | `"nginx"` | Ingress class name. |

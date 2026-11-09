@@ -1,4 +1,4 @@
-import { resilientFetch } from "./http";
+import { resilientFetch, setUnauthorizedHandler } from "./http";
 
 type FetchMock = jest.Mock<
   Promise<Response>,
@@ -141,5 +141,67 @@ describe("resilientFetch", () => {
       "aborted",
     );
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("resilientFetch after a 401", () => {
+  const realFetch = global.fetch;
+  afterEach(() => {
+    global.fetch = realFetch;
+    setUnauthorizedHandler(null);
+  });
+
+  it("renews once and retries when the handler says the session is back", async () => {
+    const fetchMock = mockFetch(jsonResponse(401, {}), jsonResponse(200, { ok: 1 }));
+    const handler = jest.fn(() => Promise.resolve(true));
+    setUnauthorizedHandler(handler);
+
+    const response = await resilientFetch("/acme/sources");
+    expect(response.status).toBe(200);
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("tells the handler why the API refused", async () => {
+    mockFetch(jsonResponse(401, { code: "NO_TENANT" }));
+    const handler = jest.fn(() => Promise.resolve(false));
+    setUnauthorizedHandler(handler);
+    expect((await resilientFetch("/acme/sources")).status).toBe(401);
+    expect(handler).toHaveBeenCalledWith({ code: "NO_TENANT" });
+  });
+
+  it("returns the 401 when the session cannot be renewed", async () => {
+    mockFetch(jsonResponse(401, {}));
+    setUnauthorizedHandler(() => Promise.resolve(false));
+    expect((await resilientFetch("/acme/sources")).status).toBe(401);
+  });
+
+  it("shares one renewal between requests that expire together", async () => {
+    mockFetch(
+      jsonResponse(401, {}),
+      jsonResponse(401, {}),
+      jsonResponse(200, {}),
+      jsonResponse(200, {}),
+    );
+    let release: (ok: boolean) => void = () => undefined;
+    const handler = jest.fn(
+      () => new Promise<boolean>((resolve) => (release = resolve)),
+    );
+    setUnauthorizedHandler(handler);
+
+    const both = Promise.all([
+      resilientFetch("/acme/a"),
+      resilientFetch("/acme/b"),
+    ]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    release(true);
+    const statuses = (await both).map((response) => response.status);
+    expect(statuses).toEqual([200, 200]);
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves 401s alone without sign-in", async () => {
+    mockFetch(jsonResponse(401, {}));
+    expect((await resilientFetch("/acme/sources")).status).toBe(401);
   });
 });

@@ -285,6 +285,12 @@ which each deployment sets on its own after including this block.
         secretKeyRef:
           name: {{ include "classifyre.apiMaskedConfigSecretName" . }}
           key: {{ include "classifyre.apiMaskedConfigSecretKey" . }}
+    {{- if .Values.iam.enabled }}
+    # With sign-in it upgrades the control database and every tenant's.
+    - name: IAM_ENABLED
+      value: "true"
+    {{- include "classifyre.tenantDatabases.env" . | nindent 4 }}
+    {{- end }}
     {{- if and (eq .Values.postgres.mode "external") .Values.postgres.external.existingSecret .Values.postgres.external.existingSecretUrlKey }}
     - name: DATABASE_URL
       valueFrom:
@@ -563,6 +569,17 @@ which each deployment sets on its own after including this block.
       key: {{ include "classifyre.s3SecretSecretAccessKeyKey" . }}
 {{- end }}
 {{- include "classifyre.telemetryEnv" . | nindent 0 }}
+{{- include "classifyre.iam.env" . | nindent 0 }}
+{{- if .Values.iam.enabled }}
+{{- include "classifyre.tenantDatabases.env" . | nindent 0 }}
+- name: IAM_API_CLIENT_ID
+  value: classifyre-api
+- name: IAM_API_CLIENT_SECRET
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "classifyre.iam.secretName" . }}
+      key: api-client-secret
+{{- end }}
 {{- with .Values.api.extraEnv }}
 {{- toYaml . | nindent 0 }}
 {{- end }}
@@ -678,4 +695,178 @@ Usage: {{ include "classifyre.priorityClassName" (dict "name" .Values.api.priori
 {{- else -}}
 {{- $name -}}
 {{- end -}}
+{{- end -}}
+
+{{- /*
+Identity and access management (docs/prd/IAM-access-management.md §9). The
+identity server is named `iam` in every resource and value of this chart.
+*/ -}}
+{{- define "classifyre.iam.fullname" -}}
+{{- printf "%s-iam" (include "classifyre.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{- define "classifyre.iam.secretName" -}}
+{{- include "classifyre.iam.fullname" . -}}
+{{- end -}}
+
+{{- define "classifyre.iam.path" -}}
+{{- .Values.iam.path | trimSuffix "/" -}}
+{{- end -}}
+
+{{- define "classifyre.iam.appUrl" -}}
+{{- if .Values.iam.appUrl -}}
+{{- .Values.iam.appUrl | trimSuffix "/" -}}
+{{- else -}}
+{{- $scheme := ternary "https" "http" (gt (len .Values.ingress.tls) 0) -}}
+{{- printf "%s://%s" $scheme .Values.ingress.host -}}
+{{- end -}}
+{{- end -}}
+
+{{- /* Public URL people reach the identity server at. Always the web app's
+     own address plus the proxied `/iam` path — the same way `/api` lives
+     wherever the web app is, with no separate host to configure. Tokens
+     carry it as their issuer. */ -}}
+{{- define "classifyre.iam.publicUrl" -}}
+{{- printf "%s%s" (include "classifyre.iam.appUrl" .) (include "classifyre.iam.path" .) -}}
+{{- end -}}
+
+{{- /* In-cluster URL for the API: keys, token checks and membership lookups. */ -}}
+{{- define "classifyre.iam.internalUrl" -}}
+{{- printf "http://%s:8080%s" (include "classifyre.iam.fullname" .) (include "classifyre.iam.path" .) -}}
+{{- end -}}
+
+{{- /* In-cluster URL of the identity server the web's `/iam/[...path]` route proxies to. */ -}}
+{{- define "classifyre.iam.serviceUrl" -}}
+{{- printf "http://%s:8080%s" (include "classifyre.iam.fullname" .) (include "classifyre.iam.path" .) -}}
+{{- end -}}
+
+{{- /* ConfigMap key of a theme file: its path under files/iam/theme, with
+     `/` (not allowed in keys) as `__`. */ -}}
+{{- define "classifyre.iam.themeKey" -}}
+{{- trimPrefix "files/iam/theme/" . | replace "/" "__" -}}
+{{- end -}}
+
+{{- /* A short hash of every theme file: changes whenever the theme does. */ -}}
+{{- define "classifyre.iam.themeHash" -}}
+{{- $all := "" -}}
+{{- range $path, $_ := .Files.Glob "files/iam/theme/**" -}}
+{{- $all = printf "%s%s=%s;" $all $path ($.Files.Get $path | sha256sum) -}}
+{{- end -}}
+{{- $all | sha256sum | trunc 10 -}}
+{{- end -}}
+
+{{- /* Where each theme file lands under /opt/keycloak/themes/classifyre.
+     Files under shared/ (fonts, logo, brand styles) go into the resources
+     of every theme type, so the ConfigMap holds them once. */ -}}
+{{- define "classifyre.iam.themeItems" -}}
+{{- range $path, $_ := .Files.Glob "files/iam/theme/**" }}
+{{- $rel := trimPrefix "files/iam/theme/" $path }}
+{{- if hasPrefix "shared/" $rel }}
+{{- range $type := list "login" "admin" "account" }}
+- key: {{ include "classifyre.iam.themeKey" $path }}
+  path: {{ printf "%s/resources/%s" $type (trimPrefix "shared/" $rel) }}
+{{- end }}
+{{- else }}
+- key: {{ include "classifyre.iam.themeKey" $path }}
+  path: {{ $rel }}
+{{- end }}
+{{- end }}
+{{- end -}}
+
+{{- define "classifyre.iam.issuerUrl" -}}
+{{- printf "%s/realms/%s" (include "classifyre.iam.publicUrl" .) .Values.iam.realm -}}
+{{- end -}}
+
+{{- define "classifyre.iam.dbHost" -}}
+{{- if eq .Values.iam.database.mode "external" -}}
+{{- .Values.iam.database.external.host -}}
+{{- else -}}
+{{- include "classifyre.databaseHost" . -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "classifyre.iam.dbPort" -}}
+{{- if eq .Values.iam.database.mode "external" -}}
+{{- .Values.iam.database.external.port | toString -}}
+{{- else -}}
+{{- include "classifyre.databasePort" . -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "classifyre.iam.dbName" -}}
+{{- if eq .Values.iam.database.mode "external" -}}
+{{- .Values.iam.database.external.database -}}
+{{- else -}}
+{{- .Values.iam.database.name -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "classifyre.iam.dbUser" -}}
+{{- if eq .Values.iam.database.mode "external" -}}
+{{- .Values.iam.database.external.username -}}
+{{- else -}}
+{{- .Values.iam.database.username -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "classifyre.iam.dbSecretName" -}}
+{{- if eq .Values.iam.database.mode "external" -}}
+{{- .Values.iam.database.external.existingSecret -}}
+{{- else if eq .Values.postgres.mode "cnpg" -}}
+{{- printf "%s-db" (include "classifyre.iam.fullname" .) -}}
+{{- else -}}
+{{- include "classifyre.iam.secretName" . -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "classifyre.iam.dbPasswordKey" -}}
+{{- if eq .Values.iam.database.mode "external" -}}
+{{- .Values.iam.database.external.existingSecretPasswordKey -}}
+{{- else -}}
+password
+{{- end -}}
+{{- end -}}
+
+{{- /* Environment the API and the web share to find the identity server.
+     The API talks to it directly in-cluster (JWKS, admin lookups); the web
+     also proxies browsers to it (route `/iam/[...path]`), so it gets the
+     service URL too. */ -}}
+{{- /* With sign-in the API works on the control database and one database
+     per tenant (docs/prd/TEN §4.1). API pods and the migration init container
+     need the same values; the web app does not. */ -}}
+{{- define "classifyre.tenantDatabases.env" -}}
+- name: CLASSIFYRE_CONTROL_DATABASE
+  value: {{ .Values.iam.controlDatabase | quote }}
+- name: CLASSIFYRE_TENANT_DATABASE_KEY
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "classifyre.iam.secretName" . }}
+      key: tenant-database-key
+{{- end -}}
+
+{{- define "classifyre.iam.env" -}}
+- name: IAM_ENABLED
+  value: {{ .Values.iam.enabled | quote }}
+{{- if .Values.iam.enabled }}
+- name: IAM_ISSUER_URL
+  value: {{ include "classifyre.iam.issuerUrl" . | quote }}
+- name: IAM_INTERNAL_URL
+  value: {{ include "classifyre.iam.internalUrl" . | quote }}
+- name: IAM_SERVICE_URL
+  value: {{ include "classifyre.iam.serviceUrl" . | quote }}
+- name: IAM_REALM
+  value: {{ .Values.iam.realm | quote }}
+- name: IAM_APP_URL
+  value: {{ include "classifyre.iam.appUrl" . | quote }}
+- name: IAM_BOOTSTRAP_TENANT
+  value: {{ .Values.iam.bootstrap.tenant.alias | quote }}
+{{- if .Values.iam.public.enabled }}
+- name: IAM_PUBLIC_TENANT
+  value: {{ .Values.iam.public.tenant | quote }}
+{{- end }}
+- name: IAM_EXPOSE_ADMIN_CONSOLE
+  value: {{ .Values.iam.exposeAdminConsole | quote }}
+- name: IAM_REALM_CONSOLE
+  value: {{ .Values.iam.realmConsole | quote }}
+{{- end }}
 {{- end -}}

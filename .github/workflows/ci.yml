@@ -24,7 +24,8 @@ env:
 jobs:
   validate:
     name: Validate
-    runs-on: ubuntu-latest
+    # Pinned: Playwright has no Chromium for ubuntu-latest (26.04) yet.
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
 
     steps:
@@ -142,6 +143,7 @@ jobs:
           if ! git diff --quiet -- \
             apps/docs/src/_generated/helm-values.mdx \
             apps/docs/src/_generated/mcp-catalog.json \
+            apps/docs/src/_generated/access-catalog.json \
             packages/api-client/src/generated \
             apps/cli/src/models/generated_input.py \
             apps/cli/src/models/generated_detectors.py \
@@ -150,6 +152,7 @@ jobs:
             git status --short -- \
               apps/docs/src/_generated/helm-values.mdx \
               apps/docs/src/_generated/mcp-catalog.json \
+              apps/docs/src/_generated/access-catalog.json \
               packages/api-client/src/generated \
               apps/cli/src/models/generated_input.py \
               apps/cli/src/models/generated_detectors.py \
@@ -157,6 +160,7 @@ jobs:
             git diff --stat -- \
               apps/docs/src/_generated/helm-values.mdx \
               apps/docs/src/_generated/mcp-catalog.json \
+              apps/docs/src/_generated/access-catalog.json \
               packages/api-client/src/generated \
               apps/cli/src/models/generated_input.py \
               apps/cli/src/models/generated_detectors.py \
@@ -384,7 +388,7 @@ jobs:
         run: bash docker/scripts/smoke.sh
 
   deploy-develop:
-    name: Deploy → classifyre-develop
+    name: Smoke deploy → classifyre-develop
     needs: [docker]
     if: github.event_name == 'push' && github.ref_name == 'develop'
     uses: ./.github/workflows/develop.yml
@@ -392,7 +396,4 @@ jobs:
       environment: classifyre-develop
       image_tag: develop
       demo_mode: 'false'
-      # Deploy, verify the app is alive, then park it at zero replicas to free
-      # cluster resources. The next push redeploys from this scaled-down state.
-      scale_down: 'true'
     secrets: inherit

@@ -2,7 +2,7 @@ import {
   ApplyBoardOpsSchema,
   BoardOpSchema,
 } from '@workspace/schemas/case-board';
-import { parseActorName } from '../actor-name.decorator';
+import { parseActorName } from '../identity/actor';
 import { claimHolds, mergeStyle, toRelationType } from './case-board.service';
 import { summarizeOps } from './case-board.events';
 

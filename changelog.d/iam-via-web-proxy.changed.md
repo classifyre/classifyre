@@ -1,0 +1,1 @@
+With sign-in on, the identity server is reached through the web app at `/iam`, like every other external path; there is no separate ingress, port, or public URL for it anymore. The old `iam.publicUrl` value is gone — the address is always `<iam.appUrl>/iam`, so existing installs only need it removed from their values if they set it.

@@ -63,7 +63,9 @@ import {
   QuickSearchResponseDto,
 } from '../dto/quick-search.dto';
 import { QuickSearchService } from '../search/quick-search.service';
+import { AccessArea, Requires } from '../identity/access.decorators';
 
+@AccessArea({ view: 'asset.view', change: 'asset.tag' })
 @Controller('assets')
 @ApiTags('Assets')
 export class AssetsController {
@@ -127,6 +129,7 @@ export class AssetsController {
 
 @AllowInDemoMode()
 @ReadOnlyEndpoint()
+@AccessArea({ view: 'asset.view', change: 'asset.tag' })
 @Controller('search')
 @ApiTags('Assets')
 export class SearchAssetsController {
@@ -156,6 +159,7 @@ export class SearchAssetsController {
     return this.quickSearchService.search(request);
   }
 
+  @Requires('finding.view')
   @Get('findings/query')
   @ApiOperation({
     summary: 'Query findings (cursor-paginated JSON)',
@@ -206,6 +210,7 @@ export class SearchAssetsController {
     return this.liveQueryService.queryAssets(query, { limit, cursor });
   }
 
+  @Requires('data.export')
   @Get('findings/export')
   @ApiOperation({
     summary: 'Export findings as CSV',
@@ -228,6 +233,7 @@ export class SearchAssetsController {
     );
   }
 
+  @Requires('data.export')
   @Get('assets/export')
   @ApiOperation({
     summary: 'Export assets (with findings) as CSV',
@@ -288,6 +294,7 @@ export class SearchAssetsController {
     return this.assetService.searchAssetsCharts(request);
   }
 
+  @Requires('finding.view')
   @Post('findings')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -305,6 +312,7 @@ export class SearchAssetsController {
     return this.findingsService.searchFindings(request);
   }
 
+  @Requires('finding.view')
   @Post('findings/custom-detectors')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -324,6 +332,7 @@ export class SearchAssetsController {
     return this.findingsService.searchCustomDetectorOptions(request);
   }
 
+  @Requires('finding.view')
   @Post('findings/charts')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -344,6 +353,7 @@ export class SearchAssetsController {
   }
 }
 
+@AccessArea({ view: 'asset.view', change: 'source.manage' })
 @Controller('sources/:sourceId/assets')
 @ApiTags('Sources', 'Assets')
 export class SourceAssetsController {

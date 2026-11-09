@@ -9,7 +9,7 @@ import {
   Put,
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { ActorName } from '../actor-name.decorator';
+import { ActorRef } from '../identity/actor-ref.decorator';
 import { AllowInDemoMode } from '../demo-mode.decorator';
 import { ReadOnlyEndpoint } from '../db/read-only-endpoint.decorator';
 import { CaseBoardService } from '../case-board/case-board.service';
@@ -30,6 +30,7 @@ import {
   PutBoardThumbnailDto,
 } from '../dto/case-board.dto';
 import { GraphResponseDto } from '../dto/graph.dto';
+import { AccessArea } from '../identity/access.decorators';
 
 /**
  * The case board: one canvas per case (docs/architecture/CASE_BOARD_PRD.md).
@@ -37,6 +38,7 @@ import { GraphResponseDto } from '../dto/graph.dto';
  * write goes through POST .../ops.
  */
 @ApiTags('case-board')
+@AccessArea({ view: 'case.view', change: 'case.edit' })
 @Controller('cases/:id/board')
 export class CaseBoardController {
   constructor(
@@ -74,7 +76,7 @@ export class CaseBoardController {
   applyOps(
     @Param('id') id: string,
     @Body() dto: ApplyBoardOpsDto,
-    @ActorName() actor: string | undefined,
+    @ActorRef() actor: string | undefined,
   ): Promise<ApplyBoardOpsResponseDto> {
     return this.board.applyOps(id, dto, actor);
   }
@@ -151,7 +153,7 @@ export class CaseBoardController {
   @ApiResponse({ status: 201, type: CaseBoardSnapshotSummaryDto })
   takeSnapshot(
     @Param('id') id: string,
-    @ActorName() actor: string | undefined,
+    @ActorRef() actor: string | undefined,
   ): Promise<CaseBoardSnapshotSummaryDto> {
     return this.boardRead.takeSnapshot(id, 'MANUAL', actor);
   }

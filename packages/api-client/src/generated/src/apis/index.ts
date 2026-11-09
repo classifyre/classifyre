@@ -2,6 +2,7 @@
 /* eslint-disable */
 export { AIApi } from './AIApi';
 export { AIProviderConfigsApi } from './AIProviderConfigsApi';
+export { AccessApi } from './AccessApi';
 export { AssetsApi } from './AssetsApi';
 export { AssistantApi } from './AssistantApi';
 export { AutopilotApi } from './AutopilotApi';
@@ -21,12 +22,14 @@ export { FindingsApi } from './FindingsApi';
 export { GlossaryApi } from './GlossaryApi';
 export { GraphApi } from './GraphApi';
 export { HealthApi } from './HealthApi';
+export { IdentityApi } from './IdentityApi';
 export { InquiriesApi } from './InquiriesApi';
 export { InstanceSettingsApi } from './InstanceSettingsApi';
 export { MaintenanceApi } from './MaintenanceApi';
 export { NamespacesApi } from './NamespacesApi';
 export { NotebooksApi } from './NotebooksApi';
 export { NotificationsApi } from './NotificationsApi';
+export { PlatformApi } from './PlatformApi';
 export { RunnersApi } from './RunnersApi';
 export { SemanticApi } from './SemanticApi';
 export { SitemapApi } from './SitemapApi';

@@ -46,8 +46,10 @@ import { RetireOutOfScopeService } from '../findings-bulk/retire-out-of-scope.se
 import { BlockWhenPaused } from '../namespace/block-when-paused.decorator';
 import { CustomDetectorFilesService } from '../custom-detector-files.service';
 import { CustomDetectorFileDto } from '../dto/custom-detector-file.dto';
+import { AccessArea, Requires } from '../identity/access.decorators';
 
 @ApiTags('Custom Detectors')
+@AccessArea({ view: 'detector.view', change: 'detector.manage' })
 @Controller('custom-detectors')
 export class CustomDetectorsController {
   constructor(
@@ -95,6 +97,7 @@ export class CustomDetectorsController {
   }
 
   @AllowInDemoMode()
+  @Requires('detector.train')
   @Post('training-examples/parse')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -260,6 +263,7 @@ export class CustomDetectorsController {
     return this.detectorFiles.delete(id, fileId);
   }
 
+  @Requires('finding.triage')
   @Post(':id/retire-out-of-scope-findings')
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
@@ -312,6 +316,7 @@ export class CustomDetectorsController {
     return this.customDetectorsService.getTrainingExamplesStats(id);
   }
 
+  @Requires('detector.train')
   @Post(':id/training-examples')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -329,6 +334,7 @@ export class CustomDetectorsController {
     return this.customDetectorsService.saveTrainingExamples(id, dto);
   }
 
+  @Requires('detector.train')
   @Delete(':id/training-examples')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete all training examples for a detector' })
@@ -340,6 +346,7 @@ export class CustomDetectorsController {
     return this.customDetectorsService.clearTrainingExamples(id);
   }
 
+  @Requires('detector.train')
   @Delete(':id/training-examples/:exampleId')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete a single training example' })
@@ -357,6 +364,7 @@ export class CustomDetectorsController {
   // ── Training ───────────────────────────────────────────────────────────────
 
   @BlockWhenPaused()
+  @Requires('detector.train')
   @Post(':id/train')
   @ApiOperation({ summary: 'Trigger custom detector training' })
   @ApiParam({ name: 'id', description: 'Custom detector UUID' })

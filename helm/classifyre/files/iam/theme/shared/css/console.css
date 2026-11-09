@@ -1,0 +1,90 @@
+/* The identity console and the account page (Keycloak's PatternFly 5 apps)
+   in Classifyre's colours: its type, sharp corners, a black masthead with
+   the lime rule, black primary buttons on paper and lime ones on black.
+   Only PatternFly's own tokens are changed, so the apps' layouts stay as
+   Keycloak ships them. */
+
+:root {
+  --pf-v5-global--FontFamily--text: var(--cl-font-sans);
+  --pf-v5-global--FontFamily--heading: var(--cl-font-sans);
+  --pf-v5-global--FontFamily--monospace: var(--cl-font-mono);
+  --pf-v5-global--BorderRadius--sm: 2px;
+  --pf-v5-global--BorderRadius--lg: 4px;
+  --pf-v5-global--primary-color--100: var(--cl-black);
+  --pf-v5-global--primary-color--200: #262626;
+  --pf-v5-global--active-color--100: var(--cl-accent-ink);
+  --pf-v5-global--link--Color: var(--cl-accent-ink);
+  --pf-v5-global--link--Color--hover: var(--cl-black);
+}
+
+:root.pf-v5-theme-dark {
+  --pf-v5-global--primary-color--100: var(--cl-accent);
+  --pf-v5-global--primary-color--200: #d4ff66;
+  --pf-v5-global--primary-color--300: var(--cl-accent);
+  --pf-v5-global--primary-color--400: #d4ff66;
+  --pf-v5-global--primary-color--light-100: var(--cl-accent);
+  --pf-v5-global--active-color--100: var(--cl-accent);
+  --pf-v5-global--active-color--300: var(--cl-accent);
+  --pf-v5-global--link--Color: var(--cl-accent);
+  --pf-v5-global--link--Color--hover: #ffffff;
+  --pf-v5-global--link--Color--light: var(--cl-accent);
+  --pf-v5-global--link--Color--light--hover: #ffffff;
+  --pf-v5-global--link--Color--dark: var(--cl-accent);
+  --pf-v5-global--link--Color--dark--hover: #ffffff;
+}
+
+/* Primary buttons: black with paper text on paper, lime with black text on
+   black. Set on the button itself, since each palette picks its own token. */
+.pf-v5-c-button.pf-m-primary {
+  --pf-v5-c-button--m-primary--BackgroundColor: var(--cl-black);
+  --pf-v5-c-button--m-primary--hover--BackgroundColor: #262626;
+  --pf-v5-c-button--m-primary--focus--BackgroundColor: #262626;
+  --pf-v5-c-button--m-primary--active--BackgroundColor: #262626;
+  --pf-v5-c-button--m-primary--Color: var(--cl-paper);
+  --pf-v5-c-button--m-primary--hover--Color: var(--cl-paper);
+  --pf-v5-c-button--m-primary--focus--Color: var(--cl-paper);
+  --pf-v5-c-button--m-primary--active--Color: var(--cl-paper);
+}
+
+:root.pf-v5-theme-dark .pf-v5-c-button.pf-m-primary {
+  --pf-v5-c-button--m-primary--BackgroundColor: var(--cl-accent);
+  --pf-v5-c-button--m-primary--hover--BackgroundColor: #ffffff;
+  --pf-v5-c-button--m-primary--focus--BackgroundColor: #ffffff;
+  --pf-v5-c-button--m-primary--active--BackgroundColor: #ffffff;
+  --pf-v5-c-button--m-primary--Color: var(--cl-black);
+  --pf-v5-c-button--m-primary--hover--Color: var(--cl-black);
+  --pf-v5-c-button--m-primary--focus--Color: var(--cl-black);
+  --pf-v5-c-button--m-primary--active--Color: var(--cl-black);
+}
+
+/* The black signal panel on top, with the brand. */
+.pf-v5-c-masthead {
+  --pf-v5-c-masthead--BackgroundColor: var(--cl-black);
+  --pf-v5-c-masthead--m-display-inline--BackgroundColor: var(--cl-black);
+  border-bottom: 2px solid var(--cl-accent);
+}
+
+.keycloak__pageheader_brand {
+  height: 2.25rem;
+  width: auto;
+}
+
+.pf-v5-c-masthead__brand::after {
+  content: "Classifyre";
+  margin-inline-start: 0.75rem;
+  font-family: var(--cl-font-display);
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #ffffff;
+  white-space: nowrap;
+}
+
+:where(a, button, input, select, [role="tab"]):focus-visible {
+  outline: 3px solid var(--cl-accent-ink);
+  outline-offset: 2px;
+}
+
+:root.pf-v5-theme-dark :where(a, button, input, select, [role="tab"]):focus-visible {
+  outline-color: var(--cl-accent);
+}

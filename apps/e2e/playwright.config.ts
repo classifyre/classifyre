@@ -2,7 +2,8 @@ import { defineConfig, devices } from "@playwright/test";
 import * as fs from "fs";
 import * as path from "path";
 
-// Minimal .env loader – avoids requiring the dotenv package
+// Minimal .env loader – avoids requiring the dotenv package. The smoke seed
+// (scripts/smoke/seed.sh) writes this file.
 const envFile = path.resolve(__dirname, ".env");
 if (fs.existsSync(envFile)) {
   for (const line of fs.readFileSync(envFile, "utf8").split("\n")) {
@@ -18,21 +19,23 @@ if (fs.existsSync(envFile)) {
 
 export default defineConfig({
   testDir: "./tests",
-  // One namespace is provisioned for the whole run and shared by every spec;
-  // teardown deletes it unless E2E_DELETE_NAMESPACE=false.
-  globalSetup: "./tests/global-setup.ts",
-  globalTeardown: "./tests/global-teardown.ts",
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 1 : 0,
+  // The smoke test waits for what it needs instead of retrying: a retry would
+  // start a second scan in a workspace the first attempt already made.
+  retries: 0,
   workers: 1,
-  reporter: [["html", { open: "never" }], ["list"]],
+  reporter: [["list"], ["html", { open: "never" }]],
 
   use: {
     baseURL: process.env.BASE_URL || "http://localhost:3000",
-    trace: "on-first-retry",
+    trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "retain-on-failure",
+    // Fail a step that cannot happen within a minute instead of waiting out
+    // the whole test; the scan waits are explicit polls with their own limits.
+    actionTimeout: 60_000,
+    navigationTimeout: 120_000,
   },
 
   projects: [
@@ -42,7 +45,7 @@ export default defineConfig({
     },
   ],
 
-  // Long global timeout: scans can take several minutes
-  timeout: 600_000,
+  // A scan starts a job pod, which can pull the scanner image first.
+  timeout: 15 * 60_000,
   expect: { timeout: 30_000 },
 });

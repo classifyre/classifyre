@@ -1,0 +1,1 @@
+**Your account** in the account menu opens your own account page, in Classifyre's look: change your name, email, password and two-factor sign-in, see where you are signed in, and pick the language of the sign-in pages.

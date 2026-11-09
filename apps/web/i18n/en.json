@@ -25,6 +25,8 @@
     "loadFailed": "Failed to load workspaces",
     "emptyTitle": "No workspaces yet",
     "emptyDescription": "Create your first workspace to start ingesting and classifying data.",
+    "emptyNoAccessTitle": "No workspaces for you yet",
+    "emptyNoAccessDescription": "You are in this tenant, but none of your groups has access to a workspace. Ask a tenant admin to give your group a role on one.",
     "createAction": "Create workspace",
     "local": "Local",
     "lastOpened": "Last opened",
@@ -107,7 +109,13 @@
     "pausedBannerDescription": "Scans, schedules, AI harness cycles and duplicate checks are stopped. Everything is read-only until you resume.",
     "pausedBannerReason": "Reason: {{reason}}",
     "pausedBannerAction": "Resume in settings",
-    "allWorkspaces": "All workspaces"
+    "allWorkspaces": "All workspaces",
+    "owningGroup": "Owning group",
+    "owningGroupPick": "Choose the group that owns it",
+    "owningGroupHint": "Members of this group and its admins get access as their grants allow.",
+    "owningGroupNone": "You cannot create workspaces: ask a tenant admin to make you a workspace manager for your group.",
+    "emptyPublicTitle": "Nothing published yet",
+    "emptyPublicDescription": "Workspaces of the public tenant show here once they are published. Sign in to see your own."
   },
   "categories": {
     "label": "Categories",
@@ -735,7 +743,9 @@
       "chat": "Chat Bots",
       "data": "Export & Import",
       "workers": "Workers",
-      "cleanup": "Cleanup"
+      "cleanup": "Cleanup",
+      "activity": "Activity",
+      "access": "Access"
     },
     "cleanup": {
       "title": "Storage & cleanup",
@@ -5417,7 +5427,6 @@
   "fingerprints": {
     "tabTune": "Tune correlation"
   },
-  "lineage": {},
   "harness": {
     "title": "Harness AI Autopilot",
     "subtitle": "Autonomous control plane",
@@ -5985,6 +5994,7 @@
     "enabledHint": "Connect this bot and start answering messages.",
     "allowMutations": "Allow changes",
     "allowMutationsHint": "When off, the bot is read-only: it can inspect but never create, update or delete.",
+    "allowMutationsSignIn": "With sign-in on, bots are always read-only: a chat message has no signed-in person behind it.",
     "capabilityGroups": "Capabilities",
     "capabilityGroupsHint": "Which tool groups the bot may use. All are enabled by default.",
     "agents": "Autopilot agents",
@@ -7223,5 +7233,156 @@
       "saved": "Labels saved. Entity values are being regenerated.",
       "add": "Add label"
     }
+  },
+  "actors": {
+    "autopilot": "Autopilot",
+    "system": "System",
+    "mcpToken": "MCP token",
+    "person": "Someone",
+    "selfDeclared": "Name entered by the person; not verified without sign-in",
+    "viaToken": "Acted through the MCP token {{token}}",
+    "via": "via {{token}}",
+    "kinds": {
+      "user": "Signed-in person",
+      "name": "Person",
+      "mcp": "MCP token",
+      "agent": "Agent",
+      "system": "System"
+    }
+  },
+  "audit": {
+    "createdBy": "Created by",
+    "lastChangedBy": "Last changed by",
+    "history": "History",
+    "historyTitle": "History",
+    "historyDescription": "Every change to this item, newest first. Only field names are kept, never their values.",
+    "mcpTool": "MCP · {{tool}}",
+    "fields": "Fields: {{fields}}",
+    "empty": "No changes recorded yet.",
+    "loadMore": "Load more",
+    "activityTitle": "Activity",
+    "activityDescription": "Every change made in this workspace, from the web app, the API or agents through MCP. Reads are not recorded."
+  },
+  "account": {
+    "menu": "Account",
+    "signedIn": "Signed in",
+    "tenant": "Tenant: {{name}}",
+    "signOut": "Sign out",
+    "tenantSettings": "Tenant access",
+    "switchTenant": "Switch tenant",
+    "platform": "Platform",
+    "signIn": "Sign in",
+    "identityConsole": "Identity console",
+    "yourAccount": "Your account"
+  },
+  "access": {
+    "title": "Access",
+    "description": "Who can open this workspace and what they may do. Grants from the tenant or the group that owns the workspace are inherited and can only be changed by a tenant admin.",
+    "loadFailed": "Could not load access.",
+    "removed": "Removed access for {{subject}}.",
+    "removeFailed": "Could not remove access.",
+    "added": "Access given.",
+    "addFailed": "Could not give access.",
+    "until": "until {{date}}",
+    "inherited": "Inherited",
+    "remove": "Remove access",
+    "none": "Nobody has access yet.",
+    "group": "Group",
+    "pickGroup": "Choose a group",
+    "groupsHint": "Groups and their people are kept in the identity server, by your operators or your company directory; a group gets access here.",
+    "role": "Role",
+    "untilOptional": "Until (optional)",
+    "add": "Give access",
+    "whyTitle": "Why can I…?",
+    "pickCapability": "Choose something you can do",
+    "becauseOf": "{{subject}} as {{role}} on {{scope}}",
+    "allWorkspaces": "All workspaces",
+    "tenantTitle": "Tenant",
+    "tenantDenied": "Only tenant admins can manage access for the whole tenant.",
+    "tenantGrants": "Access across the tenant",
+    "scope": "Applies to",
+    "scopes": {
+      "tenant": "The whole tenant",
+      "group": "A group's workspaces",
+      "workspace": "One workspace"
+    },
+    "ownedBy": "Workspaces owned by",
+    "workspace": "Workspace",
+    "pickScope": "Choose",
+    "tabs": {
+      "access": "Access",
+      "activity": "Activity"
+    },
+    "peopleElsewhere": "People and groups are managed in the identity server, or the company directory behind it. Grants here decide what they may do in Classifyre; a renamed group keeps its grants, a removed one shows as removed.",
+    "managePeople": "Manage people and groups",
+    "peopleByOperators": "Ask an operator of this installation to add people or change groups."
+  },
+  "platform": {
+    "title": "Platform",
+    "description": "Every tenant of this installation, with its admins, read from the identity server. Suspend and resume tenants, bring in workspaces made without sign-in, and remove the data of a tenant whose organization was deleted. You see tenants here, not what is in their workspaces.",
+    "denied": "This page is for operators of this installation. Ask whoever runs it to give you the classifyre-operator role.",
+    "loadFailed": "The tenants could not be loaded",
+    "failed": "That did not work",
+    "tenants": "Tenants",
+    "none": "No tenants yet.",
+    "counts": "Workspaces: {{workspaces}} · People: {{members}}",
+    "adminsAre": "Admins: {{names}}",
+    "noAdmins": "No admins",
+    "lastActivity": "Last change {{when}}",
+    "created": "Created {{when}}",
+    "localWaiting": "Workspaces made without sign-in: {{count}}. Bring them into a tenant from its menu.",
+    "actions": "Actions for {{name}}",
+    "status": {
+      "suspended": "suspended",
+      "deleted": "deleted",
+      "active": "active"
+    },
+    "problem": {
+      "ORGANIZATION_MISSING": "organization deleted",
+      "ORGANIZATION_REPLACED": "organization replaced",
+      "NO_ADMINS_GROUP": "no admins group",
+      "UPGRADE_FAILED": "upgrade failed"
+    },
+    "database": "Database",
+    "upgradeError": "Its workspaces are unavailable until the next start upgrades its database: {{error}}",
+    "import": "Bring in workspaces",
+    "importTitle": "Bring workspaces into {{name}}",
+    "importDescription": "These workspaces were made without sign-in. They are copied with all their data into the tenant's database, owned by its admins group. The originals stay where they are, for sign-in off.",
+    "importConfirm": "Bring in {{count}}",
+    "imported": "Workspaces copied into {{name}}: {{count}}",
+    "suspend": "Suspend",
+    "suspendTitle": "Suspend {{name}}?",
+    "suspendDescription": "Nobody in the tenant can work in Classifyre until it is resumed, and their agents stop too. Its data is kept, and scheduled scans keep running.",
+    "suspended": "{{name}} is suspended",
+    "resume": "Resume",
+    "resumed": "{{name}} is resumed",
+    "delete": "Remove tenant data",
+    "deleteTitle": "Remove the data of {{name}}?",
+    "deleteDescription": "Its organization is gone from the identity server. Its {{count}} workspace(s) and their database are deleted, and its grants with them. Its activity is kept, and its alias is never given out again. This cannot be undone.",
+    "deleteType": "Type {{alias}} to confirm",
+    "deleted": "The data of {{name}} is removed",
+    "managedInIdentityServer": "Tenants, their people and groups are made in the identity server (an organization with a top-level admins group). New ones appear here on their own.",
+    "openConsole": "Open the identity console",
+    "openInConsole": "Open in the identity console"
+  },
+  "noTenantPage": {
+    "title": "Not in a tenant yet",
+    "noTenant": "You are signed in, but your account is not in any tenant (organization) of Classifyre yet, so there is nothing to show you.",
+    "noTenantFix": "Ask whoever runs this installation (an operator) to add your account to your organization in the identity console, or your IT team if accounts come from your company directory.",
+    "severalTitle": "Choose one tenant",
+    "several": "Your account is in several tenants. Classifyre works in one tenant at a time.",
+    "severalFix": "Sign in again and choose the tenant you want to work in.",
+    "suspendedTitle": "Tenant suspended",
+    "suspended": "Your tenant is suspended, so nobody in it can work in Classifyre right now. Its data is kept.",
+    "suspendedFix": "An operator can resume it; ask whoever runs this installation.",
+    "deletedTitle": "Tenant deleted",
+    "deleted": "Your tenant has been deleted, with its workspaces.",
+    "deletedFix": "If you should be in another tenant, ask whoever runs this installation to add you to its organization.",
+    "replacedTitle": "Tenant closed",
+    "replaced": "The organization behind your tenant was deleted in the identity server and made again, so the tenant's workspaces stay closed: nobody inherits them by accident.",
+    "replacedFix": "Ask whoever runs this installation (an operator). The old organization can only come back from a backup of the identity server.",
+    "signedInAs": "Signed in as",
+    "retry": "Try again",
+    "signOut": "Sign out"
   }
 }
