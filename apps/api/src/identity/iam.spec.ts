@@ -126,6 +126,47 @@ describe('JwtVerifier', () => {
     ).resolves.toMatchObject({ sub: 'u1' });
     expect(fetches).toBe(before + 1);
   });
+
+  it('tries again on the next request while the identity server is starting', async () => {
+    let up = false;
+    const starting = new JwtVerifier({
+      jwksUrl: 'http://iam/certs',
+      issuer: ISSUER,
+      audience: 'classifyre-api',
+      fetchImpl: () =>
+        up
+          ? Promise.resolve(
+              new Response(JSON.stringify({ keys: [current.jwk] }), {
+                status: 200,
+              }),
+            )
+          : Promise.reject(new TypeError('fetch failed')),
+    });
+    const token = signToken(current.privateKey, 'k1', claims);
+    // Down: unavailable (the caller answers 503), not a bad token (401).
+    const down = starting.verify(token);
+    await expect(down).rejects.toThrow('fetch failed');
+    await expect(starting.verify(token)).rejects.not.toBeInstanceOf(
+      InvalidTokenError,
+    );
+    // Up a moment later: accepted at once, no half-minute wait.
+    up = true;
+    await expect(starting.verify(token)).resolves.toMatchObject({ sub: 'u1' });
+  });
+
+  it('treats an error answer from the identity server as unavailable', async () => {
+    const failing = new JwtVerifier({
+      jwksUrl: 'http://iam/certs',
+      issuer: ISSUER,
+      audience: 'classifyre-api',
+      fetchImpl: () => Promise.resolve(new Response('', { status: 503 })),
+    });
+    const result = failing.verify(signToken(current.privateKey, 'k1', claims));
+    await expect(result).rejects.toThrow('Signing keys unavailable (503)');
+    await expect(
+      failing.verify(signToken(current.privateKey, 'k1', claims)),
+    ).rejects.not.toBeInstanceOf(InvalidTokenError);
+  });
 });
 
 describe('request tokens and tenants', () => {
