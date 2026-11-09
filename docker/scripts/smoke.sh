@@ -114,7 +114,7 @@ ok "API is up"
 
 step "Waiting for the identity server and its realm"
 wait_for "the sign-in realm" "${BOOT_WAIT}" \
-  curl -fsS "${BASE}/iam/realms/classifyre/.well-known/openid-configuration"
+  curl -fsSL "${BASE}/iam/realms/classifyre/.well-known/openid-configuration"
 ok "realm classifyre answers at ${BASE}/iam"
 
 step "Waiting for the first-run workspace"
@@ -168,7 +168,7 @@ secrets_before="$(docker exec "${CONTAINER}" cat /var/lib/classifyre/iam.secrets
 docker restart "${CONTAINER}" >/dev/null
 wait_for "the API after a restart" "${BOOT_WAIT}" curl -fsS "${API}/ping"
 wait_for "the realm after a restart" "${BOOT_WAIT}" \
-  curl -fsS "${BASE}/iam/realms/classifyre/.well-known/openid-configuration"
+  curl -fsSL "${BASE}/iam/realms/classifyre/.well-known/openid-configuration"
 [ "${key_before}" = "$(docker exec "${CONTAINER}" cat /var/lib/classifyre/masked-config.key)" ] \
   || fail "the credential encryption key was regenerated — every stored credential would now be unreadable"
 [ "${secrets_before}" = "$(docker exec "${CONTAINER}" cat /var/lib/classifyre/iam.secrets)" ] \

@@ -158,7 +158,7 @@ describe('NotificationsService audiences', () => {
 
   it("lists what was sent to the person's groups, and owner-wide ones only to owner members", async () => {
     const { service, prisma } = build(ADA, null);
-    await service.findAll({} as any);
+    await service.findAll({});
     const where = prisma.notification.findMany.mock.calls[0][0].where;
     expect(JSON.stringify(where)).toContain('"hasSome":["finance","root"]');
     expect(JSON.stringify(where)).toContain('"isEmpty":true');
@@ -170,7 +170,7 @@ describe('NotificationsService audiences', () => {
       { actorRef: 'user:bo', groupIds: ['sales'] },
       null,
     );
-    await service.findAll({} as any);
+    await service.findAll({});
     const where = prisma.notification.findMany.mock.calls[0][0].where;
     expect(JSON.stringify(where)).not.toContain('isEmpty');
   });
