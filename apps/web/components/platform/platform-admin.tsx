@@ -3,7 +3,6 @@
 import * as React from "react";
 import {
   ArrowLeft,
-  FolderInput,
   LogOut,
   MoreHorizontal,
   Pause,
@@ -15,7 +14,6 @@ import {
 import { toast } from "sonner";
 import {
   api,
-  type LocalWorkspaceDto,
   type PlatformTenantDto,
 } from "@workspace/api-client";
 import {
@@ -30,15 +28,8 @@ import {
 } from "@workspace/ui/components/alert-dialog";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
-import { Checkbox } from "@workspace/ui/components/checkbox";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@workspace/ui/components/dialog";
+
+
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -56,17 +47,15 @@ import { extractApiErrorMessage } from "@/lib/extract-api-error-message";
 /**
  * The operator's page (docs/prd/TEN §4.7): every tenant with its admins and
  * counts, read from the identity server, where tenants, people and groups are
- * made. Here operators suspend and resume tenants, bring in workspaces made
- * without sign-in, and remove a tenant whose organization was deleted. They
+ * made. Here operators suspend and resume tenants, and remove a tenant whose
+ * organization was deleted. They
  * see tenants, never what is inside their workspaces.
  */
 export function PlatformAdmin() {
   const { t } = useTranslation();
   const consoleOn = useIamConsole();
   const [tenants, setTenants] = React.useState<PlatformTenantDto[] | null>(null);
-  const [local, setLocal] = React.useState<LocalWorkspaceDto[]>([]);
   const [denied, setDenied] = React.useState(false);
-  const [importing, setImporting] = React.useState<PlatformTenantDto | null>(null);
   const [suspending, setSuspending] = React.useState<PlatformTenantDto | null>(null);
   const [deleting, setDeleting] = React.useState<PlatformTenantDto | null>(null);
 
@@ -78,12 +67,7 @@ export function PlatformAdmin() {
       return;
     }
     try {
-      const [nextTenants, nextLocal] = await Promise.all([
-        api.platform.platformControllerTenants(),
-        api.platform.platformControllerLocalWorkspaces(),
-      ]);
-      setTenants(nextTenants);
-      setLocal(nextLocal);
+      setTenants(await api.platform.platformControllerTenants());
     } catch (error) {
       toast.error(await extractApiErrorMessage(error, t("platform.loadFailed")));
     }
@@ -154,8 +138,6 @@ export function PlatformAdmin() {
               <TenantRow
                 key={tenant.id}
                 tenant={tenant}
-                canImport={local.length > 0}
-                onImport={() => setImporting(tenant)}
                 onSuspend={() => setSuspending(tenant)}
                 onResume={() => void resume(tenant)}
                 onDelete={() => setDeleting(tenant)}
@@ -167,20 +149,9 @@ export function PlatformAdmin() {
               </li>
             )}
           </ul>
-          {local.length > 0 && (
-            <p className="text-xs text-muted-foreground">
-              {t("platform.localWaiting", { count: local.length })}
-            </p>
-          )}
         </>
       )}
 
-      <ImportDialog
-        tenant={importing}
-        workspaces={local}
-        onClose={() => setImporting(null)}
-        onImported={load}
-      />
       <SuspendDialog tenant={suspending} onClose={() => setSuspending(null)} onDone={load} />
       <DeleteDialog tenant={deleting} onClose={() => setDeleting(null)} onDone={load} />
     </div>
@@ -189,15 +160,11 @@ export function PlatformAdmin() {
 
 function TenantRow({
   tenant,
-  canImport,
-  onImport,
   onSuspend,
   onResume,
   onDelete,
 }: {
   tenant: PlatformTenantDto;
-  canImport: boolean;
-  onImport: () => void;
   onSuspend: () => void;
   onResume: () => void;
   onDelete: () => void;
@@ -282,12 +249,6 @@ function TenantRow({
                 {t("platform.delete")}
               </DropdownMenuItem>
             ) : null}
-            {!orphaned && canImport && (
-              <DropdownMenuItem onSelect={onImport}>
-                <FolderInput className="h-4 w-4" />
-                {t("platform.import")}
-              </DropdownMenuItem>
-            )}
             {orphaned ? null : tenant.status === "active" ? (
               <DropdownMenuItem onSelect={onSuspend}>
                 <Pause className="h-4 w-4" />
@@ -303,86 +264,6 @@ function TenantRow({
         </DropdownMenu>
       )}
     </li>
-  );
-}
-
-function ImportDialog({
-  tenant,
-  workspaces,
-  onClose,
-  onImported,
-}: {
-  tenant: PlatformTenantDto | null;
-  workspaces: LocalWorkspaceDto[];
-  onClose: () => void;
-  onImported: () => Promise<void>;
-}) {
-  const { t } = useTranslation();
-  const [chosen, setChosen] = React.useState<Set<string>>(new Set());
-  const [busy, setBusy] = React.useState(false);
-
-  React.useEffect(() => setChosen(new Set()), [tenant]);
-
-  const submit = async () => {
-    if (!tenant) return;
-    setBusy(true);
-    try {
-      const { copied } = await api.platform.platformControllerImportWorkspaces({
-        tenantId: tenant.id,
-        importWorkspacesDto: { slugs: [...chosen] },
-      });
-      toast.success(t("platform.imported", { count: copied.length, name: tenant.name }));
-      onClose();
-      await onImported();
-    } catch (error) {
-      toast.error(await extractApiErrorMessage(error, t("platform.failed")));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Dialog open={tenant !== null} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="rounded-[6px] border-2 border-border">
-        <DialogHeader>
-          <DialogTitle>{t("platform.importTitle", { name: tenant?.name ?? "" })}</DialogTitle>
-          <DialogDescription>{t("platform.importDescription")}</DialogDescription>
-        </DialogHeader>
-        <ul className="max-h-72 divide-y divide-border overflow-y-auto rounded-[4px] border border-border text-sm">
-          {workspaces.map((workspace) => (
-            <li key={workspace.id}>
-              <label className="flex cursor-pointer items-center gap-3 px-3 py-2">
-                <Checkbox
-                  checked={chosen.has(workspace.slug)}
-                  onCheckedChange={(checked) =>
-                    setChosen((current) => {
-                      const next = new Set(current);
-                      if (checked === true) next.add(workspace.slug);
-                      else next.delete(workspace.slug);
-                      return next;
-                    })
-                  }
-                />
-                <span className="min-w-0">
-                  <span className="block truncate font-medium">{workspace.name}</span>
-                  <span className="block truncate font-mono text-xs text-muted-foreground">
-                    /{workspace.slug}
-                  </span>
-                </span>
-              </label>
-            </li>
-          ))}
-        </ul>
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={onClose}>
-            {t("common.cancel")}
-          </Button>
-          <Button disabled={busy || chosen.size === 0} onClick={() => void submit()}>
-            {t("platform.importConfirm", { count: chosen.size })}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }
 

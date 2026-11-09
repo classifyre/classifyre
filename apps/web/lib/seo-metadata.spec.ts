@@ -34,6 +34,7 @@ describe("seo metadata", () => {
     // are unavailable outside a render.
     process.env.SITEMAP_BASE_URL = BASE;
     delete process.env.SITEMAP_ENABLED;
+    process.env.IAM_PUBLIC_TENANT = "showcase";
   });
 
   afterEach(() => {

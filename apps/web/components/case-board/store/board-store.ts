@@ -1,7 +1,6 @@
 import { createStore, type StoreApi } from "zustand/vanilla";
 import {
   api,
-  getActorName,
   type ApplyBoardOpsResponseDto,
   type BoardTraceResponseDto,
   type CaseBoardResponseDto,
@@ -78,8 +77,19 @@ export interface BoardState extends BoardDomain {
 
 export type BoardStore = StoreApi<BoardState>;
 
+/**
+ * Who edits on this page: the signed-in person's actor reference, shown on
+ * optimistic rows until the server's own copy arrives (the API records the
+ * author itself and never takes it from the client).
+ */
+let boardActor: string | null = null;
+
+export function setBoardActor(ref: string | null | undefined): void {
+  boardActor = ref ?? null;
+}
+
 function localContext(previews: ReadonlyMap<string, ItemPreview>): LocalContext {
-  return { actor: getActorName() ?? null, previews, now: new Date().toISOString() };
+  return { actor: boardActor, previews, now: new Date().toISOString() };
 }
 
 function domainOf(s: BoardState): BoardDomain {

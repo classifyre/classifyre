@@ -2,15 +2,12 @@
 
 import Image from "next/image";
 import { AccountMenu } from "@/components/account-menu";
-import { useIamEnabled } from "@/components/iam-session";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useTranslation } from "@/hooks/use-translation";
 
 export function WorkspaceHeader() {
   const { t } = useTranslation();
-  const iamEnabled = useIamEnabled();
-
   return (
     <header className="border-b bg-background/95 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-5 sm:px-8">
@@ -34,7 +31,7 @@ export function WorkspaceHeader() {
         <div className="flex items-center gap-1">
           <LanguageSwitcher />
           <ThemeToggle />
-          {iamEnabled && <AccountMenu />}
+          <AccountMenu />
         </div>
       </div>
     </header>

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Runs the web app locally (http://localhost:3000) with sign-in, against the
-# dev stack started with `CLASSIFYRE_IAM=true ./scripts/dev/start.sh`. The web
-# client's secret is read from the cluster, so nothing is written to disk.
+# Runs the web app locally (http://localhost:3000) against the dev stack
+# (`./scripts/dev/start.sh`). Sign-in is always on, so the web app needs the
+# identity server's settings; the web client's secret is read from the
+# cluster, so nothing is written to disk.
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
@@ -10,12 +11,11 @@ NS=${CLASSIFYRE_NAMESPACE:-classifyre-dev}
 secret=$(kubectl --context k3d-classifyre -n "$NS" get secret classifyre-iam \
   -o jsonpath='{.data.web-client-secret}' 2>/dev/null | base64 -d || true)
 if [ -z "$secret" ]; then
-  echo "No classifyre-iam Secret in $NS: start the dev stack with CLASSIFYRE_IAM=true first." >&2
+  echo "No classifyre-iam Secret in $NS: start the dev stack first (./scripts/dev/start.sh)." >&2
   exit 1
 fi
 
 cd "$ROOT/apps/web"
-export IAM_ENABLED=true
 export IAM_REALM=classifyre
 export IAM_APP_URL=http://localhost:3000
 # The issuer is always the app's own address plus the proxied `/iam` path —

@@ -67,7 +67,6 @@ async function mockAccess(page: CtPage, capabilities: string[]) {
     route.fulfill(
       json({
         actor: { id: "user:u1", displayName: "Ada Kowalczyk", kind: "person", via: "oidc" },
-        iamEnabled: true,
         capabilities,
       }),
     ),

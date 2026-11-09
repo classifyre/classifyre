@@ -14,7 +14,6 @@ import {
 /** Where the identity server sends people back with a code to exchange. */
 export async function GET(request: NextRequest) {
   const config = iamWebConfig();
-  if (!config) return new NextResponse(null, { status: 404 });
 
   const sealed = request.cookies.get(FLOW_COOKIE)?.value;
   const flow = sealed

@@ -12,7 +12,6 @@
 export function upstreamIamBaseUrl(
   env: Record<string, string | undefined> = process.env,
 ): string | null {
-  if (env.IAM_ENABLED !== "true") return null;
   const internal = env.IAM_INTERNAL_URL?.trim().replace(/\/+$/, "");
   if (internal) return internal;
   const service = env.IAM_SERVICE_URL?.trim().replace(/\/+$/, "");

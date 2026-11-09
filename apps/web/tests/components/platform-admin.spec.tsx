@@ -71,9 +71,6 @@ test.beforeEach(async ({ page }) => {
     route.fulfill(json({ operator: true, name: "Ola Operator" })),
   );
   await page.route("**/platform/tenants", (route) => route.fulfill(json(tenants)));
-  await page.route("**/platform/workspaces/local", (route) =>
-    route.fulfill(json([{ id: "w1", slug: "finance-ledger", name: "Finance ledger" }])),
-  );
 });
 
 test("lists tenants with their status, problems and admins", async ({ mount }) => {
@@ -81,7 +78,6 @@ test("lists tenants with their status, problems and admins", async ({ mount }) =
   await expect(page.getByText("Admins: Ada Kowalczyk")).toBeVisible();
   await expect(page.getByText("suspended", { exact: true })).toBeVisible();
   await expect(page.getByText("no admins group")).toBeVisible();
-  await expect(page.getByText("Workspaces made without sign-in: 1.", { exact: false })).toBeVisible();
 });
 
 test("shows each tenant's database and a failed upgrade", async ({ mount }) => {

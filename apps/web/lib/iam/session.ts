@@ -42,13 +42,13 @@ export interface IamWebConfig {
   publicTenant: boolean;
 }
 
+/** Sign-in is always on; throws when the identity server is not configured. */
 export function iamWebConfig(
   env: Record<string, string | undefined> = process.env,
-): IamWebConfig | null {
-  if (env.IAM_ENABLED !== "true") return null;
+): IamWebConfig {
   const need = (name: string) => {
     const value = env[name]?.trim();
-    if (!value) throw new Error(`IAM_ENABLED=true needs ${name}`);
+    if (!value) throw new Error(`Sign-in needs ${name} to be set`);
     return value.replace(/\/+$/, "");
   };
   const issuerUrl = need("IAM_ISSUER_URL");

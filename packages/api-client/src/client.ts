@@ -1497,24 +1497,6 @@ function isReservedApiPath(pathAfterBase: string): boolean {
   );
 }
 
-let activeActorName: string | undefined;
-
-/**
- * The display name the current person typed in, sent as `X-Actor-Name` on
- * every generated API request so board ops and timeline rows are attributed.
- * Interim identity until the app has users (CASE_BOARD_PRD open question Q1):
- * attribution, not authorisation. Percent-encoded because header values must
- * be Latin-1 and names are not.
- */
-export function setActorName(name: string | null | undefined): void {
-  const trimmed = name?.trim();
-  activeActorName = trimmed ? trimmed.slice(0, 64) : undefined;
-}
-
-export function getActorName(): string | undefined {
-  return activeActorName;
-}
-
 // API configuration
 function createConfiguration(baseUrl?: string): Configuration {
   const basePath = baseUrl || getBaseUrl();
@@ -1536,19 +1518,6 @@ function createConfiguration(baseUrl?: string): Configuration {
             url: `${trimmedBase}/${slug}${normalized}`,
             init: context.init,
           };
-        },
-      },
-      {
-        pre: async (context) => {
-          if (!activeActorName) return;
-          const headers = {
-            ...((context.init.headers as Record<string, string> | undefined) ??
-              {}),
-          };
-          if (headers["X-Actor-Name"] === undefined) {
-            headers["X-Actor-Name"] = encodeURIComponent(activeActorName);
-          }
-          return { url: context.url, init: { ...context.init, headers } };
         },
       },
     ],
@@ -1617,10 +1586,7 @@ export interface Namespace {
   createdAt: string;
   updatedAt: string;
   lastOpenedAt: string | null;
-  /**
-   * With sign-in, what the caller may do in this workspace (from the list);
-   * absent without sign-in, where everything is allowed.
-   */
+  /** What the caller may do in this workspace (from the list). */
   capabilities?: string[];
 }
 
@@ -1721,7 +1687,7 @@ class NamespacesApi {
     return this.absolutizeThumbnail((await res.json()) as Namespace);
   }
 
-  /** Groups you may create workspaces for; empty without sign-in. */
+  /** Groups you may create workspaces for. */
   async owningGroups(): Promise<OwningGroup[]> {
     const res = await resilientFetch(this.url("/owning-groups"));
     if (!res.ok) throw new Error(`Failed to load owning groups (${res.status})`);

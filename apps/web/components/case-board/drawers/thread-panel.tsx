@@ -25,7 +25,6 @@ import {
 import { toast } from "sonner";
 import {
   api,
-  getActorName,
   AddThreadEntryDtoEntryTypeEnum,
   type ThreadEntryDto,
   type ThreadRemovalPreviewDto,
@@ -178,7 +177,7 @@ function HypothesisView({
   const patch = async (data: Parameters<typeof api.threads.caseThreadsControllerUpdate>[0]["updateThreadDto"]) => {
     try {
       // The thread API does not read X-Actor-Name: say who changed it.
-      await api.threads.caseThreadsControllerUpdate({ id: thread.id, updateThreadDto: { ...data, actor: getActorName() } });
+      await api.threads.caseThreadsControllerUpdate({ id: thread.id, updateThreadDto: data });
       await changed();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error));
@@ -306,7 +305,7 @@ function HypothesisView({
           onSend={async (body) => {
             await api.threads.caseThreadsControllerAddEntry({
               id: thread.id,
-              addThreadEntryDto: { entryType: AddThreadEntryDtoEntryTypeEnum.Note, body, author: getActorName() },
+              addThreadEntryDto: { entryType: AddThreadEntryDtoEntryTypeEnum.Note, body },
             });
             await changed();
             setTab("log");
@@ -342,7 +341,7 @@ function Statement({
     try {
       await api.threads.caseThreadsControllerAddEntry({
         id: thread.id,
-        addThreadEntryDto: { entryType: AddThreadEntryDtoEntryTypeEnum.Statement, body, author: getActorName() },
+        addThreadEntryDto: { entryType: AddThreadEntryDtoEntryTypeEnum.Statement, body },
       });
       await changed();
     } catch (error) {
@@ -1018,7 +1017,7 @@ function DiscussionView({
           onSend={async (body) => {
             await api.threads.caseThreadsControllerAddEntry({
               id: thread.id,
-              addThreadEntryDto: { entryType: AddThreadEntryDtoEntryTypeEnum.Note, body, author: getActorName() },
+              addThreadEntryDto: { entryType: AddThreadEntryDtoEntryTypeEnum.Note, body },
             });
             await changed();
           }}

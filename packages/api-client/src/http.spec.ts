@@ -200,7 +200,7 @@ describe("resilientFetch after a 401", () => {
     expect(handler).toHaveBeenCalledTimes(1);
   });
 
-  it("leaves 401s alone without sign-in", async () => {
+  it("leaves 401s alone before a handler is installed", async () => {
     mockFetch(jsonResponse(401, {}));
     expect((await resilientFetch("/acme/sources")).status).toBe(401);
   });

@@ -4,7 +4,7 @@ import * as React from "react";
 import type { NodeProps } from "@xyflow/react";
 import { formatDistanceToNowStrict } from "date-fns";
 import { toast } from "sonner";
-import { api, getActorName } from "@workspace/api-client";
+import { api } from "@workspace/api-client";
 import { HypothesisCardView, type HypothesisStatus } from "@workspace/case-board/components/hypothesis-card";
 import { useLod } from "@workspace/case-board/hooks/use-lod";
 import { useTranslation } from "@/hooks/use-translation";
@@ -54,7 +54,7 @@ export const HypothesisCard = React.memo(function HypothesisCard({
     try {
       await api.threads.caseThreadsControllerAddEntry({
         id: thread.id,
-        addThreadEntryDto: { entryType: "STATEMENT", body, author: getActorName() },
+        addThreadEntryDto: { entryType: "STATEMENT", body },
       });
       store.getState().refetch();
     } catch (error) {

@@ -8,7 +8,7 @@ export function AiHealthHarness() {
 
   return (
     <ServerConfigContext.Provider
-      value={{ logsPersisted: false, demoMode: false, iamEnabled: false }}
+      value={{ logsPersisted: false, demoMode: false }}
     >
       <AiHealthProvider>
         <button

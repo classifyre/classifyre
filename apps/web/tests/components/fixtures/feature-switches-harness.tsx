@@ -15,7 +15,7 @@ import { InstanceSettingsProvider } from "@/components/instance-settings-provide
 export function FeatureSwitchesHarness() {
   return (
     <ServerConfigContext.Provider
-      value={{ logsPersisted: false, demoMode: false, iamEnabled: false }}
+      value={{ logsPersisted: false, demoMode: false }}
     >
       <InstanceSettingsProvider>
         <NamespaceProvider slug="acme">
