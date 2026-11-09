@@ -19,7 +19,6 @@ concurrency:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
   DOCKER_PLATFORMS: linux/amd64,linux/arm64
-  INTEGRATION_DATABASE_URL: ${{ secrets.INTEGRATION_DATABASE_URL || vars.INTEGRATION_DATABASE_URL || '' }}
 
 jobs:
   validate:
@@ -27,6 +26,27 @@ jobs:
     # Pinned: Playwright has no Chromium for ubuntu-latest (26.04) yet.
     runs-on: ubuntu-24.04
     timeout-minutes: 25
+
+    # The API integration tests make workspaces, and with sign-in always on
+    # each tenant gets its own database and login role (docs/prd/TEN §4.1).
+    # That needs a Postgres where the test user may create both and connect to
+    # any database: a throwaway superuser, as the chart's own Postgres has. A
+    # shared pooler such as Supabase's routes logins to the project's one
+    # database only, so it cannot reach a tenant database.
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: classifyre
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
 
     steps:
       - name: Checkout
@@ -184,9 +204,9 @@ jobs:
         run: bun run test
 
       - name: API integration tests
-        if: (success() || failure()) && env.INTEGRATION_DATABASE_URL != ''
+        if: success() || failure()
         env:
-          DATABASE_URL: ${{ env.INTEGRATION_DATABASE_URL }}
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/classifyre
           INTEGRATION_TEST_RESET_DB: "1"
           INTEGRATION_TEST_SCHEMA_KEY: ${{ github.head_ref || github.ref_name }}
         run: cd apps/api && bun run test:integration:run
