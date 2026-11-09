@@ -63,6 +63,24 @@ describe('control and tenant databases', () => {
     expect(other).not.toBe(url.password);
   });
 
+  it('keeps the project suffix a routing pooler needs on the tenant role', () => {
+    process.env.CLASSIFYRE_TENANT_DATABASE_KEY = 'key-1';
+    const name = tenantDatabaseName(TENANT);
+    process.env.DATABASE_URL =
+      'postgresql://postgres.abcdproject:secret@aws-0-eu-west-1.pooler.supabase.com:6543/postgres';
+    expect(new URL(tenantDatabaseUrl(TENANT)).username).toBe(
+      `${name}.abcdproject`,
+    );
+    // A plain Postgres keeps the bare role, also when the user has a dot.
+    process.env.DATABASE_URL = 'postgresql://ops.team:secret@db:5432/postgres';
+    expect(new URL(tenantDatabaseUrl(TENANT)).username).toBe(name);
+    // Another such pooler is told explicitly.
+    process.env.CLASSIFYRE_DATABASE_USER_SUFFIX = 'tenant-7';
+    expect(new URL(tenantDatabaseUrl(TENANT)).username).toBe(
+      `${name}.tenant-7`,
+    );
+  });
+
   it('refuses tenant databases without the key', () => {
     process.env.DATABASE_URL = withControl();
     delete process.env.CLASSIFYRE_TENANT_DATABASE_KEY;

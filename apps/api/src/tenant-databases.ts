@@ -38,6 +38,26 @@ export function tenantDatabasePassword(
     .digest('base64url');
 }
 
+/**
+ * What a pooler that serves many projects needs after a role's name to know
+ * which project it is for: Supavisor (Supabase's pooler) routes a login by a
+ * `<role>.<project>` username, and refuses a bare role ("no tenant
+ * identifier provided"). Taken from the configured user (`postgres.<project>`)
+ * on Supabase's pooler hosts, or set with `CLASSIFYRE_DATABASE_USER_SUFFIX`
+ * for another such pooler. Empty for a plain Postgres or PgBouncer.
+ */
+export function databaseUserSuffix(
+  configured: URL,
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  const explicit = env.CLASSIFYRE_DATABASE_USER_SUFFIX?.trim();
+  if (explicit) return explicit.startsWith('.') ? explicit : `.${explicit}`;
+  if (!/\.pooler\.supabase\.com$/i.test(configured.hostname)) return '';
+  const user = decodeURIComponent(configured.username);
+  const dot = user.indexOf('.');
+  return dot > 0 ? user.slice(dot) : '';
+}
+
 /** The tenant's database, logged in as the tenant's role. */
 export function tenantDatabaseUrl(
   tenantId: string,
@@ -45,7 +65,7 @@ export function tenantDatabaseUrl(
 ): string {
   const name = tenantDatabaseName(tenantId);
   const url = new URL(withDatabase(publicConnectionString(), name));
-  url.username = name;
+  url.username = `${name}${databaseUserSuffix(url, env)}`;
   url.password = tenantDatabasePassword(name, env);
   return url.toString();
 }
