@@ -272,9 +272,7 @@ run_code() { # run_code <user> <sql> [format]: the run's status and error code, 
   post "$1" /fin-ledger/query-runs "{\"sql\":\"$2\"${3:+,\"format\":\"$3\"}}" \
     | json "e=d.get('error'); print((d.get('status') or '') + ':' + ((e.get('code') if isinstance(e, dict) else None) or d.get('code') or ''))"
 }
-check D "SQL is off until a workspace admin turns it on" ":DATA_QUERY_OFF" "$(run_code admin "SELECT * FROM ledger_lake.ap.orders")"
-check D "a viewer cannot turn it on" 403 "$(status controller PUT /fin-ledger/data-query/settings '{"enabled":true}')"
-check D "a workspace admin can" true "$(curl -s -X PUT -H "$(authed admin)" -H 'Content-Type: application/json' -d '{"enabled":true}' "$B/fin-ledger/data-query/settings" | json "print(str(d.get('enabled')).lower())")"
+check D "a viewer cannot change the query limits" 403 "$(status controller PUT /fin-ledger/data-query/settings '{"maxRows":500}')"
 check D "the tenant admin may query every table" "yes,yes" "$(can_query admin ledger_lake.ap.orders),$(can_query admin ledger_lake.hr.payroll)"
 check D "a viewer sees the tables, locked" "no,no" "$(can_query controller ledger_lake.ap.orders),$(can_query controller ledger_lake.hr.payroll)"
 check D "and is refused without a job" ":NO_QUERYABLE_TABLES" "$(run_code controller "SELECT * FROM ledger_lake.ap.orders")"

@@ -21,12 +21,6 @@ import { mapValues } from '../runtime';
 export interface DataQuerySettingsDto {
     /**
      * 
-     * @type {boolean}
-     * @memberof DataQuerySettingsDto
-     */
-    enabled: boolean;
-    /**
-     * 
      * @type {number}
      * @memberof DataQuerySettingsDto
      */
@@ -61,7 +55,6 @@ export interface DataQuerySettingsDto {
  * Check if a given object implements the DataQuerySettingsDto interface.
  */
 export function instanceOfDataQuerySettingsDto(value: object): value is DataQuerySettingsDto {
-    if (!('enabled' in value) || value['enabled'] === undefined) return false;
     if (!('maxRows' in value) || value['maxRows'] === undefined) return false;
     if (!('timeoutSeconds' in value) || value['timeoutSeconds'] === undefined) return false;
     if (!('exportMaxRows' in value) || value['exportMaxRows'] === undefined) return false;
@@ -78,7 +71,6 @@ export function DataQuerySettingsDtoFromJSONTyped(json: any, ignoreDiscriminator
     }
     return {
         
-        'enabled': json['enabled'],
         'maxRows': json['maxRows'],
         'timeoutSeconds': json['timeoutSeconds'],
         'exportMaxRows': json['exportMaxRows'],
@@ -98,7 +90,6 @@ export function DataQuerySettingsDtoToJSONTyped(value?: DataQuerySettingsDto | n
 
     return {
         
-        'enabled': value['enabled'],
         'maxRows': value['maxRows'],
         'timeoutSeconds': value['timeoutSeconds'],
         'exportMaxRows': value['exportMaxRows'],

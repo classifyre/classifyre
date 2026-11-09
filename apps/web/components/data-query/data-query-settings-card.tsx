@@ -14,7 +14,6 @@ import {
 } from "@workspace/ui/components/card";
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
-import { Switch } from "@workspace/ui/components/switch";
 import { useTranslation } from "@/hooks/use-translation";
 import { useCan } from "@/hooks/use-me";
 import { ActorChip } from "@/components/actor-chip";
@@ -74,17 +73,6 @@ export function DataQuerySettingsCard() {
         <CardDescription>{t("dataQuery.settings.description")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex items-center gap-3">
-          <Switch
-            id="data-query-enabled"
-            checked={settings?.enabled ?? false}
-            disabled={!settings || !canChange || busy}
-            onCheckedChange={(enabled) => void save({ enabled })}
-          />
-          <Label htmlFor="data-query-enabled">
-            {t("dataQuery.settings.enabled")}
-          </Label>
-        </div>
         <div className="flex flex-wrap items-end gap-3">
           <div className="space-y-1">
             <Label htmlFor="data-query-max-rows" className="text-xs">

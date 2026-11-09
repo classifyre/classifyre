@@ -21,12 +21,6 @@ import { mapValues } from '../runtime';
 export interface UpdateDataQuerySettingsDto {
     /**
      * 
-     * @type {boolean}
-     * @memberof UpdateDataQuerySettingsDto
-     */
-    enabled?: boolean;
-    /**
-     * 
      * @type {number}
      * @memberof UpdateDataQuerySettingsDto
      */
@@ -62,7 +56,6 @@ export function UpdateDataQuerySettingsDtoFromJSONTyped(json: any, ignoreDiscrim
     }
     return {
         
-        'enabled': json['enabled'] == null ? undefined : json['enabled'],
         'maxRows': json['maxRows'] == null ? undefined : json['maxRows'],
         'timeoutSeconds': json['timeoutSeconds'] == null ? undefined : json['timeoutSeconds'],
         'exportMaxRows': json['exportMaxRows'] == null ? undefined : json['exportMaxRows'],
@@ -80,7 +73,6 @@ export function UpdateDataQuerySettingsDtoToJSONTyped(value?: UpdateDataQuerySet
 
     return {
         
-        'enabled': value['enabled'],
         'maxRows': value['maxRows'],
         'timeoutSeconds': value['timeoutSeconds'],
         'exportMaxRows': value['exportMaxRows'],

@@ -30,11 +30,7 @@ export function AssetDataTab({
 
   return (
     <div className="space-y-4" data-testid="asset-data-tab">
-      {!catalog.enabled ? (
-        <Notice title={t("dataQuery.disabledTitle")}>
-          {t("dataQuery.disabledBody")}
-        </Notice>
-      ) : !table.queryable ? (
+      {!table.queryable ? (
         <Notice title={t("dataQuery.notQueryable")}>
           {table.reason ?? t("dataQuery.notQueryable")}
         </Notice>

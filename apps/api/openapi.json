@@ -11843,7 +11843,7 @@
             }
           }
         },
-        "summary": "Turn SQL queries on or off, and set their limits",
+        "summary": "Set the limits of SQL queries in this workspace",
         "tags": [
           "Data query"
         ]
@@ -35330,10 +35330,6 @@
       "QueryCatalogDto": {
         "type": "object",
         "properties": {
-          "enabled": {
-            "type": "boolean",
-            "description": "This workspace answers SQL queries."
-          },
           "canQueryAll": {
             "type": "boolean",
             "description": "You may query every table here; false when only some sources or tables are granted."
@@ -35349,7 +35345,6 @@
           }
         },
         "required": [
-          "enabled",
           "canQueryAll",
           "limits",
           "sources"
@@ -35358,9 +35353,6 @@
       "DataQuerySettingsDto": {
         "type": "object",
         "properties": {
-          "enabled": {
-            "type": "boolean"
-          },
           "maxRows": {
             "type": "number"
           },
@@ -35381,7 +35373,6 @@
           }
         },
         "required": [
-          "enabled",
           "maxRows",
           "timeoutSeconds",
           "exportMaxRows"
@@ -35390,9 +35381,6 @@
       "UpdateDataQuerySettingsDto": {
         "type": "object",
         "properties": {
-          "enabled": {
-            "type": "boolean"
-          },
           "maxRows": {
             "type": "number",
             "minimum": 1,

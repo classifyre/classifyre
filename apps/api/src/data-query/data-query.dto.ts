@@ -82,9 +82,6 @@ export class QueryLimitsDto {
 }
 
 export class QueryCatalogDto {
-  @ApiProperty({ description: 'This workspace answers SQL queries.' })
-  enabled: boolean;
-
   @ApiProperty({
     description:
       'You may query every table here; false when only some sources or tables are granted.',
@@ -99,9 +96,6 @@ export class QueryCatalogDto {
 }
 
 export class DataQuerySettingsDto {
-  @ApiProperty()
-  enabled: boolean;
-
   @ApiProperty()
   maxRows: number;
 
@@ -119,9 +113,6 @@ export class DataQuerySettingsDto {
 }
 
 export class UpdateDataQuerySettingsDto {
-  @ApiPropertyOptional()
-  enabled?: boolean;
-
   @ApiPropertyOptional({ minimum: 1, maximum: 100000 })
   maxRows?: number;
 

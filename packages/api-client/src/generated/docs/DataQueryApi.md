@@ -12,7 +12,7 @@ All URIs are relative to *http://localhost*
 | [**dataQueryControllerList**](DataQueryApi.md#dataquerycontrollerlist) | **GET** /query-runs | Your recent queries in this workspace |
 | [**dataQueryControllerReceive**](DataQueryApi.md#dataquerycontrollerreceive) | **POST** /query-runs/{id}/result | Internal: a query job posts its result here |
 | [**dataQueryControllerResult**](DataQueryApi.md#dataquerycontrollerresult) | **GET** /query-runs/{id}/result | The rows of a finished query (Arrow IPC stream), or its exported file |
-| [**dataQueryControllerUpdateSettings**](DataQueryApi.md#dataquerycontrollerupdatesettings) | **PUT** /data-query/settings | Turn SQL queries on or off, and set their limits |
+| [**dataQueryControllerUpdateSettings**](DataQueryApi.md#dataquerycontrollerupdatesettings) | **PUT** /data-query/settings | Set the limits of SQL queries in this workspace |
 
 
 
@@ -532,7 +532,7 @@ No authorization required
 
 > DataQuerySettingsDto dataQueryControllerUpdateSettings(updateDataQuerySettingsDto)
 
-Turn SQL queries on or off, and set their limits
+Set the limits of SQL queries in this workspace
 
 ### Example
 

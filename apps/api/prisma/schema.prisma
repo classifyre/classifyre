@@ -208,7 +208,6 @@ enum QueryRunStatus {
 /// One row (`id = 'default'`); off until an admin turns it on.
 model DataQuerySettings {
   id             String   @id @default("default")
-  enabled        Boolean  @default(false)
   maxRows        Int      @default(10000) @map("max_rows")
   timeoutSeconds Int      @default(120) @map("timeout_seconds")
   /// Rows an export (Excel, CSV, Parquet) may hold; Excel stops at 1,048,575.

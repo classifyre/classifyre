@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { Database, Info } from "lucide-react";
+import { Database } from "lucide-react";
 import { useTranslation } from "@/hooks/use-translation";
 import { CatalogPanel } from "@/components/data-query/catalog-panel";
 import {
@@ -62,18 +62,7 @@ function QueryPageContent() {
         </p>
       </div>
 
-      {catalog && !catalog.enabled && (
-        <div className="flex items-start gap-2 rounded-md border border-dashed p-4 text-sm">
-          <Info className="mt-0.5 h-4 w-4 shrink-0" />
-          <div>
-            <div className="font-medium">{t("dataQuery.disabledTitle")}</div>
-            <div className="text-muted-foreground">
-              {t("dataQuery.disabledBody")}
-            </div>
-          </div>
-        </div>
-      )}
-      {catalog?.enabled && !catalog.canQueryAll && (
+      {catalog && !catalog.canQueryAll && (
         <p className="text-xs text-muted-foreground">
           {t("dataQuery.partialAccess", { count: queryable })}
         </p>
@@ -102,7 +91,7 @@ function QueryPageContent() {
             editorPath="query://workspace/main.sql"
             editorHeight={240}
             resultHeight={520}
-            disabled={!catalog?.enabled}
+            disabled={!catalog}
           />
         </section>
       </div>

@@ -46,7 +46,6 @@ export interface CatalogSource {
 }
 
 export interface QueryCatalog {
-  enabled: boolean;
   /** Every table of the workspace, by role; false when only some are granted. */
   canQueryAll: boolean;
   limits: { maxRows: number; timeoutSeconds: number; exportMaxRows: number };
@@ -54,7 +53,6 @@ export interface QueryCatalog {
 }
 
 export interface QuerySettings {
-  enabled: boolean;
   maxRows: number;
   timeoutSeconds: number;
   exportMaxRows: number;
@@ -96,7 +94,6 @@ export class QueryCatalogService {
       where: { id: 'default' },
     });
     return {
-      enabled: row?.enabled ?? false,
       maxRows: row?.maxRows ?? 10_000,
       timeoutSeconds: row?.timeoutSeconds ?? 120,
       exportMaxRows: row?.exportMaxRows ?? 1_000_000,
@@ -106,13 +103,11 @@ export class QueryCatalogService {
   }
 
   async updateSettings(input: {
-    enabled?: boolean;
     maxRows?: number;
     timeoutSeconds?: number;
     exportMaxRows?: number;
   }): Promise<QuerySettings> {
     const data = {
-      ...(typeof input.enabled === 'boolean' ? { enabled: input.enabled } : {}),
       ...(typeof input.maxRows === 'number'
         ? { maxRows: Math.min(Math.max(Math.trunc(input.maxRows), 1), 100_000) }
         : {}),
@@ -191,11 +186,10 @@ export class QueryCatalogService {
       if (!granted && !scope.seeLocked) continue;
       sources.get(table.sourceId)?.tables.push({
         ...table,
-        canQuery: settings.enabled && table.queryable && granted,
+        canQuery: table.queryable && granted,
       });
     }
     return {
-      enabled: settings.enabled,
       canQueryAll: scope.all,
       limits: {
         maxRows: settings.maxRows,

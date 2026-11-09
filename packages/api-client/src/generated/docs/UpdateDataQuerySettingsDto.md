@@ -6,7 +6,6 @@
 
 Name | Type
 ------------ | -------------
-`enabled` | boolean
 `maxRows` | number
 `timeoutSeconds` | number
 `exportMaxRows` | number
@@ -18,7 +17,6 @@ import type { UpdateDataQuerySettingsDto } from '@workspace/api-client'
 
 // TODO: Update the object below with actual values
 const example = {
-  "enabled": null,
   "maxRows": null,
   "timeoutSeconds": null,
   "exportMaxRows": null,

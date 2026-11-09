@@ -245,7 +245,7 @@ All URIs are relative to *http://localhost*
 *DataQueryApi* | [**dataQueryControllerList**](docs/DataQueryApi.md#dataquerycontrollerlist) | **GET** /query-runs | Your recent queries in this workspace
 *DataQueryApi* | [**dataQueryControllerReceive**](docs/DataQueryApi.md#dataquerycontrollerreceive) | **POST** /query-runs/{id}/result | Internal: a query job posts its result here
 *DataQueryApi* | [**dataQueryControllerResult**](docs/DataQueryApi.md#dataquerycontrollerresult) | **GET** /query-runs/{id}/result | The rows of a finished query (Arrow IPC stream), or its exported file
-*DataQueryApi* | [**dataQueryControllerUpdateSettings**](docs/DataQueryApi.md#dataquerycontrollerupdatesettings) | **PUT** /data-query/settings | Turn SQL queries on or off, and set their limits
+*DataQueryApi* | [**dataQueryControllerUpdateSettings**](docs/DataQueryApi.md#dataquerycontrollerupdatesettings) | **PUT** /data-query/settings | Set the limits of SQL queries in this workspace
 *DataTransferApi* | [**dataTransferControllerCancel**](docs/DataTransferApi.md#datatransfercontrollercancel) | **POST** /data-transfer/jobs/{id}/cancel | Ask a running transfer to stop
 *DataTransferApi* | [**dataTransferControllerDownload**](docs/DataTransferApi.md#datatransfercontrollerdownload) | **GET** /data-transfer/exports/{id}/download | Download a completed export archive
 *DataTransferApi* | [**dataTransferControllerJob**](docs/DataTransferApi.md#datatransfercontrollerjob) | **GET** /data-transfer/jobs/{id} | Poll one transfer job for progress

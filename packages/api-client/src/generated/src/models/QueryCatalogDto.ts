@@ -35,12 +35,6 @@ import {
  */
 export interface QueryCatalogDto {
     /**
-     * This workspace answers SQL queries.
-     * @type {boolean}
-     * @memberof QueryCatalogDto
-     */
-    enabled: boolean;
-    /**
      * You may query every table here; false when only some sources or tables are granted.
      * @type {boolean}
      * @memberof QueryCatalogDto
@@ -64,7 +58,6 @@ export interface QueryCatalogDto {
  * Check if a given object implements the QueryCatalogDto interface.
  */
 export function instanceOfQueryCatalogDto(value: object): value is QueryCatalogDto {
-    if (!('enabled' in value) || value['enabled'] === undefined) return false;
     if (!('canQueryAll' in value) || value['canQueryAll'] === undefined) return false;
     if (!('limits' in value) || value['limits'] === undefined) return false;
     if (!('sources' in value) || value['sources'] === undefined) return false;
@@ -81,7 +74,6 @@ export function QueryCatalogDtoFromJSONTyped(json: any, ignoreDiscriminator: boo
     }
     return {
         
-        'enabled': json['enabled'],
         'canQueryAll': json['canQueryAll'],
         'limits': QueryLimitsDtoFromJSON(json['limits']),
         'sources': ((json['sources'] as Array<any>).map(QueryCatalogSourceDtoFromJSON)),
@@ -99,7 +91,6 @@ export function QueryCatalogDtoToJSONTyped(value?: QueryCatalogDto | null, ignor
 
     return {
         
-        'enabled': value['enabled'],
         'canQueryAll': value['canQueryAll'],
         'limits': QueryLimitsDtoToJSON(value['limits']),
         'sources': ((value['sources'] as Array<any>).map(QueryCatalogSourceDtoToJSON)),
