@@ -51,6 +51,7 @@ export const MeResponseDtoCapabilitiesEnum = {
     WorkspacePause: 'workspace.pause',
     WorkspaceDelete: 'workspace.delete',
     WorkspaceTransfer: 'workspace.transfer',
+    NotificationView: 'notification.view',
     AccessView: 'access.view',
     AccessManage: 'access.manage',
     SourceView: 'source.view',

@@ -26,6 +26,11 @@
       "description": "Export, import or copy workspace data."
     },
     {
+      "id": "notification.view",
+      "scope": "workspace",
+      "description": "Get the notifications sent to your groups in the workspace, and mark them read, important or dismissed for yourself."
+    },
+    {
       "id": "access.view",
       "scope": "workspace",
       "description": "See who has access to the workspace."
@@ -223,6 +228,7 @@
       "scope": "workspace",
       "capabilities": [
         "workspace.view",
+        "notification.view",
         "access.view",
         "source.view",
         "finding.view",
@@ -242,6 +248,7 @@
       "scope": "workspace",
       "capabilities": [
         "workspace.view",
+        "notification.view",
         "access.view",
         "source.view",
         "finding.view",
@@ -267,6 +274,7 @@
       "scope": "workspace",
       "capabilities": [
         "workspace.view",
+        "notification.view",
         "access.view",
         "source.view",
         "finding.view",
@@ -291,6 +299,7 @@
       "scope": "workspace",
       "capabilities": [
         "workspace.view",
+        "notification.view",
         "mcp.token.own",
         "source.view",
         "source.manage",
@@ -313,6 +322,7 @@
         "workspace.pause",
         "workspace.delete",
         "workspace.transfer",
+        "notification.view",
         "access.view",
         "access.manage",
         "source.view",
@@ -374,6 +384,7 @@
         "workspace.pause",
         "workspace.delete",
         "workspace.transfer",
+        "notification.view",
         "access.view",
         "access.manage",
         "source.view",
@@ -428,6 +439,7 @@
         "workspace.pause",
         "workspace.delete",
         "workspace.transfer",
+        "notification.view",
         "access.view",
         "access.manage",
         "source.view",

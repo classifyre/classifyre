@@ -484,6 +484,25 @@ export class IdentityService {
     });
   }
 
+  /**
+   * The person's groups and every group above them: who a notification sent
+   * to a group reaches (members of its subgroups included). Empty for
+   * visitors, who are in no group.
+   */
+  async groupLineage(principal: Principal): Promise<string[]> {
+    if (principal.visitor) return [];
+    const lineage = new Set<string>();
+    for (const groupId of principal.groupIds) {
+      for (const id of await this.membership.ancestry(
+        principal.orgId,
+        groupId,
+      )) {
+        lineage.add(id);
+      }
+    }
+    return [...lineage];
+  }
+
   /** The owner group of a workspace and the groups above it; empty without an owner. */
   async ownerLineage(
     principal: Principal,

@@ -398,10 +398,12 @@ All URIs are relative to *http://localhost*
 *NotebooksApi* | [**notebookControllerScaffold**](docs/NotebooksApi.md#notebookcontrollerscaffold) | **GET** /notebooks/scaffold | The starter cells and the functions a notebook must define
 *NotebooksApi* | [**notebookControllerTemplates**](docs/NotebooksApi.md#notebookcontrollertemplates) | **GET** /notebooks/templates | Worked notebooks an author can start from or borrow cells out of
 *NotebooksApi* | [**notebookControllerUpdate**](docs/NotebooksApi.md#notebookcontrollerupdate) | **PUT** /sources/{sourceId}/notebook | Save a notebook
-*NotificationsApi* | [**notificationsControllerDeleteNotification**](docs/NotificationsApi.md#notificationscontrollerdeletenotification) | **DELETE** /notifications/{id} | Delete a notification
+*NotificationsApi* | [**notificationsControllerAudiences**](docs/NotificationsApi.md#notificationscontrolleraudiences) | **GET** /notifications/audiences | Which groups get each kind of notification
+*NotificationsApi* | [**notificationsControllerDeleteNotification**](docs/NotificationsApi.md#notificationscontrollerdeletenotification) | **DELETE** /notifications/{id} | Dismiss a notification
 *NotificationsApi* | [**notificationsControllerListNotifications**](docs/NotificationsApi.md#notificationscontrollerlistnotifications) | **GET** /notifications | List notifications
-*NotificationsApi* | [**notificationsControllerMarkAllRead**](docs/NotificationsApi.md#notificationscontrollermarkallread) | **PATCH** /notifications/mark-all-read | Mark all notifications as read
+*NotificationsApi* | [**notificationsControllerMarkAllRead**](docs/NotificationsApi.md#notificationscontrollermarkallread) | **PATCH** /notifications/mark-all-read | Mark all your notifications as read
 *NotificationsApi* | [**notificationsControllerMarkRead**](docs/NotificationsApi.md#notificationscontrollermarkread) | **PATCH** /notifications/{id}/read | Mark a notification as read
+*NotificationsApi* | [**notificationsControllerSetAudience**](docs/NotificationsApi.md#notificationscontrollersetaudience) | **PUT** /notifications/audiences/{type} | Choose which groups get a kind of notification
 *NotificationsApi* | [**notificationsControllerSetImportant**](docs/NotificationsApi.md#notificationscontrollersetimportant) | **PATCH** /notifications/{id}/important | Set notification importance
 *PlatformApi* | [**platformControllerMe**](docs/PlatformApi.md#platformcontrollerme) | **GET** /platform/me | Whether the caller is an operator (403 when not)
 *PlatformApi* | [**platformControllerRemove**](docs/PlatformApi.md#platformcontrollerremove) | **DELETE** /platform/tenants/{tenantId} | Remove a tenant whose organization was deleted
@@ -832,6 +834,7 @@ All URIs are relative to *http://localhost*
 - [NotebookExecutionDto](docs/NotebookExecutionDto.md)
 - [NotebookScaffoldDto](docs/NotebookScaffoldDto.md)
 - [NotebookTemplateDto](docs/NotebookTemplateDto.md)
+- [NotificationAudienceDto](docs/NotificationAudienceDto.md)
 - [NotificationListResponseDto](docs/NotificationListResponseDto.md)
 - [NotificationResponseDto](docs/NotificationResponseDto.md)
 - [NotificationsControllerDeleteNotification200Response](docs/NotificationsControllerDeleteNotification200Response.md)
@@ -1073,6 +1076,7 @@ All URIs are relative to *http://localhost*
 - [UpdateMcpTokenDto](docs/UpdateMcpTokenDto.md)
 - [UpdateNotebookDto](docs/UpdateNotebookDto.md)
 - [UpdateNotebookResponseDto](docs/UpdateNotebookResponseDto.md)
+- [UpdateNotificationAudienceDto](docs/UpdateNotificationAudienceDto.md)
 - [UpdateNotificationImportanceDto](docs/UpdateNotificationImportanceDto.md)
 - [UpdateRunnerAssetStatusDto](docs/UpdateRunnerAssetStatusDto.md)
 - [UpdateSourceDto](docs/UpdateSourceDto.md)

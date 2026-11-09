@@ -4,19 +4,82 @@ All URIs are relative to *http://localhost*
 
 | Method | HTTP request | Description |
 |------------- | ------------- | -------------|
-| [**notificationsControllerDeleteNotification**](NotificationsApi.md#notificationscontrollerdeletenotification) | **DELETE** /notifications/{id} | Delete a notification |
+| [**notificationsControllerAudiences**](NotificationsApi.md#notificationscontrolleraudiences) | **GET** /notifications/audiences | Which groups get each kind of notification |
+| [**notificationsControllerDeleteNotification**](NotificationsApi.md#notificationscontrollerdeletenotification) | **DELETE** /notifications/{id} | Dismiss a notification |
 | [**notificationsControllerListNotifications**](NotificationsApi.md#notificationscontrollerlistnotifications) | **GET** /notifications | List notifications |
-| [**notificationsControllerMarkAllRead**](NotificationsApi.md#notificationscontrollermarkallread) | **PATCH** /notifications/mark-all-read | Mark all notifications as read |
+| [**notificationsControllerMarkAllRead**](NotificationsApi.md#notificationscontrollermarkallread) | **PATCH** /notifications/mark-all-read | Mark all your notifications as read |
 | [**notificationsControllerMarkRead**](NotificationsApi.md#notificationscontrollermarkread) | **PATCH** /notifications/{id}/read | Mark a notification as read |
+| [**notificationsControllerSetAudience**](NotificationsApi.md#notificationscontrollersetaudience) | **PUT** /notifications/audiences/{type} | Choose which groups get a kind of notification |
 | [**notificationsControllerSetImportant**](NotificationsApi.md#notificationscontrollersetimportant) | **PATCH** /notifications/{id}/important | Set notification importance |
 
+
+
+## notificationsControllerAudiences
+
+> Array&lt;NotificationAudienceDto&gt; notificationsControllerAudiences()
+
+Which groups get each kind of notification
+
+An empty list means the workspace\&#39;s owning group. A notification keeps the groups it was sent to.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  NotificationsApi,
+} from '@workspace/api-client';
+import type { NotificationsControllerAudiencesRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new NotificationsApi();
+
+  try {
+    const data = await api.notificationsControllerAudiences();
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+This endpoint does not need any parameter.
+
+### Return type
+
+[**Array&lt;NotificationAudienceDto&gt;**](NotificationAudienceDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
 
 ## notificationsControllerDeleteNotification
 
 > NotificationsControllerDeleteNotification200Response notificationsControllerDeleteNotification(id)
 
-Delete a notification
+Dismiss a notification
+
+Hides it for you only; everyone else in its groups keeps it.
 
 ### Example
 
@@ -72,7 +135,7 @@ No authorization required
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-| **200** | Notification deleted |  -  |
+| **200** | Notification dismissed for you |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
@@ -175,9 +238,9 @@ No authorization required
 
 > NotificationsControllerMarkAllRead200Response notificationsControllerMarkAllRead(markAllReadDto)
 
-Mark all notifications as read
+Mark all your notifications as read
 
-Marks all unread notifications as read. Optional filters can narrow the update.
+Marks every unread notification you get as read, for you. Optional filters can narrow the update.
 
 ### Example
 
@@ -299,6 +362,76 @@ No authorization required
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 | **200** | Notification marked as read |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## notificationsControllerSetAudience
+
+> NotificationAudienceDto notificationsControllerSetAudience(type, updateNotificationAudienceDto)
+
+Choose which groups get a kind of notification
+
+Groups of your tenant; an empty list sends it to the owning group again. Applies to notifications made from now on.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  NotificationsApi,
+} from '@workspace/api-client';
+import type { NotificationsControllerSetAudienceRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new NotificationsApi();
+
+  const body = {
+    // 'SCAN' | 'FINDING' | 'SOURCE' | 'SYSTEM'
+    type: type_example,
+    // UpdateNotificationAudienceDto
+    updateNotificationAudienceDto: ...,
+  } satisfies NotificationsControllerSetAudienceRequest;
+
+  try {
+    const data = await api.notificationsControllerSetAudience(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **type** | `SCAN`, `FINDING`, `SOURCE`, `SYSTEM` |  | [Defaults to `undefined`] [Enum: SCAN, FINDING, SOURCE, SYSTEM] |
+| **updateNotificationAudienceDto** | [UpdateNotificationAudienceDto](UpdateNotificationAudienceDto.md) |  | |
+
+### Return type
+
+[**NotificationAudienceDto**](NotificationAudienceDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 

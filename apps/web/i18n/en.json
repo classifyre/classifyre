@@ -7442,5 +7442,25 @@
       "saved": "Saved",
       "changedBy": "Last changed by"
     }
+  },
+
+  "notificationAudiences": {
+    "title": "Who gets notifications",
+    "description": "Notifications go to groups: by default the group that owns this workspace, including its subgroups. Choose other groups for a kind of notification here; each notification keeps the groups it was sent to, and everyone marks it read for themselves.",
+    "owningGroup": "Owning group",
+    "add": "Add a group",
+    "remove": "Stop sending to {{group}}",
+    "reset": "Owning group only",
+    "saved": "Saved. New notifications go to these groups.",
+    "saveFailed": "Could not save who gets them",
+    "loadFailed": "Could not load who gets notifications",
+    "notForYou": "Notifications go to the groups of a workspace. Sign in to get the ones sent to yours.",
+    "removedGroup": "Removed group",
+    "types": {
+      "SCAN": "Scans",
+      "FINDING": "Findings",
+      "SOURCE": "Sources",
+      "SYSTEM": "System"
+    }
   }
 }

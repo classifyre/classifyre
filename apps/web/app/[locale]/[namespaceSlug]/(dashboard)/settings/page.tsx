@@ -49,6 +49,7 @@ import { WorkerQueuesCard } from "@/components/worker-queues-card";
 import { useTranslation } from "@/hooks/use-translation";
 import { AuditEventList } from "@/components/audit-history";
 import { WorkspaceAccessCard } from "@/components/access/workspace-access-card";
+import { NotificationAudiencesCard } from "@/components/access/notification-audiences-card";
 import { useCan } from "@/hooks/use-me";
 
 type SettingsDraft = {
@@ -442,6 +443,7 @@ export default function SettingsPage() {
             className="space-y-6 duration-300 animate-in fade-in-50 slide-in-from-bottom-1"
           >
             <WorkspaceAccessCard />
+            <NotificationAudiencesCard />
           </TabsContent>
         )}
         <TabsContent

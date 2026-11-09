@@ -379,7 +379,8 @@ export class CaseEscalationService {
       const recent = await this.prisma.notification.findFirst({
         where: {
           event: NotificationEvent.CASE_FINDINGS_ESCALATED,
-          isRead: false,
+          // Nobody has read it yet.
+          states: { none: { readAt: { not: null } } },
           createdAt: { gte: new Date(Date.now() - NOTIFY_QUIET_MS) },
           metadata: { path: ['caseId'], equals: caseId },
         },

@@ -158,36 +158,36 @@ enum AutoSchedulePhase {
 /// One SQL query over the tables of this workspace, run as a short-lived CLI
 /// job (docs/prd/DQ-data-query.md). The result is kept for a day, then dropped.
 model QueryRun {
-  id              String         @id @default(uuid())
-  sql             String         @db.Text
-  status          QueryRunStatus @default(PENDING)
+  id                String         @id @default(uuid())
+  sql               String         @db.Text
+  status            QueryRunStatus @default(PENDING)
   /// Who ran it: an actor reference (`user:<sub>`, a self-declared name, …).
-  actorRef        String?        @map("actor_ref")
+  actorRef          String?        @map("actor_ref")
   /// The tables the SQL names, as assets and their sources: what was read.
-  assetIds        String[]       @map("asset_ids")
-  sourceIds       String[]       @map("source_ids")
-  rowCount        Int?           @map("row_count")
-  truncated       Boolean        @default(false)
-  truncatedReason String?        @map("truncated_reason")
+  assetIds          String[]       @map("asset_ids")
+  sourceIds         String[]       @map("source_ids")
+  rowCount          Int?           @map("row_count")
+  truncated         Boolean        @default(false)
+  truncatedReason   String?        @map("truncated_reason")
   /// `[{ name, type }]`, in result order.
-  columns         Json?
+  columns           Json?
   /// `{ setupMs, executeMs, totalMs }` from the job; `queuedMs` from the API.
-  timings         Json?
+  timings           Json?
   /// `{ code, message }` when it failed.
-  error           Json?
+  error             Json?
   /// Arrow IPC stream, or the exported file. Dropped with the row when it expires.
-  result          Bytes?
+  result            Bytes?
   /// Null for rows shown in the app; `xlsx`, `csv` or `parquet` for an export.
-  resultFormat    String?        @map("result_format")
-  resultBytes     Int?           @map("result_bytes")
-  jobName         String?        @map("job_name")
-  jobNamespace    String?        @map("job_namespace")
+  resultFormat      String?        @map("result_format")
+  resultBytes       Int?           @map("result_bytes")
+  jobName           String?        @map("job_name")
+  jobNamespace      String?        @map("job_namespace")
   /// sha256 of the token the job posts its result with; cleared once it has.
-  callbackTokenHash String?      @map("callback_token_hash")
-  startedAt       DateTime?      @map("started_at")
-  finishedAt      DateTime?      @map("finished_at")
-  createdAt       DateTime       @default(now()) @map("created_at")
-  expiresAt       DateTime       @map("expires_at")
+  callbackTokenHash String?        @map("callback_token_hash")
+  startedAt         DateTime?      @map("started_at")
+  finishedAt        DateTime?      @map("finished_at")
+  createdAt         DateTime       @default(now()) @map("created_at")
+  expiresAt         DateTime       @map("expires_at")
 
   @@index([actorRef, createdAt(sort: Desc)])
   @@index([status])
@@ -219,31 +219,31 @@ model DataQuerySettings {
 }
 
 model NotebookExecution {
-  id           String                  @id @default(uuid())
+  id               String                  @id @default(uuid())
   // Null for a code detector's cell/all runs, which need no source.
   sourceId         String?                 @map("source_id")
   // Set when the notebook is a code detector's (scope DETECTOR).
   customDetectorId String?                 @map("custom_detector_id")
   // preview_detect: the asset the detector was run on.
   assetId          String?                 @map("asset_id")
-  revision     Int
-  mode         NotebookExecutionMode
-  scope        NotebookScope           @default(CONNECTOR)
-  targetCellId String?                 @map("target_cell_id")
-  status       NotebookExecutionStatus @default(PENDING)
+  revision         Int
+  mode             NotebookExecutionMode
+  scope            NotebookScope           @default(CONNECTOR)
+  targetCellId     String?                 @map("target_cell_id")
+  status           NotebookExecutionStatus @default(PENDING)
   // The cells as they were when this execution was requested.
-  cells        Json
-  outputs      Json?
-  failedCellId String?                 @map("failed_cell_id")
-  error        Json?
-  durationMs   Int?                    @map("duration_ms")
-  triggeredBy  String?                 @map("triggered_by")
+  cells            Json
+  outputs          Json?
+  failedCellId     String?                 @map("failed_cell_id")
+  error            Json?
+  durationMs       Int?                    @map("duration_ms")
+  triggeredBy      String?                 @map("triggered_by")
   // Set only for the Kubernetes path, so a cancel can find the Job to delete.
-  jobName      String?                 @map("job_name")
-  jobNamespace String?                 @map("job_namespace")
-  startedAt    DateTime?               @map("started_at")
-  finishedAt   DateTime?               @map("finished_at")
-  createdAt    DateTime                @default(now()) @map("created_at")
+  jobName          String?                 @map("job_name")
+  jobNamespace     String?                 @map("job_namespace")
+  startedAt        DateTime?               @map("started_at")
+  finishedAt       DateTime?               @map("finished_at")
+  createdAt        DateTime                @default(now()) @map("created_at")
 
   source         Source?         @relation(fields: [sourceId], references: [id], onDelete: Cascade)
   customDetector CustomDetector? @relation(fields: [customDetectorId], references: [id], onDelete: Cascade)
@@ -1051,27 +1051,31 @@ model RunnerAsset {
 }
 
 model Notification {
-  id          String           @id @default(uuid())
-  type        NotificationType
-  event       String?
-  severity    Severity         @default(INFO)
-  title       String
-  message     String
-  actionUrl   String?          @map("action_url")
-  sourceId    String?          @map("source_id")
-  runnerId    String?          @map("runner_id")
-  findingId   String?          @map("finding_id")
-  triggeredBy String?          @map("triggered_by")
-  isRead      Boolean          @default(false) @map("is_read")
-  readAt      DateTime?        @map("read_at")
-  isImportant Boolean          @default(false) @map("is_important")
-  metadata    Json?            @db.JsonB
-  createdAt   DateTime         @default(now()) @map("created_at")
-  updatedAt   DateTime         @updatedAt @map("updated_at")
+  id               String           @id @default(uuid())
+  type             NotificationType
+  event            String?
+  severity         Severity         @default(INFO)
+  title            String
+  message          String
+  actionUrl        String?          @map("action_url")
+  sourceId         String?          @map("source_id")
+  runnerId         String?          @map("runner_id")
+  findingId        String?          @map("finding_id")
+  triggeredBy      String?          @map("triggered_by")
+  /// Importance the producer gave it; each person can override it for
+  /// themselves (NotificationState.important).
+  isImportant      Boolean          @default(false) @map("is_important")
+  /// Who gets it: identity-server group ids, fixed when it is made (from
+  /// NotificationAudience). Empty: the workspace's owning group.
+  audienceGroupIds String[]         @default([]) @map("audience_group_ids")
+  metadata         Json?            @db.JsonB
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
 
-  source  Source?  @relation(fields: [sourceId], references: [id], onDelete: SetNull)
-  runner  Runner?  @relation(fields: [runnerId], references: [id], onDelete: SetNull)
-  finding Finding? @relation(fields: [findingId], references: [id], onDelete: SetNull)
+  source  Source?             @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  runner  Runner?             @relation(fields: [runnerId], references: [id], onDelete: SetNull)
+  finding Finding?            @relation(fields: [findingId], references: [id], onDelete: SetNull)
+  states  NotificationState[]
 
   @@index([type])
   @@index([event])
@@ -1079,10 +1083,38 @@ model Notification {
   @@index([sourceId])
   @@index([runnerId])
   @@index([findingId])
-  @@index([isRead])
   @@index([isImportant])
   @@index([createdAt])
   @@map("notifications")
+}
+
+/// One person's read, importance and dismissal of one notification.
+model NotificationState {
+  notificationId String    @map("notification_id")
+  /// `user:<sub>` of the person.
+  actorRef       String    @map("actor_ref")
+  readAt         DateTime? @map("read_at")
+  /// Null: the notification's own importance.
+  important      Boolean?
+  dismissedAt    DateTime? @map("dismissed_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@id([notificationId, actorRef])
+  @@index([actorRef])
+  @@map("notification_states")
+}
+
+/// Which groups get each kind of notification in this workspace. No row (or
+/// no groups): the workspace's owning group.
+model NotificationAudience {
+  type      NotificationType @id
+  groupIds  String[]         @default([]) @map("group_ids")
+  updatedBy String?          @map("updated_by")
+  updatedAt DateTime         @updatedAt @map("updated_at")
+
+  @@map("notification_audiences")
 }
 
 model InstanceSettings {
@@ -1180,17 +1212,17 @@ model InstanceSettings {
   // ── Semantic layer guardrails (docs/prd/SL0 §8, D7) ───────────────────────
   // Agents may approve their own glossary bindings and relations in MANAGED
   // mode, within a daily budget and an impact limit. 0 = no impact limit.
-  autopilotGlossaryApproveEnabled  Boolean   @default(true) @map("autopilot_glossary_approve_enabled")
-  autopilotGlossaryApprovalsPerDay Int       @default(20) @map("autopilot_glossary_approvals_per_day")
-  autopilotBindingImpactLimit      Int       @default(5000) @map("autopilot_binding_impact_limit")
+  autopilotGlossaryApproveEnabled  Boolean @default(true) @map("autopilot_glossary_approve_enabled")
+  autopilotGlossaryApprovalsPerDay Int     @default(20) @map("autopilot_glossary_approvals_per_day")
+  autopilotBindingImpactLimit      Int     @default(5000) @map("autopilot_binding_impact_limit")
   // Suggestion generators (SL4 §9): on/off map and minimum score per kind.
-  suggestionGenerators             Json?     @map("suggestion_generators") @db.JsonB
-  suggestionMinScore               Json?     @map("suggestion_min_score") @db.JsonB
-  suggestionLinkCapPerConcept      Int       @default(200) @map("suggestion_link_cap_per_concept")
-  suggestionCooccurrenceMinSupport Int       @default(20) @map("suggestion_cooccurrence_min_support")
-  suggestionCooccurrenceMinLift    Float     @default(3) @map("suggestion_cooccurrence_min_lift")
+  suggestionGenerators             Json?   @map("suggestion_generators") @db.JsonB
+  suggestionMinScore               Json?   @map("suggestion_min_score") @db.JsonB
+  suggestionLinkCapPerConcept      Int     @default(200) @map("suggestion_link_cap_per_concept")
+  suggestionCooccurrenceMinSupport Int     @default(20) @map("suggestion_cooccurrence_min_support")
+  suggestionCooccurrenceMinLift    Float   @default(3) @map("suggestion_cooccurrence_min_lift")
   // Thresholds the pending-proposals event already fired for, per day (SL4 R8).
-  glossaryProposalsNotified        Json?     @map("glossary_proposals_notified") @db.JsonB
+  glossaryProposalsNotified        Json?   @map("glossary_proposals_notified") @db.JsonB
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1202,51 +1234,51 @@ model InstanceSettings {
 }
 
 model AiProviderConfig {
-  id                     String         @id @default(uuid())
-  name                   String
-  provider               AiProviderType @default(CLAUDE)
-  model                  String         @default("")
-  apiKeyEnc              String?        @map("api_key_enc")
-  baseUrl                String?        @map("base_url")
-  contextSize            Int?           @map("context_size")
-  supportsVision         Boolean        @default(false) @map("supports_vision")
+  id                      String         @id @default(uuid())
+  name                    String
+  provider                AiProviderType @default(CLAUDE)
+  model                   String         @default("")
+  apiKeyEnc               String?        @map("api_key_enc")
+  baseUrl                 String?        @map("base_url")
+  contextSize             Int?           @map("context_size")
+  supportsVision          Boolean        @default(false) @map("supports_vision")
   // Whether this provider serves an *embeddings* endpoint rather than (or as
   // well as) chat completions. They are different APIs with different models,
   // and picking a chat model to embed with fails at request time — so the
   // embedding picker filters on this rather than offering every saved
   // provider and letting the user find out later.
-  supportsEmbedding      Boolean        @default(false) @map("supports_embedding")
+  supportsEmbedding       Boolean        @default(false) @map("supports_embedding")
   // Properties of the embedding model itself, captured here rather than in the
   // embedding configuration: they belong to the model, not to the workspace
   // that uses it, and a workspace picking this provider should not have to
   // re-state facts the provider already knows. Only meaningful when
   // supportsEmbedding is true.
-  embeddingDimensions    Int?           @map("embedding_dimensions")
-  embeddingPooling       String?        @map("embedding_pooling")
+  embeddingDimensions     Int?           @map("embedding_dimensions")
+  embeddingPooling        String?        @map("embedding_pooling")
   // Text put in front of every input before it is embedded, for models trained
   // with task prompts (EmbeddingGemma, E5, Nomic, Qwen3 Embedding): one for
   // what is stored, one for what is asked. Null sends the text as it is. The
   // document prefix is part of what a stored vector means, so changing it
   // rebuilds the corpus; the query prefix only shapes the next search.
-  embeddingDocumentPrefix String?       @map("embedding_document_prefix")
-  embeddingQueryPrefix    String?       @map("embedding_query_prefix")
+  embeddingDocumentPrefix String?        @map("embedding_document_prefix")
+  embeddingQueryPrefix    String?        @map("embedding_query_prefix")
   // What this embedding model takes besides text ("image", "audio"), in the
   // same vector space, and how the endpoint wants it sent ("llama-cpp" or
   // "gemini"). Text has one request shape everybody shares; media has one per
   // server, so it is named. Empty and null for a text-only model.
-  embeddingModalities     String[]      @default([]) @map("embedding_modalities")
-  embeddingMediaFormat    String?       @map("embedding_media_format")
+  embeddingModalities     String[]       @default([]) @map("embedding_modalities")
+  embeddingMediaFormat    String?        @map("embedding_media_format")
   // Optional pricing in USD per 1M tokens — enables cost estimates on
   // autopilot runs and the harness usage charts. Null = unknown/not billed.
-  inputCostPerMTok       Decimal?       @map("input_cost_per_mtok") @db.Decimal(10, 4)
-  outputCostPerMTok      Decimal?       @map("output_cost_per_mtok") @db.Decimal(10, 4)
+  inputCostPerMTok        Decimal?       @map("input_cost_per_mtok") @db.Decimal(10, 4)
+  outputCostPerMTok       Decimal?       @map("output_cost_per_mtok") @db.Decimal(10, 4)
   // Discounted price for input tokens served from the provider's prompt
   // cache (OpenAI-compatible `prompt_tokens_details.cached_tokens`). Null
   // means "unknown" — cached tokens are then costed at the full input rate,
   // same as before this field existed, rather than assumed free.
-  cachedInputCostPerMTok Decimal?       @map("cached_input_cost_per_mtok") @db.Decimal(10, 4)
-  createdAt              DateTime       @default(now()) @map("created_at")
-  updatedAt              DateTime       @updatedAt @map("updated_at")
+  cachedInputCostPerMTok  Decimal?       @map("cached_input_cost_per_mtok") @db.Decimal(10, 4)
+  createdAt               DateTime       @default(now()) @map("created_at")
+  updatedAt               DateTime       @updatedAt @map("updated_at")
 
   assistantInstanceSettings InstanceSettings[]  @relation("AssistantAiProvider")
   harnessInstanceSettings   InstanceSettings[]  @relation("HarnessAiProvider")
@@ -1636,29 +1668,29 @@ model Edge {
   // What this relationship means. Defaults to REFERENCE because that is the
   // class that propagates nothing: an edge whose meaning nobody declared must
   // not silently become a lineage hop.
-  relationClass EdgeClass       @default(REFERENCE) @map("relation_class")
-  granularity   EdgeGranularity @default(DATASET)
-  method        EdgeMethod      @default(SYSTEM_CATALOG)
+  relationClass      EdgeClass       @default(REFERENCE) @map("relation_class")
+  granularity        EdgeGranularity @default(DATASET)
+  method             EdgeMethod      @default(SYSTEM_CATALOG)
   // Column-level dependencies, present when `granularity` is FIELD:
   // `[{ downstream, upstreams[], transform, type }]`. A null `downstream` is an
   // indirect dependency (an ORDER BY, a join key) recorded once against the
   // dataset instead of fanned out across every output column.
-  fieldMappings Json?           @map("field_mappings") @db.JsonB
+  fieldMappings      Json?           @map("field_mappings") @db.JsonB
   // What this edge was read from: `{ sql, queryId, runId }`.
-  evidence      Json?           @db.JsonB
+  evidence           Json?           @db.JsonB
   // The job / query / notebook that moved the data, when one is known.
-  viaType       String?         @map("via_type")
-  viaId         String?         @map("via_id")
+  viaType            String?         @map("via_type")
+  viaId              String?         @map("via_id")
   // Refreshed on every re-ingest, so edges can be expired rather than
   // accumulating a decade of dead links — the failure mode of long-lived
   // catalogs. Manual edges are never expired automatically.
-  lastSeenAt    DateTime        @default(now()) @map("last_seen_at")
+  lastSeenAt         DateTime        @default(now()) @map("last_seen_at")
   // The source whose notebook asserted this edge on assets it does not own
   // (ctx.link(), ctx.means()), and the run that last did. Null for edges a
   // connector or a person wrote. No foreign key: edges name their endpoints by
   // (type, id) too, and source deletion removes these rows explicitly.
-  assertedBySourceId String? @map("asserted_by_source_id")
-  assertedByRunnerId String? @map("asserted_by_runner_id")
+  assertedBySourceId String?         @map("asserted_by_source_id")
+  assertedByRunnerId String?         @map("asserted_by_runner_id")
 
   @@unique([fromType, fromId, toType, toId, relationType])
   @@index([fromType, fromId])
@@ -1788,15 +1820,15 @@ model AssetClusterMember {
 // defaultWeight. Editing this triggers a full recompute (logged as a
 // DUPLICATES FINDER run). Defaults mirror correlation.constants.ts.
 model CorrelationConfig {
-  id            Int      @id @default(1)
-  labelWeights  Json     @default("{}") @map("label_weights") @db.JsonB
-  defaultWeight Int      @default(1) @map("default_weight")
-  relatedMin    Decimal  @default(0.30) @map("related_min") @db.Decimal(3, 2)
-  duplicateMin  Decimal  @default(0.60) @map("duplicate_min") @db.Decimal(3, 2)
+  id               Int       @id @default(1)
+  labelWeights     Json      @default("{}") @map("label_weights") @db.JsonB
+  defaultWeight    Int       @default(1) @map("default_weight")
+  relatedMin       Decimal   @default(0.30) @map("related_min") @db.Decimal(3, 2)
+  duplicateMin     Decimal   @default(0.60) @map("duplicate_min") @db.Decimal(3, 2)
   // Values to ignore when fingerprinting (noise like Person "null"). Array of
   // { id, mode: "value"|"regex"|"label", label, value }. Applied at indexing
   // time; editing triggers a full recompute.
-  exclusions    Json     @default("[]") @map("exclusions") @db.JsonB
+  exclusions       Json      @default("[]") @map("exclusions") @db.JsonB
   // Duplicate detection on/off (Settings → Cleanup). Off stops the post-scan
   // check, every recompute and the review-index build, and holds the
   // `correlation.scan` queue paused; the tuning above is kept either way.
@@ -1805,7 +1837,7 @@ model CorrelationConfig {
   enabled          Boolean   @default(true)
   disabledMode     String?   @map("disabled_mode")
   enabledChangedAt DateTime? @map("enabled_changed_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
 
   @@map("correlation_config")
 }
@@ -2120,25 +2152,25 @@ model Case {
   // asked for it. A rule applies the moment it is switched on, then after
   // every scan, finding status change and board read.
   // A finding the scans no longer see (retired by a run, or its row deleted).
-  removeGoneFindings     Boolean @default(false) @map("remove_gone_findings")
+  removeGoneFindings     Boolean   @default(false) @map("remove_gone_findings")
   // A finding someone resolved.
-  removeResolvedFindings Boolean @default(false) @map("remove_resolved_findings")
+  removeResolvedFindings Boolean   @default(false) @map("remove_resolved_findings")
   // An asset deleted from its source, with its findings.
-  removeGoneAssets       Boolean @default(false) @map("remove_gone_assets")
+  removeGoneAssets       Boolean   @default(false) @map("remove_gone_assets")
   // When an escalation rule last marked a finding of this case. Bumps
   // updatedAt too, so an escalated case rises to the top of the case list.
   lastEscalatedAt        DateTime? @map("last_escalated_at")
 
-  evidence       CaseEvidence[]
-  findings       CaseFinding[]
-  notes          CaseNote[]
-  inquiryLinks   CaseInquiry[]
-  threads        CaseThread[]
-  activities     CaseActivity[]
-  leads          CaseLead[]
-  events         CaseEvent[]
-  board          CaseBoard?
-  findingFilters CaseFindingFilter[]
+  evidence        CaseEvidence[]
+  findings        CaseFinding[]
+  notes           CaseNote[]
+  inquiryLinks    CaseInquiry[]
+  threads         CaseThread[]
+  activities      CaseActivity[]
+  leads           CaseLead[]
+  events          CaseEvent[]
+  board           CaseBoard?
+  findingFilters  CaseFindingFilter[]
   hypothesisRules CaseHypothesisRule[]
 
   @@index([status])
@@ -2178,38 +2210,38 @@ enum CaseLeadStatus {
 }
 
 model CaseLead {
-  id         String         @id @default(uuid())
-  caseId     String         @map("case_id")
+  id           String         @id @default(uuid())
+  caseId       String         @map("case_id")
   // Null for an ASSET lead (a look-alike document): accepting it adds the
   // asset, whose findings then wait around it on the board. Asset leads are
   // unique per (case, asset) through a partial index Prisma cannot model:
   // `case_leads_case_id_asset_id_asset_lead_key`, migration
   // 20260927140000_case_leads_auto_refresh.
-  findingId  String?        @map("finding_id")
-  assetId    String?        @map("asset_id")
-  origin     CaseLeadOrigin
-  status     CaseLeadStatus @default(PROPOSED)
-  rationale  String         @db.Text
+  findingId    String?        @map("finding_id")
+  assetId      String?        @map("asset_id")
+  origin       CaseLeadOrigin
+  status       CaseLeadStatus @default(PROPOSED)
+  rationale    String         @db.Text
   // Snapshots at proposal time (findings may be reconciled later).
-  title      String
-  importance Float?
+  title        String
+  importance   Float?
   // Semantic similarity for SEMANTIC_NEIGHBOR; the pair's match weight for
   // DUPLICATE.
-  similarity Float?
+  similarity   Float?
   // What in the case the lead hangs off: the evidence finding it resembles,
   // the evidence asset it duplicates (or that finding's asset), the watch that
   // answered it. "Show on board" and placing it next to its evidence read these.
-  viaFindingId String?      @map("via_finding_id")
-  viaAssetId   String?      @map("via_asset_id")
-  viaInquiryId String?      @map("via_inquiry_id")
+  viaFindingId String?        @map("via_finding_id")
+  viaAssetId   String?        @map("via_asset_id")
+  viaInquiryId String?        @map("via_inquiry_id")
   // Origin-specific facts for the card: the duplicate relation and its review
   // verdict, the labels a pair shares, whether a value is the same as its seed's.
-  details    Json?          @db.JsonB
-  proposedBy String         @map("proposed_by")
-  reviewedBy String?        @map("reviewed_by")
-  reviewedAt DateTime?      @map("reviewed_at")
-  createdAt  DateTime       @default(now()) @map("created_at")
-  updatedAt  DateTime       @updatedAt @map("updated_at")
+  details      Json?          @db.JsonB
+  proposedBy   String         @map("proposed_by")
+  reviewedBy   String?        @map("reviewed_by")
+  reviewedAt   DateTime?      @map("reviewed_at")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
 
   investigation Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
 
@@ -2278,16 +2310,16 @@ model Inquiry {
   createdBy   String?          @map("created_by")
   aiMode      AiManagementMode @default(INHERIT) @map("ai_mode")
 
-  matchAllSources    Boolean        @default(false) @map("match_all_sources")
-  sourceIds          String[]       @map("source_ids")
-  detectorTypes      DetectorType[] @map("detector_types")
-  customDetectorKeys String[]       @map("custom_detector_keys")
-  findingTypes       String[]       @map("finding_types")
-  findingTypeRegex   String[]       @map("finding_type_regex")
-  findingValueRegex  String[]       @map("finding_value_regex")
+  matchAllSources      Boolean        @default(false) @map("match_all_sources")
+  sourceIds            String[]       @map("source_ids")
+  detectorTypes        DetectorType[] @map("detector_types")
+  customDetectorKeys   String[]       @map("custom_detector_keys")
+  findingTypes         String[]       @map("finding_types")
+  findingTypeRegex     String[]       @map("finding_type_regex")
+  findingValueRegex    String[]       @map("finding_value_regex")
   // SL3 R7.6: findings that are evidence of one of these terms (by key, C8).
-  termKeys             String[]     @default([]) @map("term_keys")
-  termsIncludeNarrower Boolean      @default(false) @map("terms_include_narrower")
+  termKeys             String[]       @default([]) @map("term_keys")
+  termsIncludeNarrower Boolean        @default(false) @map("terms_include_narrower")
 
   // Counters, all recomputed from the live set — never incremented. An
   // accumulator drifts permanently once any run miscounts and cannot be
@@ -2299,8 +2331,8 @@ model Inquiry {
   // Acknowledgement only: "an operator has looked since this stamp". Does not
   // decide newness — see the run-anchor note above.
   matchesSeenAt  DateTime? @map("matches_seen_at")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
 
   caseLinks  CaseInquiry[]
   activities InquiryActivity[]
@@ -2356,9 +2388,9 @@ model CaseInquiry {
   autoPull  Boolean  @default(false) @map("auto_pull")
   createdAt DateTime @default(now()) @map("created_at")
 
-  case    Case                @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  inquiry Inquiry             @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
-  filters CaseFindingFilter[]
+  case            Case                 @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  inquiry         Inquiry              @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  filters         CaseFindingFilter[]
   hypothesisRules CaseHypothesisRule[]
 
   @@unique([caseId, inquiryId])
@@ -2469,17 +2501,17 @@ model CaseEvidence {
 // Inferred observation anchored to case evidence. No FK to findings; findingId is a
 // plain reference. Denormalized snapshots survive deletion of the finding row.
 model CaseFinding {
-  id                 String   @id @default(uuid())
-  caseId             String   @map("case_id")
-  caseEvidenceId     String   @map("case_evidence_id")
-  findingId          String   @map("finding_id")
+  id                 String    @id @default(uuid())
+  caseId             String    @map("case_id")
+  caseEvidenceId     String    @map("case_evidence_id")
+  findingId          String    @map("finding_id")
   label              String
   severity           String?
-  detectorType       String?  @map("detector_type")
-  customDetectorName String?  @map("custom_detector_name")
-  matchedContent     String?  @map("matched_content") @db.Text
-  note               String?  @db.Text
-  createdAt          DateTime @default(now()) @map("created_at")
+  detectorType       String?   @map("detector_type")
+  customDetectorName String?   @map("custom_detector_name")
+  matchedContent     String?   @map("matched_content") @db.Text
+  note               String?   @db.Text
+  createdAt          DateTime  @default(now()) @map("created_at")
   // Set when an escalation rule matched the finding; cleared by a person.
   // The rule id is kept without a foreign key (a rule may be removed later),
   // and the label says in words what it matched ("type IP_ADDRESS").
@@ -2537,7 +2569,7 @@ model CaseThread {
   createdAt         DateTime          @default(now()) @map("created_at")
   updatedAt         DateTime          @updatedAt @map("updated_at")
 
-  investigation Case                @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  investigation Case                 @relation(fields: [caseId], references: [id], onDelete: Cascade)
   entries       CaseThreadEntry[]
   support       CaseThreadSupport[]
   rules         CaseHypothesisRule[]
@@ -2614,12 +2646,12 @@ model CaseActivity {
 // objects that exist nowhere else: notes, frames and the links a person drew.
 
 enum CaseBoardItemKind {
-  EVIDENCE   // ref_id → case_evidence.id
+  EVIDENCE // ref_id → case_evidence.id
   HYPOTHESIS // ref_id → case_threads.id (kind HYPOTHESIS)
-  COMMENT    // ref_id → case_threads.id (kind DISCUSSION)
-  NOTE       // board-native; content.text
-  FRAME      // board-native; content.title
-  TERM       // ref_id → glossary_terms.id (SL5 A3)
+  COMMENT // ref_id → case_threads.id (kind DISCUSSION)
+  NOTE // board-native; content.text
+  FRAME // board-native; content.title
+  TERM // ref_id → glossary_terms.id (SL5 A3)
 }
 
 enum BoardLinkCertainty {
@@ -3182,17 +3214,17 @@ enum SupervisorGoalStatus {
 // so the existing per-agent toggle keeps working and there is exactly one place
 // to turn the supervisor off.
 model SupervisorState {
-  id               Int       @id @default(1)
+  id                   Int       @id @default(1)
   // When it asked to be woken. Null means it has never run.
-  nextWakeAt       DateTime? @map("next_wake_at")
+  nextWakeAt           DateTime? @map("next_wake_at")
   // Event types that should wake it sooner than nextWakeAt.
-  wakeOnEvents     String[]  @default([]) @map("wake_on_events")
+  wakeOnEvents         String[]  @default([]) @map("wake_on_events")
   // Its own words for why it chose this wake — shown to the operator, and read
   // back to the agent so a wake it planned does not arrive as a surprise.
-  wakeReason       String?   @map("wake_reason") @db.Text
-  lastWakeAt       DateTime? @map("last_wake_at")
+  wakeReason           String?   @map("wake_reason") @db.Text
+  lastWakeAt           DateTime? @map("last_wake_at")
   // Operator "not for a while" without switching the agent off entirely.
-  pausedUntil      DateTime? @map("paused_until")
+  pausedUntil          DateTime? @map("paused_until")
   // Capability groups the operator has switched OFF (see capabilities.ts).
   //
   // Stored as the exception list rather than the allow list on purpose: a group
@@ -3205,12 +3237,12 @@ model SupervisorState {
   // for every agent. What the supervisor may call is a different and much
   // longer list, and conflating them would put two hundred schemas back into
   // the context this whole design exists to keep small.
-  disabledCapabilities String[] @default([]) @map("disabled_capabilities")
+  disabledCapabilities String[]  @default([]) @map("disabled_capabilities")
   // Consecutive wakes that changed nothing. A deliberate no-op is a valid
   // outcome, but a long run of them means the pacing is wrong, so it is counted
   // rather than merely permitted.
-  consecutiveNoops Int       @default(0) @map("consecutive_noops")
-  updatedAt        DateTime  @updatedAt @map("updated_at")
+  consecutiveNoops     Int       @default(0) @map("consecutive_noops")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
 
   @@map("supervisor_state")
 }
@@ -3367,27 +3399,27 @@ enum GlossaryRelationType {
 }
 
 model GlossaryTerm {
-  id               String              @id @default(uuid())
+  id               String             @id @default(uuid())
   // Canonical name. Unique per scheme for CONCEPTs only, case-insensitively,
   // through a partial index Prisma cannot express (migration
   // 20261001120000_glossary_model):
   //   glossary_terms_concept_scheme_term_key
   //     ON (COALESCE(scheme_id, ''), lower(term)) WHERE kind = 'CONCEPT'
   term             String
-  aliases          String[]            @default([])
+  aliases          String[]           @default([])
   // Agent-suggested aliases stay out of lookup until an operator accepts them.
-  proposedAliases  String[]            @default([]) @map("proposed_aliases")
-  entityType       GlossaryEntityType  @default(TERM) @map("entity_type")
-  notes            String?             @db.Text
-  origin           GlossaryOrigin      @default(OPERATOR)
+  proposedAliases  String[]           @default([]) @map("proposed_aliases")
+  entityType       GlossaryEntityType @default(TERM) @map("entity_type")
+  notes            String?            @db.Text
+  origin           GlossaryOrigin     @default(OPERATOR)
   // The approval stamp: APPROVED <=> approvedAt is set (SL1 R6).
-  approvedAt       DateTime?           @map("approved_at")
-  approvedBy       String?             @map("approved_by")
+  approvedAt       DateTime?          @map("approved_at")
+  approvedBy       String?            @map("approved_by")
   // Content hash of "term + aliases + codes + definition + notes" in the
   // shared embedding store (hidden aliases excluded, SL1 R7).
-  embedContentHash String?             @map("embed_content_hash")
-  createdAt        DateTime            @default(now()) @map("created_at")
-  updatedAt        DateTime            @updatedAt @map("updated_at")
+  embedContentHash String?            @map("embed_content_hash")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
 
   kind          GlossaryTermKind @default(CONCEPT)
   // Stable reference (contract C8): ^[a-z0-9][a-z0-9._-]{0,99}$. A renamed
@@ -3413,30 +3445,30 @@ model GlossaryTerm {
   // ── Entities (G5). Only ENTITY-kind terms use these. ──
   // URN of the record that *is* this entity (a register entry, a customer
   // master row). A source that declares an entity upserts it by this URN.
-  anchorUrn     String?   @map("anchor_urn")
+  anchorUrn    String?   @map("anchor_urn")
   // Free-form, from connectors or people. Never a typed schema (G5 §4).
-  attributes    Json?     @db.JsonB
+  attributes   Json?     @db.JsonB
   // Mention counters, derived from entity_values ⋈ asset_correlation_values.
   // Updated per run and fully recomputed nightly; never written by an edit.
-  mentionCount  Int       @default(0) @map("mention_count")
-  assetCount    Int       @default(0) @map("asset_count")
-  sourceCount   Int       @default(0) @map("source_count")
-  firstSeenAt   DateTime? @map("first_seen_at")
-  lastSeenAt    DateTime? @map("last_seen_at")
+  mentionCount Int       @default(0) @map("mention_count")
+  assetCount   Int       @default(0) @map("asset_count")
+  sourceCount  Int       @default(0) @map("source_count")
+  firstSeenAt  DateTime? @map("first_seen_at")
+  lastSeenAt   DateTime? @map("last_seen_at")
   // A merged entity is DEPRECATED with `replacedById` (which already
   // redirects); this stamp is what tells a merge from a plain deprecation.
-  mergedAt      DateTime? @map("merged_at")
+  mergedAt     DateTime? @map("merged_at")
 
-  values           EntityValue[]
-  references       GlossaryReference[]
-  scheme           GlossaryScheme?      @relation(fields: [schemeId], references: [id], onDelete: SetNull)
-  replacedBy       GlossaryTerm?        @relation("GlossaryTermReplacedBy", fields: [replacedById], references: [id], onDelete: SetNull)
-  replaces         GlossaryTerm[]       @relation("GlossaryTermReplacedBy")
-  relationsFrom    GlossaryRelation[]   @relation("GlossaryRelationFrom")
-  relationsTo      GlossaryRelation[]   @relation("GlossaryRelationTo")
-  bindings         GlossaryBinding[]
-  assetTerms       AssetTerm[]
-  suggestions      SemanticSuggestion[]
+  values        EntityValue[]
+  references    GlossaryReference[]
+  scheme        GlossaryScheme?      @relation(fields: [schemeId], references: [id], onDelete: SetNull)
+  replacedBy    GlossaryTerm?        @relation("GlossaryTermReplacedBy", fields: [replacedById], references: [id], onDelete: SetNull)
+  replaces      GlossaryTerm[]       @relation("GlossaryTermReplacedBy")
+  relationsFrom GlossaryRelation[]   @relation("GlossaryRelationFrom")
+  relationsTo   GlossaryRelation[]   @relation("GlossaryRelationTo")
+  bindings      GlossaryBinding[]
+  assetTerms    AssetTerm[]
+  suggestions   SemanticSuggestion[]
 
   @@index([entityType])
   @@index([kind, status])

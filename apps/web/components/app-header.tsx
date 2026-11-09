@@ -36,6 +36,7 @@ import type { TranslationKey } from "@/i18n";
 import { stripLocalePrefix } from "@/lib/locale-detection";
 import { useEntityName } from "./document-title-updater";
 import { LANGUAGE_OPTIONS, LanguageSwitcher, useSwitchLanguage } from "./language-switcher";
+import { Can } from "@/hooks/use-me";
 import { NotificationCenter } from "./notification-center";
 import { ThemeToggle } from "./theme-toggle";
 import { DemoModeHeaderBadge } from "./demo-mode-badge";
@@ -316,7 +317,10 @@ export function HeaderActions({ demoMode }: { demoMode: boolean }) {
         <LanguageSwitcher />
         <ThemeToggle />
       </div>
-      <NotificationCenter />
+      {/* Notifications go to groups; visitors are in none. */}
+      <Can capability="notification.view">
+        <NotificationCenter />
+      </Can>
       {/*
         A plain <a>, not next/link: the documentation is a separate Next app
         (apps/docs) exported into apps/web/public/docs, so /docs is static

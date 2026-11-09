@@ -70,6 +70,7 @@ export const BUILT_IN_ROLES = [
     scope: 'workspace',
     capabilities: [
       'workspace.view',
+      'notification.view',
       'mcp.token.own',
       'source.view',
       'source.manage',
@@ -134,11 +135,14 @@ export const BUILT_IN_ROLES = [
   {
     // People who have not signed in, on an installation with a public tenant
     // (docs/prd/IAM §13 step 8e): they read its workspaces. Not who has
-    // access, not the tenant's activity, no MCP tokens; never granted.
+    // access, not the tenant's activity, no notifications (they belong to
+    // groups, and a visitor is in none), no MCP tokens; never granted.
     key: 'visitor',
     title: 'Visitor',
     scope: 'public',
-    capabilities: VIEWS.filter((id) => id !== 'access.view'),
+    capabilities: VIEWS.filter(
+      (id) => id !== 'access.view' && id !== 'notification.view',
+    ),
   },
 ] as const satisfies readonly RoleDefinition[];
 

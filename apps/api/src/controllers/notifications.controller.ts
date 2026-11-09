@@ -1,12 +1,17 @@
 import {
+  BadRequestException,
   Controller,
   Get,
+  Inject,
   Patch,
+  Put,
   Delete,
   Body,
   Param,
   Query,
+  Req,
 } from '@nestjs/common';
+import type { FastifyRequest } from 'fastify';
 import {
   ApiTags,
   ApiOperation,
@@ -21,12 +26,78 @@ import { NotificationResponseDto } from '../dto/notification-response.dto';
 import { MarkAllReadDto } from '../dto/mark-all-read.dto';
 import { UpdateNotificationImportanceDto } from '../dto/update-notification-importance.dto';
 import { Requires } from '../identity/access.decorators';
+import { ActorRef } from '../identity/actor-ref.decorator';
+import type { IdentityService } from '../identity/identity.service';
+import { IDENTITY } from '../identity/identity.tokens';
+import {
+  NotificationAudienceDto,
+  UpdateNotificationAudienceDto,
+} from '../dto/notification-audience.dto';
+import { NotificationType } from '../types/notification.types';
 
+/**
+ * The notifications sent to the caller's groups, and their own read,
+ * importance and dismissal (docs/prd/IAM-access-management.md §6.4). Those
+ * are personal, so they need only `notification.view`; which groups get each
+ * kind is the workspace's, and needs `access.manage`.
+ */
 @ApiTags('Notifications')
-@Requires('workspace.view')
+@Requires('notification.view')
 @Controller('notifications')
 export class NotificationsController {
-  constructor(private readonly notificationsService: NotificationsService) {}
+  constructor(
+    private readonly notificationsService: NotificationsService,
+    @Inject(IDENTITY) private readonly identity: IdentityService,
+  ) {}
+
+  @Get('audiences')
+  @ApiOperation({
+    summary: 'Which groups get each kind of notification',
+    description:
+      "An empty list means the workspace's owning group. A notification keeps the groups it was sent to.",
+  })
+  @ApiResponse({ status: 200, type: [NotificationAudienceDto] })
+  async audiences(): Promise<NotificationAudienceDto[]> {
+    return this.notificationsService.audiences();
+  }
+
+  @Put('audiences/:type')
+  @Requires('access.manage')
+  @ApiOperation({
+    summary: 'Choose which groups get a kind of notification',
+    description:
+      'Groups of your tenant; an empty list sends it to the owning group again. Applies to notifications made from now on.',
+  })
+  @ApiParam({ name: 'type', enum: NotificationType })
+  @ApiBody({ type: UpdateNotificationAudienceDto })
+  @ApiResponse({ status: 200, type: NotificationAudienceDto })
+  async setAudience(
+    @Req() request: FastifyRequest,
+    @Param('type') type: string,
+    @Body() body: UpdateNotificationAudienceDto,
+    @ActorRef() actor: string | undefined,
+  ): Promise<NotificationAudienceDto> {
+    if (!(Object.values(NotificationType) as string[]).includes(type)) {
+      throw new BadRequestException(`Unknown notification type '${type}'.`);
+    }
+    const groupIds = Array.isArray(body?.groupIds) ? body.groupIds : [];
+    if (groupIds.some((id) => typeof id !== 'string') || groupIds.length > 50) {
+      throw new BadRequestException('Pick up to 50 groups.');
+    }
+    const principal = await this.identity.authenticate(request.raw);
+    const known = new Set(
+      (await this.identity.groupsOf(principal, true)).map((group) => group.id),
+    );
+    const unknown = groupIds.find((id) => !known.has(id));
+    if (unknown) {
+      throw new BadRequestException(`No group '${unknown}' in your tenant.`);
+    }
+    return this.notificationsService.setAudience(
+      type as NotificationType,
+      groupIds,
+      actor,
+    );
+  }
 
   @Get()
   @ApiOperation({
@@ -44,9 +115,9 @@ export class NotificationsController {
 
   @Patch('mark-all-read')
   @ApiOperation({
-    summary: 'Mark all notifications as read',
+    summary: 'Mark all your notifications as read',
     description:
-      'Marks all unread notifications as read. Optional filters can narrow the update.',
+      'Marks every unread notification you get as read, for you. Optional filters can narrow the update.',
   })
   @ApiBody({
     type: MarkAllReadDto,
@@ -112,7 +183,10 @@ export class NotificationsController {
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'Delete a notification' })
+  @ApiOperation({
+    summary: 'Dismiss a notification',
+    description: 'Hides it for you only; everyone else in its groups keeps it.',
+  })
   @ApiParam({
     name: 'id',
     description: 'Notification ID',
@@ -120,7 +194,7 @@ export class NotificationsController {
   })
   @ApiResponse({
     status: 200,
-    description: 'Notification deleted',
+    description: 'Notification dismissed for you',
     schema: {
       type: 'object',
       properties: {
@@ -129,6 +203,6 @@ export class NotificationsController {
     },
   })
   async deleteNotification(@Param('id') id: string) {
-    return this.notificationsService.delete(id);
+    return this.notificationsService.dismiss(id);
   }
 }

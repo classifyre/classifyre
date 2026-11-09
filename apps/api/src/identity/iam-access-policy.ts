@@ -14,6 +14,18 @@ export const CLS_CAPABILITIES = 'classifyre:capabilities';
 /** Per capability, the sources and tables single-resource grants open (set by the namespace hook). */
 export const CLS_RESOURCE_GRANTS = 'classifyre:resourceGrants';
 
+/**
+ * The signed-in person of the current request, as notifications see them
+ * (set by the namespace hook and the MCP handler): their `user:<sub>` and
+ * every group they are in, with the groups above those.
+ */
+export const CLS_PERSON = 'classifyre:person';
+
+export interface ClsPerson {
+  actorRef: string;
+  groupIds: string[];
+}
+
 const NO_RESOURCES: ResourceGrants = { sourceIds: [], assetIds: [] };
 
 /**

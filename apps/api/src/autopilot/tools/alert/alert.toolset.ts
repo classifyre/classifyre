@@ -80,6 +80,11 @@ export class AlertToolset {
             where: { event: NotificationEvent.CASE_ESCALATED },
             orderBy: { createdAt: 'desc' },
             take: RECENT_ALERTS_LIMIT,
+            include: {
+              _count: {
+                select: { states: { where: { readAt: { not: null } } } },
+              },
+            },
           });
           return rows.map((n) => {
             const meta = (n.metadata ?? {}) as Record<string, unknown>;
@@ -88,7 +93,8 @@ export class AlertToolset {
               caseId: typeof meta.caseId === 'string' ? meta.caseId : null,
               severity: n.severity,
               title: n.title,
-              read: n.isRead,
+              // Read state is each person's own: read by anyone at all.
+              read: n._count.states > 0,
               createdAt: n.createdAt,
             };
           });

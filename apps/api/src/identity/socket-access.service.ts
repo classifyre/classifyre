@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { Socket } from 'socket.io';
 import type { Capability } from './capabilities';
+import type { ClsPerson } from './iam-access-policy';
 import type { IdentityService, Principal } from './identity.service';
 import { IDENTITY } from './identity.tokens';
 
@@ -44,5 +45,21 @@ export class SocketAccessService {
     } catch {
       return false;
     }
+  }
+
+  /**
+   * The signed-in person behind a socket that {@link canJoin} let in, with
+   * their groups and the groups above them; null for visitors.
+   */
+  async person(client: Socket): Promise<ClsPerson | null> {
+    const principal = client.data['classifyrePrincipal'] as
+      | Principal
+      | undefined;
+    if (!principal || principal.visitor) return null;
+    if (!principal.actor.id?.startsWith('user:')) return null;
+    return {
+      actorRef: principal.actor.id,
+      groupIds: await this.identity.groupLineage(principal),
+    };
   }
 }
