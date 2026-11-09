@@ -161,9 +161,11 @@ and serves the identity server under `/iam` of the same address.
 
 The identity server's client secrets and the key every tenant database's
 password is made from are generated on the first start and kept in
-`/var/lib/classifyre/iam.secrets`. A public tenant, several tenants for
-separate teams and a company directory work here too (see
-[Access](/access/)); for a team, prefer the [Helm chart](/deployment/kubernetes/#sign-in).
+`/var/lib/classifyre/iam.secrets`.
+
+The image has no public tenant: everyone signs in, starting with the seeded
+admin, who can add people and groups in the identity console (see
+[Access](/access/)). For a team, prefer the [Helm chart](/deployment/kubernetes/#sign-in).
 
 ### Database
 
