@@ -13,7 +13,7 @@ Classifyre already knows every table in a workspace — database tables, Delta a
 Each query runs in its own short-lived worker, next to your scans, and only ever sees the tables you are allowed to read.
 
 <Callout type="info">
-SQL is **off** in a new workspace. A workspace admin turns it on in **Settings → Export & Import → SQL over tables**.
+There is nothing to switch on: who may query which table follows roles and grants. A workspace admin can query straight away; others need the **Data reader** role (see [Who may query what](#who-may-query-what)).
 </Callout>
 
 ## What you can query
@@ -98,14 +98,12 @@ Operators set the worker's size in the Helm chart (`api.cliJobs.query`: `memory`
 
 ## Who may query what
 
-With sign-in on, reading rows is its own right, separate from seeing findings:
+Reading rows is its own right, separate from seeing findings:
 
 - **Workspace admins** (and tenant admins and workspace managers) can query every table of their workspaces.
 - The **Data reader** role gives the right to others. Give it to a group on a whole workspace, on a group's workspaces — or on **one source** or **one table**. Members also need a role that opens the workspace, such as Viewer.
 
 To give a group access to one table, open the table's **Data** tab: **Who can query this table** lists who can, and **Give access** adds a group, for the table or for its whole source. People see tables they cannot query with a lock, so they know what exists and whom to ask.
-
-With sign-in off, everyone who can open the workspace can query it once SQL is turned on.
 
 Every query is recorded: who ran it and which tables it read appear in the workspace's **Activity**.
 
@@ -119,7 +117,6 @@ Reading rows shows everything in them, including what detectors flagged as perso
 
 | Setting | Default | |
 | --- | --- | --- |
-| Answer SQL queries | Off | Turns the SQL page and the Data tab on for this workspace |
 | Rows per result | 10,000 | 1 to 100,000 |
 | Time limit | 120 s | 5 to 900 s, from starting the worker to the last row |
 | Rows per export | 1,000,000 | 1 to 10,000,000; Excel files stop at 1,048,575 |

@@ -1,0 +1,1 @@
+The Helm value `iam.enabled` is gone, and a release that still sets it fails with a message: remove it from your values and make sure `ingress.host` or `iam.appUrl` is set. The Platform page no longer imports workspaces made without sign-in; operators use the `workspaces copy --to-tenant` command instead.

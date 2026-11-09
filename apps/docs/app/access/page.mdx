@@ -9,27 +9,23 @@ import { Callout } from "nextra/components";
 # Access & Sign-in
 
 <Callout type="info">
-  Sign-in comes with the Helm chart and is on by default there. The
-  all-in-one Docker image never has it. New here? Start with
-  [Getting started](/access/getting-started/).
+  Sign-in is always on, in the Helm chart and in the all-in-one Docker image
+  alike. New here? Start with [Getting started](/access/getting-started/).
 </Callout>
 
-When sign-in is off, Classifyre works as it always has: anyone who can reach
-the instance can use every workspace, and names in timelines are whatever
-people type in. When it is on, people sign in, and what they can see and
-change depends on the **groups** they belong to.
+People sign in, and what they can see and change depends on the **groups**
+they belong to. Every change carries the name of who made it.
 
 ![The Classifyre sign-in page: the case-file card on the black string board](./images/sign-in.png)
 
-Who can open an installation depends on two switches of the chart, sign-in
-(`iam.enabled`) and a public tenant (`iam.public.enabled`):
+Who can open an installation without signing in depends on one switch of the
+chart, a public tenant (`iam.public.enabled`), meant for a public showcase:
 
-| Installation                       | Without signing in                                                          | Signed in                     |
-| ---------------------------------- | --------------------------------------------------------------------------- | ----------------------------- |
-| Docker all-in-one image            | Everyone uses every workspace (there is no sign-in)                         | –                             |
-| Helm, sign-in on (the default)     | Nothing: everyone is sent to sign in                                        | Their own tenant's workspaces |
-| Helm, sign-in on, public tenant on | One tenant's workspaces, read-only: [the public tenant](#the-public-tenant) | Their own tenant's workspaces |
-| Helm, sign-in off                  | Everyone uses every workspace, like the Docker image                        | –                             |
+| Installation                     | Without signing in                                                          | Signed in                     |
+| -------------------------------- | --------------------------------------------------------------------------- | ----------------------------- |
+| Docker all-in-one image          | Nothing: everyone is sent to sign in                                        | Their own tenant's workspaces |
+| Helm chart                       | Nothing: everyone is sent to sign in                                        | Their own tenant's workspaces |
+| Helm chart, public tenant on     | One tenant's workspaces, read-only: [the public tenant](#the-public-tenant) | Their own tenant's workspaces |
 
 **Demo mode** (`DEMO_MODE`) is a separate switch on top of any of these: it
 makes the whole installation read-only for everyone without the operator's
@@ -122,7 +118,7 @@ up this way.
 
 ## Signing in
 
-With sign-in on, opening Classifyre takes you to its sign-in page. After
+Opening Classifyre takes you to its sign-in page. After
 signing in you see only the workspaces you have access to; a workspace you
 cannot see behaves as if it did not exist.
 
@@ -205,9 +201,29 @@ you leave, they stop working.
 A token can still be narrowed further to a few tool groups when you create it
 (see [MCP Server](/settings/mcp-server/)).
 
-With sign-in, you see and revoke your own tokens; people allowed to manage
-every token of the workspace see all of them. A token made before sign-in was
-turned on has no owner and stops working: create a new one after signing in.
+You see and revoke your own tokens; people allowed to manage every token of
+the workspace see all of them.
+
+---
+
+## Notifications go to groups
+
+A notification (a failed scan, a spike in findings, a first scan, …) is sent
+to **groups**, not to everyone who can open the workspace:
+
+- By default it goes to the group that **owns the workspace**, and so to
+  everyone in it or in a group below it.
+- Under **Settings → Access → Who gets notifications**, someone who can
+  manage access picks other groups for each kind: Scans, Findings, Sources or
+  System. A change applies to notifications made from then on; each one keeps
+  the groups it was sent to.
+- **Read**, **Important** and **Dismiss** are your own: marking something
+  read does not mark it read for your colleagues.
+- Holding a role is not enough: someone with access to the workspace but in
+  none of the groups does not get its notifications. Visitors of a public
+  tenant are in no group and get none, and see no bell.
+
+See [Notifications](/notifications/) for what triggers them.
 
 ---
 
@@ -223,8 +239,8 @@ came from the web app, the API or an agent through MCP. Each entry says:
   matched content stay out of the trail.
 
 Reading something is not recorded, and neither is the work scans report back.
-Without sign-in, a person's name is whatever they typed, so the trail shows
-who _said_ they made a change. With sign-in, it shows who did.
+The author is always the signed-in person (or the person an MCP token belongs
+to): a request cannot name someone else.
 
 ### Where to see it
 

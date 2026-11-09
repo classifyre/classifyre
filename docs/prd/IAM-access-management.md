@@ -2,15 +2,15 @@
 
 |                       |                                                                                                                                      |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| **Status**            | Steps 0–8 done 2026-11-04; three reviews, all blockers fixed 2026-11-05 (§13, Review and Hardening); release is the maintainers' call |
+| **Status**            | Steps 0–8 done 2026-11-04; three reviews, all blockers fixed 2026-11-05 (§13, Review and Hardening). Since 2026-11-09 sign-in is **always on**, the all-in-one image included (§13, Step 8g) |
 | **Size**              | L (9 steps, each its own PR)                                                                                                         |
 | **Depends on**        | [S1 · Enterprise extension seams](S1-enterprise-extension-seams.md) (step 1 builds S1 R1–R8 and R15)                                 |
-| **Identity provider** | Keycloak 26.8.1 (`quay.io/keycloak/keycloak:26.8.1`, released 2026-10-13), Helm chart only                                           |
-| **Not in scope**      | the all-in-one Docker image, per-record rules (for example "this case is visible to its team only"), Keycloak Authorization Services |
+| **Identity provider** | Keycloak 26.8.1 (`quay.io/keycloak/keycloak:26.8.1`, released 2026-10-13), in the Helm chart and the all-in-one image                |
+| **Not in scope**      | per-record rules (for example "this case is visible to its team only"), Keycloak Authorization Services                              |
 
 ## 1. Summary
 
-Add sign-in, tenants and role-based access to Classifyre. IAM is **optional**. With IAM off, everything works as it does today. Only the Helm chart can turn it on, and there it is **on by default**.
+Add sign-in, tenants and role-based access to Classifyre. *(As built, 2026-11-09: IAM is **always on**, in the Helm chart and the all-in-one Docker image alike; the mode without it is gone. The rules H1–H4 below are rewritten to match; §13 Step 8g lists what that removed. The text further down still describes the optional design where it was built that way.)*
 
 The split of responsibilities:
 
@@ -25,12 +25,12 @@ These come from the request. Each one has a check that fails CI or fails the dep
 
 | #   | Rule                                                                                   | How it is enforced                                                                                                                                                                                                                                                                                                         |
 | --- | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| H1  | Everything keeps working without IAM                                                   | `IAM_ENABLED` is unset by default. The default `LocalAccessPolicy` allows everything and the actor comes from `X-Actor-Name`, as today. The whole API e2e suite runs in both modes                                                                                                                                         |
-| H2  | The all-in-one Docker image never uses IAM                                             | Nothing under `docker/` changes. The API refuses to boot when `ENVIRONMENT=docker` and `IAM_ENABLED=true`, and a spec covers this. No Keycloak artefact goes into any image built by the root `Dockerfile`                                                                                                                 |
-| H3  | Keycloak runs from the chart only, optional, on by default, kept current by Dependabot | `iam.enabled: true` in `helm/classifyre/values.yaml`. The image tag is tracked by Dependabot (step 4, §9.3)                                                                                                                                                                                                                |
-| H4  | With IAM on, there is no SEO and no sitemap                                            | `templates/validate-values.yaml` fails the install when `iam.enabled` and `frontend.sitemap.enabled` are both true. The web app and the API also ignore `SITEMAP_ENABLED` when `IAM_ENABLED=true`: `robots.txt` serves `Disallow: /`, sitemap routes 404, every page is `noindex`                                          |
+| H1  | Sign-in is always on (2026-11-09; was "everything keeps working without IAM") | No `IAM_ENABLED` switch: the API and web refuse to start without the identity server settings. No `LocalAccessPolicy`, no self-declared `X-Actor-Name`, no open-database mode. Old open-database workspaces reach a tenant only through `admin workspaces copy --to-tenant` |
+| H2  | The all-in-one Docker image ships the identity server too (2026-11-09; was "never uses IAM") | `docker/Dockerfile` adds the stock Keycloak distribution and a Temurin JRE as literal `FROM` tags (Dependabot); the realm setup and theme come from `helm/classifyre/files/iam` as a build context. Logins `classifyre`/`classifyre`; machine secrets generated into the data volume. The same Playwright smoke test runs against it as against the chart |
+| H3  | Keycloak is always deployed, kept current by Dependabot | No `iam.enabled` value (passing it fails the install). The chart image tag and the all-in-one `FROM` tag are tracked by Dependabot and must be equal (`scripts/check-keycloak-version.sh` in CI) |
+| H4  | No SEO and no sitemap, except for a public tenant | `templates/validate-values.yaml` fails the install when `frontend.sitemap.enabled` is on without `iam.public.enabled`. The web app and the API serve the sitemap only with a public tenant; otherwise `robots.txt` serves `Disallow: /`, sitemap routes 404, every page is `noindex` |
 | H5  | The chart says `iam`, never `keycloak`                                                 | Values key `iam`, templates `iam-*.yaml`, resources `<fullname>-iam`, env vars `IAM_*`. The only place the word appears is the image repository. A `helm template` test greps the rendered manifests for `keycloak` outside image references and the variable names the images themselves require (`KC_*`, `KEYCLOAK_URL`) |
-| H6  | The UI shows who changed what                                                          | Every authored entity records `createdBy` / `updatedBy` as an actor reference, and every workspace has an audit trail (§10, §11). This also works without IAM, with self-declared names                                                                                                                                    |
+| H6  | The UI shows who changed what                                                          | Every authored entity records `createdBy` / `updatedBy` as an actor reference, and every workspace has an audit trail (§10, §11). Authors are always the signed-in person; clients cannot name one                                                                                                                                    |
 | H7  | The backend respects the tenant                                                        | A workspace belongs to exactly one tenant, and every request is checked against it in the namespace hook before any controller runs. A workspace in another tenant answers **404**, not 403, so its existence does not leak                                                                                                |
 
 ## 3. Vocabulary
@@ -188,6 +188,17 @@ Investigator and Curator are side by side, not stacked: a person who needs both 
 3. Put `@Requires(...)` on the routes and set the capability on the MCP tools.
 
 No migration and no Keycloak change. When custom roles exist (step 9), tenant admins can add the new capability to their own bundles.
+
+### 6.4 Notifications go to groups (2026-11-09)
+
+A notification is sent to groups, never to "the workspace":
+
+- `notification_audiences` (per workspace) holds, per notification type (SCAN, FINDING, SOURCE, SYSTEM), the groups that get it. None chosen means the workspace's **owning group**. Changing it needs `access.manage` (Settings → Access → Who gets notifications).
+- Each notification fixes its audience when it is made (`notifications.audience_group_ids`; empty = the owning group, which also covers rows from before this change).
+- A person gets a notification when one of their groups, or a group above one of theirs, is in its audience. Roles alone do not make anyone a recipient.
+- Read, important and dismissed are per person (`notification_states`, keyed by `user:<sub>`). "Delete" dismisses for the caller only.
+- Capability `notification.view` is in every role but the visitor's: visitors of a public tenant are in no group and get no notifications, REST or socket.
+- Live updates: the socket joins one room per group of the person (with the groups above) and one personal room; new notifications go to the audience's group rooms, read/important/dismiss to the personal room.
 
 ## 7. Business use cases
 
@@ -858,6 +869,21 @@ Asked for: the identity server in Classifyre's style (sign-in page on the landin
 - A deleted tenant answered `TENANT_SUSPENDED` (the page offered a resume that is refused) and a replaced organization answered `SIGN_IN_REQUIRED` (the web renewed the session instead of explaining): now `TENANT_DELETED` and `TENANT_REPLACED`, each with its page, whose texts moved into `i18n/en.json`/`de.json` (`noTenantPage`).
 - The setup job reports an organization name already taken instead of failing on a bare conflict; theme references in single quotes get the hash too; `GET /tenant` is asked once per page (`hooks/use-tenant.ts`); the namespaces list has a spec; gated buttons carry `data-testid`s.
 - Docs corrected: where Auditor and Tenant admin can be given (tenant only), tenant admins may create a workspace for any group, deleting or moving a group that owns workspaces changes which parent grants reach them, visitors see editors' names in a workspace's history, suspending the public tenant counts within a minute.
+
+### Step 8g · Sign-in always on (2026-11-09)
+
+The mode without sign-in is gone everywhere (the user's call: "we should never deliver without iam"; a public tenant is only for the showcase).
+
+- **API:** `iamEnabled()`, `LocalAccessPolicy`, self-declared actors (`X-Actor-Name`, `parseActorName`, the `'header'` actor), the open-database mode (`workspace-scope.ts`, the `'open'` fallback of `workspaceDatabaseUrl`, `migrateWorkspaces` on the open DB) and every `identity | null` branch are removed. `IDENTITY`, `IAM_CONFIG`, `ACCESS_POLICY` are never null. Chat bots only read (`chat_bots.allow_mutations` dropped). MCP tokens always have an owner (ownerless rows deleted, `owner_sub NOT NULL`). Client author fields stay as internal service inputs but are hidden from the OpenAPI contract; the access guard always stamps them. The control DB no longer keeps the `local` tenant row (`OPEN_DATABASE_DDL` creates it only in an open database being copied from).
+- **Operator command:** `workspaces list`, `workspaces copy --to-tenant` (the one upgrade path for open-database workspaces) and new `workspaces create`. `--to-local` and `tenants split` are gone, and so is the Platform page's import.
+- **Web:** no `IAM_ENABLED`; account menu always shown; owner group always picked; no name prompt; chat-bot "allow changes" switch replaced by a read-only note; sitemap only with a public tenant.
+- **Chart:** no `iam.enabled`; `ingress.host` or `iam.appUrl` required; dev stack always with sign-in (`values-dev-iam.yaml` merged, skaffold `iam` profile folded into `dev`).
+- **SQL (DQ):** the per-workspace on/off switch is gone; grants decide.
+- **Notifications:** go to groups (§6.4).
+- **All-in-one image:** Keycloak and a JRE in the image, `iam` and `iam-setup` s6 services, the realm setup script shared with the chart (new `IAM_ADMIN_USER`, `IAM_BOOTSTRAP_ADMIN_TEMPORARY`, first/last name), first workspace made through `admin workspaces create`.
+- **Smoke:** one Playwright spec for the chart (`develop.yml`) and the image (`docker/scripts/smoke.sh`, CI job `smoke`), seeded by `scripts/smoke/seed.sh` with `SMOKE_TARGET=k8s|docker`, run twice around a restart (`@after-restart`); shared setup in `.github/actions/e2e-smoke`.
+
+Open: `values-dev-vps-db.yaml` (the dev overlay on the showcase database) does not render, since the identity server would need the showcase's realm database; `DEMO_MODE` overlaps the visitor role and could go.
 
 ### Step 9 · Later
 
