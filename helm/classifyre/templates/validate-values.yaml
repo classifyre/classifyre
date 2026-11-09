@@ -31,17 +31,17 @@
 {{- /* Production reminder: when postgres.mode=external, set postgres.connection.sslMode to
      "require" or "verify-full". The default "disable" is intentional for embedded/local installs. */ -}}
 
-{{- if .Values.iam.enabled -}}
-{{- /* Sign-in means a private instance: nothing in it is for crawlers (§2 H4),
-     except a public tenant, which visitors and crawlers may read. */ -}}
-{{- if and .Values.frontend.sitemap.enabled (not .Values.iam.public.enabled) -}}
-{{- fail "frontend.sitemap.enabled needs iam.public.enabled when iam.enabled=true: only a public tenant is for crawlers" -}}
+{{- if hasKey .Values.iam "enabled" -}}
+{{- fail "iam.enabled is gone: sign-in is always on. Remove it from your values" -}}
 {{- end -}}
-{{- if and .Values.iam.public.enabled (eq (toString .Values.iam.public.tenant) "local") -}}
-{{- fail "iam.public.tenant cannot be 'local': that name is kept for workspaces made without sign-in" -}}
+{{- /* Sign-in is always on, so an instance is private: nothing in it is for
+     crawlers (§2 H4), except a public tenant, which visitors and crawlers may
+     read. */ -}}
+{{- if and .Values.frontend.sitemap.enabled (not .Values.iam.public.enabled) -}}
+{{- fail "frontend.sitemap.enabled needs iam.public.enabled: only a public tenant is for crawlers" -}}
 {{- end -}}
 {{- if and (not .Values.iam.appUrl) (empty .Values.ingress.host) -}}
-{{- fail "iam.enabled=true needs ingress.host (or iam.appUrl) to know the URL people open Classifyre at; the identity server lives under it at <appUrl>/iam. Set iam.enabled=false for an instance without sign-in" -}}
+{{- fail "Set ingress.host (or iam.appUrl) to the URL people open Classifyre at: sign-in is always on and the identity server lives under it at <appUrl>/iam" -}}
 {{- end -}}
 {{- $validIamDbModes := list "shared" "external" -}}
 {{- if not (has .Values.iam.database.mode $validIamDbModes) -}}
@@ -55,5 +55,4 @@
 {{- end -}}
 {{- if not (regexMatch "^/[a-z0-9-]+$" .Values.iam.path) -}}
 {{- fail "iam.path must be one path segment such as /iam" -}}
-{{- end -}}
 {{- end -}}

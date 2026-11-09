@@ -52,3 +52,14 @@ postgres:
     username: postgres
   connection:
     sslMode: disable
+
+# Sign-in is always on. This release serves its own web app on the
+# port-forward, so that is the address people open it at.
+# NOT DONE: with an external PostgreSQL the identity server needs its own
+# database too (iam.database.mode=external + iam.database.external.*), and
+# pointing a second identity server at the showcase's realm database is not
+# safe. Until that is decided this overlay does not render.
+iam:
+  appUrl: http://localhost:3302
+  public:
+    enabled: false

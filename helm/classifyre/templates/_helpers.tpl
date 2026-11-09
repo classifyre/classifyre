@@ -285,12 +285,8 @@ which each deployment sets on its own after including this block.
         secretKeyRef:
           name: {{ include "classifyre.apiMaskedConfigSecretName" . }}
           key: {{ include "classifyre.apiMaskedConfigSecretKey" . }}
-    {{- if .Values.iam.enabled }}
-    # With sign-in it upgrades the control database and every tenant's.
-    - name: IAM_ENABLED
-      value: "true"
+    # It upgrades the control database and every tenant's.
     {{- include "classifyre.tenantDatabases.env" . | nindent 4 }}
-    {{- end }}
     {{- if and (eq .Values.postgres.mode "external") .Values.postgres.external.existingSecret .Values.postgres.external.existingSecretUrlKey }}
     - name: DATABASE_URL
       valueFrom:
@@ -583,7 +579,6 @@ which each deployment sets on its own after including this block.
 {{- end }}
 {{- include "classifyre.telemetryEnv" . | nindent 0 }}
 {{- include "classifyre.iam.env" . | nindent 0 }}
-{{- if .Values.iam.enabled }}
 {{- include "classifyre.tenantDatabases.env" . | nindent 0 }}
 - name: IAM_API_CLIENT_ID
   value: classifyre-api
@@ -592,7 +587,6 @@ which each deployment sets on its own after including this block.
     secretKeyRef:
       name: {{ include "classifyre.iam.secretName" . }}
       key: api-client-secret
-{{- end }}
 {{- with .Values.api.extraEnv }}
 {{- toYaml . | nindent 0 }}
 {{- end }}
@@ -864,9 +858,6 @@ password
 {{- end -}}
 
 {{- define "classifyre.iam.env" -}}
-- name: IAM_ENABLED
-  value: {{ .Values.iam.enabled | quote }}
-{{- if .Values.iam.enabled }}
 - name: IAM_ISSUER_URL
   value: {{ include "classifyre.iam.issuerUrl" . | quote }}
 - name: IAM_INTERNAL_URL
@@ -887,5 +878,4 @@ password
   value: {{ .Values.iam.exposeAdminConsole | quote }}
 - name: IAM_REALM_CONSOLE
   value: {{ .Values.iam.realmConsole | quote }}
-{{- end }}
 {{- end -}}

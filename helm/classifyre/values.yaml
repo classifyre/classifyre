@@ -1024,11 +1024,9 @@ ingress:
   tls: []
 
 iam:
-  # Sign-in and access management (docs/prd/IAM-access-management.md). With it
-  # off, anyone who reaches the instance can do everything. On by default in
-  # this chart; the all-in-one Docker image never uses it.
-  # -- Turn sign-in and access management on. Off restores open access.
-  enabled: true
+  # Sign-in and access management (docs/prd/IAM-access-management.md). Always
+  # on: every install has the identity server, and the all-in-one Docker image
+  # ships it too. People open Classifyre at ingress.host (or iam.appUrl).
   image:
     # -- Identity server image repository.
     repository: quay.io/keycloak/keycloak

@@ -106,7 +106,7 @@ say "install throwaway release $REL in $NS"
 kubectl get namespace "$NS" >/dev/null 2>&1 && { echo "namespace $NS exists; remove it first"; exit 1; }
 kubectl create namespace "$NS" >/dev/null
 helm install "$REL" "$ROOT/helm/classifyre" -n "$NS" \
-  -f "$ROOT/helm/develop/values-dev.yaml" -f "$ROOT/helm/develop/values-dev-iam.yaml" \
+  -f "$ROOT/helm/develop/values-dev.yaml" \
   --set worker.replicaCount=0 --set ingress.enabled=false --set priorityClasses.create=false \
   --set postgres.embedded.persistence.enabled=false --set api.cliCache.enabled=false \
   --set api.embedding.enabled=false \
@@ -290,22 +290,10 @@ check D "exporting needs data.export as well" ":EXPORT_NOT_ALLOWED" "$(run_code 
 check D "the grants are listed with the workspace's" "asset,source" "$(get admin /fin-ledger/access/grants | json "print(','.join(sorted(g['scopeType'] for g in d if g['roleKey']=='data-reader')))")"
 check D "another tenant gets 404" 404 "$(status outsider@globex GET /fin-ledger/data-query/catalog)"
 
-say "operator copies workspaces between a tenant and the open database (docs/prd/TEN §4.9)"
-operator workspaces copy --to-local fin-q3 >/dev/null
-check T0 "a copy to the open database leaves the tenant's in place" "fin-ledger,fin-q3,sales-pipeline" "$(slugs admin)"
-check T0 "and is in the open database" fin-q3 "$(pg classifyre "SELECT string_agg(slug, ',') FROM namespaces WHERE status = 'active'")"
-check T0 "the open database holds no tenant's workspace or access" "0|0" "$(pg classifyre "SELECT (SELECT count(*) FROM namespaces WHERE tenant_id <> '00000000-0000-4000-8000-0000000000aa') || '|' || (SELECT count(*) FROM iam_grants)")"
-Q3_SCHEMA=$(pg classifyre_control "SELECT schema_name FROM namespaces WHERE slug = 'fin-q3'")
-Q3_COPY=$(pg classifyre "SELECT schema_name FROM namespaces WHERE slug = 'fin-q3'")
-check T0 "with its data, as a new workspace" "$(pg "$DEFAULT_DB" "SELECT count(*) FROM $Q3_SCHEMA.audit_events"),new" "$(pg classifyre "SELECT count(*) FROM $Q3_COPY.audit_events"),$([ "$Q3_COPY" != "$Q3_SCHEMA" ] && echo new || echo same)"
-check T0 "a copy to a taken address is refused" 2 "$(operator workspaces copy --to-tenant globex fin-q3 >/dev/null 2>&1; echo $?)"
-EVENTS=$(get admin /tenant/audit-events)
-COPIES=$(echo "$EVENTS" | json "a=[e['action'] for e in d if (e.get('detail') or {}).get('slug')=='fin-q3']; print('yes' if 'workspace.copied_out' in a else a)")
-[ "$COPIES" = yes ] || COPIES="$COPIES; body: ${EVENTS:0:300}"
-check T0 "the copy is in the tenant's activity" yes "$COPIES"
-# A second workspace made without sign-in, under an address no tenant uses,
-# for the Platform page to bring in.
-pg classifyre "UPDATE namespaces SET slug = 'fin-q3-local' WHERE slug = 'fin-q3'" >/dev/null
+say "operator commands (docs/prd/TEN §4.9)"
+check T0 "copies go only into a tenant" 2 "$(operator workspaces copy --to-local fin-q3 >/dev/null 2>&1; echo $?)"
+check T0 "a copy into an unknown tenant is refused" 2 "$(operator workspaces copy --to-tenant nowhere --all >/dev/null 2>&1; echo $?)"
+check T0 "an open database without workspaces has nothing to copy" "Nothing to copy to globex." "$(operator workspaces copy --to-tenant globex --all 2>&1 | tail -1)"
 
 say "operators manage tenants on the Platform page (docs/prd/TEN §4.7)"
 optoken() { # an operator's token names no tenant
@@ -341,8 +329,7 @@ check P "suspending a tenant" suspended "$(op POST "/platform/tenants/$GLOBEX_ID
 check P "refuses its people" TENANT_SUSPENDED "$(get outsider /namespaces globex | json "print(d.get('code'))")"
 op POST "/platform/tenants/$GLOBEX_ID/resume" >/dev/null
 check P "and resuming lets them back in" 200 "$(status outsider@globex GET /namespaces)"
-check P "workspaces made without sign-in are offered for import" fin-q3-local "$(op GET /platform/workspaces/local | json "print(','.join(w['slug'] for w in d))")"
-check P "and copied into a tenant" fin-q3-local "$(op POST "/platform/tenants/$INITECH_ID/workspaces" '{"slugs":["fin-q3-local"]}' | json "print(','.join(d['copied']))")"
+check P "the operator command makes a tenant's first workspace" "Created initech-ops in tenant initech." "$(operator workspaces create --tenant initech --slug initech-ops --owner-group "$INITECH_ADMINS" 2>&1 | tail -1)"
 INITECH_DB="classifyre_t_${INITECH_ID//-/}"
 check P "which gets the tenant its own database" "$INITECH_DB" "$(op GET /platform/tenants | json "print(next(t['database'] for t in d if t['alias']=='initech'))")"
 check P "its data is not removed while its organization exists" ORGANIZATION_EXISTS "$(op DELETE "/platform/tenants/$INITECH_ID?confirm=initech" | json "print(d.get('code'))")"
@@ -352,19 +339,8 @@ check P "nor without its alias typed" 400 "$(opstatus DELETE "/platform/tenants/
 check P "then its data is removed" 204 "$(opstatus DELETE "/platform/tenants/$INITECH_ID?confirm=initech")"
 check P "it stays listed as deleted, alias reserved" deleted "$(op GET /platform/tenants | json "print(next(t['status'] for t in d if t['alias']=='initech'))")"
 check P "with its database and workspaces gone" "0|0" "$(pg postgres "SELECT count(*) FROM pg_database WHERE datname = '$INITECH_DB'")|$(pg classifyre_control "SELECT count(*) FROM namespaces WHERE tenant_id = '$INITECH_ID'")"
-check P "the copy is in that tenant's activity" workspace.copied_in "$(pg classifyre_control "SELECT action FROM iam_audit_events WHERE tenant_id = '$INITECH_ID' AND action LIKE 'workspace.%'")"
+check P "the workspace is in that tenant's activity" workspace.created "$(pg classifyre_control "SELECT action FROM iam_audit_events WHERE tenant_id = '$INITECH_ID' AND action LIKE 'workspace.%'")"
 check P "globex's activity has the suspension and the resume" "tenant.resumed,tenant.suspended" "$(pg classifyre_control "SELECT string_agg(action, ',' ORDER BY action) FROM iam_audit_events WHERE tenant_id = '$GLOBEX_ID' AND action LIKE 'tenant.%'")"
-
-say "sign-in turned off by mistake (docs/prd/TEN §4.2)"
-helm upgrade "$REL" "$ROOT/helm/classifyre" -n "$NS" --reuse-values --set iam.enabled=false >/dev/null
-kubectl -n "$NS" rollout status "deploy/$REL-classifyre-api" --timeout=600s >/dev/null
-# The forward was bound to the replaced pod.
-kill "${PF_PIDS[0]}" 2>/dev/null || true
-kubectl -n "$NS" port-forward "svc/$REL-classifyre-api" "$API_PORT:8000" >/dev/null 2>&1 & PF_PIDS+=($!)
-until curl -s -m 3 "$B/ping" | grep -q pong; do sleep 2; done
-check T0 "without sign-in only the open database is listed" "fin-q3-local" "$(curl -s "$B/namespaces" | json "print(','.join(sorted(n['slug'] for n in d)))")"
-check T0 "a tenant's workspace answers 404 by its address" 404 "$(status - GET /fin-ledger/sources)"
-check T0 "the tenants are untouched in their databases" 3 "$(pg "$DEFAULT_DB" "SELECT count(*) FROM pg_namespace WHERE nspname LIKE 'ns\_%'")"
 
 say "results"
 printf '%s\n' "${RESULTS[@]}"

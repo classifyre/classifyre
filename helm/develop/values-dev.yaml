@@ -610,7 +610,30 @@ telemetry:
 objectStorage:
   enabled: false
 
-# Sign-in is off by default on the dev stack. Turn it on with
-# `CLASSIFYRE_IAM=true ./scripts/dev/start.sh`, which adds values-dev-iam.yaml.
+# Sign-in on the k3d dev stack, as everywhere (it is always on).
+# The web app is not deployed in-cluster for local dev (`frontend.enabled:
+# false`), so the browser cannot use the ingress for sign-in: no ingress
+# routes `/iam` without the web service behind it. Instead the browser opens
+# the web server on your machine, whose `/iam/[...path]` route proxies to the
+# identity server — so the public URL and the app URL are both localhost:3000,
+# and the issuer in tokens is the host the browser actually sees.
 iam:
-  enabled: false
+  appUrl: http://localhost:3000
+  # Visitors who have not signed in browse the `public` tenant, read-only;
+  # signed-in people see only their own tenant (docs/prd/IAM step 8e).
+  public:
+    enabled: true
+    tenant: public
+  # As in production: through the app only the realm's identity console
+  # (http://localhost:3000/auth/console/, for operators). The master realm's
+  # console is on the skaffold port-forward, http://localhost:8280/iam/admin
+  # (user `admin`, password in the classifyre-iam Secret, key admin-password).
+  exposeAdminConsole: false
+  database:
+    poolMaxSize: 5
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      memory: 1Gi
