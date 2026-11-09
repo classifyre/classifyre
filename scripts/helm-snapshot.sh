@@ -27,6 +27,8 @@ HELM_COMMON_ARGS=(
   # Pinned so the rendered output stays deterministic: the chart otherwise
   # generates a random key on every render.
   --set "api.internalApiKey.value=${CLASSIFYRE_INTERNAL_KEY:-snapshot-classifyre-internal-key-0001}"
+  # Sign-in is always on, and it needs the address people open Classifyre at.
+  --set "ingress.host=snapshot.example.com"
 )
 
 while [[ $# -gt 0 ]]; do
@@ -62,7 +64,13 @@ trap 'rm -rf "${TMP_DIR}"' EXIT
 render_snapshot() {
   local values_file="$1"
   local output_file="$2"
-  helm template classifyre "${CHART_DIR}" -f "${values_file}" "${HELM_COMMON_ARGS[@]}" > "${output_file}"
+  # The identity server's secrets are generated on first install (and read
+  # back from the cluster afterwards); mask them so the snapshot is stable.
+  helm template classifyre "${CHART_DIR}" -f "${values_file}" "${HELM_COMMON_ARGS[@]}" \
+    | sed -E \
+        -e 's/^(  (admin-password|password|web-client-secret|api-client-secret|bootstrap-admin-password|tenant-database-key): )"[A-Za-z0-9]{40}"$/\1"<generated>"/' \
+        -e 's/^( +checksum\/secret: )[0-9a-f]{64}$/\1<generated>/' \
+    > "${output_file}"
 }
 
 mkdir -p "${TMP_DIR}"

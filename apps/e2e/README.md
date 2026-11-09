@@ -21,7 +21,7 @@ never visible text, so translations cannot break it.
 
 ## Run it against the local dev stack
 
-The dev stack must run with sign-in (`CLASSIFYRE_IAM=true ./scripts/dev/start.sh`)
+The dev stack must be running (`./scripts/dev/start.sh`)
 and the web app on `localhost:3000`.
 
 ```bash

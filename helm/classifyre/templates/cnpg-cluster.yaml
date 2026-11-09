@@ -27,7 +27,6 @@ spec:
     {{- with .Values.postgres.cnpg.storage.storageClassName }}
     storageClass: {{ . | quote }}
     {{- end }}
-  {{- if .Values.iam.enabled }}
   managed:
     roles:
       {{- if eq .Values.iam.database.mode "shared" }}
@@ -45,25 +44,22 @@ spec:
         login: true
         createdb: true
         createrole: true
-  {{- end }}
   bootstrap:
     initdb:
       database: {{ .Values.postgres.cnpg.database | quote }}
       owner: {{ .Values.postgres.cnpg.user | quote }}
       secret:
         name: {{ include "classifyre.databaseSecretName" . }}
-      {{- if .Values.iam.enabled }}
       # Tenant databases are made from template1 and the API cannot create
       # extensions here (no superuser), so they inherit it.
       postInitTemplateSQL:
         - CREATE EXTENSION IF NOT EXISTS vector
-      {{- end }}
       postInitApplicationSQL:
         - CREATE EXTENSION IF NOT EXISTS vector
         {{- if has "pg_stat_statements" .Values.postgres.cnpg.postgresql.sharedPreloadLibraries }}
         - CREATE EXTENSION IF NOT EXISTS pg_stat_statements
         {{- end }}
-{{- if and .Values.iam.enabled (eq .Values.iam.database.mode "shared") }}
+{{- if eq .Values.iam.database.mode "shared" }}
 ---
 # Needs CloudNativePG 1.25 or later (the Database resource).
 apiVersion: postgresql.cnpg.io/v1

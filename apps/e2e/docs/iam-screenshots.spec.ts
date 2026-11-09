@@ -12,7 +12,7 @@ import {
 
 /**
  * The screenshots of the docs site's Access pages, taken from a dev stack with
- * sign-in (CLASSIFYRE_IAM=true ./scripts/dev/start.sh, then
+ * sign-in (./scripts/dev/start.sh, then
  * `bun run web-iam:dev`). It plays the docs' example company, Brightwater
  * Logistics, through the real app and identity console:
  *
