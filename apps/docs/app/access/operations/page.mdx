@@ -221,52 +221,46 @@ database, once its first workspace made one.
 
 ---
 
-## The public tenant
+## Public workspaces
 
-To let people browse one tenant without signing in, as on a public showcase,
-turn on a public tenant:
+A public workspace is read-only for everyone of its tenant without a grant
+on it and, in the first tenant (`iam.bootstrap.tenant`), for people who have
+not signed in. People make it public in its **Settings → Access** (needs
+`workspace.publish`: Workspace admin, Tenant admin); operators can do it for
+many at once:
 
-```yaml
-iam:
-  public:
-    enabled: true
-    tenant: public # its alias; can be the first tenant, iam.bootstrap.tenant.alias
-    name: Public # display name when the setup job creates it
+```bash
+kubectl -n classifyre exec deploy/classifyre-api -- \
+  node dist/src/admin.js workspaces publish --tenant default --all
+kubectl -n classifyre exec deploy/classifyre-api -- \
+  node dist/src/admin.js workspaces publish --tenant default finance-ledger --off
 ```
 
-- The realm setup job creates its organization with an empty top-level
-  `admins` group when it does not exist. Add its editors to that group in the
-  console; the group gets Tenant admin the first time one of them signs in,
-  as in every tenant. When the public tenant is the first tenant, the first
-  admin edits it from the start.
-- Visitors hold the **Visitor** role on that tenant and nothing else: the read
-  capabilities of a Viewer without `access.view` (who has access) and without
-  MCP tokens, and no tenant capabilities. It is never offered when giving
-  access and cannot be granted.
+- Visitors hold the read capabilities of a Viewer without `access.view` (who
+  has access), notifications and MCP tokens, and no tenant capabilities.
+  Anything more answers _sign in_ (401), which the app turns into the sign-in
+  page.
 - A request with no credentials at all is a visitor. A request with a bad or
   expired sign-in still answers _sign in again_, so a session is renewed, never
   quietly dropped to a visitor.
-- Signed-in people work in their own tenant only, as without a public tenant.
-- **Suspend** the public tenant on the [Platform page](#the-platform-page) to
-  close it within a minute: visitors are sent to sign in until it is resumed.
-- `frontend.sitemap.enabled` is allowed with sign-in only together with a
-  public tenant, and the sitemap then lists only its workspaces.
-- **Demo mode** (`api.env.DEMO_MODE: "true"`) still makes everything read-only
-  for everyone without the bypass key, editors included. Use it for a public
-  showcase whose content operators load with the bypass key; leave it off when
-  the public tenant's editors work in the app.
+- Anonymous requests never reach the identity server: the first tenant is
+  read from Classifyre's own database, at most once a minute.
+- **Suspend** the first tenant on the [Platform page](#the-platform-page) to
+  close its public workspaces within a minute.
+- `frontend.sitemap.enabled` lists only the first tenant's public workspaces.
+- A showcase is a first tenant whose workspaces are public; its editors sign
+  in to change them. There is no read-only mode for the whole installation.
 
 To publish workspaces of an install from before sign-in was always on, copy
-them into the public tenant once (see [Workspaces made without
+them into the first tenant and publish them (see [Workspaces made without
 sign-in](#workspaces-made-without-sign-in)):
 
 ```bash
 kubectl -n classifyre exec deploy/classifyre-api -- \
-  node dist/src/admin.js workspaces copy --to-tenant public --all
+  node dist/src/admin.js workspaces copy --to-tenant default --all
+kubectl -n classifyre exec deploy/classifyre-api -- \
+  node dist/src/admin.js workspaces publish --tenant default --all
 ```
-
-A public tenant is meant for a showcase. The all-in-one Docker image has
-none: everyone signs in there too.
 
 ---
 

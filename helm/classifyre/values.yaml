@@ -280,8 +280,8 @@ api:
   # -- injected into the API and worker pods, forwarded by them into every CLI
   # -- job's environment, and stripped from inbound requests by the web proxy so
   # -- a browser can never present it. It also exempts those CLI callbacks from
-  # -- the demo-mode read-only guard, which is what lets scheduled scans and the
-  # -- autopilot agents keep working on a demo instance.
+  # -- the read-only guard, which is what lets scheduled scans and the
+  # -- autopilot agents keep working while nobody signed in can write.
   internalApiKey:
     # -- Existing secret name that contains the internal API key.
     # -- When set, chart will not create or manage this secret.

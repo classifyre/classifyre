@@ -879,6 +879,27 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * Update a namespace, reporting when its publish state actually flipped.
+   * The registry owns the before/after comparison; the caller owns what the
+   * flip means (the controller records a tenant activity event).
+   */
+  async updateWithPublishTransition(
+    id: string,
+    patch: UpdateNamespaceInput,
+    onPublishChange: (
+      published: boolean,
+      updated: Namespace,
+    ) => Promise<void> | void,
+  ): Promise<Namespace> {
+    const before = patch.public !== undefined ? await this.get(id) : null;
+    const updated = await this.update(id, patch);
+    if (before && before.public !== updated.public) {
+      await onPublishChange(updated.public, updated);
+    }
+    return updated;
+  }
+
+  /**
    * Soft-delete a namespace: mark it `deleted` so it disappears from listings
    * and can no longer be resolved (any request to its URL 404s), then stop its
    * workers, pg-boss instance and scheduling. The tenant's Postgres schema and

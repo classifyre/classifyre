@@ -394,9 +394,10 @@ same host, at `https://<your-host>/iam`. See
 [Access & Sign-in](/access/) for what people can do once signed in.
 
 <Callout type="info">
-  Everyone signs in to the web app and the API keeps tenants apart. To let people browse one tenant without signing in, turn on a
-  public tenant (`iam.public.enabled`; see
-  [Running sign-in → The public tenant](/access/operations/#the-public-tenant)).
+  Everyone signs in to the web app and the API keeps tenants apart. To let
+  people read some workspaces of the first tenant without signing in, make
+  them public (see [Running sign-in → Public
+  workspaces](/access/operations/#public-workspaces)).
   Tenants, people and groups are managed in the identity server; Classifyre
   gives them access.
 </Callout>
@@ -409,7 +410,6 @@ What the chart sets up:
 | Its database       | An `iam` role and database on the chart's PostgreSQL (`iam.database.mode: shared`), or your own (`external`)                                                     |
 | Realm `classifyre` | Created and kept up to date by a job on every install and upgrade: the web and API clients, short-lived tokens (5 minutes), brute-force protection, audit events, English and German |
 | First tenant       | `iam.bootstrap.tenant` (default `default`) with a group `admins`                                                                                                 |
-| Public tenant      | Only with `iam.public.enabled`: `iam.public.tenant` (default `public`) with an empty group `admins`, unless it is the first tenant                               |
 | First admin        | `iam.bootstrap.admin.username` (default `admin`), member of `admins`, with a temporary password, and an operator                                                  |
 | Theme              | Classifyre's look for the sign-in pages, the identity console and the account page, as plain files from a ConfigMap (`iam.theme`); the server image stays the stock one |
 
@@ -448,10 +448,10 @@ is under `admin-password` in the same Secret. See
 
 ### Sitemap
 
-A sitemap (`frontend.sitemap.enabled`) is only allowed with a public tenant,
-whose workspaces it then lists: a private instance publishes nothing for
-search engines. There is no `iam.enabled` any more: a release that still
-sets it fails with a message, so remove it from your values.
+A sitemap (`frontend.sitemap.enabled`) lists only the public workspaces of
+the first tenant: nothing private is published for search engines. There is
+no `iam.enabled`, `iam.public` or `api.env.DEMO_MODE` any more: a release that
+still sets one fails with a message, so remove them from your values.
 
 ### Upgrades and backups
 

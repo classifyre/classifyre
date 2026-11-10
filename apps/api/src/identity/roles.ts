@@ -138,10 +138,10 @@ export const BUILT_IN_ROLES = [
     capabilities: ['platform.tenants.manage'],
   },
   {
-    // People who have not signed in, on an installation with a public tenant
-    // (docs/prd/IAM §13 step 8e): they read its workspaces. Not who has
-    // access, not the tenant's activity, no notifications (they belong to
-    // groups, and a visitor is in none), no MCP tokens; never granted.
+    // People who have not signed in (docs/prd/IAM §13 step 8h): they read the
+    // public workspaces of the first tenant. Not who has access, not the
+    // tenant's activity, no notifications (they belong to groups, and a
+    // visitor is in none), no MCP tokens; never granted.
     key: 'visitor',
     title: 'Visitor',
     scope: 'public',

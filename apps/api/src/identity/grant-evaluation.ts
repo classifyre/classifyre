@@ -1,6 +1,6 @@
 import type { Capability } from './capabilities';
 import { BUILT_IN_ROLES } from './roles';
-import type { GrantScope } from './tenancy.service';
+import type { GrantScope, WorkspaceVisibility } from './tenancy.service';
 
 const ROLE_CAPABILITIES = new Map<string, readonly Capability[]>(
   BUILT_IN_ROLES.map((role) => [role.key, role.capabilities]),
@@ -66,10 +66,12 @@ export function resourceGrantsInWorkspace(
   return { sourceIds: [...sourceIds], assetIds: [...assetIds] };
 }
 
-/** Every capability the grants give in one workspace. Grants only add up. */
 /**
  * What anyone of the tenant may do in a public workspace without a grant on
- * it: read, as a visitor does (docs/prd/IAM §13 step 8h).
+ * it: read, as a visitor does (docs/prd/IAM-access-management.md §13 step
+ * 8h). A public workspace never opens to another tenant: `capabilitiesIn`
+ * answers null across tenants, so this set can only ever widen access inside
+ * the workspace's own tenant.
  */
 export const PUBLIC_WORKSPACE_CAPABILITIES: readonly Capability[] =
   roleCapabilities('visitor');
@@ -80,11 +82,11 @@ export function capabilitiesInWorkspace(
     namespaceId: string;
     ownerLineage: readonly string[];
     /** A public workspace adds read-only access for everyone of its tenant. */
-    public?: boolean;
+    visibility?: WorkspaceVisibility;
   },
 ): Set<Capability> {
   const capabilities = new Set<Capability>(
-    workspace.public ? PUBLIC_WORKSPACE_CAPABILITIES : [],
+    workspace.visibility === 'public' ? PUBLIC_WORKSPACE_CAPABILITIES : [],
   );
   for (const grant of grants) {
     if (!grantApplies(grant, workspace)) continue;

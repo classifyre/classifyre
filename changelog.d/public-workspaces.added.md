@@ -1,0 +1,1 @@
+You can now make a workspace public, read-only for everyone in its tenant and for signed-out visitors of the first tenant, with the new workspace.publish capability. This replaces the public tenant and demo mode, which are gone.

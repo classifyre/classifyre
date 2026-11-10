@@ -412,15 +412,27 @@ describe('IdentityService', () => {
       workspaceTenancy: (id: string) =>
         Promise.resolve(
           id === 'ws-globex'
-            ? { tenantId: 't-globex', ownerGroupId: 'finance', public: true }
+            ? {
+                tenantId: 't-globex',
+                ownerGroupId: 'finance',
+                visibility: 'public',
+              }
             : id === 'ws-sales'
-              ? { tenantId: 't-acme', ownerGroupId: 'sales', public: false }
+              ? {
+                  tenantId: 't-acme',
+                  ownerGroupId: 'sales',
+                  visibility: 'private',
+                }
               : id === 'ws-public'
-                ? { tenantId: 't-acme', ownerGroupId: 'sales', public: true }
+                ? {
+                    tenantId: 't-acme',
+                    ownerGroupId: 'sales',
+                    visibility: 'public',
+                  }
                 : {
                     tenantId: 't-acme',
                     ownerGroupId: 'ap-team',
-                    public: false,
+                    visibility: 'private',
                   },
         ),
     } as unknown as TenancyService;

@@ -195,7 +195,6 @@ export function registerEntityMcpTools(
     annotations: typeof READ | typeof WRITE | typeof DESTRUCTIVE,
     run: (args: Args<K>) => Promise<unknown>,
   ) => {
-    const write = annotations !== READ;
     server.registerTool(
       name,
       { title, description, inputSchema: schemas[name], annotations },
