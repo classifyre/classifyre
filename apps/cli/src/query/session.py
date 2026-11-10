@@ -205,10 +205,13 @@ class QuerySession:
             binding = self._bindings[entry.source_alias]
             try:
                 relation = binding.relation(conn, entry.location)
-            except BindingError:
-                raise
+            except BindingError as exc:
+                # Scan wording: "Failed to connect to <label>: <cause>".
+                # The binding already names the endpoint in its message, so
+                # keep it whole instead of prefixing the table again.
+                raise BindingError(f"Failed to connect to {binding.label()}: {exc}") from exc
             except Exception as exc:
-                raise BindingError(f"Could not open {name}: {_first_line(exc)}") from exc
+                raise BindingError(f"Failed to connect to {binding.label()}: {_first_line(exc)}") from exc
             if binding.source_type == "POSTGRESQL":
                 _postgres_settings(conn)
             if name.source not in created_catalogs:
