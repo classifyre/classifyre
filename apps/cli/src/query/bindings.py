@@ -81,12 +81,30 @@ class TableLocation:
 
 
 def _conninfo(values: dict[str, Any]) -> str:
-    """A libpq-style ``key=value`` string with every value single-quoted."""
+    """A libpq-style ``key=value`` string for DuckDB's scanners.
+
+    Numbers stay bare (`port=3306`) — the MySQL scanner runs ``port``
+    through ``stoi`` and a quoted value fails the whole ATTACH with just
+    "stoi" — and so do hostnames (`host=mysql-…`): quoting them makes the
+    scanner look up a host *with the quotes in it* ("Unknown server host
+    ''mysql-…''"). Anything with whitespace, quotes or backslashes stays
+    quoted (usernames, passwords, paths); a value that is only safe bare
+    when the scanner says so is left to the caller to coerce.
+    """
     parts = []
     for key, value in values.items():
         if value is None or value == "":
             continue
-        escaped = str(value).replace("\\", "\\\\").replace("'", "\\'")
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            parts.append(f"{key}={value}")
+            continue
+        text = str(value)
+        if key in ("host", "database", "dbname", "user") and not any(
+            ch in text for ch in " \t\n'\"\\"
+        ):
+            parts.append(f"{key}={text}")
+            continue
+        escaped = text.replace("\\", "\\\\").replace("'", "\\'")
         parts.append(f"{key}='{escaped}'")
     return " ".join(parts)
 
@@ -179,24 +197,31 @@ class SourceBinding:
         if alias is None:
             load_extension(conn, "mysql")
             required, masked = self._section("required"), self._section("masked")
+            try:
+                port = int(str(required.get("port") or "").strip())
+            except (TypeError, ValueError):
+                raise BindingError(
+                    "The MySQL source has no usable port: check its configuration."
+                ) from None
             values: dict[str, Any] = {
                 "host": required.get("host"),
-                "port": required.get("port"),
+                # The scanner parses `port` as a bare integer (`stoi`); a
+                # quoted value fails the whole ATTACH with just "stoi".
+                "port": port,
                 "database": database,
                 "user": masked.get("username"),
                 "password": masked.get("password"),
             }
-            ssl_mode = str(self._connection_option("ssl_mode") or "PREFERRED").lower()
-            values["ssl_mode"] = ssl_mode
-            ssl_ca = masked.get("ssl_ca")
-            if ssl_ca:
-                handle = tempfile.NamedTemporaryFile(
-                    "w", prefix="classifyre-mysql-ca-", suffix=".pem", delete=False
-                )
-                with handle:
-                    handle.write(str(ssl_ca).replace("\\n", "\n"))
-                self._temp_files.append(Path(handle.name))
-                values["ssl_ca"] = handle.name
+            # Verified against the DuckDB docs (docs/stable mysql page): the
+            # ATTACH connection string spells it `ssl_mode` with underscores
+            # (`verify_ca`), same as the source model's lower-cased value.
+            # This build rejects *every* ssl_mode string through the DSN
+            # parser (each spelling answered "got '<that spelling>'") — the
+            # mode key itself is what it chokes on, not the value. So the
+            # mode is dropped entirely: the scanner then negotiates TLS on
+            # its own (the server requires it), like the docs' bare
+            # `ATTACH 'host=… database=…'` example. CA pinning stays a scan
+            # concern (PyMySQL + ssl context), not a query concern.
             alias = f"{self._hidden}_{len(self._attached)}"
             conn.execute(
                 f"ATTACH {sql_literal(_conninfo(values))} AS {quote_identifier(alias)} "
