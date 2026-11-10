@@ -20,7 +20,6 @@ What is reused rather than rewritten:
 from __future__ import annotations
 
 import logging
-import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -171,7 +170,7 @@ class SourceBinding:
 
     def _require_location_fields(self, location: TableLocation, *fields: str) -> list[str]:
         values = [getattr(location, name) for name in fields]
-        missing = [name for name, value in zip(fields, values) if not value]
+        missing = [name for name, value in zip(fields, values, strict=True) if not value]
         if missing:
             raise BindingError(
                 f"Could not open {self.label()}: the table's location is incomplete "
