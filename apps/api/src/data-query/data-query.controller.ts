@@ -65,7 +65,7 @@ export class DataQueryController {
   @Get('data-query/settings')
   @Requires('workspace.view')
   @ApiOperation({
-    summary: 'Whether this workspace answers SQL, and its limits',
+    summary: 'The SQL limits of this workspace',
   })
   @ApiOkResponse({ type: DataQuerySettingsDto })
   getSettings(): Promise<DataQuerySettingsDto> {

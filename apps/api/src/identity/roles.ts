@@ -96,14 +96,14 @@ export const BUILT_IN_ROLES = [
     key: 'data-reader',
     title: 'Data reader',
     scope: 'workspace',
-    capabilities: ['data.query'],
+    capabilities: ['data.query', 'notification.view'],
   },
   {
     // Add-on: combined with another role, never granted alone in practice.
     key: 'code-author',
     title: 'Code author',
     scope: 'workspace',
-    capabilities: ['code.author'],
+    capabilities: ['code.author', 'notification.view'],
   },
   {
     // Access group, not a business unit: its members create workspaces for
@@ -118,7 +118,12 @@ export const BUILT_IN_ROLES = [
     key: 'auditor',
     title: 'Auditor',
     scope: 'tenant',
-    capabilities: ['tenant.audit.view', 'access.view', 'workspace.view'],
+    capabilities: [
+      'tenant.audit.view',
+      'access.view',
+      'workspace.view',
+      'notification.view',
+    ],
   },
   {
     key: 'tenant-admin',

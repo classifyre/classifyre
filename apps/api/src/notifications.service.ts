@@ -357,11 +357,25 @@ export class NotificationsService {
     return { updated: ids.length };
   }
 
+  /** One visible notification → new own state → fresh response. */
+  private async transitionOne(
+    person: ClsPerson,
+    id: string,
+    data: Pick<
+      Prisma.NotificationStateUncheckedCreateInput,
+      'readAt' | 'important' | 'dismissedAt'
+    >,
+  ): Promise<NotificationResponseDto> {
+    await this.visibleOne(person, id);
+    await this.setState(person, [id], data);
+    return this.reload(person, id);
+  }
+
   async markRead(id: string): Promise<NotificationResponseDto> {
     const person = this.requirePerson();
-    await this.visibleOne(person, id);
-    await this.setState(person, [id], { readAt: new Date() });
-    const response = await this.reload(person, id);
+    const response = await this.transitionOne(person, id, {
+      readAt: new Date(),
+    });
     this.notificationEventsGateway?.emitNotificationUpdated(
       person.actorRef,
       response,
@@ -374,9 +388,7 @@ export class NotificationsService {
     important: boolean,
   ): Promise<NotificationResponseDto> {
     const person = this.requirePerson();
-    await this.visibleOne(person, id);
-    await this.setState(person, [id], { important });
-    const response = await this.reload(person, id);
+    const response = await this.transitionOne(person, id, { important });
     this.notificationEventsGateway?.emitNotificationUpdated(
       person.actorRef,
       response,

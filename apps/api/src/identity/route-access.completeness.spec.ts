@@ -160,4 +160,16 @@ describe('built-in roles', () => {
     );
     expect(CAPABILITY_IDS.filter((id) => !granted.has(id))).toEqual([]);
   });
+
+  it("give notification.view to every workspace/tenant role but the visitor's (IAM §6.4)", () => {
+    // platform-operator never acts in a workspace, so it carries no
+    // workspace capabilities.
+    for (const role of BUILT_IN_ROLES) {
+      if (role.key === 'visitor' || role.key === 'platform-operator') {
+        expect(role.capabilities).not.toContain('notification.view');
+      } else {
+        expect(role.capabilities).toContain('notification.view');
+      }
+    }
+  });
 });

@@ -184,9 +184,17 @@ export class QueryCatalogService {
         scope.sourceIds.has(table.sourceId) ||
         scope.assetIds.has(table.assetId);
       if (!granted && !scope.seeLocked) continue;
+      // R4: say why a visible table cannot be queried — unreadable by the
+      // engine, or locked for lack of a grant.
+      const reason = table.queryable
+        ? granted
+          ? undefined
+          : 'You need the Data reader role on this table or its source to query it.'
+        : table.reason;
       sources.get(table.sourceId)?.tables.push({
         ...table,
         canQuery: table.queryable && granted,
+        ...(reason ? { reason } : {}),
       });
     }
     return {

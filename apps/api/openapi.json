@@ -11888,7 +11888,7 @@
             }
           }
         },
-        "summary": "Whether this workspace answers SQL, and its limits",
+        "summary": "The SQL limits of this workspace",
         "tags": [
           "Data query"
         ]
@@ -35400,7 +35400,7 @@
           },
           "canQuery": {
             "type": "boolean",
-            "description": "You may query it now: SQL is on here, it is queryable, and a role or grant gives you access."
+            "description": "You may query it now: it is queryable, and a role or grant gives you access."
           },
           "reason": {
             "type": "string",

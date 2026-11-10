@@ -204,8 +204,8 @@ enum QueryRunStatus {
   CANCELLED
 }
 
-/// Whether this workspace answers SQL over its tables, and the limits.
-/// One row (`id = 'default'`); off until an admin turns it on.
+/// The SQL limits of this workspace (grants decide who may query; R8).
+/// One row (`id = 'default'`).
 model DataQuerySettings {
   id             String   @id @default("default")
   maxRows        Int      @default(10000) @map("max_rows")

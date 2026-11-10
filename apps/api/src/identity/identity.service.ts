@@ -529,6 +529,22 @@ export class IdentityService {
     return this.membership.groups(principal.orgId, { fresh });
   }
 
+  /**
+   * The first of `groupIds` that is not a group of the principal's tenant,
+   * or undefined when all belong. Fresh read: an admin who just made one
+   * expects to find it here.
+   */
+  async unknownGroupId(
+    principal: Principal,
+    groupIds: string[],
+  ): Promise<string | undefined> {
+    if (!groupIds.length) return undefined;
+    const known = new Set(
+      (await this.groupsOf(principal, true)).map((group) => group.id),
+    );
+    return groupIds.find((id) => !known.has(id));
+  }
+
   /** Every workspace of the principal's tenant they can see, with what they may do there. */
   async visibleWorkspaces(
     principal: Principal,

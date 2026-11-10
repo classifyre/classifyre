@@ -55,7 +55,7 @@ Later phases add column masking (driven by the PII findings Classifyre already h
 
 **The settings.** `data_query_settings` (per workspace): `max_rows` (10,000), `timeout_seconds` (120) and `export_max_rows`. Changed with `workspace.settings`. *(The `enabled` switch was dropped 2026-11-09, migration `20261110090200_data_query_always_on`.)*
 
-**What a person sees.** The catalog lists every table-shaped asset. A table is `canQuery` when the setting is on, DuckDB can read it, and a role or grant covers it. Tables someone cannot query are listed (locked) only if they hold `asset.view`.
+**What a person sees.** The catalog lists every table-shaped asset. A table is `canQuery` when DuckDB can read it and a role or grant covers it (R8: no switch). Tables someone cannot query are listed (locked) only if they hold `asset.view`.
 
 ## 5. Design
 
@@ -69,7 +69,7 @@ sequenceDiagram
   W->>A: POST /<ws>/query-runs {sql}
   A->>A: setting on? catalog for this person → allowed tables
   A->>A: sources the SQL names (sqlName prefix) → their recipes, decrypted
-  A->>A: QueryRun PENDING (token hash), audit per table read
+  A->>A: QueryRun PENDING (token hash); per-table audit on success, for the tables the job read (R6)
   A-->>W: run (PENDING)
   A->>J: K8s Job or local process, request gzipped in env
   J->>J: SQLGlot gate against the allowed tables
@@ -108,16 +108,16 @@ A table is `<source>.<schema>.<table>`, every part a plain lower-case identifier
 ### 5.4 The API (`apps/api/src/data-query/`)
 
 - `QueryCatalogService` — the table list of a workspace (cached 30 s), then per request who may query what.
-- `QueryRunService` — creates the run, picks the sources the SQL mentions (only allowed ones; a few too many is harmless), decrypts their recipes, starts the job, receives the result. At most 8 sources per query and 3 running queries per person. Results expire after 24 h.
+- `QueryRunService` — creates the run, picks the sources the SQL names in code (only allowed ones), decrypts their recipes, starts the job, receives the result. At most 8 sources per query and 3 running queries per person. Results expire after 24 h.
 - Routes: `GET data-query/catalog`, `GET|PUT data-query/settings`, `POST query-runs`, `GET query-runs`, `GET query-runs/:id`, `GET query-runs/:id/result`, `POST query-runs/:id/cancel`, and the job's `POST query-runs/:id/result`.
 - The callback route is the one public workspace route: the namespace hook lets `POST /query-runs/<uuid>/result` with an `X-Query-Run-Token` through, and the route compares the token's sha256 with the run's (constant time), then clears it. The job holds no `CLASSIFYRE_INTERNAL_KEY`, like a notebook job.
 - Job mode `query` in `kubernetes-cli-job.service.ts`: the quick resource profile, `activeDeadlineSeconds = timeout + 60`, `backoffLimit 0`, optional `K8S_CLI_QUERY_JOB_PRIORITY_CLASS` and `K8S_CLI_QUERY_JOB_MEMORY`.
 
 ### 5.5 The web app
 
-- **SQL page** (`/<ws>/query`, sidebar "SQL"): the catalog on the left (sources → tables → columns, play mark = can query, lock = cannot, a reason when DuckDB cannot read it, "Only what I can query", filter), the editor and its result on the right.
+- **SQL page** (`/<ws>/query`, sidebar "SQL"): the catalog on the left (sources → tables → columns, play mark = can query, lock = cannot, a reason when it cannot be queried (unreadable, or locked for lack of a grant — R4), "Only what I can query", filter), the editor and its result on the right.
 - **Asset → Data tab**: shown for table-shaped assets; the editor starts with `SELECT * FROM <table> LIMIT 100`, "Open in SQL" carries the query over. People with `access.manage` (sign-in on) see **Who can query this table** and give a group the Data reader role on the table or its source.
-- **Settings → Export & Import**: the on/off switch and the limits, with who last changed them.
+- **Settings → Export & Import**: the limits, with who last changed them.
 - Libraries: Monaco (already in the app, served from the app's own copy) with its SQL grammar and a completion provider fed by the catalog; `@tanstack/react-table` v8 + `@tanstack/react-virtual` for the grid (sortable, only visible rows in the DOM); `apache-arrow` to decode; `sql-formatter` for Format.
 
 ### 5.6 Export and large tables
@@ -153,7 +153,7 @@ A table is `<source>.<schema>.<table>`, every part a plain lower-case identifier
 | CLI unit (`tests/test_query.py`) | The POC's bypass list and more (34 statements refused), analytics SQL accepted, joins across files, exact row cap, byte cap, timeout, refused table before attaching, engine errors reach the person, one marker line |
 | API unit | Names and locations per source type, collisions, mentioned sources, resource grants; route-access completeness (the callback is the one public workspace route) |
 | Dev stack | `lakehouse-lab`: Delta + Iceberg + Parquet/CSV in buckets, PostgreSQL joined with Delta, timeout, cancel, refusal, audit rows, latency |
-| Personas (next) | `scripts/dev/iam-personas.sh`: no grant (table absent from the catalog, query refused), table grant, source grant, setting off |
+| Personas (next) | `scripts/dev/iam-personas.sh`: no grant (table absent from the catalog, query refused), table grant, source grant |
 
 ## 9. As built
 

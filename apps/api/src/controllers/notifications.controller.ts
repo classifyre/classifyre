@@ -85,10 +85,7 @@ export class NotificationsController {
       throw new BadRequestException('Pick up to 50 groups.');
     }
     const principal = await this.identity.authenticate(request.raw);
-    const known = new Set(
-      (await this.identity.groupsOf(principal, true)).map((group) => group.id),
-    );
-    const unknown = groupIds.find((id) => !known.has(id));
+    const unknown = await this.identity.unknownGroupId(principal, groupIds);
     if (unknown) {
       throw new BadRequestException(`No group '${unknown}' in your tenant.`);
     }
