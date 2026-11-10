@@ -159,14 +159,18 @@ export default function LandingPage() {
     void loadStats();
   }, [load, loadStats]);
 
-  // Someone who has not signed in and finds nothing public is here to sign in.
+  // Someone who has not signed in and finds nothing public is here to sign
+  // in: head straight there instead of flashing "Nothing public yet" while
+  // the login page loads.
+  const redirectingToLogin =
+    visitor && namespaces !== null && namespaces.length === 0;
   React.useEffect(() => {
-    if (visitor && namespaces?.length === 0) {
+    if (redirectingToLogin) {
       window.location.assign(
         `/auth/login/?returnTo=${encodeURIComponent(window.location.pathname)}`,
       );
     }
-  }, [visitor, namespaces]);
+  }, [redirectingToLogin]);
 
   const confirmDelete = async () => {
     if (!pendingDelete) return;
@@ -237,7 +241,13 @@ export default function LandingPage() {
         className="mx-auto max-w-6xl px-5 py-10 sm:px-8 sm:py-14"
         data-testid="workspace-directory"
         data-app-state={
-          namespaces !== null ? "ready" : error ? "error" : "loading"
+          redirectingToLogin
+            ? "loading"
+            : namespaces !== null
+              ? "ready"
+              : error
+                ? "error"
+                : "loading"
         }
       >
         <div className="mb-9 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
@@ -285,7 +295,7 @@ export default function LandingPage() {
           </Card>
         )}
 
-        {namespaces === null ? (
+        {namespaces === null || redirectingToLogin ? (
           <div
             className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3"
             aria-label={t("workspaces.loading")}
