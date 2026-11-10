@@ -7255,7 +7255,25 @@
     "empty": "Noch keine Änderungen erfasst.",
     "loadMore": "Mehr laden",
     "activityTitle": "Aktivität",
-    "activityDescription": "Jede Änderung in diesem Arbeitsbereich, aus der Web-App, der API oder von Agenten über MCP. Lesezugriffe werden nicht erfasst."
+    "activityDescription": "Jede Änderung in diesem Arbeitsbereich, aus der Web-App, der API oder von Agenten über MCP. Lesezugriffe werden nicht erfasst.",
+    "table": {
+      "when": "Wann",
+      "who": "Wer",
+      "what": "Was",
+      "where": "Wo",
+      "fields": "Felder",
+      "channel": "Kanal",
+      "search": "Aktivität filtern …",
+      "capability": "Fähigkeit",
+      "allCapabilities": "Alle Fähigkeiten",
+      "allChannels": "Alle Kanäle",
+      "allActors": "Alle Akteure",
+      "rest": "Web & API",
+      "mcp": "MCP",
+      "empty": "Keine Änderungen für diese Filter.",
+      "rangeOf": "von {{total}}",
+      "thisWorkspace": "Dieser Arbeitsbereich"
+    }
   },
   "account": {
     "menu": "Konto",
@@ -7287,13 +7305,39 @@
     "role": "Rolle",
     "untilOptional": "Bis (optional)",
     "add": "Zugriff gewähren",
-    "whyTitle": "Warum darf ich …?",
+    "whyTitle": "Was ich darf",
+    "whyDescription": "Jede Fähigkeit, die Sie hier haben, mit Gruppe, Rolle und Bereich, der sie gibt. Jede Spalte ist sortierbar.",
     "pickCapability": "Etwas wählen, das Sie dürfen",
     "becauseOf": "{{subject}} als {{role}} auf {{scope}}",
+    "canDo": {
+      "capability": "Fähigkeit",
+      "group": "Gruppe",
+      "role": "Rolle",
+      "tenant": "Mandant",
+      "scope": "Bereich",
+      "via": "Über",
+      "empty": "Nichts erklärt diese Fähigkeit bisher.",
+      "none": "Sie haben hier noch nichts."
+    },
+    "grantsTable": {
+      "group": "Gruppe",
+      "role": "Rolle",
+      "scope": "Bereich",
+      "until": "Bis",
+      "origin": "Herkunft",
+      "here": "Dieser Arbeitsbereich",
+      "actions": "Aktionen"
+    },
+    "giveAccessTitle": "Zugriff gewähren",
+    "giveAccessDescription": "Einer Gruppe eine Rolle in diesem Arbeitsbereich geben, optional bis zu einem Datum. Sie können nur Rollen geben, deren Fähigkeiten Sie hier alle haben.",
+    "cancel": "Abbrechen",
     "allWorkspaces": "Alle Arbeitsbereiche",
     "tenantTitle": "Mandant",
     "tenantDenied": "Nur Mandanten-Admins verwalten den Zugriff für den ganzen Mandanten.",
     "tenantGrants": "Zugriff im ganzen Mandanten",
+    "tenantGrantsGrouped": "Nach Gruppe",
+    "tenantGrantsUngrouped": "Alle Freigaben",
+    "removedGroupId": "Entfernte Gruppe {{id}}",
     "scope": "Gilt für",
     "scopes": {
       "tenant": "Den ganzen Mandanten",
@@ -7309,7 +7353,15 @@
     },
     "peopleElsewhere": "Personen und Gruppen werden im Identitätsserver verwaltet oder im Firmenverzeichnis dahinter. Die Freigaben hier legen fest, was sie in Classifyre dürfen; eine umbenannte Gruppe behält ihre Freigaben, eine entfernte wird als entfernt angezeigt.",
     "managePeople": "Personen und Gruppen verwalten",
-    "peopleByOperators": "Bitten Sie einen Betreiber dieser Installation, Personen hinzuzufügen oder Gruppen zu ändern."
+    "peopleByOperators": "Bitten Sie einen Betreiber dieser Installation, Personen hinzuzufügen oder Gruppen zu ändern.",
+    "tenantActivity": {
+      "description": "Freigaben, erstellte oder gelöschte Arbeitsbereiche im ganzen Mandanten. Jede Spalte ist sortierbar, nach Aktion, Akteur oder freiem Text filterbar.",
+      "action": "Aktion",
+      "empty": "Noch keine Aktivität.",
+      "noMatch": "Keine Aktivität für diese Filter.",
+      "search": "Aktivität filtern …",
+      "allActions": "Alle Aktionen"
+    }
   },
   "platform": {
     "title": "Plattform",
@@ -7453,6 +7505,8 @@
     "loadFailed": "Konnte nicht laden, wer Benachrichtigungen erhält",
     "notForYou": "Benachrichtigungen gehen an die Gruppen eines Arbeitsbereichs. Melden Sie sich an, um die an Ihre Gruppen zu erhalten.",
     "removedGroup": "Entfernte Gruppe",
+    "groups": "Gruppen",
+    "members": "{{count}} Mitglieder",
     "types": {
       "SCAN": "Scans",
       "FINDING": "Funde",

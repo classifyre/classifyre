@@ -422,25 +422,74 @@ export class TenancyService implements OnModuleDestroy {
     );
   }
 
-  async tenantEvents(tenantId: string, limit = 100) {
-    const { rows } = await this.pool.query<{
-      id: string;
-      occurred_at: Date;
-      actor: string | null;
-      action: string;
-      detail: Record<string, unknown>;
-    }>(
-      `SELECT id, occurred_at, actor, action, detail FROM iam_audit_events
-        WHERE tenant_id = $1 ORDER BY occurred_at DESC LIMIT $2`,
-      [tenantId, Math.min(Math.max(limit, 1), 500)],
-    );
-    return rows.map((row) => ({
-      id: row.id,
-      occurredAt: row.occurred_at,
-      actor: row.actor,
-      action: row.action,
-      detail: row.detail,
-    }));
+  async tenantEvents(
+    tenantId: string,
+    query: {
+      action?: string;
+      actor?: string;
+      search?: string;
+      skip?: number;
+      limit?: number;
+      sortBy?: 'OCCURRED_AT' | 'ACTOR' | 'ACTION';
+      sortOrder?: 'ASC' | 'DESC';
+    } = {},
+  ) {
+    const needle = query.search?.trim() ?? '';
+    const conditions: string[] = ['tenant_id = $1'];
+    const params: unknown[] = [tenantId];
+    const push = (sql: string, value: unknown) => {
+      params.push(value);
+      conditions.push(sql.replace('$?', `$${params.length}`));
+    };
+    if (query.action) push('action = $?', query.action);
+    if (query.actor) push('actor = $?', query.actor);
+    if (needle) {
+      params.push(`%${needle}%`);
+      const like = `$${params.length}`;
+      conditions.push(
+        `(action ILIKE ${like} OR actor ILIKE ${like} OR detail::text ILIKE ${like})`,
+      );
+    }
+    const where = conditions.join(' AND ');
+    const sortDir = query.sortOrder === 'ASC' ? 'ASC' : 'DESC';
+    const sortCol =
+      query.sortBy === 'ACTOR'
+        ? 'actor'
+        : query.sortBy === 'ACTION'
+          ? 'action'
+          : 'occurred_at';
+    const skip = Math.max(query.skip ?? 0, 0);
+    const limit = Math.min(Math.max(query.limit ?? 100, 1), 500);
+    const [{ rows }, { rows: counted }] = await Promise.all([
+      this.pool.query<{
+        id: string;
+        occurred_at: Date;
+        actor: string | null;
+        action: string;
+        detail: Record<string, unknown>;
+      }>(
+        `SELECT id, occurred_at, actor, action, detail FROM iam_audit_events
+          WHERE ${where} ORDER BY ${sortCol} ${sortDir}, occurred_at DESC, id DESC
+          OFFSET $${params.length + 1} LIMIT $${params.length + 2}`,
+        [...params, skip, limit],
+      ),
+      this.pool.query<{ count: string }>(
+        `SELECT count(*)::text AS count FROM iam_audit_events WHERE ${where}`,
+        params,
+      ),
+    ]);
+    return {
+      items: rows.map((row) => ({
+        id: row.id,
+        occurredAt: row.occurred_at,
+        actor: row.actor,
+        action: row.action,
+        detail: row.detail,
+      })),
+      total: Number(counted[0]?.count ?? 0),
+      skip,
+      limit,
+    };
   }
 
   /**

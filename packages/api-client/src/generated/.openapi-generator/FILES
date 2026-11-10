@@ -63,6 +63,7 @@ docs/AssistantControllerRespondRequestMessagesInner.md
 docs/AttachFindingsDto.md
 docs/AttachFindingsResponseDto.md
 docs/AuditEventDto.md
+docs/AuditEventsResponseDto.md
 docs/AutopilotApi.md
 docs/AutopilotStatsDto.md
 docs/BoardEndpointDto.md
@@ -547,6 +548,7 @@ docs/SupervisorStateDto.md
 docs/TenantAdminDto.md
 docs/TenantDto.md
 docs/TenantEventDto.md
+docs/TenantEventsResponseDto.md
 docs/TenantGroupDto.md
 docs/TenantMembershipDto.md
 docs/TestConnectionResponseDto.md
@@ -710,6 +712,7 @@ src/models/AssistantControllerRespondRequestMessagesInner.ts
 src/models/AttachFindingsDto.ts
 src/models/AttachFindingsResponseDto.ts
 src/models/AuditEventDto.ts
+src/models/AuditEventsResponseDto.ts
 src/models/AutopilotStatsDto.ts
 src/models/BoardEndpointDto.ts
 src/models/BoardItemDto.ts
@@ -1164,6 +1167,7 @@ src/models/SupervisorStateDto.ts
 src/models/TenantAdminDto.ts
 src/models/TenantDto.ts
 src/models/TenantEventDto.ts
+src/models/TenantEventsResponseDto.ts
 src/models/TenantGroupDto.ts
 src/models/TenantMembershipDto.ts
 src/models/TestConnectionResponseDto.ts

@@ -1,4 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import { CAPABILITY_IDS } from './capabilities';
 import type { GrantScopeType } from './tenancy.service';
 
@@ -189,4 +191,84 @@ export class TenantEventDto {
 
   @ApiProperty({ type: Object })
   detail: Record<string, unknown>;
+}
+
+export enum TenantEventSortBy {
+  OCCURRED_AT = 'OCCURRED_AT',
+  ACTOR = 'ACTOR',
+  ACTION = 'ACTION',
+}
+
+export enum TenantEventSortOrder {
+  ASC = 'ASC',
+  DESC = 'DESC',
+}
+
+/** Tenant-level activity paging: filters and offset pages like the workspace trail. */
+export class QueryTenantEventsDto {
+  @ApiPropertyOptional({ example: 'grant.added' })
+  @IsOptional()
+  @IsString()
+  action?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Actor reference; resolve display names with GET /tenant/actors/resolve.',
+  })
+  @IsOptional()
+  @IsString()
+  actor?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Free text over the action and its detail (group path, address, workspace slug).',
+  })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @ApiPropertyOptional({ default: 0 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  skip?: number = 0;
+
+  @ApiPropertyOptional({ default: 100 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(500)
+  limit?: number = 100;
+
+  @ApiPropertyOptional({
+    enum: TenantEventSortBy,
+    default: TenantEventSortBy.OCCURRED_AT,
+  })
+  @IsOptional()
+  @IsIn(Object.values(TenantEventSortBy))
+  sortBy?: TenantEventSortBy = TenantEventSortBy.OCCURRED_AT;
+
+  @ApiPropertyOptional({
+    enum: TenantEventSortOrder,
+    default: TenantEventSortOrder.DESC,
+  })
+  @IsOptional()
+  @IsIn(Object.values(TenantEventSortOrder))
+  sortOrder?: TenantEventSortOrder = TenantEventSortOrder.DESC;
+}
+
+export class TenantEventsResponseDto {
+  @ApiProperty({ type: [TenantEventDto] })
+  items: TenantEventDto[];
+
+  @ApiProperty()
+  total: number;
+
+  @ApiProperty()
+  skip: number;
+
+  @ApiProperty()
+  limit: number;
 }

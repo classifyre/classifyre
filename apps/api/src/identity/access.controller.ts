@@ -23,9 +23,12 @@ import { Requires } from './access.decorators';
 import {
   CreateGrantDto,
   GrantDto,
+  QueryTenantEventsDto,
   RoleDto,
   TenantDto,
-  TenantEventDto,
+  TenantEventsResponseDto,
+  TenantEventSortBy,
+  TenantEventSortOrder,
   TenantGroupDto,
   TenantMembershipDto,
 } from './access.dto';
@@ -290,10 +293,43 @@ export class TenantAccessController {
   @ApiOperation({
     summary: 'Tenant-level changes: grants, workspaces created or deleted',
   })
-  @ApiOkResponse({ type: [TenantEventDto] })
-  async events(@Req() request: FastifyRequest): Promise<TenantEventDto[]> {
+  @ApiQuery({ name: 'action', required: false })
+  @ApiQuery({ name: 'actor', required: false })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'skip', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'sortBy', required: false, enum: TenantEventSortBy })
+  @ApiQuery({ name: 'sortOrder', required: false, enum: TenantEventSortOrder })
+  @ApiOkResponse({ type: TenantEventsResponseDto })
+  async events(
+    @Req() request: FastifyRequest,
+    @Query('action') action?: string,
+    @Query('actor') actor?: string,
+    @Query('search') search?: string,
+    @Query('skip') skip?: string,
+    @Query('limit') limit?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: string,
+  ): Promise<TenantEventsResponseDto> {
     const principal = await this.principal(request);
-    return this.access.tenantEvents(principal);
+    const dto: QueryTenantEventsDto = {
+      action,
+      actor,
+      search,
+      skip: skip ? Number(skip) : undefined,
+      limit: limit ? Number(limit) : undefined,
+      sortBy: (Object.values(TenantEventSortBy) as string[]).includes(
+        sortBy ?? '',
+      )
+        ? (sortBy as TenantEventSortBy)
+        : undefined,
+      sortOrder: (Object.values(TenantEventSortOrder) as string[]).includes(
+        sortOrder ?? '',
+      )
+        ? (sortOrder as TenantEventSortOrder)
+        : undefined,
+    };
+    return this.access.tenantEvents(principal, dto);
   }
 
   @Get('tenants')

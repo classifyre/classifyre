@@ -46,6 +46,7 @@ import { FeatureSwitchesCard } from "@/components/maintenance/feature-switches-c
 import { PauseWorkspaceCard } from "@/components/namespace/pause-workspace-card";
 import { WorkerQueuesCard } from "@/components/worker-queues-card";
 
+import { useNamespace } from "@/components/namespace-provider";
 import { useTranslation } from "@/hooks/use-translation";
 import { AuditEventList } from "@/components/audit-history";
 import { WorkspaceAccessCard } from "@/components/access/workspace-access-card";
@@ -119,6 +120,7 @@ const TAB_TRIGGER_CLASS =
 
 export default function SettingsPage() {
   const { t } = useTranslation();
+  const { slug } = useNamespace();
   const canSeeAccess = useCan("access.view");
   const { settings, loading, saving, error, updateSettings } =
     useInstanceSettings();
@@ -463,7 +465,7 @@ export default function SettingsPage() {
               <p className="text-xs text-muted-foreground">
                 {t("audit.activityDescription")}
               </p>
-              <AuditEventList filter={{}} showEntity />
+              <AuditEventList filter={{}} showEntity workspaceSlug={slug} />
             </CardContent>
           </Card>
         </TabsContent>

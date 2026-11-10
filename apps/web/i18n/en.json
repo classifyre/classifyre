@@ -7255,7 +7255,25 @@
     "empty": "No changes recorded yet.",
     "loadMore": "Load more",
     "activityTitle": "Activity",
-    "activityDescription": "Every change made in this workspace, from the web app, the API or agents through MCP. Reads are not recorded."
+    "activityDescription": "Every change made in this workspace, from the web app, the API or agents through MCP. Reads are not recorded.",
+    "table": {
+      "when": "When",
+      "who": "Who",
+      "what": "What",
+      "where": "Where",
+      "fields": "Fields",
+      "channel": "Channel",
+      "search": "Filter activity…",
+      "capability": "Capability",
+      "allCapabilities": "All capabilities",
+      "allChannels": "All channels",
+      "allActors": "All actors",
+      "rest": "Web & API",
+      "mcp": "MCP",
+      "empty": "No changes match these filters.",
+      "rangeOf": "of {{total}}",
+      "thisWorkspace": "This workspace"
+    }
   },
   "account": {
     "menu": "Account",
@@ -7287,13 +7305,39 @@
     "role": "Role",
     "untilOptional": "Until (optional)",
     "add": "Give access",
-    "whyTitle": "Why can I…?",
+    "whyTitle": "What I can do",
+    "whyDescription": "Every capability you hold here, with the group, role and scope that gives it. Sort any column.",
     "pickCapability": "Choose something you can do",
     "becauseOf": "{{subject}} as {{role}} on {{scope}}",
+    "canDo": {
+      "capability": "Capability",
+      "group": "Group",
+      "role": "Role",
+      "tenant": "Tenant",
+      "scope": "Scope",
+      "via": "Via",
+      "empty": "Nothing explains that capability yet.",
+      "none": "You hold nothing here yet."
+    },
+    "grantsTable": {
+      "group": "Group",
+      "role": "Role",
+      "scope": "Scope",
+      "until": "Until",
+      "origin": "Origin",
+      "here": "This workspace",
+      "actions": "Actions"
+    },
+    "giveAccessTitle": "Give access",
+    "giveAccessDescription": "Give a group a role on this workspace, optionally until a date. You can only give roles whose capabilities you all hold here.",
+    "cancel": "Cancel",
     "allWorkspaces": "All workspaces",
     "tenantTitle": "Tenant",
     "tenantDenied": "Only tenant admins can manage access for the whole tenant.",
     "tenantGrants": "Access across the tenant",
+    "tenantGrantsGrouped": "Grouped by group",
+    "tenantGrantsUngrouped": "All grants",
+    "removedGroupId": "Removed group {{id}}",
     "scope": "Applies to",
     "scopes": {
       "tenant": "The whole tenant",
@@ -7309,7 +7353,15 @@
     },
     "peopleElsewhere": "People and groups are managed in the identity server, or the company directory behind it. Grants here decide what they may do in Classifyre; a renamed group keeps its grants, a removed one shows as removed.",
     "managePeople": "Manage people and groups",
-    "peopleByOperators": "Ask an operator of this installation to add people or change groups."
+    "peopleByOperators": "Ask an operator of this installation to add people or change groups.",
+    "tenantActivity": {
+      "description": "Grants, workspaces created or deleted across the tenant. Sort any column, filter by action, actor or free text.",
+      "action": "Action",
+      "empty": "No activity yet.",
+      "noMatch": "No activity matches these filters.",
+      "search": "Filter activity…",
+      "allActions": "All actions"
+    }
   },
   "platform": {
     "title": "Platform",
@@ -7453,6 +7505,8 @@
     "loadFailed": "Could not load who gets notifications",
     "notForYou": "Notifications go to the groups of a workspace. Sign in to get the ones sent to yours.",
     "removedGroup": "Removed group",
+    "groups": "Groups",
+    "members": "{{count}} members",
     "types": {
       "SCAN": "Scans",
       "FINDING": "Findings",

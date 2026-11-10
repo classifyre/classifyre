@@ -20,13 +20,47 @@ const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
  * and that parameter's value. `/cases/:id/evidence/:evidenceId` with id `c1`
  * is entity `cases` / `c1`; `POST /sources` is `sources`, with the id taken
  * from the created object.
+ *
+ * Access policy changes are the exception: `POST /access/grants`,
+ * `DELETE /access/grants/:id` and `PUT /notifications/audiences/:type`
+ * change *this workspace's* access, so they file under the caller workspace
+ * (`entityType: 'workspaces'`), with the grant id / audience type as the
+ * entity id — otherwise the workspace activity shows a bare `access/grants`
+ * or `notifications/audiences` where-clause that links nowhere and explains
+ * nothing.
  */
 export function routeEntity(
   routePath: string,
   params: Record<string, string | undefined>,
   responseBody: unknown,
+  workspaceId?: string | null,
 ): { entityType: string | null; entityId: string | null } {
   const segments = routePath.split('/').filter(Boolean);
+  if (
+    segments[0] === 'access' &&
+    segments[1] === 'grants' &&
+    workspaceId
+  ) {
+    if (routePath.includes(':id')) {
+      const value = params[segments[segments.indexOf(':id')].slice(1)];
+      return { entityType: 'workspaces', entityId: value ?? workspaceId };
+    }
+    const createdId =
+      responseBody &&
+      typeof responseBody === 'object' &&
+      typeof (responseBody as { id?: unknown }).id === 'string'
+        ? (responseBody as { id: string }).id
+        : null;
+    return { entityType: 'workspaces', entityId: createdId ?? workspaceId };
+  }
+  if (
+    segments[0] === 'notifications' &&
+    segments[1] === 'audiences' &&
+    workspaceId
+  ) {
+    const value = params[segments[segments.indexOf(':type')].slice(1)];
+    return { entityType: 'workspaces', entityId: value ?? workspaceId };
+  }
   const paramAt = segments.findIndex((segment) => segment.startsWith(':'));
   const staticPart = (
     paramAt === -1 ? segments : segments.slice(0, paramAt)
@@ -92,7 +126,12 @@ export class AuditInterceptor implements NestInterceptor {
           channel: 'rest',
           capability: access.capability,
           operation: `${request.method.toUpperCase()} ${routePath}`,
-          ...routeEntity(routePath, request.params ?? {}, responseBody),
+          ...routeEntity(
+            routePath,
+            request.params ?? {},
+            responseBody,
+            this.audit.workspaceId(),
+          ),
           fields: inputFields(request.body),
           status,
         });

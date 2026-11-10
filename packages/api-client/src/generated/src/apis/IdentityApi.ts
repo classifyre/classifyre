@@ -15,13 +15,13 @@
 
 import * as runtime from '../runtime';
 import type {
-  AuditEventDto,
+  AuditEventsResponseDto,
   MeResponseDto,
   ResolvedActorDto,
 } from '../models/index';
 import {
-    AuditEventDtoFromJSON,
-    AuditEventDtoToJSON,
+    AuditEventsResponseDtoFromJSON,
+    AuditEventsResponseDtoToJSON,
     MeResponseDtoFromJSON,
     MeResponseDtoToJSON,
     ResolvedActorDtoFromJSON,
@@ -32,8 +32,14 @@ export interface AuditControllerListRequest {
     entityType?: string;
     entityId?: string;
     actor?: string;
+    capability?: string;
+    operation?: string;
+    search?: string;
     before?: string;
     limit?: number;
+    skip?: number;
+    sortBy?: AuditControllerListSortByEnum;
+    sortOrder?: AuditControllerListSortOrderEnum;
 }
 
 export interface AuditControllerResolveRequest {
@@ -46,10 +52,10 @@ export interface AuditControllerResolveRequest {
 export class IdentityApi extends runtime.BaseAPI {
 
     /**
-     * Filter by entity (e.g. entityType=sources&entityId=…) or by actor reference. Page with `before`, the id of the last event received.
+     * Filter by entity (e.g. entityType=sources&entityId=…), actor, capability, operation or free text. Sort any column; page with `skip`/`limit` or, for \"load more\", with `before`, the id of the last event received.
      * Changes made in this workspace, newest first
      */
-    async auditControllerListRaw(requestParameters: AuditControllerListRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<AuditEventDto>>> {
+    async auditControllerListRaw(requestParameters: AuditControllerListRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AuditEventsResponseDto>> {
         const queryParameters: any = {};
 
         if (requestParameters['entityType'] != null) {
@@ -64,12 +70,36 @@ export class IdentityApi extends runtime.BaseAPI {
             queryParameters['actor'] = requestParameters['actor'];
         }
 
+        if (requestParameters['capability'] != null) {
+            queryParameters['capability'] = requestParameters['capability'];
+        }
+
+        if (requestParameters['operation'] != null) {
+            queryParameters['operation'] = requestParameters['operation'];
+        }
+
+        if (requestParameters['search'] != null) {
+            queryParameters['search'] = requestParameters['search'];
+        }
+
         if (requestParameters['before'] != null) {
             queryParameters['before'] = requestParameters['before'];
         }
 
         if (requestParameters['limit'] != null) {
             queryParameters['limit'] = requestParameters['limit'];
+        }
+
+        if (requestParameters['skip'] != null) {
+            queryParameters['skip'] = requestParameters['skip'];
+        }
+
+        if (requestParameters['sortBy'] != null) {
+            queryParameters['sortBy'] = requestParameters['sortBy'];
+        }
+
+        if (requestParameters['sortOrder'] != null) {
+            queryParameters['sortOrder'] = requestParameters['sortOrder'];
         }
 
         const headerParameters: runtime.HTTPHeaders = {};
@@ -84,14 +114,14 @@ export class IdentityApi extends runtime.BaseAPI {
             query: queryParameters,
         }, initOverrides);
 
-        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(AuditEventDtoFromJSON));
+        return new runtime.JSONApiResponse(response, (jsonValue) => AuditEventsResponseDtoFromJSON(jsonValue));
     }
 
     /**
-     * Filter by entity (e.g. entityType=sources&entityId=…) or by actor reference. Page with `before`, the id of the last event received.
+     * Filter by entity (e.g. entityType=sources&entityId=…), actor, capability, operation or free text. Sort any column; page with `skip`/`limit` or, for \"load more\", with `before`, the id of the last event received.
      * Changes made in this workspace, newest first
      */
-    async auditControllerList(requestParameters: AuditControllerListRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<AuditEventDto>> {
+    async auditControllerList(requestParameters: AuditControllerListRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AuditEventsResponseDto> {
         const response = await this.auditControllerListRaw(requestParameters, initOverrides);
         return await response.value();
     }
@@ -168,3 +198,23 @@ export class IdentityApi extends runtime.BaseAPI {
     }
 
 }
+
+/**
+ * @export
+ */
+export const AuditControllerListSortByEnum = {
+    OccurredAt: 'OCCURRED_AT',
+    Actor: 'ACTOR',
+    Operation: 'OPERATION',
+    EntityType: 'ENTITY_TYPE',
+    Capability: 'CAPABILITY'
+} as const;
+export type AuditControllerListSortByEnum = typeof AuditControllerListSortByEnum[keyof typeof AuditControllerListSortByEnum];
+/**
+ * @export
+ */
+export const AuditControllerListSortOrderEnum = {
+    Asc: 'ASC',
+    Desc: 'DESC'
+} as const;
+export type AuditControllerListSortOrderEnum = typeof AuditControllerListSortOrderEnum[keyof typeof AuditControllerListSortOrderEnum];

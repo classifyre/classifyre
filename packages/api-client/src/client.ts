@@ -370,6 +370,7 @@ export type {
   ExploreViewDto,
   SaveExploreViewDto,
   AuditEventDto,
+  AuditEventsResponseDto,
   ResolvedActorDto,
   MeResponseDto,
   MeActorDto,
@@ -387,6 +388,7 @@ export type {
   TenantDto,
   TenantMembershipDto,
   TenantEventDto,
+  TenantEventsResponseDto,
   TenantGroupDto,
   NotificationAudienceDto,
   UpdateNotificationAudienceDto,
@@ -725,6 +727,44 @@ export const SearchSourcesSortOrderEnum = {
 } as const;
 export type SearchSourcesSortOrder =
   (typeof SearchSourcesSortOrderEnum)[keyof typeof SearchSourcesSortOrderEnum];
+
+export const AuditControllerListSortByEnum = {
+  OccurredAt: "OCCURRED_AT",
+  Actor: "ACTOR",
+  Operation: "OPERATION",
+  EntityType: "ENTITY_TYPE",
+  Capability: "CAPABILITY",
+} as const;
+export type AuditControllerListSortByEnum =
+  (typeof AuditControllerListSortByEnum)[keyof typeof AuditControllerListSortByEnum];
+
+export const AuditControllerListSortOrderEnum = {
+  Asc: "ASC",
+  Desc: "DESC",
+} as const;export type AuditControllerListSortOrderEnum =
+  (typeof AuditControllerListSortOrderEnum)[keyof typeof AuditControllerListSortOrderEnum];
+
+export const TenantAccessControllerEventsSortByEnum = {
+  OccurredAt: "OCCURRED_AT",
+  Actor: "ACTOR",
+  Action: "ACTION",
+} as const;
+export type TenantAccessControllerEventsSortByEnum =
+  (typeof TenantAccessControllerEventsSortByEnum)[keyof typeof TenantAccessControllerEventsSortByEnum];
+
+export const TenantAccessControllerEventsSortOrderEnum = {
+  Asc: "ASC",
+  Desc: "DESC",
+} as const;
+export type TenantAccessControllerEventsSortOrderEnum =
+  (typeof TenantAccessControllerEventsSortOrderEnum)[keyof typeof TenantAccessControllerEventsSortOrderEnum];
+
+export const AuditEventDtoChannelEnum = {
+  Rest: "rest",
+  Mcp: "mcp",
+} as const;
+export type AuditEventDtoChannelEnum =
+  (typeof AuditEventDtoChannelEnum)[keyof typeof AuditEventDtoChannelEnum];
 
 export type SearchAssetsPageInputDto = GeneratedSearchAssetsPageDto & {
   sortBy?: SearchAssetsSortBy;

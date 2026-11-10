@@ -61,6 +61,31 @@ describe('routeEntity', () => {
       entityId: null,
     });
   });
+
+  it('files access grants under the workspace, not access/grants', () => {
+    expect(
+      routeEntity(
+        '/access/grants',
+        {},
+        { id: 'g-1', scopeId: 'ws-1' },
+        'ws-1',
+      ),
+    ).toEqual({ entityType: 'workspaces', entityId: 'g-1' });
+    expect(
+      routeEntity('/access/grants/:id', { id: 'g-1' }, {}, 'ws-1'),
+    ).toEqual({ entityType: 'workspaces', entityId: 'g-1' });
+  });
+
+  it('files notification audience changes under the workspace', () => {
+    expect(
+      routeEntity(
+        '/notifications/audiences/:type',
+        { type: 'SCAN' },
+        {},
+        'ws-1',
+      ),
+    ).toEqual({ entityType: 'workspaces', entityId: 'SCAN' });
+  });
 });
 
 describe('mcpToolEntity', () => {
@@ -102,6 +127,7 @@ describe('AuditInterceptor', () => {
   const recorded: AuditEventInput[] = [];
   const audit = {
     inWorkspace: () => true,
+    workspaceId: () => 'ws-1',
     record: (event: AuditEventInput) => {
       recorded.push(event);
       return Promise.resolve();
