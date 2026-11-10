@@ -45,7 +45,7 @@ import {
 } from "@workspace/ui/components/table";
 import { ActorChip } from "@/components/actor-chip";
 import { useTranslation } from "@/hooks/use-translation";
-import { useLocalePath } from "@/lib/app-path";
+import { useLocale } from "@/lib/app-path";
 import { formatDate, formatRelative } from "@/lib/date";
 
 export interface AuditFilter {
@@ -224,7 +224,9 @@ export function AuditEventTable({
   workspaces?: Namespace[];
 }) {
   const { t } = useTranslation();
-  const localePath = useLocalePath();
+  const locale = useLocale();
+  const localePath = (path: string) =>
+    locale === "en" ? path : `/${locale}${path}`;
   const {
     events,
     total,
@@ -456,7 +458,9 @@ function WhereCell({
   workspaceSlug?: string;
   workspaces?: Namespace[];
 }) {
-  const localePath = useLocalePath();
+  const locale = useLocale();
+  const localePath = (path: string) =>
+    locale === "en" ? path : `/${locale}${path}`;
   const { t } = useTranslation();
   const entityType = event.entityType ?? "";
   const entityId = event.entityId ?? "";

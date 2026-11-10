@@ -65,7 +65,7 @@ import {
 import { ActorChip } from "@/components/actor-chip";
 import { useIamConsole } from "@/components/iam-session";
 import { useTranslation } from "@/hooks/use-translation";
-import { useLocalePath } from "@/lib/app-path";
+import { useLocale } from "@/lib/app-path";
 import { formatDate, formatRelative } from "@/lib/date";
 import { extractApiErrorMessage } from "@/lib/extract-api-error-message";
 
@@ -503,7 +503,9 @@ function TenantActivityTable({
   workspaces: Namespace[];
 }) {
   const { t } = useTranslation();
-  const localePath = useLocalePath();
+  const locale = useLocale();
+  const localePath = (path: string) =>
+    locale === "en" ? path : `/${locale}${path}`;
   const [events, setEvents] = React.useState<TenantEventDto[]>([]);
   const [total, setTotal] = React.useState(0);
   const [loading, setLoading] = React.useState(false);
