@@ -98,9 +98,19 @@ export function QueryWorkbench({
 
   React.useImperativeHandle(ref, () => ({
     insert: (text) =>
-      setSql((current) =>
-        current.trim() ? `${current.replace(/\s+$/, "")} ${text}` : text,
-      ),
+      setSql((current) => {
+        if (!current.trim()) return text;
+        // A catalog click appends a table name: replace a trailing `LIMIT n`
+        // (the starter every editor ships with) instead of appending after
+        // it — `LIMIT 100 my.table` is not valid SQL, whatever separates the
+        // two. A trailing comma keeps its list (`SELECT a,` + table); anything
+        // else starts a new line so the name lands where a table belongs.
+        const stripped = current.replace(/\s+$/, "");
+        const withoutLimit = stripped.replace(/\s+LIMIT\s+\d+\s*$/i, "");
+        if (withoutLimit !== stripped) return `${withoutLimit}\n${text}`;
+        const separator = stripped.endsWith(",") ? " " : "\n";
+        return `${stripped}${separator}${text}`;
+      }),
     setSql,
   }));
 
