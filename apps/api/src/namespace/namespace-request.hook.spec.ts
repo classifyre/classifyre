@@ -1,4 +1,5 @@
 import {
+  authorizeWorkspaceRequest,
   databaseLaneForRequest,
   namespaceRewriteUrl,
 } from './namespace-request.hook';
@@ -32,6 +33,83 @@ describe('namespaceRewriteUrl', () => {
     const request = { url: '/acme/sources?limit=10' } as any;
     expect(namespaceRewriteUrl(request)).toBe('/sources?limit=10');
     expect(request.classifyreSlug).toBe('acme');
+  });
+});
+
+describe('authorizeWorkspaceRequest visitor shape (H7)', () => {
+  const visitor = {
+    visitor: true as const,
+    tenant: { id: 't-first' },
+    actor: { kind: 'visitor', ref: undefined, id: null },
+    groupIds: new Set<string>(),
+    grants: [],
+  };
+  const member = {
+    tenant: { id: 't-first' },
+    actor: { kind: 'person', ref: 'user:u1', id: 'user:u1' },
+    groupIds: new Set<string>(['g1']),
+    grants: [],
+    via: 'bearer' as const,
+  };
+  const ns = { namespaceId: 'ws-1', slug: 'ws-1', schemaName: 'ns_ws_1' };
+
+  async function authorize(
+    principal: unknown,
+    capabilities: Set<string> | null,
+  ) {
+    const identity = {
+      authenticate: jest.fn(() => Promise.resolve(principal)),
+      capabilitiesIn: jest.fn(() => Promise.resolve(capabilities)),
+      groupLineage: jest.fn(() => Promise.resolve([])),
+      config: { appOrigin: 'https://app.example' },
+    };
+    const cls = { set: jest.fn() };
+    const sent: { code: number; body: unknown }[] = [];
+    const reply = {
+      code: (code: number) => ({
+        send: (body: unknown) => {
+          sent.push({ code, body });
+        },
+      }),
+    };
+    const request = { raw: {}, url: '/sources', method: 'GET', headers: {} };
+    const internalApiKey = { isInternalRequest: () => false };
+    const ok = await authorizeWorkspaceRequest(
+      identity as any,
+      cls as any,
+      request as any,
+      reply,
+      ns,
+      internalApiKey as any,
+    );
+    return { ok, sent };
+  }
+
+  it('answers 404 to a visitor probing another tenant', async () => {
+    const { ok, sent } = await authorize(visitor, null);
+    expect(ok).toBe(false);
+    expect(sent).toHaveLength(1);
+    expect(sent[0].code).toBe(404);
+  });
+
+  it('asks a visitor to sign in for their own tenant’s private workspace', async () => {
+    const { ok, sent } = await authorize(visitor, new Set());
+    expect(ok).toBe(false);
+    expect(sent).toHaveLength(1);
+    expect(sent[0].code).toBe(401);
+  });
+
+  it('answers 404 to a signed-in member without access', async () => {
+    const { ok, sent } = await authorize(member, new Set());
+    expect(ok).toBe(false);
+    expect(sent).toHaveLength(1);
+    expect(sent[0].code).toBe(404);
+  });
+
+  it('lets a visitor into a public workspace', async () => {
+    const { ok, sent } = await authorize(visitor, new Set(['workspace.view']));
+    expect(ok).toBe(true);
+    expect(sent).toHaveLength(0);
   });
 });
 

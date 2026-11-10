@@ -88,11 +88,17 @@ export interface Grant extends GrantScope {
   expiresAt: Date | null;
 }
 
+/**
+ * Whether a workspace is read-only for everyone of its tenant (and for
+ * visitors of the first tenant). `public` never opens a workspace to another
+ * tenant: every capability check still answers null across tenants first.
+ */
+export type WorkspaceVisibility = 'private' | 'public';
+
 export interface WorkspaceTenancy {
   tenantId: string;
   ownerGroupId: string | null;
-  /** Read-only for everyone of the tenant, and for visitors of the first tenant. */
-  public: boolean;
+  visibility: WorkspaceVisibility;
 }
 
 const TENANT_TTL_MS = 60_000;
@@ -272,7 +278,7 @@ export class TenancyService implements OnModuleDestroy {
       ? {
           tenantId: rows[0].tenant_id,
           ownerGroupId: rows[0].owner_group_id,
-          public: rows[0].is_public,
+          visibility: rows[0].is_public ? 'public' : 'private',
         }
       : null;
   }
@@ -552,7 +558,7 @@ export class TenancyService implements OnModuleDestroy {
         {
           tenantId: row.tenant_id,
           ownerGroupId: row.owner_group_id,
-          public: row.is_public,
+          visibility: row.is_public ? 'public' : 'private',
         },
       ]),
     );

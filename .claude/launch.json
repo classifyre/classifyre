@@ -12,6 +12,15 @@
       "autoPort": true
     },
     {
+      "name": "web-iam",
+      "runtimeExecutable": "zsh",
+      "runtimeArgs": [
+        "-c",
+        "source ~/.nvm/nvm.sh && nvm use 22 >/dev/null && bash scripts/dev/web-iam.sh"
+      ],
+      "port": 3000
+    },
+    {
       "name": "blog",
       "runtimeExecutable": "zsh",
       "runtimeArgs": [

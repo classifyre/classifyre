@@ -179,7 +179,7 @@ PUT /<workspace>/maintenance/features/embeddings   {"enabled": true}
 The `PUT` answers with the new state, the id of the cleanup run when data is
 being deleted (poll `GET /maintenance/cleanup/runs/:runId`), and whether a
 catch-up recompute was queued. It is allowed while the workspace is paused and
-blocked in demo mode. Turning a feature on or off while its data is being
+needs `workspace.settings`. Turning a feature on or off while its data is being
 deleted answers `409`.
 
 Work refused because a feature is off answers with a message naming the switch:
@@ -341,7 +341,7 @@ Workspaces in production hold tens of millions of rows (a busy one can keep
 - **Allowed while paused — that is the point.** Cleanup is the one mutation
   a frozen workspace still accepts: pause stops every writer, so the wipe
   drains without anything re-inserting behind it. The recommended flow is
-  pause → clean → resume. (Demo mode still blocks it entirely.)
+  pause → clean → resume.
 
 Row counts are planner estimates and may read `-1`/stale right after massive
 writes; sizes include indexes and TOAST. Both are measured live on each visit

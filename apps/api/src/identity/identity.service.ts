@@ -460,7 +460,7 @@ export class IdentityService {
     return capabilitiesInWorkspace(principal.grants, {
       namespaceId,
       ownerLineage: await this.lineageFor(principal, tenancy.ownerGroupId),
-      public: tenancy.public,
+      visibility: tenancy.visibility,
     });
   }
 
@@ -548,7 +548,7 @@ export class IdentityService {
       const capabilities = capabilitiesInWorkspace(principal.grants, {
         namespaceId,
         ownerLineage: await this.lineageFor(principal, tenancy.ownerGroupId),
-        public: tenancy.public,
+        visibility: tenancy.visibility,
       });
       if (capabilities.has('workspace.view'))
         visible.set(namespaceId, capabilities);

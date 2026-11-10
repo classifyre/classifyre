@@ -28,7 +28,7 @@ These come from the request. Each one has a check that fails CI or fails the dep
 | H1  | Sign-in is always on (2026-11-09; was "everything keeps working without IAM") | No `IAM_ENABLED` switch: the API and web refuse to start without the identity server settings. No `LocalAccessPolicy`, no self-declared `X-Actor-Name`, no open-database mode. Old open-database workspaces reach a tenant only through `admin workspaces copy --to-tenant` |
 | H2  | The all-in-one Docker image ships the identity server too (2026-11-09; was "never uses IAM") | `docker/Dockerfile` adds the stock Keycloak distribution and a Temurin JRE as literal `FROM` tags (Dependabot); the realm setup and theme come from `helm/classifyre/files/iam` as a build context. Logins `classifyre`/`classifyre`; machine secrets generated into the data volume. The same Playwright smoke test runs against it as against the chart |
 | H3  | Keycloak is always deployed, kept current by Dependabot | No `iam.enabled` value (passing it fails the install). The chart image tag and the all-in-one `FROM` tag are tracked by Dependabot and must be equal (`scripts/check-keycloak-version.sh` in CI) |
-| H4  | No SEO and no sitemap, except for a public tenant | `templates/validate-values.yaml` fails the install when `frontend.sitemap.enabled` is on without `iam.public.enabled`. The web app and the API serve the sitemap only with a public tenant; otherwise `robots.txt` serves `Disallow: /`, sitemap routes 404, every page is `noindex` |
+| H4  | No SEO and no sitemap unless enabled | The sitemap is served only when `frontend.sitemap.enabled` is on; otherwise `robots.txt` serves `Disallow: /`, sitemap routes 404, every page is `noindex`. Nothing couples the sitemap to tenants anymore (the public-tenant condition died with step 8h) |
 | H5  | The chart says `iam`, never `keycloak`                                                 | Values key `iam`, templates `iam-*.yaml`, resources `<fullname>-iam`, env vars `IAM_*`. The only place the word appears is the image repository. A `helm template` test greps the rendered manifests for `keycloak` outside image references and the variable names the images themselves require (`KC_*`, `KEYCLOAK_URL`) |
 | H6  | The UI shows who changed what                                                          | Every authored entity records `createdBy` / `updatedBy` as an actor reference, and every workspace has an audit trail (§10, §11). Authors are always the signed-in person; clients cannot name one                                                                                                                                    |
 | H7  | The backend respects the tenant                                                        | A workspace belongs to exactly one tenant, and every request is checked against it in the namespace hook before any controller runs. A workspace in another tenant answers **404**, not 403, so its existence does not leak                                                                                                |
@@ -197,7 +197,7 @@ A notification is sent to groups, never to "the workspace":
 - Each notification fixes its audience when it is made (`notifications.audience_group_ids`; empty = the owning group, which also covers rows from before this change).
 - A person gets a notification when one of their groups, or a group above one of theirs, is in its audience. Roles alone do not make anyone a recipient.
 - Read, important and dismissed are per person (`notification_states`, keyed by `user:<sub>`). "Delete" dismisses for the caller only.
-- Capability `notification.view` is in every role but the visitor's: visitors of a public tenant are in no group and get no notifications, REST or socket.
+- Capability `notification.view` is in every role but the visitor's: visitors, who have not signed in, are in no group and get no notifications, REST or socket.
 - Live updates: the socket joins one room per group of the person (with the groups above) and one personal room; new notifications go to the audience's group rooms, read/important/dismiss to the personal room.
 
 ## 7. Business use cases
@@ -818,6 +818,8 @@ Step 8c is reversed. Classifyre had grown a second user and group manager next t
 
 ### Step 8e · A public tenant (2026-11-08)
 
+**Superseded 2026-11-10 by step 8h:** the public tenant (`iam.public.*`, its realm organization, `IAM_PUBLIC_TENANT`) is gone, replaced by public workspaces. Kept below as the record of what was built.
+
 Asked for: one installation that is public and private at once, as the showcase needs. People who have not signed in browse public content; signed-in people see only their own tenant, never public content mixed in. Chart defaults stay `iam.enabled: true`, public off, demo off; the showcase runs sign-in, public and demo; the all-in-one Docker image keeps no sign-in at all (everything open, as if public).
 
 **Design chosen: the public area is a tenant.** `iam.public.enabled` + `iam.public.tenant` (alias, default `public`; it can be the first tenant). A request with no credentials at all becomes a **visitor**: a principal of that tenant whose only grant is the built-in, never-grantable role `visitor` (scope `public`): the workspace `.view` capabilities without `access.view`, no `mcp.token.own`, no tenant capabilities. Everything else is the existing machinery: the namespace hook checks the visitor like anyone (another tenant's workspace answers 404), capability checks refuse every write (403), data stays in the tenant's database.
@@ -884,6 +886,16 @@ The mode without sign-in is gone everywhere (the user's call: "we should never d
 - **Smoke:** one Playwright spec for the chart (`develop.yml`) and the image (`docker/scripts/smoke.sh`, CI job `smoke`), seeded by `scripts/smoke/seed.sh` with `SMOKE_TARGET=k8s|docker`, run twice around a restart (`@after-restart`); shared setup in `.github/actions/e2e-smoke`.
 
 Open: `values-dev-vps-db.yaml` (the dev overlay on the showcase database) does not render, since the identity server would need the showcase's realm database; `DEMO_MODE` overlaps the visitor role and could go.
+
+### Step 8h · Public workspaces replace the public tenant and demo mode (2026-11-10)
+
+A workspace can be made public (Settings → Access, or the operator command `workspaces publish --tenant <alias> (--all | <slug>...) [--off]`): read-only for everyone of its tenant without a grant on it, and for people who have not signed in when it is in the first tenant. It never opens to another tenant (H7): the namespace hook answers 404 to unsigned probes of foreign addresses, and grants are still evaluated only inside the workspace's own tenant.
+
+- **Capability.** `workspace.publish` — "Make the workspace public or private again". Held by Workspace admin (via the `WORKSPACE_ADMIN` derivation), Workspace manager, and Tenant admin; recorded in the tenant's activity (`workspace.published` / `workspace.unpublished`).
+- **Visitor.** Someone without credentials is always a visitor of the first tenant (`IAM_BOOTSTRAP_TENANT`), read from the control database without asking the identity server, with no grants. They read its public workspaces (`PUBLIC_WORKSPACE_CAPABILITIES`, the visitor's read set); anything else asks them to sign in (401). A visitor is in no group and gets no notifications (§6.4).
+- **Demo mode gone.** `DEMO_MODE` and its bypass key are removed: the guard branch, the per-tool MCP checks, the demo badge and blocked dialog, and the chart value. Read-only controls now follow capabilities; the read-only POST marker is `@ReadsOnly`. `SHOWCASE_MODE` in the web proxy is unrelated (a trailing-slash flag for local showcase work) and stays.
+- **Showcase.** Editors of a showcase sign in and edit normally; nobody who has not signed in starts work. The user docs under `apps/docs` (access, deployment) describe this; this PRD is the spec behind them.
+- **Checks.** `iam.spec.ts` ("public workspaces (IAM step 8h)": visitor of the first tenant, public reads without grants, never cross-tenant, tokens never become visitors, no visitors before setup); the namespace-hook spec pins the visitor 401-vs-404 shape; the route-access completeness spec pins `workspace.publish` to Workspace admin, Workspace manager and Tenant admin only.
 
 ### Step 9 · Later
 

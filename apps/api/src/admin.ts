@@ -40,11 +40,28 @@ export interface CopyRequest {
   ownerGroupId?: string;
 }
 
-export function parseCopy(args: string[]): CopyRequest {
+/**
+ * The shared front of the bulk workspace commands: a tenant option, then
+ * `--all` or slugs. Command-specific flags and valued options ride along;
+ * anything else is rejected here, once, with the all-vs-slugs check.
+ */
+function parseWorkspaceSelector(
+  args: string[],
+  tenantOption: '--to-tenant' | '--tenant',
+  missingTenant: string,
+  flags: readonly string[] = [],
+  valued: readonly string[] = [],
+): {
+  tenant: string;
+  slugs: string[] | 'all';
+  flagsOn: Set<string>;
+  values: Map<string, string>;
+} {
   let tenant: string | undefined;
-  let ownerGroupId: string | undefined;
   let all = false;
   const slugs: string[] = [];
+  const flagsOn = new Set<string>();
+  const values = new Map<string, string>();
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     const value = () => {
@@ -54,18 +71,30 @@ export function parseCopy(args: string[]): CopyRequest {
       }
       return next;
     };
-    if (arg === '--to-tenant') tenant = value();
-    else if (arg === '--owner-group') ownerGroupId = value();
+    if (arg === tenantOption) tenant = value();
     else if (arg === '--all') all = true;
+    else if (flags.includes(arg)) flagsOn.add(arg);
+    else if (valued.includes(arg)) values.set(arg, value());
     else if (arg.startsWith('--'))
       throw new UsageError(`Unknown option ${arg}`);
     else slugs.push(arg.toLowerCase());
   }
-  if (!tenant) throw new UsageError('Say where to: --to-tenant <alias>');
+  if (!tenant) throw new UsageError(missingTenant);
   if (all === slugs.length > 0) {
     throw new UsageError('Name the workspaces, or pass --all');
   }
-  return { tenant, slugs: all ? 'all' : slugs, ownerGroupId };
+  return { tenant, slugs: all ? 'all' : slugs, flagsOn, values };
+}
+
+export function parseCopy(args: string[]): CopyRequest {
+  const { tenant, slugs, values } = parseWorkspaceSelector(
+    args,
+    '--to-tenant',
+    'Say where to: --to-tenant <alias>',
+    [],
+    ['--owner-group'],
+  );
+  return { tenant, slugs, ownerGroupId: values.get('--owner-group') };
 }
 
 export interface PublishRequest {
@@ -76,29 +105,13 @@ export interface PublishRequest {
 }
 
 export function parsePublish(args: string[]): PublishRequest {
-  let tenant: string | undefined;
-  let all = false;
-  let off = false;
-  const slugs: string[] = [];
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    if (arg === '--tenant') {
-      const next = args[++i];
-      if (!next || next.startsWith('--')) {
-        throw new UsageError('--tenant needs a value');
-      }
-      tenant = next;
-    } else if (arg === '--all') all = true;
-    else if (arg === '--off') off = true;
-    else if (arg.startsWith('--'))
-      throw new UsageError(`Unknown option ${arg}`);
-    else slugs.push(arg.toLowerCase());
-  }
-  if (!tenant) throw new UsageError('workspaces publish needs --tenant');
-  if (all === slugs.length > 0) {
-    throw new UsageError('Name the workspaces, or pass --all');
-  }
-  return { tenant, slugs: all ? 'all' : slugs, off };
+  const { tenant, slugs, flagsOn } = parseWorkspaceSelector(
+    args,
+    '--tenant',
+    'workspaces publish needs --tenant',
+    ['--off'],
+  );
+  return { tenant, slugs, off: flagsOn.has('--off') };
 }
 
 export interface CreateRequest {

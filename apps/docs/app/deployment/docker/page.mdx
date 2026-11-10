@@ -142,7 +142,6 @@ Pass them with `-e NAME=value`, or with `--env-file`.
 | `PORT_HTTP` | `3000` | Port inside the container. Usually easier to remap with `-p 8080:3000`. |
 | `CLASSIFYRE_BOOTSTRAP_NAMESPACE` | `default` | Slug of the workspace created on first boot. Set to `""` to create your own. |
 | `CLASSIFYRE_MASKED_CONFIG_KEY` | *generated* | Encrypts stored source credentials and MCP tokens. |
-| `DEMO_MODE` | `false` | Read-only mode; blocks every write. |
 | `TELEMETRY_DISABLED` / `DO_NOT_TRACK` | unset | Set either to `1` to disable [telemetry](/deployment/telemetry/). |
 | `CORS_ORIGIN` | same-origin | Only needed if the UI is served from another host. |
 
@@ -163,9 +162,9 @@ The identity server's client secrets and the key every tenant database's
 password is made from are generated on the first start and kept in
 `/var/lib/classifyre/iam.secrets`.
 
-The image has no public tenant: everyone signs in, starting with the seeded
-admin, who can add people and groups in the identity console (see
-[Access](/access/)). For a team, prefer the [Helm chart](/deployment/kubernetes/#sign-in).
+Everyone signs in, starting with the seeded admin, who can add people and
+groups in the identity console (see [Access](/access/)). For a team, prefer
+the [Helm chart](/deployment/kubernetes/#sign-in).
 
 ### Database
 

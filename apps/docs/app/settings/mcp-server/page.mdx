@@ -365,7 +365,7 @@ When adding MCP functionality in API code:
 | --- | --- | --- |
 | `401 Unauthorized` | Invalid/missing token | Verify `Authorization: Bearer ...` |
 | A tool is missing from `tools/list` | The token's scope does not include its group | Edit the token under `Settings -> MCP Server` and tick the group (see the capability map) |
-| `DEMO_MODE_READ_ONLY` from a write tool | The instance runs in demo mode | Writes are refused on demo instances; read tools still work |
+| `CAPABILITY_REQUIRED` from a write tool | The token's owner may not do that in this workspace | Give their group a role that allows it, or use a token of someone who may |
 | `404 Not Found` | Wrong URL | Confirm host and `/mcp` path |
 | `503 Service Unavailable` | MCP disabled | Enable MCP in Settings |
 | Connection refused | Host not reachable | Check port, firewall, reverse proxy |

@@ -83,9 +83,11 @@ function createTargetUrl(
   request: NextRequest,
   path: string[],
 ) {
-  // A deployed frontend (`SHOWCASE_MODE`) answers `/api/<path>` with a 308 to
-  // `/api/<path>/` (trailingSlash), and `redirect: "manual"` would hand that
-  // redirect to the browser, so ask for the final URL straight away.
+  // Local showcase work (`SHOWCASE_MODE=1`, `bun run dev:showcase`) proxies a
+  // deployed frontend whose `trailingSlash` answers `/api/<path>` with a 308
+  // to `/api/<path>/`, and `redirect: "manual"` would hand that redirect to
+  // the browser, so ask for the final URL straight away. Unrelated to the
+  // removed demo mode: no bypass, only the trailing slash.
   const suffix = process.env.SHOWCASE_MODE === "1" ? "/" : "";
   const targetUrl = new URL(`${baseUrl}/${path.join("/")}${suffix}`);
   request.nextUrl.searchParams.forEach((value, key) => {

@@ -129,7 +129,8 @@ export class AccessGuard implements CanActivate {
         principal.actor,
         access.capability,
       );
-      if (!decision.allow) this.deny(principal, access.capability);
+      if (!decision.allow)
+        this.denyAsSignInOrForbidden(principal, access.capability);
       return true;
     }
 
@@ -141,7 +142,7 @@ export class AccessGuard implements CanActivate {
       access.capability !== 'tenant.workspace.create' &&
       !this.identity.tenantCapabilities(principal).has(access.capability)
     ) {
-      this.deny(principal, access.capability);
+      this.denyAsSignInOrForbidden(principal, access.capability);
     }
     return true;
   }
@@ -151,7 +152,10 @@ export class AccessGuard implements CanActivate {
    * more asks them to sign in (401), which the web app turns into the
    * sign-in page. A signed-in person lacks a grant (403).
    */
-  private deny(principal: Principal, capability: Capability): never {
+  private denyAsSignInOrForbidden(
+    principal: Principal,
+    capability: Capability,
+  ): never {
     if (principal.visitor) {
       throwAuthenticationError(
         new AuthenticationError('Sign in to continue.', 'SIGN_IN_REQUIRED'),

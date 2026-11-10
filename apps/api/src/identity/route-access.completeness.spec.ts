@@ -172,4 +172,24 @@ describe('built-in roles', () => {
       }
     }
   });
+
+  it('give workspace.publish only to Workspace admin, Workspace manager and Tenant admin', () => {
+    // Pinned so a future workspace capability added next to `code.author`
+    // cannot silently grant publish again: publish arrives only through the
+    // WORKSPACE_ADMIN derivation and the tenant-admin bundle.
+    for (const role of BUILT_IN_ROLES) {
+      const has = (role.capabilities as readonly string[]).includes(
+        'workspace.publish',
+      );
+      if (
+        role.key === 'workspace-admin' ||
+        role.key === 'workspace-manager' ||
+        role.key === 'tenant-admin'
+      ) {
+        expect(has).toBe(true);
+      } else {
+        expect(has).toBe(false);
+      }
+    }
+  });
 });

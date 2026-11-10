@@ -196,7 +196,8 @@ export function registerNamespaceHook(
  * for the access guard. Scan callbacks (internal key) and MCP (its own
  * tokens) are not signed-in requests and pass through.
  */
-async function authorizeWorkspaceRequest(
+/** Exported for its spec: the 401/404 shape is the H7 contract. */
+export async function authorizeWorkspaceRequest(
   identity: IdentityService,
   cls: ClsService,
   request: {
@@ -246,9 +247,19 @@ async function authorizeWorkspaceRequest(
   }
 
   const capabilities = await identity.capabilitiesIn(principal, ns.namespaceId);
-  if (!capabilities?.has('workspace.view') && principal.visitor) {
-    // Not public: someone who has not signed in is asked to, rather than
-    // told the workspace does not exist.
+  if (!capabilities) {
+    // Another tenant's workspace, or one with no tenancy row: H7 says it
+    // looks exactly like a workspace that does not exist. That holds for
+    // visitors too, so an unsigned probe of a foreign address gets a 404,
+    // not a 401 that would confirm the address belongs to someone.
+    await reply
+      .code(404)
+      .send({ error: 'Not Found', message: `Unknown namespace '${ns.slug}'` });
+    return false;
+  }
+  if (!capabilities.has('workspace.view') && principal.visitor) {
+    // Not public, but in the visitor's own (first) tenant: someone who has
+    // not signed in is asked to, rather than told it does not exist.
     await reply.code(401).send({
       statusCode: 401,
       error: 'Unauthorized',
@@ -257,7 +268,7 @@ async function authorizeWorkspaceRequest(
     });
     return false;
   }
-  if (!capabilities?.has('workspace.view')) {
+  if (!capabilities.has('workspace.view')) {
     await reply
       .code(404)
       .send({ error: 'Not Found', message: `Unknown namespace '${ns.slug}'` });
