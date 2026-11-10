@@ -241,7 +241,7 @@ All URIs are relative to *http://localhost*
 *DataQueryApi* | [**dataQueryControllerCreate**](docs/DataQueryApi.md#dataquerycontrollercreate) | **POST** /query-runs | Run one SELECT; poll the run for its status
 *DataQueryApi* | [**dataQueryControllerGet**](docs/DataQueryApi.md#dataquerycontrollerget) | **GET** /query-runs/{id} | One of your queries
 *DataQueryApi* | [**dataQueryControllerGetCatalog**](docs/DataQueryApi.md#dataquerycontrollergetcatalog) | **GET** /data-query/catalog | The tables you can query with SQL, and those you could with access
-*DataQueryApi* | [**dataQueryControllerGetSettings**](docs/DataQueryApi.md#dataquerycontrollergetsettings) | **GET** /data-query/settings | Whether this workspace answers SQL, and its limits
+*DataQueryApi* | [**dataQueryControllerGetSettings**](docs/DataQueryApi.md#dataquerycontrollergetsettings) | **GET** /data-query/settings | The SQL limits of this workspace
 *DataQueryApi* | [**dataQueryControllerList**](docs/DataQueryApi.md#dataquerycontrollerlist) | **GET** /query-runs | Your recent queries in this workspace
 *DataQueryApi* | [**dataQueryControllerReceive**](docs/DataQueryApi.md#dataquerycontrollerreceive) | **POST** /query-runs/{id}/result | Internal: a query job posts its result here
 *DataQueryApi* | [**dataQueryControllerResult**](docs/DataQueryApi.md#dataquerycontrollerresult) | **GET** /query-runs/{id}/result | The rows of a finished query (Arrow IPC stream), or its exported file

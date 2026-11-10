@@ -8,6 +8,11 @@
  * does not exist or is not granted — with the job's own codes and messages.
  * It never allows anything: whatever it lets through is checked again,
  * properly, by the SQLGlot gate in the job (apps/cli/src/query/gate.py).
+ *
+ * Intentional duplication: the regex gate here mirrors the SQLGlot gate
+ * there. Keep the refusal `code` values and their messages in sync
+ * (`invalid_sql`, `select_only`, `function_not_allowed`,
+ * `table_name_required`, `table_not_available`); the job stays authoritative.
  */
 
 export interface PrecheckRefusal {
@@ -24,8 +29,11 @@ const READ_ONLY_START = /^(select|with|from|values|\()\b/i;
 /**
  * The SQL with string literals, quoted identifiers and comments blanked out,
  * so keywords and names are only ever found in code.
+ *
+ * Named for what it returns: executable code without literals or comments.
+ * `codeOnly` stays as a deprecated alias for existing imports.
  */
-export function codeOnly(sql: string): string {
+export function stripLiteralsAndComments(sql: string): string {
   let out = '';
   let i = 0;
   while (i < sql.length) {
@@ -66,8 +74,11 @@ function statementCount(code: string): number {
     .filter(Boolean).length;
 }
 
+/** Deprecated alias for {@link stripLiteralsAndComments}. */
+export const codeOnly = stripLiteralsAndComments;
+
 /** `a.b.c` names in code, lower-cased, quotes removed. */
-function threePartNames(code: string): string[] {
+export function extractThreePartNames(code: string): string[] {
   const part = '(?:"[^"]+"|[A-Za-z_][A-Za-z0-9_]*)';
   const re = new RegExp(
     `(?<![A-Za-z0-9_."])(${part})\\s*\\.\\s*(${part})\\s*\\.\\s*(${part})(?!\\s*\\()`,
@@ -96,7 +107,7 @@ export function precheckSql(
   allowed: ReadonlySet<string>,
   sources: ReadonlySet<string>,
 ): PrecheckRefusal | null {
-  const code = codeOnly(sql).trim();
+  const code = stripLiteralsAndComments(sql).trim();
   if (!code) {
     return { code: 'invalid_sql', message: 'Write a SELECT statement.' };
   }
@@ -122,7 +133,7 @@ export function precheckSql(
       message: 'Only tables can be read here, not files or table functions.',
     };
   }
-  for (const name of threePartNames(code)) {
+  for (const name of extractThreePartNames(code)) {
     const source = name.split('.')[0];
     if (sources.has(source) && !allowed.has(name)) {
       return {

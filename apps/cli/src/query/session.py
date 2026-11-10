@@ -197,7 +197,7 @@ class QuerySession:
             conn.execute(f"SET max_temp_directory_size = '{spill.replace(chr(39), '')}'")
         return conn
 
-    def _expose(self, conn: Any, tables: set[TableName]) -> None:
+    def _attach_tables_as_views(self, conn: Any, tables: set[TableName]) -> None:
         created_catalogs: set[str] = set()
         created_schemas: set[tuple[str, str]] = set()
         for name in sorted(tables, key=str):
@@ -293,7 +293,7 @@ class QuerySession:
         self._conn = conn
         with self._deadline(conn, self.request.timeout_seconds) as fired:
             try:
-                self._expose(conn, validated.tables)
+                self._attach_tables_as_views(conn, validated.tables)
                 setup_done = time.monotonic()
                 if self.request.export_format == "xlsx":
                     load_extension(conn, "excel")

@@ -8,8 +8,15 @@
  * lower-case identifier, so nobody has to quote anything and the CLI's SQL
  * gate can compare names exactly.
  */
+import { stripLiteralsAndComments } from './sql-precheck';
 
-/** Source types the CLI can attach or scan with DuckDB (apps/cli/src/query/bindings.py). */
+/**
+ * Source types the CLI can attach or scan with DuckDB.
+ *
+ * Keep in sync with `QUERYABLE_SOURCE_TYPES` in
+ * apps/cli/src/query/bindings.py (same eight values); the API names them,
+ * the job attaches them.
+ */
 export const QUERYABLE_SOURCE_TYPES = new Set([
   'POSTGRESQL',
   'MYSQL',
@@ -28,10 +35,17 @@ const OBJECT_STORAGE_TYPES = new Set([
   'LOCAL_FOLDER',
 ]);
 
-/** Lakehouse formats DuckDB reads; Lance, Hudi and Paimon are not among them. */
+/**
+ * Lakehouse formats DuckDB reads; Lance, Hudi and Paimon are not among them.
+ * Keep in sync with `LAKEHOUSE_FORMATS` in apps/cli/src/query/bindings.py.
+ */
 const LAKEHOUSE_FORMATS = new Set(['delta', 'iceberg']);
 
-/** File tables by MIME type: what DuckDB reads straight from a bucket. */
+/**
+ * File tables by MIME type: what DuckDB reads straight from a bucket.
+ * The `format` values match `FILE_FORMATS` in
+ * apps/cli/src/query/bindings.py (`json` there is read via `read_json_auto`).
+ */
 const FILE_FORMATS: Record<string, string> = {
   'application/parquet': 'parquet',
   'application/vnd.apache.parquet': 'parquet',
@@ -250,9 +264,14 @@ export function assignTableNames<
   return names;
 }
 
-/** The sources whose SQL name the text mentions as `<name>.` (quoted or not). */
+/**
+ * The sources whose SQL name the executable code mentions as `<name>.`
+ * (quoted or not). Literals and comments are blanked first, so a source
+ * named inside a string never causes its recipe to leave the API
+ * (docs/prd/DQ-data-query.md §5.4 "only the recipes of their sources").
+ */
 export function mentionedSourceNames(sql: string, names: Iterable<string>) {
-  const lower = sql.toLowerCase();
+  const lower = stripLiteralsAndComments(sql).toLowerCase();
   const found = new Set<string>();
   for (const name of names) {
     const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

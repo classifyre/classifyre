@@ -62,30 +62,28 @@ function seconds(ms: number | undefined): string {
 /**
  * One SQL editor and its result. Used by the SQL page (with the catalog
  * beside it) and by an asset's Data tab (prefilled with that table).
+ *
+ * React 19: `ref` arrives as a prop, not via `forwardRef`.
  */
-export const QueryWorkbench = React.forwardRef<
-  QueryWorkbenchHandle,
-  {
-    catalog: QueryCatalog | null;
-    initialSql: string;
-    editorPath: string;
-    editorHeight?: number;
-    resultHeight?: number;
-    disabled?: boolean;
-    onRunFinished?: (run: QueryRun) => void;
-  }
->(function QueryWorkbench(
-  {
-    catalog,
-    initialSql,
-    editorPath,
-    editorHeight = 200,
-    resultHeight = 440,
-    disabled = false,
-    onRunFinished,
-  },
+export function QueryWorkbench({
+  catalog,
+  initialSql,
+  editorPath,
+  editorHeight = 200,
+  resultHeight = 440,
+  disabled = false,
+  onRunFinished,
   ref,
-) {
+}: {
+  catalog: QueryCatalog | null;
+  initialSql: string;
+  editorPath: string;
+  editorHeight?: number;
+  resultHeight?: number;
+  disabled?: boolean;
+  onRunFinished?: (run: QueryRun) => void;
+  ref?: React.Ref<QueryWorkbenchHandle>;
+}) {
   const { t } = useTranslation();
   const [sql, setSql] = React.useState(initialSql);
   const [run, setRun] = React.useState<QueryRun | null>(null);
@@ -356,4 +354,4 @@ export const QueryWorkbench = React.forwardRef<
       )}
     </div>
   );
-});
+}

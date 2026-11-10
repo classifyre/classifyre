@@ -214,7 +214,7 @@ export class DataQueryApi extends runtime.BaseAPI {
     }
 
     /**
-     * Whether this workspace answers SQL, and its limits
+     * The SQL limits of this workspace
      */
     async dataQueryControllerGetSettingsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<DataQuerySettingsDto>> {
         const queryParameters: any = {};
@@ -235,7 +235,7 @@ export class DataQueryApi extends runtime.BaseAPI {
     }
 
     /**
-     * Whether this workspace answers SQL, and its limits
+     * The SQL limits of this workspace
      */
     async dataQueryControllerGetSettings(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<DataQuerySettingsDto> {
         const response = await this.dataQueryControllerGetSettingsRaw(initOverrides);

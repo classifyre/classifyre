@@ -30,13 +30,18 @@ from ..utils.duckdb_engine import load_extension, quote_identifier, sql_literal
 logger = logging.getLogger(__name__)
 
 #: Formats DuckDB reads natively, by the ``format`` of a location.
+#: Keep in sync with ``LAKEHOUSE_FORMATS`` in apps/api/src/data-query/sql-names.ts.
 LAKEHOUSE_FORMATS = frozenset({"delta", "iceberg"})
+#: Keep in sync with ``FILE_FORMATS`` in apps/api/src/data-query/sql-names.ts
+#: (``json`` here is read via ``read_json_auto``).
 FILE_FORMATS = frozenset({"parquet", "csv", "tsv", "jsonl", "json", "avro"})
 
 OBJECT_STORAGE_TYPES = frozenset(
     {"S3_COMPATIBLE_STORAGE", "AZURE_BLOB_STORAGE", "GOOGLE_CLOUD_STORAGE", "LOCAL_FOLDER"}
 )
 ATTACHED_CATALOG_TYPES = frozenset({"ICEBERG_REST", "DUCKLAKE"})
+#: Keep in sync with ``QUERYABLE_SOURCE_TYPES`` in
+#: apps/api/src/data-query/sql-names.ts (same eight values).
 QUERYABLE_SOURCE_TYPES = (
     OBJECT_STORAGE_TYPES | ATTACHED_CATALOG_TYPES | frozenset({"POSTGRESQL", "MYSQL"})
 )
@@ -132,7 +137,7 @@ class SourceBinding:
             return self._object_storage(conn, location)
         raise BindingError(f"Sources of type {self.source_type} cannot be queried yet.")
 
-    def _need(self, location: TableLocation, *fields: str) -> list[str]:
+    def _require_location_fields(self, location: TableLocation, *fields: str) -> list[str]:
         values = [getattr(location, name) for name in fields]
         if any(not value for value in values):
             raise BindingError(
@@ -142,7 +147,9 @@ class SourceBinding:
         return [str(value) for value in values]
 
     def _postgres(self, conn: Any, location: TableLocation) -> str:
-        database, schema, table = self._need(location, "database", "schema", "table")
+        database, schema, table = self._require_location_fields(
+            location, "database", "schema", "table"
+        )
         alias = self._attached.get(database)
         if alias is None:
             load_extension(conn, "postgres")
@@ -167,7 +174,7 @@ class SourceBinding:
         return ".".join(quote_identifier(part) for part in (alias, schema, table))
 
     def _mysql(self, conn: Any, location: TableLocation) -> str:
-        database, table = self._need(location, "database", "table")
+        database, table = self._require_location_fields(location, "database", "table")
         alias = self._attached.get(database)
         if alias is None:
             load_extension(conn, "mysql")
@@ -200,7 +207,7 @@ class SourceBinding:
         return ".".join(quote_identifier(part) for part in (alias, database, table))
 
     def _attached_catalog(self, conn: Any, location: TableLocation) -> str:
-        schema, table = self._need(location, "schema", "table")
+        schema, table = self._require_location_fields(location, "schema", "table")
         alias = self._attached.get("")
         if alias is None:
             source = self._instance()
@@ -211,7 +218,7 @@ class SourceBinding:
         return ".".join(quote_identifier(part) for part in (alias, schema, table))
 
     def _object_storage(self, conn: Any, location: TableLocation) -> str:
-        (key,) = self._need(location, "object_key")
+        (key,) = self._require_location_fields(location, "object_key")
         fmt = location.format or ""
         if self._storage is None:
             storage = self._instance()._lakehouse_storage()

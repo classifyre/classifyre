@@ -76,7 +76,7 @@ export interface QueryCatalogTableDto {
      */
     queryable: boolean;
     /**
-     * You may query it now: SQL is on here, it is queryable, and a role or grant gives you access.
+     * You may query it now: it is queryable, and a role or grant gives you access.
      * @type {boolean}
      * @memberof QueryCatalogTableDto
      */

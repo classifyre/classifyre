@@ -8,7 +8,7 @@ All URIs are relative to *http://localhost*
 | [**dataQueryControllerCreate**](DataQueryApi.md#dataquerycontrollercreate) | **POST** /query-runs | Run one SELECT; poll the run for its status |
 | [**dataQueryControllerGet**](DataQueryApi.md#dataquerycontrollerget) | **GET** /query-runs/{id} | One of your queries |
 | [**dataQueryControllerGetCatalog**](DataQueryApi.md#dataquerycontrollergetcatalog) | **GET** /data-query/catalog | The tables you can query with SQL, and those you could with access |
-| [**dataQueryControllerGetSettings**](DataQueryApi.md#dataquerycontrollergetsettings) | **GET** /data-query/settings | Whether this workspace answers SQL, and its limits |
+| [**dataQueryControllerGetSettings**](DataQueryApi.md#dataquerycontrollergetsettings) | **GET** /data-query/settings | The SQL limits of this workspace |
 | [**dataQueryControllerList**](DataQueryApi.md#dataquerycontrollerlist) | **GET** /query-runs | Your recent queries in this workspace |
 | [**dataQueryControllerReceive**](DataQueryApi.md#dataquerycontrollerreceive) | **POST** /query-runs/{id}/result | Internal: a query job posts its result here |
 | [**dataQueryControllerResult**](DataQueryApi.md#dataquerycontrollerresult) | **GET** /query-runs/{id}/result | The rows of a finished query (Arrow IPC stream), or its exported file |
@@ -274,7 +274,7 @@ No authorization required
 
 > DataQuerySettingsDto dataQueryControllerGetSettings()
 
-Whether this workspace answers SQL, and its limits
+The SQL limits of this workspace
 
 ### Example
 

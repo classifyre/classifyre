@@ -1,4 +1,9 @@
-import { codeOnly, precheckSql } from './sql-precheck';
+import {
+  codeOnly,
+  extractThreePartNames,
+  precheckSql,
+  stripLiteralsAndComments,
+} from './sql-precheck';
 
 const allowed = new Set(['shop.public.orders', 'lake.tables.events']);
 const sources = new Set(['shop', 'lake', 'other']);
@@ -44,5 +49,20 @@ describe('SQL pre-check (before a job is started)', () => {
     const code = codeOnly(sql);
     expect(code).toHaveLength(sql.length);
     expect(code).not.toContain(';');
+  });
+
+  it('exposes the executable code under its new name', () => {
+    expect(stripLiteralsAndComments("SELECT 'x' -- y")).toBe(
+      codeOnly("SELECT 'x' -- y"),
+    );
+  });
+
+  it('finds only the tables named in code', () => {
+    const names = extractThreePartNames(
+      stripLiteralsAndComments(
+        "SELECT * FROM shop.public.orders WHERE note = 'lake.tables.events' -- other.x.y",
+      ).toLowerCase(),
+    );
+    expect(names).toEqual(['shop.public.orders']);
   });
 });

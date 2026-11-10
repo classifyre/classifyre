@@ -19,7 +19,11 @@ import {
   type CatalogTable,
 } from './query-catalog.service';
 import { mentionedSourceNames } from './sql-names';
-import { precheckSql } from './sql-precheck';
+import {
+  extractThreePartNames,
+  precheckSql,
+  stripLiteralsAndComments,
+} from './sql-precheck';
 import { ACCESS_POLICY, type AccessPolicy } from '../identity/access-policy';
 import { Inject } from '@nestjs/common';
 
@@ -207,18 +211,38 @@ export class QueryRunService {
       );
     }
 
-    const tables: CatalogTable[] = used.flatMap((entry) => entry.tables);
-    const named = tables.filter((t) =>
-      text.toLowerCase().includes(`${t.schema}.${t.table}`),
+    // Tables of the used sources, each carrying its source's SQL name so the
+    // job request never re-derives it from `sqlName.split('.')`.
+    const tablesWithSource: {
+      entrySourceSqlName: string;
+      table: CatalogTable;
+    }[] = used.flatMap((entry) =>
+      entry.tables.map((table) => ({
+        entrySourceSqlName: entry.source.sqlName,
+        table,
+      })),
+    );
+    // Only names in executable code count: literals and comments are blanked
+    // first, so `'shop.public.orders'` in a string neither attaches a source
+    // (above) nor marks a table as read (here).
+    const namesInCode = new Set(
+      extractThreePartNames(stripLiteralsAndComments(text).toLowerCase()),
+    );
+    const tablesNamedInCode = tablesWithSource.filter(({ table }) =>
+      namesInCode.has(table.sqlName),
     );
     void this.purgeExpired().catch(() => undefined);
     const token = randomBytes(32).toString('base64url');
+    // `assetIds` starts as the tables named in code and is replaced with the
+    // job's authoritative table list on success (received in `receiveResult`);
+    // per-table audit is recorded there, never here, so refusals and failures
+    // audit nothing and successes audit exactly what was read.
     const run = await this.prisma.queryRun.create({
       data: {
         sql: text,
         status: QueryRunStatus.PENDING,
         actorRef: actor.ref ?? null,
-        assetIds: named.map((t) => t.assetId),
+        assetIds: tablesNamedInCode.map(({ table }) => table.assetId),
         sourceIds: used.map((entry) => entry.source.id),
         callbackTokenHash: tokenHash(token),
         resultFormat: exportFormat ?? null,
@@ -252,28 +276,14 @@ export class QueryRunService {
         sourceId: entry.source.id,
         recipe: recipes.get(entry.source.id),
       })),
-      tables: tables.map((t) => ({
-        source: t.sqlName.split('.')[0],
-        schema: t.schema,
-        table: t.table,
-        assetId: t.assetId,
-        location: t.location,
+      tables: tablesWithSource.map(({ entrySourceSqlName, table }) => ({
+        source: entrySourceSqlName,
+        schema: table.schema,
+        table: table.table,
+        assetId: table.assetId,
+        location: table.location,
       })),
     };
-
-    for (const assetId of named.map((t) => t.assetId)) {
-      void this.audit.record({
-        actor,
-        channel: 'rest',
-        capability: exportFormat ? 'data.export' : 'data.query',
-        operation: exportFormat
-          ? `query-runs.export-table.${exportFormat}`
-          : 'query-runs.read-table',
-        entityType: 'asset',
-        entityId: assetId,
-        fields: [],
-      });
-    }
 
     void this.execute(run.id, request, settings.timeoutSeconds);
     return this.view(run);
@@ -377,7 +387,13 @@ export class QueryRunService {
   ): Promise<void> {
     const run = await this.prisma.queryRun.findUnique({
       where: { id: runId },
-      select: { callbackTokenHash: true, status: true, sourceIds: true },
+      select: {
+        callbackTokenHash: true,
+        status: true,
+        sourceIds: true,
+        actorRef: true,
+        resultFormat: true,
+      },
     });
     const expected = run?.callbackTokenHash;
     const given = token ? tokenHash(token) : '';
@@ -420,6 +436,32 @@ export class QueryRunService {
           callbackTokenHash: null,
         },
       });
+      // R6: audit exactly the tables the job validated and read, attributed
+      // to the run's actor. Refusals and failures read nothing, so they
+      // record no per-table event; the run row itself keeps the attribution.
+      if (assetIds?.length && run.actorRef) {
+        const actor = {
+          id: null,
+          displayName: null,
+          kind: 'person' as const,
+          via: 'none' as const,
+          ref: run.actorRef,
+        };
+        const isExport = Boolean(run.resultFormat);
+        for (const assetId of assetIds) {
+          void this.audit.record({
+            actor,
+            channel: 'rest',
+            capability: isExport ? 'data.export' : 'data.query',
+            operation: isExport
+              ? `query-runs.export-table.${run.resultFormat}`
+              : 'query-runs.read-table',
+            entityType: 'asset',
+            entityId: assetId,
+            fields: [],
+          });
+        }
+      }
       return;
     }
     const error = (body?.error ?? {}) as { code?: string; message?: string };

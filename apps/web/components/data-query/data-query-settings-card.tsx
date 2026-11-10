@@ -19,7 +19,7 @@ import { useCan } from "@/hooks/use-me";
 import { ActorChip } from "@/components/actor-chip";
 import { apiErrorMessage } from "@/lib/data-query";
 
-/** Settings → Data: whether the workspace answers SQL, and its limits. */
+/** Settings → Data: the SQL limits of the workspace. */
 export function DataQuerySettingsCard() {
   const { t } = useTranslation();
   const canChange = useCan("workspace.settings");
@@ -46,7 +46,6 @@ export function DataQuerySettingsCard() {
   }, []);
 
   const save = async (patch: {
-    enabled?: boolean;
     maxRows?: number;
     timeoutSeconds?: number;
     exportMaxRows?: number;

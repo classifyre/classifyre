@@ -128,6 +128,14 @@ describe('SQL names for data query', () => {
     );
     expect([...found].sort()).toEqual(['lake', 'shop']);
   });
+
+  it('ignores sources named only in literals or comments', () => {
+    const found = mentionedSourceNames(
+      "SELECT 'shop.public.a' AS s FROM lake.x.y /* other.z.w */ -- shop.q.r",
+      ['shop', 'lake', 'other'],
+    );
+    expect([...found]).toEqual(['lake']);
+  });
 });
 
 describe('resource grants', () => {

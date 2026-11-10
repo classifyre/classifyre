@@ -9,6 +9,10 @@ write CTEs, table functions (``read_parquet``, ``query``, ``postgres_query``…)
 functions outside :data:`SAFE_FUNCTIONS` (``getenv``, ``current_setting``…),
 system catalogs, and any table name that is not in the allowlist — the hidden
 ``__src_*`` attachments included.
+
+The API runs a cheap regex pre-check first
+(``apps/api/src/data-query/sql-precheck.ts``); this gate stays authoritative.
+Keep the refusal ``code`` values and their messages in sync.
 """
 
 from __future__ import annotations
