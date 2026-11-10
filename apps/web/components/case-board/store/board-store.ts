@@ -53,7 +53,7 @@ export interface BoardState extends BoardDomain {
   run(cmd: Command): void;
   /**
    * Show unplaced items at these positions without saving them. A read-only
-   * board (closed case, demo instance) cannot place what the server created
+   * board (closed case, someone who may only view) cannot place what the server created
    * unplaced, and unplaced items are not rendered.
    */
   placeLocally(positions: ReadonlyMap<string, XY>): void;
@@ -117,14 +117,15 @@ export function createBoardStore(
   caseId: string,
   opts: {
     /**
-     * A demo instance refuses every write, so the board opens read-only there.
-     * Without this, placing the first open's unplaced items is refused, the
-     * batch dropped, the board read again and the items placed again, forever.
+     * Someone who may not edit the case (a viewer, a visitor of a public
+     * workspace) opens the board read-only. Without this, placing the first
+     * open's unplaced items is refused, the batch dropped, the board read
+     * again and the items placed again, forever.
      */
-    demo?: boolean;
+    viewOnly?: boolean;
   } = {},
 ): BoardStore {
-  const demo = opts.demo ?? false;
+  const viewOnly = opts.viewOnly ?? false;
   let persistence: Persistence;
   let refetchTimer: ReturnType<typeof setTimeout> | null = null;
   let loading: Promise<void> | null = null;
@@ -228,7 +229,7 @@ export function createBoardStore(
     return {
       caseId,
       version: 0,
-      readOnly: demo,
+      readOnly: viewOnly,
       caseStatus: "OPEN",
       loaded: false,
       loadError: null,
@@ -282,7 +283,7 @@ export function createBoardStore(
         }
         beforeNeighbourhood = { systemEdges: withNeighbours.systemEdges, suggested: withNeighbours.suggested };
         if (neighbourhood) withNeighbours = mergeTraceNeighbourhood(withNeighbours, neighbourhood);
-        const readOnly = res.board.readOnly || demo;
+        const readOnly = res.board.readOnly || viewOnly;
         // A board that became writable places (and saves) them for real.
         if (!readOnly) localPlacements.clear();
         const stillUnplaced = new Map(

@@ -667,7 +667,6 @@ export class McpServerFactoryService {
         annotations: { readOnlyHint: false, destructiveHint: false },
       },
       async ({ kind, enabled, goal, max_iterations }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
           await this.autopilotService.updateAgent(kind as AgentKind, {
             ...(enabled !== undefined ? { enabled } : {}),
@@ -898,7 +897,6 @@ export class McpServerFactoryService {
         annotations: { readOnlyHint: false, destructiveHint: false },
       },
       async ({ instruction, source_id, agent_kinds, case_id }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
           await this.autopilotService.trigger({
             instruction,
@@ -923,7 +921,6 @@ export class McpServerFactoryService {
         annotations: { readOnlyHint: false, destructiveHint: false },
       },
       async ({ id }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(await this.autopilotService.cancelRun(id));
       },
     );
@@ -960,7 +957,6 @@ export class McpServerFactoryService {
         annotations: { readOnlyHint: false, destructiveHint: false },
       },
       async ({ caseId, findingId, rationale }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
           await this.caseLeadsService.propose(caseId, {
             findingId,
@@ -982,7 +978,6 @@ export class McpServerFactoryService {
         annotations: { readOnlyHint: false, destructiveHint: false },
       },
       async ({ caseId }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
           await this.caseLeadsService.generate(caseId, toolAuthor()),
         );
@@ -1004,7 +999,6 @@ export class McpServerFactoryService {
         annotations: { readOnlyHint: false, destructiveHint: false },
       },
       async ({ caseId, leadId, action, reason }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
           await this.caseLeadsService.review(
             caseId,
@@ -1049,7 +1043,6 @@ export class McpServerFactoryService {
         annotations: { readOnlyHint: false, destructiveHint: false },
       },
       async ({ caseId, occurredAt, ...rest }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         const when = new Date(occurredAt);
         if (Number.isNaN(when.getTime())) {
           throw new NotFoundException(`Invalid occurredAt: ${occurredAt}`);
@@ -1077,7 +1070,6 @@ export class McpServerFactoryService {
         annotations: { readOnlyHint: false, destructiveHint: true },
       },
       async ({ caseId, eventId }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
           await this.caseEventsService.remove(caseId, eventId, toolAuthor()),
         );
@@ -1103,7 +1095,6 @@ export class McpServerFactoryService {
       },
       {
         json: jsonResult,
-        assertNotDemoMode: () => this.mcpToolExecutor.assertNotDemoMode(),
       },
     );
   }
@@ -1120,7 +1111,6 @@ export class McpServerFactoryService {
       },
       {
         json: jsonResult,
-        assertNotDemoMode: () => this.mcpToolExecutor.assertNotDemoMode(),
       },
     );
   }
@@ -1428,7 +1418,6 @@ export class McpServerFactoryService {
         },
       },
       async ({ id }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         await this.requireSource(id);
         await this.schedulerService.removeSchedule(id);
         await this.sourceService.deleteSource({ id });
@@ -1470,7 +1459,6 @@ export class McpServerFactoryService {
         },
       },
       async ({ sourceId, triggerType, triggeredBy }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
           await this.cliRunnerService.startRun(
             sourceId,
@@ -1598,7 +1586,6 @@ export class McpServerFactoryService {
         source,
         afterCellId,
       }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         const notebook = await this.notebookService.get(sourceId, scope);
         const newCell = {
           id: cellId ?? `cell-${Date.now().toString(36)}`,
@@ -1658,7 +1645,6 @@ export class McpServerFactoryService {
         source,
         type,
       }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         const notebook = await this.notebookService.get(sourceId, scope);
         const index = notebook.cells.findIndex((cell) => cell.id === cellId);
         if (index === -1) {
@@ -1695,7 +1681,6 @@ export class McpServerFactoryService {
         },
       },
       async ({ sourceId, scope = 'connector', baseRevision, cellId }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         const notebook = await this.notebookService.get(sourceId, scope);
         if (!notebook.cells.some((cell) => cell.id === cellId)) {
           throw new NotFoundException(`No cell with id '${cellId}'.`);
@@ -1732,7 +1717,6 @@ export class McpServerFactoryService {
         },
       },
       async ({ sourceId, scope = 'connector', packages }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
           await this.updateNotebookConfigSection(sourceId, scope, { packages }),
         );
@@ -1756,7 +1740,6 @@ export class McpServerFactoryService {
         },
       },
       async ({ sourceId, scope = 'connector', folders }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
           await this.updateNotebookConfigSection(sourceId, scope, {
             local_folders: folders,
@@ -1804,7 +1787,6 @@ export class McpServerFactoryService {
         },
       },
       async ({ sourceId, fileName, contentBase64, mimeType }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         const file = await this.sourceFilesService.create({
           sourceId,
           fileName,
@@ -1847,7 +1829,6 @@ export class McpServerFactoryService {
         },
       },
       async ({ sourceId, fileId }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         await this.sourceFilesService.delete(sourceId, fileId);
         return jsonResult({ deleted: true, fileId });
       },
@@ -1911,7 +1892,6 @@ export class McpServerFactoryService {
         annotations: { readOnlyHint: false, destructiveHint: true },
       },
       async ({ source_id }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
           await this.sourceService.retractAugmentations(source_id),
         );
@@ -1952,7 +1932,6 @@ export class McpServerFactoryService {
         targetCellId,
         maxAssets,
       }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         const notebook = await this.notebookService.get(sourceId, scope);
         const execution = await this.notebookExecutionService.create(
           sourceId,
@@ -2027,7 +2006,6 @@ export class McpServerFactoryService {
         },
       },
       async ({ executionId }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
           await this.notebookExecutionService.cancel(executionId),
         );
@@ -2393,7 +2371,6 @@ export class McpServerFactoryService {
         },
       },
       async ({ id, ...rest }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         assertMayWriteCode((rest as any).pipeline_schema);
         if (!(rest as any).pipeline_schema) {
           // A rename or activation flip carries no schema, but changing a
@@ -2425,7 +2402,6 @@ export class McpServerFactoryService {
         },
       },
       async ({ id }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         const stored = await this.customDetectorsService.getById(id);
         assertMayWriteCode((stored as any)?.pipelineSchema);
         return jsonResult(await this.customDetectorsService.delete(id));
@@ -2488,7 +2464,6 @@ export class McpServerFactoryService {
         expectedCount,
         confirm,
       }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         const operation =
           dryRun === false
             ? await this.retireOutOfScope.startRetire(
@@ -2728,7 +2703,6 @@ export class McpServerFactoryService {
         assetId,
         maxAssets,
       }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         const detector = await this.customDetectorsService.getById(detectorId);
         const notebook = (detector.pipelineSchema as Record<string, any>)
           ?.notebook;
@@ -2778,7 +2752,6 @@ export class McpServerFactoryService {
         annotations: { readOnlyHint: false, destructiveHint: false },
       },
       async ({ detectorId, fileName, contentBase64, mimeType }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
           await this.customDetectorFiles.create({
             customDetectorId: detectorId,
@@ -2802,7 +2775,6 @@ export class McpServerFactoryService {
         annotations: { readOnlyHint: false, destructiveHint: true },
       },
       async ({ detectorId, fileId }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         await this.customDetectorFiles.delete(detectorId, fileId);
         return jsonResult({ deleted: true, fileId });
       },
@@ -3082,7 +3054,6 @@ export class McpServerFactoryService {
         },
       },
       async ({ runnerId }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(await this.cliRunnerService.stopRunner(runnerId));
       },
     );
@@ -3298,7 +3269,6 @@ export class McpServerFactoryService {
         },
       },
       async ({ id, ...rest }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(await this.findingsService.update(id, rest));
       },
     );
@@ -3358,7 +3328,6 @@ export class McpServerFactoryService {
         },
       },
       async (args) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         // zod carries the filter dates as ISO strings where the DTO declares
         // Date; Prisma takes either for a DateTime comparison, as search does.
         return jsonResult(
@@ -3409,7 +3378,6 @@ export class McpServerFactoryService {
         },
       },
       async ({ operationId }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
           this.findingBulkOperations.toDto(
             await this.findingBulkOperations.requestCancel(operationId),
@@ -3474,7 +3442,6 @@ export class McpServerFactoryService {
         },
       },
       async ({ source_id }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(await this.sourceService.purgeFindings(source_id));
       },
     );
@@ -3545,7 +3512,6 @@ export class McpServerFactoryService {
         not_scanned_since,
         dry_run,
       }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
           await this.sourceService.purgeAssets(source_id, {
             externalIdPrefix: external_id_prefix,
@@ -3829,7 +3795,6 @@ export class McpServerFactoryService {
         },
       },
       async ({ id, ...rest }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(await this.inquiriesService.update(id, rest));
       },
     );
@@ -3848,7 +3813,6 @@ export class McpServerFactoryService {
         },
       },
       async ({ id }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         await this.inquiriesService.remove(id);
         return jsonResult({ deleted: true, inquiryId: id });
       },
@@ -3899,7 +3863,6 @@ export class McpServerFactoryService {
         },
       },
       async ({ id }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(await this.inquiriesService.rematch(id));
       },
     );
@@ -4092,7 +4055,6 @@ export class McpServerFactoryService {
         },
       },
       async ({ id, ...rest }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
           await this.casesService.update(id, rest, toolAuthor()),
         );
@@ -4169,7 +4131,6 @@ export class McpServerFactoryService {
         },
       },
       async ({ id, ...rest }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(await this.casesService.close(id, rest));
       },
     );
@@ -4191,7 +4152,6 @@ export class McpServerFactoryService {
         },
       },
       async ({ id, ...rest }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(await this.casesService.reopen(id, rest));
       },
     );
@@ -4214,7 +4174,6 @@ export class McpServerFactoryService {
         },
       },
       async ({ id, ...rest }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(await this.casesService.addEvidence(id, rest));
       },
     );
@@ -4236,7 +4195,6 @@ export class McpServerFactoryService {
         },
       },
       async ({ id, ...rest }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(await this.casesService.attachFindings(id, rest));
       },
     );
@@ -4261,7 +4219,6 @@ export class McpServerFactoryService {
         },
       },
       async ({ id, ...rest }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(await this.casesService.pullFromInquiry(id, rest));
       },
     );
@@ -4285,7 +4242,6 @@ export class McpServerFactoryService {
         },
       },
       async ({ id, inquiryIds, autoPullInquiryIds }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
           await this.casesService.linkInquiries(id, {
             inquiryIds,
@@ -4318,7 +4274,6 @@ export class McpServerFactoryService {
         },
       },
       async ({ id, inquiryId, autoPull }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
           await this.casesService.setInquiryAutoPull(
             id,
@@ -4350,7 +4305,6 @@ export class McpServerFactoryService {
         },
       },
       async ({ id, inquiryId }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
           await this.casesService.unlinkInquiry(id, inquiryId, toolAuthor()),
         );
@@ -4444,7 +4398,6 @@ export class McpServerFactoryService {
             })),
           });
         }
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
           await this.caseFindingFilters.add(
             id,
@@ -4481,7 +4434,6 @@ export class McpServerFactoryService {
         },
       },
       async ({ id, findingIds }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
           await this.caseEscalation.clear(id, findingIds, toolAuthor()),
         );
@@ -4507,7 +4459,6 @@ export class McpServerFactoryService {
         },
       },
       async ({ id, filterId }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult({
           filters: await this.caseFindingFilters.remove(
             id,
@@ -4566,7 +4517,6 @@ export class McpServerFactoryService {
         annotations: { readOnlyHint: false, destructiveHint: false },
       },
       async ({ id, ...rule }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
           await this.caseHypothesisRules.add(id, rule, toolAuthor()),
         );
@@ -4595,7 +4545,6 @@ export class McpServerFactoryService {
         annotations: { readOnlyHint: false, destructiveHint: false },
       },
       async ({ id, ruleId, ...patch }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
           await this.caseHypothesisRules.update(
             id,
@@ -4623,7 +4572,6 @@ export class McpServerFactoryService {
         annotations: { readOnlyHint: false, destructiveHint: true },
       },
       async ({ id, ruleId, removeLinks }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
           await this.caseHypothesisRules.remove(
             id,
@@ -4706,7 +4654,6 @@ export class McpServerFactoryService {
         },
       },
       async ({ id, filterId, pattern, description, removeEmptiedAssets }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
           await this.caseFindingFilters.update(
             id,
@@ -4839,7 +4786,6 @@ export class McpServerFactoryService {
         },
       },
       async ({ caseId, kind, ...rest }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
           await this.caseThreadsService.create(caseId, {
             kind: kind ?? CaseThreadKind.HYPOTHESIS,
@@ -4878,7 +4824,6 @@ export class McpServerFactoryService {
         },
       },
       async ({ threadId, ...rest }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
           await this.caseThreadsService.addEntry(threadId, rest),
         );
@@ -4919,7 +4864,6 @@ export class McpServerFactoryService {
         },
       },
       async ({ threadId, ...rest }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
           await this.caseThreadsService.update(threadId, {
             ...rest,
@@ -4949,7 +4893,6 @@ export class McpServerFactoryService {
         },
       },
       async ({ threadId, ...rest }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
           await this.caseThreadsService.linkSupport(threadId, rest),
         );
@@ -5077,7 +5020,6 @@ export class McpServerFactoryService {
         },
       },
       async ({ caseId, baseVersion, ops }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         const version =
           baseVersion ?? (await this.caseBoardRead.currentVersion(caseId));
         return jsonResult(
@@ -5121,7 +5063,6 @@ export class McpServerFactoryService {
         },
       },
       async ({ caseId }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
           await this.caseBoardTools.place(caseId, toolAuthor()),
         );
@@ -5155,7 +5096,6 @@ export class McpServerFactoryService {
         },
       },
       async ({ caseId, dryRun }) => {
-        if (!dryRun) this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
           await this.caseBoardTools.tidy(caseId, { dryRun }, toolAuthor()),
         );
@@ -5191,7 +5131,6 @@ export class McpServerFactoryService {
         },
       },
       async ({ caseId, itemIds, title, frameId, color, arrangement }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
           await this.caseBoardTools.frame(
             caseId,
@@ -5283,7 +5222,6 @@ export class McpServerFactoryService {
         },
       },
       async ({ caseId }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
           await this.caseBoardRead.takeSnapshot(caseId, 'MANUAL', toolAuthor()),
         );
@@ -5339,7 +5277,6 @@ export class McpServerFactoryService {
         },
       },
       async (dto) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         const saved = await this.correlationService.saveConfig(dto);
         // The status below promised this; nothing scheduled it (field report P6).
         await this.correlationService.scheduleFullRecompute(
@@ -5374,7 +5311,6 @@ export class McpServerFactoryService {
         },
       },
       async ({ mode, label, value }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         const config = await this.correlationService.addExclusion({
           mode,
           label: label ?? null,
@@ -5407,7 +5343,6 @@ export class McpServerFactoryService {
         },
       },
       async ({ id }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         const config = await this.correlationService.removeExclusion(id);
         await this.correlationService.scheduleFullRecompute(
           'correlation exclusion removed (MCP)',
@@ -5440,7 +5375,6 @@ export class McpServerFactoryService {
         },
       },
       async ({ assetId }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
         // Explicit request: say why nothing happens rather than report a
         // recompute that the switched-off scheduler silently refused.
         await this.correlationService.assertEnabled();

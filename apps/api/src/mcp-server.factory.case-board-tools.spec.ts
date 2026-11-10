@@ -58,7 +58,7 @@ describe('McpServerFactoryService case board tools', () => {
     update: jest.fn().mockResolvedValue({ filters: [] }),
   };
   const caseThreadsService = { update: jest.fn().mockResolvedValue({}) };
-  const mcpToolExecutor = { assertNotDemoMode: jest.fn() };
+  const mcpToolExecutor = {};
 
   let tools: Record<string, RegisteredTool>;
 
@@ -147,14 +147,12 @@ describe('McpServerFactoryService case board tools', () => {
     ).toBe(false);
   });
 
-  it('places, tidies (dry runs skip the demo guard), frames and traces', async () => {
+  it('places, tidies, frames and traces', async () => {
     await call('place_case_board_items', { caseId: CASE });
     expect(caseBoardTools.place).toHaveBeenCalledWith(CASE, 'mcp');
 
     await call('tidy_case_board', { caseId: CASE, dryRun: true });
-    expect(mcpToolExecutor.assertNotDemoMode).toHaveBeenCalledTimes(1);
     await call('tidy_case_board', { caseId: CASE });
-    expect(mcpToolExecutor.assertNotDemoMode).toHaveBeenCalledTimes(2);
     expect(caseBoardTools.tidy.mock.calls).toEqual([
       [CASE, { dryRun: true }, 'mcp'],
       [CASE, { dryRun: undefined }, 'mcp'],

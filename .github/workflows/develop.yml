@@ -15,14 +15,6 @@ on:
         description: "Docker image tag to deploy (branch name, version, etc.)"
         required: false
         default: "develop"
-      demo_mode:
-        description: "Enable demo mode"
-        required: false
-        default: "true"
-        type: choice
-        options:
-          - "true"
-          - "false"
       keep_running:
         description: "classifyre-develop only: leave the smoke release up after the test instead of destroying it with its database."
         required: false
@@ -39,9 +31,6 @@ on:
       image_tag:
         type: string
         default: "develop"
-      demo_mode:
-        type: string
-        default: "true"
       keep_running:
         type: string
         default: "false"
@@ -67,7 +56,6 @@ jobs:
       DOCKER_NAMESPACE: ${{ secrets.DOCKER_USERNAME }}
       HELM_NAMESPACE: ${{ inputs.environment || 'classifyre-develop' }}
       IMAGE_TAG: ${{ inputs.image_tag || 'develop' }}
-      DEMO_MODE: ${{ inputs.demo_mode || 'true' }}
       KEEP_RUNNING: ${{ inputs.keep_running || 'false' }}
 
     steps:
@@ -122,7 +110,6 @@ jobs:
           echo "API image:   ${DOCKER_NAMESPACE}/api:${IMAGE_TAG}"
           echo "Web image:   ${DOCKER_NAMESPACE}/web:${IMAGE_TAG}"
           echo "CLI image:   ${DOCKER_NAMESPACE}/cli:${IMAGE_TAG}"
-          echo "Demo mode:   ${DEMO_MODE}"
 
       # The node is shared with prod and has run out of disk before (a full
       # image pull evicts everything). Stop before pulling more images.
@@ -193,7 +180,6 @@ jobs:
             --set api.cliJobs.image.tag="${IMAGE_TAG}" \
             --set frontend.image.repository="${DOCKER_NAMESPACE}/web" \
             --set frontend.image.tag="${IMAGE_TAG}" \
-            --set-string api.env.DEMO_MODE="${DEMO_MODE}" \
             --wait \
             --timeout 15m
 

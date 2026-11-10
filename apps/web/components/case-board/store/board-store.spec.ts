@@ -92,9 +92,9 @@ afterEach(() => {
 });
 
 describe("board store", () => {
-  it("opens read-only on a demo instance, so nothing it cannot save is ever sent", async () => {
+  it("opens read-only for someone who may only view, so nothing it cannot save is ever sent", async () => {
     mockGet.mockResolvedValueOnce(board(1, [noteDto(0, T0)]));
-    const store = createBoardStore("C", { demo: true });
+    const store = createBoardStore("C", { viewOnly: true });
     await store.getState().load();
     expect(store.getState().readOnly).toBe(true);
     store.getState().run(addNote({ x: 10, y: 10 }));
@@ -104,7 +104,7 @@ describe("board store", () => {
   it("places a read-only board's unplaced items on screen only, and keeps them across refetches", async () => {
     const unplaced = { ...noteDto(0, T0), x: null, y: null } as unknown as ReturnType<typeof noteDto>;
     mockGet.mockResolvedValue(board(1, [unplaced]));
-    const store = createBoardStore("C", { demo: true });
+    const store = createBoardStore("C", { viewOnly: true });
     await store.getState().load();
     const stop = store.getState().connect();
 

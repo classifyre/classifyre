@@ -26,8 +26,7 @@ import { AccessArea } from '../identity/access.decorators';
  * these endpoints answer correctly on `SERVICE_ROLE=api` pods, which never run
  * a queue handler themselves.
  *
- * Pause/resume is deliberately non-GET, which means `DemoModeGuard` blocks it
- * on a demo instance without any extra annotation.
+ * Pause/resume is deliberately non-GET, so it needs `workspace.settings`.
  */
 @ApiTags('Worker Queues')
 @AccessArea({ view: 'workspace.view', change: 'workspace.settings' })

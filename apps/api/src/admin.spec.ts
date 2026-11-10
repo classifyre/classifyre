@@ -1,4 +1,4 @@
-import { parseCopy, parseCreate, UsageError } from './admin';
+import { parseCopy, parseCreate, parsePublish, UsageError } from './admin';
 
 describe('workspaces copy arguments', () => {
   it('copies named workspaces into a tenant', () => {
@@ -59,5 +59,29 @@ describe('workspaces create arguments', () => {
   ])('refuses %j', (args, message) => {
     expect(() => parseCreate(args)).toThrow(UsageError);
     expect(() => parseCreate(args)).toThrow(message);
+  });
+});
+
+describe('workspaces publish arguments', () => {
+  it('publishes named workspaces, every one, or makes them private', () => {
+    expect(parsePublish(['--tenant', 'showcase', 'Nova'])).toEqual({
+      tenant: 'showcase',
+      slugs: ['nova'],
+      off: false,
+    });
+    expect(parsePublish(['--tenant', 'showcase', '--all', '--off'])).toEqual({
+      tenant: 'showcase',
+      slugs: 'all',
+      off: true,
+    });
+  });
+
+  it.each([
+    [['--all'], 'needs --tenant'],
+    [['--tenant', 'showcase'], 'Name the workspaces'],
+    [['--tenant', 'showcase', '--all', 'nova'], 'Name the workspaces'],
+    [['--tenant', 'showcase', '--force'], 'Unknown option'],
+  ])('refuses %j', (args, message) => {
+    expect(() => parsePublish(args)).toThrow(message);
   });
 });

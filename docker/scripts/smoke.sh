@@ -124,19 +124,20 @@ ok "workspace '${NS}' exists in the first tenant"
 
 # ── What the container serves ─────────────────────────────────────────────────
 step "Checking the routes"
-# Without a session the app sends people to sign in.
-status="$(curl -s -o /dev/null -w '%{http_code}' "${BASE}/")"
-[ "${status}" = "307" ] || [ "${status}" = "302" ] || fail "/ answered ${status}, not a redirect to sign in"
-ok "/ sends people to sign in"
+curl -fsSL -o /dev/null "${BASE}/" || fail "the web UI did not answer at /"
+ok "web UI at /"
 curl -fsS -o /dev/null "${BASE}/docs/" || fail "the bundled docs site did not answer at /docs/"
 ok "docs site at /docs/"
 # Swagger lives at /docs on the API. It must not shadow, or be shadowed by, the
 # documentation site the web app serves at the same path.
 curl -fsS -o /dev/null "${API}/docs" || fail "Swagger did not answer at /api/docs"
 ok "Swagger at /api/docs (no collision with the docs site)"
-status="$(curl -s -o /dev/null -w '%{http_code}' "${API}/namespaces")"
-[ "${status}" = "401" ] || fail "/api/namespaces answered ${status} without a session, not 401"
-ok "the API asks for sign-in"
+# Without a session: nothing is public on a fresh install, and the workspace
+# itself asks to sign in.
+[ "$(curl -fsSL "${API}/namespaces")" = "[]" ] || fail "/api/namespaces lists workspaces without a session"
+status="$(curl -s -o /dev/null -w '%{http_code}' "${API}/${NS}/sources")"
+[ "${status}" = "401" ] || fail "/api/${NS}/sources answered ${status} without a session, not 401"
+ok "without a session nothing is listed and a workspace asks to sign in"
 
 # ── Database ──────────────────────────────────────────────────────────────────
 step "Checking the databases"

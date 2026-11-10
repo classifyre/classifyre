@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { Controller, Get, Post, type ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { AllowInDemoMode } from '../demo-mode.decorator';
+import { ReadsOnly } from '../reads-only.decorator';
 import { InternalOnly } from '../internal-only.decorator';
 import { AccessArea, PublicRoute, Requires } from './access.decorators';
 import { AccessGuard, CapabilityRequiredException } from './access.guard';
@@ -19,7 +19,7 @@ class SampleController {
   @Post()
   create() {}
 
-  @AllowInDemoMode()
+  @ReadsOnly()
   @Post('search')
   search() {}
 
@@ -242,6 +242,34 @@ describe('AccessGuard on signed-in writes', () => {
       title: 'x',
       createdBy: 'user:u1',
       author: 'user:u1',
+    });
+  });
+
+  it('asks a visitor to sign in instead of refusing them a capability', async () => {
+    allow = false;
+    const visitorIdentity = {
+      ...identity,
+      authenticate: () =>
+        Promise.resolve({
+          actor: { ...actor, ref: undefined, kind: 'visitor' },
+          via: 'cookie',
+          grants: [],
+          visitor: true,
+        }),
+    };
+    const visitorGuard = new AccessGuard(
+      new Reflector(),
+      {
+        set: () => undefined,
+        workspaceId: () => 'ws-1',
+      } as unknown as ActorContextService,
+      { isInternalRequest: () => false } as never,
+      { check: () => ({ allow }), capabilities: () => new Set() },
+      visitorIdentity as never,
+    );
+    const { context } = contextFor(SampleController, 'create', 'POST');
+    await expect(visitorGuard.canActivate(context)).rejects.toMatchObject({
+      response: { statusCode: 401, code: 'SIGN_IN_REQUIRED' },
     });
   });
 

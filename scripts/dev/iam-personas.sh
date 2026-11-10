@@ -109,9 +109,7 @@ helm install "$REL" "$ROOT/helm/classifyre" -n "$NS" \
   -f "$ROOT/helm/develop/values-dev.yaml" \
   --set worker.replicaCount=0 --set ingress.enabled=false --set priorityClasses.create=false \
   --set postgres.embedded.persistence.enabled=false --set api.cliCache.enabled=false \
-  --set api.embedding.enabled=false \
-  `# Visitors of a public tenant are checked by the smoke test (apps/e2e).` \
-  --set iam.public.enabled=false >/dev/null
+  --set api.embedding.enabled=false >/dev/null
 
 say "wait for the API, the identity server and the realm setup"
 # Give up after ten minutes and say why, instead of waiting forever on pods
@@ -304,6 +302,23 @@ check N "nobody marks what was not sent to them" 404 "$(status controller PATCH 
 check N "a viewer cannot choose who gets them" 403 "$(status controller PUT /fin-ledger/notifications/audiences/SCAN "{\"groupIds\":[\"$AP\"]}")"
 check N "a workspace admin can" 200 "$(status admin PUT /fin-ledger/notifications/audiences/SCAN "{\"groupIds\":[\"$AP\"]}")"
 check N "only groups of the tenant" 400 "$(status admin PUT /fin-ledger/notifications/audiences/SCAN '{"groupIds":["no-such-group"]}')"
+
+say "public workspaces: read-only within their tenant (docs/prd/IAM step 8h)"
+anon_slugs() { curl -s "$B/namespaces" | json "print(','.join(sorted(n['slug'] for n in d)) or '-')"; }
+check W "without signing in nothing is listed while nothing is public" - "$(anon_slugs)"
+check W "and a private workspace asks to sign in" 401 "$(status - GET /sales-pipeline/sources)"
+check W "a viewer cannot make a workspace public" 403 "$(status controller PATCH "/namespaces/$WS_LEDGER" '{"public":true}')"
+check W "a tenant admin can" 200 "$(status admin PATCH "/namespaces/$WS_SALES" '{"public":true}')"
+check W "visitors then see it listed" sales-pipeline "$(anon_slugs)"
+check W "and read it" 200 "$(status - GET /sales-pipeline/sources)"
+check W "but change nothing: they are asked to sign in" 401 "$(status - POST /sales-pipeline/sources '{"name":"x","type":"LOCAL_FOLDER","config":{}}')"
+check W "nor see who has access" 401 "$(status - GET /sales-pipeline/access/grants)"
+check W "a member of the tenant without a grant on it reads it" 200 "$(status controller GET /sales-pipeline/sources)"
+check W "but cannot change it" 403 "$(status controller POST /sales-pipeline/sources '{"name":"x","type":"LOCAL_FOLDER","config":{}}')"
+check W "another tenant never sees it" 404 "$(status outsider@globex GET /sales-pipeline/sources)"
+check W "making it public is in the tenant's activity" workspace.published "$(pg classifyre_control "SELECT action FROM iam_audit_events WHERE action = 'workspace.published' LIMIT 1")"
+status admin PATCH "/namespaces/$WS_SALES" '{"public":false}' >/dev/null
+check W "private again, it closes at once" 401 "$(status - GET /sales-pipeline/sources)"
 
 say "operator commands (docs/prd/TEN §4.9)"
 check T0 "copies go only into a tenant" 2 "$(operator workspaces copy --to-local fin-q3 >/dev/null 2>&1; echo $?)"

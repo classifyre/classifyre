@@ -19,7 +19,6 @@ async function mockSettings(page: CtPage) {
         timeFormat: "TWELVE_HOUR",
         aiProviderConfigId: null,
         harnessAiProviderConfigId: null,
-        demoMode: false,
         createdAt: "2026-03-10T00:00:00.000Z",
         updatedAt: "2026-03-10T00:00:00.000Z",
       }),

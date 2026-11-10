@@ -49,11 +49,11 @@ describe('CaseLeadsScheduler', () => {
     expect(options.singletonNextSlot).toBeUndefined();
   });
 
-  it('leaves a demo instance as curated', async () => {
+  it('leaves a public workspace as curated for visitors', async () => {
     await new CaseLeadsScheduler(
       pgBoss as never,
       {
-        isDemoMode: true,
+        current: () => ({ kind: 'visitor' }),
       } as never,
     ).requestOnRead('case-1');
 

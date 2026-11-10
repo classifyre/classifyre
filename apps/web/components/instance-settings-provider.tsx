@@ -60,7 +60,6 @@ type InstanceSettingsContextValue = {
 const DEFAULT_SETTINGS: InstanceSettingsResponse = {
   id: 1,
   mcpEnabled: true,
-  demoMode: false,
   language: InstanceSettingsResponseDtoLanguageEnum.Automatic,
   timezone: "AUTOMATIC",
   timeFormat: InstanceSettingsResponseDtoTimeFormatEnum.Automatic,

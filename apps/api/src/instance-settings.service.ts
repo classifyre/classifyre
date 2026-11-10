@@ -1,6 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
-import { DemoModeService } from './demo-mode.service';
 import { MaskedConfigCryptoService } from './masked-config-crypto.service';
 import type { InstanceSettings, Prisma } from '@prisma/client';
 import { InstanceSettingsResponseDto } from './dto/instance-settings-response.dto';
@@ -16,7 +15,6 @@ const isInstanceTokenSet =
 export class InstanceSettingsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly demoMode: DemoModeService,
     private readonly crypto: MaskedConfigCryptoService,
   ) {}
 
@@ -51,7 +49,6 @@ export class InstanceSettingsService {
       autoScheduleEnabled: settings.autoScheduleEnabled,
       hfTokenSet: !!settings.hfTokenEnc,
       hfTokenInstanceSet: isInstanceTokenSet,
-      demoMode: this.demoMode.isDemoMode,
       createdAt: settings.createdAt,
       updatedAt: settings.updatedAt,
     };

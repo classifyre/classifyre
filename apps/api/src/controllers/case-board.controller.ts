@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ActorRef } from '../identity/actor-ref.decorator';
-import { AllowInDemoMode } from '../demo-mode.decorator';
+import { ReadsOnly } from '../reads-only.decorator';
 import { ReadOnlyEndpoint } from '../db/read-only-endpoint.decorator';
 import { CaseBoardService } from '../case-board/case-board.service';
 import { CaseBoardReadService } from '../case-board/case-board-read.service';
@@ -83,7 +83,7 @@ export class CaseBoardController {
 
   // Reads that carry a body: open on a demo instance like POST /graph/expand,
   // and retried after a transient database error like any read.
-  @AllowInDemoMode()
+  @ReadsOnly()
   @ReadOnlyEndpoint()
   @Post('neighbours')
   @HttpCode(HttpStatus.OK)
@@ -99,7 +99,7 @@ export class CaseBoardController {
     return this.board.neighbours(id, dto?.itemId);
   }
 
-  @AllowInDemoMode()
+  @ReadsOnly()
   @ReadOnlyEndpoint()
   @Post('trace')
   @HttpCode(HttpStatus.OK)

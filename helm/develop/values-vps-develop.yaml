@@ -19,7 +19,6 @@ api:
     pullPolicy: Always
 
   env:
-    DEMO_MODE: "false"
     MAX_CONCURRENT_RUNNERS: "1"
 
   # Single-node VPS: minimal footprint.
@@ -118,15 +117,11 @@ telemetry:
 objectStorage:
   enabled: false
 
-# The smoke test signs in, creates a workspace and checks access. The web app
-# proxies the identity server at /iam on the same host. A public tenant next
-# to `default`, so the smoke test checks that visitors see it and signed-in
-# people of `default` never do.
+# The smoke test signs in, creates a workspace, checks access, and makes a
+# workspace public to check that visitors read it and nothing else. The web
+# app proxies the identity server at /iam on the same host.
 iam:
   appUrl: https://staging.classifyre.com
-  public:
-    enabled: true
-    tenant: public
   resources:
     requests:
       cpu: 100m

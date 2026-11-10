@@ -9,7 +9,8 @@ import {
 } from "@workspace/ui/components/sidebar";
 import { Separator } from "@workspace/ui/components/separator";
 import { AssistantFab } from "./assistant-workflow-provider";
-import { DemoModeBanner } from "./demo-mode-badge";
+import { PublicViewBanner } from "./public-view-badge";
+import { useTenant } from "@/hooks/use-tenant";
 import { PausedWorkspaceBanner } from "./namespace/paused-workspace-banner";
 import { DocumentTitleUpdater } from "./document-title-updater";
 import { AiHealthProvider } from "./ai-health";
@@ -34,7 +35,8 @@ export function DashboardLayout({
   children: React.ReactNode;
   serverConfig?: ServerConfig;
 }) {
-  const { demoMode } = serverConfig;
+  // Someone who has not signed in reads a public workspace, read-only.
+  const visitor = useTenant()?.visitor ?? false;
 
   return (
     <ServerConfigContext.Provider value={serverConfig}>
@@ -53,9 +55,9 @@ export function DashboardLayout({
                   <Separator orientation="vertical" className="mr-1 h-4 shrink-0 sm:mr-2" />
                   <AppBreadcrumbs />
                 </div>
-                <HeaderActions demoMode={demoMode} />
+                <HeaderActions visitor={visitor} />
               </header>
-              {demoMode && <DemoModeBanner />}
+              {visitor && <PublicViewBanner />}
               <PausedWorkspaceBanner />
               <div className="flex min-w-0 flex-1 flex-col gap-4 p-4 pt-2">
                 {children}

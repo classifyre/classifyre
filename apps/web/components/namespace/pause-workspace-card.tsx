@@ -1,5 +1,6 @@
 "use client";
 
+import { useCan } from "@/hooks/use-me";
 import * as React from "react";
 import {
   Button,
@@ -13,8 +14,6 @@ import { Loader2, OctagonPause, Play } from "lucide-react";
 import { toast } from "sonner";
 import { useNamespace } from "@/components/namespace-provider";
 import { useTranslation } from "@/hooks/use-translation";
-import { useServerConfig } from "@/components/server-config-provider";
-import { useInstanceSettings } from "@/components/instance-settings-provider";
 
 /**
  * Workspace-level pause, at the top of the Settings → Workers tab.
@@ -28,9 +27,8 @@ import { useInstanceSettings } from "@/components/instance-settings-provider";
 export function PauseWorkspaceCard() {
   const { namespace, refresh } = useNamespace();
   const { t } = useTranslation();
-  const serverConfig = useServerConfig();
-  const { settings } = useInstanceSettings();
-  const demoMode = serverConfig.demoMode || settings.demoMode;
+  // Without the right to change it, the control is shown but cannot run.
+  const readOnly = !useCan("workspace.pause");
 
   const [reasonDraft, setReasonDraft] = React.useState(
     namespace?.pausedReason ?? "",
@@ -45,7 +43,7 @@ export function PauseWorkspaceCard() {
   }, [namespace?.pausedReason]);
 
   const setPauseState = async (nextPaused: boolean) => {
-    if (!namespace || busy || demoMode) return;
+    if (!namespace || busy || readOnly) return;
     setBusy(true);
     try {
       await api.namespaces.update(namespace.id, {
@@ -114,7 +112,7 @@ export function PauseWorkspaceCard() {
               type="button"
               size="sm"
               className="h-8 rounded-[4px]"
-              disabled={busy || demoMode}
+              disabled={busy || readOnly}
               onClick={() => void setPauseState(false)}
             >
               <Play className="mr-1.5 h-3.5 w-3.5" />
@@ -134,7 +132,7 @@ export function PauseWorkspaceCard() {
                 value={reasonDraft}
                 onChange={(event) => setReasonDraft(event.target.value)}
                 placeholder={t("workspaces.pauseReasonPlaceholder")}
-                disabled={busy || demoMode}
+                disabled={busy || readOnly}
                 maxLength={280}
                 className="h-9 rounded-[4px] border-2 border-border"
               />
@@ -144,7 +142,7 @@ export function PauseWorkspaceCard() {
               size="sm"
               variant="destructive"
               className="h-9 rounded-[4px] sm:shrink-0"
-              disabled={busy || demoMode}
+              disabled={busy || readOnly}
               onClick={() => void setPauseState(true)}
             >
               <OctagonPause className="mr-1.5 h-3.5 w-3.5" />

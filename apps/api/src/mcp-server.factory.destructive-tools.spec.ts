@@ -56,7 +56,7 @@ describe('McpServerFactoryService destructive tools reject unknown keys', () => 
       McpServerFactoryService.prototype,
     ) as McpServerFactoryService & Record<string, unknown>;
     Object.assign(factory, {
-      mcpToolExecutor: { assertNotDemoMode: jest.fn() },
+      mcpToolExecutor: {},
     });
     const server = factory.createServer();
     registered = (

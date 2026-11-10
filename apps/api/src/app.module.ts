@@ -4,8 +4,6 @@ import { ClsModule } from 'nestjs-cls';
 import { CliBackpressureGuard } from './guards/cli-backpressure.guard';
 import { PrismaService } from './prisma.service';
 import { PrismaCoreModule } from './prisma/prisma-core.module';
-import { DemoModeService } from './demo-mode.service';
-import { DemoModeGuard } from './demo-mode.guard';
 import { NamespacePauseModule } from './namespace/namespace-pause.module';
 import { MaintenanceModule } from './maintenance/maintenance.module';
 import { NamespacePausedGuard } from './namespace/namespace-paused.guard';
@@ -184,13 +182,11 @@ import {
   ],
   providers: [
     { provide: APP_GUARD, useClass: InternalApiKeyGuard },
-    { provide: APP_GUARD, useClass: DemoModeGuard },
     { provide: APP_GUARD, useClass: NamespacePausedGuard },
     // Last: the questions above (internal key, demo, paused) are answered first.
     { provide: APP_GUARD, useClass: AccessGuard },
     { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
     CliBackpressureGuard,
-    DemoModeService,
     InternalApiKeyService,
     PrismaService,
     SourceService,

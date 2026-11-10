@@ -91,6 +91,8 @@ export interface Grant extends GrantScope {
 export interface WorkspaceTenancy {
   tenantId: string;
   ownerGroupId: string | null;
+  /** Read-only for everyone of the tenant, and for visitors of the first tenant. */
+  public: boolean;
 }
 
 const TENANT_TTL_MS = 60_000;
@@ -261,11 +263,17 @@ export class TenancyService implements OnModuleDestroy {
     const { rows } = await this.pool.query<{
       tenant_id: string;
       owner_group_id: string | null;
-    }>(`SELECT tenant_id, owner_group_id FROM namespaces WHERE id = $1`, [
-      namespaceId,
-    ]);
+      is_public: boolean;
+    }>(
+      `SELECT tenant_id, owner_group_id, is_public FROM namespaces WHERE id = $1`,
+      [namespaceId],
+    );
     return rows[0]
-      ? { tenantId: rows[0].tenant_id, ownerGroupId: rows[0].owner_group_id }
+      ? {
+          tenantId: rows[0].tenant_id,
+          ownerGroupId: rows[0].owner_group_id,
+          public: rows[0].is_public,
+        }
       : null;
   }
 
@@ -533,14 +541,19 @@ export class TenancyService implements OnModuleDestroy {
       id: string;
       tenant_id: string;
       owner_group_id: string | null;
+      is_public: boolean;
     }>(
-      `SELECT id, tenant_id, owner_group_id FROM namespaces WHERE tenant_id = $1 AND status = 'active'`,
+      `SELECT id, tenant_id, owner_group_id, is_public FROM namespaces WHERE tenant_id = $1 AND status = 'active'`,
       [tenantId],
     );
     return new Map(
       rows.map((row) => [
         row.id,
-        { tenantId: row.tenant_id, ownerGroupId: row.owner_group_id },
+        {
+          tenantId: row.tenant_id,
+          ownerGroupId: row.owner_group_id,
+          public: row.is_public,
+        },
       ]),
     );
   }

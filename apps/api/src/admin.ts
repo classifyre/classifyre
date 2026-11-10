@@ -5,6 +5,7 @@
  *   node dist/src/admin.js workspaces list
  *   node dist/src/admin.js workspaces copy --to-tenant <alias> (--all | <slug>...) [--owner-group <id>]
  *   node dist/src/admin.js workspaces create --tenant <alias> --slug <slug> [--name <name>] [--owner-group <id>]
+ *   node dist/src/admin.js workspaces publish --tenant <alias> (--all | <slug>...) [--off]
  *
  * Classifyre runs on its control database and one database per tenant.
  * Workspaces made by installs from before sign-in was always on stay in their
@@ -65,6 +66,39 @@ export function parseCopy(args: string[]): CopyRequest {
     throw new UsageError('Name the workspaces, or pass --all');
   }
   return { tenant, slugs: all ? 'all' : slugs, ownerGroupId };
+}
+
+export interface PublishRequest {
+  tenant: string;
+  slugs: string[] | 'all';
+  /** Make them private again. */
+  off: boolean;
+}
+
+export function parsePublish(args: string[]): PublishRequest {
+  let tenant: string | undefined;
+  let all = false;
+  let off = false;
+  const slugs: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === '--tenant') {
+      const next = args[++i];
+      if (!next || next.startsWith('--')) {
+        throw new UsageError('--tenant needs a value');
+      }
+      tenant = next;
+    } else if (arg === '--all') all = true;
+    else if (arg === '--off') off = true;
+    else if (arg.startsWith('--'))
+      throw new UsageError(`Unknown option ${arg}`);
+    else slugs.push(arg.toLowerCase());
+  }
+  if (!tenant) throw new UsageError('workspaces publish needs --tenant');
+  if (all === slugs.length > 0) {
+    throw new UsageError('Name the workspaces, or pass --all');
+  }
+  return { tenant, slugs: all ? 'all' : slugs, off };
 }
 
 export interface CreateRequest {
@@ -150,7 +184,48 @@ async function listWorkspaces(control: Pool, open: Pool | null): Promise<void> {
 const USAGE = `Usage:
   node dist/src/admin.js workspaces list
   node dist/src/admin.js workspaces copy --to-tenant <alias> (--all | <slug>...) [--owner-group <id>]
-  node dist/src/admin.js workspaces create --tenant <alias> --slug <slug> [--name <name>] [--owner-group <id>]`;
+  node dist/src/admin.js workspaces create --tenant <alias> --slug <slug> [--name <name>] [--owner-group <id>]
+  node dist/src/admin.js workspaces publish --tenant <alias> (--all | <slug>...) [--off]`;
+
+/**
+ * Makes a tenant's workspaces public (read-only for everyone of the tenant,
+ * and for visitors when it is the first tenant) or private again.
+ */
+async function publishWorkspaces(
+  control: Pool,
+  request: PublishRequest,
+): Promise<void> {
+  const tenant = await tenantByAlias(control, request.tenant);
+  const { rows } = await control.query<{ id: string; slug: string }>(
+    `UPDATE namespaces SET is_public = $3, updated_at = now()
+      WHERE tenant_id = $1 AND status = 'active'
+        AND ($2::text[] IS NULL OR slug = ANY($2))
+      RETURNING id, slug`,
+    [tenant.id, request.slugs === 'all' ? null : request.slugs, !request.off],
+  );
+  const missing =
+    request.slugs === 'all'
+      ? []
+      : request.slugs.filter((slug) => !rows.some((row) => row.slug === slug));
+  if (missing.length) {
+    throw new UsageError(
+      `No workspace ${missing.join(', ')} in tenant ${tenant.alias}.`,
+    );
+  }
+  for (const row of rows) {
+    await recordEvent(
+      control,
+      tenant.id,
+      ACTOR,
+      request.off ? 'workspace.unpublished' : 'workspace.published',
+      { namespaceId: row.id, slug: row.slug },
+    );
+    console.log(
+      `${row.slug} is ${request.off ? 'private' : 'public, read-only'}.`,
+    );
+  }
+  if (!rows.length) console.log(`No workspace in tenant ${tenant.alias}.`);
+}
 
 /** Creates an empty workspace in a tenant, owned by its admins unless told. */
 async function createWorkspace(
@@ -192,10 +267,12 @@ async function createWorkspace(
 async function main(argv: string[]): Promise<void> {
   const [area, command, ...rest] = argv;
   const known =
-    area === 'workspaces' && ['list', 'copy', 'create'].includes(command ?? '');
+    area === 'workspaces' &&
+    ['list', 'copy', 'create', 'publish'].includes(command ?? '');
   if (!known) throw new UsageError(USAGE);
   const copy = command === 'copy' ? parseCopy(rest) : null;
   const create = command === 'create' ? parseCreate(rest) : null;
+  const publish = command === 'publish' ? parsePublish(rest) : null;
 
   // `kubectl exec` skips the container's start script, which is what builds
   // DATABASE_URL from the chart's DB_* variables.
@@ -214,6 +291,7 @@ async function main(argv: string[]): Promise<void> {
   try {
     if (command === 'list') return await listWorkspaces(control, open);
     if (create) return await createWorkspace(control, create);
+    if (publish) return await publishWorkspaces(control, publish);
     if (!copy) return;
     if (!open || !openUrl) {
       throw new UsageError(

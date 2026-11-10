@@ -38,7 +38,7 @@ import {
   TrainingExampleDto,
   TrainingExamplesStatsDto,
 } from '../dto/training-example.dto';
-import { AllowInDemoMode } from '../demo-mode.decorator';
+import { ReadsOnly } from '../reads-only.decorator';
 import { RetireOutOfScopeFindingsDto } from '../dto/retire-out-of-scope-findings.dto';
 import { FindingBulkOperationDto } from '../findings-bulk/finding-bulk-operation.dto';
 import { FindingBulkOperationService } from '../findings-bulk/finding-bulk-operation.service';
@@ -96,7 +96,7 @@ export class CustomDetectorsController {
     return this.customDetectorsService.create(dto);
   }
 
-  @AllowInDemoMode()
+  @ReadsOnly()
   @Requires('detector.train')
   @Post('training-examples/parse')
   @HttpCode(HttpStatus.OK)

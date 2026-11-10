@@ -19,7 +19,7 @@ import {
   SemanticLinkMethod,
 } from '@prisma/client';
 import { ActorRef } from '../identity/actor-ref.decorator';
-import { AllowInDemoMode } from '../demo-mode.decorator';
+import { ReadsOnly } from '../reads-only.decorator';
 import { GlossaryService } from '../glossary/glossary.service';
 import { BindingsService } from './bindings/bindings.service';
 import type { BindingSpec } from './bindings/binding-spec';
@@ -191,7 +191,7 @@ export class SemanticController {
 
   @Post('bindings/preview')
   @HttpCode(HttpStatus.OK)
-  @AllowInDemoMode()
+  @ReadsOnly()
   @ApiOperation({
     summary: 'Preview a binding: counts, samples, the lookup table, warnings',
   })

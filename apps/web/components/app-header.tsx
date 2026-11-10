@@ -39,7 +39,7 @@ import { LANGUAGE_OPTIONS, LanguageSwitcher, useSwitchLanguage } from "./languag
 import { Can } from "@/hooks/use-me";
 import { NotificationCenter } from "./notification-center";
 import { ThemeToggle } from "./theme-toggle";
-import { DemoModeHeaderBadge } from "./demo-mode-badge";
+import { PublicViewHeaderBadge } from "./public-view-badge";
 import { AccountMenu } from "@/components/account-menu";
 
 type T = (key: TranslationKey, params?: Record<string, string | number>) => string;
@@ -305,14 +305,14 @@ const iconButton = "relative rounded-[4px] border-2 border-transparent hover:bor
  * theme, the documentation and settings move into one menu, so the trail
  * keeps the room.
  */
-export function HeaderActions({ demoMode }: { demoMode: boolean }) {
+export function HeaderActions({ visitor }: { visitor: boolean }) {
   const { t } = useTranslation();
   const { nsHref } = useNamespace();
   const { resolvedTheme, setTheme } = useTheme();
   const { resolvedLanguage, switchLanguage } = useSwitchLanguage();
   return (
     <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-      {demoMode && <DemoModeHeaderBadge />}
+      {visitor && <PublicViewHeaderBadge />}
       <div className="hidden items-center gap-2 sm:flex">
         <LanguageSwitcher />
         <ThemeToggle />

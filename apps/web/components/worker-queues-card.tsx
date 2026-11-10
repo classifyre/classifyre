@@ -1,5 +1,6 @@
 "use client";
 
+import { useCan } from "@/hooks/use-me";
 import * as React from "react";
 import {
   AlertDialog,
@@ -39,7 +40,6 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
-import { useServerConfig } from "@/components/server-config-provider";
 import { useInstanceSettings } from "@/components/instance-settings-provider";
 import { FEATURE_SWITCHES_PATH } from "@/components/feature-off-notice";
 import { useNsPath } from "@/lib/ns-path";
@@ -77,9 +77,9 @@ function formatDuration(ms: number | null | undefined): string {
  */
 export function WorkerQueuesCard() {
   const { t } = useTranslation();
-  const serverConfig = useServerConfig();
   const { settings } = useInstanceSettings();
-  const demoMode = serverConfig.demoMode || settings.demoMode;
+  // Without the right to change it, the control is shown but cannot run.
+  const readOnly = !useCan("workspace.settings");
 
   const [overview, setOverview] = React.useState<WorkerOverviewDto | null>(
     null,
@@ -143,7 +143,7 @@ export function WorkerQueuesCard() {
   );
 
   const runPurge = async () => {
-    if (!purgeTarget || purging || demoMode) return;
+    if (!purgeTarget || purging || readOnly) return;
     const target = purgeTarget;
     setPurging(true);
     try {
@@ -253,7 +253,7 @@ export function WorkerQueuesCard() {
                   <QueueRow
                     key={queue.queue}
                     queue={queue}
-                    demoMode={demoMode}
+                    readOnly={readOnly}
                     pending={pending === queue.queue}
                     onTogglePause={() => void togglePause(queue)}
                     onPurge={() => setPurgeTarget(queue)}
@@ -315,13 +315,13 @@ export function WorkerQueuesCard() {
 
 function QueueRow({
   queue,
-  demoMode,
+  readOnly,
   pending,
   onTogglePause,
   onPurge,
 }: {
   queue: WorkerQueueDto;
-  demoMode: boolean;
+  readOnly: boolean;
   pending: boolean;
   onTogglePause: () => void;
   onPurge: () => void;
@@ -463,7 +463,7 @@ function QueueRow({
               variant="outline"
               size="sm"
               className="h-7 rounded-[4px] text-[11px]"
-              disabled={demoMode}
+              disabled={readOnly}
               onClick={onPurge}
             >
               {t("settings.workers.purge")}
@@ -486,7 +486,7 @@ function QueueRow({
             variant="outline"
             size="sm"
             className="h-7 rounded-[4px] text-[11px]"
-            disabled={demoMode || pending}
+            disabled={readOnly || pending}
             onClick={onTogglePause}
           >
             {pending ? (

@@ -3,7 +3,6 @@ import { BadRequestException } from '@nestjs/common';
 import { InstanceLanguage, InstanceTimeFormat } from '@prisma/client';
 import { InstanceSettingsService } from './instance-settings.service';
 import { PrismaService } from './prisma.service';
-import { DemoModeService } from './demo-mode.service';
 import { MaskedConfigCryptoService } from './masked-config-crypto.service';
 
 describe('InstanceSettingsService', () => {
@@ -23,7 +22,6 @@ describe('InstanceSettingsService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         InstanceSettingsService,
-        DemoModeService,
         MaskedConfigCryptoService,
         {
           provide: PrismaService,
@@ -68,7 +66,6 @@ describe('InstanceSettingsService', () => {
     expect(result).toMatchObject({
       id: 1,
       mcpEnabled: true,
-      demoMode: false,
       language: InstanceLanguage.ENGLISH,
       timezone: 'UTC',
       timeFormat: InstanceTimeFormat.TWELVE_HOUR,

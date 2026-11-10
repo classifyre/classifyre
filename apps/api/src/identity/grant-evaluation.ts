@@ -67,11 +67,25 @@ export function resourceGrantsInWorkspace(
 }
 
 /** Every capability the grants give in one workspace. Grants only add up. */
+/**
+ * What anyone of the tenant may do in a public workspace without a grant on
+ * it: read, as a visitor does (docs/prd/IAM §13 step 8h).
+ */
+export const PUBLIC_WORKSPACE_CAPABILITIES: readonly Capability[] =
+  roleCapabilities('visitor');
+
 export function capabilitiesInWorkspace(
   grants: readonly (GrantScope & { roleKey: string })[],
-  workspace: { namespaceId: string; ownerLineage: readonly string[] },
+  workspace: {
+    namespaceId: string;
+    ownerLineage: readonly string[];
+    /** A public workspace adds read-only access for everyone of its tenant. */
+    public?: boolean;
+  },
 ): Set<Capability> {
-  const capabilities = new Set<Capability>();
+  const capabilities = new Set<Capability>(
+    workspace.public ? PUBLIC_WORKSPACE_CAPABILITIES : [],
+  );
   for (const grant of grants) {
     if (!grantApplies(grant, workspace)) continue;
     for (const capability of roleCapabilities(grant.roleKey)) {

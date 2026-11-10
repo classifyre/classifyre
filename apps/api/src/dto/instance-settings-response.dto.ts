@@ -194,13 +194,6 @@ export class InstanceSettingsResponseDto {
 
   @ApiProperty({
     description:
-      'Read-only. When true, the instance runs in demo mode and all mutating operations are rejected.',
-    example: false,
-  })
-  demoMode: boolean;
-
-  @ApiProperty({
-    description:
       'Read-only. Whether a user-configured Hugging Face token is stored (encrypted at rest).',
     example: false,
   })

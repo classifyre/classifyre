@@ -21,7 +21,7 @@ import {
 } from '@nestjs/swagger';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { PublicRoute, Requires } from '../identity/access.decorators';
-import { AllowInDemoMode } from '../demo-mode.decorator';
+import { ReadsOnly } from '../reads-only.decorator';
 import {
   CreateQueryRunDto,
   DataQuerySettingsDto,
@@ -84,7 +84,7 @@ export class DataQueryController {
 
   @Post('query-runs')
   @Requires('workspace.view')
-  @AllowInDemoMode()
+  @ReadsOnly()
   @ApiOperation({
     summary: 'Run one SELECT; poll the run for its status',
     description:
@@ -147,7 +147,7 @@ export class DataQueryController {
 
   @Post('query-runs/:id/cancel')
   @Requires('workspace.view')
-  @AllowInDemoMode()
+  @ReadsOnly()
   @ApiOperation({ summary: 'Stop one of your queries' })
   @ApiOkResponse({ type: QueryRunDto })
   cancel(@Param('id', ParseUUIDPipe) id: string): Promise<QueryRunDto> {
@@ -161,7 +161,7 @@ export class DataQueryController {
    */
   @Post('query-runs/:id/result')
   @PublicRoute()
-  @AllowInDemoMode()
+  @ReadsOnly()
   @HttpCode(204)
   @ApiOperation({
     summary: 'Internal: a query job posts its result here',

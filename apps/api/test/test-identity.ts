@@ -42,7 +42,6 @@ const config: IamConfig = {
   apiClientId: 'classifyre-api',
   apiClientSecret: 'e2e',
   bootstrapTenantAlias: TEST_TENANT_ALIAS,
-  publicTenantAlias: null,
   appOrigin: null,
 };
 

@@ -18,7 +18,6 @@ import {
 
 const ENV_KEYS = [
   "SITEMAP_ENABLED",
-  "IAM_PUBLIC_TENANT",
   "SITEMAP_BASE_URL",
   "PUBLIC_BASE_URL",
   "SITEMAP_CHUNK_SIZE",
@@ -43,7 +42,6 @@ describe("sitemap-config", () => {
 
   describe("isSitemapEnabled", () => {
     it("is off unless explicitly enabled", () => {
-      process.env.IAM_PUBLIC_TENANT = "showcase";
       expect(isSitemapEnabled()).toBe(false);
       process.env.SITEMAP_ENABLED = "false";
       expect(isSitemapEnabled()).toBe(false);
@@ -53,12 +51,6 @@ describe("sitemap-config", () => {
       expect(isSitemapEnabled()).toBe(true);
     });
 
-    it("is off without a public tenant, whatever SITEMAP_ENABLED says", () => {
-      process.env.SITEMAP_ENABLED = "true";
-      expect(isSitemapEnabled()).toBe(false);
-      process.env.IAM_PUBLIC_TENANT = " ";
-      expect(isSitemapEnabled()).toBe(false);
-    });
   });
 
   describe("sitemapChunkSize", () => {
@@ -270,7 +262,6 @@ describe("sitemap-config", () => {
 
     it("invites crawlers and advertises the index once enabled", () => {
       process.env.SITEMAP_ENABLED = "true";
-      process.env.IAM_PUBLIC_TENANT = "showcase";
       const body = renderRobots("https://showcase.classifyre.com");
 
       expect(body).toContain("Allow: /");
@@ -281,7 +272,6 @@ describe("sitemap-config", () => {
 
     it("covers the locale-prefixed form of every namespace-scoped rule", () => {
       process.env.SITEMAP_ENABLED = "true";
-      process.env.IAM_PUBLIC_TENANT = "showcase";
       const body = renderRobots("https://showcase.classifyre.com");
 
       // `/*/settings/` wildcards one segment (the namespace slug) and so does
@@ -294,7 +284,6 @@ describe("sitemap-config", () => {
 
     it("blocks everything when the hostname cannot be resolved", () => {
       process.env.SITEMAP_ENABLED = "true";
-      process.env.IAM_PUBLIC_TENANT = "showcase";
       expect(renderRobots(null)).toBe("User-agent: *\nDisallow: /\n");
     });
   });

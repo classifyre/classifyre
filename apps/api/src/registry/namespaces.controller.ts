@@ -283,9 +283,22 @@ export class NamespacesController {
       id,
       'workspace.settings',
       ...(body.paused !== undefined ? (['workspace.pause'] as const) : []),
+      ...(body.public !== undefined ? (['workspace.publish'] as const) : []),
     );
     await this.assertOwnCategories(request, body.categoryIds);
-    return this.registry.update(id, body);
+    const before =
+      body.public !== undefined ? await this.registry.get(id) : null;
+    const updated = await this.registry.update(id, body);
+    if (before && before.public !== updated.public) {
+      const principal = await this.principal(request);
+      await this.tenancy.recordTenantEvent(
+        principal.tenant.id,
+        principal.actor.ref,
+        updated.public ? 'workspace.published' : 'workspace.unpublished',
+        { namespaceId: id, slug: updated.slug },
+      );
+    }
+    return updated;
   }
 
   @Requires('workspace.delete')

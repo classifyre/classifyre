@@ -159,6 +159,15 @@ export default function LandingPage() {
     void loadStats();
   }, [load, loadStats]);
 
+  // Someone who has not signed in and finds nothing public is here to sign in.
+  React.useEffect(() => {
+    if (visitor && namespaces?.length === 0) {
+      window.location.assign(
+        `/auth/login/?returnTo=${encodeURIComponent(window.location.pathname)}`,
+      );
+    }
+  }, [visitor, namespaces]);
+
   const confirmDelete = async () => {
     if (!pendingDelete) return;
     setDeleting(true);
