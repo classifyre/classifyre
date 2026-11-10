@@ -12,7 +12,7 @@ import { InstanceSettingsProvider } from "@/components/instance-settings-provide
 export function WorkerQueuesCardHarness() {
   return (
     <ServerConfigContext.Provider
-      value={{ logsPersisted: false, demoMode: false }}
+      value={{ logsPersisted: false }}
     >
       <InstanceSettingsProvider>
         <WorkerQueuesCard />

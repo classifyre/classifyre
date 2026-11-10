@@ -1577,6 +1577,11 @@ export interface Namespace {
   pausedAt: string | null;
   /** Operator note recorded at pause time; null when unset. */
   pausedReason: string | null;
+  /**
+   * Read-only for everyone of the tenant without a grant on it, and for
+   * people who have not signed in when it is in the first tenant.
+   */
+  public: boolean;
   settings: Record<string, unknown>;
   /** Ordered external links shown on the workspace card. */
   externalLinks: NamespaceExternalLink[];
@@ -1620,6 +1625,8 @@ export interface UpdateNamespaceInput {
    * pause state untouched.
    */
   paused?: boolean;
+  /** Make it public or private again; needs `workspace.publish`. */
+  public?: boolean;
   /**
    * Operator note stored alongside the pause. `null`/empty clears it.
    * Omit to leave it untouched.

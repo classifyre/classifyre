@@ -1,5 +1,6 @@
 "use client";
 
+import { useCan } from "@/hooks/use-me";
 import * as React from "react";
 import { Sparkles } from "lucide-react";
 import {
@@ -160,6 +161,9 @@ export function AssistantWorkflowProvider({
   children: React.ReactNode;
 }) {
   const { settings } = useInstanceSettings();
+  // Read-only people (a viewer, a visitor of a public workspace) get no
+  // assistant: it acts in the workspace.
+  const canUseAgent = useCan("agent.use");
   const router = useRouter();
   const pathname = usePathname();
   const [bridge, setBridge] = React.useState<AssistantPageBridge | null>(null);
@@ -530,7 +534,7 @@ export function AssistantWorkflowProvider({
   const active =
     (bridge ? bridge.canOpen : true) &&
     !!settings.aiProviderConfigId &&
-    !settings.demoMode;
+    canUseAgent;
   const contextValue = React.useMemo<AssistantWorkflowContextValue>(
     () => ({
       active,

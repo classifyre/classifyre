@@ -51,17 +51,11 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
-  // Not signed in: with a public tenant they browse it; the API answers them
-  // as visitors, read-only.
-  if (config.publicTenant || request.nextUrl.pathname.startsWith("/api/")) {
-    return NextResponse.next();
-  }
-  const login = new URL("/auth/login", config.appUrl);
-  login.searchParams.set(
-    "returnTo",
-    `${request.nextUrl.pathname}${request.nextUrl.search}`,
-  );
-  return NextResponse.redirect(login);
+  // Not signed in: they may read the first tenant's public workspaces, as
+  // visitors. The API answers anything else with 401, which sends them to
+  // sign in (components/iam-session.tsx), and the workspace list sends them
+  // there when nothing is public.
+  return NextResponse.next();
 }
 
 export const config = {

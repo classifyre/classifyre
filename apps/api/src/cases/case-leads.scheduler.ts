@@ -1,7 +1,7 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { PgBossService } from '../scheduler/pg-boss.service';
 // A value import: an @Optional() injection resolves from emitted metadata.
-import { DemoModeService } from '../demo-mode.service';
+import { ActorContextService } from '../identity/actor-context.service';
 import {
   CASE_LEADS_COALESCE_SECONDS,
   CASE_LEADS_DELAY_SECONDS,
@@ -40,7 +40,7 @@ export class CaseLeadsScheduler {
 
   constructor(
     private readonly pgBoss: PgBossService,
-    @Optional() private readonly demo?: DemoModeService,
+    @Optional() private readonly actors?: ActorContextService,
   ) {}
 
   /** The case's evidence or watches changed: refresh its leads shortly. */
@@ -60,10 +60,11 @@ export class CaseLeadsScheduler {
   /**
    * Someone opened the case: refresh unless one ran in the last few minutes.
    * Throttled, not debounced — a board that re-reads every minute must not
-   * keep a refresh permanently queued. A demo instance is left as curated.
+   * keep a refresh permanently queued. A visitor reading a public workspace
+   * leaves it as curated: nobody who has not signed in starts work.
    */
   async requestOnRead(caseId: string): Promise<void> {
-    if (this.demo?.isDemoMode) return;
+    if (this.actors?.current().kind === 'visitor') return;
     if (this.askedRecently(`read:${caseId}`, READ_ASKED_RECENTLY_MS)) return;
     await this.send(
       { caseId, reason: 'board opened' },

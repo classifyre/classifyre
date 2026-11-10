@@ -13,9 +13,6 @@ type Registered = {
 
 function register(deps: Partial<Record<keyof SemanticMcpDeps, unknown>>) {
   const tools = new Map<string, Registered>();
-  const assertNotDemoMode = jest.fn((): void => {
-    throw new Error('demo mode');
-  });
   registerSemanticMcpTools(
     {
       registerTool: (name, config, cb) => {
@@ -27,9 +24,9 @@ function register(deps: Partial<Record<keyof SemanticMcpDeps, unknown>>) {
       },
     },
     deps as SemanticMcpDeps,
-    { json: (payload) => payload, assertNotDemoMode },
+    { json: (payload) => payload },
   );
-  return { tools, assertNotDemoMode };
+  return { tools };
 }
 
 describe('semantic MCP tools', () => {
@@ -54,42 +51,13 @@ describe('semantic MCP tools', () => {
     ).toBe(false);
   });
 
-  it('every write refuses in demo mode before touching anything', async () => {
-    const touched = jest.fn();
-    const proxy = new Proxy(
-      {},
-      { get: () => new Proxy(touched, { get: () => touched }) },
-    );
-    const { tools, assertNotDemoMode } = register({
-      glossary: proxy,
-      relations: proxy,
-      transfer: proxy,
-      bindings: proxy,
-      vocabulary: proxy,
-      meaning: proxy,
-      packs: proxy,
-      findInText: proxy,
-      proposals: proxy,
-      suggestions: proxy,
-      map: proxy,
-    });
-    const writes = [...tools].filter(([, tool]) => !tool.readOnly);
-    expect(writes.length).toBeGreaterThan(10);
-    for (const [, tool] of writes) {
-      await expect(tool.run({})).rejects.toThrow('demo mode');
-    }
-    expect(assertNotDemoMode).toHaveBeenCalledTimes(writes.length);
-    expect(touched).not.toHaveBeenCalled();
-  });
-
   it('imports and pack installs are dry runs unless asked otherwise', async () => {
     const importFile = jest.fn().mockResolvedValue({});
     const install = jest.fn().mockResolvedValue({});
-    const { tools, assertNotDemoMode } = register({
+    const { tools } = register({
       transfer: { importFile },
       packs: { install },
     });
-    assertNotDemoMode.mockImplementation(() => undefined);
     const unlocked = tools;
     await unlocked.get('import_glossary')!.run({ format: 'csv', content: 'x' });
     await unlocked.get('install_glossary_pack')!.run({ key: 'gdpr' });

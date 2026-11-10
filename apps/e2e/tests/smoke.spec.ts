@@ -32,10 +32,6 @@ const BASE_URL = env("BASE_URL", "http://localhost:3000").replace(/\/$/, "");
 const ADMIN = { user: env("SMOKE_ADMIN_USER"), password: env("SMOKE_ADMIN_PASSWORD") };
 const VIEWER = { user: env("SMOKE_VIEWER_USER"), password: env("SMOKE_VIEWER_PASSWORD") };
 const VIEWERS_GROUP = env("SMOKE_VIEWERS_GROUP", "/smoke-viewers");
-// Set by the seed when the release has a public tenant (iam.public).
-const PUBLISHER = process.env.SMOKE_PUBLISHER_USER
-  ? { user: env("SMOKE_PUBLISHER_USER"), password: env("SMOKE_PUBLISHER_PASSWORD") }
-  : null;
 const FOLDER = env("SMOKE_FOLDER", "/mnt/corpora/smoke");
 
 const RUN = process.env.SMOKE_RUN || Date.now().toString(36);
@@ -43,15 +39,13 @@ const AFTER_RESTART = process.env.SMOKE_AFTER_RESTART === "1";
 const WORKSPACE_NAME = `Smoke ${RUN}`;
 const SLUG = `smoke-${RUN}`;
 const SOURCE_NAME = `Smoke folder ${RUN}`;
-const PUBLIC_NAME = `Smoke public ${RUN}`;
-const PUBLIC_SLUG = `smoke-public-${RUN}`;
 
 /** Calls the API through the web app, signed in by the page's cookies. */
 class Api {
   constructor(private readonly request: APIRequestContext) {}
 
   async call<T = unknown>(
-    method: "GET" | "POST" | "DELETE",
+    method: "GET" | "POST" | "PATCH" | "DELETE",
     path: string,
     body?: unknown,
   ): Promise<{ status: number; body: T }> {
@@ -71,7 +65,7 @@ class Api {
     return { status: response.status(), body: parsed as T };
   }
 
-  async ok<T = unknown>(method: "GET" | "POST" | "DELETE", path: string, body?: unknown): Promise<T> {
+  async ok<T = unknown>(method: "GET" | "POST" | "PATCH" | "DELETE", path: string, body?: unknown): Promise<T> {
     const result = await this.call<T>(method, path, body);
     expect(result.status, `${method} ${path}: ${JSON.stringify(result.body)}`).toBeLessThan(300);
     return result.body;
@@ -159,10 +153,13 @@ test.describe.serial("smoke with sign-in", () => {
     await expect(admin.page.getByText(SOURCE_NAME, { exact: true }).first()).toBeVisible();
   });
 
-  test("without signing in: sign-in required, or only the public tenant", async () => {
+  test("without signing in: only public workspaces, nothing to change", async () => {
     const anonymous = await playwrightRequest.newContext();
-    const response = await anonymous.get(`${BASE_URL}/api/namespaces`);
-    expect(response.status()).toBe(PUBLISHER ? 200 : 401);
+    const listed = await anonymous.get(`${BASE_URL}/api/namespaces`);
+    expect(listed.status()).toBe(200);
+    expect(Array.isArray(await listed.json())).toBe(true);
+    const tenant = await anonymous.get(`${BASE_URL}/api/tenant/grants`);
+    expect(tenant.status()).toBe(401);
     await anonymous.dispose();
   });
 
@@ -350,54 +347,49 @@ test.describe.serial("smoke with sign-in", () => {
     expect(exported.body.code).toBe("EXPORT_NOT_ALLOWED");
   });
 
-  test("a visitor reads the public tenant, and it never mixes with signed-in tenants", async ({
+  test("a public workspace is read-only for visitors, and closes again when made private", async ({
     browser,
   }) => {
-    test.skip(!PUBLISHER, "the release has no public tenant (iam.public)");
-    const publisher = await signedIn(browser, PUBLISHER!);
     const visitorContext = await browser.newContext();
-    let publicId = "";
+    const visitor = new Api(visitorContext.request);
     try {
-      publicId = await createWorkspace(publisher, PUBLIC_NAME, PUBLIC_SLUG);
-      expect(
-        (await publisher.api.ok<Array<{ slug: string }>>("GET", "/namespaces")).map((ws) => ws.slug),
-        "the public tenant's editor sees only the public tenant",
-      ).not.toContain(SLUG);
+      expect((await visitor.call("GET", `/${SLUG}/sources`)).status, "private: sign in").toBe(401);
 
-      // No session: the app opens on the public tenant, with Sign in on top.
-      const page = await visitorContext.newPage();
-      await page.goto("/");
-      await expect(page.getByTestId("sign-in")).toBeVisible();
-      await expect(page.getByTestId(`workspace-card-${PUBLIC_SLUG}`)).toBeVisible();
-      await expect(page.getByTestId(`workspace-card-${SLUG}`)).toHaveCount(0);
+      // The admin makes it public from Settings → Access.
+      const { page } = admin;
+      await page.goto(`/${SLUG}/settings/?tab=access`);
+      await page.getByTestId("public-workspace-switch").click();
+      await page.getByTestId("public-workspace-confirm").click();
+      await expect(page.getByTestId("public-workspace-switch")).toHaveAttribute("data-state", "checked");
 
-      const visitor = new Api(visitorContext.request);
+      // No session: the directory lists it, with Sign in on top, and it reads.
+      const visitorPage = await visitorContext.newPage();
+      await visitorPage.goto("/");
+      await expect(visitorPage.getByTestId("sign-in")).toBeVisible();
+      await expect(visitorPage.getByTestId(`workspace-card-${SLUG}`)).toBeVisible();
       const listed = (await visitor.ok<Array<{ slug: string }>>("GET", "/namespaces")).map((ws) => ws.slug);
-      expect(listed).toContain(PUBLIC_SLUG);
-      expect(listed, "a signed-in tenant's workspace").not.toContain(SLUG);
-      expect((await visitor.call("GET", `/${SLUG}/sources`)).status).toBe(404);
-      expect((await visitor.call("GET", `/${PUBLIC_SLUG}/sources`)).status).toBe(200);
-      // Read-only, not who has access, and no notifications: those go to
-      // groups, and a visitor is in none.
-      expect((await visitor.call("GET", `/${PUBLIC_SLUG}/access/grants`)).status).toBe(403);
-      expect((await visitor.call("GET", `/${PUBLIC_SLUG}/notifications`)).status).toBe(403);
-      const write = await visitor.call("POST", `/${PUBLIC_SLUG}/sources`, {
+      expect(listed).toContain(SLUG);
+      expect((await visitor.call("GET", `/${SLUG}/sources`)).status).toBe(200);
+      expect((await visitor.call("GET", `/${SLUG}/findings/stats`)).status).toBe(200);
+      // Read-only: changing anything, who has access and notifications ask
+      // them to sign in.
+      const write = await visitor.call("POST", `/${SLUG}/sources`, {
         type: "LOCAL_FOLDER",
         name: "Not allowed",
         config: { type: "LOCAL_FOLDER", required: { path: FOLDER } },
       });
-      expect(write.status).toBe(403);
+      expect(write.status).toBe(401);
+      expect((await visitor.call("GET", `/${SLUG}/access/grants`)).status).toBe(401);
+      expect((await visitor.call("GET", `/${SLUG}/notifications`)).status).toBe(401);
 
-      // Signed in to another tenant: the public tenant is not there.
-      const adminSees = (await admin.api.ok<Array<{ slug: string }>>("GET", "/namespaces")).map(
-        (ws) => ws.slug,
-      );
-      expect(adminSees).not.toContain(PUBLIC_SLUG);
-      expect((await admin.api.call("GET", `/${PUBLIC_SLUG}/sources`)).status).toBe(404);
+      // Private again: closed to visitors at once.
+      await admin.api.ok("PATCH", `/namespaces/${workspaceId}`, { public: false });
+      expect((await visitor.call("GET", `/${SLUG}/sources`)).status).toBe(401);
+      expect(
+        (await visitor.ok<Array<{ slug: string }>>("GET", "/namespaces")).map((ws) => ws.slug),
+      ).not.toContain(SLUG);
     } finally {
-      if (publicId) await publisher.api.call("DELETE", `/namespaces/${publicId}`);
       await visitorContext.close();
-      await publisher.context.close();
     }
   });
 });

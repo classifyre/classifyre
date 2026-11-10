@@ -14,13 +14,11 @@ export interface IamConfig {
   audience: string;
   apiClientId: string;
   apiClientSecret: string;
-  /** Alias of the first tenant, made with its admins at boot. */
-  bootstrapTenantAlias: string;
   /**
-   * Alias of the public tenant: people who have not signed in read its
-   * workspaces (docs/prd/IAM step 8e). Null: everyone must sign in.
+   * Alias of the first tenant, made with its admins at boot. People who have
+   * not signed in read its public workspaces.
    */
-  publicTenantAlias: string | null;
+  bootstrapTenantAlias: string;
   /** Origin of the Classifyre app; cookie-signed writes must come from it. */
   appOrigin: string | null;
 }
@@ -65,7 +63,6 @@ export function readIamConfig(env: NodeJS.ProcessEnv = process.env): IamConfig {
     apiClientId: required('IAM_API_CLIENT_ID'),
     apiClientSecret: required('IAM_API_CLIENT_SECRET'),
     bootstrapTenantAlias: env.IAM_BOOTSTRAP_TENANT?.trim() || 'default',
-    publicTenantAlias: env.IAM_PUBLIC_TENANT?.trim() || null,
     appOrigin: originOf(env.IAM_APP_URL),
   };
 }

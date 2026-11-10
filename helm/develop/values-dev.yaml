@@ -130,7 +130,6 @@ api:
     # background embedding does not starve the API, and do not expect it to
     # bound memory.
     EMBEDDING_INTRA_OP_THREADS: "2"
-    DEMO_MODE: "false"
 
   extraVolumeMounts:
     - name: development-source
@@ -619,11 +618,8 @@ objectStorage:
 # and the issuer in tokens is the host the browser actually sees.
 iam:
   appUrl: http://localhost:3000
-  # Visitors who have not signed in browse the `public` tenant, read-only;
-  # signed-in people see only their own tenant (docs/prd/IAM step 8e).
-  public:
-    enabled: true
-    tenant: public
+  # People who have not signed in read the public workspaces of the first
+  # tenant (`default`), read-only (docs/prd/IAM step 8h).
   # As in production: through the app only the realm's identity console
   # (http://localhost:3000/auth/console/, for operators). The master realm's
   # console is on the skaffold port-forward, http://localhost:8280/iam/admin

@@ -40,8 +40,8 @@ import { Requires } from '../identity/access.decorators';
 /**
  * Namespace-scoped export and import.
  *
- * Every mutating route here is a plain POST, so the demo-mode guard blocks it
- * by default — a demo instance must not hand out its corpus or accept one.
+ * Every route needs `workspace.transfer`, which visitors of a public
+ * workspace never hold: a public workspace does not hand out its corpus.
  */
 @ApiTags('data-transfer')
 @Requires('workspace.transfer')

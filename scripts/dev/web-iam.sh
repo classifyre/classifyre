@@ -26,14 +26,13 @@ export IAM_ISSUER_URL="$IAM_APP_URL/iam/realms/$IAM_REALM"
 export IAM_INTERNAL_URL=http://localhost:8280/iam
 export IAM_WEB_CLIENT_ID=classifyre-web
 export IAM_WEB_CLIENT_SECRET="$secret"
-# Same settings as the API's (the dev values): the public tenant visitors
-# browse, and which identity consoles the `/iam` proxy forwards.
+# Same settings as the API's (the dev values): which identity consoles the
+# `/iam` proxy forwards.
 api_env() {
   kubectl --context k3d-classifyre -n "$NS" get deploy classifyre-api \
     -o jsonpath="{.spec.template.spec.containers[0].env[?(@.name==\"$1\")].value}" 2>/dev/null || true
 }
-IAM_PUBLIC_TENANT=$(api_env IAM_PUBLIC_TENANT)
 IAM_REALM_CONSOLE=$(api_env IAM_REALM_CONSOLE)
 IAM_EXPOSE_ADMIN_CONSOLE=$(api_env IAM_EXPOSE_ADMIN_CONSOLE)
-export IAM_PUBLIC_TENANT IAM_REALM_CONSOLE IAM_EXPOSE_ADMIN_CONSOLE
+export IAM_REALM_CONSOLE IAM_EXPOSE_ADMIN_CONSOLE
 exec bun dev

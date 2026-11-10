@@ -403,13 +403,25 @@ describe('IdentityService', () => {
       },
       rememberPrincipal: () => Promise.resolve(),
       grantsFor: () => Promise.resolve(grants),
+      tenantByAlias: (alias: string) =>
+        Promise.resolve(
+          alias === 'acme'
+            ? { ...acme, orgId: tenantOrg, status: tenantStatus }
+            : null,
+        ),
       workspaceTenancy: (id: string) =>
         Promise.resolve(
           id === 'ws-globex'
-            ? { tenantId: 't-globex', ownerGroupId: 'finance' }
+            ? { tenantId: 't-globex', ownerGroupId: 'finance', public: true }
             : id === 'ws-sales'
-              ? { tenantId: 't-acme', ownerGroupId: 'sales' }
-              : { tenantId: 't-acme', ownerGroupId: 'ap-team' },
+              ? { tenantId: 't-acme', ownerGroupId: 'sales', public: false }
+              : id === 'ws-public'
+                ? { tenantId: 't-acme', ownerGroupId: 'sales', public: true }
+                : {
+                    tenantId: 't-acme',
+                    ownerGroupId: 'ap-team',
+                    public: false,
+                  },
         ),
     } as unknown as TenancyService;
     const verifier = {
@@ -441,47 +453,65 @@ describe('IdentityService', () => {
     expect(principal.tenant.alias).toBe('acme');
   });
 
-  describe('a public tenant (IAM step 8e)', () => {
-    const publicConfig = { ...config, publicTenantAlias: 'acme' };
+  describe('public workspaces (IAM step 8h)', () => {
+    const firstAcme = { ...config, bootstrapTenantAlias: 'acme' };
     const anonymous = () => ({ headers: {} });
 
-    it('makes someone without credentials a visitor who may only read it', async () => {
-      const identity = service({ enabled: true, orgs: [] }, publicConfig);
+    it('makes someone without credentials a visitor of the first tenant, who only reads its public workspaces', async () => {
+      const identity = service({ enabled: true, orgs: [] }, firstAcme);
       const visitor = await identity.authenticate(anonymous());
       expect(visitor).toMatchObject({
         visitor: true,
         sub: '',
         tenant: { alias: 'acme' },
+        grants: [],
         actor: { kind: 'visitor', ref: undefined },
       });
-      const capabilities = await identity.capabilitiesIn(visitor, 'ws-ledger');
-      expect(capabilities?.has('finding.view')).toBe(true);
-      expect(capabilities?.has('access.view')).toBe(false);
-      expect(capabilities?.has('mcp.token.own')).toBe(false);
-      expect(capabilities?.has('source.manage')).toBe(false);
+      const open = await identity.capabilitiesIn(visitor, 'ws-public');
+      expect(open?.has('workspace.view')).toBe(true);
+      expect(open?.has('finding.view')).toBe(true);
+      expect(open?.has('access.view')).toBe(false);
+      expect(open?.has('notification.view')).toBe(false);
+      expect(open?.has('mcp.token.own')).toBe(false);
+      expect(open?.has('source.manage')).toBe(false);
+      // A private workspace of the same tenant is closed to them …
+      expect(
+        (await identity.capabilitiesIn(visitor, 'ws-sales'))?.has(
+          'workspace.view',
+        ),
+      ).toBe(false);
+      // … and another tenant's public one does not exist for them.
+      expect(await identity.capabilitiesIn(visitor, 'ws-globex')).toBeNull();
       expect(
         identity.tenantCapabilities(visitor).has('tenant.audit.view'),
       ).toBe(false);
-      // Another tenant's workspace does not exist for a visitor.
-      expect(await identity.capabilitiesIn(visitor, 'ws-globex')).toBeNull();
+    });
+
+    it('lets every member of the tenant read a public workspace without a grant on it', async () => {
+      orgClaim = ['acme'];
+      const identity = service({ enabled: true, orgs: ['acme'] });
+      const principal = await identity.authenticate(request());
+      const open = await identity.capabilitiesIn(principal, 'ws-public');
+      expect(open?.has('workspace.view')).toBe(true);
+      expect(open?.has('source.manage')).toBe(false);
+      expect((await identity.capabilitiesIn(principal, 'ws-sales'))?.size).toBe(
+        0,
+      );
+    });
+
+    it('never opens a public workspace to another tenant', async () => {
+      orgClaim = ['acme'];
+      const identity = service({ enabled: true, orgs: ['acme'] });
+      const principal = await identity.authenticate(request());
+      expect(await identity.capabilitiesIn(principal, 'ws-globex')).toBeNull();
     });
 
     it('never turns a request with a token into a visitor', async () => {
       orgClaim = [];
-      const identity = service({ enabled: true, orgs: [] }, publicConfig);
+      const identity = service({ enabled: true, orgs: [] }, firstAcme);
       await expect(
         identity.authenticate({ headers: { cookie: 'cf_session=a.b.c' } }),
       ).rejects.toMatchObject({ code: 'NO_TENANT' });
-    });
-
-    it('signs people in to their own tenant as before', async () => {
-      orgClaim = ['acme'];
-      const principal = await service(
-        { enabled: true, orgs: ['acme'] },
-        publicConfig,
-      ).authenticate(request());
-      expect(principal.visitor).toBeUndefined();
-      expect(principal.actor.kind).toBe('person');
     });
 
     it('never makes a visitor of a request that brings credentials of another kind', async () => {
@@ -489,17 +519,17 @@ describe('IdentityService', () => {
         headers: { authorization: 'Basic dXNlcjpwYXNz' },
       } as unknown as Parameters<IdentityService['authenticate']>[0];
       await expect(
-        service({ enabled: true, orgs: [] }, publicConfig).authenticate(basic),
+        service({ enabled: true, orgs: [] }, firstAcme).authenticate(basic),
       ).rejects.toMatchObject({ code: 'SIGN_IN_REQUIRED' });
     });
 
-    it('has no visitors without a public tenant, or while it is suspended', async () => {
+    it('has no visitors before the first tenant exists, or while it is suspended', async () => {
       await expect(
         service({ enabled: true, orgs: [] }).authenticate(anonymous()),
       ).rejects.toMatchObject({ code: 'SIGN_IN_REQUIRED' });
       tenantStatus = 'suspended';
       await expect(
-        service({ enabled: true, orgs: [] }, publicConfig).authenticate(
+        service({ enabled: true, orgs: [] }, firstAcme).authenticate(
           anonymous(),
         ),
       ).rejects.toMatchObject({ code: 'SIGN_IN_REQUIRED' });

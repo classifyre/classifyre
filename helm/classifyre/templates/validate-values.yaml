@@ -34,11 +34,13 @@
 {{- if hasKey .Values.iam "enabled" -}}
 {{- fail "iam.enabled is gone: sign-in is always on. Remove it from your values" -}}
 {{- end -}}
-{{- /* Sign-in is always on, so an instance is private: nothing in it is for
-     crawlers (§2 H4), except a public tenant, which visitors and crawlers may
-     read. */ -}}
-{{- if and .Values.frontend.sitemap.enabled (not .Values.iam.public.enabled) -}}
-{{- fail "frontend.sitemap.enabled needs iam.public.enabled: only a public tenant is for crawlers" -}}
+{{- /* Sign-in is always on, so an instance is private: crawlers read only the
+     public workspaces of the first tenant (§2 H4). */ -}}
+{{- if hasKey .Values.iam "public" -}}
+{{- fail "iam.public is gone: make workspaces of the first tenant public instead (workspace Settings → Access). Remove it from your values" -}}
+{{- end -}}
+{{- if hasKey .Values.api.env "DEMO_MODE" -}}
+{{- fail "api.env.DEMO_MODE is gone: a public workspace is read-only for visitors, and its editors sign in. Remove it from your values" -}}
 {{- end -}}
 {{- if and (not .Values.iam.appUrl) (empty .Values.ingress.host) -}}
 {{- fail "Set ingress.host (or iam.appUrl) to the URL people open Classifyre at: sign-in is always on and the identity server lives under it at <appUrl>/iam" -}}

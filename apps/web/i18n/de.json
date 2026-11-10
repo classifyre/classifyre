@@ -114,8 +114,9 @@
     "owningGroupPick": "Gruppe wählen, der er gehört",
     "owningGroupHint": "Mitglieder dieser Gruppe erhalten Zugriff gemäß ihren Freigaben.",
     "owningGroupNone": "Sie können keine Arbeitsbereiche anlegen: Bitten Sie eine Mandanten-Admin, Sie zur Arbeitsbereichs-Verwaltung Ihrer Gruppe zu machen.",
-    "emptyPublicTitle": "Noch nichts veröffentlicht",
-    "emptyPublicDescription": "Arbeitsbereiche des öffentlichen Mandanten erscheinen hier, sobald sie veröffentlicht sind. Melden Sie sich an, um Ihre eigenen zu sehen."
+    "emptyPublicTitle": "Noch nichts öffentlich",
+    "emptyPublicDescription": "Öffentliche Arbeitsbereiche erscheinen hier. Melden Sie sich an, um Ihre eigenen zu sehen.",
+    "publicBadge": "Öffentlich"
   },
   "categories": {
     "label": "Kategorien",
@@ -164,24 +165,21 @@
     "emptyWorkspacesTitle": "Hier ist noch nichts abgelegt",
     "emptyWorkspacesDescription": "Füge diese Kategorie in den Einstellungen eines Arbeitsbereichs hinzu, dann erscheint er hier."
   },
-  "demo": {
-    "badge": "Demo",
-    "headerCta": "Eigene Instanz",
-    "bannerCta": "Demo im Nur-Lese-Modus — eigene Instanz holen",
-    "tooltip": "Sie erkunden eine gemeinsam genutzte Demo im Nur-Lese-Modus. Ansicht, Suche und Dashboards funktionieren normal — Erstellen, Bearbeiten, Löschen, Scans ausführen, Detektoren trainieren und der Browser-Assistent sind deaktiviert.",
-    "mcpNotice": "Demo-Modus ist aktiv. MCP-Lesezugriff funktioniert mit einem vorhandenen Token, aber das Erstellen, Bearbeiten oder Löschen von Tokens ist deaktiviert. Mit einer eigenen Instanz können Sie Tokens ausstellen.",
-    "upgradeTitle": "Classifyre mit Ihren eigenen Daten betreiben",
-    "upgradeDescription": "Diese Demo wird geteilt und ist schreibgeschützt. Ihre eigene Instanz ist in Minuten eingerichtet, kostenlos und sendet Ihre Dokumente nirgendwohin.",
-    "blockedTitle": "Dafür brauchen Sie eine eigene Instanz",
-    "blockedDescription": "Die Demo ist schreibgeschützt, daher sind Erstellen, Bearbeiten, Löschen und das Ausführen von Scans hier deaktiviert. Mit einer eigenen Classifyre-Instanz steht alles zur Verfügung.",
+  "publicView": {
+    "badge": "Öffentlich",
+    "headerCta": "Nur lesen",
+    "bannerCta": "Öffentlich und nur lesbar — anmelden oder eigenes Classifyre holen",
+    "tooltip": "Sie lesen einen öffentlichen Arbeitsbereich. Stöbern und Suchen funktionieren; um etwas zu ändern, melden Sie sich an.",
+    "upgradeTitle": "Dieser Arbeitsbereich ist öffentlich und nur lesbar",
+    "upgradeDescription": "Melden Sie sich an, wenn Sie hier ein Konto haben, oder betreiben Sie Classifyre mit Ihren eigenen Daten: in Minuten, kostenlos, und Ihre Dokumente verlassen nie Ihre Umgebung.",
+    "signIn": "Anmelden",
     "dockerTitle": "Docker",
     "dockerDescription": "Ein einziges `docker run` unter macOS, Windows oder Linux. Alles bleibt auf Ihrem Rechner — ohne Server, ohne Konto.",
     "dockerCta": "Image holen",
     "helmTitle": "Kubernetes (Helm)",
     "helmDescription": "Für Ihr Team selbst hosten — mit dem Produktions-Helm-Chart und Ihrer eigenen Datenbank.",
     "helmCta": "Installationsanleitung",
-    "upgradeFootnote": "Beide Optionen sind kostenlos und Open Source. Ihre Dokumente bleiben auf Ihrem Rechner oder in Ihrem eigenen Cluster.",
-    "keepExploring": "Demo weiter erkunden"
+    "upgradeFootnote": "Beide Optionen sind kostenlos und Open Source. Ihre Dokumente bleiben auf Ihrem Rechner oder in Ihrem eigenen Cluster."
   },
   "nav": {
     "overview": "Übersicht",
@@ -7443,7 +7441,6 @@
       "changedBy": "Zuletzt geändert von"
     }
   },
-
   "notificationAudiences": {
     "title": "Wer Benachrichtigungen erhält",
     "description": "Benachrichtigungen gehen an Gruppen: standardmäßig an die Gruppe, der dieser Arbeitsbereich gehört, samt Untergruppen. Hier wählen Sie für eine Art von Benachrichtigung andere Gruppen; jede Benachrichtigung behält die Gruppen, an die sie ging, und jede Person markiert sie für sich als gelesen.",
@@ -7462,5 +7459,16 @@
       "SOURCE": "Quellen",
       "SYSTEM": "System"
     }
+  },
+  "publicWorkspace": {
+    "title": "Öffentlicher Arbeitsbereich",
+    "label": "Öffentlich, nur lesbar",
+    "description": "Alle Ihres Mandanten können ihn ohne Freigabe lesen, und ist er im ersten Mandanten der Installation, auch Leute ohne Anmeldung. Niemand erhält ein Recht, ihn zu ändern, und kein anderer Mandant sieht ihn je.",
+    "confirmTitle": "Diesen Arbeitsbereich öffentlich machen?",
+    "confirmDescription": "Seine Quellen, Funde, Fälle und alles andere werden lesbar, nur lesend, für alle Ihres Mandanten und, im ersten Mandanten, für alle, die Classifyre ohne Anmeldung öffnen. Sie können ihn jederzeit wieder privat machen.",
+    "confirm": "Öffentlich machen",
+    "published": "Der Arbeitsbereich ist öffentlich, nur lesbar.",
+    "unpublished": "Der Arbeitsbereich ist wieder privat.",
+    "saveFailed": "Konnte nicht ändern, ob der Arbeitsbereich öffentlich ist"
   }
 }

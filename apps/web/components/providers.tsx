@@ -5,7 +5,6 @@ import { ThemeProvider as NextThemesProvider } from "next-themes";
 import { Toaster } from "@workspace/ui/components";
 import { AssistantWorkflowProvider } from "@/components/assistant-workflow-provider";
 import { CookieConsent } from "@/components/cookie-consent";
-import { DemoModeBlockedDialog } from "@/components/demo-mode-blocked-dialog";
 import { InstanceSettingsProvider } from "@/components/instance-settings-provider";
 import { PostHogProvider } from "@/components/posthog-provider";
 import { ActiveNamespacesProvider } from "@/components/active-namespaces-provider";
@@ -33,7 +32,6 @@ export function Providers({
           <InstanceSettingsProvider routeLocale={locale}>
             <AssistantWorkflowProvider>
               {children}
-              <DemoModeBlockedDialog />
               {/* Inside InstanceSettingsProvider so the redirect reads the
                   same effective language setting the UI renders with. */}
               <LocaleAutoRedirect />

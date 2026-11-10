@@ -11,10 +11,9 @@ import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
 
 /**
- * The demo deployment is read-only, so every wall a visitor hits is really an
- * invitation to run their own instance. Both walls — the header badge and the
- * blocked-action dialog — render the same two options from here so the pitch
- * (and the URLs behind it) exist once.
+ * A public workspace is read-only for visitors, so the badge that says so is
+ * also an invitation to run their own instance: the two options and the URLs
+ * behind them exist once, here.
  */
 
 type Option = {
@@ -29,16 +28,16 @@ const OPTIONS: Option[] = [
   {
     href: getStartedUrl,
     icon: Container,
-    titleKey: "demo.dockerTitle",
-    descriptionKey: "demo.dockerDescription",
-    ctaKey: "demo.dockerCta",
+    titleKey: "publicView.dockerTitle",
+    descriptionKey: "publicView.dockerDescription",
+    ctaKey: "publicView.dockerCta",
   },
   {
     href: helmDeploymentUrl,
     icon: Boxes,
-    titleKey: "demo.helmTitle",
-    descriptionKey: "demo.helmDescription",
-    ctaKey: "demo.helmCta",
+    titleKey: "publicView.helmTitle",
+    descriptionKey: "publicView.helmDescription",
+    ctaKey: "publicView.helmCta",
   },
 ];
 
@@ -47,7 +46,7 @@ const OPTIONS: Option[] = [
  * inside dialogs that are themselves width-capped, so the breakpoint is the
  * `sm:` container query proxy rather than the viewport being "desktop".
  */
-export function DemoUpgradeOptions({ className }: { className?: string }) {
+export function PublicViewUpgradeOptions({ className }: { className?: string }) {
   const { t } = useTranslation();
 
   return (
@@ -81,12 +80,12 @@ export function DemoUpgradeOptions({ className }: { className?: string }) {
 }
 
 /** Footnote under the options: both paths are free and keep data in place. */
-export function DemoUpgradeFootnote({ className }: { className?: string }) {
+export function PublicViewUpgradeFootnote({ className }: { className?: string }) {
   const { t } = useTranslation();
 
   return (
     <p className={cn("text-muted-foreground text-xs", className)}>
-      {t("demo.upgradeFootnote")}
+      {t("publicView.upgradeFootnote")}
     </p>
   );
 }

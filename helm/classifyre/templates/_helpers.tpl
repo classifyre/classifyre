@@ -870,10 +870,6 @@ password
   value: {{ include "classifyre.iam.appUrl" . | quote }}
 - name: IAM_BOOTSTRAP_TENANT
   value: {{ .Values.iam.bootstrap.tenant.alias | quote }}
-{{- if .Values.iam.public.enabled }}
-- name: IAM_PUBLIC_TENANT
-  value: {{ .Values.iam.public.tenant | quote }}
-{{- end }}
 - name: IAM_EXPOSE_ADMIN_CONSOLE
   value: {{ .Values.iam.exposeAdminConsole | quote }}
 - name: IAM_REALM_CONSOLE

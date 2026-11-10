@@ -289,9 +289,6 @@ while IFS='=' read -r name value; do
   [ -n "$name" ] && default "$name" "$value"
 done < "$iam_secrets"
 
-# No public tenant here: everyone signs in, starting with the seeded admin.
-# A public tenant is for a showcase run from the Helm chart.
-unset IAM_PUBLIC_TENANT IAM_PUBLIC_TENANT_NAME
 default IAM_REALM                "classifyre"
 default IAM_APP_URL              "${CLASSIFYRE_URL}"
 default IAM_ISSUER_URL           "${CLASSIFYRE_URL}/iam/realms/${IAM_REALM}"

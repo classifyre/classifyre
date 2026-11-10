@@ -21,9 +21,8 @@ export class InternalOnlyException extends ForbiddenException {
 }
 
 /**
- * Rejects public traffic on @InternalOnly() endpoints. Unlike DemoModeGuard
- * this applies in every mode: the CLI's write-back endpoints are internal
- * regardless of whether the instance is a demo.
+ * Rejects public traffic on @InternalOnly() endpoints: the CLI's write-back
+ * endpoints are internal, whoever is signed in.
  */
 @Injectable()
 export class InternalApiKeyGuard implements CanActivate {

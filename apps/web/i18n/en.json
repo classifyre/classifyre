@@ -114,8 +114,9 @@
     "owningGroupPick": "Choose the group that owns it",
     "owningGroupHint": "Members of this group and its admins get access as their grants allow.",
     "owningGroupNone": "You cannot create workspaces: ask a tenant admin to make you a workspace manager for your group.",
-    "emptyPublicTitle": "Nothing published yet",
-    "emptyPublicDescription": "Workspaces of the public tenant show here once they are published. Sign in to see your own."
+    "emptyPublicTitle": "Nothing public yet",
+    "emptyPublicDescription": "Public workspaces show here. Sign in to see your own.",
+    "publicBadge": "Public"
   },
   "categories": {
     "label": "Categories",
@@ -164,24 +165,21 @@
     "emptyWorkspacesTitle": "Nothing filed here yet",
     "emptyWorkspacesDescription": "Add this category to a workspace from its settings, and it will appear here."
   },
-  "demo": {
-    "badge": "Demo",
-    "headerCta": "Get your own",
-    "bannerCta": "Read-only demo — get your own Classifyre",
-    "tooltip": "You are exploring a shared, read-only demo. Viewing, search, and dashboards work normally — creating, editing, deleting, running scans, training detectors, and the browser assistant are disabled.",
-    "mcpNotice": "Demo mode is active. MCP read-only access works with an existing token, but creating, editing, or deleting tokens is disabled. Run your own instance to issue tokens.",
-    "upgradeTitle": "Run Classifyre on your own data",
-    "upgradeDescription": "This demo is shared and read-only. Your own instance takes minutes, costs nothing, and never sends your documents anywhere.",
-    "blockedTitle": "This action needs your own instance",
-    "blockedDescription": "The demo is read-only, so creating, editing, deleting, and running scans are turned off here. Everything unlocks the moment you run Classifyre yourself.",
+  "publicView": {
+    "badge": "Public",
+    "headerCta": "Read-only",
+    "bannerCta": "Public and read-only — sign in or get your own Classifyre",
+    "tooltip": "You are reading a public workspace. Browsing and search work; changing anything needs you to sign in.",
+    "upgradeTitle": "This workspace is public and read-only",
+    "upgradeDescription": "Sign in if you have an account here, or run Classifyre on your own data: it takes minutes, costs nothing and never sends your documents anywhere.",
+    "signIn": "Sign in",
     "dockerTitle": "Docker",
     "dockerDescription": "One `docker run` on macOS, Windows or Linux. Everything stays on your machine — no server, no account.",
     "dockerCta": "Get the image",
     "helmTitle": "Kubernetes (Helm)",
     "helmDescription": "Self-host for your team with the production Helm chart and your own database.",
     "helmCta": "Installation guide",
-    "upgradeFootnote": "Both options are free and open source. Your documents stay on your machine or in your own cluster.",
-    "keepExploring": "Keep exploring the demo"
+    "upgradeFootnote": "Both options are free and open source. Your documents stay on your machine or in your own cluster."
   },
   "nav": {
     "overview": "Overview",
@@ -7443,7 +7441,6 @@
       "changedBy": "Last changed by"
     }
   },
-
   "notificationAudiences": {
     "title": "Who gets notifications",
     "description": "Notifications go to groups: by default the group that owns this workspace, including its subgroups. Choose other groups for a kind of notification here; each notification keeps the groups it was sent to, and everyone marks it read for themselves.",
@@ -7462,5 +7459,16 @@
       "SOURCE": "Sources",
       "SYSTEM": "System"
     }
+  },
+  "publicWorkspace": {
+    "title": "Public workspace",
+    "label": "Public, read-only",
+    "description": "Everyone of your tenant can read it without a grant, and people who have not signed in can too when it is in the installation's first tenant. Nobody gains any right to change it, and no other tenant ever sees it.",
+    "confirmTitle": "Make this workspace public?",
+    "confirmDescription": "Its sources, findings, cases and everything else become readable, read-only, for everyone of your tenant and, in the first tenant, for anyone who opens Classifyre without signing in. You can make it private again at any time.",
+    "confirm": "Make public",
+    "published": "The workspace is public, read-only.",
+    "unpublished": "The workspace is private again.",
+    "saveFailed": "Could not change whether the workspace is public"
   }
 }

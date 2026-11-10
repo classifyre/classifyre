@@ -3,18 +3,7 @@
 import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import {
-  ArrowRight,
-  ArrowUpRight,
-  Clock,
-  ExternalLink,
-  Layers,
-  Loader2,
-  OctagonPause,
-  Settings,
-  TriangleAlert,
-  Trash2,
-} from "lucide-react";
+import { ArrowRight, ArrowUpRight, Clock, ExternalLink, Globe, Layers, Loader2, OctagonPause, Settings, Trash2, TriangleAlert } from "lucide-react";
 import type { Namespace, NamespaceStats } from "@workspace/api-client";
 import { Button } from "@workspace/ui/components/button";
 import { Card, CardContent } from "@workspace/ui/components/card";
@@ -127,6 +116,15 @@ export function WorkspaceCard({
                 >
                   <OctagonPause className="size-3 shrink-0" />
                   {t("workspaces.pausedBadge")}
+                </span>
+              )}
+              {ns.public && (
+                <span
+                  data-testid={`workspace-public-${ns.slug}`}
+                  className="flex shrink-0 items-center gap-1 rounded-sm border border-border px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground"
+                >
+                  <Globe className="size-3 shrink-0" />
+                  {t("workspaces.publicBadge")}
                 </span>
               )}
             </div>

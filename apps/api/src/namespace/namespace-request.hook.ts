@@ -225,14 +225,16 @@ async function authorizeWorkspaceRequest(
   if (!principal) return false;
 
   try {
-    assertSameOrigin(
-      principal,
-      {
-        method: request.method,
-        headers: request.headers,
-      },
-      identity.config.appOrigin,
-    );
+    // A visitor brings no session for another site to ride on.
+    if (!principal.visitor)
+      assertSameOrigin(
+        principal,
+        {
+          method: request.method,
+          headers: request.headers,
+        },
+        identity.config.appOrigin,
+      );
   } catch {
     await reply.code(403).send({
       statusCode: 403,
@@ -244,6 +246,17 @@ async function authorizeWorkspaceRequest(
   }
 
   const capabilities = await identity.capabilitiesIn(principal, ns.namespaceId);
+  if (!capabilities?.has('workspace.view') && principal.visitor) {
+    // Not public: someone who has not signed in is asked to, rather than
+    // told the workspace does not exist.
+    await reply.code(401).send({
+      statusCode: 401,
+      error: 'Unauthorized',
+      code: 'SIGN_IN_REQUIRED',
+      message: 'Sign in to continue.',
+    });
+    return false;
+  }
   if (!capabilities?.has('workspace.view')) {
     await reply
       .code(404)

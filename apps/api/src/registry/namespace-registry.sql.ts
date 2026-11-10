@@ -78,6 +78,11 @@ ALTER TABLE public.namespaces
 -- resolved and billed as active.
 ALTER TABLE public.namespaces
   ADD COLUMN IF NOT EXISTS paused boolean NOT NULL DEFAULT false;
+-- A public workspace is read-only for everyone of its tenant who has no
+-- grant on it, and for people who have not signed in when the tenant is the
+-- first one (IAM_BOOTSTRAP_TENANT). It never opens to another tenant.
+ALTER TABLE public.namespaces
+  ADD COLUMN IF NOT EXISTS is_public boolean NOT NULL DEFAULT false;
 ALTER TABLE public.namespaces
   ADD COLUMN IF NOT EXISTS paused_at timestamptz;
 ALTER TABLE public.namespaces

@@ -36,14 +36,12 @@ import {
 } from './namespace/namespace-request.hook';
 import {
   CLS_DATABASE_LANE,
-  CLS_DEMO_MODE_BYPASS,
   CLS_NAMESPACE_ID,
   CLS_SCHEMA,
   CLS_SLUG,
 } from './namespace/namespace.constants';
 import { PrismaClientManager } from './prisma/prisma-client-manager';
 import { InternalApiKeyService } from './internal-api-key.service';
-import { DemoModeService } from './demo-mode.service';
 import compress from '@fastify/compress';
 import { constants as zlibConstants } from 'node:zlib';
 import { resolveHeapGuard } from './utils/heap-guard';
@@ -283,7 +281,6 @@ async function bootstrap() {
   const namespaceRegistry = app.get(NamespaceRegistryService);
   const prismaClientManager = app.get(PrismaClientManager);
   const internalApiKey = app.get(InternalApiKeyService);
-  const demoMode = app.get(DemoModeService);
   const actors = app.get(ActorContextService);
 
   // Resolve the leading `/<slug>` into a tenant context (404 on unknown slug)
@@ -325,7 +322,6 @@ async function bootstrap() {
       );
       // Write tools check demo mode deep inside their callbacks, where the
       // request is gone, so hand them the bypass decision through CLS.
-      cls.set(CLS_DEMO_MODE_BYPASS, demoMode.isBypassRequest(request.headers));
 
       const settings = await instanceSettingsService.getSettings();
       if (!settings.mcpEnabled) {

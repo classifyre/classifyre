@@ -6,12 +6,10 @@
 #   - namespace: classifyre-develop
 #   - release: same as namespace
 #   - image tag: develop
-#   - demo mode: true
 #
 # Usage:
 #   ./scripts/deploy-develop.sh
 #   ./scripts/deploy-develop.sh feat-my-pr
-#   ./scripts/deploy-develop.sh --demo-mode false
 #   ./scripts/deploy-develop.sh --namespace my-ns --values /tmp/override.yaml
 
 set -euo pipefail
@@ -28,14 +26,12 @@ Options:
   -r, --release NAME        Helm release name. Default: same as namespace
   -f, --values FILE         Extra Helm values file. Can be passed multiple times.
       --base-values FILE    Base values file. Default: ./helm/develop/values-vps-develop.yaml
-      --demo-mode BOOL      Set api.env.DEMO_MODE to true or false. Default: true
       --timeout DURATION    Helm and rollout timeout. Default: 15m
   -h, --help                Show this help
 
 Examples:
   ./scripts/deploy-develop.sh
   ./scripts/deploy-develop.sh feat-my-pr
-  ./scripts/deploy-develop.sh --demo-mode false
   ./scripts/deploy-develop.sh -n classifyre-develop -f /tmp/override.yaml
 EOF
 }
@@ -70,7 +66,6 @@ IMAGE_TAG="develop"
 HELM_NAMESPACE="classifyre-develop"
 HELM_RELEASE_NAME=""
 BASE_VALUES_FILE="./helm/develop/values-vps-develop.yaml"
-DEMO_MODE="true"
 DEPLOY_TIMEOUT="15m"
 DOCKER_NAMESPACE="${DOCKER_NAMESPACE:-classifyre}"
 EXTRA_VALUES_FILES=()
@@ -101,11 +96,6 @@ while [[ $# -gt 0 ]]; do
     --base-values)
       require_arg "$1" "${2:-}"
       BASE_VALUES_FILE="$2"
-      shift 2
-      ;;
-    --demo-mode)
-      require_arg "$1" "${2:-}"
-      DEMO_MODE="$(normalize_bool "$2")"
       shift 2
       ;;
     --timeout)
@@ -169,7 +159,6 @@ echo "╔═══════════════════════�
 echo "║  Develop deploy: tag=${IMAGE_TAG}"
 echo "║  Namespace: ${HELM_NAMESPACE}"
 echo "║  Release: ${HELM_RELEASE_NAME}"
-echo "║  Demo mode: ${DEMO_MODE}"
 echo "╚══════════════════════════════════════════════════╝"
 
 # ── Resolve kubeconfig ────────────────────────────────────────────────────────
@@ -207,7 +196,6 @@ helm upgrade --install "${HELM_RELEASE_NAME}" ./helm/classifyre \
   --set api.cliJobs.image.tag="${IMAGE_TAG}" \
   --set frontend.image.repository="${DOCKER_NAMESPACE}/web" \
   --set frontend.image.tag="${IMAGE_TAG}" \
-  --set-string api.env.DEMO_MODE="${DEMO_MODE}" \
   --wait \
   --timeout "${DEPLOY_TIMEOUT}"
 

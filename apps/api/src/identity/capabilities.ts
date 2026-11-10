@@ -36,6 +36,12 @@ export const CAPABILITIES = [
     description: 'Pause and resume the workspace.',
   },
   {
+    id: 'workspace.publish',
+    scope: 'workspace',
+    description:
+      'Make the workspace public (read-only for everyone of the tenant, and for visitors of the first tenant) or private again.',
+  },
+  {
     id: 'workspace.delete',
     scope: 'workspace',
     description: 'Delete the workspace.',

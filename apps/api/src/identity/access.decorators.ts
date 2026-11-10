@@ -6,7 +6,7 @@ export const REQUIRES_KEY = 'classifyre:requires';
 export const PUBLIC_ROUTE_KEY = 'classifyre:publicRoute';
 
 export interface AccessAreaOptions {
-  /** Needed by reads: GET/HEAD, and POSTs marked `@AllowInDemoMode()` (search, charts, previews). */
+  /** Needed by reads: GET/HEAD, and POSTs marked `@ReadsOnly()` (search, charts, previews). */
   view: Capability;
   /** Needed by every other route of the controller. */
   change: Capability;

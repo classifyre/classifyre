@@ -30,7 +30,7 @@ import {
 } from '../dto/export-query.dto';
 import { CliRunnerService } from './cli-runner.service';
 import { RunnerStatus } from '@prisma/client';
-import { AllowInDemoMode } from '../demo-mode.decorator';
+import { ReadsOnly } from '../reads-only.decorator';
 import { AllowWhenPaused } from '../namespace/allow-when-paused.decorator';
 import { BlockWhenPaused } from '../namespace/block-when-paused.decorator';
 import { ReadOnlyEndpoint } from '../db/read-only-endpoint.decorator';
@@ -422,7 +422,7 @@ export class CliRunnerController {
     return this.runnerAugmentation.finish(runnerId);
   }
 
-  @AllowInDemoMode()
+  @ReadsOnly()
   @Get('runners/:runnerId/assets/progress')
   @ApiOperation({ summary: 'Get runner asset processing progress' })
   @ApiResponse({ status: 200, type: RunnerAssetProgressDto })
@@ -437,7 +437,7 @@ export class CliRunnerController {
     return this.cliRunnerService.getRunnerStatus(runnerId);
   }
 
-  @AllowInDemoMode()
+  @ReadsOnly()
   @Get('runners/:runnerId/queue-position')
   @ApiOperation({
     summary: 'Why a queued run has not started yet',
@@ -451,7 +451,7 @@ export class CliRunnerController {
 
   // POST only because the filter set does not fit a query string — this reads
   // logs, so it stays available on a read-only demo instance.
-  @AllowInDemoMode()
+  @ReadsOnly()
   @Post('runners/:runnerId/logs')
   @ApiOperation({
     summary:
@@ -502,7 +502,7 @@ export class CliRunnerController {
   }
 }
 
-@AllowInDemoMode()
+@ReadsOnly()
 @ReadOnlyEndpoint()
 @ApiTags('Runners')
 @AccessArea({ view: 'source.view', change: 'source.run' })

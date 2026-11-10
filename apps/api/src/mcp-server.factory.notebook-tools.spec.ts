@@ -29,7 +29,6 @@ describe('McpServerFactoryService notebook tools', () => {
     decryptSourceConfig: jest.fn(),
   };
   const mcpToolExecutor = {
-    assertNotDemoMode: jest.fn(),
     updateSource: jest.fn(),
   };
 

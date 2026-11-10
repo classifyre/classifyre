@@ -1,5 +1,6 @@
 "use client";
 
+import { useCan } from "@/hooks/use-me";
 import * as React from "react";
 import {
   AlertDialog,
@@ -36,7 +37,6 @@ import {
   refreshWorkspaceFeatures,
   useWorkspaceFeatures,
 } from "@/hooks/use-workspace-features";
-import { useServerConfig } from "@/components/server-config-provider";
 import { useInstanceSettings } from "@/components/instance-settings-provider";
 import { emitStorageChanged, onStorageChanged } from "@/lib/storage-events";
 
@@ -97,9 +97,9 @@ const FEATURE_OF_DATASET: Partial<Record<string, WorkspaceFeatureKey>> = {
  */
 export function CleanupCard() {
   const { t } = useTranslation();
-  const serverConfig = useServerConfig();
   const { settings } = useInstanceSettings();
-  const demoMode = serverConfig.demoMode || settings.demoMode;
+  // Without the right to change it, the control is shown but cannot run.
+  const readOnly = !useCan("workspace.settings");
   const { feature: featureState } = useWorkspaceFeatures();
   const featureName = (key: WorkspaceFeatureKey) =>
     t(`features.items.${key}.name` as TranslationKey);
@@ -249,7 +249,7 @@ export function CleanupCard() {
                       variant="outline"
                       className="h-8 rounded-[4px]"
                       disabled={
-                        busy || demoMode || cleaningKey !== null || featureWipe
+                        busy || readOnly || cleaningKey !== null || featureWipe
                       }
                       onClick={() => setConfirmKey(dataset.cleanupKey)}
                     >
@@ -298,7 +298,7 @@ export function CleanupCard() {
   };
 
   const runCleanup = async () => {
-    if (!confirmKey || runState || demoMode) return;
+    if (!confirmKey || runState || readOnly) return;
     const key = confirmKey;
     setConfirmKey(null);
     const owner = FEATURE_OF_DATASET[key];

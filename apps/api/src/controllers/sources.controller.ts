@@ -69,7 +69,7 @@ import {
   SearchSourcesRequestDto,
 } from '../dto/search-sources-request.dto';
 import { SearchSourcesResponseDto } from '../dto/search-sources-response.dto';
-import { AllowInDemoMode } from '../demo-mode.decorator';
+import { ReadsOnly } from '../reads-only.decorator';
 import { ReadOnlyEndpoint } from '../db/read-only-endpoint.decorator';
 import { SourceFilesService } from '../source-files.service';
 import { BlockWhenPaused } from '../namespace/block-when-paused.decorator';
@@ -1467,7 +1467,7 @@ export class SourcesController {
   }
 }
 
-@AllowInDemoMode()
+@ReadsOnly()
 @ReadOnlyEndpoint()
 @AccessArea({ view: 'source.view', change: 'source.manage' })
 @Controller('search/sources')

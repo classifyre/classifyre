@@ -32,11 +32,6 @@ describe("web sign-in session", () => {
     expect(() => iamWebConfig({})).toThrow(/IAM_ISSUER_URL/);
   });
 
-  it("lets visitors in only with a public tenant", () => {
-    expect(config.publicTenant).toBe(false);
-    expect(iamWebConfig({ ...env, IAM_PUBLIC_TENANT: "public" })!.publicTenant).toBe(true);
-  });
-
   it("exchanges tokens in-cluster but sends browsers to the public issuer", () => {
     expect(config.tokenUrl).toBe(
       "http://classifyre-iam:8080/iam/realms/classifyre/protocol/openid-connect/token",

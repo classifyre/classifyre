@@ -1,5 +1,5 @@
 import { CliRunnerController } from './cli-runner.controller';
-import { ALLOW_IN_DEMO_MODE_KEY } from '../demo-mode.decorator';
+import { READS_ONLY_KEY } from '../reads-only.decorator';
 import { INTERNAL_ONLY_KEY } from '../internal-only.decorator';
 
 const handler = (name: string) =>
@@ -23,14 +23,11 @@ describe('CliRunnerController endpoint access metadata', () => {
     }
   });
 
-  it('does not mark internal endpoints as demo-mode safe', () => {
-    // The internal key is what lets a CLI job through DemoModeGuard; the
-    // demo allow-list must not also open them to the public.
+  it('does not mark internal endpoints as read-only', () => {
+    // The internal key is what lets a CLI job write back; marking them as
+    // reads would open them to read-only people.
     expect(
-      Reflect.getMetadata(
-        ALLOW_IN_DEMO_MODE_KEY,
-        handler('updateRunnerStatus'),
-      ),
+      Reflect.getMetadata(READS_ONLY_KEY, handler('updateRunnerStatus')),
     ).toBeUndefined();
   });
 
@@ -44,7 +41,7 @@ describe('CliRunnerController endpoint access metadata', () => {
       'bulkRerunScans',
     ]) {
       expect(
-        Reflect.getMetadata(ALLOW_IN_DEMO_MODE_KEY, handler(name)),
+        Reflect.getMetadata(READS_ONLY_KEY, handler(name)),
       ).toBeUndefined();
       expect(
         Reflect.getMetadata(INTERNAL_ONLY_KEY, handler(name)),
@@ -55,7 +52,7 @@ describe('CliRunnerController endpoint access metadata', () => {
   it('keeps log search readable in demo mode', () => {
     // POST only because the filter set does not fit a query string.
     expect(
-      Reflect.getMetadata(ALLOW_IN_DEMO_MODE_KEY, handler('searchRunnerLogs')),
+      Reflect.getMetadata(READS_ONLY_KEY, handler('searchRunnerLogs')),
     ).toBe(true);
   });
 });

@@ -1,10 +1,11 @@
 import { SetMetadata } from '@nestjs/common';
 
-export const ALLOW_IN_DEMO_MODE_KEY = 'allowInDemoMode';
+export const READS_ONLY_KEY = 'readsOnly';
 
 /**
- * Mark a handler or controller as permitted in demo-mode.
- * Apply to non-GET endpoints that are query/read-only by nature
- * (e.g. POST /search/*, POST /semantic/query/*).
+ * Marks a non-GET handler (or controller) that only reads: a search or a
+ * preview sent as POST because its input does not fit a query string. Access
+ * checks then treat it as viewing (`route-access.ts`), so read-only people —
+ * a Viewer, or a visitor of a public workspace — may call it.
  */
-export const AllowInDemoMode = () => SetMetadata(ALLOW_IN_DEMO_MODE_KEY, true);
+export const ReadsOnly = () => SetMetadata(READS_ONLY_KEY, true);

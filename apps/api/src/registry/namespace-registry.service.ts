@@ -83,6 +83,7 @@ interface NamespaceRow {
   paused: boolean;
   paused_at: Date | null;
   paused_reason: string | null;
+  is_public: boolean;
   settings: Record<string, unknown>;
   external_links: NamespaceExternalLink[] | null;
   created_at: Date;
@@ -98,7 +99,7 @@ interface NamespaceRow {
 const NAMESPACE_COLUMNS = `
   id, name, slug, schema_name, tenant_id, description,
   (thumbnail_blob IS NOT NULL) AS has_thumbnail,
-  paused, paused_at, paused_reason,
+  paused, paused_at, paused_reason, is_public,
   settings, external_links, created_at, updated_at, last_opened_at
 `;
 
@@ -810,6 +811,9 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
     const previouslyPaused = pauseTouched
       ? (await this.get(id)).paused
       : undefined;
+    if (patch.public !== undefined) {
+      push('is_public', patch.public === true);
+    }
     if (patch.paused !== undefined) {
       push('paused', patch.paused);
       push('paused_at', patch.paused ? new Date() : null);
@@ -1169,6 +1173,7 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
       paused: row.paused ?? false,
       pausedAt: row.paused_at ? row.paused_at.toISOString() : null,
       pausedReason: row.paused_reason ?? null,
+      public: row.is_public ?? false,
       // A relative path to the streaming endpoint (cache-busted by updated_at);
       // the web api-client resolves it to an absolute URL. Null when unset.
       thumbnail: row.has_thumbnail

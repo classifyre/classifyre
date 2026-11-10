@@ -1,11 +1,4 @@
-import {
-  BadRequestException,
-  Controller,
-  Get,
-  Inject,
-  NotFoundException,
-  Query,
-} from '@nestjs/common';
+import { BadRequestException, Controller, Get, Query } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { SitemapEntriesDto, SitemapIndexDto } from './sitemap.dto';
 import {
@@ -15,8 +8,6 @@ import {
 } from './sitemap.entities';
 import { SitemapService } from './sitemap.service';
 import { PublicRoute } from '../identity/access.decorators';
-import type { IamConfig } from '../identity/iam-config';
-import { IAM_CONFIG } from '../identity/identity.tokens';
 
 /**
  * Namespace-scoped sitemap coordinates (`GET /<namespace>/sitemap/...`).
@@ -29,19 +20,7 @@ import { IAM_CONFIG } from '../identity/identity.tokens';
 @PublicRoute()
 @Controller('sitemap')
 export class SitemapController {
-  constructor(
-    private readonly sitemapService: SitemapService,
-    @Inject(IAM_CONFIG) private readonly iam: IamConfig,
-  ) {}
-
-  /**
-   * An instance is private (docs/prd §2 H4), except its public tenant: the
-   * namespace hook lets a crawler, a visitor, reach only that tenant's
-   * workspaces.
-   */
-  private assertPublic(): void {
-    if (!this.iam.publicTenantAlias) throw new NotFoundException();
-  }
+  constructor(private readonly sitemapService: SitemapService) {}
 
   @Get()
   @ApiOperation({
@@ -54,7 +33,6 @@ export class SitemapController {
   })
   @ApiResponse({ status: 200, type: SitemapIndexDto })
   getIndex(@Query('chunkSize') chunkSize?: string): Promise<SitemapIndexDto> {
-    this.assertPublic();
     return this.sitemapService.getIndex(parseIntOrUndefined(chunkSize));
   }
 
@@ -75,7 +53,6 @@ export class SitemapController {
     @Query('chunk') chunk?: string,
     @Query('chunkSize') chunkSize?: string,
   ): Promise<SitemapEntriesDto> {
-    this.assertPublic();
     return this.sitemapService.getEntries(
       parseEntityType(type),
       parseIntOrUndefined(chunk) ?? 0,
