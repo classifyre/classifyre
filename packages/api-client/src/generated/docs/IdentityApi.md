@@ -12,11 +12,11 @@ All URIs are relative to *http://localhost*
 
 ## auditControllerList
 
-> Array&lt;AuditEventDto&gt; auditControllerList(entityType, entityId, actor, before, limit)
+> AuditEventsResponseDto auditControllerList(entityType, entityId, actor, capability, operation, search, before, limit, skip, sortBy, sortOrder)
 
 Changes made in this workspace, newest first
 
-Filter by entity (e.g. entityType&#x3D;sources&amp;entityId&#x3D;…) or by actor reference. Page with &#x60;before&#x60;, the id of the last event received.
+Filter by entity (e.g. entityType&#x3D;sources&amp;entityId&#x3D;…), actor, capability, operation or free text. Sort any column; page with &#x60;skip&#x60;/&#x60;limit&#x60; or, for \&quot;load more\&quot;, with &#x60;before&#x60;, the id of the last event received.
 
 ### Example
 
@@ -39,9 +39,21 @@ async function example() {
     // string (optional)
     actor: actor_example,
     // string (optional)
+    capability: capability_example,
+    // string (optional)
+    operation: operation_example,
+    // string (optional)
+    search: search_example,
+    // string (optional)
     before: before_example,
     // number (optional)
     limit: 8.14,
+    // number (optional)
+    skip: 8.14,
+    // 'OCCURRED_AT' | 'ACTOR' | 'OPERATION' | 'ENTITY_TYPE' | 'CAPABILITY' (optional)
+    sortBy: sortBy_example,
+    // 'ASC' | 'DESC' (optional)
+    sortOrder: sortOrder_example,
   } satisfies AuditControllerListRequest;
 
   try {
@@ -64,12 +76,18 @@ example().catch(console.error);
 | **entityType** | `string` |  | [Optional] [Defaults to `undefined`] |
 | **entityId** | `string` |  | [Optional] [Defaults to `undefined`] |
 | **actor** | `string` |  | [Optional] [Defaults to `undefined`] |
+| **capability** | `string` |  | [Optional] [Defaults to `undefined`] |
+| **operation** | `string` |  | [Optional] [Defaults to `undefined`] |
+| **search** | `string` |  | [Optional] [Defaults to `undefined`] |
 | **before** | `string` |  | [Optional] [Defaults to `undefined`] |
 | **limit** | `number` |  | [Optional] [Defaults to `undefined`] |
+| **skip** | `number` |  | [Optional] [Defaults to `undefined`] |
+| **sortBy** | `OCCURRED_AT`, `ACTOR`, `OPERATION`, `ENTITY_TYPE`, `CAPABILITY` |  | [Optional] [Defaults to `undefined`] [Enum: OCCURRED_AT, ACTOR, OPERATION, ENTITY_TYPE, CAPABILITY] |
+| **sortOrder** | `ASC`, `DESC` |  | [Optional] [Defaults to `undefined`] [Enum: ASC, DESC] |
 
 ### Return type
 
-[**Array&lt;AuditEventDto&gt;**](AuditEventDto.md)
+[**AuditEventsResponseDto**](AuditEventsResponseDto.md)
 
 ### Authorization
 

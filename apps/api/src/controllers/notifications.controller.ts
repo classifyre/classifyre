@@ -27,8 +27,10 @@ import { MarkAllReadDto } from '../dto/mark-all-read.dto';
 import { UpdateNotificationImportanceDto } from '../dto/update-notification-importance.dto';
 import { Requires } from '../identity/access.decorators';
 import { ActorRef } from '../identity/actor-ref.decorator';
+import { ActorContextService } from '../identity/actor-context.service';
 import type { IdentityService } from '../identity/identity.service';
 import { IDENTITY } from '../identity/identity.tokens';
+import { TenancyService } from '../identity/tenancy.service';
 import {
   NotificationAudienceDto,
   UpdateNotificationAudienceDto,
@@ -47,6 +49,8 @@ import { NotificationType } from '../types/notification.types';
 export class NotificationsController {
   constructor(
     private readonly notificationsService: NotificationsService,
+    private readonly actors: ActorContextService,
+    private readonly tenancy: TenancyService,
     @Inject(IDENTITY) private readonly identity: IdentityService,
   ) {}
 
@@ -89,11 +93,28 @@ export class NotificationsController {
     if (unknown) {
       throw new BadRequestException(`No group '${unknown}' in your tenant.`);
     }
-    return this.notificationsService.setAudience(
+    const saved = await this.notificationsService.setAudience(
       type as NotificationType,
       groupIds,
       actor,
     );
+    // Audience changes are tenant-visible: which groups get SCAN/FINDING/…
+    // in this workspace is access policy, so it lands in the same trail as
+    // grants. The workspace trail records the PUT through the interceptor.
+    const workspaceId = this.actors.workspaceId();
+    await this.tenancy.recordTenantEvent(
+      principal.tenant.id,
+      principal.actor.ref,
+      groupIds.length === 0
+        ? 'notification.audience.reset'
+        : 'notification.audience.set',
+      {
+        type,
+        groupIds,
+        ...(workspaceId ? { namespaceId: workspaceId } : {}),
+      },
+    );
+    return saved;
   }
 
   @Get()

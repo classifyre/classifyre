@@ -85,8 +85,19 @@ export class AccessManagementService {
     }));
   }
 
-  tenantEvents(principal: Principal) {
-    return this.tenancy.tenantEvents(principal.tenant.id);
+  tenantEvents(
+    principal: Principal,
+    query?: {
+      action?: string;
+      actor?: string;
+      search?: string;
+      skip?: number;
+      limit?: number;
+      sortBy?: 'OCCURRED_AT' | 'ACTOR' | 'ACTION';
+      sortOrder?: 'ASC' | 'DESC';
+    },
+  ) {
+    return this.tenancy.tenantEvents(principal.tenant.id, query);
   }
 
   /** Every tenant the principal belongs to, for the account menu's switcher (§12.2). */

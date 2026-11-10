@@ -89,7 +89,7 @@ No authorization required
 
 ## tenantAccessControllerEvents
 
-> Array&lt;TenantEventDto&gt; tenantAccessControllerEvents()
+> TenantEventsResponseDto tenantAccessControllerEvents(action, actor, search, skip, limit, sortBy, sortOrder)
 
 Tenant-level changes: grants, workspaces created or deleted
 
@@ -106,8 +106,25 @@ async function example() {
   console.log("🚀 Testing @workspace/api-client SDK...");
   const api = new AccessApi();
 
+  const body = {
+    // string (optional)
+    action: action_example,
+    // string (optional)
+    actor: actor_example,
+    // string (optional)
+    search: search_example,
+    // number (optional)
+    skip: 8.14,
+    // number (optional)
+    limit: 8.14,
+    // 'OCCURRED_AT' | 'ACTOR' | 'ACTION' (optional)
+    sortBy: sortBy_example,
+    // 'ASC' | 'DESC' (optional)
+    sortOrder: sortOrder_example,
+  } satisfies TenantAccessControllerEventsRequest;
+
   try {
-    const data = await api.tenantAccessControllerEvents();
+    const data = await api.tenantAccessControllerEvents(body);
     console.log(data);
   } catch (error) {
     console.error(error);
@@ -120,11 +137,20 @@ example().catch(console.error);
 
 ### Parameters
 
-This endpoint does not need any parameter.
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **action** | `string` |  | [Optional] [Defaults to `undefined`] |
+| **actor** | `string` |  | [Optional] [Defaults to `undefined`] |
+| **search** | `string` |  | [Optional] [Defaults to `undefined`] |
+| **skip** | `number` |  | [Optional] [Defaults to `undefined`] |
+| **limit** | `number` |  | [Optional] [Defaults to `undefined`] |
+| **sortBy** | `OCCURRED_AT`, `ACTOR`, `ACTION` |  | [Optional] [Defaults to `undefined`] [Enum: OCCURRED_AT, ACTOR, ACTION] |
+| **sortOrder** | `ASC`, `DESC` |  | [Optional] [Defaults to `undefined`] [Enum: ASC, DESC] |
 
 ### Return type
 
-[**Array&lt;TenantEventDto&gt;**](TenantEventDto.md)
+[**TenantEventsResponseDto**](TenantEventsResponseDto.md)
 
 ### Authorization
 

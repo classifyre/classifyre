@@ -9202,7 +9202,7 @@
     },
     "/audit-events": {
       "get": {
-        "description": "Filter by entity (e.g. entityType=sources&entityId=…) or by actor reference. Page with `before`, the id of the last event received.",
+        "description": "Filter by entity (e.g. entityType=sources&entityId=…), actor, capability, operation or free text. Sort any column; page with `skip`/`limit` or, for \"load more\", with `before`, the id of the last event received.",
         "operationId": "AuditController_list",
         "parameters": [
           {
@@ -9230,6 +9230,30 @@
             }
           },
           {
+            "name": "capability",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "operation",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "before",
             "required": false,
             "in": "query",
@@ -9244,6 +9268,41 @@
             "schema": {
               "type": "number"
             }
+          },
+          {
+            "name": "skip",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "OCCURRED_AT",
+                "ACTOR",
+                "OPERATION",
+                "ENTITY_TYPE",
+                "CAPABILITY"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "ASC",
+                "DESC"
+              ],
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -9252,10 +9311,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/AuditEventDto"
-                  }
+                  "$ref": "#/components/schemas/AuditEventsResponseDto"
                 }
               }
             }
@@ -9660,17 +9716,80 @@
     "/tenant/audit-events": {
       "get": {
         "operationId": "TenantAccessController_events",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "action",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "actor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "skip",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "OCCURRED_AT",
+                "ACTOR",
+                "ACTION"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "ASC",
+                "DESC"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/TenantEventDto"
-                  }
+                  "$ref": "#/components/schemas/TenantEventsResponseDto"
                 }
               }
             }
@@ -30923,6 +31042,32 @@
           "status"
         ]
       },
+      "AuditEventsResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditEventDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "skip": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "skip",
+          "limit"
+        ]
+      },
       "ResolvedActorDto": {
         "type": "object",
         "properties": {
@@ -31302,6 +31447,32 @@
           "actor",
           "action",
           "detail"
+        ]
+      },
+      "TenantEventsResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TenantEventDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "skip": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "skip",
+          "limit"
         ]
       },
       "TenantMembershipDto": {

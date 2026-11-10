@@ -20,7 +20,7 @@ import type {
   ResolvedActorDto,
   RoleDto,
   TenantDto,
-  TenantEventDto,
+  TenantEventsResponseDto,
   TenantGroupDto,
   TenantMembershipDto,
 } from '../models/index';
@@ -35,8 +35,8 @@ import {
     RoleDtoToJSON,
     TenantDtoFromJSON,
     TenantDtoToJSON,
-    TenantEventDtoFromJSON,
-    TenantEventDtoToJSON,
+    TenantEventsResponseDtoFromJSON,
+    TenantEventsResponseDtoToJSON,
     TenantGroupDtoFromJSON,
     TenantGroupDtoToJSON,
     TenantMembershipDtoFromJSON,
@@ -45,6 +45,16 @@ import {
 
 export interface TenantAccessControllerAddGrantRequest {
     createGrantDto: CreateGrantDto;
+}
+
+export interface TenantAccessControllerEventsRequest {
+    action?: string;
+    actor?: string;
+    search?: string;
+    skip?: number;
+    limit?: number;
+    sortBy?: TenantAccessControllerEventsSortByEnum;
+    sortOrder?: TenantAccessControllerEventsSortOrderEnum;
 }
 
 export interface TenantAccessControllerRemoveGrantRequest {
@@ -114,8 +124,36 @@ export class AccessApi extends runtime.BaseAPI {
     /**
      * Tenant-level changes: grants, workspaces created or deleted
      */
-    async tenantAccessControllerEventsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<TenantEventDto>>> {
+    async tenantAccessControllerEventsRaw(requestParameters: TenantAccessControllerEventsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantEventsResponseDto>> {
         const queryParameters: any = {};
+
+        if (requestParameters['action'] != null) {
+            queryParameters['action'] = requestParameters['action'];
+        }
+
+        if (requestParameters['actor'] != null) {
+            queryParameters['actor'] = requestParameters['actor'];
+        }
+
+        if (requestParameters['search'] != null) {
+            queryParameters['search'] = requestParameters['search'];
+        }
+
+        if (requestParameters['skip'] != null) {
+            queryParameters['skip'] = requestParameters['skip'];
+        }
+
+        if (requestParameters['limit'] != null) {
+            queryParameters['limit'] = requestParameters['limit'];
+        }
+
+        if (requestParameters['sortBy'] != null) {
+            queryParameters['sortBy'] = requestParameters['sortBy'];
+        }
+
+        if (requestParameters['sortOrder'] != null) {
+            queryParameters['sortOrder'] = requestParameters['sortOrder'];
+        }
 
         const headerParameters: runtime.HTTPHeaders = {};
 
@@ -129,14 +167,14 @@ export class AccessApi extends runtime.BaseAPI {
             query: queryParameters,
         }, initOverrides);
 
-        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(TenantEventDtoFromJSON));
+        return new runtime.JSONApiResponse(response, (jsonValue) => TenantEventsResponseDtoFromJSON(jsonValue));
     }
 
     /**
      * Tenant-level changes: grants, workspaces created or deleted
      */
-    async tenantAccessControllerEvents(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<TenantEventDto>> {
-        const response = await this.tenantAccessControllerEventsRaw(initOverrides);
+    async tenantAccessControllerEvents(requestParameters: TenantAccessControllerEventsRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantEventsResponseDto> {
+        const response = await this.tenantAccessControllerEventsRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -566,3 +604,21 @@ export class AccessApi extends runtime.BaseAPI {
     }
 
 }
+
+/**
+ * @export
+ */
+export const TenantAccessControllerEventsSortByEnum = {
+    OccurredAt: 'OCCURRED_AT',
+    Actor: 'ACTOR',
+    Action: 'ACTION'
+} as const;
+export type TenantAccessControllerEventsSortByEnum = typeof TenantAccessControllerEventsSortByEnum[keyof typeof TenantAccessControllerEventsSortByEnum];
+/**
+ * @export
+ */
+export const TenantAccessControllerEventsSortOrderEnum = {
+    Asc: 'ASC',
+    Desc: 'DESC'
+} as const;
+export type TenantAccessControllerEventsSortOrderEnum = typeof TenantAccessControllerEventsSortOrderEnum[keyof typeof TenantAccessControllerEventsSortOrderEnum];
