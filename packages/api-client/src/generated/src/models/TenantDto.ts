@@ -77,7 +77,6 @@ export const TenantDtoCapabilitiesEnum = {
     WorkspaceView: 'workspace.view',
     WorkspaceSettings: 'workspace.settings',
     WorkspacePause: 'workspace.pause',
-    WorkspacePublish: 'workspace.publish',
     WorkspaceDelete: 'workspace.delete',
     WorkspaceTransfer: 'workspace.transfer',
     NotificationView: 'notification.view',

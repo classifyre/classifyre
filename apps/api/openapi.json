@@ -22824,6 +22824,11 @@
             "description": "Master switch for adaptive (\"automatic\") source scheduling. When false, no AUTO source is started; each source keeps its phase, so turning this back on resumes exactly where it left off.",
             "example": true
           },
+          "demoMode": {
+            "type": "boolean",
+            "description": "Read-only. When true, the instance runs in demo mode and all mutating operations are rejected.",
+            "example": false
+          },
           "hfTokenSet": {
             "type": "boolean",
             "description": "Read-only. Whether a user-configured Hugging Face token is stored (encrypted at rest).",
@@ -22871,6 +22876,7 @@
           "harnessMaxRecalledMemories",
           "harnessDreamIntervalDays",
           "autoScheduleEnabled",
+          "demoMode",
           "hfTokenSet",
           "hfTokenInstanceSet",
           "createdAt",
@@ -30802,7 +30808,6 @@
                 "workspace.view",
                 "workspace.settings",
                 "workspace.pause",
-                "workspace.publish",
                 "workspace.delete",
                 "workspace.transfer",
                 "notification.view",
@@ -30985,7 +30990,6 @@
                 "workspace.view",
                 "workspace.settings",
                 "workspace.pause",
-                "workspace.publish",
                 "workspace.delete",
                 "workspace.transfer",
                 "notification.view",
@@ -31204,7 +31208,6 @@
                 "workspace.view",
                 "workspace.settings",
                 "workspace.pause",
-                "workspace.publish",
                 "workspace.delete",
                 "workspace.transfer",
                 "notification.view",
