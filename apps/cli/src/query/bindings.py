@@ -126,6 +126,20 @@ class SourceBinding:
 
     # ── recipe access ──────────────────────────────────────────────────
 
+    def label(self) -> str:
+        """What the source is called in errors: `mysql://host:port/`.
+
+        Mirrors the scan's ``_source_label`` (`host:port`, no database): the
+        query and the scan then name the same failing endpoint the same way,
+        so a person comparing the two sees one problem, not two wordings.
+        """
+        required = self._section("required")
+        host = str(required.get("host") or "").strip()
+        port = str(required.get("port") or "").strip()
+        if host:
+            return f"mysql://{host}:{port}/" if port else f"mysql://{host}/"
+        return self._hidden
+
     def _section(self, name: str) -> dict[str, Any]:
         value = self.recipe.get(name)
         return value if isinstance(value, dict) else {}
@@ -157,10 +171,11 @@ class SourceBinding:
 
     def _require_location_fields(self, location: TableLocation, *fields: str) -> list[str]:
         values = [getattr(location, name) for name in fields]
-        if any(not value for value in values):
+        missing = [name for name, value in zip(fields, values) if not value]
+        if missing:
             raise BindingError(
-                f"The table's location is incomplete (needs {', '.join(fields)}): "
-                "run a scan of the source again."
+                f"Could not open {self.label()}: the table's location is incomplete "
+                f"(needs {', '.join(missing)}): run a scan of the source again."
             )
         return [str(value) for value in values]
 
