@@ -15,6 +15,8 @@ export interface AuditEventInput {
   operation: string;
   entityType: string | null;
   entityId: string | null;
+  /** Display name of the entity at record time (names only, never secrets). */
+  entityName?: string | null;
   fields: string[];
   status?: number;
 }
@@ -87,6 +89,7 @@ export class AuditTrailService {
           operation: event.operation,
           entityType: event.entityType,
           entityId: event.entityId,
+          entityName: event.entityName ?? null,
           fields: event.fields,
           status: event.status ?? null,
         },
@@ -123,6 +126,10 @@ export class AuditTrailService {
               },
               {
                 entityType: { contains: needle, mode: 'insensitive' as const },
+              },
+              { entityId: { contains: needle, mode: 'insensitive' as const } },
+              {
+                entityName: { contains: needle, mode: 'insensitive' as const },
               },
               { actor: { contains: needle, mode: 'insensitive' as const } },
             ],

@@ -76,6 +76,25 @@ describe('routeEntity', () => {
     ).toEqual({ entityType: 'workspaces', entityId: 'g-1' });
   });
 
+  it('names a grant change "<group> on <scope>" when the response says so', () => {
+    expect(
+      routeEntity(
+        '/access/grants',
+        {},
+        {
+          id: 'g-1',
+          subjectLabel: '/finance',
+          scopeLabel: 'shop_lake.shop.orders',
+        },
+        'ws-1',
+      ),
+    ).toEqual({
+      entityType: 'workspaces',
+      entityId: 'g-1',
+      entityName: '/finance on shop_lake.shop.orders',
+    });
+  });
+
   it('files notification audience changes under the workspace', () => {
     expect(
       routeEntity(

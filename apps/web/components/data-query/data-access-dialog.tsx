@@ -132,11 +132,17 @@ export function useTableAccessGrants(
   return { grants, groups, reload };
 }
 
-/** The name a scope reads as: this table, its whole source, or the label. */
+/**
+ * The name a scope reads as. Resource grants (this table / its source) use
+ * the asset or source name recorded on the grant row itself — the backend
+ * labels single-resource grants that way, so no "this table" fallback is
+ * needed. Anything wider falls back to the grant's scope label.
+ */
 export function accessScopeLabel(
   t: (key: "dataQuery.access.thisTable" | "dataQuery.access.wholeSource") => string,
-  grant: GrantDto,
+  grant: GrantDto & { resourceName?: string | null },
 ): string {
+  if (grant.resourceName) return grant.resourceName;
   if (grant.scopeType === "asset") return t("dataQuery.access.thisTable");
   if (grant.scopeType === "source") return t("dataQuery.access.wholeSource");
   return grant.scopeLabel;

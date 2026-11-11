@@ -34,24 +34,48 @@ export function routeEntity(
   params: Record<string, string | undefined>,
   responseBody: unknown,
   workspaceId?: string | null,
-): { entityType: string | null; entityId: string | null } {
+): {
+  entityType: string | null;
+  entityId: string | null;
+  entityName?: string | null;
+} {
   const segments = routePath.split('/').filter(Boolean);
   if (
     segments[0] === 'access' &&
     segments[1] === 'grants' &&
     workspaceId
   ) {
+    // A grant change names the group it touches and the scope it applies to
+    // (`/finance` on `shop.orders`), so the trail reads without resolving
+    // group paths or asset names afterwards.
+    const grant = (
+      responseBody && typeof responseBody === 'object'
+        ? (responseBody as Record<string, unknown>)
+        : null
+    );
+    const subject =
+      typeof grant?.subjectLabel === 'string' ? grant.subjectLabel : null;
+    const scope =
+      typeof grant?.scopeLabel === 'string' ? grant.scopeLabel : null;
+    const entityName =
+      subject && scope
+        ? `${subject} on ${scope}`
+        : (subject ?? scope ?? null);
     if (routePath.includes(':id')) {
       const value = params[segments[segments.indexOf(':id')].slice(1)];
-      return { entityType: 'workspaces', entityId: value ?? workspaceId };
+      return {
+        entityType: 'workspaces',
+        entityId: value ?? workspaceId,
+        ...(entityName ? { entityName } : {}),
+      };
     }
     const createdId =
-      responseBody &&
-      typeof responseBody === 'object' &&
-      typeof (responseBody as { id?: unknown }).id === 'string'
-        ? (responseBody as { id: string }).id
-        : null;
-    return { entityType: 'workspaces', entityId: createdId ?? workspaceId };
+      typeof grant?.id === 'string' ? grant.id : null;
+    return {
+      entityType: 'workspaces',
+      entityId: createdId ?? workspaceId,
+      ...(entityName ? { entityName } : {}),
+    };
   }
   if (
     segments[0] === 'notifications' &&

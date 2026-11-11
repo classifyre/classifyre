@@ -439,6 +439,9 @@ export class QueryRunService {
       // R6: audit exactly the tables the job validated and read, attributed
       // to the run's actor. Refusals and failures read nothing, so they
       // record no per-table event; the run row itself keeps the attribution.
+      // The SQL name goes along (`shop_lake.shop.orders`), so the trail
+      // reads without resolving asset ids — and the per-table tab filters
+      // on names, not just ids.
       if (assetIds?.length && run.actorRef) {
         const actor = {
           id: null,
@@ -447,6 +450,7 @@ export class QueryRunService {
           via: 'none' as const,
           ref: run.actorRef,
         };
+        const names = await this.sqlNamesFor(assetIds);
         const isExport = Boolean(run.resultFormat);
         for (const assetId of assetIds) {
           void this.audit.record({
@@ -458,6 +462,7 @@ export class QueryRunService {
               : 'query-runs.read-table',
             entityType: 'asset',
             entityId: assetId,
+            entityName: names.get(assetId) ?? null,
             fields: [],
           });
         }
@@ -476,6 +481,14 @@ export class QueryRunService {
     const { tables } = await this.catalog.tables();
     const wanted = new Set(sqlNames);
     return tables.filter((t) => wanted.has(t.sqlName)).map((t) => t.assetId);
+  }
+
+  private async sqlNamesFor(assetIds: string[]): Promise<Map<string, string>> {
+    const { tables } = await this.catalog.tables();
+    const wanted = new Set(assetIds);
+    return new Map(
+      tables.filter((t) => wanted.has(t.assetId)).map((t) => [t.assetId, t.sqlName]),
+    );
   }
 
   async get(runId: string): Promise<QueryRunView> {

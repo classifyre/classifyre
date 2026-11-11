@@ -82,7 +82,14 @@ describe('AccessManagementService', () => {
     ownerLineage: () => Promise.resolve(['finance']),
   } as unknown as IdentityService;
 
-  const service = new AccessManagementService(tenancy, identity);
+  const service = new AccessManagementService(
+    tenancy,
+    identity,
+    {
+      source: { findMany: () => Promise.resolve([]) },
+      asset: { findMany: () => Promise.resolve([]) },
+    } as never,
+  );
   const base = {
     subjectType: 'group' as const,
     subjectId: 'legal',
