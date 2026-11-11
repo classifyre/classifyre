@@ -80,6 +80,13 @@ When a signal is specific to you, build a **custom detector**. The same framewor
 spans the whole spectrum — from a zero-overhead pattern rule to a full AI model,
 across both text and images:
 
+How a custom detector finds things — its patterns, prompts, model settings or
+code — is shown only to people who can change detectors (**detector.manage**).
+Everyone else who can see detectors, visitors of a public workspace included,
+sees its name, kind, the sources using it and what it found, never its
+definition; the API and MCP leave it out for them too.
+
+
 | Engine                   | Modality | Best for                                            |
 | ------------------------ | -------- | --------------------------------------------------- |
 | **Regex**                | Text     | Codes, IDs, structured patterns — exact and instant |

@@ -49,10 +49,7 @@ import { CustomDetectorTrainingHistoryTable } from "@/components/custom-detector
 import { CustomDetectorExtractionCoverage } from "@/components/custom-detector-extraction-coverage";
 import { VisualScanBadge } from "@/components/detector-type-badge";
 import { isVisualDetector } from "@/lib/custom-detector-badge";
-import {
-  isNonTrainableKind,
-  resolveDetectorKind,
-} from "@/lib/detector-kind";
+import { isNonTrainableKind, resolveDetectorKind } from "@/lib/detector-kind";
 import { formatDate } from "@/lib/date";
 import { useTranslation } from "@/hooks/use-translation";
 import {
@@ -64,6 +61,7 @@ import {
 import { FindingsTable } from "@/components/findings-table";
 import { RetireOutOfScopeFindings } from "@/components/retire-out-of-scope-findings";
 import { narrowsDetector } from "@/lib/detector-narrowing";
+import { useCan } from "@/hooks/use-me";
 import { ChangedBy } from "@/components/audit-history";
 
 // The generated DTO is out-of-sync with the server — pipeline detectors carry
@@ -74,6 +72,9 @@ type DetectorWithPipeline = CustomDetectorResponseDto & {
 };
 
 export default function CustomDetectorDetailsPage() {
+  // How a detector finds things (patterns, prompts, code) is for the people
+  // who can change detectors; the API sends others no definition.
+  const canManageDetector = useCan("detector.manage");
   const nsPath = useNsPath();
   const router = useRouter();
   const { t } = useTranslation();
@@ -347,9 +348,7 @@ export default function CustomDetectorDetailsPage() {
 
       <Tabs
         value={activeTab}
-        onValueChange={(value) =>
-          setActiveTab(value as "overview" | "results")
-        }
+        onValueChange={(value) => setActiveTab(value as "overview" | "results")}
         urlParam="tab"
         className="space-y-4"
       >
@@ -363,233 +362,251 @@ export default function CustomDetectorDetailsPage() {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
-      <Card className="border-2 border-border rounded-[6px]">
-        <CardHeader>
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <CardTitle>{detector.name}</CardTitle>
-                {isVisualDetector(pipelineSchemaType) ? (
-                  <VisualScanBadge />
-                ) : null}
+          <Card className="border-2 border-border rounded-[6px]">
+            <CardHeader>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <CardTitle>{detector.name}</CardTitle>
+                    {isVisualDetector(pipelineSchemaType) ? (
+                      <VisualScanBadge />
+                    ) : null}
+                  </div>
+                  <CardDescription className="font-mono text-xs">
+                    {detector.key}
+                  </CardDescription>
+                  <ChangedBy
+                    entityType="custom-detectors"
+                    entityId={detector.id}
+                    createdAt={detector.createdAt}
+                    className="mt-1"
+                  />
+                </div>
               </div>
-              <CardDescription className="font-mono text-xs">
-                {detector.key}
-              </CardDescription>
-              <ChangedBy
-                entityType="custom-detectors"
-                entityId={detector.id}
-                createdAt={detector.createdAt}
-                className="mt-1"
-              />
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent
-          className={`grid gap-3 ${!isNonTrainable && (isPipelineDetector || detector.method !== "RULESET") ? "md:grid-cols-3" : "md:grid-cols-2"}`}
-        >
-          <div className="rounded-[4px] border border-border/20 p-3">
-            <p className="text-xs text-muted-foreground mb-1">
-              {t("detectors.sourcesUsing")}
-            </p>
-            {sourcesUsing.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                {t("common.none")}
-              </p>
-            ) : (
-              <ul className="space-y-0.5">
-                {sourcesUsing.map((source) => (
-                  <li key={source.id}>
-                    <a
-                      href={nsPath(`/sources/${source.id}`)}
-                      className="text-sm font-medium underline underline-offset-2 hover:text-foreground/70"
-                    >
-                      {source.name}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-          <div className="rounded-[4px] border border-border/20 p-3">
-            <p className="text-xs text-muted-foreground">
-              {t("detectors.sourcesWithFindings")}
-            </p>
-            <p className="text-lg font-semibold">
-              {detector.sourcesWithFindingsCount}
-            </p>
-          </div>
-          {!isNonTrainable &&
-            (isPipelineDetector || detector.method !== "RULESET") && (
+            </CardHeader>
+            <CardContent
+              className={`grid gap-3 ${!isNonTrainable && (isPipelineDetector || detector.method !== "RULESET") ? "md:grid-cols-3" : "md:grid-cols-2"}`}
+            >
+              <div className="rounded-[4px] border border-border/20 p-3">
+                <p className="text-xs text-muted-foreground mb-1">
+                  {t("detectors.sourcesUsing")}
+                </p>
+                {sourcesUsing.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    {t("common.none")}
+                  </p>
+                ) : (
+                  <ul className="space-y-0.5">
+                    {sourcesUsing.map((source) => (
+                      <li key={source.id}>
+                        <a
+                          href={nsPath(`/sources/${source.id}`)}
+                          className="text-sm font-medium underline underline-offset-2 hover:text-foreground/70"
+                        >
+                          {source.name}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
               <div className="rounded-[4px] border border-border/20 p-3">
                 <p className="text-xs text-muted-foreground">
-                  {t("detectors.lastTrained")}
+                  {t("detectors.sourcesWithFindings")}
                 </p>
-                <p className="text-sm font-medium">
-                  {detector.lastTrainedAt
-                    ? formatDate(detector.lastTrainedAt)
-                    : t("detectors.never")}
+                <p className="text-lg font-semibold">
+                  {detector.sourcesWithFindingsCount}
                 </p>
               </div>
-            )}
-        </CardContent>
-      </Card>
+              {!isNonTrainable &&
+                (isPipelineDetector || detector.method !== "RULESET") && (
+                  <div className="rounded-[4px] border border-border/20 p-3">
+                    <p className="text-xs text-muted-foreground">
+                      {t("detectors.lastTrained")}
+                    </p>
+                    <p className="text-sm font-medium">
+                      {detector.lastTrainedAt
+                        ? formatDate(detector.lastTrainedAt)
+                        : t("detectors.never")}
+                    </p>
+                  </div>
+                )}
+            </CardContent>
+          </Card>
 
-      {isPipelineDetector ? (
-        isTransformerPipeline ? (
-          <TransformerDetectorEditor
-            pipelineType={pipelineSchemaType as TransformerPipelineType}
-            mode="edit"
-            detectorId={detectorId}
-            submitLabel={t("common.save")}
-            isSubmitting={isSaving}
-            initialPipelineSchema={detector.pipelineSchema}
-            initialName={detector.name}
-            initialKey={detector.key}
-            initialDescription={detector.description ?? ""}
-            initialIsActive={detector.isActive}
-            onSubmit={(payload) => savePipelineDetector(payload)}
-          />
-        ) : isRegexPipeline ? (
-          <RegexDetectorEditor
-            mode="edit"
-            detectorId={detectorId}
-            submitLabel={t("common.save")}
-            isSubmitting={isSaving}
-            initialPipelineSchema={detector.pipelineSchema}
-            initialName={detector.name}
-            initialKey={detector.key}
-            initialDescription={detector.description ?? ""}
-            onSubmit={(payload) => savePipelineDetector(payload)}
-          />
-        ) : isLLMPipeline ? (
-          <LLMDetectorEditor
-            mode="edit"
-            detectorId={detectorId}
-            submitLabel={t("common.save")}
-            isSubmitting={isSaving}
-            initialPipelineSchema={detector.pipelineSchema}
-            initialName={detector.name}
-            initialKey={detector.key}
-            initialDescription={detector.description ?? ""}
-            initialIsActive={detector.isActive}
-            initialAiProviderConfigId={detector.aiProviderConfigId ?? null}
-            onSubmit={(payload) =>
-              savePipelineDetector(payload, {
-                aiProviderConfigId: payload.aiProviderConfigId,
-              })
-            }
-          />
-        ) : isDecisionPipeline ? (
-          <DecisionDetectorEditor
-            mode="edit"
-            detectorId={detectorId}
-            submitLabel={t("common.save")}
-            isSubmitting={isSaving}
-            initialPipelineSchema={detector.pipelineSchema}
-            initialSecretKeys={
-              (detector as { secretKeys?: string[] }).secretKeys ?? []
-            }
-            initialName={detector.name}
-            initialKey={detector.key}
-            initialDescription={detector.description ?? ""}
-            initialIsActive={detector.isActive}
-            onSubmit={(payload) => savePipelineDetector(payload)}
-          />
-        ) : isCodePipeline ? (
-          <CodeDetectorEditor
-            mode="edit"
-            detectorId={detectorId}
-            submitLabel={t("common.save")}
-            isSubmitting={isSaving}
-            initialPipelineSchema={detector.pipelineSchema}
-            initialSecretKeys={
-              (detector as { secretKeys?: string[] }).secretKeys ?? []
-            }
-            initialName={detector.name}
-            initialKey={detector.key}
-            initialDescription={detector.description ?? ""}
-            initialIsActive={detector.isActive}
-            onSubmit={(payload) => savePipelineDetector(payload)}
-          />
-        ) : isTagPipeline ? (
-          <TagDetectorEditor
-            mode="edit"
-            submitLabel={t("common.save")}
-            isSubmitting={isSaving}
-            initialPipelineSchema={detector.pipelineSchema}
-            initialName={detector.name}
-            initialKey={detector.key}
-            initialDescription={detector.description ?? ""}
-            initialIsActive={detector.isActive}
-            onSubmit={(payload) => savePipelineDetector(payload)}
-          />
-        ) : (
-          <PipelineDetectorEditor
-            mode="edit"
-            detectorId={detectorId}
-            submitLabel={t("common.save")}
-            isSubmitting={isSaving}
-            initialPipelineSchema={detector.pipelineSchema}
-            initialName={detector.name}
-            initialKey={detector.key}
-            initialDescription={detector.description ?? ""}
-            onSubmit={(payload) => savePipelineDetector(payload)}
-          />
-        )
-      ) : (
-        <CustomDetectorEditor
-          mode="edit"
-          initialValue={{
-            id: detector.id,
-            name: detector.name,
-            key: detector.key,
-            description: detector.description ?? "",
-            method: detector.method,
-            isActive: detector.isActive,
-            config: detector.config,
-          }}
-          submitLabel={t("common.save")}
-          isSubmitting={isSaving}
-          onSubmit={handleSave}
-        />
-      )}
-
-      {isPipelineDetector && (
-        <RetireOutOfScopeFindings
-          detectorId={detectorId}
-          detectorKey={detector.key}
-          reviewRequested={retireReviewRequested}
-          onReviewStarted={handleRetireReviewStarted}
-        />
-      )}
-
-      {Boolean(detector.config?.extractor) && (
-        <section className="space-y-4">
-          <h2 className="font-serif text-2xl font-black uppercase tracking-[0.06em]">
-            {t("detectors.extractionTab")}
-          </h2>
-          <CustomDetectorExtractionCoverage detectorId={detectorId} />
-        </section>
-      )}
-
-      {!isNonTrainable &&
-        (isPipelineDetector || detector.method !== "RULESET") && (
-          <section data-testid="training-history-section" className="space-y-4">
-            <div>
-              <h2 className="font-serif text-2xl font-black uppercase tracking-[0.06em]">
-                {t("detectors.trainingHistoryTab")}
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                {t("detectors.findingsCount", {
-                  count: detector.findingsCount,
-                })}
+          {canManageDetector ? (
+            isPipelineDetector ? (
+              isTransformerPipeline ? (
+                <TransformerDetectorEditor
+                  pipelineType={pipelineSchemaType as TransformerPipelineType}
+                  mode="edit"
+                  detectorId={detectorId}
+                  submitLabel={t("common.save")}
+                  isSubmitting={isSaving}
+                  initialPipelineSchema={detector.pipelineSchema}
+                  initialName={detector.name}
+                  initialKey={detector.key}
+                  initialDescription={detector.description ?? ""}
+                  initialIsActive={detector.isActive}
+                  onSubmit={(payload) => savePipelineDetector(payload)}
+                />
+              ) : isRegexPipeline ? (
+                <RegexDetectorEditor
+                  mode="edit"
+                  detectorId={detectorId}
+                  submitLabel={t("common.save")}
+                  isSubmitting={isSaving}
+                  initialPipelineSchema={detector.pipelineSchema}
+                  initialName={detector.name}
+                  initialKey={detector.key}
+                  initialDescription={detector.description ?? ""}
+                  onSubmit={(payload) => savePipelineDetector(payload)}
+                />
+              ) : isLLMPipeline ? (
+                <LLMDetectorEditor
+                  mode="edit"
+                  detectorId={detectorId}
+                  submitLabel={t("common.save")}
+                  isSubmitting={isSaving}
+                  initialPipelineSchema={detector.pipelineSchema}
+                  initialName={detector.name}
+                  initialKey={detector.key}
+                  initialDescription={detector.description ?? ""}
+                  initialIsActive={detector.isActive}
+                  initialAiProviderConfigId={
+                    detector.aiProviderConfigId ?? null
+                  }
+                  onSubmit={(payload) =>
+                    savePipelineDetector(payload, {
+                      aiProviderConfigId: payload.aiProviderConfigId,
+                    })
+                  }
+                />
+              ) : isDecisionPipeline ? (
+                <DecisionDetectorEditor
+                  mode="edit"
+                  detectorId={detectorId}
+                  submitLabel={t("common.save")}
+                  isSubmitting={isSaving}
+                  initialPipelineSchema={detector.pipelineSchema}
+                  initialSecretKeys={
+                    (detector as { secretKeys?: string[] }).secretKeys ?? []
+                  }
+                  initialName={detector.name}
+                  initialKey={detector.key}
+                  initialDescription={detector.description ?? ""}
+                  initialIsActive={detector.isActive}
+                  onSubmit={(payload) => savePipelineDetector(payload)}
+                />
+              ) : isCodePipeline ? (
+                <CodeDetectorEditor
+                  mode="edit"
+                  detectorId={detectorId}
+                  submitLabel={t("common.save")}
+                  isSubmitting={isSaving}
+                  initialPipelineSchema={detector.pipelineSchema}
+                  initialSecretKeys={
+                    (detector as { secretKeys?: string[] }).secretKeys ?? []
+                  }
+                  initialName={detector.name}
+                  initialKey={detector.key}
+                  initialDescription={detector.description ?? ""}
+                  initialIsActive={detector.isActive}
+                  onSubmit={(payload) => savePipelineDetector(payload)}
+                />
+              ) : isTagPipeline ? (
+                <TagDetectorEditor
+                  mode="edit"
+                  submitLabel={t("common.save")}
+                  isSubmitting={isSaving}
+                  initialPipelineSchema={detector.pipelineSchema}
+                  initialName={detector.name}
+                  initialKey={detector.key}
+                  initialDescription={detector.description ?? ""}
+                  initialIsActive={detector.isActive}
+                  onSubmit={(payload) => savePipelineDetector(payload)}
+                />
+              ) : (
+                <PipelineDetectorEditor
+                  mode="edit"
+                  detectorId={detectorId}
+                  submitLabel={t("common.save")}
+                  isSubmitting={isSaving}
+                  initialPipelineSchema={detector.pipelineSchema}
+                  initialName={detector.name}
+                  initialKey={detector.key}
+                  initialDescription={detector.description ?? ""}
+                  onSubmit={(payload) => savePipelineDetector(payload)}
+                />
+              )
+            ) : (
+              <CustomDetectorEditor
+                mode="edit"
+                initialValue={{
+                  id: detector.id,
+                  name: detector.name,
+                  key: detector.key,
+                  description: detector.description ?? "",
+                  method: detector.method,
+                  isActive: detector.isActive,
+                  config: detector.config,
+                }}
+                submitLabel={t("common.save")}
+                isSubmitting={isSaving}
+                onSubmit={handleSave}
+              />
+            )
+          ) : (
+            <div
+              className="rounded-md border border-dashed p-6 text-sm"
+              data-testid="detector-definition-hidden"
+            >
+              <p className="font-medium">
+                {t("detectors.definitionHiddenTitle")}
+              </p>
+              <p className="mt-1 text-muted-foreground">
+                {t("detectors.definitionHiddenDescription")}
               </p>
             </div>
-            <CustomDetectorTrainingHistoryTable history={history} />
-          </section>
-        )}
+          )}
 
+          {isPipelineDetector && (
+            <RetireOutOfScopeFindings
+              detectorId={detectorId}
+              detectorKey={detector.key}
+              reviewRequested={retireReviewRequested}
+              onReviewStarted={handleRetireReviewStarted}
+            />
+          )}
+
+          {Boolean(detector.config?.extractor) && (
+            <section className="space-y-4">
+              <h2 className="font-serif text-2xl font-black uppercase tracking-[0.06em]">
+                {t("detectors.extractionTab")}
+              </h2>
+              <CustomDetectorExtractionCoverage detectorId={detectorId} />
+            </section>
+          )}
+
+          {!isNonTrainable &&
+            (isPipelineDetector || detector.method !== "RULESET") && (
+              <section
+                data-testid="training-history-section"
+                className="space-y-4"
+              >
+                <div>
+                  <h2 className="font-serif text-2xl font-black uppercase tracking-[0.06em]">
+                    {t("detectors.trainingHistoryTab")}
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    {t("detectors.findingsCount", {
+                      count: detector.findingsCount,
+                    })}
+                  </p>
+                </div>
+                <CustomDetectorTrainingHistoryTable history={history} />
+              </section>
+            )}
         </TabsContent>
 
         <TabsContent value="results" className="space-y-4">

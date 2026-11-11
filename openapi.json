@@ -31352,7 +31352,9 @@
               "enum": [
                 "tenant",
                 "group",
-                "workspace"
+                "workspace",
+                "source",
+                "asset"
               ]
             }
           },

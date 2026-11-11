@@ -4,26 +4,13 @@ import * as React from "react";
 import { Trash2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@workspace/api-client";
-import type { GrantDto, TenantGroupDto } from "@workspace/api-client";
+import type { GrantDto, RoleDto, TenantGroupDto } from "@workspace/api-client";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@workspace/ui/components/dialog";
-import { Label } from "@workspace/ui/components/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@workspace/ui/components/select";
+
+
+
+
 import {
   Table,
   TableBody,
@@ -38,6 +25,10 @@ import {
   TabsList,
   TabsTrigger,
 } from "@workspace/ui/components/tabs";
+import {
+  GiveAccessDialog,
+  type GrantTarget,
+} from "@/components/access/give-access-dialog";
 import { AuditEventList } from "@/components/audit-history";
 import { useNamespace } from "@/components/namespace-provider";
 import {
@@ -47,38 +38,27 @@ import {
 } from "@/components/sortable-table-head";
 import { useCan } from "@/hooks/use-me";
 import { useTranslation } from "@/hooks/use-translation";
-import { apiErrorMessage } from "@/lib/data-query";
+import { formatDate } from "@/lib/date";
 import { extractApiErrorMessage } from "@/lib/extract-api-error-message";
 
 /**
- * What a Data tab is about, and so whose access and activity it shows:
- * the whole workspace (the SQL page), one source (every table in it), or
- * one table. The one type every piece below takes, so the three places
- * never drift apart.
+ * What a Data tab is about, and so whose access it shows: one source (every
+ * table in it) or one table. Access given on the whole workspace, a group's
+ * workspaces or other scopes is managed in Settings → Access.
  */
 export type DataScope =
-  | { kind: "workspace" }
   | { kind: "source"; sourceId: string; name: string }
   | { kind: "asset"; assetId: string; sourceId: string; name: string };
-
-/** The audit `resource` a scope's Activity filters on (API audit-resources.ts). */
-function activityResource(scope: DataScope): string {
-  if (scope.kind === "source") return `source:${scope.sourceId}`;
-  if (scope.kind === "asset") return `asset:${scope.assetId}`;
-  return "data";
-}
 
 const DATA_READER = "data-reader";
 
 /**
  * Whether a grant opens this scope's rows:
  * - a table: Data reader on the table, on its source, or anything wider;
- * - a source: Data reader on the source, on one of its tables, or wider;
- * - the workspace: every Data reader grant, wherever it applies.
+ * - a source: Data reader on the source, on one of its tables, or wider.
  */
 function reaches(scope: DataScope, workspaceId: string, grant: GrantDto) {
   if (grant.roleKey !== DATA_READER) return false;
-  if (scope.kind === "workspace") return true;
   const onResource = (id: string) => grant.scopeId === `${workspaceId}/${id}`;
   if (grant.scopeType === "asset") {
     return scope.kind === "asset"
@@ -92,12 +72,14 @@ function reaches(scope: DataScope, workspaceId: string, grant: GrantDto) {
 export interface DataAccessGrants {
   grants: GrantDto[] | null;
   groups: TenantGroupDto[];
+  roles: RoleDto[];
   reload: () => Promise<void>;
 }
 
 /**
- * The Data reader grants that reach a scope, and the tenant's groups to give
- * new ones to. Loads only for people who may see who has access.
+ * The Data reader grants that reach a scope, with the tenant's groups and
+ * the workspace's roles for giving new ones. Loads only for people who may
+ * see who has access.
  */
 export function useDataAccessGrants(scope: DataScope): DataAccessGrants {
   const { t } = useTranslation();
@@ -106,17 +88,20 @@ export function useDataAccessGrants(scope: DataScope): DataAccessGrants {
   const workspaceId = namespace?.id ?? "";
   const [grants, setGrants] = React.useState<GrantDto[] | null>(null);
   const [groups, setGroups] = React.useState<TenantGroupDto[]>([]);
+  const [roles, setRoles] = React.useState<RoleDto[]>([]);
   const scopeKey = JSON.stringify(scope);
 
   const reload = React.useCallback(async () => {
     if (!workspaceId || !canView) return;
     const current = JSON.parse(scopeKey) as DataScope;
     try {
-      const [all, tenantGroups] = await Promise.all([
+      const [all, tenantGroups, workspaceRoles] = await Promise.all([
         api.access.workspaceAccessControllerGrants(),
         api.access.workspaceAccessControllerGroups(),
+        api.access.workspaceAccessControllerRoles(),
       ]);
       setGroups(tenantGroups);
+      setRoles(workspaceRoles);
       setGrants(all.filter((grant) => reaches(current, workspaceId, grant)));
     } catch (error) {
       toast.error(await extractApiErrorMessage(error, t("access.loadFailed")));
@@ -128,7 +113,7 @@ export function useDataAccessGrants(scope: DataScope): DataAccessGrants {
     void reload();
   }, [reload]);
 
-  return { grants, groups, reload };
+  return { grants, groups, roles, reload };
 }
 
 /** A grant this screen may take away: given here, and only data access. */
@@ -136,13 +121,11 @@ function removable(grant: GrantDto): boolean {
   return (
     !grant.inherited &&
     grant.roleKey === DATA_READER &&
-    (grant.scopeType === "asset" ||
-      grant.scopeType === "source" ||
-      grant.scopeType === "workspace")
+    (grant.scopeType === "asset" || grant.scopeType === "source")
   );
 }
 
-type GrantsSortCol = "group" | "scope";
+type GrantsSortCol = "group" | "scope" | "until";
 
 /** Who can read a scope's rows, as a sortable table like settings → Access. */
 function DataAccessOverview({
@@ -161,7 +144,12 @@ function DataAccessOverview({
     () =>
       sortRows(
         access.grants ?? [],
-        (grant) => (sortCol === "scope" ? grant.scopeLabel : grant.subjectLabel),
+        (grant) =>
+          sortCol === "scope"
+            ? grant.scopeLabel
+            : sortCol === "until"
+              ? grant.expiresAt
+              : grant.subjectLabel,
         sortDir,
       ),
     [access.grants, sortCol, sortDir],
@@ -204,6 +192,11 @@ function DataAccessOverview({
                   column="scope"
                   sort={sort}
                 />
+                <SortableHead
+                  label={t("access.grantsTable.until")}
+                  column="until"
+                  sort={sort}
+                />
                 <TableHead>
                   <span className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
                     {t("access.grantsTable.origin")}
@@ -224,6 +217,9 @@ function DataAccessOverview({
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {grant.scopeLabel}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {grant.expiresAt ? formatDate(grant.expiresAt) : "—"}
                   </TableCell>
                   <TableCell>
                     {grant.inherited ? (
@@ -260,11 +256,11 @@ function DataAccessOverview({
 }
 
 /**
- * Give a group the Data reader role on exactly this scope: the table on a
- * table's tab, the whole source on a source's tab, the workspace on the SQL
- * page. No scope picker — where the button sits is what it opens.
+ * "Give access" on a Data tab: the one Give access dialog (as in Settings →
+ * Access) with the role fixed to Data reader and the target fixed to this
+ * source or table — the group and an optional end date are left to choose.
  */
-export function GiveDataAccessDialog({
+export function GiveDataAccessButton({
   scope,
   access,
 }: {
@@ -273,117 +269,44 @@ export function GiveDataAccessDialog({
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = React.useState(false);
-  const [groupId, setGroupId] = React.useState("");
-  const [busy, setBusy] = React.useState(false);
-  const name = scope.kind === "workspace" ? "" : scope.name;
-
-  const give = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!groupId) return;
-    setBusy(true);
-    try {
-      await api.access.workspaceAccessControllerAddGrant({
-        createGrantDto: {
-          subjectType: "group",
-          subjectId: groupId,
-          roleKey: DATA_READER,
-          ...(scope.kind === "asset"
-            ? { scopeType: "asset", resourceId: scope.assetId }
-            : scope.kind === "source"
-              ? { scopeType: "source", resourceId: scope.sourceId }
-              : { scopeType: "workspace" }),
-        },
-      });
-      setOpen(false);
-      toast.success(t("dataQuery.access.added"));
-      await access.reload();
-    } catch (error) {
-      toast.error(await apiErrorMessage(error));
-    } finally {
-      setBusy(false);
-    }
-  };
-
+  const target: GrantTarget =
+    scope.kind === "asset"
+      ? { kind: "asset", id: scope.assetId, name: scope.name }
+      : { kind: "source", id: scope.sourceId, name: scope.name };
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (next) setGroupId("");
-      }}
-    >
-      <DialogTrigger asChild>
-        <Button size="sm" data-testid="data-access-dialog-trigger">
-          <UserPlus className="mr-1.5 h-3.5 w-3.5" />
-          {t("dataQuery.access.give")}
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-lg" data-testid="data-access-dialog">
-        <DialogHeader>
-          <DialogTitle>{t("dataQuery.access.giveTitle")}</DialogTitle>
-          <DialogDescription>
-            {t(`dataQuery.access.giveDescription.${scope.kind}`, { name })}
-          </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={(event) => void give(event)} className="grid gap-3">
-          <div className="grid gap-1">
-            <Label htmlFor="data-access-group">{t("access.group")}</Label>
-            <Select value={groupId} onValueChange={setGroupId}>
-              <SelectTrigger id="data-access-group" data-testid="data-access-group">
-                <SelectValue placeholder={t("dataQuery.access.pickGroup")} />
-              </SelectTrigger>
-              <SelectContent>
-                {access.groups.map((group) => (
-                  <SelectItem key={group.id} value={group.id}>
-                    {group.path}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {t(`dataQuery.access.giveHint.${scope.kind}`, { name })}
-          </p>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-              disabled={busy}
-            >
-              {t("access.cancel")}
-            </Button>
-            <Button
-              type="submit"
-              disabled={!groupId || busy}
-              data-testid="data-access-give"
-            >
-              <UserPlus className="h-4 w-4" />
-              {t("dataQuery.access.give")}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+    <>
+      <Button
+        size="sm"
+        onClick={() => setOpen(true)}
+        data-testid="data-access-dialog-trigger"
+      >
+        <UserPlus className="mr-1.5 h-3.5 w-3.5" />
+        {t("dataQuery.access.give")}
+      </Button>
+      <GiveAccessDialog
+        open={open}
+        onOpenChange={setOpen}
+        groups={access.groups}
+        roles={access.roles}
+        fixed={{ roleKey: DATA_READER, target }}
+        onAdded={access.reload}
+      />
+    </>
   );
 }
 
 /**
- * Access and Activity for a scope, below its query: **Access** (the grants
- * that reach it, for people who may see who has access) and **Activity**
- * (what the trail recorded touching it: access given or taken away, reads
- * and exports of its tables). Activity names people, so it shows with
- * `access.view` too — never to visitors of a public workspace.
+ * Who can query this source or table, below its query, for people who may
+ * see who has access. A table's tab also has its **Activity** (reads,
+ * exports and access changes touching it); the workspace-wide trail is in
+ * Settings → Activity.
  */
-export function DataAccessTabs({
+export function DataAccessSection({
   scope,
   access,
-  actions,
 }: {
   scope: DataScope;
   access: DataAccessGrants;
-  /** Beside the tab list, e.g. Give access where no header holds it. */
-  actions?: React.ReactNode;
 }) {
   const { t } = useTranslation();
   const canView = useCan("access.view");
@@ -391,36 +314,42 @@ export function DataAccessTabs({
   const canSeeActivity = useCan("activity.view");
   if (!canView) return null;
 
+  const overview = (
+    <DataAccessOverview scope={scope} access={access} canManage={canManage} />
+  );
+  if (scope.kind !== "asset" || !canSeeActivity) {
+    return (
+      <div className="space-y-2 pt-2" data-testid="data-access">
+        <p className="text-xs font-mono uppercase tracking-[0.14em]">
+          {t("dataQuery.access.open")}
+        </p>
+        {overview}
+      </div>
+    );
+  }
   return (
     <div className="pt-2" data-testid="data-access">
       <Tabs defaultValue="access">
-        <div className="flex flex-wrap items-center gap-2">
         <TabsList>
           <TabsTrigger value="access" data-testid="data-access-tab">
             {t("dataQuery.access.open")}
           </TabsTrigger>
-          {canSeeActivity && (
-            <TabsTrigger value="activity" data-testid="data-activity-tab">
-              {t("dataQuery.access.activity")}
-            </TabsTrigger>
-          )}
+          <TabsTrigger value="activity" data-testid="data-activity-tab">
+            {t("dataQuery.access.activity")}
+          </TabsTrigger>
         </TabsList>
-          {actions && <div className="ml-auto">{actions}</div>}
-        </div>
         <TabsContent value="access" className="mt-2">
-          <DataAccessOverview scope={scope} access={access} canManage={canManage} />
+          {overview}
         </TabsContent>
-{canSeeActivity && (
         <TabsContent value="activity" className="mt-2">
           <p className="mb-2 text-xs text-muted-foreground">
-            {t(`dataQuery.access.activityHint.${scope.kind}`)}
+            {t("dataQuery.access.activityHint.asset")}
           </p>
           <AuditEventList
-            filter={{ resource: activityResource(scope) }}
-            showEntity={scope.kind !== "asset"}
+            filter={{ resource: `asset:${scope.assetId}` }}
+            showEntity={false}
           />
         </TabsContent>
-        )}
       </Tabs>
     </div>
   );

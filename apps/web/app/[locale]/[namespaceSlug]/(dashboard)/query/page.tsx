@@ -4,14 +4,7 @@ import * as React from "react";
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useTranslation } from "@/hooks/use-translation";
-import {
-  DataAccessTabs,
-  GiveDataAccessDialog,
-  useDataAccessGrants,
-  type DataScope,
-} from "@/components/data-query/data-access";
 import { QueryExplorer } from "@/components/data-query/query-explorer";
-import { useCan } from "@/hooks/use-me";
 import { useTenant } from "@/hooks/use-tenant";
 import {
   QueryWorkbench,
@@ -106,7 +99,6 @@ function QueryPageContent() {
             }}
             onSaved={() => reloadSaved()}
           />
-          <WorkspaceDataAccess />
         </section>
         <section className="w-full min-w-0 shrink-0 overflow-x-clip px-2 py-2 xl:w-80 xl:border-l">
           <QueryExplorer
@@ -132,29 +124,6 @@ function QueryPageContent() {
           />
         </section>
       </div>
-    </div>
-  );
-}
-
-const WORKSPACE: DataScope = { kind: "workspace" };
-
-/**
- * Who can query this workspace's tables, and what was read: every Data
- * reader grant (on the workspace, a source or a table) and the trail of
- * reads, exports and access changes. Give access here opens every table.
- */
-function WorkspaceDataAccess() {
-  const access = useDataAccessGrants(WORKSPACE);
-  const canManage = useCan("access.manage");
-  return (
-    <div className="mt-6 border-t pt-4">
-      <DataAccessTabs
-        scope={WORKSPACE}
-        access={access}
-        actions={
-          canManage && <GiveDataAccessDialog scope={WORKSPACE} access={access} />
-        }
-      />
     </div>
   );
 }

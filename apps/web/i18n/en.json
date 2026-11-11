@@ -2692,7 +2692,9 @@
       "templatesLoading": "Loading templates...",
       "templatesHint": "Start from a template. Each is a working rule with test scenarios; edit it into yours.",
       "templatesScenarios": "{{count}} test scenario(s)"
-    }
+    },
+    "definitionHiddenTitle": "How this detector works is not shown to you",
+    "definitionHiddenDescription": "Its patterns, prompts or code are shown only to people who can change detectors. What it found is in Results."
   },
   "scans": {
     "title": "Scans",
@@ -7335,7 +7337,7 @@
       "actions": "Actions"
     },
     "giveAccessTitle": "Give access",
-    "giveAccessDescription": "Give a group a role on this workspace, optionally until a date. You can only give roles whose capabilities you all hold here.",
+    "giveAccessDescription": "Give a group a role on this workspace — or, for Data reader, on one source or one table — optionally until a date. You can only give roles whose capabilities you all hold here.",
     "cancel": "Cancel",
     "allWorkspaces": "All workspaces",
     "tenantTitle": "Tenant",
@@ -7367,6 +7369,16 @@
       "noMatch": "No activity matches these filters.",
       "search": "Filter activity…",
       "allActions": "All actions"
+    },
+    "appliesTo": {
+      "label": "Applies to",
+      "workspace": "This whole workspace",
+      "source": "One source",
+      "asset": "One table",
+      "pickSource": "Source",
+      "pickTable": "Table",
+      "choose": "Choose…",
+      "none": "Nothing to choose: scan a database, lakehouse or bucket first."
     }
   },
   "platform": {
@@ -7512,32 +7524,16 @@
     "access": {
       "open": "Access",
       "description": {
-        "workspace": "Every Data reader grant in this workspace: on the whole workspace, on a source, or on one table. Data access always goes to a group.",
         "source": "Groups that can query this source's tables: the Data reader role on the source, on one of its tables, or on the whole workspace.",
         "asset": "Groups that can query this table: the Data reader role on the table, on its source, or on the whole workspace."
       },
       "activity": "Activity",
       "activityHint": {
-        "workspace": "Reads and exports of this workspace's tables and changes to data access, newest first. Each table read counts once per query.",
-        "source": "Reads and exports of this source's tables and access given or removed on it or its tables, newest first.",
         "asset": "Reads and exports of this table and access given or removed on it, newest first. Query runs themselves stay in each person's History."
       },
-      "giveTitle": "Give data access",
-      "giveDescription": {
-        "workspace": "Give a group the Data reader role on this workspace: every table in it.",
-        "source": "Give a group the Data reader role on the whole source {{name}}: every table in it.",
-        "asset": "Give a group the Data reader role on the table {{name}}."
-      },
-      "giveHint": {
-        "workspace": "Opens every table of the workspace to the group, today's and future ones. For one source or table, use its Data tab. Every change is recorded in Activity.",
-        "source": "Opens every table of {{name}} to the group. For a single table, use the table's Data tab. Every change is recorded in Activity.",
-        "asset": "Opens only {{name}} to the group. For the whole source, use the source's Data tab. Every change is recorded in Activity."
-      },
       "none": "Nobody beyond workspace admins.",
-      "pickGroup": "Choose a group",
       "give": "Give access",
       "remove": "Remove access",
-      "added": "Access given",
       "viewerNote": "Members also need a role that opens the workspace, such as Viewer."
     },
     "settings": {

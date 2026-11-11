@@ -1,0 +1,1 @@
+A custom detector's patterns, prompts and code, and the list of AI providers, are now shown only to people who can change detectors or see the settings; visitors of a public workspace no longer see them, and a public workspace no longer sends visitors to the sign-in page on its own.

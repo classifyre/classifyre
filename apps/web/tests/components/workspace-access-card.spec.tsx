@@ -69,12 +69,46 @@ async function mockAccess(page: CtPage, capabilities: string[]) {
           scopes: ["tenant"],
           capabilities: [],
         },
+        {
+          key: "data-reader",
+          title: "Data reader",
+          scopes: ["workspace", "group", "tenant", "source", "asset"],
+          capabilities: [],
+        },
       ]),
     ),
   );
   await page.route("**/access/groups", (route) =>
     route.fulfill(
       json([{ id: "sales", name: "sales", path: "/sales", parentId: null }]),
+    ),
+  );
+  await page.route("**/data-query/catalog", (route) =>
+    route.fulfill(
+      json({
+        sources: [
+          {
+            id: "s-shop",
+            name: "Shop lake",
+            sqlName: "shop_lake",
+            type: "S3_COMPATIBLE_STORAGE",
+            queryable: true,
+            tables: [
+              {
+                assetId: "a-orders",
+                sourceId: "s-shop",
+                name: "orders",
+                schema: "shop",
+                table: "orders",
+                sqlName: "shop_lake.shop.orders",
+                queryable: true,
+                canQuery: true,
+                columns: [],
+              },
+            ],
+          },
+        ],
+      }),
     ),
   );
   await page.route("**/access/explain?*", (route) =>
@@ -147,6 +181,43 @@ test("gives a group a role from the dialog", async ({ mount, page }) => {
   await expect
     .poll(() => calls.find((c) => c.method === "POST")?.body ?? "")
     .toContain('"subjectId":"sales"');
+});
+
+test("gives Data reader on one source, until a date, from the same dialog", async ({
+  mount,
+  page,
+}) => {
+  const calls = await mockAccess(page, [
+    "workspace.view",
+    "access.view",
+    "access.manage",
+  ]);
+  const card = await mount(<WorkspaceAccessCard />);
+  await card.getByTestId("workspace-give-access").click();
+
+  const dialog = page.getByTestId("give-access-dialog");
+  await dialog.getByTestId("give-access-group").click();
+  await page.getByRole("option", { name: "/sales" }).click();
+  await dialog.getByTestId("give-access-role").click();
+  await page.getByRole("option", { name: "Data reader" }).click();
+  // A role given on single sources and tables asks which.
+  await dialog.getByTestId("give-access-target").click();
+  await page.getByRole("option", { name: "One source" }).click();
+  await dialog.getByTestId("give-access-resource").click();
+  await page.getByRole("option", { name: "Shop lake" }).click();
+  await dialog.getByTestId("give-access-until").fill("2027-06-30");
+  await dialog.getByTestId("give-access-submit").click();
+
+  await expect
+    .poll(() => calls.find((c) => c.method === "POST")?.body ?? "")
+    .toContain('"scopeType":"source"');
+  const body = JSON.parse(calls.find((c) => c.method === "POST")!.body!);
+  expect(body).toMatchObject({
+    subjectId: "sales",
+    roleKey: "data-reader",
+    resourceId: "s-shop",
+  });
+  expect(String(body.expiresAt)).toContain("2027-06-30");
 });
 
 test("hides changes from people who may only look", async ({ mount, page }) => {

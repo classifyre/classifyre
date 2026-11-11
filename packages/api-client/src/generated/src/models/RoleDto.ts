@@ -52,7 +52,9 @@ export interface RoleDto {
 export const RoleDtoScopesEnum = {
     Tenant: 'tenant',
     Group: 'group',
-    Workspace: 'workspace'
+    Workspace: 'workspace',
+    Source: 'source',
+    Asset: 'asset'
 } as const;
 export type RoleDtoScopesEnum = typeof RoleDtoScopesEnum[keyof typeof RoleDtoScopesEnum];
 

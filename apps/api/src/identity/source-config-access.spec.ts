@@ -1,4 +1,8 @@
-import { SourceConfigAccess, withoutConfig } from './source-config-access';
+import {
+  SourceConfigAccess,
+  withoutConfig,
+  withoutDetectorDefinition,
+} from './source-config-access';
 import type { Actor } from './actor';
 
 const source = {
@@ -89,5 +93,30 @@ describe('SourceConfigAccess', () => {
 
   it('never from scan jobs with the internal key', async () => {
     expect(await access(false, job).forCaller(source)).toBe(source);
+  });
+});
+
+describe('withoutDetectorDefinition', () => {
+  it('keeps what a detector is and found, never how it finds it', () => {
+    const detector = {
+      id: 'd1',
+      name: 'Card numbers',
+      pipelineSchema: { type: 'REGEX', patterns: ['\\d{16}'] },
+      config: { ruleset: ['x'] },
+      secretKeys: ['OPENAI_KEY'],
+      aiProviderConfigId: 'p1',
+      findingsCount: 3,
+    };
+    expect(withoutDetectorDefinition([detector])).toEqual([
+      {
+        id: 'd1',
+        name: 'Card numbers',
+        pipelineSchema: { type: 'REGEX' },
+        config: {},
+        secretKeys: [],
+        aiProviderConfigId: null,
+        findingsCount: 3,
+      },
+    ]);
   });
 });
