@@ -30,7 +30,7 @@
     },
     {
       "name": "boto3",
-      "version": "1.43.126",
+      "version": "1.44.0",
       "modules": [
         "boto3"
       ],
@@ -110,7 +110,7 @@
     },
     {
       "name": "google-api-python-client",
-      "version": "2.201.0",
+      "version": "2.202.0",
       "modules": [
         "googleapiclient"
       ],
@@ -119,7 +119,7 @@
     },
     {
       "name": "google-auth",
-      "version": "2.62.1",
+      "version": "2.62.2",
       "modules": [
         "google.auth"
       ],
@@ -190,7 +190,7 @@
     },
     {
       "name": "litellm",
-      "version": "1.108.3",
+      "version": "1.109.0",
       "modules": [
         "litellm"
       ],
@@ -368,7 +368,7 @@
     },
     {
       "name": "pymysql",
-      "version": "1.2.3",
+      "version": "1.2.4",
       "modules": [
         "pymysql"
       ],
@@ -386,7 +386,7 @@
     },
     {
       "name": "pypdfium2",
-      "version": "5.15.1",
+      "version": "5.15.2",
       "modules": [
         "pypdfium2"
       ],
@@ -448,7 +448,7 @@
     },
     {
       "name": "sqlglot",
-      "version": "30.30.0",
+      "version": "30.31.0",
       "modules": [
         "sqlglot"
       ],
