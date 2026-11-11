@@ -1,1 +1,0 @@
-Visitors of a public workspace, and members reading one without a role in it, no longer see its activity, its settings or how its sources are configured, and cannot use SQL; the API refuses them these too. People without the right to change sources now see a source's name, type and scans but not its configuration or notebook code.

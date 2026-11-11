@@ -1,1 +1,0 @@
-Giving access now uses one dialog everywhere — Settings → Access and the Data tabs of sources and tables — with the same fields: group, role, what it applies to and an optional end date. From Settings, the Data reader role (which opens SQL) can now be given on one source or one table, and access given on a Data tab can end on a date.

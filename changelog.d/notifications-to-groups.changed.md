@@ -1,1 +1,0 @@
-Notifications now go to groups: by default to the group that owns the workspace, or to the groups chosen for each kind under Settings → Access → Who gets notifications. Marking a notification read, important or dismissed now applies to you only, and visitors of a public workspace see none.

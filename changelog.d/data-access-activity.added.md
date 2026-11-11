@@ -1,1 +1,0 @@
-A table's Data tab, a source's Data tab and the SQL page now show Access and Activity for exactly that scope: who can query it, and which reads, exports and access changes touched it. Give access on a table's tab always opens just that table, and on the SQL page the whole workspace.

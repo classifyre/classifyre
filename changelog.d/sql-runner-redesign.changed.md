@@ -1,1 +1,0 @@
-The SQL page now works like a small IDE: Run, Format and Save sit in one toolbar above the editor, and your tables, recent queries and saved queries are in tabs beside it. Names complete as you type with access marks, a table or column from the list lands where the cursor stands, reopening a past query brings back just its SQL, and results can be searched, sorted and paged.
