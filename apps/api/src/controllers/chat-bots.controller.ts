@@ -22,7 +22,7 @@ import {
 import { AccessArea } from '../identity/access.decorators';
 
 @ApiTags('Chat Bots')
-@AccessArea({ view: 'agent.view', change: 'agent.configure' })
+@AccessArea({ view: 'settings.view', change: 'agent.configure' })
 @Controller('instance-settings/chat/bots')
 export class ChatBotsController {
   constructor(private readonly service: ChatBotsService) {}

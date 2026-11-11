@@ -25,7 +25,10 @@ export class AuditController {
     private readonly actors: ActorDirectoryService,
   ) {}
 
+  // What people did is not the public's to read: visitors and members
+  // reading a public workspace without a grant hold no activity.view.
   @Get('audit-events')
+  @Requires('activity.view')
   @ApiOperation({
     summary: 'Changes made in this workspace, newest first',
     description:

@@ -213,3 +213,19 @@ export class InstanceSettingsResponseDto {
   @ApiProperty()
   updatedAt: Date;
 }
+
+/** What every page needs to show dates and text, for anyone in the workspace. */
+export class DisplaySettingsDto {
+  @ApiProperty({ enum: INSTANCE_LANGUAGE_VALUES, example: 'ENGLISH' })
+  language: InstanceLanguageValue;
+
+  @ApiProperty({
+    description:
+      'Default IANA timezone used for date/time rendering. Use "AUTOMATIC" to detect from browser.',
+    example: 'AUTOMATIC',
+  })
+  timezone: string;
+
+  @ApiProperty({ enum: INSTANCE_TIME_FORMAT_VALUES, example: 'TWELVE_HOUR' })
+  timeFormat: InstanceTimeFormatValue;
+}

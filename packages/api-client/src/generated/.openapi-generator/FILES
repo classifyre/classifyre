@@ -217,6 +217,7 @@ docs/DeleteRunnerResponseDto.md
 docs/DeprecateGlossaryTermDto.md
 docs/DiscoveryRecentRunDto.md
 docs/DiscoveryRunSourceDto.md
+docs/DisplaySettingsDto.md
 docs/EdgeClass.md
 docs/EdgeDetailDto.md
 docs/EmbeddingAiProviderOptionDto.md
@@ -857,6 +858,7 @@ src/models/DeleteRunnerResponseDto.ts
 src/models/DeprecateGlossaryTermDto.ts
 src/models/DiscoveryRecentRunDto.ts
 src/models/DiscoveryRunSourceDto.ts
+src/models/DisplaySettingsDto.ts
 src/models/EdgeClass.ts
 src/models/EdgeDetailDto.ts
 src/models/EmbeddingAiProviderOptionDto.ts

@@ -52,7 +52,8 @@ import { AuditEventList } from "@/components/audit-history";
 import { WorkspaceAccessCard } from "@/components/access/workspace-access-card";
 import { NotificationAudiencesCard } from "@/components/access/notification-audiences-card";
 import { PublicWorkspaceCard } from "@/components/access/public-workspace-card";
-import { useCan } from "@/hooks/use-me";
+import { useCan, useMe } from "@/hooks/use-me";
+import { WorkspaceDetailsCard } from "@/components/namespace/workspace-details-card";
 
 type SettingsDraft = {
   language: InstanceSettingsResponseDtoLanguageEnum;
@@ -118,10 +119,44 @@ function getTimezoneOptions(currentTimezone: string) {
 const TAB_TRIGGER_CLASS =
   "gap-2 px-1 text-xs font-mono uppercase tracking-[0.14em]";
 
+/**
+ * The workspace settings, for people who hold `settings.view`. Visitors of a
+ * public workspace, and members reading one without a grant, never see what
+ * is configured here: not even the page (the API refuses it too).
+ */
 export default function SettingsPage() {
+  const { t } = useTranslation();
+  const me = useMe();
+  if (!me) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center text-muted-foreground">
+        <Loader2 className="h-5 w-5 animate-spin" />
+        <span className="ml-2 text-sm">{t("settings.loading")}</span>
+      </div>
+    );
+  }
+  if (!(me.capabilities as string[]).includes("settings.view")) {
+    return (
+      <div
+        className="mx-auto max-w-lg rounded-md border border-dashed p-8 text-center"
+        data-testid="settings-no-access"
+      >
+        <Settings className="mx-auto mb-3 size-7 text-muted-foreground" />
+        <p className="font-medium">{t("settings.noAccessTitle")}</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {t("settings.noAccessDescription")}
+        </p>
+      </div>
+    );
+  }
+  return <WorkspaceSettings />;
+}
+
+function WorkspaceSettings() {
   const { t } = useTranslation();
   const { slug } = useNamespace();
   const canSeeAccess = useCan("access.view");
+  const canSeeActivity = useCan("activity.view");
   const { settings, loading, saving, error, updateSettings } =
     useInstanceSettings();
   const [draft, setDraft] = React.useState<SettingsDraft>(() =>
@@ -250,16 +285,20 @@ export default function SettingsPage() {
               {t("settings.tabs.access")}
             </TabsTrigger>
           )}
-          <TabsTrigger value="activity" className={TAB_TRIGGER_CLASS}>
-            <History className="h-3.5 w-3.5" />
-            {t("settings.tabs.activity")}
-          </TabsTrigger>
+          {canSeeActivity && (
+            <TabsTrigger value="activity" className={TAB_TRIGGER_CLASS}>
+              <History className="h-3.5 w-3.5" />
+              {t("settings.tabs.activity")}
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent
           value="general"
           className="space-y-6 duration-300 animate-in fade-in-50 slide-in-from-bottom-1"
         >
+          <WorkspaceDetailsCard />
+
           <Card className="panel-card rounded-[6px]">
             <CardContent className="p-5">
               <VersionSettingsSection />
@@ -450,6 +489,7 @@ export default function SettingsPage() {
             <NotificationAudiencesCard />
           </TabsContent>
         )}
+{canSeeActivity && (
         <TabsContent
           value="activity"
           className="space-y-6 duration-300 animate-in fade-in-50 slide-in-from-bottom-1"
@@ -469,6 +509,7 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
+        )}
       </Tabs>
     </div>
   );

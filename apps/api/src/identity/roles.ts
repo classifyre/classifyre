@@ -23,6 +23,18 @@ const VIEWS: readonly Capability[] = WORKSPACE_CAPABILITIES.filter((id) =>
   id.endsWith('.view'),
 );
 
+/**
+ * Views a visitor of a public workspace never gets (docs/prd/IAM §13 step
+ * 8h): who has access, notifications, the settings, and the activity — what
+ * people did is not the public's to read.
+ */
+const NOT_FOR_VISITORS: ReadonlySet<Capability> = new Set<Capability>([
+  'access.view',
+  'notification.view',
+  'settings.view',
+  'activity.view',
+]);
+
 const WORKSPACE_ADMIN: readonly Capability[] = WORKSPACE_CAPABILITIES.filter(
   (id) => id !== 'code.author',
 );
@@ -122,6 +134,7 @@ export const BUILT_IN_ROLES = [
       'tenant.audit.view',
       'access.view',
       'workspace.view',
+      'activity.view',
       'notification.view',
     ],
   },
@@ -140,14 +153,12 @@ export const BUILT_IN_ROLES = [
   {
     // People who have not signed in (docs/prd/IAM §13 step 8h): they read the
     // public workspaces of the first tenant. Not who has access, not the
-    // tenant's activity, no notifications (they belong to groups, and a
-    // visitor is in none), no MCP tokens; never granted.
+    // settings, not the activity, no notifications (they belong to groups,
+    // and a visitor is in none), no MCP tokens, no SQL; never granted.
     key: 'visitor',
     title: 'Visitor',
     scope: 'public',
-    capabilities: VIEWS.filter(
-      (id) => id !== 'access.view' && id !== 'notification.view',
-    ),
+    capabilities: VIEWS.filter((id) => !NOT_FOR_VISITORS.has(id)),
   },
 ] as const satisfies readonly RoleDefinition[];
 

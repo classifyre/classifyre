@@ -12,6 +12,7 @@ import {
 } from "@/components/data-query/data-access";
 import { QueryExplorer } from "@/components/data-query/query-explorer";
 import { useCan } from "@/hooks/use-me";
+import { useTenant } from "@/hooks/use-tenant";
 import {
   QueryWorkbench,
   type QueryWorkbenchHandle,
@@ -159,6 +160,22 @@ function WorkspaceDataAccess() {
 }
 
 export default function QueryPage() {
+  const { t } = useTranslation();
+  // SQL is never the public's: visitors of a public workspace are asked to
+  // sign in (the API refuses them every SQL route as well).
+  if (useTenant()?.visitor) {
+    return (
+      <div
+        className="mx-auto mt-10 max-w-lg rounded-md border border-dashed p-8 text-center"
+        data-testid="query-sign-in"
+      >
+        <p className="font-medium">{t("dataQuery.signInTitle")}</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {t("dataQuery.signInDescription")}
+        </p>
+      </div>
+    );
+  }
   return (
     <Suspense>
       <QueryPageContent />

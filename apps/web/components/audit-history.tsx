@@ -38,6 +38,7 @@ import {
   TableRow,
 } from "@workspace/ui/components/table";
 import { ActorChip } from "@/components/actor-chip";
+import { useCan } from "@/hooks/use-me";
 import {
   SortableHead,
   useTableSort,
@@ -484,7 +485,11 @@ export function ChangedBy({
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
-  const { events } = useAuditEvents({ entityType, entityId });
+  // Who did what is not the public's to read: no activity.view, no trail.
+  const canSeeActivity = useCan("activity.view");
+  const { events } = useAuditEvents(
+    canSeeActivity ? { entityType, entityId } : null,
+  );
   const last = events[0];
 
   return (
@@ -505,15 +510,17 @@ export function ChangedBy({
           <span>· {formatRelative(last.occurredAt)}</span>
         </span>
       )}
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-6 gap-1 px-1.5 text-xs"
-        onClick={() => setOpen(true)}
-      >
-        <History className="h-3 w-3" aria-hidden />
-        {t("audit.history")}
-      </Button>
+      {canSeeActivity && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 gap-1 px-1.5 text-xs"
+          onClick={() => setOpen(true)}
+        >
+          <History className="h-3 w-3" aria-hidden />
+          {t("audit.history")}
+        </Button>
+      )}
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent className="w-full overflow-y-auto sm:max-w-2xl">
           <SheetHeader>

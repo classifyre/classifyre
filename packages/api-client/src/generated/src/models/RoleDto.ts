@@ -61,6 +61,8 @@ export type RoleDtoScopesEnum = typeof RoleDtoScopesEnum[keyof typeof RoleDtoSco
  */
 export const RoleDtoCapabilitiesEnum = {
     WorkspaceView: 'workspace.view',
+    SettingsView: 'settings.view',
+    ActivityView: 'activity.view',
     WorkspaceSettings: 'workspace.settings',
     WorkspacePause: 'workspace.pause',
     WorkspacePublish: 'workspace.publish',

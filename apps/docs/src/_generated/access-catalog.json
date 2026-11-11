@@ -3,7 +3,17 @@
     {
       "id": "workspace.view",
       "scope": "workspace",
-      "description": "Open the workspace and read its settings and activity."
+      "description": "Open the workspace."
+    },
+    {
+      "id": "settings.view",
+      "scope": "workspace",
+      "description": "See the workspace settings: language and time, workers, cleanup, MCP, chat bots, SQL limits. Never held by visitors of a public workspace."
+    },
+    {
+      "id": "activity.view",
+      "scope": "workspace",
+      "description": "Read who changed and read what in the workspace (Activity, History). Never held by visitors of a public workspace."
     },
     {
       "id": "workspace.settings",
@@ -48,7 +58,7 @@
     {
       "id": "source.view",
       "scope": "workspace",
-      "description": "Read sources, their notebooks and their scans."
+      "description": "Read sources and their scans. Their configuration and notebook code need source.manage."
     },
     {
       "id": "source.manage",
@@ -233,6 +243,8 @@
       "scope": "workspace",
       "capabilities": [
         "workspace.view",
+        "settings.view",
+        "activity.view",
         "notification.view",
         "access.view",
         "source.view",
@@ -253,6 +265,8 @@
       "scope": "workspace",
       "capabilities": [
         "workspace.view",
+        "settings.view",
+        "activity.view",
         "notification.view",
         "access.view",
         "source.view",
@@ -279,6 +293,8 @@
       "scope": "workspace",
       "capabilities": [
         "workspace.view",
+        "settings.view",
+        "activity.view",
         "notification.view",
         "access.view",
         "source.view",
@@ -323,6 +339,8 @@
       "scope": "workspace",
       "capabilities": [
         "workspace.view",
+        "settings.view",
+        "activity.view",
         "workspace.settings",
         "workspace.pause",
         "workspace.publish",
@@ -388,6 +406,8 @@
       "capabilities": [
         "tenant.workspace.create",
         "workspace.view",
+        "settings.view",
+        "activity.view",
         "workspace.settings",
         "workspace.pause",
         "workspace.publish",
@@ -436,6 +456,7 @@
         "tenant.audit.view",
         "access.view",
         "workspace.view",
+        "activity.view",
         "notification.view"
       ]
     },
@@ -445,6 +466,8 @@
       "scope": "tenant",
       "capabilities": [
         "workspace.view",
+        "settings.view",
+        "activity.view",
         "workspace.settings",
         "workspace.pause",
         "workspace.publish",

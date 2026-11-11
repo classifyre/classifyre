@@ -23,7 +23,9 @@ export const MCP_GROUP_ACCESS: Record<string, AccessAreaOptions> = {
   case_board: { view: 'case.view', change: 'case.edit' },
   autopilot: { view: 'agent.view', change: 'agent.configure' },
   correlation: { view: 'asset.view', change: 'correlation.review' },
-  custom_source_code: { view: 'source.view', change: 'code.author' },
+  // Notebook code is how a source is configured: reading it needs
+  // source.manage, like the REST notebook routes.
+  custom_source_code: { view: 'source.manage', change: 'code.author' },
   extractions: { view: 'finding.view', change: 'detector.manage' },
   case_leads: { view: 'case.view', change: 'lead.review' },
   glossary: { view: 'glossary.view', change: 'glossary.edit' },

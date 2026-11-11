@@ -1,6 +1,7 @@
 import * as React from "react";
 import { expect, test } from "@playwright/experimental-ct-react";
 import { AuditEventList, ChangedBy } from "@/components/audit-history";
+import { signedInAs } from "./fixtures/signed-in";
 
 type CtPage = Parameters<Parameters<typeof test>[2]>[0]["page"];
 
@@ -98,6 +99,7 @@ test("ChangedBy names the creator and the last change, resolving the token", asy
   mount,
   page,
 }) => {
+  await signedInAs(page, ["workspace.view", "activity.view"]);
   const { resolved } = await mockAuditApi(page);
   const component = await mount(
     <ChangedBy entityType="sources" entityId="s1" createdBy="Jordan Reyes" />,
@@ -117,6 +119,7 @@ test("the history sheet lists every change in a dense table", async ({
   mount,
   page,
 }) => {
+  await signedInAs(page, ["workspace.view", "activity.view"]);
   await mockAuditApi(page);
   const component = await mount(
     <ChangedBy entityType="sources" entityId="s1" />,
@@ -129,6 +132,25 @@ test("the history sheet lists every change in a dense table", async ({
   await expect(sheet.getByText("config, name")).toBeVisible();
   await expect(sheet.getByText("POST /sources")).toBeVisible();
   await expect(sheet.getByText("name, type")).toBeVisible();
+});
+
+test("without activity.view (a visitor) there is no history to open", async ({
+  mount,
+  page,
+}) => {
+  await signedInAs(page, ["workspace.view", "source.view"]);
+  const requests: string[] = [];
+  await page.route("**/audit-events**", (route) => {
+    requests.push(route.request().url());
+    return route.fulfill({ status: 403, body: "{}" });
+  });
+  const component = await mount(
+    <ChangedBy entityType="sources" entityId="s1" createdBy="Jordan Reyes" />,
+  );
+  await expect(component.getByText("Created by")).toBeVisible();
+  await expect(component.getByRole("button", { name: "History" })).toHaveCount(0);
+  // The trail is never asked for: who did what is not the public's.
+  expect(requests).toEqual([]);
 });
 
 test("the activity table filters server-side", async ({ mount, page }) => {

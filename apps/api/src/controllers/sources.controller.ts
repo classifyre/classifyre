@@ -13,6 +13,7 @@ import {
   NotFoundException,
   Query,
   Logger,
+  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -73,8 +74,10 @@ import { ReadsOnly } from '../reads-only.decorator';
 import { ReadOnlyEndpoint } from '../db/read-only-endpoint.decorator';
 import { SourceFilesService } from '../source-files.service';
 import { BlockWhenPaused } from '../namespace/block-when-paused.decorator';
+import { SourceConfigInterceptor } from '../identity/source-config-access';
 import { AccessArea, Requires } from '../identity/access.decorators';
 
+@UseInterceptors(SourceConfigInterceptor)
 @AccessArea({ view: 'source.view', change: 'source.manage' })
 @Controller('sources')
 @ApiTags('Sources')
@@ -1469,6 +1472,7 @@ export class SourcesController {
 
 @ReadsOnly()
 @ReadOnlyEndpoint()
+@UseInterceptors(SourceConfigInterceptor)
 @AccessArea({ view: 'source.view', change: 'source.manage' })
 @Controller('search/sources')
 @ApiTags('Sources')

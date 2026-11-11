@@ -4,6 +4,7 @@ All URIs are relative to *http://localhost*
 
 | Method | HTTP request | Description |
 |------------- | ------------- | -------------|
+| [**instanceSettingsControllerGetDisplaySettings**](InstanceSettingsApi.md#instancesettingscontrollergetdisplaysettings) | **GET** /instance-settings/display | How dates and language are shown |
 | [**instanceSettingsControllerGetSettings**](InstanceSettingsApi.md#instancesettingscontrollergetsettings) | **GET** /instance-settings | Get instance settings |
 | [**instanceSettingsControllerUpdateSettings**](InstanceSettingsApi.md#instancesettingscontrollerupdatesettings) | **PUT** /instance-settings | Update instance settings |
 | [**mcpSettingsControllerCreateToken**](InstanceSettingsApi.md#mcpsettingscontrollercreatetoken) | **POST** /instance-settings/mcp/tokens | Create MCP access token |
@@ -13,6 +14,65 @@ All URIs are relative to *http://localhost*
 | [**mcpSettingsControllerListTokens**](InstanceSettingsApi.md#mcpsettingscontrollerlisttokens) | **GET** /instance-settings/mcp/tokens | List MCP access tokens |
 | [**mcpSettingsControllerUpdateToken**](InstanceSettingsApi.md#mcpsettingscontrollerupdatetoken) | **PATCH** /instance-settings/mcp/tokens/{id} | Update MCP access token |
 
+
+
+## instanceSettingsControllerGetDisplaySettings
+
+> DisplaySettingsDto instanceSettingsControllerGetDisplaySettings()
+
+How dates and language are shown
+
+Language, time zone and time format: what every page needs to display dates, for anyone who can open the workspace. The rest of the settings need settings.view.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  InstanceSettingsApi,
+} from '@workspace/api-client';
+import type { InstanceSettingsControllerGetDisplaySettingsRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new InstanceSettingsApi();
+
+  try {
+    const data = await api.instanceSettingsControllerGetDisplaySettings();
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+This endpoint does not need any parameter.
+
+### Return type
+
+[**DisplaySettingsDto**](DisplaySettingsDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
 
 ## instanceSettingsControllerGetSettings

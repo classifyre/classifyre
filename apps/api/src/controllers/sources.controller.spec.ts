@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { SourceConfigAccess } from '../identity/source-config-access';
 import { SourcesController } from './sources.controller';
 import { SourceService } from '../source.service';
 import { ValidationService } from '../validation.service';
@@ -93,6 +94,11 @@ describe('SourcesController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [SourcesController],
       providers: [
+        // Configs are shown as-is here; redaction has its own spec.
+        {
+          provide: SourceConfigAccess,
+          useValue: { forCaller: (value: unknown) => Promise.resolve(value) },
+        },
         { provide: SourceService, useValue: mockSourceService },
         { provide: ValidationService, useValue: mockValidationService },
         {

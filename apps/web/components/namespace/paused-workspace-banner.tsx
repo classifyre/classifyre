@@ -13,7 +13,7 @@ import { useTranslation } from "@/hooks/use-translation";
  * namespace metadata is still resolving).
  */
 export function PausedWorkspaceBanner() {
-  const { namespace } = useNamespace();
+  const { namespace, nsHref } = useNamespace();
   const { t } = useTranslation();
 
   if (!namespace || !namespace.paused) return null;
@@ -43,7 +43,7 @@ export function PausedWorkspaceBanner() {
         </span>
       </p>
       <Link
-        href={`/namespaces/${namespace.id}/settings`}
+        href={nsHref("/settings?tab=workers")}
         className="shrink-0 text-xs font-semibold uppercase tracking-[0.08em] underline underline-offset-2 hover:no-underline sm:ml-auto"
       >
         {t("workspaces.pausedBannerAction")}

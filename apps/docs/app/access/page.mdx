@@ -173,14 +173,20 @@ Public means **read-only** for everyone who has no grant on it:
 ![A visitor reading public workspaces, read-only, with Sign in](./images/public-visitor.png)
 
 - Visitors **read**: workspaces, sources and their scans, assets, findings,
-  detectors, cases, inquiries, the glossary and entities. They cannot change
-  anything, see who has access, get notifications, read the tenant's
-  activity, create MCP tokens, or run and save SQL (table rows need the Data
-  reader role, which is only ever given to groups); anything more asks them
-  to sign in.
-- A workspace's own history is part of reading it: visitors see **who
-  changed what** there, with the names of its editors. Publish under names
-  you are happy to show.
+  detectors, cases, inquiries, the glossary and entities. Anything more asks
+  them to sign in.
+- What happens behind the scenes stays closed to them, in the app and in the
+  API alike:
+  - **no activity** — not who changed or read what, not an item's
+    **History** (`activity.view`);
+  - **no settings** — not even the page; only how dates and language are
+    shown (`settings.view`);
+  - **no SQL** — no tables to query, no runs, nothing saved;
+  - **no source configuration** — they see a source's name, type and scans,
+    never its connection, sampling, detectors or code;
+  - no access list, no notifications, no MCP tokens, no changes.
+- Members of the tenant reading a public workspace without a grant on it see
+  it the same way.
 - Editors sign in and work in it as usual, with whatever their roles allow.
 - Anything a crawler can reach is what a visitor can: the sitemap
   (`frontend.sitemap.enabled`) lists only the first tenant's public

@@ -78,6 +78,7 @@ import { useFormatDuration } from "@/hooks/use-format-duration";
 import { summarizeTextCoverage } from "@/lib/text-coverage";
 import { CohortSelectionCard } from "@/components/cohort-yield";
 import { fetchCatalog, type QueryCatalog } from "@/lib/data-query";
+import { useCan } from "@/hooks/use-me";
 import { ChangedBy } from "@/components/audit-history";
 
 const EMPTY_CHARTS: SearchAssetsChartsResponseDto = {
@@ -122,7 +123,10 @@ const SourceDataTab = dynamic(
 
 // The canvas measures the DOM: client-only, loaded when the tab opens.
 const ExploreWorkspace = dynamic(
-  () => import("@/components/explore/explore-workspace").then((m) => m.ExploreWorkspace),
+  () =>
+    import("@/components/explore/explore-workspace").then(
+      (m) => m.ExploreWorkspace,
+    ),
   { ssr: false },
 );
 
@@ -131,6 +135,13 @@ export default function SourceViewPage() {
   const formatDuration = useFormatDuration();
   const router = useRouter();
   const sourceId = useRouteId();
+  // How a source is set up is for the people who can change it: the API
+  // sends others no configuration, and the page shows no place for it.
+  const canManage = useCan("source.manage");
+  const canPurge = useCan("source.purge");
+  const canRun = useCan("source.run");
+  const canUseAgent = useCan("agent.use");
+  const hasActions = canManage || canPurge || canUseAgent;
 
   const [source, setSource] = useState<SourceResponseDto | null>(null);
   // What SQL can read: the Data tab shows only for a source with tables.
@@ -526,66 +537,81 @@ export default function SourceViewPage() {
         </div>
         <div className="flex flex-col items-start gap-2 sm:items-end">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  aria-label={t("common.moreActions")}
-                >
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  onClick={() =>
-                    router.push(nsPath(`/sources/${sourceId}/edit`))
-                  }
-                >
-                  <Pencil className="h-4 w-4" />
-                  {t("sources.editSource")}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setAutopilotOpen(true)}>
-                  <Bot className="h-4 w-4 text-[#d97706]" />
-                  AI autopilot
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  variant="destructive"
-                  onClick={() => setPurgeFindingsOpen(true)}
-                >
-                  <Eraser className="h-4 w-4" />
-                  {t("sources.purgeFindings.button")}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  variant="destructive"
-                  onClick={() => setPurgeAssetsOpen(true)}
-                >
-                  <Eraser className="h-4 w-4" />
-                  {t("sources.purgeAssets.button")}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  variant="destructive"
-                  onClick={() => setDeleteSourceOpen(true)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                  {t("sources.deleteSource")}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Button
-              size="sm"
-              onClick={handleStartScan}
-              disabled={isStartingScan || isRunning}
-            >
-              <Play className="h-4 w-4" />
-              {isStartingScan
-                ? t("common.starting")
-                : isRunning
-                  ? t("common.runningLabel")
-                  : t("sources.runScan")}
-            </Button>
+            {hasActions && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    aria-label={t("common.moreActions")}
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {canManage && (
+                    <DropdownMenuItem
+                      data-testid="source-edit"
+                      onClick={() =>
+                        router.push(nsPath(`/sources/${sourceId}/edit`))
+                      }
+                    >
+                      <Pencil className="h-4 w-4" />
+                      {t("sources.editSource")}
+                    </DropdownMenuItem>
+                  )}
+                  {canUseAgent && (
+                    <DropdownMenuItem onClick={() => setAutopilotOpen(true)}>
+                      <Bot className="h-4 w-4 text-[#d97706]" />
+                      AI autopilot
+                    </DropdownMenuItem>
+                  )}
+                  {canPurge && <DropdownMenuSeparator />}
+                  {canPurge && (
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onClick={() => setPurgeFindingsOpen(true)}
+                    >
+                      <Eraser className="h-4 w-4" />
+                      {t("sources.purgeFindings.button")}
+                    </DropdownMenuItem>
+                  )}
+                  {canPurge && (
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onClick={() => setPurgeAssetsOpen(true)}
+                    >
+                      <Eraser className="h-4 w-4" />
+                      {t("sources.purgeAssets.button")}
+                    </DropdownMenuItem>
+                  )}
+                  {canManage && <DropdownMenuSeparator />}
+                  {canManage && (
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onClick={() => setDeleteSourceOpen(true)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      {t("sources.deleteSource")}
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+            {canRun && (
+              <Button
+                size="sm"
+                onClick={handleStartScan}
+                disabled={isStartingScan || isRunning}
+              >
+                <Play className="h-4 w-4" />
+                {isStartingScan
+                  ? t("common.starting")
+                  : isRunning
+                    ? t("common.runningLabel")
+                    : t("sources.runScan")}
+              </Button>
+            )}
           </div>
           {actionError && (
             <p className="text-xs text-destructive">{actionError}</p>
@@ -912,62 +938,64 @@ export default function SourceViewPage() {
             </Card>
 
             <div className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>{t("sources.detail.requiredDetails")}</CardTitle>
-                  <CardDescription>
-                    {t("sources.detail.requiredDetailsDesc")}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {requiredFields.length > 0 ? (
-                    <div className="grid gap-3">
-                      {requiredFields.map(({ key, label, value }) => (
-                        <div
-                          key={key}
-                          className="flex items-start justify-between gap-4"
-                        >
-                          <p className="text-xs uppercase text-muted-foreground capitalize">
-                            {label}
-                          </p>
-                          <p
-                            className="text-sm text-right text-foreground/90 line-clamp-2 font-mono"
-                            title={String(value)}
+              {canManage && (
+                <Card data-testid="source-configuration">
+                  <CardHeader>
+                    <CardTitle>{t("sources.detail.requiredDetails")}</CardTitle>
+                    <CardDescription>
+                      {t("sources.detail.requiredDetailsDesc")}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {requiredFields.length > 0 ? (
+                      <div className="grid gap-3">
+                        {requiredFields.map(({ key, label, value }) => (
+                          <div
+                            key={key}
+                            className="flex items-start justify-between gap-4"
                           >
-                            {formatFieldValue(value)}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      {t("sources.detail.noRequiredDetails")}
-                    </p>
-                  )}
-
-                  {enabledDetectors.length > 0 && (
-                    <div className="space-y-2">
-                      <p className="text-xs uppercase text-muted-foreground">
-                        {t("sources.detail.activeDetectors")}
-                      </p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {enabledDetectors.map((detector) => (
-                          <Badge
-                            key={detector.id}
-                            variant="outline"
-                            className="gap-1.5"
-                          >
-                            <span
-                              className={`h-1.5 w-1.5 rounded-full ${detectorDotClass[detector.type] ?? "bg-slate-400"}`}
-                            />
-                            {detector.label}
-                          </Badge>
+                            <p className="text-xs uppercase text-muted-foreground capitalize">
+                              {label}
+                            </p>
+                            <p
+                              className="text-sm text-right text-foreground/90 line-clamp-2 font-mono"
+                              title={String(value)}
+                            >
+                              {formatFieldValue(value)}
+                            </p>
+                          </div>
                         ))}
                       </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        {t("sources.detail.noRequiredDetails")}
+                      </p>
+                    )}
+
+                    {enabledDetectors.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-xs uppercase text-muted-foreground">
+                          {t("sources.detail.activeDetectors")}
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {enabledDetectors.map((detector) => (
+                            <Badge
+                              key={detector.id}
+                              variant="outline"
+                              className="gap-1.5"
+                            >
+                              <span
+                                className={`h-1.5 w-1.5 rounded-full ${detectorDotClass[detector.type] ?? "bg-slate-400"}`}
+                              />
+                              {detector.label}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
 
               <Card>
                 <CardHeader>
@@ -1049,7 +1077,11 @@ export default function SourceViewPage() {
         </TabsContent>
 
         <TabsContent value="connections" className="space-y-4">
-          <ExploreWorkspace mode="source" sourceId={sourceId} sourceName={source.name} />
+          <ExploreWorkspace
+            mode="source"
+            sourceId={sourceId}
+            sourceName={source.name}
+          />
         </TabsContent>
 
         {hasData && queryCatalog && (

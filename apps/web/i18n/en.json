@@ -1000,7 +1000,9 @@
         "failed": "The last batch threw. pg-boss retries on its own schedule.",
         "stale": "No worker has reported recently. The process may have been killed mid-job."
       }
-    }
+    },
+    "noAccessTitle": "You can't see this workspace's settings",
+    "noAccessDescription": "Settings are for people with a role in this workspace. Sign in, or ask a workspace admin for access."
   },
   "features": {
     "title": "Features",
@@ -1564,7 +1566,10 @@
       "started": "Queued {{count}} scan(s)",
       "skipped": "{{count}} source(s) could not be started",
       "failed": "Failed to start scans"
-    }
+    },
+    "editNoAccessTitle": "You can't edit this source",
+    "editNoAccessDescription": "How a source is set up — its connection, sampling, detectors and code — is shown only to people who can change sources.",
+    "editNoAccessBack": "Back to the source"
   },
   "findings": {
     "title": "Findings",
@@ -7554,7 +7559,9 @@
     "editor": {
       "undo": "Undo (Ctrl/⌘+Z)",
       "redo": "Redo (Ctrl/⌘+Shift+Z)"
-    }
+    },
+    "signInTitle": "Sign in to use SQL",
+    "signInDescription": "Querying tables needs a signed-in account with data access. A public workspace is for reading its findings, sources and cases."
   },
   "notificationAudiences": {
     "title": "Who gets notifications",

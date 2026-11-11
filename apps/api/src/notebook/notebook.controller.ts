@@ -36,7 +36,7 @@ import {
   UpdateNotebookDto,
   UpdateNotebookResponseDto,
 } from './dto/notebook.dto';
-import { AccessArea } from '../identity/access.decorators';
+import { AccessArea, Requires } from '../identity/access.decorators';
 
 @ApiTags('Notebooks')
 @AccessArea({ view: 'source.view', change: 'code.author' })
@@ -86,6 +86,8 @@ export class NotebookController {
     return this.notebooks.templates(this.resolveTemplateScope(scope));
   }
 
+  // Notebook code is how the source is configured: source.manage.
+  @Requires('source.manage')
   @Get('sources/:sourceId/notebook')
   @ApiOperation({ summary: "Read a source's notebook" })
   @ApiResponse({ status: 200, type: NotebookDto })
@@ -122,6 +124,8 @@ export class NotebookController {
     return this.notebooks.update(sourceId, dto, this.resolveScope(scope));
   }
 
+  // Notebook code is how the source is configured: source.manage.
+  @Requires('source.manage')
   @Get('sources/:sourceId/notebook/export')
   @ApiOperation({
     summary: 'The notebook as an ordinary Python module',
@@ -177,6 +181,8 @@ export class NotebookController {
     return this.executions.toDto(execution);
   }
 
+  // Notebook code is how the source is configured: source.manage.
+  @Requires('source.manage')
   @Get('sources/:sourceId/notebook/executions')
   @ApiOperation({ summary: 'Recent executions for a source' })
   @ApiResponse({ status: 200, type: [NotebookExecutionDto] })

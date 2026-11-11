@@ -1000,7 +1000,9 @@
         "failed": "Der letzte Batch ist fehlgeschlagen. pg-boss wiederholt ihn nach eigenem Zeitplan.",
         "stale": "Kein Worker hat sich kürzlich gemeldet. Der Prozess wurde möglicherweise mitten im Job beendet."
       }
-    }
+    },
+    "noAccessTitle": "Sie können die Einstellungen dieses Arbeitsbereichs nicht sehen",
+    "noAccessDescription": "Die Einstellungen sind für Personen mit einer Rolle in diesem Arbeitsbereich. Melden Sie sich an oder bitten Sie einen Admin des Arbeitsbereichs um Zugriff."
   },
   "features": {
     "title": "Funktionen",
@@ -1564,7 +1566,10 @@
       "started": "{{count}} Scan(s) eingereiht",
       "skipped": "{{count}} Quelle(n) konnten nicht gestartet werden",
       "failed": "Scans konnten nicht gestartet werden"
-    }
+    },
+    "editNoAccessTitle": "Sie können diese Quelle nicht bearbeiten",
+    "editNoAccessDescription": "Wie eine Quelle eingerichtet ist – Verbindung, Stichprobe, Detektoren und Code –, sehen nur Personen, die Quellen ändern dürfen.",
+    "editNoAccessBack": "Zurück zur Quelle"
   },
   "findings": {
     "title": "Befunde",
@@ -7554,7 +7559,9 @@
     "editor": {
       "undo": "Rückgängig (Strg/⌘+Z)",
       "redo": "Wiederholen (Strg/⌘+Umschalt+Z)"
-    }
+    },
+    "signInTitle": "Melden Sie sich an, um SQL zu nutzen",
+    "signInDescription": "Tabellen abzufragen braucht ein angemeldetes Konto mit Datenzugriff. Ein öffentlicher Arbeitsbereich ist zum Lesen seiner Funde, Quellen und Fälle da."
   },
   "notificationAudiences": {
     "title": "Wer Benachrichtigungen erhält",

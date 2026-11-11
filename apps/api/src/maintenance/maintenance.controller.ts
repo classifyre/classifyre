@@ -24,7 +24,7 @@ import {
 import { AccessArea } from '../identity/access.decorators';
 
 @ApiTags('maintenance')
-@AccessArea({ view: 'workspace.view', change: 'workspace.settings' })
+@AccessArea({ view: 'settings.view', change: 'workspace.settings' })
 @Controller('maintenance')
 export class MaintenanceController {
   constructor(

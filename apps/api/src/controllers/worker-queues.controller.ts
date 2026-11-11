@@ -29,7 +29,7 @@ import { AccessArea } from '../identity/access.decorators';
  * Pause/resume is deliberately non-GET, so it needs `workspace.settings`.
  */
 @ApiTags('Worker Queues')
-@AccessArea({ view: 'workspace.view', change: 'workspace.settings' })
+@AccessArea({ view: 'settings.view', change: 'workspace.settings' })
 @Controller('worker-queues')
 export class WorkerQueuesController {
   constructor(private readonly workerQueues: WorkerQueuesService) {}

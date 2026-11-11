@@ -11,6 +11,7 @@ import {
   HttpStatus,
   UseGuards,
   Res,
+  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -81,9 +82,11 @@ import { SearchRunnersChartsRequestDto } from '../dto/search-runners-charts-requ
 import { SearchRunnersChartsResponseDto } from '../dto/search-runners-charts-response.dto';
 import { SearchRunnersAssetsRequestDto } from '../dto/search-runners-assets-request.dto';
 import { SearchRunnersAssetsResponseDto } from '../dto/search-runners-assets-response.dto';
+import { SourceConfigInterceptor } from '../identity/source-config-access';
 import { AccessArea, Requires } from '../identity/access.decorators';
 
 @ApiTags('Runners')
+@UseInterceptors(SourceConfigInterceptor)
 @AccessArea({ view: 'source.view', change: 'source.run' })
 @Controller()
 export class CliRunnerController {
@@ -505,6 +508,7 @@ export class CliRunnerController {
 @ReadsOnly()
 @ReadOnlyEndpoint()
 @ApiTags('Runners')
+@UseInterceptors(SourceConfigInterceptor)
 @AccessArea({ view: 'source.view', change: 'source.run' })
 @Controller('search')
 export class SearchRunnersController {

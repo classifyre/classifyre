@@ -133,20 +133,25 @@ export function WorkspaceCard({
             </p>
           </div>
           <div className="-mr-2 -mt-2 flex shrink-0 items-center">
-            <Button
-              variant="ghost"
-              size="icon"
-              asChild
-              className="text-muted-foreground"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <Link
-                href={localePath(`/namespaces/${ns.id}/settings`)}
-                aria-label={t("workspaces.settingsAria", { name: ns.name })}
+            {/* The workspace's own settings (Settings → General), for
+                people who may see them: never visitors. */}
+            {(ns.capabilities?.includes("settings.view") ?? false) && (
+              <Button
+                variant="ghost"
+                size="icon"
+                asChild
+                className="text-muted-foreground"
+                onClick={(event) => event.stopPropagation()}
               >
-                <Settings className="h-4 w-4" />
-              </Link>
-            </Button>
+                <Link
+                  href={localePath(`/${ns.slug}/settings?tab=general`)}
+                  aria-label={t("workspaces.settingsAria", { name: ns.name })}
+                  data-testid={`workspace-settings-${ns.slug}`}
+                >
+                  <Settings className="h-4 w-4" />
+                </Link>
+              </Button>
+            )}
             {onDelete &&
               (ns.capabilities?.includes("workspace.delete") ?? true) && (
                 <Button

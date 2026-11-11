@@ -53,7 +53,7 @@ async function mockApi(page: CtPage) {
   return { posted, audit };
 }
 
-const ADMIN = ["workspace.view", "access.view", "access.manage"];
+const ADMIN = ["workspace.view", "access.view", "access.manage", "activity.view"];
 
 test("a table lists the grants that open it, and gives access to it alone", async ({
   mount,
