@@ -52,6 +52,8 @@ export interface AuditFilter {
   entityType?: string;
   entityId?: string;
   actor?: string;
+  /** Free-text search, like the table's own search box. */
+  search?: string;
 }
 
 type AuditSortCol = "when" | "who" | "what" | "where" | "capability" | "channel";
@@ -137,7 +139,7 @@ export function useAuditEvents(filter: AuditFilter | null) {
       const size = Number(pageSize) || PAGE_SIZE_OPTIONS[1];
       const response = await api.identity.auditControllerList({
         ...parsed,
-        search: search.trim() || undefined,
+        search: search.trim() || parsed.search || undefined,
         capability: capability === "ALL" ? undefined : capability,
         operation: undefined,
         limit: size,

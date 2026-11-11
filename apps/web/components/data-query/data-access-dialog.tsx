@@ -173,13 +173,8 @@ export function TableAccessOverview({
   }, [access.grants, sortCol, sortDir, t]);
 
   return (
-    <div data-testid="data-access-overview">
-      <div className="mb-2 flex items-center gap-2">
-        <p className="text-xs font-mono uppercase tracking-[0.14em]">
-          {t("dataQuery.access.title")}
-        </p>
-      </div>
-      <p className="-mt-1 mb-3 text-xs text-muted-foreground">
+    <div>
+      <p className="mb-3 text-xs text-muted-foreground">
         {t("dataQuery.access.description")}
       </p>
       <div className="overflow-x-auto rounded-[4px] border border-border">
