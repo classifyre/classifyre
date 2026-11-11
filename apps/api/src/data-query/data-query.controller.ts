@@ -1,11 +1,13 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Headers,
   HttpCode,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Put,
   Query,
@@ -27,9 +29,12 @@ import {
   DataQuerySettingsDto,
   QueryCatalogDto,
   QueryRunDto,
+  SavedQueryDto,
+  SaveSavedQueryDto,
   UpdateDataQuerySettingsDto,
 } from './data-query.dto';
 import { QueryCatalogService } from './query-catalog.service';
+import { SavedQueriesService } from './saved-queries.service';
 import {
   EXPORT_MEDIA_TYPES,
   QueryRunService,
@@ -49,7 +54,51 @@ export class DataQueryController {
   constructor(
     private readonly catalog: QueryCatalogService,
     private readonly runs: QueryRunService,
+    private readonly saved: SavedQueriesService,
   ) {}
+
+  @Get('saved-queries')
+  @Requires('workspace.view')
+  @ApiOperation({ summary: 'Your saved SQL in this workspace' })
+  @ApiOkResponse({ type: [SavedQueryDto] })
+  listSaved(): Promise<SavedQueryDto[]> {
+    return this.saved.list();
+  }
+
+  @Post('saved-queries')
+  @Requires('workspace.view')
+  @ApiOperation({ summary: 'Save SQL under a name' })
+  @ApiOkResponse({ type: SavedQueryDto })
+  createSaved(@Body() body: SaveSavedQueryDto): Promise<SavedQueryDto> {
+    return this.saved.create(body?.name ?? '', body?.sql ?? '');
+  }
+
+  @Get('saved-queries/:id')
+  @Requires('workspace.view')
+  @ApiOperation({ summary: 'One of your saved queries' })
+  @ApiOkResponse({ type: SavedQueryDto })
+  getSaved(@Param('id', ParseUUIDPipe) id: string): Promise<SavedQueryDto> {
+    return this.saved.get(id);
+  }
+
+  @Patch('saved-queries/:id')
+  @Requires('workspace.view')
+  @ApiOperation({ summary: 'Rename a saved query or save new SQL under it' })
+  @ApiOkResponse({ type: SavedQueryDto })
+  updateSaved(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: SaveSavedQueryDto,
+  ): Promise<SavedQueryDto> {
+    return this.saved.update(id, body?.name, body?.sql);
+  }
+
+  @Delete('saved-queries/:id')
+  @Requires('workspace.view')
+  @HttpCode(204)
+  @ApiOperation({ summary: 'Delete a saved query' })
+  removeSaved(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
+    return this.saved.remove(id);
+  }
 
   @Get('data-query/catalog')
   @Requires('workspace.view')

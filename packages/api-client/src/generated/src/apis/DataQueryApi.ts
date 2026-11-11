@@ -19,6 +19,8 @@ import type {
   DataQuerySettingsDto,
   QueryCatalogDto,
   QueryRunDto,
+  SaveSavedQueryDto,
+  SavedQueryDto,
   UpdateDataQuerySettingsDto,
 } from '../models/index';
 import {
@@ -30,6 +32,10 @@ import {
     QueryCatalogDtoToJSON,
     QueryRunDtoFromJSON,
     QueryRunDtoToJSON,
+    SaveSavedQueryDtoFromJSON,
+    SaveSavedQueryDtoToJSON,
+    SavedQueryDtoFromJSON,
+    SavedQueryDtoToJSON,
     UpdateDataQuerySettingsDtoFromJSON,
     UpdateDataQuerySettingsDtoToJSON,
 } from '../models/index';
@@ -42,7 +48,15 @@ export interface DataQueryControllerCreateRequest {
     createQueryRunDto: CreateQueryRunDto;
 }
 
+export interface DataQueryControllerCreateSavedRequest {
+    saveSavedQueryDto: SaveSavedQueryDto;
+}
+
 export interface DataQueryControllerGetRequest {
+    id: string;
+}
+
+export interface DataQueryControllerGetSavedRequest {
     id: string;
 }
 
@@ -56,8 +70,17 @@ export interface DataQueryControllerReceiveRequest {
     xQueryRunMeta: string;
 }
 
+export interface DataQueryControllerRemoveSavedRequest {
+    id: string;
+}
+
 export interface DataQueryControllerResultRequest {
     id: string;
+}
+
+export interface DataQueryControllerUpdateSavedRequest {
+    id: string;
+    saveSavedQueryDto: SaveSavedQueryDto;
 }
 
 export interface DataQueryControllerUpdateSettingsRequest {
@@ -148,6 +171,45 @@ export class DataQueryApi extends runtime.BaseAPI {
     }
 
     /**
+     * Save SQL under a name
+     */
+    async dataQueryControllerCreateSavedRaw(requestParameters: DataQueryControllerCreateSavedRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<SavedQueryDto>> {
+        if (requestParameters['saveSavedQueryDto'] == null) {
+            throw new runtime.RequiredError(
+                'saveSavedQueryDto',
+                'Required parameter "saveSavedQueryDto" was null or undefined when calling dataQueryControllerCreateSaved().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/saved-queries`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: SaveSavedQueryDtoToJSON(requestParameters['saveSavedQueryDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => SavedQueryDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Save SQL under a name
+     */
+    async dataQueryControllerCreateSaved(requestParameters: DataQueryControllerCreateSavedRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<SavedQueryDto> {
+        const response = await this.dataQueryControllerCreateSavedRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
      * One of your queries
      */
     async dataQueryControllerGetRaw(requestParameters: DataQueryControllerGetRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<QueryRunDto>> {
@@ -214,6 +276,43 @@ export class DataQueryApi extends runtime.BaseAPI {
     }
 
     /**
+     * One of your saved queries
+     */
+    async dataQueryControllerGetSavedRaw(requestParameters: DataQueryControllerGetSavedRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<SavedQueryDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling dataQueryControllerGetSaved().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/saved-queries/{id}`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => SavedQueryDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * One of your saved queries
+     */
+    async dataQueryControllerGetSaved(requestParameters: DataQueryControllerGetSavedRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<SavedQueryDto> {
+        const response = await this.dataQueryControllerGetSavedRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
      * The SQL limits of this workspace
      */
     async dataQueryControllerGetSettingsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<DataQuerySettingsDto>> {
@@ -276,6 +375,35 @@ export class DataQueryApi extends runtime.BaseAPI {
     }
 
     /**
+     * Your saved SQL in this workspace
+     */
+    async dataQueryControllerListSavedRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<SavedQueryDto>>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/saved-queries`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(SavedQueryDtoFromJSON));
+    }
+
+    /**
+     * Your saved SQL in this workspace
+     */
+    async dataQueryControllerListSaved(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<SavedQueryDto>> {
+        const response = await this.dataQueryControllerListSavedRaw(initOverrides);
+        return await response.value();
+    }
+
+    /**
      * Internal: a query job posts its result here
      */
     async dataQueryControllerReceiveRaw(requestParameters: DataQueryControllerReceiveRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
@@ -334,6 +462,42 @@ export class DataQueryApi extends runtime.BaseAPI {
     }
 
     /**
+     * Delete a saved query
+     */
+    async dataQueryControllerRemoveSavedRaw(requestParameters: DataQueryControllerRemoveSavedRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling dataQueryControllerRemoveSaved().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/saved-queries/{id}`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Delete a saved query
+     */
+    async dataQueryControllerRemoveSaved(requestParameters: DataQueryControllerRemoveSavedRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.dataQueryControllerRemoveSavedRaw(requestParameters, initOverrides);
+    }
+
+    /**
      * The rows of a finished query (Arrow IPC stream), or its exported file
      */
     async dataQueryControllerResultRaw(requestParameters: DataQueryControllerResultRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
@@ -367,6 +531,53 @@ export class DataQueryApi extends runtime.BaseAPI {
      */
     async dataQueryControllerResult(requestParameters: DataQueryControllerResultRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.dataQueryControllerResultRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Rename a saved query or save new SQL under it
+     */
+    async dataQueryControllerUpdateSavedRaw(requestParameters: DataQueryControllerUpdateSavedRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<SavedQueryDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling dataQueryControllerUpdateSaved().'
+            );
+        }
+
+        if (requestParameters['saveSavedQueryDto'] == null) {
+            throw new runtime.RequiredError(
+                'saveSavedQueryDto',
+                'Required parameter "saveSavedQueryDto" was null or undefined when calling dataQueryControllerUpdateSaved().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/saved-queries/{id}`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'PATCH',
+            headers: headerParameters,
+            query: queryParameters,
+            body: SaveSavedQueryDtoToJSON(requestParameters['saveSavedQueryDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => SavedQueryDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Rename a saved query or save new SQL under it
+     */
+    async dataQueryControllerUpdateSaved(requestParameters: DataQueryControllerUpdateSavedRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<SavedQueryDto> {
+        const response = await this.dataQueryControllerUpdateSavedRaw(requestParameters, initOverrides);
+        return await response.value();
     }
 
     /**

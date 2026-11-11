@@ -15,6 +15,7 @@ import type {
 export type QueryCatalog = QueryCatalogDto;
 export type QueryCatalogTable = QueryCatalogTableDto;
 export type QueryRun = QueryRunDto;
+export type { SavedQueryDto, SaveSavedQueryDto } from "@workspace/api-client";
 
 export const TERMINAL_STATUSES = new Set([
   "SUCCESS",
@@ -67,6 +68,57 @@ export async function downloadExport(run: QueryRun): Promise<void> {
 
 export async function cancelQuery(id: string): Promise<QueryRun> {
   return api.dataQuery.dataQueryControllerCancel({ id });
+}
+
+export async function fetchRecentRuns(limit = 30): Promise<QueryRun[]> {
+  return api.dataQuery.dataQueryControllerList({ limit });
+}
+
+export async function fetchSavedQueries(): Promise<
+  import("@workspace/api-client").SavedQueryDto[]
+> {
+  return api.dataQuery.dataQueryControllerListSaved();
+}
+
+export async function createSavedQuery(
+  name: string,
+  sql: string,
+): Promise<import("@workspace/api-client").SavedQueryDto> {
+  return api.dataQuery.dataQueryControllerCreateSaved({
+    saveSavedQueryDto: { name, sql },
+  });
+}
+
+export async function updateSavedQuery(
+  id: string,
+  patch: { name?: string; sql?: string },
+): Promise<import("@workspace/api-client").SavedQueryDto> {
+  return api.dataQuery.dataQueryControllerUpdateSaved({
+    id,
+    saveSavedQueryDto: { name: patch.name ?? "", sql: patch.sql ?? "" },
+  });
+}
+
+export async function deleteSavedQuery(id: string): Promise<void> {
+  await api.dataQuery.dataQueryControllerRemoveSaved({ id });
+}
+
+/**
+ * What to start the editor with: a preview of your first queryable table, in
+ * full three-part `source.schema.table` form (cross-source SQL needs it).
+ */
+export function starterSql(catalog: QueryCatalog | null): {
+  sql: string;
+  title: string;
+} {
+  const first = (catalog?.sources ?? [])
+    .flatMap((s) => s.tables)
+    .find((t) => t.canQuery);
+  if (!first) return { sql: "SELECT 1", title: "Empty query" };
+  return {
+    sql: `SELECT *\nFROM ${first.sqlName}\nLIMIT 100`,
+    title: first.sqlName,
+  };
 }
 
 /** How long polling rides out a gateway that does not answer (an API restart). */

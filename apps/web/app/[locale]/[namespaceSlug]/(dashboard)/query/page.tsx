@@ -3,35 +3,39 @@
 import * as React from "react";
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { Database } from "lucide-react";
 import { useTranslation } from "@/hooks/use-translation";
-import { CatalogPanel } from "@/components/data-query/catalog-panel";
+import { QueryExplorer } from "@/components/data-query/query-explorer";
 import {
   QueryWorkbench,
   type QueryWorkbenchHandle,
 } from "@/components/data-query/query-workbench";
-import { fetchCatalog, type QueryCatalog } from "@/lib/data-query";
-
-function firstQueryableSql(catalog: QueryCatalog | null): string {
-  for (const source of catalog?.sources ?? []) {
-    const table = source.tables.find((t) => t.canQuery);
-    if (table) return `SELECT *\nFROM ${table.sqlName}\nLIMIT 100`;
-  }
-  return "SELECT 1";
-}
+import {
+  fetchCatalog,
+  fetchRecentRuns,
+  fetchSavedQueries,
+  starterSql,
+  type QueryCatalog,
+  type QueryRun,
+  type SavedQueryDto,
+} from "@/lib/data-query";
 
 /**
- * SQL over the workspace's tables (docs/prd/DQ-data-query.md): what you may
- * query on the left, an editor and its result on the right. A query can join
- * tables of different sources.
+ * SQL over the workspace's tables (docs/prd/DQ-data-query.md): an IDE page —
+ * the editor fills the space, the explorer (sources, history, saved) sits
+ * beside it. A query can join tables of different sources.
  */
 function QueryPageContent() {
-  const { t } = useTranslation();
   const params = useSearchParams();
   const [catalog, setCatalog] = React.useState<QueryCatalog | null>(null);
   const [failed, setFailed] = React.useState(false);
+  const [history, setHistory] = React.useState<QueryRun[]>([]);
+  const [historyLoading, setHistoryLoading] = React.useState(true);
+  const [saved, setSaved] = React.useState<SavedQueryDto[]>([]);
+  const [savedLoading, setSavedLoading] = React.useState(true);
+  const [activeRunId, setActiveRunId] = React.useState<string | null>(null);
   const workbench = React.useRef<QueryWorkbenchHandle>(null);
   const seeded = React.useRef(false);
+  const { t } = useTranslation();
 
   React.useEffect(() => {
     fetchCatalog()
@@ -39,59 +43,83 @@ function QueryPageContent() {
       .catch(() => setFailed(true));
   }, []);
 
+  const reloadHistory = React.useCallback(() => {
+    setHistoryLoading(true);
+    fetchRecentRuns()
+      .then(setHistory)
+      .catch(() => undefined)
+      .finally(() => setHistoryLoading(false));
+  }, []);
+
+  const reloadSaved = React.useCallback(() => {
+    setSavedLoading(true);
+    fetchSavedQueries()
+      .then(setSaved)
+      .catch(() => undefined)
+      .finally(() => setSavedLoading(false));
+  }, []);
+
+  React.useEffect(() => {
+    reloadHistory();
+    reloadSaved();
+  }, [reloadHistory, reloadSaved]);
+
   React.useEffect(() => {
     if (!catalog || seeded.current) return;
     seeded.current = true;
-    workbench.current?.setSql(params.get("sql") ?? firstQueryableSql(catalog));
+    workbench.current?.setSql(params.get("sql") ?? starterSql(catalog).sql);
   }, [catalog, params]);
 
-  const queryable = (catalog?.sources ?? []).reduce(
-    (n, source) => n + source.tables.filter((t) => t.canQuery).length,
-    0,
-  );
-
   return (
-    <div className="flex flex-col gap-4 p-4 lg:p-6">
-      <div className="space-y-1">
-        <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
-          <Database className="h-6 w-6" />
-          {t("dataQuery.title")}
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          {t("dataQuery.subtitle")}
-        </p>
-      </div>
-
-      {catalog && !catalog.canQueryAll && (
-        <p className="text-xs text-muted-foreground">
-          {t("dataQuery.partialAccess", { count: queryable })}
-        </p>
-      )}
+    <div className="-mx-4 -mb-4 flex min-h-[calc(100vh-10rem)] min-w-0 flex-col">
       {failed && (
-        <p className="text-sm text-destructive">
+        <p className="px-3 pt-2 text-sm text-destructive">
           {t("dataQuery.catalogFailed")}
         </p>
       )}
 
-      <div className="grid min-h-0 gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]">
-        <aside className="rounded-md border p-3 lg:sticky lg:top-4 lg:h-[calc(100vh-12rem)]">
-          <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            {t("dataQuery.catalogTitle")}
-          </div>
-          <CatalogPanel
-            catalog={catalog}
-            onInsert={(text) => workbench.current?.insert(text)}
-          />
-        </aside>
-        <section className="min-w-0">
+      <div className="grid min-h-0 flex-1 gap-0 xl:grid-cols-[minmax(0,1fr)_20rem]">
+        <section className="min-w-0 overflow-x-clip px-3 py-2">
           <QueryWorkbench
             ref={workbench}
             catalog={catalog}
             initialSql=""
             editorPath="query://workspace/main.sql"
-            editorHeight={240}
+            editorHeight={340}
             resultHeight={520}
             disabled={!catalog}
+            onRunFinished={(run) => {
+              setActiveRunId(run.id);
+              setHistory((current) => {
+                const rest = current.filter((r) => r.id !== run.id);
+                return [run, ...rest].slice(0, 30);
+              });
+            }}
+            onSaved={() => reloadSaved()}
+          />
+        </section>
+        <section className="w-full min-w-0 shrink-0 overflow-x-clip px-2 py-2 xl:w-80 xl:border-l">
+          <QueryExplorer
+            catalog={catalog}
+            history={history}
+            historyLoading={historyLoading}
+            saved={saved}
+            savedLoading={savedLoading}
+            activeRunId={activeRunId}
+            onOpenRun={(run) => {
+              setActiveRunId(run.id);
+              QueryWorkbench.showRun?.(run);
+            }}
+            onOpenSaved={(item) => {
+              setActiveRunId(null);
+              workbench.current?.setSql(item.sql);
+            }}
+            onRunTable={(sqlName) => {
+              setActiveRunId(null);
+              workbench.current?.setSql(
+                `SELECT *\nFROM ${sqlName}\nLIMIT 100`,
+              );
+            }}
           />
         </section>
       </div>
