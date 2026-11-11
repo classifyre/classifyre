@@ -3,13 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import {
-  ArrowDown,
-  ArrowUp,
-  ChevronsUpDown,
-  History,
-  Search,
-} from "lucide-react";
+import { History, Search } from "lucide-react";
 import {
   api,
   AuditControllerListSortByEnum,
@@ -44,6 +38,11 @@ import {
   TableRow,
 } from "@workspace/ui/components/table";
 import { ActorChip } from "@/components/actor-chip";
+import {
+  SortableHead,
+  useTableSort,
+  type TableSort,
+} from "@/components/sortable-table-head";
 import { useTranslation } from "@/hooks/use-translation";
 import { useLocale } from "@/lib/app-path";
 import { formatDate, formatRelative } from "@/lib/date";
@@ -52,12 +51,16 @@ export interface AuditFilter {
   entityType?: string;
   entityId?: string;
   actor?: string;
+  /**
+   * Only events that touched this: `data` (SQL reads, data-reader grants),
+   * `source:<id>` or `asset:<id>` — the Data tabs' Activity.
+   */
+  resource?: string;
   /** Free-text search, like the table's own search box. */
   search?: string;
 }
 
 type AuditSortCol = "when" | "who" | "what" | "where" | "capability" | "channel";
-type SortDir = "asc" | "desc";
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100] as const;
 
@@ -70,42 +73,6 @@ const SORT_PARAM: Record<AuditSortCol, AuditControllerListSortByEnum> = {
   channel: AuditControllerListSortByEnum.OccurredAt,
 };
 
-/** Sortable column head for the dense audit table. */
-function SortableHead({
-  label,
-  column,
-  sortCol,
-  sortDir,
-  onSort,
-}: {
-  label: string;
-  column: AuditSortCol;
-  sortCol: AuditSortCol;
-  sortDir: SortDir;
-  onSort: (col: AuditSortCol) => void;
-}) {
-  const active = sortCol === column;
-  return (
-    <TableHead>
-      <button
-        type="button"
-        onClick={() => onSort(column)}
-        className="flex items-center gap-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:text-foreground"
-      >
-        {label}
-        {active ? (
-          sortDir === "asc" ? (
-            <ArrowUp className="h-2.5 w-2.5" />
-          ) : (
-            <ArrowDown className="h-2.5 w-2.5" />
-          )
-        ) : (
-          <ChevronsUpDown className="h-2.5 w-2.5 opacity-40" />
-        )}
-      </button>
-    </TableHead>
-  );
-}
 
 /**
  * Audit events for a filter, newest first. The trail is dense and server-side:
@@ -122,8 +89,17 @@ export function useAuditEvents(filter: AuditFilter | null) {
   const [capability, setCapability] = useState<string>("ALL");
   const [channel, setChannel] = useState<string>("ALL");
   const [capabilities, setCapabilities] = useState<string[]>([]);
-  const [sortCol, setSortCol] = useState<AuditSortCol>("when");
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const tableSort = useTableSort<AuditSortCol>("when", "desc", (col) =>
+    col === "when" ? "desc" : "asc",
+  );
+  const { sortCol, sortDir } = tableSort;
+  // Channel is a filter, not a server sort: its head does not sort.
+  const sort: TableSort<AuditSortCol> = {
+    ...tableSort,
+    onSort: (col) => {
+      if (col !== "channel") tableSort.onSort(col);
+    },
+  };
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<string>(String(PAGE_SIZE_OPTIONS[1]));
   const key = filter ? JSON.stringify(filter) : null;
@@ -167,7 +143,7 @@ export function useAuditEvents(filter: AuditFilter | null) {
     } finally {
       setLoading(false);
     }
-  }, [key, page, pageSize, search, capability, sortCol, sortDir, channel]);
+  }, [key, page, pageSize, search, capability, sortCol, sortDir]);
 
   useEffect(() => {
     setEvents([]);
@@ -178,16 +154,6 @@ export function useAuditEvents(filter: AuditFilter | null) {
   useEffect(() => {
     setPage(1);
   }, [key, search, capability, channel, pageSize]);
-
-  const onSort = (col: AuditSortCol) => {
-    if (col === "channel") return;
-    if (col === sortCol) {
-      setSortDir((dir) => (dir === "asc" ? "desc" : "asc"));
-    } else {
-      setSortCol(col);
-      setSortDir(col === "when" ? "desc" : "asc");
-    }
-  };
 
   return {
     events: channel === "ALL" ? events : events.filter((e) => e.channel === channel),
@@ -200,9 +166,7 @@ export function useAuditEvents(filter: AuditFilter | null) {
     capabilities,
     channel,
     setChannel,
-    sortCol,
-    sortDir,
-    onSort,
+    sort,
     page,
     setPage,
     pageSize,
@@ -226,9 +190,6 @@ export function AuditEventTable({
   workspaces?: Namespace[];
 }) {
   const { t } = useTranslation();
-  const locale = useLocale();
-  const localePath = (path: string) =>
-    locale === "en" ? path : `/${locale}${path}`;
   const {
     events,
     total,
@@ -240,9 +201,7 @@ export function AuditEventTable({
     capabilities,
     channel,
     setChannel,
-    sortCol,
-    sortDir,
-    onSort,
+    sort,
     page,
     setPage,
     pageSize,
@@ -305,39 +264,29 @@ export function AuditEventTable({
               <SortableHead
                 label={t("audit.table.when")}
                 column="when"
-                sortCol={sortCol}
-                sortDir={sortDir}
-                onSort={onSort}
+                sort={sort}
               />
               <SortableHead
                 label={t("audit.table.who")}
                 column="who"
-                sortCol={sortCol}
-                sortDir={sortDir}
-                onSort={onSort}
+                sort={sort}
               />
               <SortableHead
                 label={t("audit.table.what")}
                 column="what"
-                sortCol={sortCol}
-                sortDir={sortDir}
-                onSort={onSort}
+                sort={sort}
               />
               {showEntity && (
                 <SortableHead
                   label={t("audit.table.where")}
                   column="where"
-                  sortCol={sortCol}
-                  sortDir={sortDir}
-                  onSort={onSort}
+                  sort={sort}
                 />
               )}
               <SortableHead
                 label={t("audit.table.capability")}
                 column="capability"
-                sortCol={sortCol}
-                sortDir={sortDir}
-                onSort={onSort}
+                sort={sort}
               />
               <TableHead>
                 <span className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
@@ -501,7 +450,9 @@ function WhereCell({
         </span>
       );
     }
-    return <span>{t("audit.table.thisWorkspace")}</span>;
+    // Inside one workspace: the change speaks for itself when it was named
+    // ("/finance on orders"); otherwise it happened to this workspace.
+    return <span>{entityName || t("audit.table.thisWorkspace")}</span>;
   }
 
   if (!entityType) return <span>—</span>;

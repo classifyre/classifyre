@@ -14,6 +14,7 @@ import { CliRunnerService } from '../cli-runner/cli-runner.service';
 import { MaskedConfigCryptoService } from '../masked-config-crypto.service';
 import { ActorContextService } from '../identity/actor-context.service';
 import { AuditTrailService } from '../identity/audit-trail.service';
+import { tableReadResources } from '../identity/audit-resources';
 import {
   QueryCatalogService,
   type CatalogTable,
@@ -450,7 +451,7 @@ export class QueryRunService {
           via: 'none' as const,
           ref: run.actorRef,
         };
-        const names = await this.sqlNamesFor(assetIds);
+        const tables = await this.tablesFor(assetIds);
         const isExport = Boolean(run.resultFormat);
         for (const assetId of assetIds) {
           void this.audit.record({
@@ -462,7 +463,11 @@ export class QueryRunService {
               : 'query-runs.read-table',
             entityType: 'asset',
             entityId: assetId,
-            entityName: names.get(assetId) ?? null,
+            entityName: tables.get(assetId)?.sqlName ?? null,
+            resources: tableReadResources({
+              assetId,
+              sourceId: tables.get(assetId)?.sourceId,
+            }),
             fields: [],
           });
         }
@@ -483,11 +488,16 @@ export class QueryRunService {
     return tables.filter((t) => wanted.has(t.sqlName)).map((t) => t.assetId);
   }
 
-  private async sqlNamesFor(assetIds: string[]): Promise<Map<string, string>> {
+  /** SQL name and source of each table read, for its audit row. */
+  private async tablesFor(
+    assetIds: string[],
+  ): Promise<Map<string, { sqlName: string; sourceId: string }>> {
     const { tables } = await this.catalog.tables();
     const wanted = new Set(assetIds);
     return new Map(
-      tables.filter((t) => wanted.has(t.assetId)).map((t) => [t.assetId, t.sqlName]),
+      tables
+        .filter((t) => wanted.has(t.assetId))
+        .map((t) => [t.assetId, { sqlName: t.sqlName, sourceId: t.sourceId }]),
     );
   }
 

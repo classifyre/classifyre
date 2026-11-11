@@ -1394,7 +1394,8 @@
       "textCoverageValue": "{{pct}}% extracted",
       "lowTextCoverageBadge": "Low text coverage ({{pct}}%)",
       "lowTextCoverageTooltip": "Some assets produced no extractable text; findings may be incomplete.",
-      "tabConnections": "Connections"
+      "tabConnections": "Connections",
+      "tabData": "Data"
     },
     "edit": {
       "loading": "Loading source configuration...",
@@ -7467,6 +7468,8 @@
     "assetTab": "Data",
     "assetLockedTitle": "No data access",
     "assetLocked": "You can see this table but not its rows. A workspace admin can give your group the Data reader role on this table or its source.",
+    "sourceTables": "{{count}} of {{total}} tables you can query",
+    "sourceLocked": "You cannot query any table of {{name}}. A workspace admin can give your group the Data reader role on the source or its tables.",
     "explorer": {
       "tables": "Tables",
       "history": "History",
@@ -7503,17 +7506,29 @@
     },
     "access": {
       "open": "Access",
-      "title": "Who can query this table",
-      "description": "Data access always goes to a group: the Data reader role on this table, on its whole source, or on the workspace.",
+      "description": {
+        "workspace": "Every Data reader grant in this workspace: on the whole workspace, on a source, or on one table. Data access always goes to a group.",
+        "source": "Groups that can query this source's tables: the Data reader role on the source, on one of its tables, or on the whole workspace.",
+        "asset": "Groups that can query this table: the Data reader role on the table, on its source, or on the whole workspace."
+      },
       "activity": "Activity",
-      "activityHint": "Access changes and queries touching this table, newest first. Reads are recorded per table; query runs themselves stay in History.",
+      "activityHint": {
+        "workspace": "Reads and exports of this workspace's tables and changes to data access, newest first. Each table read counts once per query.",
+        "source": "Reads and exports of this source's tables and access given or removed on it or its tables, newest first.",
+        "asset": "Reads and exports of this table and access given or removed on it, newest first. Query runs themselves stay in each person's History."
+      },
       "giveTitle": "Give data access",
-      "giveDescription": "Give a group the Data reader role on this table or its whole source. Every change is recorded in Activity.",
+      "giveDescription": {
+        "workspace": "Give a group the Data reader role on this workspace: every table in it.",
+        "source": "Give a group the Data reader role on the whole source {{name}}: every table in it.",
+        "asset": "Give a group the Data reader role on the table {{name}}."
+      },
+      "giveHint": {
+        "workspace": "Opens every table of the workspace to the group, today's and future ones. For one source or table, use its Data tab. Every change is recorded in Activity.",
+        "source": "Opens every table of {{name}} to the group. For a single table, use the table's Data tab. Every change is recorded in Activity.",
+        "asset": "Opens only {{name}} to the group. For the whole source, use the source's Data tab. Every change is recorded in Activity."
+      },
       "none": "Nobody beyond workspace admins.",
-      "thisTable": "This table",
-      "thisTableName": "This table ({{name}})",
-      "wholeSource": "Its whole source",
-      "wholeSourceName": "Its whole source ({{name}})",
       "pickGroup": "Choose a group",
       "give": "Give access",
       "remove": "Remove access",
@@ -7529,6 +7544,16 @@
       "save": "Save limits",
       "saved": "Saved",
       "changedBy": "Last changed by"
+    },
+    "completion": {
+      "schema": "{{source}} · {{count}} tables you can query",
+      "table": "{{name}} · {{count}} columns",
+      "locked": "{{name}} (no access)",
+      "source": "{{source}} · {{count}} tables"
+    },
+    "editor": {
+      "undo": "Undo (Ctrl/⌘+Z)",
+      "redo": "Redo (Ctrl/⌘+Shift+Z)"
     }
   },
   "notificationAudiences": {

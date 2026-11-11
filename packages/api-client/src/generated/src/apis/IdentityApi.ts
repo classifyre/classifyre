@@ -34,6 +34,7 @@ export interface AuditControllerListRequest {
     actor?: string;
     capability?: string;
     operation?: string;
+    resource?: string;
     search?: string;
     before?: string;
     limit?: number;
@@ -52,7 +53,7 @@ export interface AuditControllerResolveRequest {
 export class IdentityApi extends runtime.BaseAPI {
 
     /**
-     * Filter by entity (e.g. entityType=sources&entityId=…), actor, capability, operation or free text. Sort any column; page with `skip`/`limit` or, for \"load more\", with `before`, the id of the last event received.
+     * Filter by entity (e.g. entityType=sources&entityId=…), by what it touched (resource=data, source:<id> or asset:<id>), actor, capability, operation or free text. Sort any column; page with `skip`/`limit` or, for \"load more\", with `before`, the id of the last event received.
      * Changes made in this workspace, newest first
      */
     async auditControllerListRaw(requestParameters: AuditControllerListRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AuditEventsResponseDto>> {
@@ -76,6 +77,10 @@ export class IdentityApi extends runtime.BaseAPI {
 
         if (requestParameters['operation'] != null) {
             queryParameters['operation'] = requestParameters['operation'];
+        }
+
+        if (requestParameters['resource'] != null) {
+            queryParameters['resource'] = requestParameters['resource'];
         }
 
         if (requestParameters['search'] != null) {
@@ -118,7 +123,7 @@ export class IdentityApi extends runtime.BaseAPI {
     }
 
     /**
-     * Filter by entity (e.g. entityType=sources&entityId=…), actor, capability, operation or free text. Sort any column; page with `skip`/`limit` or, for \"load more\", with `before`, the id of the last event received.
+     * Filter by entity (e.g. entityType=sources&entityId=…), by what it touched (resource=data, source:<id> or asset:<id>), actor, capability, operation or free text. Sort any column; page with `skip`/`limit` or, for \"load more\", with `before`, the id of the last event received.
      * Changes made in this workspace, newest first
      */
     async auditControllerList(requestParameters: AuditControllerListRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AuditEventsResponseDto> {

@@ -4374,6 +4374,10 @@ model AuditEvent {
   /// path, workspace slug), so the trail reads without extra lookups.
   /// Never a secret: names only, like the rest of the row.
   entityName String?  @map("entity_name")
+  /// What the change or read touched, beyond the one entity: `data` for SQL
+  /// reads and data-reader grants, `source:<id>`, `asset:<id>`. The Data
+  /// tabs filter their Activity on one of these (identity/audit-resources.ts).
+  resources  String[] @default([])
   /// Top-level input keys of the change.
   fields     String[] @default([])
   /// HTTP status of the response (REST only).
@@ -4382,5 +4386,6 @@ model AuditEvent {
   @@index([entityType, entityId, occurredAt(sort: Desc)])
   @@index([occurredAt(sort: Desc)])
   @@index([actor, occurredAt(sort: Desc)])
+  @@index([resources], type: Gin)
   @@map("audit_events")
 }

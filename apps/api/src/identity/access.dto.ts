@@ -112,6 +112,11 @@ export class GrantDto {
       'True when the grant comes from the tenant or an owning group rather than this workspace.',
   })
   inherited?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'For a grant on one table: the source the table belongs to.',
+  })
+  sourceId?: string;
 }
 
 export class TenantDto {

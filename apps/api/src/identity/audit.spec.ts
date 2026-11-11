@@ -64,12 +64,7 @@ describe('routeEntity', () => {
 
   it('files access grants under the workspace, not access/grants', () => {
     expect(
-      routeEntity(
-        '/access/grants',
-        {},
-        { id: 'g-1', scopeId: 'ws-1' },
-        'ws-1',
-      ),
+      routeEntity('/access/grants', {}, { id: 'g-1', scopeId: 'ws-1' }, 'ws-1'),
     ).toEqual({ entityType: 'workspaces', entityId: 'g-1' });
     expect(
       routeEntity('/access/grants/:id', { id: 'g-1' }, {}, 'ws-1'),
@@ -93,6 +88,58 @@ describe('routeEntity', () => {
       entityId: 'g-1',
       entityName: '/finance on shop_lake.shop.orders',
     });
+  });
+
+  it('tags data grants with what they open, given or removed', () => {
+    const tableGrant = {
+      id: 'g-2',
+      roleKey: 'data-reader',
+      scopeType: 'asset',
+      scopeId: 'ws-1/a-orders',
+      sourceId: 's-shop',
+      subjectLabel: '/finance',
+      scopeLabel: 'orders',
+    };
+    // Given: the table, its source (for the source's Activity) and `data`.
+    expect(routeEntity('/access/grants', {}, tableGrant, 'ws-1')).toMatchObject(
+      {
+        entityId: 'g-2',
+        resources: ['data', 'asset:a-orders', 'source:s-shop'],
+      },
+    );
+    // Removed: the response is the removed grant, so it is tagged alike.
+    expect(
+      routeEntity(
+        '/access/grants/:id',
+        { id: 'g-3' },
+        {
+          id: 'g-3',
+          roleKey: 'data-reader',
+          scopeType: 'source',
+          scopeId: 'ws-1/s-shop',
+          subjectLabel: '/finance',
+          scopeLabel: 'Shop',
+        },
+        'ws-1',
+      ),
+    ).toMatchObject({
+      entityName: '/finance on Shop',
+      resources: ['data', 'source:s-shop'],
+    });
+    // Not data access: no tags, nothing for a Data tab to show.
+    expect(
+      routeEntity(
+        '/access/grants',
+        {},
+        {
+          id: 'g-4',
+          roleKey: 'viewer',
+          scopeType: 'workspace',
+          scopeId: 'ws-1',
+        },
+        'ws-1',
+      ),
+    ).not.toHaveProperty('resources');
   });
 
   it('files notification audience changes under the workspace', () => {

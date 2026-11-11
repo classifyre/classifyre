@@ -10,6 +10,7 @@ import { Reflector } from '@nestjs/core';
 import { Observable, tap } from 'rxjs';
 import type { ActorRequest } from './access.guard';
 import { ANONYMOUS_ACTOR } from './actor';
+import { grantResources } from './audit-resources';
 import { AuditTrailService, inputFields } from './audit-trail.service';
 import { resolveRouteAccess } from './route-access';
 
@@ -38,43 +39,43 @@ export function routeEntity(
   entityType: string | null;
   entityId: string | null;
   entityName?: string | null;
+  resources?: string[];
 } {
   const segments = routePath.split('/').filter(Boolean);
-  if (
-    segments[0] === 'access' &&
-    segments[1] === 'grants' &&
-    workspaceId
-  ) {
+  if (segments[0] === 'access' && segments[1] === 'grants' && workspaceId) {
     // A grant change names the group it touches and the scope it applies to
     // (`/finance` on `shop.orders`), so the trail reads without resolving
     // group paths or asset names afterwards.
-    const grant = (
+    const grant =
       responseBody && typeof responseBody === 'object'
         ? (responseBody as Record<string, unknown>)
-        : null
-    );
+        : null;
     const subject =
       typeof grant?.subjectLabel === 'string' ? grant.subjectLabel : null;
     const scope =
       typeof grant?.scopeLabel === 'string' ? grant.scopeLabel : null;
     const entityName =
-      subject && scope
-        ? `${subject} on ${scope}`
-        : (subject ?? scope ?? null);
+      subject && scope ? `${subject} on ${scope}` : (subject ?? scope ?? null);
+    // Given and removed grants both answer with the grant, so a table's or a
+    // source's Activity shows who got (or lost) access to it.
+    const resources = grant ? grantResources(grant) : [];
+    const named = {
+      ...(entityName ? { entityName } : {}),
+      ...(resources.length ? { resources } : {}),
+    };
     if (routePath.includes(':id')) {
       const value = params[segments[segments.indexOf(':id')].slice(1)];
       return {
         entityType: 'workspaces',
         entityId: value ?? workspaceId,
-        ...(entityName ? { entityName } : {}),
+        ...named,
       };
     }
-    const createdId =
-      typeof grant?.id === 'string' ? grant.id : null;
+    const createdId = typeof grant?.id === 'string' ? grant.id : null;
     return {
       entityType: 'workspaces',
       entityId: createdId ?? workspaceId,
-      ...(entityName ? { entityName } : {}),
+      ...named,
     };
   }
   if (

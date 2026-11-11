@@ -3,11 +3,8 @@
 import * as React from "react";
 import Link from "next/link";
 import {
-  ArrowDown,
   ArrowLeft,
-  ArrowUp,
   Building2,
-  ChevronsUpDown,
   History,
   KeyRound,
   Search,
@@ -63,6 +60,11 @@ import {
   TabsTrigger,
 } from "@workspace/ui/components/tabs";
 import { ActorChip } from "@/components/actor-chip";
+import {
+  SortableHead,
+  sortRows,
+  useTableSort,
+} from "@/components/sortable-table-head";
 import { useIamConsole } from "@/components/iam-session";
 import { useTranslation } from "@/hooks/use-translation";
 import { useLocale } from "@/lib/app-path";
@@ -72,7 +74,6 @@ import { extractApiErrorMessage } from "@/lib/extract-api-error-message";
 type ScopeType = "tenant" | "group" | "workspace";
 type GrantsSortCol = "group" | "role" | "scope" | "until";
 type ActivitySortCol = "when" | "who" | "what";
-type SortDir = "asc" | "desc";
 
 const TAB_TRIGGER_CLASS =
   "gap-2 px-1 text-xs font-mono uppercase tracking-[0.14em]";
@@ -252,41 +253,6 @@ export function TenantAdmin() {
   );
 }
 
-function SortableHead({
-  label,
-  column,
-  sortCol,
-  sortDir,
-  onSort,
-}: {
-  label: string;
-  column: GrantsSortCol;
-  sortCol: GrantsSortCol;
-  sortDir: SortDir;
-  onSort: (col: GrantsSortCol) => void;
-}) {
-  const active = sortCol === column;
-  return (
-    <TableHead>
-      <button
-        type="button"
-        onClick={() => onSort(column)}
-        className="flex items-center gap-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:text-foreground"
-      >
-        {label}
-        {active ? (
-          sortDir === "asc" ? (
-            <ArrowUp className="h-2.5 w-2.5" />
-          ) : (
-            <ArrowDown className="h-2.5 w-2.5" />
-          )
-        ) : (
-          <ChevronsUpDown className="h-2.5 w-2.5 opacity-40" />
-        )}
-      </button>
-    </TableHead>
-  );
-}
 
 /** All grants of the tenant, sortable and grouped by group — no paging, it fits. */
 function TenantGrantsTable({
@@ -303,53 +269,44 @@ function TenantGrantsTable({
   onRemove: (grant: GrantDto) => void;
 }) {
   const { t } = useTranslation();
-  const [sortCol, setSortCol] = React.useState<GrantsSortCol>("group");
-  const [sortDir, setSortDir] = React.useState<SortDir>("asc");
+  const sort = useTableSort<GrantsSortCol>("group");
+  const { sortCol, sortDir } = sort;
 
-  const onSort = (col: GrantsSortCol) => {
-    if (col === sortCol) {
-      setSortDir((dir) => (dir === "asc" ? "desc" : "asc"));
-    } else {
-      setSortCol(col);
-      setSortDir("asc");
-    }
-  };
+  const roleTitle = React.useCallback(
+    (key: string) => roles.find((role) => role.key === key)?.title ?? key,
+    [roles],
+  );
+  const groupPath = React.useCallback(
+    (id: string) =>
+      groups.find((group) => group.id === id)?.path ??
+      t("access.removedGroupId", { id: id.slice(0, 8) }),
+    [groups, t],
+  );
+  const scopeName = React.useCallback(
+    (grant: GrantDto) =>
+      grant.scopeType === "workspace"
+        ? (workspaces.find((ws) => ws.id === grant.scopeId)?.name ??
+          grant.scopeLabel)
+        : grant.scopeLabel,
+    [workspaces],
+  );
 
-  const roleTitle = (key: string) =>
-    roles.find((role) => role.key === key)?.title ?? key;
-  const groupPath = (id: string) =>
-    groups.find((group) => group.id === id)?.path ??
-    t("access.removedGroupId", { id: id.slice(0, 8) });
-  const scopeName = (grant: GrantDto) =>
-    grant.scopeType === "workspace"
-      ? (workspaces.find((ws) => ws.id === grant.scopeId)?.name ?? grant.scopeLabel)
-      : grant.scopeLabel;
-
-  const sorted = React.useMemo(() => {
-    const keyOf = (grant: GrantDto) =>
-      sortCol === "role"
-        ? roleTitle(grant.roleKey)
-        : sortCol === "scope"
-          ? scopeName(grant)
-          : sortCol === "until"
-            ? (grant.expiresAt ?? "")
-            : groupPath(grant.subjectId);
-    return [...grants].sort((a, b) => {
-      const left = keyOf(a);
-      const right = keyOf(b);
-      if (sortCol === "until") {
-        const l = left ? new Date(left as string | Date).getTime() : NaN;
-        const r = right ? new Date(right as string | Date).getTime() : NaN;
-        if (Number.isNaN(l) && Number.isNaN(r)) return 0;
-        if (Number.isNaN(l)) return 1;
-        if (Number.isNaN(r)) return -1;
-        return sortDir === "asc" ? l - r : r - l;
-      }
-      const cmp = String(left).localeCompare(String(right));
-      return sortDir === "asc" ? cmp : -cmp;
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [grants, sortCol, sortDir, groups, roles, workspaces]);
+  const sorted = React.useMemo(
+    () =>
+      sortRows(
+        grants,
+        (grant) =>
+          sortCol === "role"
+            ? roleTitle(grant.roleKey)
+            : sortCol === "scope"
+              ? scopeName(grant)
+              : sortCol === "until"
+                ? grant.expiresAt
+                : groupPath(grant.subjectId),
+        sortDir,
+      ),
+    [grants, sortCol, sortDir, roleTitle, scopeName, groupPath],
+  );
 
   const grouped = React.useMemo(() => {
     const byGroup = new Map<string, GrantDto[]>();
@@ -361,8 +318,7 @@ function TenantGrantsTable({
     return [...byGroup.entries()].sort(([a], [b]) =>
       groupPath(a).localeCompare(groupPath(b)),
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sorted]);
+  }, [sorted, groupPath]);
 
   if (grants.length === 0) {
     return (
@@ -396,23 +352,17 @@ function TenantGrantsTable({
                   <SortableHead
                     label={t("access.grantsTable.role")}
                     column="role"
-                    sortCol={sortCol}
-                    sortDir={sortDir}
-                    onSort={onSort}
+                    sort={sort}
                   />
                   <SortableHead
                     label={t("access.grantsTable.scope")}
                     column="scope"
-                    sortCol={sortCol}
-                    sortDir={sortDir}
-                    onSort={onSort}
+                    sort={sort}
                   />
                   <SortableHead
                     label={t("access.grantsTable.until")}
                     column="until"
-                    sortCol={sortCol}
-                    sortDir={sortDir}
-                    onSort={onSort}
+                    sort={sort}
                   />
                   <TableHead className="text-right">
                     <span className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
@@ -513,8 +463,10 @@ function TenantActivityTable({
   const [action, setAction] = React.useState("ALL");
   const [actor, setActor] = React.useState("");
   const [search, setSearch] = React.useState("");
-  const [sortCol, setSortCol] = React.useState<ActivitySortCol>("when");
-  const [sortDir, setSortDir] = React.useState<SortDir>("desc");
+  const sort = useTableSort<ActivitySortCol>("when", "desc", (col) =>
+    col === "when" ? "desc" : "asc",
+  );
+  const { sortCol, sortDir } = sort;
   const [page, setPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState<string>(String(ACTIVITY_PAGE_SIZE_OPTIONS[1]));
 
@@ -569,38 +521,9 @@ function TenantActivityTable({
     setPage(1);
   }, [action, actor, search, pageSize]);
 
-  const onSort = (col: ActivitySortCol) => {
-    if (col === sortCol) {
-      setSortDir((dir) => (dir === "asc" ? "desc" : "asc"));
-    } else {
-      setSortCol(col);
-      setSortDir(col === "when" ? "desc" : "asc");
-    }
-  };
-
-  const head = (label: string, column: ActivitySortCol) => {
-    const active = sortCol === column;
-    return (
-      <TableHead>
-        <button
-          type="button"
-          onClick={() => onSort(column)}
-          className="flex items-center gap-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:text-foreground"
-        >
-          {label}
-          {active ? (
-            sortDir === "asc" ? (
-              <ArrowUp className="h-2.5 w-2.5" />
-            ) : (
-              <ArrowDown className="h-2.5 w-2.5" />
-            )
-          ) : (
-            <ChevronsUpDown className="h-2.5 w-2.5 opacity-40" />
-          )}
-        </button>
-      </TableHead>
-    );
-  };
+  const head = (label: string, column: ActivitySortCol) => (
+    <SortableHead label={label} column={column} sort={sort} />
+  );
 
   const size = Number(pageSize) || ACTIVITY_PAGE_SIZE_OPTIONS[1];
   const totalPages = Math.max(1, Math.ceil(total / size));

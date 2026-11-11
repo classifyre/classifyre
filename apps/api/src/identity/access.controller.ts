@@ -4,7 +4,6 @@ import {
   Controller,
   Delete,
   Get,
-  HttpCode,
   Inject,
   Param,
   Post,
@@ -132,13 +131,13 @@ export class WorkspaceAccessController {
 
   @Delete('grants/:id')
   @Requires('access.manage')
-  @HttpCode(204)
   @ApiOperation({ summary: 'Remove a grant made on this workspace' })
+  @ApiOkResponse({ type: GrantDto, description: 'The grant that was removed.' })
   async removeGrant(
     @Req() request: FastifyRequest,
     @Param('id') id: string,
-  ): Promise<void> {
-    await this.access.removeGrant(
+  ): Promise<GrantDto> {
+    return this.access.removeGrant(
       await this.principal(request),
       id,
       this.actors.workspaceId(),
@@ -260,13 +259,13 @@ export class TenantAccessController {
 
   @Delete('grants/:id')
   @Requires('tenant.access.manage')
-  @HttpCode(204)
   @ApiOperation({ summary: 'Remove any grant of the tenant' })
+  @ApiOkResponse({ type: GrantDto, description: 'The grant that was removed.' })
   async removeGrant(
     @Req() request: FastifyRequest,
     @Param('id') id: string,
-  ): Promise<void> {
-    await this.access.removeGrant(await this.principal(request), id);
+  ): Promise<GrantDto> {
+    return this.access.removeGrant(await this.principal(request), id);
   }
 
   @Get('actors/resolve')

@@ -77,19 +77,14 @@ export function NotificationAudiencesCard() {
   const save = async (type: Kind, groupIds: string[]) => {
     setBusy(type);
     try {
-      const saved = await api.notifications.notificationsControllerSetAudience({
+      await api.notifications.notificationsControllerSetAudience({
         type,
         updateNotificationAudienceDto: { groupIds },
       });
-      // Re-read from the server rather than trusting the echo: the audience
-      // is also recorded in the tenant audit trail, and a re-read keeps the
-      // badges in sync with what new notifications will actually use.
-      const [nextAudiences] = await Promise.all([
-        api.notifications.notificationsControllerAudiences(),
-      ]);
-      setAudiences(nextAudiences);
+      // Re-read from the server rather than trusting the echo: a re-read
+      // keeps the badges in sync with what new notifications will use.
+      setAudiences(await api.notifications.notificationsControllerAudiences());
       toast.success(t("notificationAudiences.saved"));
-      void saved;
     } catch (error) {
       toast.error(await extractApiErrorMessage(error, t("notificationAudiences.saveFailed")));
     } finally {

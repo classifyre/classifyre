@@ -20,9 +20,9 @@ import type { TranslationKey } from "@/i18n";
  * - `not_configured` — Harness has no provider assigned.
  * - `error`          — an assigned provider failed the live test (no connection,
  *                      no structured output, bad key, …). `detail` holds why.
- * - `unavailable`    — demo mode: never probed, never warned on. The probe is a
- *                      mutating call the demo guard rejects anyway, and the
- *                      provider is not something a demo visitor could fix.
+ * - `unavailable`    — the person cannot configure AI (a viewer, a visitor of a
+ *                      public workspace): never probed, never warned on. The
+ *                      probe needs `agent.configure`, and they could not fix it.
  */
 export type AiHealthStatus =
   | "ok"
@@ -130,8 +130,8 @@ export function useAiHealth(): AiHealthValue {
 }
 
 /** True when there is something the operator should fix. `unavailable` is
- * deliberately excluded: nothing is broken and nobody viewing a demo can act
- * on it, so neither the sidebar warning nor the top-bar pill renders. */
+ * deliberately excluded: nothing is broken and someone who cannot configure
+ * AI cannot act on it, so neither the sidebar warning nor the top-bar pill renders. */
 function isUnhealthy(status: AiHealthStatus): boolean {
   return status === "not_configured" || status === "error";
 }

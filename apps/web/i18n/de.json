@@ -1394,7 +1394,8 @@
       "textCoverageValue": "{{pct}} % extrahiert",
       "lowTextCoverageBadge": "Geringe Texterfassung ({{pct}} %)",
       "lowTextCoverageTooltip": "Einige Assets lieferten keinen extrahierbaren Text; Befunde könnten unvollständig sein.",
-      "tabConnections": "Verbindungen"
+      "tabConnections": "Verbindungen",
+      "tabData": "Daten"
     },
     "edit": {
       "loading": "Quellkonfiguration wird geladen...",
@@ -7467,6 +7468,8 @@
     "assetTab": "Daten",
     "assetLockedTitle": "Kein Datenzugriff",
     "assetLocked": "Sie sehen diese Tabelle, aber nicht ihre Zeilen. Ein Admin des Arbeitsbereichs kann Ihrer Gruppe die Rolle Datenleser für diese Tabelle oder ihre Quelle geben.",
+    "sourceTables": "{{count}} von {{total}} Tabellen abfragbar",
+    "sourceLocked": "Sie dürfen keine Tabelle von {{name}} abfragen. Ein Admin des Arbeitsbereichs kann Ihrer Gruppe die Rolle Datenleser für die Quelle oder ihre Tabellen geben.",
     "explorer": {
       "tables": "Tabellen",
       "history": "Verlauf",
@@ -7503,17 +7506,29 @@
     },
     "access": {
       "open": "Zugriff",
-      "title": "Wer diese Tabelle abfragen darf",
-      "description": "Datenzugriff geht immer an eine Gruppe: die Rolle Datenleser für diese Tabelle, ihre ganze Quelle oder den Arbeitsbereich.",
+      "description": {
+        "workspace": "Jede Datenleser-Freigabe in diesem Arbeitsbereich: für den ganzen Arbeitsbereich, eine Quelle oder eine Tabelle. Datenzugriff geht immer an eine Gruppe.",
+        "source": "Gruppen, die die Tabellen dieser Quelle abfragen dürfen: die Rolle Datenleser für die Quelle, eine ihrer Tabellen oder den ganzen Arbeitsbereich.",
+        "asset": "Gruppen, die diese Tabelle abfragen dürfen: die Rolle Datenleser für die Tabelle, ihre Quelle oder den ganzen Arbeitsbereich."
+      },
       "activity": "Aktivität",
-      "activityHint": "Zugriffsänderungen und Abfragen zu dieser Tabelle, neueste zuerst. Lesezugriffe werden pro Tabelle festgehalten; Abfrageläufe bleiben im Verlauf.",
+      "activityHint": {
+        "workspace": "Lese- und Exportzugriffe auf die Tabellen dieses Arbeitsbereichs und Änderungen am Datenzugriff, neueste zuerst. Jede gelesene Tabelle zählt einmal pro Abfrage.",
+        "source": "Lese- und Exportzugriffe auf die Tabellen dieser Quelle und Zugriff, der für sie oder ihre Tabellen gegeben oder entfernt wurde, neueste zuerst.",
+        "asset": "Lese- und Exportzugriffe auf diese Tabelle und Zugriff, der für sie gegeben oder entfernt wurde, neueste zuerst. Abfrageläufe selbst bleiben im Verlauf der jeweiligen Person."
+      },
       "giveTitle": "Datenzugriff geben",
-      "giveDescription": "Geben Sie einer Gruppe die Rolle Datenleser für diese Tabelle oder ihre ganze Quelle. Jede Änderung wird in der Aktivität festgehalten.",
+      "giveDescription": {
+        "workspace": "Geben Sie einer Gruppe die Rolle Datenleser für diesen Arbeitsbereich: jede Tabelle darin.",
+        "source": "Geben Sie einer Gruppe die Rolle Datenleser für die ganze Quelle {{name}}: jede Tabelle darin.",
+        "asset": "Geben Sie einer Gruppe die Rolle Datenleser für die Tabelle {{name}}."
+      },
+      "giveHint": {
+        "workspace": "Öffnet jede Tabelle des Arbeitsbereichs für die Gruppe, heutige und künftige. Für eine Quelle oder Tabelle nutzen Sie deren Daten-Tab. Jede Änderung wird in der Aktivität festgehalten.",
+        "source": "Öffnet jede Tabelle von {{name}} für die Gruppe. Für eine einzelne Tabelle nutzen Sie deren Daten-Tab. Jede Änderung wird in der Aktivität festgehalten.",
+        "asset": "Öffnet nur {{name}} für die Gruppe. Für die ganze Quelle nutzen Sie deren Daten-Tab. Jede Änderung wird in der Aktivität festgehalten."
+      },
       "none": "Niemand außer den Admins des Arbeitsbereichs.",
-      "thisTable": "Diese Tabelle",
-      "thisTableName": "Diese Tabelle ({{name}})",
-      "wholeSource": "Ihre ganze Quelle",
-      "wholeSourceName": "Ihre ganze Quelle ({{name}})",
       "pickGroup": "Gruppe wählen",
       "give": "Zugriff geben",
       "remove": "Zugriff entfernen",
@@ -7529,6 +7544,16 @@
       "save": "Limits speichern",
       "saved": "Gespeichert",
       "changedBy": "Zuletzt geändert von"
+    },
+    "completion": {
+      "schema": "{{source}} · {{count}} abfragbare Tabellen",
+      "table": "{{name}} · {{count}} Spalten",
+      "locked": "{{name}} (kein Zugriff)",
+      "source": "{{source}} · {{count}} Tabellen"
+    },
+    "editor": {
+      "undo": "Rückgängig (Strg/⌘+Z)",
+      "redo": "Wiederholen (Strg/⌘+Umschalt+Z)"
     }
   },
   "notificationAudiences": {

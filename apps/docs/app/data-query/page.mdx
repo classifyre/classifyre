@@ -8,7 +8,11 @@ import { Callout, Steps } from "nextra/components"
 
 # SQL over your tables
 
-Classifyre already knows every table in a workspace — database tables, Delta and Iceberg tables in a lakehouse, Parquet and CSV files in a bucket — and what was found in them. With **SQL** you read the rows themselves: open a table's **Data** tab, or the **SQL** page to query and join several tables at once.
+Classifyre already knows every table in a workspace — database tables, Delta and Iceberg tables in a lakehouse, Parquet and CSV files in a bucket — and what was found in them. With **SQL** you read the rows themselves, in three places:
+
+- a table's **Data** tab, which starts with that table;
+- a source's **Data** tab, with the source's tables listed beside the editor;
+- the **SQL** page, to query and join tables of every source at once.
 
 The SQL page works like a small IDE: the editor fills the space, and the **Tables**, **History** and **Saved** tabs sit beside it. A query can join tables of different sources.
 
@@ -27,6 +31,8 @@ There is nothing to switch on: who may query which table follows roles and grant
 | S3-compatible storage, Azure Blob, Google Cloud Storage, Local folder | Delta and Iceberg tables, and Parquet, CSV, TSV, JSON-lines and Avro files |
 
 Lance, Hudi and Paimon tables, and other source types, are listed with the reason they cannot be queried yet. Scan a source first: SQL only knows the tables a scan found.
+
+A MySQL source set to verify the server's certificate (**SSL mode** *Verify CA* or *Verify identity*) cannot be queried with SQL yet: the query engine cannot check the certificate, so it refuses rather than connect without the check. Scans still verify it.
 
 ## Names
 
@@ -83,7 +89,7 @@ What a query cannot do, by design:
 ## Your recent queries and saved queries
 
 - **History** lists your recent runs, newest first. Opening one loads just its SQL back into the editor — never its old rows, which expire after a day and may be huge. Press **Run** again for fresh rows.
-- **Saved** keeps the queries you named with **Save**, for you only: rename or delete them there, open one into the editor. A table grant that later disappears may refuse a query that used to run.
+- **Saved** keeps the queries you named with **Save**, for you only: rename or delete them there, open one into the editor. A table grant that later disappears may refuse a query that used to run. Saving needs a sign-in: visitors of a [public workspace](/access#public-workspaces) can read its findings, but cannot run or save SQL.
 
 ## Export to Excel, CSV or Parquet
 
@@ -117,9 +123,25 @@ Reading rows is its own right, separate from seeing findings:
 - **Workspace admins** (and tenant admins and workspace managers) can query every table of their workspaces.
 - The **Data reader** role gives the right to others. Give it to a group on a whole workspace, on a group's workspaces — or on **one source** or **one table**. Members also need a role that opens the workspace, such as Viewer.
 
-To give a group access to one table, open the table's **Data** tab: **Who can query this table** lists who can, and **Give access** adds a group, for the table or for its whole source. People see tables they cannot query with a lock, so they know what exists and whom to ask.
+People see tables they cannot query with a lock, so they know what exists and whom to ask.
 
-Every query is recorded: who ran it and which tables it read appear in the workspace's **Activity**.
+### Giving access where the data is
+
+Each of the three places has the same block below its result, with two tabs, for people who can see who has access (**access.view**):
+
+| Where | **Access** lists | **Give access** gives the Data reader role on | **Activity** shows |
+| --- | --- | --- | --- |
+| A table's **Data** tab | grants on the table, on its source, and wider ones | this table | reads and exports of the table, access given or removed on it |
+| A source's **Data** tab | grants on the source, on any of its tables, and wider ones | the whole source: every table in it | reads and exports of any of its tables, access given or removed on the source or its tables |
+| The **SQL** page | every Data reader grant in the workspace | the whole workspace: every table, today's and future ones | every table read and export, every change to data access |
+
+![A source's Data tab: the editor and result, the source's tables beside it, and who can query its tables below](./images/source-data-tab.png)
+
+![A table's Activity: who read and exported it, and the access given on it](./images/table-activity.png)
+
+There is no scope to pick: where you press **Give access** decides what it opens. Grants made here can be removed here with the bin button; inherited ones (from the tenant or an owning group) are changed in **Settings → Access**.
+
+Every query is recorded: each table it read appears once in **Activity**, with who ran it. The workspace's own **Activity** (Settings) shows the same rows among all other changes.
 
 <Callout type="warning">
 Reading rows shows everything in them, including what detectors flagged as personal data. Give the Data reader role as narrowly as the work needs: one table or one source rather than a whole workspace.

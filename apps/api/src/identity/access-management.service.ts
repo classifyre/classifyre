@@ -33,6 +33,8 @@ export interface GrantView extends Grant {
   scopeLabel: string;
   /** True when the grant comes from the tenant or a group, not this workspace. */
   inherited?: boolean;
+  /** For a table grant: the source the table belongs to. */
+  sourceId?: string;
   createdBy?: string | null;
   createdAt?: Date;
 }
@@ -61,6 +63,11 @@ function isResourceScope(scopeType: GrantScopeType): boolean {
 /** The workspace a resource grant's scope id (`<namespaceId>/<id>`) is in. */
 function resourceWorkspace(scopeId: string): string {
   return scopeId.split('/')[0] ?? '';
+}
+
+/** The source or table id in a resource grant's scope id. */
+function resourceIdOf(scopeId: string): string {
+  return scopeId.split('/').slice(1).join('/');
 }
 
 /**
@@ -299,7 +306,7 @@ export class AccessManagementService {
     principal: Principal,
     id: string,
     onlyWorkspace?: string,
-  ): Promise<void> {
+  ): Promise<GrantView> {
     const grant = await this.tenancy.grantById(principal.tenant.id, id);
     if (
       !grant ||
@@ -327,6 +334,10 @@ export class AccessManagementService {
         scopeId: grant.scopeId,
       },
     );
+    // What was removed, labelled like the list: the trail names it and the
+    // caller can say what went.
+    const [view] = await this.label(principal, [grant]);
+    return view;
   }
 
   private async label<T extends Grant>(
@@ -340,41 +351,49 @@ export class AccessManagementService {
     );
     // Single-resource grants name their source or table, so the access
     // screens and the audit trail read without extra lookups.
-    const names = await this.resourceNames(grants);
-    return grants.map((grant) => ({
-      ...grant,
-      subjectLabel: groups.get(grant.subjectId) ?? 'Removed group',
-      scopeLabel:
-        grant.scopeType === 'tenant'
-          ? principal.tenant.name
-          : grant.scopeType === 'group'
-            ? `Workspaces of ${groups.get(grant.scopeId) ?? 'a removed group'}`
-            : (names.get(`${grant.scopeType}/${grant.scopeId}`) ??
-              (grant.scopeType === 'source'
-                ? 'One source'
-                : grant.scopeType === 'asset'
-                  ? 'One table'
-                  : 'This workspace')),
-      ...(inherited ? { inherited: inherited(grant) } : {}),
-    }));
+    const resources = await this.resources(grants);
+    return grants.map((grant) => {
+      const resource = isResourceScope(grant.scopeType)
+        ? resources.get(`${grant.scopeType}/${resourceIdOf(grant.scopeId)}`)
+        : undefined;
+      return {
+        ...grant,
+        subjectLabel: groups.get(grant.subjectId) ?? 'Removed group',
+        scopeLabel:
+          grant.scopeType === 'tenant'
+            ? principal.tenant.name
+            : grant.scopeType === 'group'
+              ? `Workspaces of ${groups.get(grant.scopeId) ?? 'a removed group'}`
+              : (resource?.name ??
+                (grant.scopeType === 'source'
+                  ? 'One source'
+                  : grant.scopeType === 'asset'
+                    ? 'One table'
+                    : 'This workspace')),
+        ...(resource?.sourceId ? { sourceId: resource.sourceId } : {}),
+        ...(inherited ? { inherited: inherited(grant) } : {}),
+      };
+    });
   }
 
   /**
-   * Display names for single-source/table grant scopes (`source/<id>`,
-   * `asset/<id>` → the source or asset name), batched in two reads. Deleted
-   * resources stay absent, and the generic fallbacks above apply.
+   * Single-source/table grant scopes (`source/<id>`, `asset/<id>`) → the
+   * source or table name, and a table's source, batched in two reads of the
+   * current workspace. Deleted resources (or ones of another workspace in a
+   * tenant-wide list) stay absent, and the generic labels apply.
    */
-  private async resourceNames(
+  private async resources(
     grants: Grant[],
-  ): Promise<Map<string, string>> {
+  ): Promise<Map<string, { name: string; sourceId?: string }>> {
     const sourceIds = new Set<string>();
     const assetIds = new Set<string>();
     for (const grant of grants) {
-      const resourceId = grant.scopeId.split('/').slice(1).join('/');
-      if (grant.scopeType === 'source') sourceIds.add(resourceId);
-      if (grant.scopeType === 'asset') assetIds.add(resourceId);
+      if (grant.scopeType === 'source')
+        sourceIds.add(resourceIdOf(grant.scopeId));
+      if (grant.scopeType === 'asset')
+        assetIds.add(resourceIdOf(grant.scopeId));
     }
-    const names = new Map<string, string>();
+    const out = new Map<string, { name: string; sourceId?: string }>();
     if (sourceIds.size) {
       const rows = await this.prisma.source
         .findMany({
@@ -382,17 +401,19 @@ export class AccessManagementService {
           select: { id: true, name: true },
         })
         .catch(() => []);
-      for (const row of rows) names.set(`source/${row.id}`, row.name);
+      for (const row of rows) out.set(`source/${row.id}`, { name: row.name });
     }
     if (assetIds.size) {
       const rows = await this.prisma.asset
         .findMany({
           where: { id: { in: [...assetIds] } },
-          select: { id: true, name: true },
+          select: { id: true, name: true, sourceId: true },
         })
         .catch(() => []);
-      for (const row of rows) names.set(`asset/${row.id}`, row.name);
+      for (const row of rows) {
+        out.set(`asset/${row.id}`, { name: row.name, sourceId: row.sourceId });
+      }
     }
-    return names;
+    return out;
   }
 }

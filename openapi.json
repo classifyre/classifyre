@@ -9202,7 +9202,7 @@
     },
     "/audit-events": {
       "get": {
-        "description": "Filter by entity (e.g. entityType=sources&entityId=…), actor, capability, operation or free text. Sort any column; page with `skip`/`limit` or, for \"load more\", with `before`, the id of the last event received.",
+        "description": "Filter by entity (e.g. entityType=sources&entityId=…), by what it touched (resource=data, source:<id> or asset:<id>), actor, capability, operation or free text. Sort any column; page with `skip`/`limit` or, for \"load more\", with `before`, the id of the last event received.",
         "operationId": "AuditController_list",
         "parameters": [
           {
@@ -9241,6 +9241,15 @@
             "name": "operation",
             "required": false,
             "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "resource",
+            "required": false,
+            "in": "query",
+            "description": "Only events that touched this: `data` (SQL reads and data-reader grants), `source:<id>` or `asset:<id>`.",
             "schema": {
               "type": "string"
             }
@@ -9481,8 +9490,15 @@
           }
         ],
         "responses": {
-          "204": {
-            "description": ""
+          "200": {
+            "description": "The grant that was removed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GrantDto"
+                }
+              }
+            }
           }
         },
         "summary": "Remove a grant made on this workspace",
@@ -9665,8 +9681,15 @@
           }
         ],
         "responses": {
-          "204": {
-            "description": ""
+          "200": {
+            "description": "The grant that was removed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GrantDto"
+                }
+              }
+            }
           }
         },
         "summary": "Remove any grant of the tenant",
@@ -31410,6 +31433,10 @@
           "inherited": {
             "type": "boolean",
             "description": "True when the grant comes from the tenant or an owning group rather than this workspace."
+          },
+          "sourceId": {
+            "type": "string",
+            "description": "For a grant on one table: the source the table belongs to."
           }
         },
         "required": [

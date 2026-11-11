@@ -1,7 +1,12 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { SavedQueriesService } from './saved-queries.service';
 
-function harness(actorRef: string | undefined = 'user:anna') {
+/** `null`: a visitor of a public workspace, who has no actor reference. */
+function harness(actorRef: string | null = 'user:anna') {
   const rows = new Map<string, TestRow>();
   let seq = 0;
   const prisma = {
@@ -28,7 +33,13 @@ function harness(actorRef: string | undefined = 'user:anna') {
         return Promise.resolve(row);
       }),
       update: jest.fn(
-        ({ where, data }: { where: { id: string }; data: Partial<TestInput> }) => {
+        ({
+          where,
+          data,
+        }: {
+          where: { id: string };
+          data: Partial<TestInput>;
+        }) => {
           const row = rows.get(where.id)!;
           const next = { ...row, ...data, updatedAt: new Date() };
           rows.set(where.id, next);
@@ -41,14 +52,11 @@ function harness(actorRef: string | undefined = 'user:anna') {
       }),
     },
   };
-  const actors = { current: () => ({ ref: actorRef }) };
+  const actors = { current: () => ({ ref: actorRef ?? undefined }) };
   return {
     rows,
     prisma,
-    service: new SavedQueriesService(
-      prisma as never,
-      actors as never,
-    ),
+    service: new SavedQueriesService(prisma as never, actors as never),
   };
 }
 
@@ -106,5 +114,29 @@ describe('SavedQueriesService', () => {
     await expect(bob.service.remove(created.id)).rejects.toBeInstanceOf(
       NotFoundException,
     );
+  });
+
+  it('saves nothing for a visitor of a public workspace', async () => {
+    const visitor = harness(null);
+    expect(await visitor.service.list()).toEqual([]);
+    await expect(
+      visitor.service.create('Shared pool', 'SELECT 1'),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(visitor.prisma.savedQuery.create).not.toHaveBeenCalled();
+  });
+
+  it('validates SQL the same way on create and update', async () => {
+    const h = harness();
+    const created = await h.service.create('Q', '  SELECT 1  ');
+    expect(created.sql).toBe('SELECT 1');
+    const updated = await h.service.update(
+      created.id,
+      undefined,
+      '  SELECT 2 ',
+    );
+    expect(updated.sql).toBe('SELECT 2');
+    await expect(
+      h.service.update(created.id, undefined, 'x'.repeat(100_001)),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 });

@@ -1,9 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ClsService } from 'nestjs-cls';
-import {
-  CLS_NAMESPACE_ID,
-  CLS_SCHEMA,
-} from '../namespace/namespace.constants';
+import { CLS_NAMESPACE_ID, CLS_SCHEMA } from '../namespace/namespace.constants';
 import { PrismaService } from '../prisma.service';
 import type { Actor } from './actor';
 import type { Capability } from './capabilities';
@@ -17,6 +14,8 @@ export interface AuditEventInput {
   entityId: string | null;
   /** Display name of the entity at record time (names only, never secrets). */
   entityName?: string | null;
+  /** What it touched beyond the entity (identity/audit-resources.ts). */
+  resources?: string[];
   fields: string[];
   status?: number;
 }
@@ -27,6 +26,8 @@ export interface AuditEventQuery {
   actor?: string;
   capability?: string;
   operation?: string;
+  /** One `audit_events.resources` entry: `data`, `source:<id>`, `asset:<id>`. */
+  resource?: string;
   search?: string;
   /** Return events older than this id's event (keyset paging). */
   before?: string;
@@ -90,6 +91,7 @@ export class AuditTrailService {
           entityType: event.entityType,
           entityId: event.entityId,
           entityName: event.entityName ?? null,
+          resources: event.resources ?? [],
           fields: event.fields,
           status: event.status ?? null,
         },
@@ -117,6 +119,7 @@ export class AuditTrailService {
       ...(query.actor ? { actor: query.actor } : {}),
       ...(query.capability ? { capability: query.capability } : {}),
       ...(query.operation ? { operation: query.operation } : {}),
+      ...(query.resource ? { resources: { has: query.resource } } : {}),
       ...(needle
         ? {
             OR: [

@@ -29,13 +29,19 @@ export class AuditController {
   @ApiOperation({
     summary: 'Changes made in this workspace, newest first',
     description:
-      'Filter by entity (e.g. entityType=sources&entityId=…), actor, capability, operation or free text. Sort any column; page with `skip`/`limit` or, for "load more", with `before`, the id of the last event received.',
+      'Filter by entity (e.g. entityType=sources&entityId=…), by what it touched (resource=data, source:<id> or asset:<id>), actor, capability, operation or free text. Sort any column; page with `skip`/`limit` or, for "load more", with `before`, the id of the last event received.',
   })
   @ApiQuery({ name: 'entityType', required: false })
   @ApiQuery({ name: 'entityId', required: false })
   @ApiQuery({ name: 'actor', required: false })
   @ApiQuery({ name: 'capability', required: false })
   @ApiQuery({ name: 'operation', required: false })
+  @ApiQuery({
+    name: 'resource',
+    required: false,
+    description:
+      'Only events that touched this: `data` (SQL reads and data-reader grants), `source:<id>` or `asset:<id>`.',
+  })
   @ApiQuery({ name: 'search', required: false })
   @ApiQuery({ name: 'before', required: false })
   @ApiQuery({ name: 'limit', required: false, type: Number })
@@ -49,6 +55,7 @@ export class AuditController {
     @Query('actor') actor?: string,
     @Query('capability') capability?: string,
     @Query('operation') operation?: string,
+    @Query('resource') resource?: string,
     @Query('search') search?: string,
     @Query('before') before?: string,
     @Query('limit') limit?: string,
@@ -94,6 +101,7 @@ export class AuditController {
       actor: dto.actor,
       capability: dto.capability,
       operation: dto.operation,
+      resource: resource || undefined,
       search: dto.search,
       before: dto.before,
       limit: dto.page?.limit,
