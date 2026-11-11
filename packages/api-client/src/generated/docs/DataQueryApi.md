@@ -6,12 +6,17 @@ All URIs are relative to *http://localhost*
 |------------- | ------------- | -------------|
 | [**dataQueryControllerCancel**](DataQueryApi.md#dataquerycontrollercancel) | **POST** /query-runs/{id}/cancel | Stop one of your queries |
 | [**dataQueryControllerCreate**](DataQueryApi.md#dataquerycontrollercreate) | **POST** /query-runs | Run one SELECT; poll the run for its status |
+| [**dataQueryControllerCreateSaved**](DataQueryApi.md#dataquerycontrollercreatesaved) | **POST** /saved-queries | Save SQL under a name |
 | [**dataQueryControllerGet**](DataQueryApi.md#dataquerycontrollerget) | **GET** /query-runs/{id} | One of your queries |
 | [**dataQueryControllerGetCatalog**](DataQueryApi.md#dataquerycontrollergetcatalog) | **GET** /data-query/catalog | The tables you can query with SQL, and those you could with access |
+| [**dataQueryControllerGetSaved**](DataQueryApi.md#dataquerycontrollergetsaved) | **GET** /saved-queries/{id} | One of your saved queries |
 | [**dataQueryControllerGetSettings**](DataQueryApi.md#dataquerycontrollergetsettings) | **GET** /data-query/settings | The SQL limits of this workspace |
 | [**dataQueryControllerList**](DataQueryApi.md#dataquerycontrollerlist) | **GET** /query-runs | Your recent queries in this workspace |
+| [**dataQueryControllerListSaved**](DataQueryApi.md#dataquerycontrollerlistsaved) | **GET** /saved-queries | Your saved SQL in this workspace |
 | [**dataQueryControllerReceive**](DataQueryApi.md#dataquerycontrollerreceive) | **POST** /query-runs/{id}/result | Internal: a query job posts its result here |
+| [**dataQueryControllerRemoveSaved**](DataQueryApi.md#dataquerycontrollerremovesaved) | **DELETE** /saved-queries/{id} | Delete a saved query |
 | [**dataQueryControllerResult**](DataQueryApi.md#dataquerycontrollerresult) | **GET** /query-runs/{id}/result | The rows of a finished query (Arrow IPC stream), or its exported file |
+| [**dataQueryControllerUpdateSaved**](DataQueryApi.md#dataquerycontrollerupdatesaved) | **PATCH** /saved-queries/{id} | Rename a saved query or save new SQL under it |
 | [**dataQueryControllerUpdateSettings**](DataQueryApi.md#dataquerycontrollerupdatesettings) | **PUT** /data-query/settings | Set the limits of SQL queries in this workspace |
 
 
@@ -129,6 +134,71 @@ example().catch(console.error);
 ### Return type
 
 [**QueryRunDto**](QueryRunDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## dataQueryControllerCreateSaved
+
+> SavedQueryDto dataQueryControllerCreateSaved(saveSavedQueryDto)
+
+Save SQL under a name
+
+### Example
+
+```ts
+import {
+  Configuration,
+  DataQueryApi,
+} from '@workspace/api-client';
+import type { DataQueryControllerCreateSavedRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new DataQueryApi();
+
+  const body = {
+    // SaveSavedQueryDto
+    saveSavedQueryDto: ...,
+  } satisfies DataQueryControllerCreateSavedRequest;
+
+  try {
+    const data = await api.dataQueryControllerCreateSaved(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **saveSavedQueryDto** | [SaveSavedQueryDto](SaveSavedQueryDto.md) |  | |
+
+### Return type
+
+[**SavedQueryDto**](SavedQueryDto.md)
 
 ### Authorization
 
@@ -270,6 +340,71 @@ No authorization required
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
 
+## dataQueryControllerGetSaved
+
+> SavedQueryDto dataQueryControllerGetSaved(id)
+
+One of your saved queries
+
+### Example
+
+```ts
+import {
+  Configuration,
+  DataQueryApi,
+} from '@workspace/api-client';
+import type { DataQueryControllerGetSavedRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new DataQueryApi();
+
+  const body = {
+    // string
+    id: id_example,
+  } satisfies DataQueryControllerGetSavedRequest;
+
+  try {
+    const data = await api.dataQueryControllerGetSaved(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+[**SavedQueryDto**](SavedQueryDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
 ## dataQueryControllerGetSettings
 
 > DataQuerySettingsDto dataQueryControllerGetSettings()
@@ -392,6 +527,63 @@ No authorization required
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
 
+## dataQueryControllerListSaved
+
+> Array&lt;SavedQueryDto&gt; dataQueryControllerListSaved()
+
+Your saved SQL in this workspace
+
+### Example
+
+```ts
+import {
+  Configuration,
+  DataQueryApi,
+} from '@workspace/api-client';
+import type { DataQueryControllerListSavedRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new DataQueryApi();
+
+  try {
+    const data = await api.dataQueryControllerListSaved();
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+This endpoint does not need any parameter.
+
+### Return type
+
+[**Array&lt;SavedQueryDto&gt;**](SavedQueryDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
 ## dataQueryControllerReceive
 
 > dataQueryControllerReceive(id, xQueryRunToken, xQueryRunMeta)
@@ -440,6 +632,71 @@ example().catch(console.error);
 | **id** | `string` |  | [Defaults to `undefined`] |
 | **xQueryRunToken** | `string` |  | [Defaults to `undefined`] |
 | **xQueryRunMeta** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+`void` (Empty response body)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: Not defined
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **204** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## dataQueryControllerRemoveSaved
+
+> dataQueryControllerRemoveSaved(id)
+
+Delete a saved query
+
+### Example
+
+```ts
+import {
+  Configuration,
+  DataQueryApi,
+} from '@workspace/api-client';
+import type { DataQueryControllerRemoveSavedRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new DataQueryApi();
+
+  const body = {
+    // string
+    id: id_example,
+  } satisfies DataQueryControllerRemoveSavedRequest;
+
+  try {
+    const data = await api.dataQueryControllerRemoveSaved(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
 
 ### Return type
 
@@ -518,6 +775,74 @@ No authorization required
 
 - **Content-Type**: Not defined
 - **Accept**: Not defined
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## dataQueryControllerUpdateSaved
+
+> SavedQueryDto dataQueryControllerUpdateSaved(id, saveSavedQueryDto)
+
+Rename a saved query or save new SQL under it
+
+### Example
+
+```ts
+import {
+  Configuration,
+  DataQueryApi,
+} from '@workspace/api-client';
+import type { DataQueryControllerUpdateSavedRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new DataQueryApi();
+
+  const body = {
+    // string
+    id: id_example,
+    // SaveSavedQueryDto
+    saveSavedQueryDto: ...,
+  } satisfies DataQueryControllerUpdateSavedRequest;
+
+  try {
+    const data = await api.dataQueryControllerUpdateSaved(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+| **saveSavedQueryDto** | [SaveSavedQueryDto](SaveSavedQueryDto.md) |  | |
+
+### Return type
+
+[**SavedQueryDto**](SavedQueryDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
 
 
 ### HTTP response details

@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma.service';
 import { DataQueryController } from './data-query.controller';
 import { QueryCatalogService } from './query-catalog.service';
 import { QueryRunService } from './query-run.service';
+import { SavedQueriesService } from './saved-queries.service';
 
 /** SQL over the tables of a workspace (docs/prd/DQ-data-query.md). */
 @Module({
@@ -15,7 +16,8 @@ import { QueryRunService } from './query-run.service';
     MaskedConfigCryptoService,
     QueryCatalogService,
     QueryRunService,
+    SavedQueriesService,
   ],
-  exports: [QueryCatalogService, QueryRunService],
+  exports: [QueryCatalogService, QueryRunService, SavedQueriesService],
 })
 export class DataQueryModule {}

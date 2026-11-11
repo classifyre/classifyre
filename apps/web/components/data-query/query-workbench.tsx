@@ -1,30 +1,15 @@
 "use client";
 
 import * as React from "react";
-import {
-  AlertCircle,
-  Download,
-  Loader2,
-  Play,
-  Square,
-  WandSparkles,
-} from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@workspace/ui/components/dropdown-menu";
+import { AlertCircle } from "lucide-react";
 import { toast } from "sonner";
-import { useCan } from "@/hooks/use-me";
 import { Button } from "@workspace/ui/components/button";
-import { Badge } from "@workspace/ui/components/badge";
 import { useTranslation } from "@/hooks/use-translation";
 import {
   apiErrorMessage,
   cancelQuery,
+  createSavedQuery,
   downloadExport,
-  type ExportFormat,
   fetchRows,
   runErrorMessage,
   startQuery,
@@ -33,35 +18,22 @@ import {
   type QueryRows,
   type QueryRun,
 } from "@/lib/data-query";
-import type { TranslationKey } from "@/i18n";
 import { SqlEditor } from "./sql-editor";
+import { QueryToolbar } from "./query-toolbar";
 import { ResultsGrid } from "./results-grid";
+import { SaveQueryDialog } from "./save-query-dialog";
 
 export interface QueryWorkbenchHandle {
-  /** Put text at the end of the query (a table name from the catalog). */
+  /** Insert at the cursor — the explorer writes through the editor itself. */
   insert: (text: string) => void;
   setSql: (sql: string) => void;
 }
 
-const STATUS_TONE: Record<
-  string,
-  "default" | "secondary" | "destructive" | "outline"
-> = {
-  PENDING: "outline",
-  RUNNING: "secondary",
-  SUCCESS: "default",
-  ERROR: "destructive",
-  TIMEOUT: "destructive",
-  CANCELLED: "outline",
-};
-
-function seconds(ms: number | undefined): string {
-  return ms === undefined ? "–" : (ms / 1000).toFixed(ms < 10_000 ? 2 : 1);
-}
-
 /**
- * One SQL editor and its result. Used by the SQL page (with the catalog
- * beside it) and by an asset's Data tab (prefilled with that table).
+ * One SQL editor and its result. The editor is the workbench: Run sits
+ * beside it in a toolbar (Format, Save, Export alongside), the result below.
+ * The SQL page puts the explorer beside it; an asset's Data tab pre-fills
+ * that table.
  *
  * React 19: `ref` arrives as a prop, not via `forwardRef`.
  */
@@ -73,6 +45,7 @@ export function QueryWorkbench({
   resultHeight = 440,
   disabled = false,
   onRunFinished,
+  onSaved,
   ref,
 }: {
   catalog: QueryCatalog | null;
@@ -82,37 +55,47 @@ export function QueryWorkbench({
   resultHeight?: number;
   disabled?: boolean;
   onRunFinished?: (run: QueryRun) => void;
+  onSaved?: () => void;
   ref?: React.Ref<QueryWorkbenchHandle>;
 }) {
   const { t } = useTranslation();
   const [sql, setSql] = React.useState(initialSql);
+  // `setSql` from outside (history, saved, open-in-SQL) goes through here so
+  // the editor's own undo stack records it like a typed edit — Ctrl/Cmd+Z
+  // steps back through reopened queries, not just keystrokes.
+  const setActiveEditorSql = React.useCallback(
+    (next: string) => {
+      (SqlEditor as { replaceAll?: (text: string) => void }).replaceAll?.(
+        next,
+      ) ?? setSql(next);
+    },
+    [],
+  );
   const [run, setRun] = React.useState<QueryRun | null>(null);
   const [rows, setRows] = React.useState<QueryRows | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
   const [elapsed, setElapsed] = React.useState(0);
-  const [exporting, setExporting] = React.useState<ExportFormat | null>(null);
-  const canExport = useCan("data.export");
+  const [saveOpen, setSaveOpen] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
   const abortRef = React.useRef<AbortController | null>(null);
   const startedRef = React.useRef(0);
 
-  React.useImperativeHandle(ref, () => ({
-    insert: (text) =>
-      setSql((current) => {
-        if (!current.trim()) return text;
-        // A catalog click appends a table name: replace a trailing `LIMIT n`
-        // (the starter every editor ships with) instead of appending after
-        // it — `LIMIT 100 my.table` is not valid SQL, whatever separates the
-        // two. A trailing comma keeps its list (`SELECT a,` + table); anything
-        // else starts a new line so the name lands where a table belongs.
-        const stripped = current.replace(/\s+$/, "");
-        const withoutLimit = stripped.replace(/\s+LIMIT\s+\d+\s*$/i, "");
-        if (withoutLimit !== stripped) return `${withoutLimit}\n${text}`;
-        const separator = stripped.endsWith(",") ? " " : "\n";
-        return `${stripped}${separator}${text}`;
-      }),
-    setSql,
-  }));
+  // The explorer beside the editor inserts at the cursor through the
+  // editor's own context; this imperative escape stays for "open in SQL"
+  // and pages that set SQL from outside. Everything funnels into the
+  // editor model, so undo (Ctrl/Cmd+Z) treats it like a typed edit.
+  React.useImperativeHandle(
+    ref,
+    () => ({
+      insert: (text) =>
+        setSql((current) =>
+          current.trim() ? `${current.trimEnd()}\n${text}` : text,
+        ),
+      setSql: setActiveEditorSql,
+    }),
+    [setActiveEditorSql],
+  );
 
   React.useEffect(() => () => abortRef.current?.abort(), []);
 
@@ -125,35 +108,40 @@ export function QueryWorkbench({
     return () => clearInterval(timer);
   }, [busy]);
 
-  const execute = React.useCallback(async () => {
-    if (busy || disabled || !sql.trim()) return;
-    abortRef.current?.abort();
-    const controller = new AbortController();
-    abortRef.current = controller;
-    setBusy(true);
-    setError(null);
-    setRows(null);
-    startedRef.current = Date.now();
-    setElapsed(0);
-    try {
-      const created = await startQuery(sql);
-      setRun(created);
-      const finished = await waitForRun(created.id, setRun, controller.signal);
-      if (finished.status === "SUCCESS") {
-        setRows(await fetchRows(finished));
-      } else {
-        setError(runErrorMessage(finished));
+  const execute = React.useCallback(
+    async (text?: string) => {
+      const statement = (text ?? sql).trim();
+      if (busy || disabled || !statement) return;
+      if (text !== undefined && text !== sql) setSql(text);
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      setBusy(true);
+      setError(null);
+      setRows(null);
+      startedRef.current = Date.now();
+      setElapsed(0);
+      try {
+        const created = await startQuery(statement);
+        setRun(created);
+        const finished = await waitForRun(created.id, setRun, controller.signal);
+        if (finished.status === "SUCCESS") {
+          setRows(await fetchRows(finished));
+        } else {
+          setError(runErrorMessage(finished));
+        }
+        onRunFinished?.(finished);
+      } catch (caught) {
+        if ((caught as Error)?.name !== "AbortError") {
+          setError(await apiErrorMessage(caught));
+        }
+      } finally {
+        setElapsed(Date.now() - startedRef.current);
+        setBusy(false);
       }
-      onRunFinished?.(finished);
-    } catch (caught) {
-      if ((caught as Error)?.name !== "AbortError") {
-        setError(await apiErrorMessage(caught));
-      }
-    } finally {
-      setElapsed(Date.now() - startedRef.current);
-      setBusy(false);
-    }
-  }, [busy, disabled, sql, onRunFinished]);
+    },
+    [busy, disabled, sql, onRunFinished],
+  );
 
   const stop = React.useCallback(async () => {
     if (!run) return;
@@ -167,12 +155,12 @@ export function QueryWorkbench({
 
   /**
    * The whole result as a file, not just the rows on screen: a job of its
-   * own, up to the workspace's export row limit (Excel: 1,048,575).
+   * own, up to the workspace's export row limit (Excel: 1,048,575). Lives
+   * beside the grid's search — it downloads what the grid shows.
    */
   const exportAs = React.useCallback(
-    async (fileFormat: ExportFormat) => {
-      if (exporting || disabled || !sql.trim()) return;
-      setExporting(fileFormat);
+    async (fileFormat: "xlsx" | "csv" | "parquet") => {
+      if (disabled || !sql.trim()) return;
       try {
         const created = await startQuery(sql, fileFormat);
         const finished = await waitForRun(created.id, () => undefined);
@@ -192,11 +180,9 @@ export function QueryWorkbench({
         );
       } catch (caught) {
         toast.error(await apiErrorMessage(caught));
-      } finally {
-        setExporting(null);
       }
     },
-    [exporting, disabled, sql, t],
+    [disabled, sql, t],
   );
 
   const format = React.useCallback(async () => {
@@ -208,7 +194,32 @@ export function QueryWorkbench({
     }
   }, [sql]);
 
-  const timings = run?.timings ?? undefined;
+  const save = React.useCallback(
+    async (name: string) => {
+      if (saving || disabled || !sql.trim()) return;
+      setSaving(true);
+      try {
+        await createSavedQuery(name, sql);
+        setSaveOpen(false);
+        onSaved?.();
+        toast.success(t("dataQuery.explorer.saved"));
+      } catch (caught) {
+        toast.error(await apiErrorMessage(caught));
+      } finally {
+        setSaving(false);
+      }
+    },
+    [saving, disabled, sql, onSaved, t],
+  );
+
+  /**
+   * History reopens the SQL only — never the rows. Results can be huge and
+   * they expire after a day; the query itself is what the person wants back.
+   * They press Run again when they want fresh rows.
+   */
+  const runSql = React.useCallback((next: QueryRun) => {
+    setActiveEditorSql(next.sql);
+  }, []);
 
   return (
     <div className="space-y-3">
@@ -216,102 +227,22 @@ export function QueryWorkbench({
         value={sql}
         onChange={setSql}
         onRun={() => void execute()}
+        onFormat={() => void format()}
         catalog={catalog}
         height={editorHeight}
         path={editorPath}
       />
-      <div className="flex flex-wrap items-center gap-2">
-        {busy ? (
-          <Button size="sm" variant="secondary" onClick={() => void stop()}>
-            <Square className="mr-1.5 h-3.5 w-3.5" />
-            {t("dataQuery.cancel")}
-          </Button>
-        ) : (
-          <Button
-            size="sm"
-            onClick={() => void execute()}
-            disabled={disabled || !sql.trim()}
-            data-testid="run-query"
-          >
-            <Play className="mr-1.5 h-3.5 w-3.5" />
-            {t("dataQuery.run")}
-          </Button>
-        )}
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={() => void format()}
-          disabled={!sql.trim()}
-        >
-          <WandSparkles className="mr-1.5 h-3.5 w-3.5" />
-          {t("dataQuery.format")}
-        </Button>
-        {canExport && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={disabled || !sql.trim() || exporting !== null}
-                data-testid="export-query"
-              >
-                {exporting ? (
-                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Download className="mr-1.5 h-3.5 w-3.5" />
-                )}
-                {exporting
-                  ? t("dataQuery.export.running")
-                  : t("dataQuery.export.button")}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              <DropdownMenuItem
-                data-testid="export-xlsx"
-                onSelect={() => void exportAs("xlsx")}
-              >
-                {t("dataQuery.export.xlsx")}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                data-testid="export-csv"
-                onSelect={() => void exportAs("csv")}
-              >
-                {t("dataQuery.export.csv")}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                data-testid="export-parquet"
-                onSelect={() => void exportAs("parquet")}
-              >
-                {t("dataQuery.export.parquet")}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-        <span className="text-xs text-muted-foreground">
-          {t("dataQuery.shortcut")}
-        </span>
-        <div className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
-          {run && (
-            <Badge variant={STATUS_TONE[run.status] ?? "outline"}>
-              {busy && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
-              {t(`dataQuery.status.${run.status}` as TranslationKey)}
-            </Badge>
-          )}
-          {(busy || run) && (
-            <span data-testid="query-elapsed">
-              {t("dataQuery.elapsed", { seconds: seconds(elapsed) })}
-            </span>
-          )}
-          {timings?.totalMs !== undefined && !busy && (
-            <span>
-              {t("dataQuery.timings", {
-                setup: seconds(timings.setupMs),
-                query: seconds(timings.executeMs),
-              })}
-            </span>
-          )}
-        </div>
-      </div>
+      <QueryToolbar
+        busy={busy}
+        canRun={!disabled && Boolean(sql.trim())}
+        run={run}
+        elapsed={elapsed}
+        disabled={disabled}
+        onRun={() => void execute()}
+        onStop={() => void stop()}
+        onFormat={() => void format()}
+        onSave={() => setSaveOpen(true)}
+      />
 
       {error && (
         <div
@@ -332,23 +263,20 @@ export function QueryWorkbench({
 
       {rows && (
         <div className="space-y-2">
-          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-            <span data-testid="query-row-count">
-              {t("dataQuery.rows", { count: rows.rows.length })}
-            </span>
-            <span>
-              {t("dataQuery.columns", { count: rows.columns.length })}
-            </span>
-            {run?.truncated && (
-              <span className="text-amber-600 dark:text-amber-400">
-                {run.truncatedReason === "bytes"
-                  ? t("dataQuery.truncatedBytes", { count: rows.rows.length })
-                  : t("dataQuery.truncatedRows", { count: rows.rows.length })}
-              </span>
-            )}
-          </div>
+          {run?.truncated && (
+            <p className="text-xs text-amber-600 dark:text-amber-400">
+              {run.truncatedReason === "bytes"
+                ? t("dataQuery.truncatedBytes", { count: rows.rows.length })
+                : t("dataQuery.truncatedRows", { count: rows.rows.length })}
+            </p>
+          )}
           {rows.rows.length ? (
-            <ResultsGrid result={rows} height={resultHeight} />
+            <ResultsGrid
+              result={rows}
+              height={resultHeight}
+              canExport
+              onExport={(fileFormat) => void exportAs(fileFormat)}
+            />
           ) : (
             <div className="rounded-md border p-6 text-center text-sm text-muted-foreground">
               {t("dataQuery.emptyResult")}
@@ -362,6 +290,38 @@ export function QueryWorkbench({
           {t("dataQuery.noResult")}
         </div>
       )}
+
+      <SaveQueryDialog
+        open={saveOpen}
+        defaultName={sql.split("\n")[0]?.slice(0, 60) ?? ""}
+        busy={saving}
+        onClose={() => setSaveOpen(false)}
+        onSave={(name) => void save(name)}
+      />
+
+      <RunLoader runSql={runSql} />
     </div>
   );
+}
+
+/**
+ * Lets the page ask the workbench to show a run (from history) without
+ * threading callbacks: the page sets `QueryWorkbench.showRun`, the loader
+ * below picks it up. Kept deliberately tiny — a full store would be
+ * over-engineering for one editor.
+ */
+function RunLoader({ runSql }: { runSql: (run: QueryRun) => void }) {
+  const ref = React.useRef(runSql);
+  ref.current = runSql;
+  React.useEffect(() => {
+    (QueryWorkbench as { showRun?: (run: QueryRun) => void }).showRun = (
+      run: QueryRun,
+    ) => ref.current(run);
+  }, []);
+  return null;
+}
+
+export namespace QueryWorkbench {
+  /** Show a past run's SQL and rows in the workbench (from history). */
+  export let showRun: ((run: QueryRun) => void) | undefined;
 }

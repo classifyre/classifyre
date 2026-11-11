@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsString, MaxLength } from 'class-validator';
 
 export class QueryColumnDto {
   @ApiProperty()
@@ -149,6 +150,35 @@ export class QueryRunErrorDto {
 
   @ApiProperty()
   message: string;
+}
+
+export class SavedQueryDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty({ maxLength: 120 })
+  name!: string;
+
+  @ApiProperty({ description: 'One SELECT over tables named `<source>.<schema>.<table>`.' })
+  sql!: string;
+
+  @ApiProperty({ type: String, format: 'date-time' })
+  createdAt!: Date;
+
+  @ApiProperty({ type: String, format: 'date-time' })
+  updatedAt!: Date;
+}
+
+export class SaveSavedQueryDto {
+  @ApiProperty({ maxLength: 120, description: 'The name shown in Scripts.' })
+  @IsString()
+  @MaxLength(120)
+  name!: string;
+
+  @ApiProperty({ description: 'One SELECT over tables named `<source>.<schema>.<table>`.' })
+  @IsString()
+  @MaxLength(100_000)
+  sql!: string;
 }
 
 export class QueryRunDto {

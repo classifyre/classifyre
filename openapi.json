@@ -11969,6 +11969,153 @@
         ]
       }
     },
+    "/saved-queries": {
+      "get": {
+        "operationId": "DataQueryController_listSaved",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SavedQueryDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Your saved SQL in this workspace",
+        "tags": [
+          "Data query"
+        ]
+      },
+      "post": {
+        "operationId": "DataQueryController_createSaved",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveSavedQueryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedQueryDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Save SQL under a name",
+        "tags": [
+          "Data query"
+        ]
+      }
+    },
+    "/saved-queries/{id}": {
+      "get": {
+        "operationId": "DataQueryController_getSaved",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedQueryDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "One of your saved queries",
+        "tags": [
+          "Data query"
+        ]
+      },
+      "patch": {
+        "operationId": "DataQueryController_updateSaved",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveSavedQueryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedQueryDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Rename a saved query or save new SQL under it",
+        "tags": [
+          "Data query"
+        ]
+      },
+      "delete": {
+        "operationId": "DataQueryController_removeSaved",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Delete a saved query",
+        "tags": [
+          "Data query"
+        ]
+      }
+    },
     "/data-query/catalog": {
       "get": {
         "operationId": "DataQueryController_getCatalog",
@@ -35494,6 +35641,55 @@
         "required": [
           "revision",
           "mode"
+        ]
+      },
+      "SavedQueryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "sql": {
+            "type": "string",
+            "description": "One SELECT over tables named `<source>.<schema>.<table>`."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "sql",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "SaveSavedQueryDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "description": "The name shown in Scripts."
+          },
+          "sql": {
+            "type": "string",
+            "description": "One SELECT over tables named `<source>.<schema>.<table>`."
+          }
+        },
+        "required": [
+          "name",
+          "sql"
         ]
       },
       "QueryLimitsDto": {

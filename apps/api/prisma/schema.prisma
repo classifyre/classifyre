@@ -204,6 +204,20 @@ enum QueryRunStatus {
   CANCELLED
 }
 
+/// A person's saved SQL over the tables of this workspace, kept per user by
+/// IAM actor reference (like query runs): nobody ever sees another's.
+model SavedQuery {
+  id        String   @id @default(uuid())
+  name      String
+  sql       String   @db.Text
+  actorRef  String?  @map("actor_ref")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([actorRef, updatedAt(sort: Desc)])
+  @@map("saved_queries")
+}
+
 /// The SQL limits of this workspace (grants decide who may query; R8).
 /// One row (`id = 'default'`).
 model DataQuerySettings {

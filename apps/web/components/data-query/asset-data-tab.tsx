@@ -45,7 +45,10 @@ export function AssetDataTab({
               {table.sqlName}
             </code>
             <Button asChild size="sm" variant="ghost" className="ml-auto">
-              <Link href={`${nsHref("/query")}?sql=${encodeURIComponent(sql)}`}>
+              <Link
+                href={`${nsHref("/query")}?sql=${encodeURIComponent(sql)}`}
+                title={t("dataQuery.openInQueryHint")}
+              >
                 <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
                 {t("dataQuery.openInQuery")}
               </Link>

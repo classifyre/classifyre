@@ -382,6 +382,8 @@ export type {
   QueryColumnDto,
   QueryRunDto,
   QueryRunErrorDto,
+  SavedQueryDto,
+  SaveSavedQueryDto,
   DataQuerySettingsDto,
   UpdateDataQuerySettingsDto,
   RoleDto,

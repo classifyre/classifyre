@@ -239,12 +239,17 @@ All URIs are relative to *http://localhost*
 *CustomDetectorsApi* | [**customDetectorsControllerUploadFile**](docs/CustomDetectorsApi.md#customdetectorscontrolleruploadfile) | **POST** /custom-detectors/{id}/files | Upload one file to a code detector
 *DataQueryApi* | [**dataQueryControllerCancel**](docs/DataQueryApi.md#dataquerycontrollercancel) | **POST** /query-runs/{id}/cancel | Stop one of your queries
 *DataQueryApi* | [**dataQueryControllerCreate**](docs/DataQueryApi.md#dataquerycontrollercreate) | **POST** /query-runs | Run one SELECT; poll the run for its status
+*DataQueryApi* | [**dataQueryControllerCreateSaved**](docs/DataQueryApi.md#dataquerycontrollercreatesaved) | **POST** /saved-queries | Save SQL under a name
 *DataQueryApi* | [**dataQueryControllerGet**](docs/DataQueryApi.md#dataquerycontrollerget) | **GET** /query-runs/{id} | One of your queries
 *DataQueryApi* | [**dataQueryControllerGetCatalog**](docs/DataQueryApi.md#dataquerycontrollergetcatalog) | **GET** /data-query/catalog | The tables you can query with SQL, and those you could with access
+*DataQueryApi* | [**dataQueryControllerGetSaved**](docs/DataQueryApi.md#dataquerycontrollergetsaved) | **GET** /saved-queries/{id} | One of your saved queries
 *DataQueryApi* | [**dataQueryControllerGetSettings**](docs/DataQueryApi.md#dataquerycontrollergetsettings) | **GET** /data-query/settings | The SQL limits of this workspace
 *DataQueryApi* | [**dataQueryControllerList**](docs/DataQueryApi.md#dataquerycontrollerlist) | **GET** /query-runs | Your recent queries in this workspace
+*DataQueryApi* | [**dataQueryControllerListSaved**](docs/DataQueryApi.md#dataquerycontrollerlistsaved) | **GET** /saved-queries | Your saved SQL in this workspace
 *DataQueryApi* | [**dataQueryControllerReceive**](docs/DataQueryApi.md#dataquerycontrollerreceive) | **POST** /query-runs/{id}/result | Internal: a query job posts its result here
+*DataQueryApi* | [**dataQueryControllerRemoveSaved**](docs/DataQueryApi.md#dataquerycontrollerremovesaved) | **DELETE** /saved-queries/{id} | Delete a saved query
 *DataQueryApi* | [**dataQueryControllerResult**](docs/DataQueryApi.md#dataquerycontrollerresult) | **GET** /query-runs/{id}/result | The rows of a finished query (Arrow IPC stream), or its exported file
+*DataQueryApi* | [**dataQueryControllerUpdateSaved**](docs/DataQueryApi.md#dataquerycontrollerupdatesaved) | **PATCH** /saved-queries/{id} | Rename a saved query or save new SQL under it
 *DataQueryApi* | [**dataQueryControllerUpdateSettings**](docs/DataQueryApi.md#dataquerycontrollerupdatesettings) | **PUT** /data-query/settings | Set the limits of SQL queries in this workspace
 *DataTransferApi* | [**dataTransferControllerCancel**](docs/DataTransferApi.md#datatransfercontrollercancel) | **POST** /data-transfer/jobs/{id}/cancel | Ask a running transfer to stop
 *DataTransferApi* | [**dataTransferControllerDownload**](docs/DataTransferApi.md#datatransfercontrollerdownload) | **GET** /data-transfer/exports/{id}/download | Download a completed export archive
@@ -953,7 +958,9 @@ All URIs are relative to *http://localhost*
 - [RunnersChartsTopSourceDto](docs/RunnersChartsTopSourceDto.md)
 - [RunnersChartsTotalsDto](docs/RunnersChartsTotalsDto.md)
 - [SaveExploreViewDto](docs/SaveExploreViewDto.md)
+- [SaveSavedQueryDto](docs/SaveSavedQueryDto.md)
 - [SaveTrainingExamplesDto](docs/SaveTrainingExamplesDto.md)
+- [SavedQueryDto](docs/SavedQueryDto.md)
 - [ScanCacheEntryDto](docs/ScanCacheEntryDto.md)
 - [SearchAssetFindingDto](docs/SearchAssetFindingDto.md)
 - [SearchAssetItemDto](docs/SearchAssetItemDto.md)
