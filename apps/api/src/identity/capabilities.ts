@@ -59,11 +59,6 @@ export const CAPABILITIES = [
     description: 'Delete the workspace.',
   },
   {
-    id: 'workspace.transfer',
-    scope: 'workspace',
-    description: 'Export, import or copy workspace data.',
-  },
-  {
     id: 'notification.view',
     scope: 'workspace',
     description:

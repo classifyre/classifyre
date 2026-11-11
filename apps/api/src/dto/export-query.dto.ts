@@ -177,25 +177,6 @@ export class ExportAssetsQueryDto {
   includeAssetsWithoutFindings?: boolean = false;
 }
 
-export class LiveQueryResponseDto {
-  @ApiProperty({
-    description:
-      'Page of result rows. Each row is a flat object keyed by column name.',
-    type: 'array',
-    items: { type: 'object', additionalProperties: true },
-  })
-  items!: Record<string, unknown>[];
-
-  @ApiProperty({
-    description:
-      'Opaque cursor for the next page, or null when this is the last page. ' +
-      'Pass it back as the `cursor` query param to fetch the next page.',
-    type: String,
-    nullable: true,
-  })
-  nextCursor!: string | null;
-}
-
 export class ExportRunnerAssetsQueryDto {
   @ApiPropertyOptional()
   @IsOptional()

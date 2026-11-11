@@ -1025,10 +1025,6 @@ spec:
               value: "10GiB"
             - name: K8S_CLI_QUERY_JOB_PRIORITY_CLASS
               value: "classifyre-interactive"
-            - name: DATA_TRANSFER_TTL_MINUTES
-              value: "60"
-            - name: DATA_TRANSFER_MAX_MB
-              value: "0"
             - name: S3_CONFIGURED
               value: "false"
             - name: TELEMETRY_DISABLED
@@ -1563,10 +1559,6 @@ spec:
               value: "10GiB"
             - name: K8S_CLI_QUERY_JOB_PRIORITY_CLASS
               value: "classifyre-interactive"
-            - name: DATA_TRANSFER_TTL_MINUTES
-              value: "60"
-            - name: DATA_TRANSFER_MAX_MB
-              value: "0"
             - name: S3_CONFIGURED
               value: "false"
             - name: TELEMETRY_DISABLED

@@ -65,13 +65,10 @@ python3 showcases/nova-manufacturing/harness.py machines -v
 
 ## Shipping it to showcase.classifyre.com
 
-The namespace is defined by configuration plus self-contained data, so there are two ways to move it:
+The namespace is defined by configuration plus self-contained data, so it moves by rebuilding:
 
-1. **Rebuild** on the target (what the Firmenbuch showcase does): point `API_BASE` at the server, create the namespace, run
+**Rebuild** on the target (what the Firmenbuch showcase does): point `API_BASE` at the server, create the namespace, run
    `build/run.py all --yes` then `build/run.py investigations`. No credentials or external systems are involved.
-2. **Import an archive**: `dump_files/nova-manufacturing-showcase-2026-10-04.cfyre` (git-ignored) holds sources with their uploaded files,
-   assets, findings, detectors, glossary and investigations. Import it with the *Data transfer* screen or
-   `POST /data-transfer/imports`.
 
 Notes for the target instance:
 

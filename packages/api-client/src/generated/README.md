@@ -78,8 +78,6 @@ All URIs are relative to *http://localhost*
 *AssetsApi* | [**assetsControllerGetReferencingFindings**](docs/AssetsApi.md#assetscontrollergetreferencingfindings) | **GET** /assets/{id}/referencing-findings | Findings recorded on assets that point at this one
 *AssetsApi* | [**searchAssetsControllerExportAssets**](docs/AssetsApi.md#searchassetscontrollerexportassets) | **GET** /search/assets/export | Export assets (with findings) as CSV
 *AssetsApi* | [**searchAssetsControllerExportFindings**](docs/AssetsApi.md#searchassetscontrollerexportfindings) | **GET** /search/findings/export | Export findings as CSV
-*AssetsApi* | [**searchAssetsControllerQueryAssets**](docs/AssetsApi.md#searchassetscontrollerqueryassets) | **GET** /search/assets/query | Query assets with findings (cursor-paginated JSON)
-*AssetsApi* | [**searchAssetsControllerQueryFindings**](docs/AssetsApi.md#searchassetscontrollerqueryfindings) | **GET** /search/findings/query | Query findings (cursor-paginated JSON)
 *AssetsApi* | [**searchAssetsControllerQuickSearch**](docs/AssetsApi.md#searchassetscontrollerquicksearch) | **POST** /search/quick | Search as you type
 *AssetsApi* | [**searchAssetsControllerSearchAssets**](docs/AssetsApi.md#searchassetscontrollersearchassets) | **POST** /search/assets | Search assets with findings
 *AssetsApi* | [**searchAssetsControllerSearchAssetsCharts**](docs/AssetsApi.md#searchassetscontrollersearchassetscharts) | **POST** /search/assets/charts | Search assets charts overview
@@ -251,15 +249,6 @@ All URIs are relative to *http://localhost*
 *DataQueryApi* | [**dataQueryControllerResult**](docs/DataQueryApi.md#dataquerycontrollerresult) | **GET** /query-runs/{id}/result | The rows of a finished query (Arrow IPC stream), or its exported file
 *DataQueryApi* | [**dataQueryControllerUpdateSaved**](docs/DataQueryApi.md#dataquerycontrollerupdatesaved) | **PATCH** /saved-queries/{id} | Rename a saved query or save new SQL under it
 *DataQueryApi* | [**dataQueryControllerUpdateSettings**](docs/DataQueryApi.md#dataquerycontrollerupdatesettings) | **PUT** /data-query/settings | Set the limits of SQL queries in this workspace
-*DataTransferApi* | [**dataTransferControllerCancel**](docs/DataTransferApi.md#datatransfercontrollercancel) | **POST** /data-transfer/jobs/{id}/cancel | Ask a running transfer to stop
-*DataTransferApi* | [**dataTransferControllerDownload**](docs/DataTransferApi.md#datatransfercontrollerdownload) | **GET** /data-transfer/exports/{id}/download | Download a completed export archive
-*DataTransferApi* | [**dataTransferControllerJob**](docs/DataTransferApi.md#datatransfercontrollerjob) | **GET** /data-transfer/jobs/{id} | Poll one transfer job for progress
-*DataTransferApi* | [**dataTransferControllerJobs**](docs/DataTransferApi.md#datatransfercontrollerjobs) | **GET** /data-transfer/jobs | List recent export and import jobs
-*DataTransferApi* | [**dataTransferControllerRemove**](docs/DataTransferApi.md#datatransfercontrollerremove) | **DELETE** /data-transfer/jobs/{id} | Delete a finished job and its archive
-*DataTransferApi* | [**dataTransferControllerScopes**](docs/DataTransferApi.md#datatransfercontrollerscopes) | **GET** /data-transfer/scopes | List the kinds of data that can be exported, with row counts
-*DataTransferApi* | [**dataTransferControllerStartExport**](docs/DataTransferApi.md#datatransfercontrollerstartexport) | **POST** /data-transfer/exports | Start an export of the selected scopes
-*DataTransferApi* | [**dataTransferControllerStartImport**](docs/DataTransferApi.md#datatransfercontrollerstartimport) | **POST** /data-transfer/imports | Import selected scopes from an uploaded archive
-*DataTransferApi* | [**dataTransferControllerUpload**](docs/DataTransferApi.md#datatransfercontrollerupload) | **POST** /data-transfer/imports/upload | Upload an archive and read its manifest without importing it
 *EmbeddingsApi* | [**embeddingControllerBoilerplate**](docs/EmbeddingsApi.md#embeddingcontrollerboilerplate) | **GET** /sources/{sourceId}/boilerplate-clusters | Near-duplicate finding clusters in a source (repeated boilerplate)
 *EmbeddingsApi* | [**embeddingControllerBoilerplateGlobal**](docs/EmbeddingsApi.md#embeddingcontrollerboilerplateglobal) | **GET** /embeddings/boilerplate-clusters | Near-duplicate finding clusters across the corpus, optionally filtered to specific sources
 *EmbeddingsApi* | [**embeddingControllerChunks**](docs/EmbeddingsApi.md#embeddingcontrollerchunks) | **POST** /sources/{sourceId}/embeddings/chunks | Store asset chunk-to-content mappings
@@ -380,7 +369,7 @@ All URIs are relative to *http://localhost*
 *MaintenanceApi* | [**maintenanceControllerListFeatures**](docs/MaintenanceApi.md#maintenancecontrollerlistfeatures) | **GET** /maintenance/features | Workspace feature switches (embeddings, duplicate detection): state, how each was turned off, the data each owns and the queues held while off
 *MaintenanceApi* | [**maintenanceControllerOverview**](docs/MaintenanceApi.md#maintenancecontrolleroverview) | **GET** /maintenance/overview | Workspace storage overview: per-table row estimates and byte sizes, grouped into protected and cleanable datasets
 *MaintenanceApi* | [**maintenanceControllerSetFeature**](docs/MaintenanceApi.md#maintenancecontrollersetfeature) | **PUT** /maintenance/features/{key} | Turn a workspace feature on or off. Off holds its worker queues paused (every replica stops; the Workers tab cannot resume them) and either keeps its data (a pause — turning back on catches up) or, with deleteData, wipes it in the background (poll GET cleanup/runs/:runId). On resumes the queues and catches up: one full duplicate recompute, or an embedding backfill. Body: { enabled: boolean, deleteData?: boolean }. Allowed while the workspace is paused.
-*MaintenanceApi* | [**maintenanceControllerStartCleanup**](docs/MaintenanceApi.md#maintenancecontrollerstartcleanup) | **POST** /maintenance/cleanup/{key} | Start wiping one cleanable dataset in the background (scan history, duplicates, embeddings, harness runs, finished queue jobs, derived stats/graph, finished transfers). Protected data is never accepted here. Poll GET cleanup/runs/:runId for progress. Deliberately allowed while paused: freezing the workers first is the recommended quiet window (pause, clean, resume), since no writer can race the wipe.
+*MaintenanceApi* | [**maintenanceControllerStartCleanup**](docs/MaintenanceApi.md#maintenancecontrollerstartcleanup) | **POST** /maintenance/cleanup/{key} | Start wiping one cleanable dataset in the background (scan history, duplicates, embeddings, harness runs, finished queue jobs, derived stats/graph). Protected data is never accepted here. Poll GET cleanup/runs/:runId for progress. Deliberately allowed while paused: freezing the workers first is the recommended quiet window (pause, clean, resume), since no writer can race the wipe.
 *NamespacesApi* | [**namespacesControllerCreate**](docs/NamespacesApi.md#namespacescontrollercreate) | **POST** /namespaces | Create a namespace (provisions its Postgres schema + migrations)
 *NamespacesApi* | [**namespacesControllerCreateCategory**](docs/NamespacesApi.md#namespacescontrollercreatecategory) | **POST** /namespaces/categories | Create a workspace category
 *NamespacesApi* | [**namespacesControllerGet**](docs/NamespacesApi.md#namespacescontrollerget) | **GET** /namespaces/{id} | Get a namespace by id
@@ -440,7 +429,6 @@ All URIs are relative to *http://localhost*
 *RunnersApi* | [**cliRunnerControllerUpdateRunnerAssetStatuses**](docs/RunnersApi.md#clirunnercontrollerupdaterunnerassetstatuses) | **PATCH** /runners/{runnerId}/assets/status | Update processing status of runner assets
 *RunnersApi* | [**cliRunnerControllerUpdateRunnerStatus**](docs/RunnersApi.md#clirunnercontrollerupdaterunnerstatusoperation) | **PATCH** /runners/{runnerId}/status | Update runner status
 *RunnersApi* | [**searchRunnersControllerExportRunnerAssets**](docs/RunnersApi.md#searchrunnerscontrollerexportrunnerassets) | **GET** /search/runner-assets/export | Export runner assets as CSV
-*RunnersApi* | [**searchRunnersControllerQueryRunnerAssets**](docs/RunnersApi.md#searchrunnerscontrollerqueryrunnerassets) | **GET** /search/runner-assets/query | Query runner assets (cursor-paginated JSON)
 *RunnersApi* | [**searchRunnersControllerSearchRunnerAssets**](docs/RunnersApi.md#searchrunnerscontrollersearchrunnerassets) | **POST** /search/runner-assets | Search runner assets
 *RunnersApi* | [**searchRunnersControllerSearchRunners**](docs/RunnersApi.md#searchrunnerscontrollersearchrunners) | **POST** /search/runners | Search runners
 *RunnersApi* | [**searchRunnersControllerSearchRunnersCharts**](docs/RunnersApi.md#searchrunnerscontrollersearchrunnerscharts) | **POST** /search/runners/charts | Runners charts overview
@@ -482,6 +470,8 @@ All URIs are relative to *http://localhost*
 *SemanticApi* | [**semanticControllerVocabularyList**](docs/SemanticApi.md#semanticcontrollervocabularylist) | **GET** /semantic/vocabulary | The observed vocabulary: detector outputs and metadata fields, with counts and bindings
 *SemanticApi* | [**semanticControllerVocabularyRefresh**](docs/SemanticApi.md#semanticcontrollervocabularyrefresh) | **POST** /semantic/vocabulary/refresh | Queue a vocabulary refresh (one source, or all)
 *SemanticApi* | [**semanticControllerVocabularyValues**](docs/SemanticApi.md#semanticcontrollervocabularyvalues) | **GET** /semantic/vocabulary/values | Top observed values with counts, for the binding dialog
+*SettingsApi* | [**deploymentSettingsControllerGet**](docs/SettingsApi.md#deploymentsettingscontrollerget) | **GET** /runner-limits | Scan limits of this deployment: what is saved in Settings and what the chart or image sets
+*SettingsApi* | [**deploymentSettingsControllerUpdate**](docs/SettingsApi.md#deploymentsettingscontrollerupdate) | **PUT** /runner-limits | Set scan limits for the whole deployment; null hands a limit back to the chart or image
 *SitemapApi* | [**sitemapControllerGetEntries**](docs/SitemapApi.md#sitemapcontrollergetentries) | **GET** /sitemap/entries | One chunk of detail-page ids + last-modified dates
 *SitemapApi* | [**sitemapControllerGetIndex**](docs/SitemapApi.md#sitemapcontrollergetindex) | **GET** /sitemap | Sitemap index: per-entity chunk counts and last-modified dates
 *SourcesApi* | [**cohortControllerPreview**](docs/SourcesApi.md#cohortcontrollerpreview) | **GET** /sources/{id}/cohort-weights | Preview the band split of a source\&#39;s cohorts for its next run
@@ -559,7 +549,6 @@ All URIs are relative to *http://localhost*
 - [AppliedBoardOpDto](docs/AppliedBoardOpDto.md)
 - [ApplyBoardOpsDto](docs/ApplyBoardOpsDto.md)
 - [ApplyBoardOpsResponseDto](docs/ApplyBoardOpsResponseDto.md)
-- [ArchivePreviewDto](docs/ArchivePreviewDto.md)
 - [AssetChunkDto](docs/AssetChunkDto.md)
 - [AssetFindingDetectorCountDto](docs/AssetFindingDetectorCountDto.md)
 - [AssetFindingSeverityCountDto](docs/AssetFindingSeverityCountDto.md)
@@ -713,13 +702,10 @@ All URIs are relative to *http://localhost*
 - [CustomDetectorResponseDtoSourcesUsingInner](docs/CustomDetectorResponseDtoSourcesUsingInner.md)
 - [CustomDetectorTrainingRunDto](docs/CustomDetectorTrainingRunDto.md)
 - [DataQuerySettingsDto](docs/DataQuerySettingsDto.md)
-- [DataTransferJobDto](docs/DataTransferJobDto.md)
-- [DataTransferJobListDto](docs/DataTransferJobListDto.md)
 - [DecisionsToCaseDto](docs/DecisionsToCaseDto.md)
 - [DecisionsToCaseResponseDto](docs/DecisionsToCaseResponseDto.md)
 - [DecisionsToInquiryDto](docs/DecisionsToInquiryDto.md)
 - [DecisionsToInquiryResponseDto](docs/DecisionsToInquiryResponseDto.md)
-- [DeleteDataTransferJobResponseDto](docs/DeleteDataTransferJobResponseDto.md)
 - [DeleteGlossaryTermResponseDto](docs/DeleteGlossaryTermResponseDto.md)
 - [DeleteRunnerResponseDto](docs/DeleteRunnerResponseDto.md)
 - [DeprecateGlossaryTermDto](docs/DeprecateGlossaryTermDto.md)
@@ -819,7 +805,6 @@ All URIs are relative to *http://localhost*
 - [LinkInquiriesDto](docs/LinkInquiriesDto.md)
 - [LinkThreadSupportDto](docs/LinkThreadSupportDto.md)
 - [ListRunnersResponseDto](docs/ListRunnersResponseDto.md)
-- [LiveQueryResponseDto](docs/LiveQueryResponseDto.md)
 - [LocationDto](docs/LocationDto.md)
 - [MarkAllReadDto](docs/MarkAllReadDto.md)
 - [MatchOptionCustomDetectorDto](docs/MatchOptionCustomDetectorDto.md)
@@ -950,6 +935,8 @@ All URIs are relative to *http://localhost*
 - [RunnerFindingItemDto](docs/RunnerFindingItemDto.md)
 - [RunnerFindingQueryDto](docs/RunnerFindingQueryDto.md)
 - [RunnerFindingQueryResponseDto](docs/RunnerFindingQueryResponseDto.md)
+- [RunnerLimitDto](docs/RunnerLimitDto.md)
+- [RunnerLimitsDto](docs/RunnerLimitsDto.md)
 - [RunnerLogEntryDto](docs/RunnerLogEntryDto.md)
 - [RunnerLogsResponseDto](docs/RunnerLogsResponseDto.md)
 - [RunnerQueuePositionDto](docs/RunnerQueuePositionDto.md)
@@ -1025,8 +1012,6 @@ All URIs are relative to *http://localhost*
 - [SourcesControllerGetSchedule200Response](docs/SourcesControllerGetSchedule200Response.md)
 - [SourcesControllerUpdateStatusRequest](docs/SourcesControllerUpdateStatusRequest.md)
 - [SplitPairResponseDto](docs/SplitPairResponseDto.md)
-- [StartExportDto](docs/StartExportDto.md)
-- [StartImportDto](docs/StartImportDto.md)
 - [StartRunnerDto](docs/StartRunnerDto.md)
 - [StopRunnerResponseDto](docs/StopRunnerResponseDto.md)
 - [SupervisorBudgetDto](docs/SupervisorBudgetDto.md)
@@ -1056,7 +1041,6 @@ All URIs are relative to *http://localhost*
 - [TrainingExampleItemDto](docs/TrainingExampleItemDto.md)
 - [TrainingExamplesStatsDto](docs/TrainingExamplesStatsDto.md)
 - [TrainingExamplesStatsDtoByLabelValue](docs/TrainingExamplesStatsDtoByLabelValue.md)
-- [TransferScopeDto](docs/TransferScopeDto.md)
 - [TriggerAutopilotDto](docs/TriggerAutopilotDto.md)
 - [TriggerAutopilotResponseDto](docs/TriggerAutopilotResponseDto.md)
 - [UndoBatchDto](docs/UndoBatchDto.md)
@@ -1090,6 +1074,7 @@ All URIs are relative to *http://localhost*
 - [UpdateNotificationAudienceDto](docs/UpdateNotificationAudienceDto.md)
 - [UpdateNotificationImportanceDto](docs/UpdateNotificationImportanceDto.md)
 - [UpdateRunnerAssetStatusDto](docs/UpdateRunnerAssetStatusDto.md)
+- [UpdateRunnerLimitsDto](docs/UpdateRunnerLimitsDto.md)
 - [UpdateSourceDto](docs/UpdateSourceDto.md)
 - [UpdateSupervisorDto](docs/UpdateSupervisorDto.md)
 - [UpdateSupervisorGoalDto](docs/UpdateSupervisorGoalDto.md)

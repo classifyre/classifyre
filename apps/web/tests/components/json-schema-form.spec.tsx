@@ -273,7 +273,7 @@ test("an empty credentials block is not rendered at all", async ({ mount }) => {
         },
         required: ["path"],
       },
-      // LOCAL_FOLDER and SQLITE declare masked with nothing in it.
+      // LOCAL_FOLDER declares masked with nothing in it.
       masked: { type: "object", properties: {} },
     },
   };

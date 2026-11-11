@@ -4,6 +4,7 @@ import {
   Logger,
   Optional,
 } from '@nestjs/common';
+import { DeploymentSettingsService } from '../deployment-settings/deployment-settings.service';
 import { NamespacePauseService } from '../namespace/namespace-pause.service';
 import type { Job } from 'pg-boss';
 import {
@@ -125,6 +126,7 @@ export class AutoScheduleService {
     private readonly cliRunner: CliRunnerService,
     private readonly notifications: NotificationsService,
     @Optional() private readonly namespacePause?: NamespacePauseService,
+    @Optional() private readonly deploymentSettings?: DeploymentSettingsService,
   ) {}
 
   /**
@@ -502,7 +504,9 @@ export class AutoScheduleService {
     });
     if (settings && !settings.autoScheduleEnabled) return;
 
-    const limit = maxConcurrentAutoScans();
+    const limit = this.deploymentSettings
+      ? await this.deploymentSettings.effective('autoScheduleMaxConcurrent')
+      : maxConcurrentAutoScans();
     if (limit === 0) return;
 
     // EVERY scan in flight counts, not just the adaptive scheduler's own.

@@ -70,9 +70,6 @@
       "$ref": "#/definitions/ServiceDeskInput"
     },
     {
-      "$ref": "#/definitions/SQLiteInput"
-    },
-    {
       "$ref": "#/definitions/NotionInput"
     },
     {
@@ -1334,13 +1331,6 @@
         }
       },
       "MYSQL": {
-        "table": {
-          "use": [
-            "tabularTable"
-          ]
-        }
-      },
-      "SQLITE": {
         "table": {
           "use": [
             "tabularTable"
@@ -3985,7 +3975,6 @@
         "CONFLUENCE",
         "JIRA",
         "SERVICEDESK",
-        "SQLITE",
         "NOTION",
         "EMAIL",
         "YOUTUBE",
@@ -9985,110 +9974,6 @@
           "required": [
             "required",
             "masked",
-            "sampling"
-          ],
-          "additionalProperties": false
-        }
-      ]
-    },
-    "SQLiteRequired": {
-      "title": "SQLiteRequired",
-      "label": "SQLite Settings",
-      "type": "object",
-      "properties": {
-        "database_path": {
-          "type": "string",
-          "description": "Absolute or relative path to the SQLite database file (e.g. /data/app.db)"
-        }
-      },
-      "required": [
-        "database_path"
-      ],
-      "additionalProperties": false
-    },
-    "SQLiteOptionalScope": {
-      "title": "SQLiteOptionalScope",
-      "label": "SQLite Scope",
-      "type": "object",
-      "description": "Table selection scope.",
-      "properties": {
-        "include_tables": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Optional table allowlist. Only tables in this list will be scanned."
-        },
-        "table_limit": {
-          "type": "integer",
-          "minimum": 1,
-          "description": "Optional cap on number of table assets extracted"
-        }
-      },
-      "additionalProperties": false
-    },
-    "SQLiteOptional": {
-      "title": "SQLiteOptional",
-      "label": "SQLite Options",
-      "type": "object",
-      "properties": {
-        "scope": {
-          "$ref": "#/definitions/SQLiteOptionalScope"
-        }
-      },
-      "additionalProperties": false
-    },
-    "SQLiteInput": {
-      "title": "SQLiteInput",
-      "label": "SQLite",
-      "allOf": [
-        {
-          "$ref": "#/definitions/CoreInput"
-        },
-        {
-          "type": "object",
-          "properties": {
-            "type": {
-              "const": "SQLITE"
-            },
-            "required": {
-              "$ref": "#/definitions/SQLiteRequired"
-            },
-            "masked": {
-              "type": "object",
-              "description": "SQLite has no credentials; this section is intentionally empty.",
-              "properties": {},
-              "additionalProperties": false
-            },
-            "optional": {
-              "$ref": "#/definitions/SQLiteOptional"
-            },
-            "detectors": {
-              "$ref": "#/definitions/Detectors"
-            },
-            "custom_detectors": {
-              "$ref": "#/definitions/CustomDetectorSelections"
-            },
-            "sampling": {
-              "$ref": "#/definitions/SamplingConfig"
-            },
-            "scan_cache": {
-              "$ref": "#/definitions/ScanCacheConfig"
-            },
-            "resources": {
-              "$ref": "#/definitions/ResourceOverrides"
-            },
-            "cleanup_removed_detector_findings": {
-              "type": "boolean",
-              "default": true,
-              "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
-            },
-            "augmentation": {
-              "$ref": "#/definitions/AugmentationConfig"
-            }
-          },
-          "required": [
-            "required",
             "sampling"
           ],
           "additionalProperties": false

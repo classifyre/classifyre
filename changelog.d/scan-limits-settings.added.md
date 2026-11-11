@@ -1,0 +1,1 @@
+Settings → General now has Scan limits: scans running at once, automatic scans at once, and runs kept per source. Values saved there apply to the whole installation and override the Helm chart and the all-in-one image; leaving a field empty hands the limit back to them.

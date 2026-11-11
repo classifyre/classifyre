@@ -1,6 +1,6 @@
 ---
 title: Settings
-description: Manage workspace-wide preferences, scan capacity, integrations, and data transfer.
+description: Manage workspace-wide preferences, scan limits, SQL limits, and integrations.
 ---
 
 # Settings
@@ -17,10 +17,9 @@ the same sense: listing them needs **settings.view**.
 
 | Tab                 | What it controls                                                                                        |
 | ------------------- | ------------------------------------------------------------------------------------------------------- |
-| **General**         | The workspace itself (name, address, description, categories, links, picture), software version, concurrent scan capacity, language, timezone, time format, and the Hugging Face token |
+| **General**         | The workspace itself (name, address, description, categories, links, picture), software version, SQL limits, scan limits, language, timezone, time format, and the Hugging Face token |
 | **MCP Servers**     | The Classifyre MCP endpoint, bearer tokens, and client connection guides                                |
 | **Chat Bots**       | Telegram and Slack bots, permissions, and connection diagnostics                                        |
-| **Export & Import** | Portable workspace archives and transfer history                                                        |
 
 ---
 
@@ -35,13 +34,36 @@ workspace directory shows on its card. The gear on the card opens this tab.
 Changing them needs **workspace.settings**; a new slug moves the page to the
 new address. Pausing and resuming are under **Workers**.
 
-### Software and scanning
+### Software version
 
 The version card shows the installed Classifyre release and whether an update
-is available. **Concurrent scans** controls how many scan jobs this workspace
-may run at once. Higher values can sweep a large corpus faster, but consume
-more CPU and memory; lower values leave more capacity for the rest of the
-instance.
+is available.
+
+### SQL over tables
+
+The limits of [SQL over tables](/data-query/): rows per result, the time limit
+and rows per export. They apply to this workspace; who may query which table
+follows roles and data-reader grants.
+
+### Scan limits
+
+Three limits govern how much scanning the installation does. Changing them
+needs **workspace.settings** and takes effect within seconds, with no restart.
+
+| Setting                   | What it limits                                                                                  | Helm chart value                   | All-in-one image variable      |
+| ------------------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------- | ------------------------------ |
+| Scans running at once     | Scans running across all workspaces; further scans wait in the queue. `0` means unlimited.      | `api.env.MAX_CONCURRENT_RUNNERS`   | `MAX_CONCURRENT_RUNNERS`       |
+| Automatic scans at once   | Scans in flight before the adaptive scheduler asks for another one. `0` turns it off.            | `api.env.AUTO_SCHEDULE_MAX_CONCURRENT` | `AUTO_SCHEDULE_MAX_CONCURRENT` |
+| Runs kept per source      | Finished runs kept for each source; older ones are removed. `0` keeps everything.                | `api.env.MAX_RUNNERS_PER_SOURCE`   | `MAX_RUNNERS_PER_SOURCE`       |
+
+These limits belong to the **whole installation**, not to one workspace: the
+scans of every workspace share the same machine, so every workspace shows and
+changes the same values.
+
+A value saved here **overrides** the one the Helm chart or the all-in-one image
+sets. Each field shows what the chart or image sets underneath it. Leave a
+field empty and save to hand that limit back, after which changes to the chart
+or the container's environment apply again.
 
 ### Language, timezone, and time format
 
@@ -86,18 +108,6 @@ Chat Bots connect Telegram or Slack to Classifyre. Each bot can be enabled
 independently and restricted to selected capability groups and Autopilot
 agents. Mutation access can also be disabled to make a bot read-only. Built-in
 tests and diagnostics show whether credentials and the live connection work.
-
----
-
-## Export & Import
-
-Export & Import moves selected workspace data through a compressed `.cfyre`
-archive. Choose the data areas to include, monitor the job, and download the
-completed archive; an import lets you preview the archive and select which
-parts to load.
-
-Credentials and secrets are never exported. Imported records receive new IDs,
-and links between those records are rewritten to remain consistent.
 
 ---
 

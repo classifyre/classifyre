@@ -23,6 +23,7 @@ import { CustomDetectorExtractionsService } from './custom-detector-extractions.
 import { CustomDetectorTestsService } from './custom-detector-tests.service';
 import { CliRunnerModule } from './cli-runner/cli-runner.module';
 import { NotebookModule } from './notebook/notebook.module';
+import { DeploymentSettingsModule } from './deployment-settings/deployment-settings.module';
 import { DataQueryModule } from './data-query/data-query.module';
 import { WebSocketModule } from './websocket/websocket.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
@@ -31,7 +32,6 @@ import { AutopilotModule } from './autopilot/autopilot.module';
 import { CorrelationModule } from './correlation/correlation.module';
 import { AgentMemoryService } from './autopilot/memory/agent-memory.service';
 import { ExportModule } from './export/export.module';
-import { DataTransferModule } from './data-transfer/data-transfer.module';
 import { MaskedConfigCryptoService } from './masked-config-crypto.service';
 import { CustomDetectorFilesService } from './custom-detector-files.service';
 import { InstanceSettingsService } from './instance-settings.service';
@@ -133,13 +133,13 @@ import {
     CliRunnerModule,
     NotebookModule,
     DataQueryModule,
+    DeploymentSettingsModule,
     WebSocketModule,
     SchedulerModule,
     MatchingModule,
     AutopilotModule,
     CorrelationModule,
     ExportModule,
-    DataTransferModule,
     EmbeddingModule,
     FindingStatsModule,
     MaintenanceModule,

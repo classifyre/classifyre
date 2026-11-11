@@ -43,7 +43,6 @@ class AssetType(StrEnum):
     CONFLUENCE = 'CONFLUENCE'
     JIRA = 'JIRA'
     SERVICEDESK = 'SERVICEDESK'
-    SQLITE = 'SQLITE'
     NOTION = 'NOTION'
     EMAIL = 'EMAIL'
     YOUTUBE = 'YOUTUBE'
@@ -381,7 +380,6 @@ class Type(StrEnum):
     CONFLUENCE = 'CONFLUENCE'
     JIRA = 'JIRA'
     SERVICEDESK = 'SERVICEDESK'
-    SQLITE = 'SQLITE'
     NOTION = 'NOTION'
     EMAIL = 'EMAIL'
     YOUTUBE = 'YOUTUBE'
@@ -3200,7 +3198,6 @@ class Type23(StrEnum):
     CONFLUENCE = 'CONFLUENCE'
     JIRA = 'JIRA'
     SERVICEDESK = 'SERVICEDESK'
-    SQLITE = 'SQLITE'
     NOTION = 'NOTION'
     EMAIL = 'EMAIL'
     YOUTUBE = 'YOUTUBE'
@@ -3223,40 +3220,6 @@ class Type23(StrEnum):
     ICEBERG_REST = 'ICEBERG_REST'
     GIT = 'GIT'
     CUSTOM = 'CUSTOM'
-
-
-class SQLiteRequired(BaseModel):
-    model_config = ConfigDict(
-        extra='forbid',
-    )
-    database_path: str = Field(
-        ...,
-        description='Absolute or relative path to the SQLite database file (e.g. /data/app.db)',
-    )
-
-
-class SQLiteOptionalScope(BaseModel):
-    """
-    Table selection scope.
-    """
-
-    model_config = ConfigDict(
-        extra='forbid',
-    )
-    include_tables: list[str] | None = Field(
-        None,
-        description='Optional table allowlist. Only tables in this list will be scanned.',
-    )
-    table_limit: int | None = Field(
-        None, description='Optional cap on number of table assets extracted', ge=1
-    )
-
-
-class SQLiteOptional(BaseModel):
-    model_config = ConfigDict(
-        extra='forbid',
-    )
-    scope: SQLiteOptionalScope | None = None
 
 
 class NotionRequired(BaseModel):
@@ -6101,35 +6064,6 @@ class ServiceDeskInput(CoreInput):
     augmentation: AugmentationConfig | None = None
 
 
-class SQLiteInput(CoreInput):
-    model_config = ConfigDict(
-        extra='forbid',
-    )
-    type: Literal['SQLITE'] = Field(..., description='Type of the asset or source')
-    required: SQLiteRequired
-    masked: dict[str, Any] | None = Field(
-        None,
-        description='SQLite has no credentials; this section is intentionally empty.',
-        max_length=0,
-    )
-    optional: SQLiteOptional | None = None
-    detectors: list[Detector] | None = Field(
-        None, description='Detectors to run on ingested content'
-    )
-    custom_detectors: list[CustomDetectorSelection] | None = Field(
-        None,
-        description='Reusable custom detector IDs selected from the custom detector catalog.',
-    )
-    sampling: SamplingConfig
-    scan_cache: ScanCacheConfig | None = None
-    resources: ResourceOverrides | None = None
-    cleanup_removed_detector_findings: bool | None = Field(
-        True,
-        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
-    )
-    augmentation: AugmentationConfig | None = None
-
-
 class NotionInput(CoreInput):
     model_config = ConfigDict(
         extra='forbid',
@@ -6741,7 +6675,6 @@ class SourceInput(
         | ConfluenceInput
         | JiraInput
         | ServiceDeskInput
-        | SQLiteInput
         | NotionInput
         | EmailInput
         | YouTubeInput
@@ -6787,7 +6720,6 @@ class SourceInput(
         | ConfluenceInput
         | JiraInput
         | ServiceDeskInput
-        | SQLiteInput
         | NotionInput
         | EmailInput
         | YouTubeInput

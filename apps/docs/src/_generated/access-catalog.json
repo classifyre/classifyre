@@ -36,11 +36,6 @@
       "description": "Delete the workspace."
     },
     {
-      "id": "workspace.transfer",
-      "scope": "workspace",
-      "description": "Export, import or copy workspace data."
-    },
-    {
       "id": "notification.view",
       "scope": "workspace",
       "description": "Get the notifications sent to your groups in the workspace, and mark them read, important or dismissed for yourself."
@@ -345,7 +340,6 @@
         "workspace.pause",
         "workspace.publish",
         "workspace.delete",
-        "workspace.transfer",
         "notification.view",
         "access.view",
         "access.manage",
@@ -412,7 +406,6 @@
         "workspace.pause",
         "workspace.publish",
         "workspace.delete",
-        "workspace.transfer",
         "notification.view",
         "access.view",
         "access.manage",
@@ -472,7 +465,6 @@
         "workspace.pause",
         "workspace.publish",
         "workspace.delete",
-        "workspace.transfer",
         "notification.view",
         "access.view",
         "access.manage",

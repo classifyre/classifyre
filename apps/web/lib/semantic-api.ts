@@ -4,7 +4,7 @@ import { getNamespacedApiBaseUrl } from "@workspace/api-client";
  * The glossary's semantic layer (docs/prd/SL1–SL5): terms with kinds, keys and
  * schemes; relations; bindings; meaning; the review queue; the semantic map.
  *
- * Hand-written fetches, like `data-transfer-api.ts`: these controllers return
+ * Hand-written fetches, the way the other hand-written clients are: these controllers return
  * service objects rather than Swagger DTOs, so the generated client has no
  * response types for them. The types below mirror the API services.
  */

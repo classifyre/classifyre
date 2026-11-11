@@ -132,7 +132,7 @@ const docSections = [
     title: "Staying Informed",
     badge: "OUTPUTS",
     description:
-      "Notifications for the events worth knowing about, and exports that put findings into Excel, Google Sheets, or your BI tool — as a snapshot or a live feed.",
+      "Notifications for the events worth knowing about, and CSV downloads of findings and assets.",
     href: "/docs/notifications/",
     items: [
       { label: "Notifications", href: "/docs/notifications/" },

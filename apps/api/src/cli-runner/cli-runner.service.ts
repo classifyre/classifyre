@@ -1,3 +1,4 @@
+import { DeploymentSettingsService } from '../deployment-settings/deployment-settings.service';
 import { enqueueSemanticAfterRun } from '../semantic/semantic-jobs.scheduler';
 import {
   Injectable,
@@ -266,6 +267,8 @@ export class CliRunnerService {
     private cohortWeights?: CohortWeightsService,
     @Optional()
     private pause?: NamespacePauseService,
+    @Optional()
+    private deploymentSettings?: DeploymentSettingsService,
   ) {}
 
   /** Current namespace UUID from CLS, if running within a namespace context. */
@@ -4177,7 +4180,10 @@ export class CliRunnerService {
     return `${n}${s[(v - 20) % 10] ?? s[v] ?? s[0]}`;
   }
 
-  private resolveMaxRunnersPerSource(): number {
+  private async resolveMaxRunnersPerSource(): Promise<number> {
+    if (this.deploymentSettings) {
+      return this.deploymentSettings.effective('maxRunnersPerSource');
+    }
     const raw = process.env.MAX_RUNNERS_PER_SOURCE;
     if (!raw) return 5;
     const parsed = Number.parseInt(raw, 10);
@@ -4185,7 +4191,7 @@ export class CliRunnerService {
   }
 
   private async pruneOldRunners(sourceId: string): Promise<void> {
-    const limit = this.resolveMaxRunnersPerSource();
+    const limit = await this.resolveMaxRunnersPerSource();
     if (limit === 0) return;
 
     const terminated = await this.prisma.runner.findMany({
@@ -5114,7 +5120,7 @@ export class CliRunnerService {
       throw new NotFoundException(`Runner with ID ${runnerId} not found`);
     }
 
-    const concurrencyLimit = this.resolveMaxConcurrentRunners();
+    const concurrencyLimit = await this.resolveMaxConcurrentRunners();
     if (runner.status !== RunnerStatus.PENDING) {
       return {
         runnerId,
@@ -5823,7 +5829,11 @@ export class CliRunnerService {
    * per-workspace row in instance_settings, but that control was inert on
    * every real deployment because the environment variable always won.
    */
-  private resolveMaxConcurrentRunners(): number {
+  private async resolveMaxConcurrentRunners(): Promise<number> {
+    // A value saved in Settings outranks the chart / image environment.
+    if (this.deploymentSettings) {
+      return this.deploymentSettings.effective('maxConcurrentRunners');
+    }
     const raw = process.env.MAX_CONCURRENT_RUNNERS;
     if (raw && raw.trim() !== '') {
       const parsed = Number.parseInt(raw, 10);
@@ -5833,7 +5843,7 @@ export class CliRunnerService {
   }
 
   private async canStartNewRunner(): Promise<boolean> {
-    const limit = this.resolveMaxConcurrentRunners();
+    const limit = await this.resolveMaxConcurrentRunners();
     if (limit === 0) return true;
     return (await this.countRunningRunners()) < limit;
   }
@@ -5887,7 +5897,7 @@ export class CliRunnerService {
    * query fails.
    */
   async promotePendingRunners(): Promise<void> {
-    const limit = this.resolveMaxConcurrentRunners();
+    const limit = await this.resolveMaxConcurrentRunners();
     for (let promoted = 0; limit === 0 || promoted < limit; promoted += 1) {
       if (!(await this.dequeueNextPendingRunner())) return;
     }

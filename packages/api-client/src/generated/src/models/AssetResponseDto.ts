@@ -93,7 +93,6 @@ export const AssetResponseDtoSourceTypeEnum = {
     Dremio: 'DREMIO',
     Mongodb: 'MONGODB',
     Neo4J: 'NEO4J',
-    Sqlite: 'SQLITE',
     Notion: 'NOTION',
     Powerbi: 'POWERBI',
     Tableau: 'TABLEAU',

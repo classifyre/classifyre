@@ -245,8 +245,14 @@ startup. Override only with reason.
 | `CLASSIFYRE_NODE_HEAP_MB` | Node heap ceiling. Bigger is usually worse — a larger ceiling means more garbage accrues before a major GC. |
 | `PG_SHARED_BUFFERS`, `PG_WORK_MEM`, `PG_EFFECTIVE_CACHE_SIZE` | PostgreSQL memory. |
 | `MAX_CONCURRENT_RUNNERS` | Scans running at once. |
+| `AUTO_SCHEDULE_MAX_CONCURRENT` | Automatic scans in flight before the adaptive scheduler holds back. |
+| `MAX_RUNNERS_PER_SOURCE` | Finished runs kept per source. |
 | `CLASSIFYRE_MAX_POOL_WORKERS` | Detector worker processes per scan. |
 | `CLASSIFYRE_MIN_MEMORY_MB` | The 4 GB startup floor. |
+
+The three scan limits can also be changed in **Settings → General → Scan
+limits**; a value saved there overrides the variable (see
+[Settings](/settings/#scan-limits)).
 
 The startup log prints what it chose:
 
@@ -322,7 +328,5 @@ the identity server's.
 
 ## Moving to Kubernetes
 
-Nothing here is a dead end. [Export a workspace](/data-export/) from this
-container and import it into a cluster install — sources, findings, cases and
-lineage all move. The [Helm chart](/deployment/kubernetes/) runs the same images
-this one is composed from.
+The [Helm chart](/deployment/kubernetes/) runs the same images this one is
+composed from.

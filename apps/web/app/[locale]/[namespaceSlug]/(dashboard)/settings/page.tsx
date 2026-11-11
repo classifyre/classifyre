@@ -22,7 +22,6 @@ import {
   Clock3,
   Cpu,
   Database,
-  DatabaseBackup,
   Globe,
   Languages,
   Loader2,
@@ -39,7 +38,7 @@ import { McpSettingsCard } from "@/components/mcp-settings-card";
 import { ChatBotsCard } from "@/components/chat-bots-card";
 import { HuggingFaceSettingsCard } from "@/components/huggingface-settings-card";
 import { VersionSettingsSection } from "@/components/version-update-notifier";
-import { DataTransferCard } from "@/components/data-transfer/data-transfer-card";
+import { RunnerLimitsCard } from "@/components/maintenance/runner-limits-card";
 import { DataQuerySettingsCard } from "@/components/data-query/data-query-settings-card";
 import { CleanupCard } from "@/components/maintenance/cleanup-card";
 import { FeatureSwitchesCard } from "@/components/maintenance/feature-switches-card";
@@ -267,10 +266,6 @@ function WorkspaceSettings() {
             <MessageSquare className="h-3.5 w-3.5" />
             {t("settings.tabs.chat")}
           </TabsTrigger>
-          <TabsTrigger value="data" className={TAB_TRIGGER_CLASS}>
-            <DatabaseBackup className="h-3.5 w-3.5" />
-            {t("settings.tabs.data")}
-          </TabsTrigger>
           <TabsTrigger value="workers" className={TAB_TRIGGER_CLASS}>
             <Cpu className="h-3.5 w-3.5" />
             {t("settings.tabs.workers")}
@@ -439,6 +434,8 @@ function WorkspaceSettings() {
             </CardContent>
           </Card>
 
+          <DataQuerySettingsCard />
+          <RunnerLimitsCard />
           <HuggingFaceSettingsCard />
         </TabsContent>
 
@@ -454,14 +451,6 @@ function WorkspaceSettings() {
           className="duration-300 animate-in fade-in-50 slide-in-from-bottom-1"
         >
           <ChatBotsCard />
-        </TabsContent>
-
-        <TabsContent
-          value="data"
-          className="space-y-6 duration-300 animate-in fade-in-50 slide-in-from-bottom-1"
-        >
-          <DataQuerySettingsCard />
-          <DataTransferCard />
         </TabsContent>
 
         <TabsContent

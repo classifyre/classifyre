@@ -28,11 +28,9 @@ import type { FastifyReply } from 'fastify';
 import { AssetType } from '@prisma/client';
 import { PgStreamService } from '../export/pg-stream.service';
 import { ExportQueryService } from '../export/export-query.service';
-import { LiveQueryService } from '../export/live-query.service';
 import {
   ExportAssetsQueryDto,
   ExportFindingsQueryDto,
-  LiveQueryResponseDto,
 } from '../dto/export-query.dto';
 import { AssetService } from '../asset.service';
 import { FindingsService } from '../findings.service';
@@ -138,7 +136,6 @@ export class SearchAssetsController {
     private readonly findingsService: FindingsService,
     private readonly pgStreamService: PgStreamService,
     private readonly exportQueryService: ExportQueryService,
-    private readonly liveQueryService: LiveQueryService,
     private readonly quickSearchService: QuickSearchService,
   ) {}
 
@@ -157,57 +154,6 @@ export class SearchAssetsController {
     @Body() request: QuickSearchRequestDto,
   ): Promise<QuickSearchResponseDto> {
     return this.quickSearchService.search(request);
-  }
-
-  @Requires('finding.view')
-  @Get('findings/query')
-  @ApiOperation({
-    summary: 'Query findings (cursor-paginated JSON)',
-    description:
-      'Returns a page of findings as JSON for live consumption (e.g. Excel Power Query). Follow `nextCursor` to page through the full result set. Order is stable for incremental refresh; sort/filter in the client.',
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    description: 'Page size (default 1000, max 10000)',
-  })
-  @ApiQuery({
-    name: 'cursor',
-    required: false,
-    description: 'Opaque cursor from a previous page',
-  })
-  @ApiResponse({ status: 200, type: LiveQueryResponseDto })
-  async queryFindings(
-    @Query() query: ExportFindingsQueryDto,
-    @Query('limit') limit?: string,
-    @Query('cursor') cursor?: string,
-  ): Promise<LiveQueryResponseDto> {
-    return this.liveQueryService.queryFindings(query, { limit, cursor });
-  }
-
-  @Get('assets/query')
-  @ApiOperation({
-    summary: 'Query assets with findings (cursor-paginated JSON)',
-    description:
-      'Returns a page of asset-finding rows as JSON for live consumption (e.g. Excel Power Query). Follow `nextCursor` to page through the full result set.',
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    description: 'Page size (default 1000, max 10000)',
-  })
-  @ApiQuery({
-    name: 'cursor',
-    required: false,
-    description: 'Opaque cursor from a previous page',
-  })
-  @ApiResponse({ status: 200, type: LiveQueryResponseDto })
-  async queryAssets(
-    @Query() query: ExportAssetsQueryDto,
-    @Query('limit') limit?: string,
-    @Query('cursor') cursor?: string,
-  ): Promise<LiveQueryResponseDto> {
-    return this.liveQueryService.queryAssets(query, { limit, cursor });
   }
 
   @Requires('data.export')

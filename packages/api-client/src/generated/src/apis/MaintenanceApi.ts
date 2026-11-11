@@ -161,7 +161,7 @@ export class MaintenanceApi extends runtime.BaseAPI {
     }
 
     /**
-     * Start wiping one cleanable dataset in the background (scan history, duplicates, embeddings, harness runs, finished queue jobs, derived stats/graph, finished transfers). Protected data is never accepted here. Poll GET cleanup/runs/:runId for progress. Deliberately allowed while paused: freezing the workers first is the recommended quiet window (pause, clean, resume), since no writer can race the wipe.
+     * Start wiping one cleanable dataset in the background (scan history, duplicates, embeddings, harness runs, finished queue jobs, derived stats/graph). Protected data is never accepted here. Poll GET cleanup/runs/:runId for progress. Deliberately allowed while paused: freezing the workers first is the recommended quiet window (pause, clean, resume), since no writer can race the wipe.
      */
     async maintenanceControllerStartCleanupRaw(requestParameters: MaintenanceControllerStartCleanupRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
         if (requestParameters['key'] == null) {
@@ -190,7 +190,7 @@ export class MaintenanceApi extends runtime.BaseAPI {
     }
 
     /**
-     * Start wiping one cleanable dataset in the background (scan history, duplicates, embeddings, harness runs, finished queue jobs, derived stats/graph, finished transfers). Protected data is never accepted here. Poll GET cleanup/runs/:runId for progress. Deliberately allowed while paused: freezing the workers first is the recommended quiet window (pause, clean, resume), since no writer can race the wipe.
+     * Start wiping one cleanable dataset in the background (scan history, duplicates, embeddings, harness runs, finished queue jobs, derived stats/graph). Protected data is never accepted here. Poll GET cleanup/runs/:runId for progress. Deliberately allowed while paused: freezing the workers first is the recommended quiet window (pause, clean, resume), since no writer can race the wipe.
      */
     async maintenanceControllerStartCleanup(requestParameters: MaintenanceControllerStartCleanupRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.maintenanceControllerStartCleanupRaw(requestParameters, initOverrides);

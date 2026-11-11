@@ -201,7 +201,7 @@ rules:
   and glossary carry a Kept badge and have no action — the API has no cleanup
   path for them at all, so a misclick cannot destroy the investigation.
 - **Cleanable.** Scan history, duplicate artefacts, embeddings, harness
-  history, finished queue jobs, derived stats/graphs and finished transfers.
+  history, finished queue jobs, derived stats/graphs.
   Each row explains what goes, what stays, and what rebuilds itself.
 
 Every cleanup asks for confirmation first, then runs **in the background**:
@@ -242,7 +242,6 @@ all of it previously counted as protected assets.
 | Finished queue jobs | Completed/failed/cancelled jobs and archived history                 | Pending, scheduled and running jobs; the schedules themselves                    | N/A (history)                           |
 | Finding statistics  | Precomputed daily rollups and worker state                           | —                                                                                | Yes, automatically via the stats worker |
 | Source graph        | Precomputed nodes, links and worker state                            | —                                                                                | Yes, automatically via the graph worker |
-| Finished transfers  | Completed/failed/cancelled import/export jobs with chunks            | Staged and running transfers                                                     | N/A (history)                           |
 
 ### Side effects
 
@@ -285,9 +284,6 @@ you wipe. What each wipe does change, besides freeing space:
 - **Source graph (rebuilds via the graph worker).** The source graph view
   goes empty until the worker rebuilds it; same full-recompute caveat as the
   stats above.
-- **Finished transfers (history only).** Completed import/export entries
-  disappear from the transfer history; staged and running transfers continue
-  untouched.
 
 ---
 
@@ -328,7 +324,7 @@ Workspaces in production hold tens of millions of rows (a busy one can keep
   and the final `result`. Run records live in API memory (last 50) — an API
   restart drops them, in which case the overview itself shows the outcome.
 - **Live work is skipped, never deleted.** Running or pending scans, queued
-  or active jobs and unfinished transfers are counted under “left alone” in
+  or active jobs are counted under “left alone” in
   the result instead of being touched.
 - **Foreign keys are honoured in dependency order.** Children before parents
   (logs before runs, members before clusters, chunks before jobs); nullable

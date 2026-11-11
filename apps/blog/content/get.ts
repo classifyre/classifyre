@@ -235,7 +235,7 @@ const enKubernetes = {
 const enWhich = {
   marker: "Not sure which",
   title: "Pick by where the data has to stay",
-  lede: "Both runtimes carry the same features, and a namespace export moves your work from one to the other, so this is not a decision you are locked into.",
+  lede: "Both runtimes carry the same features and run the same images, so this is not a decision you are locked into.",
   dockerHead: "Choose Docker when",
   dockerPoints: [
     "You are evaluating, or you investigate alone.",

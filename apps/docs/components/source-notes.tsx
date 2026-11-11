@@ -42,7 +42,7 @@ function Note({
 
 /**
  * Shared behaviour of every SQL database source (PostgreSQL, MySQL, SQL Server,
- * Oracle, SQLite, Hive, Snowflake, Databricks).
+ * Oracle, Hive, Snowflake, Databricks).
  */
 export function SqlSourceNotes({
   /** Set when the engine's catalog can report what a view reads from. */

@@ -24,11 +24,7 @@ import {
 import type { FastifyReply } from 'fastify';
 import { PgStreamService } from '../export/pg-stream.service';
 import { ExportQueryService } from '../export/export-query.service';
-import { LiveQueryService } from '../export/live-query.service';
-import {
-  ExportRunnerAssetsQueryDto,
-  LiveQueryResponseDto,
-} from '../dto/export-query.dto';
+import { ExportRunnerAssetsQueryDto } from '../dto/export-query.dto';
 import { CliRunnerService } from './cli-runner.service';
 import { RunnerStatus } from '@prisma/client';
 import { ReadsOnly } from '../reads-only.decorator';
@@ -516,33 +512,7 @@ export class SearchRunnersController {
     private cliRunnerService: CliRunnerService,
     private readonly pgStreamService: PgStreamService,
     private readonly exportQueryService: ExportQueryService,
-    private readonly liveQueryService: LiveQueryService,
   ) {}
-
-  @Get('runner-assets/query')
-  @ApiOperation({
-    summary: 'Query runner assets (cursor-paginated JSON)',
-    description:
-      'Returns a page of runner_assets rows as JSON for live consumption (e.g. Excel Power Query). Follow `nextCursor` to page through the full result set.',
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    description: 'Page size (default 1000, max 10000)',
-  })
-  @ApiQuery({
-    name: 'cursor',
-    required: false,
-    description: 'Opaque cursor from a previous page',
-  })
-  @ApiResponse({ status: 200, type: LiveQueryResponseDto })
-  async queryRunnerAssets(
-    @Query() query: ExportRunnerAssetsQueryDto,
-    @Query('limit') limit?: string,
-    @Query('cursor') cursor?: string,
-  ): Promise<LiveQueryResponseDto> {
-    return this.liveQueryService.queryRunnerAssets(query, { limit, cursor });
-  }
 
   @Requires('data.export')
   @Get('runner-assets/export')

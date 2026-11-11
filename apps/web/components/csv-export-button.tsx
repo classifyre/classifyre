@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Download, ExternalLink } from "lucide-react";
+import { Download } from "lucide-react";
 import { Button } from "@workspace/ui/components";
 import {
   Dialog,
@@ -114,17 +114,7 @@ export function CsvExportButton({
         <DialogHeader>
           <DialogTitle>{title ?? t("csvExport.title" as TranslationKey)}</DialogTitle>
           <DialogDescription>
-            {t("csvExport.description" as TranslationKey, { count: total.toLocaleString(), entityLabel })}{" "}
-            <a
-              href="/docs/data-export/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 underline underline-offset-2"
-            >
-              {t("csvExport.descriptionLink" as TranslationKey)}
-              <ExternalLink className="h-3 w-3" />
-            </a>
-            {t("csvExport.descriptionSuffix" as TranslationKey)}
+            {t("csvExport.description" as TranslationKey, { count: total.toLocaleString(), entityLabel })}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

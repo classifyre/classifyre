@@ -17,26 +17,16 @@ export interface ExportQuery {
   filename: string;
 }
 
-export interface PagedQuery {
-  sql: string;
-  params: unknown[];
-  /** Result-column aliases whose values form the opaque next-page cursor. */
-  cursorKeys: string[];
-}
-
-/** Reusable SELECT/FROM/WHERE pieces shared by the CSV and paged builders. */
+/** Reusable SELECT/FROM/WHERE pieces behind the CSV builders. */
 interface QueryParts {
   b: SqlParams;
   selectSql: string;
   fromSql: string;
   whereClauses: string[];
-  /** Raw SQL key expressions for keyset pagination, with their result aliases. */
-  keyColumns: Array<{ expr: string; alias: string }>;
 }
 
 /**
- * Builds parameterized SQL (joins + WHERE) for the CSV exports and the
- * cursor-paginated "live query" endpoints.
+ * Builds parameterized SQL (joins + WHERE) for the CSV exports.
  *
  * The existing search services return `Prisma.*WhereInput` objects which cannot
  * feed pg-query-stream, so the WHERE clauses are rebuilt here as parameterized
@@ -44,10 +34,6 @@ interface QueryParts {
  * expand to `column IN ($1::"Enum", ...)`, JSON columns are selected as `::text`,
  * and free-text search reuses the ILIKE-OR + full-text-search shape from
  * findings.service.ts.
- *
- * The CSV and paged variants share the same SELECT/FROM/WHERE so the two stay
- * consistent; only the ORDER BY (display sort vs. keyset key) and the LIMIT/cursor
- * differ.
  */
 @Injectable()
 export class ExportQueryService {
@@ -95,7 +81,6 @@ export class ExportQueryService {
         JOIN assets a ON f.asset_id = a.id
         LEFT JOIN sources s ON f.source_id = s.id`,
       whereClauses: where,
-      keyColumns: [{ expr: 'f.id', alias: '__cursor_0' }],
     };
   }
 
@@ -108,14 +93,6 @@ export class ExportQueryService {
       filename: `findings-${this.dateStamp()}.csv`,
       columns: FINDINGS_COLUMNS,
     };
-  }
-
-  buildFindingsPaged(
-    filters: ExportFindingsQueryDto,
-    limit: number,
-    cursor?: string[],
-  ): PagedQuery {
-    return this.toPaged(this.findingsParts(filters), limit, cursor);
   }
 
   // ── Assets (one row per asset-finding) ───────────────────────────────────────
@@ -188,7 +165,6 @@ export class ExportQueryService {
 
     let findingsJoin: string;
     let findingSelect: string;
-    let keyColumns: QueryParts['keyColumns'];
     if (excludeFindings) {
       // No findings join — one row per asset, finding columns null.
       findingsJoin = '';
@@ -199,7 +175,6 @@ export class ExportQueryService {
         NULL::text AS finding_status,
         NULL::numeric AS confidence,
         NULL::text AS matched_content`;
-      keyColumns = [{ expr: 'a.id', alias: '__cursor_0' }];
     } else {
       const onConds = ['f.asset_id = a.id', ...findingConds].join(' AND ');
       // LEFT JOIN keeps assets without matching findings (null finding columns);
@@ -212,12 +187,6 @@ export class ExportQueryService {
         f.status AS finding_status,
         f.confidence AS confidence,
         f.matched_content AS matched_content`;
-      // Composite key: an asset may appear once per finding, so the finding id
-      // (empty for unmatched assets) is the tiebreaker after the asset id.
-      keyColumns = [
-        { expr: 'a.id', alias: '__cursor_0' },
-        { expr: `COALESCE(f.id::text, '')`, alias: '__cursor_1' },
-      ];
     }
 
     return {
@@ -227,7 +196,6 @@ export class ExportQueryService {
         ${findingsJoin}
         LEFT JOIN sources s ON a.source_id = s.id`,
       whereClauses: assetWhere,
-      keyColumns,
     };
   }
 
@@ -240,14 +208,6 @@ export class ExportQueryService {
       filename: `assets-${this.dateStamp()}.csv`,
       columns: ASSETS_COLUMNS,
     };
-  }
-
-  buildAssetsPaged(
-    filters: ExportAssetsQueryDto,
-    limit: number,
-    cursor?: string[],
-  ): PagedQuery {
-    return this.toPaged(this.assetsParts(filters), limit, cursor);
   }
 
   // ── Runner assets ────────────────────────────────────────────────────────────
@@ -274,8 +234,6 @@ export class ExportQueryService {
       fromSql: `FROM runner_assets ra
         LEFT JOIN assets a ON a.runner_id = ra.runner_id AND a.hash = ra.asset_hash`,
       whereClauses: where,
-      // asset_hash is unique within a runner and already a selected column.
-      keyColumns: [{ expr: 'ra.asset_hash', alias: 'asset_hash' }],
     };
   }
 
@@ -287,62 +245,6 @@ export class ExportQueryService {
       params: parts.b.values,
       filename: `runner-assets-${this.dateStamp()}.csv`,
       columns: RUNNER_ASSETS_COLUMNS,
-    };
-  }
-
-  buildRunnerAssetsPaged(
-    filters: ExportRunnerAssetsQueryDto,
-    limit: number,
-    cursor?: string[],
-  ): PagedQuery {
-    return this.toPaged(this.runnerAssetsParts(filters), limit, cursor);
-  }
-
-  // ── Shared paged-query assembly ──────────────────────────────────────────────
-
-  /**
-   * Turns shared query parts into a keyset-paginated query: stable ascending
-   * order by the key columns, a `(k1,k2) > (c1,c2)` lexicographic cursor clause,
-   * and a LIMIT. Key columns are also selected (aliased) so the caller can read
-   * them off the last row to build the next cursor.
-   */
-  private toPaged(
-    parts: QueryParts,
-    limit: number,
-    cursor?: string[],
-  ): PagedQuery {
-    const { b, whereClauses } = parts;
-    const conds = [...whereClauses];
-
-    if (cursor?.length) {
-      conds.push(
-        keysetClause(
-          b,
-          parts.keyColumns.map((k) => k.expr),
-          cursor,
-        ),
-      );
-    }
-
-    const keySelect = parts.keyColumns
-      // Synthetic `__cursor_*` keys must be selected; aliases that name a real
-      // selected column (e.g. asset_hash) are already present.
-      .filter((k) => k.alias.startsWith('__cursor_'))
-      .map((k) => `${k.expr} AS ${k.alias}`);
-
-    const selectSql = keySelect.length
-      ? `${parts.selectSql}, ${keySelect.join(', ')}`
-      : parts.selectSql;
-
-    const orderBy = parts.keyColumns.map((k) => `${k.expr} ASC`).join(', ');
-    const limitPlaceholder = b.add(limit);
-
-    return {
-      sql: `SELECT ${selectSql} ${parts.fromSql} ${whereSql(conds)}
-        ORDER BY ${orderBy}
-        LIMIT ${limitPlaceholder}`,
-      params: b.values,
-      cursorKeys: parts.keyColumns.map((k) => k.alias),
     };
   }
 
@@ -471,27 +373,6 @@ class SqlParams {
 
 function whereSql(clauses: string[]): string {
   return clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
-}
-
-/**
- * Lexicographic keyset comparison for stable ascending pagination:
- * `(k0 > c0) OR (k0 = c0 AND k1 > c1) OR ...`.
- */
-function keysetClause(
-  b: SqlParams,
-  keyExprs: string[],
-  cursorVals: string[],
-): string {
-  const ors: string[] = [];
-  for (let i = 0; i < keyExprs.length && i < cursorVals.length; i++) {
-    const ands: string[] = [];
-    for (let j = 0; j < i; j++) {
-      ands.push(`${keyExprs[j]} = ${b.add(cursorVals[j])}`);
-    }
-    ands.push(`${keyExprs[i]} > ${b.add(cursorVals[i])}`);
-    ors.push(`(${ands.join(' AND ')})`);
-  }
-  return `(${ors.join(' OR ')})`;
 }
 
 // This app registers no global ValidationPipe, so class-transformer decorators on
