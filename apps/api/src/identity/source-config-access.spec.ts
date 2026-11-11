@@ -58,12 +58,14 @@ describe('SourceConfigAccess', () => {
     displayName: null,
     kind: 'visitor',
     via: 'none',
+    ref: undefined,
   };
   const job: Actor = {
     id: null,
     displayName: null,
     kind: 'system',
     via: 'internal-key',
+    ref: undefined,
   };
 
   const access = (manage: boolean, actor: Actor) =>
