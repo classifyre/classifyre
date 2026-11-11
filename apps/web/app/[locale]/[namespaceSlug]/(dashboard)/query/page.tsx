@@ -5,6 +5,8 @@ import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useTranslation } from "@/hooks/use-translation";
 import { QueryExplorer } from "@/components/data-query/query-explorer";
+import { Lock } from "lucide-react";
+import { Button } from "@workspace/ui/components/button";
 import { useTenant } from "@/hooks/use-tenant";
 import {
   QueryWorkbench,
@@ -128,23 +130,61 @@ function QueryPageContent() {
   );
 }
 
-export default function QueryPage() {
+/** What the teaser shows: the kind of question SQL answers across sources. */
+const TEASER_SQL = `-- Join tables of different sources in one query
+SELECT c.region, count(*) AS orders, sum(o.amount) AS revenue
+FROM crm_db.public.customers AS c
+JOIN shop_lake.shop.orders AS o ON o.customer_id = c.id
+GROUP BY ALL
+ORDER BY revenue DESC
+LIMIT 100`;
+
+/**
+ * The SQL page as the public sees it: the real editor and toolbar, with an
+ * example query, every action disabled — what signing in opens. The API
+ * refuses visitors every SQL route (catalog, runs, saved queries) anyway.
+ */
+function QueryTeaser() {
   const { t } = useTranslation();
-  // SQL is never the public's: visitors of a public workspace are asked to
-  // sign in (the API refuses them every SQL route as well).
-  if (useTenant()?.visitor) {
-    return (
-      <div
-        className="mx-auto mt-10 max-w-lg rounded-md border border-dashed p-8 text-center"
-        data-testid="query-sign-in"
-      >
-        <p className="font-medium">{t("dataQuery.signInTitle")}</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {t("dataQuery.signInDescription")}
-        </p>
+  const returnTo =
+    typeof window === "undefined" ? "/" : window.location.pathname;
+  return (
+    <div
+      className="-mx-4 -mb-4 flex min-h-[calc(100vh-10rem)] min-w-0 flex-col"
+      data-testid="query-teaser"
+    >
+      <div className="mx-3 mt-2 flex flex-wrap items-center gap-3 rounded-md border border-dashed bg-muted/30 p-4">
+        <Lock className="h-5 w-5 shrink-0 text-muted-foreground" />
+        <div className="min-w-0 flex-1">
+          <p className="font-medium">{t("dataQuery.teaser.title")}</p>
+          <p className="text-sm text-muted-foreground">
+            {t("dataQuery.teaser.description")}
+          </p>
+        </div>
+        <Button asChild size="sm" data-testid="query-teaser-sign-in">
+          <a href={`/auth/login/?returnTo=${encodeURIComponent(returnTo)}`}>
+            {t("dataQuery.teaser.signIn")}
+          </a>
+        </Button>
       </div>
-    );
-  }
+      <section className="min-w-0 px-3 py-2">
+        <QueryWorkbench
+          catalog={null}
+          initialSql={TEASER_SQL}
+          editorPath="query://teaser/example.sql"
+          editorHeight={240}
+          resultHeight={320}
+          disabled
+        />
+      </section>
+    </div>
+  );
+}
+
+export default function QueryPage() {
+  // SQL is never the public's to run: visitors of a public workspace see
+  // what it can do, and are asked to sign in to use it.
+  if (useTenant()?.visitor) return <QueryTeaser />;
   return (
     <Suspense>
       <QueryPageContent />

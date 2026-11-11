@@ -432,6 +432,11 @@ test.describe.serial("smoke with sign-in", () => {
       await expect(visitorPage.getByTestId("sign-in")).toBeVisible({ timeout: 60_000 });
       await visitorPage.waitForTimeout(3_000);
       expect(new URL(visitorPage.url()).pathname).toContain(`/${SLUG}/discovery`);
+      // SQL shows what it can do, and runs nothing for them.
+      await visitorPage.goto(`/${SLUG}/query/`);
+      await expect(visitorPage.getByTestId("query-teaser")).toBeVisible({ timeout: 60_000 });
+      await expect(visitorPage.getByTestId("run-query")).toBeDisabled();
+      await expect(visitorPage.getByTestId("query-teaser-sign-in")).toBeVisible();
       await visitorPage.goto(`/${SLUG}/settings/`);
       await expect(visitorPage.getByTestId("settings-no-access")).toBeVisible();
       // Nor is saving SQL, which would pool every visitor's queries together.

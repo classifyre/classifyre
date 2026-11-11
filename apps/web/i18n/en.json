@@ -7556,8 +7556,11 @@
       "undo": "Undo (Ctrl/⌘+Z)",
       "redo": "Redo (Ctrl/⌘+Shift+Z)"
     },
-    "signInTitle": "Sign in to use SQL",
-    "signInDescription": "Querying tables needs a signed-in account with data access. A public workspace is for reading its findings, sources and cases."
+    "teaser": {
+      "title": "SQL over this workspace's tables",
+      "description": "Query and join the rows of its databases, lakehouses and files with standard SQL, export them to Excel, CSV or Parquet. Sign in with an account that has data access to run queries.",
+      "signIn": "Sign in to use SQL"
+    }
   },
   "notificationAudiences": {
     "title": "Who gets notifications",
