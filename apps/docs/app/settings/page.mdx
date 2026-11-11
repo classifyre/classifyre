@@ -52,18 +52,21 @@ needs **workspace.settings** and takes effect within seconds, with no restart.
 
 | Setting                   | What it limits                                                                                  | Helm chart value                   | All-in-one image variable      |
 | ------------------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------- | ------------------------------ |
-| Scans running at once     | Scans running across all workspaces; further scans wait in the queue. `0` means unlimited.      | `api.env.MAX_CONCURRENT_RUNNERS`   | `MAX_CONCURRENT_RUNNERS`       |
-| Automatic scans at once   | Scans in flight before the adaptive scheduler asks for another one. `0` turns it off.            | `api.env.AUTO_SCHEDULE_MAX_CONCURRENT` | `AUTO_SCHEDULE_MAX_CONCURRENT` |
-| Runs kept per source      | Finished runs kept for each source; older ones are removed. `0` keeps everything.                | `api.env.MAX_RUNNERS_PER_SOURCE`   | `MAX_RUNNERS_PER_SOURCE`       |
+| Scans running at once     | Scans this workspace runs at once; further scans wait in the queue. `0` means no workspace limit.      | `api.env.MAX_CONCURRENT_RUNNERS`   | `MAX_CONCURRENT_RUNNERS`       |
+| Automatic scans at once   | Scans in flight in this workspace before the adaptive scheduler asks for another one. `0` turns it off.            | `api.env.AUTO_SCHEDULE_MAX_CONCURRENT` | `AUTO_SCHEDULE_MAX_CONCURRENT` |
+| Runs kept per source      | Finished runs kept for each source of this workspace; older ones are removed. `0` keeps everything.                | `api.env.MAX_RUNNERS_PER_SOURCE`   | `MAX_RUNNERS_PER_SOURCE`       |
 
-These limits belong to the **whole installation**, not to one workspace: the
-scans of every workspace share the same machine, so every workspace shows and
-changes the same values.
+The limits are **per workspace**: each workspace saves its own values, and the
+settings of one never change another.
 
-A value saved here **overrides** the one the Helm chart or the all-in-one image
-sets. Each field shows what the chart or image sets underneath it. Leave a
-field empty and save to hand that limit back, after which changes to the chart
-or the container's environment apply again.
+A value saved here **replaces** the one the Helm chart or the all-in-one image
+sets, for this workspace. Each field shows what the chart or image sets
+underneath it. Leave a field empty and save to follow the chart or image again.
+
+**Scans running at once** is the exception to "replaces": the chart or image
+value stays the ceiling for the whole installation, because every workspace
+shares the same machine. The workspace value caps the scans this workspace runs
+at once, so it can hold a workspace below the ceiling but never above it.
 
 ### Language, timezone, and time format
 

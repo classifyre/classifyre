@@ -9,7 +9,6 @@ import {
   PUBLIC_SEARCH_PATH_OPTION,
 } from './registry/namespace-registry.sql';
 import { WORKER_QUEUE_STATE_DDL } from './scheduler/worker-queue-state.sql';
-import { DEPLOYMENT_SETTINGS_DDL } from './deployment-settings/deployment-settings.sql';
 import { IAM_TABLES_DDL, OPEN_DATABASE_DDL } from './identity/tenancy.sql';
 import {
   assertDatabaseKind,
@@ -70,7 +69,6 @@ async function prepareRegistry(client: PoolClient): Promise<void> {
   await client.query(REGISTRY_TABLE_DDL);
   await client.query(IAM_TABLES_DDL);
   await client.query(WORKER_QUEUE_STATE_DDL);
-  await client.query(DEPLOYMENT_SETTINGS_DDL);
   await checkDatabaseKind(client);
 }
 
@@ -88,7 +86,6 @@ export async function prepareOpenDatabase(
   await db.query(OPEN_DATABASE_DDL);
   await db.query(IAM_TABLES_DDL);
   await db.query(WORKER_QUEUE_STATE_DDL);
-  await db.query(DEPLOYMENT_SETTINGS_DDL);
 }
 
 /** Ensure the global namespace registry exists under the migration lock. */

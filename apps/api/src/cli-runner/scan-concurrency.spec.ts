@@ -39,7 +39,9 @@ describe('scan concurrency', () => {
 
   const limit = () =>
     (
-      service as unknown as { resolveMaxConcurrentRunners: () => Promise<number> }
+      service as unknown as {
+        resolveMaxConcurrentRunners: () => number;
+      }
     ).resolveMaxConcurrentRunners();
 
   const canStart = () =>
@@ -56,44 +58,45 @@ describe('scan concurrency', () => {
     else process.env.MAX_CONCURRENT_RUNNERS = ENV;
   });
 
-  it('uses the configured limit', async () => {
+  it('uses the configured limit', () => {
     process.env.MAX_CONCURRENT_RUNNERS = '4';
-    expect(await limit()).toBe(4);
+    expect(limit()).toBe(4);
   });
 
-  it('lets a value saved in Settings outrank the environment', async () => {
+  it('holds a workspace below the deployment ceiling when its limit is reached', async () => {
     process.env.MAX_CONCURRENT_RUNNERS = '4';
+    count.mockResolvedValue(1);
     Object.assign(service, {
-      deploymentSettings: { effective: jest.fn().mockResolvedValue(7) },
+      deploymentSettings: { override: jest.fn().mockResolvedValue(1) },
     });
-    expect(await limit()).toBe(7);
+    await expect(canStart()).resolves.toBe(false);
   });
 
-  it('defaults to 2 when nothing is configured', async () => {
-    expect(await limit()).toBe(2);
+  it('defaults to 2 when nothing is configured', () => {
+    expect(limit()).toBe(2);
   });
 
   it('honours 0 as unlimited rather than falling back', async () => {
     process.env.MAX_CONCURRENT_RUNNERS = '0';
-    expect(await limit()).toBe(0);
+    expect(limit()).toBe(0);
     // 0 must short-circuit before counting anything.
     await expect(canStart()).resolves.toBe(true);
     expect(count).not.toHaveBeenCalled();
   });
 
-  it('ignores a malformed value and falls back to the default', async () => {
+  it('ignores a malformed value and falls back to the default', () => {
     process.env.MAX_CONCURRENT_RUNNERS = 'not-a-number';
-    expect(await limit()).toBe(2);
+    expect(limit()).toBe(2);
   });
 
-  it('ignores a negative value and falls back to the default', async () => {
+  it('ignores a negative value and falls back to the default', () => {
     process.env.MAX_CONCURRENT_RUNNERS = '-1';
-    expect(await limit()).toBe(2);
+    expect(limit()).toBe(2);
   });
 
-  it('ignores an empty value and falls back to the default', async () => {
+  it('ignores an empty value and falls back to the default', () => {
     process.env.MAX_CONCURRENT_RUNNERS = '   ';
-    expect(await limit()).toBe(2);
+    expect(limit()).toBe(2);
   });
 
   describe('canStartNewRunner', () => {

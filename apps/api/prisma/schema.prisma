@@ -1142,6 +1142,13 @@ model InstanceSettings {
 
   hfTokenEnc String? @map("hf_token_enc")
 
+  // Scan limits of this workspace. Null follows the Helm chart / all-in-one
+  // image (MAX_CONCURRENT_RUNNERS, AUTO_SCHEDULE_MAX_CONCURRENT,
+  // MAX_RUNNERS_PER_SOURCE); a number replaces it for this workspace.
+  maxConcurrentRunners      Int? @map("max_concurrent_runners")
+  autoScheduleMaxConcurrent Int? @map("auto_schedule_max_concurrent")
+  maxRunnersPerSource       Int? @map("max_runners_per_source")
+
   // Investigation autopilot — instance-wide defaults. Per-entity aiMode on
   // Inquiry/Case overrides these when not INHERIT.
   // Per-agent prompt steering lives on AgentConfig.goal, not here: the
