@@ -286,7 +286,7 @@ No authorization required
 
 ## tenantAccessControllerRemoveGrant
 
-> tenantAccessControllerRemoveGrant(id)
+> GrantDto tenantAccessControllerRemoveGrant(id)
 
 Remove any grant of the tenant
 
@@ -329,7 +329,7 @@ example().catch(console.error);
 
 ### Return type
 
-`void` (Empty response body)
+[**GrantDto**](GrantDto.md)
 
 ### Authorization
 
@@ -338,13 +338,13 @@ No authorization required
 ### HTTP request headers
 
 - **Content-Type**: Not defined
-- **Accept**: Not defined
+- **Accept**: `application/json`
 
 
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-| **204** |  |  -  |
+| **200** | The grant that was removed. |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
@@ -835,7 +835,7 @@ No authorization required
 
 ## workspaceAccessControllerRemoveGrant
 
-> workspaceAccessControllerRemoveGrant(id)
+> GrantDto workspaceAccessControllerRemoveGrant(id)
 
 Remove a grant made on this workspace
 
@@ -878,7 +878,7 @@ example().catch(console.error);
 
 ### Return type
 
-`void` (Empty response body)
+[**GrantDto**](GrantDto.md)
 
 ### Authorization
 
@@ -887,13 +887,13 @@ No authorization required
 ### HTTP request headers
 
 - **Content-Type**: Not defined
-- **Accept**: Not defined
+- **Accept**: `application/json`
 
 
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-| **204** |  |  -  |
+| **200** | The grant that was removed. |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 

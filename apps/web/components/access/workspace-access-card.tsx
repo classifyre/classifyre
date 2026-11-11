@@ -2,15 +2,17 @@
 
 import * as React from "react";
 import {
-  ArrowDown,
-  ArrowUp,
-  ChevronsUpDown,
   Plus,
   ShieldCheck,
   Trash2,
   UserPlus,
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  SortableHead,
+  sortRows,
+  useTableSort,
+} from "@/components/sortable-table-head";
 import {
   api,
   type GrantDto,
@@ -51,44 +53,7 @@ import { formatDate } from "@/lib/date";
 import { extractApiErrorMessage } from "@/lib/extract-api-error-message";
 
 type GrantsSortCol = "group" | "role" | "scope" | "until";
-type SortDir = "asc" | "desc";
 
-/** One sortable column head for the dense access tables. */
-function SortableHead({
-  label,
-  column,
-  sortCol,
-  sortDir,
-  onSort,
-}: {
-  label: string;
-  column: GrantsSortCol;
-  sortCol: GrantsSortCol;
-  sortDir: SortDir;
-  onSort: (col: GrantsSortCol) => void;
-}) {
-  const active = sortCol === column;
-  return (
-    <TableHead>
-      <button
-        type="button"
-        onClick={() => onSort(column)}
-        className="flex items-center gap-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:text-foreground"
-      >
-        {label}
-        {active ? (
-          sortDir === "asc" ? (
-            <ArrowUp className="h-2.5 w-2.5" />
-          ) : (
-            <ArrowDown className="h-2.5 w-2.5" />
-          )
-        ) : (
-          <ChevronsUpDown className="h-2.5 w-2.5 opacity-40" />
-        )}
-      </button>
-    </TableHead>
-  );
-}
 
 /**
  * Who has access to this workspace, and why (docs/prd §12.4). Grants made
@@ -125,8 +90,10 @@ export function WorkspaceAccessCard() {
     void load();
   }, [load]);
 
-  const roleTitle = (key: string) =>
-    roles.find((role) => role.key === key)?.title ?? key;
+  const roleTitle = React.useCallback(
+    (key: string) => roles.find((role) => role.key === key)?.title ?? key,
+    [roles],
+  );
 
   const remove = async (grant: GrantDto) => {
     try {
@@ -192,43 +159,25 @@ function GrantsTable({
   onRemove: (grant: GrantDto) => void;
 }) {
   const { t } = useTranslation();
-  const [sortCol, setSortCol] = React.useState<GrantsSortCol>("group");
-  const [sortDir, setSortDir] = React.useState<SortDir>("asc");
+  const sort = useTableSort<GrantsSortCol>("group");
+  const { sortCol, sortDir } = sort;
 
-  const onSort = (col: GrantsSortCol) => {
-    if (col === sortCol) {
-      setSortDir((dir) => (dir === "asc" ? "desc" : "asc"));
-    } else {
-      setSortCol(col);
-      setSortDir("asc");
-    }
-  };
-
-  const rows = React.useMemo(() => {
-    const base = grants ?? [];
-    const keyOf = (grant: GrantDto) =>
-      sortCol === "role"
-        ? roleTitle(grant.roleKey)
-        : sortCol === "scope"
-          ? grant.scopeLabel
-          : sortCol === "until"
-            ? (grant.expiresAt ?? "")
-            : grant.subjectLabel;
-    return [...base].sort((a, b) => {
-      const left = keyOf(a);
-      const right = keyOf(b);
-      if (left instanceof Date || right instanceof Date) {
-        const l = left ? new Date(left as string | Date).getTime() : NaN;
-        const r = right ? new Date(right as string | Date).getTime() : NaN;
-        if (Number.isNaN(l) && Number.isNaN(r)) return 0;
-        if (Number.isNaN(l)) return 1;
-        if (Number.isNaN(r)) return -1;
-        return sortDir === "asc" ? l - r : r - l;
-      }
-      const cmp = String(left).localeCompare(String(right));
-      return sortDir === "asc" ? cmp : -cmp;
-    });
-  }, [grants, sortCol, sortDir, roleTitle]);
+  const rows = React.useMemo(
+    () =>
+      sortRows(
+        grants ?? [],
+        (grant) =>
+          sortCol === "role"
+            ? roleTitle(grant.roleKey)
+            : sortCol === "scope"
+              ? grant.scopeLabel
+              : sortCol === "until"
+                ? grant.expiresAt
+                : grant.subjectLabel,
+        sortDir,
+      ),
+    [grants, sortCol, sortDir, roleTitle],
+  );
 
   if (grants?.length === 0) {
     return (
@@ -246,30 +195,22 @@ function GrantsTable({
             <SortableHead
               label={t("access.grantsTable.group")}
               column="group"
-              sortCol={sortCol}
-              sortDir={sortDir}
-              onSort={onSort}
+              sort={sort}
             />
             <SortableHead
               label={t("access.grantsTable.role")}
               column="role"
-              sortCol={sortCol}
-              sortDir={sortDir}
-              onSort={onSort}
+              sort={sort}
             />
             <SortableHead
               label={t("access.grantsTable.scope")}
               column="scope"
-              sortCol={sortCol}
-              sortDir={sortDir}
-              onSort={onSort}
+              sort={sort}
             />
             <SortableHead
               label={t("access.grantsTable.until")}
               column="until"
-              sortCol={sortCol}
-              sortDir={sortDir}
-              onSort={onSort}
+              sort={sort}
             />
             <TableHead>
               <span className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
@@ -461,9 +402,10 @@ function WhatICanDo({ roles }: { roles: RoleDto[] }) {
   const [rows, setRows] = React.useState<
     { capability: string; grant: GrantDto }[] | null
   >(null);
-  const [sortCol, setSortCol] =
-    React.useState<"capability" | "group" | "role" | "scope">("capability");
-  const [sortDir, setSortDir] = React.useState<SortDir>("asc");
+  const sort = useTableSort<"capability" | "group" | "role" | "scope">(
+    "capability",
+  );
+  const { sortCol, sortDir } = sort;
 
   const capabilities = React.useMemo(
     () => [...(me?.capabilities ?? [])].sort(),
@@ -494,56 +436,30 @@ function WhatICanDo({ roles }: { roles: RoleDto[] }) {
     };
   }, [capabilities]);
 
-  const roleTitle = (key: string) =>
-    roles.find((role) => role.key === key)?.title ?? key;
+  const roleTitle = React.useCallback(
+    (key: string) => roles.find((role) => role.key === key)?.title ?? key,
+    [roles],
+  );
 
-  const onSort = (col: typeof sortCol) => {
-    if (col === sortCol) {
-      setSortDir((dir) => (dir === "asc" ? "desc" : "asc"));
-    } else {
-      setSortCol(col);
-      setSortDir("asc");
-    }
-  };
+  const sorted = React.useMemo(
+    () =>
+      sortRows(
+        rows ?? [],
+        (row) =>
+          sortCol === "group"
+            ? row.grant.subjectLabel
+            : sortCol === "role"
+              ? roleTitle(row.grant.roleKey)
+              : sortCol === "scope"
+                ? row.grant.scopeLabel
+                : row.capability,
+        sortDir,
+      ),
+    [rows, sortCol, sortDir, roleTitle],
+  );
 
-  const sorted = React.useMemo(() => {
-    const keyOf = (row: { capability: string; grant: GrantDto }) =>
-      sortCol === "group"
-        ? row.grant.subjectLabel
-        : sortCol === "role"
-          ? roleTitle(row.grant.roleKey)
-          : sortCol === "scope"
-            ? row.grant.scopeLabel
-            : row.capability;
-    return [...(rows ?? [])].sort((a, b) => {
-      const cmp = keyOf(a).localeCompare(keyOf(b));
-      return sortDir === "asc" ? cmp : -cmp;
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, sortCol, sortDir]);
-
-  const head = (
-    label: string,
-    column: typeof sortCol,
-  ) => (
-    <TableHead>
-      <button
-        type="button"
-        onClick={() => onSort(column)}
-        className="flex items-center gap-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:text-foreground"
-      >
-        {label}
-        {sortCol === column ? (
-          sortDir === "asc" ? (
-            <ArrowUp className="h-2.5 w-2.5" />
-          ) : (
-            <ArrowDown className="h-2.5 w-2.5" />
-          )
-        ) : (
-          <ChevronsUpDown className="h-2.5 w-2.5 opacity-40" />
-        )}
-      </button>
-    </TableHead>
+  const head = (label: string, column: typeof sortCol) => (
+    <SortableHead label={label} column={column} sort={sort} />
   );
 
   if ((rows ?? []).length === 0) {

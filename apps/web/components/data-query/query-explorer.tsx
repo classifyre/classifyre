@@ -38,33 +38,17 @@ import {
 import { cn } from "@workspace/ui/lib/utils";
 import { useTranslation } from "@/hooks/use-translation";
 import { useNamespace } from "@/components/namespace-provider";
+import { formatDate, formatRelative } from "@/lib/date";
 import {
   type QueryCatalog,
   type QueryCatalogTable,
   type QueryRun,
   type SavedQueryDto,
 } from "@/lib/data-query";
-import { useSqlInsert } from "./sql-editor";
 
+/** When a run or a saved query was last touched, in the reader's language. */
 function ShortTime({ at }: { at: string | Date }) {
-  const date = new Date(at);
-  const now = Date.now();
-  const diff = now - date.getTime();
-  if (diff < 60_000) return <span>just now</span>;
-  if (diff < 3_600_000) return <span>{Math.round(diff / 60_000)} min ago</span>;
-  if (diff < 86_400_000 && date.toDateString() === new Date().toDateString()) {
-    return (
-      <span>
-        {date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-      </span>
-    );
-  }
-  return (
-    <span>
-      {date.toLocaleDateString([], { month: "short", day: "numeric" })}{" "}
-      {date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-    </span>
-  );
+  return <span title={formatDate(at)}>{formatRelative(at)}</span>;
 }
 
 function StatusDot({ status }: { status: string }) {
@@ -117,35 +101,41 @@ async function copyText(text: string): Promise<boolean> {
 }
 
 /**
- * The right-hand side of the SQL page: Tables (sources → tables → columns),
+ * The explorer beside an editor: Tables (sources → tables → columns),
  * History (recent SQL, reopened into the editor) and Saved. A table's play
  * button replaces the editor with a preview query over it; copy takes the
- * full `source.schema.table` name for pasting elsewhere.
+ * full `source.schema.table` name for pasting elsewhere. `tablesOnly` keeps
+ * just the tables, for a source's Data tab.
  */
 export function QueryExplorer({
   catalog,
-  history,
-  historyLoading,
-  saved,
-  savedLoading,
+  onInsert,
+  onRunTable,
+  tablesOnly = false,
+  history = [],
+  historyLoading = false,
+  saved = [],
+  savedLoading = false,
   onOpenRun,
   onOpenSaved,
-  onRunTable,
   activeRunId,
 }: {
   catalog: QueryCatalog | null;
-  history: QueryRun[];
-  historyLoading: boolean;
-  saved: SavedQueryDto[];
-  savedLoading: boolean;
-  onOpenRun: (run: QueryRun) => void;
-  onOpenSaved: (saved: SavedQueryDto) => void;
+  /** Writes a table or column name where the editor's cursor stands. */
+  onInsert: (text: string) => void;
   onRunTable: (sqlName: string) => void;
+  tablesOnly?: boolean;
+  history?: QueryRun[];
+  historyLoading?: boolean;
+  saved?: SavedQueryDto[];
+  savedLoading?: boolean;
+  onOpenRun?: (run: QueryRun) => void;
+  onOpenSaved?: (saved: SavedQueryDto) => void;
   activeRunId?: string | null;
 }) {
   const { t } = useTranslation();
   const { nsHref } = useNamespace();
-  const insert = useSqlInsert();
+  const insert = onInsert;
   const [tab, setTab] = React.useState("tables");
   const [filter, setFilter] = React.useState("");
   const [onlyQueryable, setOnlyQueryable] = React.useState(false);
@@ -215,20 +205,22 @@ export function QueryExplorer({
         onValueChange={setTab}
         className="flex h-full min-h-0 w-full min-w-0 flex-col"
       >
-        <TabsList className="grid h-8 w-full shrink-0 grid-cols-3 p-0.5">
-          <TabsTrigger value="tables" className="h-7 gap-1.5 px-1 text-xs">
-            <Database className="h-3.5 w-3.5" />
-            {t("dataQuery.explorer.tables")}
-          </TabsTrigger>
-          <TabsTrigger value="history" className="h-7 gap-1.5 px-1 text-xs">
-            <History className="h-3.5 w-3.5" />
-            {t("dataQuery.explorer.history")}
-          </TabsTrigger>
-          <TabsTrigger value="saved" className="h-7 gap-1.5 px-1 text-xs">
-            <FileText className="h-3.5 w-3.5" />
-            {t("dataQuery.explorer.saved")}
-          </TabsTrigger>
-        </TabsList>
+        {!tablesOnly && (
+          <TabsList className="grid h-8 w-full shrink-0 grid-cols-3 p-0.5">
+            <TabsTrigger value="tables" className="h-7 gap-1.5 px-1 text-xs">
+              <Database className="h-3.5 w-3.5" />
+              {t("dataQuery.explorer.tables")}
+            </TabsTrigger>
+            <TabsTrigger value="history" className="h-7 gap-1.5 px-1 text-xs">
+              <History className="h-3.5 w-3.5" />
+              {t("dataQuery.explorer.history")}
+            </TabsTrigger>
+            <TabsTrigger value="saved" className="h-7 gap-1.5 px-1 text-xs">
+              <FileText className="h-3.5 w-3.5" />
+              {t("dataQuery.explorer.saved")}
+            </TabsTrigger>
+          </TabsList>
+        )}
 
         <TabsContent
           value="tables"
@@ -573,7 +565,7 @@ export function QueryExplorer({
                   "group w-full min-w-0 rounded border p-2 text-left hover:bg-muted",
                   activeRunId === run.id && "border-primary bg-muted",
                 )}
-                onClick={() => onOpenRun(run)}
+                onClick={() => onOpenRun?.(run)}
                 title={t("dataQuery.explorer.reopenHint")}
                 data-testid={`query-history-${run.id}`}
               >
@@ -620,7 +612,7 @@ export function QueryExplorer({
                 key={item.id}
                 type="button"
                 className="group w-full min-w-0 rounded border p-2 text-left hover:bg-muted"
-                onClick={() => onOpenSaved(item)}
+                onClick={() => onOpenSaved?.(item)}
                 title={t("dataQuery.explorer.reopenHint")}
                 data-testid={`query-saved-${item.id}`}
               >

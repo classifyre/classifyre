@@ -332,6 +332,19 @@ test.describe.serial("smoke with sign-in", () => {
       .poll(async () => (await ordersTable(viewer.api)).canQuery, { timeout: 90_000, intervals: [5_000] })
       .toBe(true);
 
+    // The source's Data tab: its tables beside the editor, and the access
+    // just given on one of them in the source's Access and Activity.
+    {
+      const { page } = admin;
+      await page.goto(`/${SLUG}/sources/${sourceId}/?tab=data`);
+      const tab = page.getByTestId("source-data-tab");
+      await expect(tab).toBeVisible({ timeout: 60_000 });
+      await expect(tab.getByTestId(`catalog-table-${before.sqlName}`)).toBeVisible();
+      await expect(tab.getByTestId("data-access-table")).toContainText(VIEWERS_GROUP);
+      await tab.getByTestId("data-activity-tab").click();
+      await expect(tab.getByTestId("data-access")).toContainText(VIEWERS_GROUP, { timeout: 30_000 });
+    }
+
     const { page } = viewer;
     await page.goto(`/${SLUG}/assets/${before.assetId}/?tab=data`);
     await expect(page.getByTestId("asset-data-tab")).toBeVisible();
@@ -381,6 +394,12 @@ test.describe.serial("smoke with sign-in", () => {
       expect(write.status).toBe(401);
       expect((await visitor.call("GET", `/${SLUG}/access/grants`)).status).toBe(401);
       expect((await visitor.call("GET", `/${SLUG}/notifications`)).status).toBe(401);
+      // Nor is saving SQL, which would pool every visitor's queries together.
+      const saved = await visitor.call("POST", `/${SLUG}/saved-queries`, {
+        name: "Shared pool",
+        sql: "SELECT 1",
+      });
+      expect(saved.status).toBe(401);
 
       // Private again: closed to visitors at once.
       await admin.api.ok("PATCH", `/namespaces/${workspaceId}`, { public: false });

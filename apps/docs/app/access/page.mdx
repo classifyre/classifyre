@@ -175,7 +175,9 @@ Public means **read-only** for everyone who has no grant on it:
 - Visitors **read**: workspaces, sources and their scans, assets, findings,
   detectors, cases, inquiries, the glossary and entities. They cannot change
   anything, see who has access, get notifications, read the tenant's
-  activity, or create MCP tokens; anything more asks them to sign in.
+  activity, create MCP tokens, or run and save SQL (table rows need the Data
+  reader role, which is only ever given to groups); anything more asks them
+  to sign in.
 - A workspace's own history is part of reading it: visitors see **who
   changed what** there, with the names of its editors. Publish under names
   you are happy to show.
@@ -235,7 +237,11 @@ came from the web app, the API or an agent through MCP. Each entry says:
 - **which fields** were sent. Their values are never stored, so secrets and
   matched content stay out of the trail.
 
-Reading something is not recorded, and neither is the work scans report back.
+Reading is not recorded, with one exception: reading **table rows with SQL**.
+Each table a query or an export read is recorded once, with who ran it, so a
+table's, a source's and the SQL page's **Activity** show who read what (see
+[SQL over your tables](/data-query#giving-access-where-the-data-is)). The work
+scans report back is not recorded either.
 The author is always the signed-in person (or the person an MCP token belongs
 to): a request cannot name someone else.
 
@@ -249,9 +255,14 @@ to): a request cannot name someone else.
 - **For the tenant.** **Tenant access → Activity** lists every grant given or
   removed and every workspace created or deleted, and what operators did to
   the tenant.
+- **For data.** A table's or a source's **Data** tab, and the **SQL** page,
+  have an **Activity** tab of their own: reads and exports of those tables and
+  the data access given or removed on them.
 - **Through the API.** `GET /<workspace>/audit-events`, filtered by item
-  (`entityType`, `entityId`) or by author (`actor`), and
-  `GET /tenant/audit-events`.
+  (`entityType`, `entityId`), by what it touched (`resource`: `data`,
+  `source:<id>` or `asset:<id>`), by author (`actor`), `capability`,
+  `operation` or free text (`search`), sorted (`sortBy`, `sortOrder`) and
+  paged (`skip`, `limit`); and `GET /tenant/audit-events`.
 
 Changes to people and groups are recorded by the identity server itself:
 **Events** and the organization's **Admin events** in its console.

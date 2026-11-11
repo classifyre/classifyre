@@ -77,6 +77,7 @@ import { useEntityDocumentTitle } from "@/components/document-title-updater";
 import { useFormatDuration } from "@/hooks/use-format-duration";
 import { summarizeTextCoverage } from "@/lib/text-coverage";
 import { CohortSelectionCard } from "@/components/cohort-yield";
+import { fetchCatalog, type QueryCatalog } from "@/lib/data-query";
 import { ChangedBy } from "@/components/audit-history";
 
 const EMPTY_CHARTS: SearchAssetsChartsResponseDto = {
@@ -110,6 +111,15 @@ const detectorLabelKeys: Partial<Record<DetectorType, string>> = {
 
 const getApiBase = () => getNamespacedApiBaseUrl();
 
+// Monaco and the results grid: client-only, loaded when the Data tab opens.
+const SourceDataTab = dynamic(
+  () =>
+    import("@/components/data-query/source-data-tab").then(
+      (m) => m.SourceDataTab,
+    ),
+  { ssr: false },
+);
+
 // The canvas measures the DOM: client-only, loaded when the tab opens.
 const ExploreWorkspace = dynamic(
   () => import("@/components/explore/explore-workspace").then((m) => m.ExploreWorkspace),
@@ -123,6 +133,8 @@ export default function SourceViewPage() {
   const sourceId = useRouteId();
 
   const [source, setSource] = useState<SourceResponseDto | null>(null);
+  // What SQL can read: the Data tab shows only for a source with tables.
+  const [queryCatalog, setQueryCatalog] = useState<QueryCatalog | null>(null);
   const [assetCharts, setAssetCharts] =
     useState<SearchAssetsChartsResponseDto>(EMPTY_CHARTS);
   const [recentRunners, setRecentRunners] = useState<
@@ -187,6 +199,19 @@ export default function SourceViewPage() {
       }
     },
     [sourceId],
+  );
+
+  useEffect(() => {
+    let active = true;
+    fetchCatalog()
+      .then((catalog) => active && setQueryCatalog(catalog))
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
+  const hasData = Boolean(
+    queryCatalog?.sources?.some((s) => s.id === sourceId && s.tables.length),
   );
 
   useEffect(() => {
@@ -596,7 +621,14 @@ export default function SourceViewPage() {
         onOpenChange={setDeleteSourceOpen}
       />
 
-      <Tabs defaultValue="overview" urlParam="tab" className="space-y-4">
+      <Tabs
+        // Remounted once the Data tab is known, so ?tab=data opens it: the
+        // tabs read the address when they mount.
+        key={hasData ? "with-data" : "without-data"}
+        defaultValue="overview"
+        urlParam="tab"
+        className="space-y-4"
+      >
         <TabsList className="h-auto rounded-[4px] border-2 border-border bg-background p-1">
           <TabsTrigger value="overview" className="rounded-[3px]">
             {t("sources.detail.tabOverview")}
@@ -610,6 +642,15 @@ export default function SourceViewPage() {
           <TabsTrigger value="connections" className="rounded-[3px]">
             {t("sources.detail.tabConnections")}
           </TabsTrigger>
+          {hasData && (
+            <TabsTrigger
+              value="data"
+              className="rounded-[3px]"
+              data-testid="source-data-tab-trigger"
+            >
+              {t("sources.detail.tabData")}
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
@@ -1010,6 +1051,16 @@ export default function SourceViewPage() {
         <TabsContent value="connections" className="space-y-4">
           <ExploreWorkspace mode="source" sourceId={sourceId} sourceName={source.name} />
         </TabsContent>
+
+        {hasData && queryCatalog && (
+          <TabsContent value="data" className="space-y-4">
+            <SourceDataTab
+              catalog={queryCatalog}
+              sourceId={sourceId}
+              sourceName={source.name}
+            />
+          </TabsContent>
+        )}
       </Tabs>
 
       <BulkUpdateDialog

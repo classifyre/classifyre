@@ -277,3 +277,35 @@ def test_export_stays_inside_the_gate(folder: Path) -> None:
         _request(folder, "SELECT * FROM read_csv('/etc/passwd')", exportFormat="xlsx")
     )
     assert payload["error"]["code"] == "function_not_allowed"
+
+
+def _binding(source_type: str, required: dict[str, Any], **optional: Any) -> Any:
+    from src.query.bindings import SourceBinding
+
+    recipe = {"type": source_type, "required": required, "optional": optional}
+    return SourceBinding("shop_db", 0, recipe, "src-1")
+
+
+def test_binding_labels_name_the_endpoint_like_the_scan() -> None:
+    mysql = _binding("MYSQL", {"host": "db.example.test", "port": 3306})
+    postgres = _binding("POSTGRESQL", {"host": "pg.example.test", "port": 5432})
+    files = _binding("S3_COMPATIBLE_STORAGE", {"bucket": "lake"})
+    assert mysql.label() == "mysql://db.example.test:3306/"
+    assert postgres.label() == "postgresql://pg.example.test:5432/"
+    # No host: the SQL name the person typed, never an internal alias.
+    assert files.label() == "shop_db"
+
+
+@pytest.mark.parametrize("mode", ["VERIFY_CA", "verify_identity"])
+def test_mysql_certificate_checks_are_refused_not_dropped(mode: str) -> None:
+    from src.query.bindings import BindingError, TableLocation
+
+    binding = _binding(
+        "MYSQL",
+        {"host": "db.example.test", "port": 3306},
+        connection={"ssl_mode": mode},
+    )
+    conn = duckdb.connect()
+    location = TableLocation(kind="catalog", database="shop", table="orders")
+    with pytest.raises(BindingError, match="verifies the server's certificate"):
+        binding.relation(conn, location)

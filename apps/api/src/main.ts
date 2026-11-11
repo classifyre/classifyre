@@ -320,8 +320,6 @@ async function bootstrap() {
         (request.raw as NamespaceRawRequest).classifyreDatabaseLane ??
           'interactive',
       );
-      // Write tools check demo mode deep inside their callbacks, where the
-      // request is gone, so hand them the bypass decision through CLS.
 
       const settings = await instanceSettingsService.getSettings();
       if (!settings.mcpEnabled) {

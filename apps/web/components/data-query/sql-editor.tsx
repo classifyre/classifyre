@@ -7,6 +7,7 @@ import type { editor, languages, Position } from "monaco-editor";
 import { Undo2, Redo2 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Textarea } from "@workspace/ui/components/textarea";
+import { useTranslation } from "@/hooks/use-translation";
 import type { QueryCatalog } from "@/lib/data-query";
 
 // Monaco reads `window` when its module loads: never in a server chunk.
@@ -14,12 +15,28 @@ const Editor = dynamic(() => import("@/components/monaco-editor-lazy"), {
   ssr: false,
 });
 
+/** The words completion details are written in, translated by the editor. */
+export interface SqlCompletionLabels {
+  /** `{{source}} · {{count}} tables you can query` for a schema. */
+  schema: (source: string, count: number) => string;
+  /** `{{name}} · {{count}} columns` for a table you can query. */
+  table: (name: string, count: number) => string;
+  /** `{{name}} (no access)` for a table you cannot. */
+  locked: (name: string) => string;
+  /** `{{source}} · {{count}} tables` for a source. */
+  source: (source: string, count: number) => string;
+}
+
 /**
- * The catalog completions are read from. One SQL completion provider serves
- * every editor on the page, so it reads whatever catalog the last mounted
- * editor was given rather than registering one provider per editor.
+ * What each editor completes from, by its model: one SQL completion provider
+ * serves every editor on the page (Monaco registers per language), and looks
+ * up the catalog and words of the editor it is completing in — a source's
+ * Data tab completes only that source, the SQL page the whole workspace.
  */
-let completionCatalog: QueryCatalog | null = null;
+const completionContexts = new Map<
+  string,
+  { catalog: QueryCatalog | null; labels: SqlCompletionLabels }
+>();
 let providerRegistered = false;
 
 const KEYWORDS = [
@@ -81,7 +98,10 @@ function registerCompletions(monaco: Monaco): void {
         line,
       );
       const suggestions: languages.CompletionItem[] = [];
-      const sources = completionCatalog?.sources ?? [];
+      const context = completionContexts.get(model.uri.toString());
+      if (!context) return { suggestions };
+      const { labels } = context;
+      const sources = context.catalog?.sources ?? [];
       const Kind = monaco.languages.CompletionItemKind;
 
       if (pathMatch) {
@@ -106,7 +126,7 @@ function registerCompletions(monaco: Monaco): void {
               suggestions.push({
                 label: schema,
                 kind: Kind.Module,
-                detail: `${source.name} · ${queryable} tables you can query`,
+                detail: labels.schema(source.name, queryable),
                 insertText: schema,
                 range,
               });
@@ -130,8 +150,8 @@ function registerCompletions(monaco: Monaco): void {
                 label: table.table,
                 kind: Kind.Struct,
                 detail: table.canQuery
-                  ? `${table.name} · ${table.columns.length} columns`
-                  : `${table.name} (no access)`,
+                  ? labels.table(table.name, table.columns.length)
+                  : labels.locked(table.name),
                 insertText: table.table,
                 insertTextRules:
                   monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
@@ -165,7 +185,7 @@ function registerCompletions(monaco: Monaco): void {
         suggestions.push({
           label: source.sqlName,
           kind: Kind.Folder,
-          detail: `${source.name} · ${queryable} tables`,
+          detail: labels.source(source.name, queryable),
           insertText: source.sqlName,
           range,
         });
@@ -202,7 +222,7 @@ function registerCompletions(monaco: Monaco): void {
  */
 function columnsOfQueryTables(
   sql: string,
-  sources: NonNullable<typeof completionCatalog>["sources"],
+  sources: QueryCatalog["sources"],
 ): Array<{ name: string; table: string; type: string }> {
   const bySqlName = new Map(
     sources.flatMap((s) => s.tables.map((t) => [t.sqlName, t] as const)),
@@ -235,6 +255,17 @@ function columnsOfQueryTables(
   return out;
 }
 
+/** What the workbench beside the editor may do to it. */
+export interface SqlEditorHandle {
+  /** Insert where the cursor stands (the explorer's table and column names). */
+  insert: (text: string) => void;
+  /**
+   * Replace everything as one undoable edit (history, saved, previews): one
+   * Ctrl/Cmd+Z brings back what was on screen before.
+   */
+  replaceAll: (text: string) => void;
+}
+
 export interface SqlEditorProps {
   value: string;
   onChange: (value: string) => void;
@@ -244,6 +275,8 @@ export interface SqlEditorProps {
   height?: number | string;
   /** Distinct per editor, so each keeps its own undo history. */
   path: string;
+  /** React 19: `ref` arrives as a prop. */
+  ref?: React.Ref<SqlEditorHandle>;
 }
 
 export function SqlEditor({
@@ -254,30 +287,64 @@ export function SqlEditor({
   catalog,
   height = 220,
   path,
+  ref,
 }: SqlEditorProps) {
+  const { t } = useTranslation();
   const { resolvedTheme } = useTheme();
   const runRef = React.useRef(onRun);
   runRef.current = onRun;
   const formatRef = React.useRef(onFormat);
   formatRef.current = onFormat;
+  const onChangeRef = React.useRef(onChange);
+  onChangeRef.current = onChange;
   const [, bumpHistory] = React.useState(0);
-
-  React.useEffect(() => {
-    completionCatalog = catalog;
-  }, [catalog]);
-
-  /**
-   * Insert text where the cursor stands — a table from the explorer lands
-   * exactly where a table belongs, never appended to the wrong clause.
-   * Returns the text after the edit, so the caller's state stays in sync with
-   * what Monaco shows (and undo keeps working).
-   */
   const editorRef = React.useRef<editor.IStandaloneCodeEditor | null>(null);
+  const modelKey = React.useRef<string | null>(null);
+  // Edits asked for before Monaco finished loading (it loads lazily): the
+  // textarea fallback shows `value` meanwhile, and these apply on mount.
+  const pending = React.useRef<Array<(e: editor.IStandaloneCodeEditor) => void>>([]);
+
+  const labels = React.useMemo<SqlCompletionLabels>(
+    () => ({
+      schema: (source, count) =>
+        t("dataQuery.completion.schema", { source, count }),
+      table: (name, count) => t("dataQuery.completion.table", { name, count }),
+      locked: (name) => t("dataQuery.completion.locked", { name }),
+      source: (source, count) =>
+        t("dataQuery.completion.source", { source, count }),
+    }),
+    [t],
+  );
+
+  // This editor's catalog and words, under its model's uri.
+  React.useEffect(() => {
+    const key = modelKey.current;
+    if (key) completionContexts.set(key, { catalog, labels });
+  }, [catalog, labels]);
+  React.useEffect(
+    () => () => {
+      if (modelKey.current) completionContexts.delete(modelKey.current);
+    },
+    [],
+  );
+
+  const catalogRef = React.useRef(catalog);
+  catalogRef.current = catalog;
+  const labelsRef = React.useRef(labels);
+  labelsRef.current = labels;
 
   const handleMount = React.useCallback(
     (instance: editor.IStandaloneCodeEditor, monaco: Monaco) => {
       editorRef.current = instance;
       registerCompletions(monaco);
+      const key = instance.getModel()?.uri.toString() ?? null;
+      modelKey.current = key;
+      if (key) {
+        completionContexts.set(key, {
+          catalog: catalogRef.current,
+          labels: labelsRef.current,
+        });
+      }
       instance.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () =>
         runRef.current(),
       );
@@ -285,108 +352,81 @@ export function SqlEditor({
         monaco.KeyMod.Shift | monaco.KeyMod.Alt | monaco.KeyCode.KeyF,
         () => formatRef.current?.(),
       );
-      // Browser memory: undo/redo across every programmatic replace
-      // (history reopen, preview, template), not just keystrokes. Monaco's
-      // own stack already covers all of these — the buttons below just need
-      // to be told when it changed.
-      const historyListener = instance.onDidChangeModelContent(() =>
-        bumpHistory((n) => n + 1),
-      );
-      return historyListener.dispose.bind(historyListener);
+      // Undo/redo across every programmatic replace (history reopen,
+      // preview, template), not just keystrokes: Monaco's own stack covers
+      // them — the buttons only need to re-render when it changes.
+      instance.onDidChangeModelContent(() => bumpHistory((n) => n + 1));
+      for (const apply of pending.current.splice(0)) apply(instance);
     },
     [],
   );
 
-  React.useEffect(() => {
-    const editor = editorRef.current;
-    if (!editor) return;
-    const pending = (SqlEditor as { pendingInsert?: string }).pendingInsert;
-    if (pending) {
-      delete (SqlEditor as { pendingInsert?: string }).pendingInsert;
-      insertAtCursor(editor, pending);
-      onChange(editor.getValue());
-      editor.focus();
-    }
-  });
-
-  const replaceAll = React.useCallback(
-    (text: string) => {
-      const editor = editorRef.current;
-      if (!editor) {
-        (SqlEditor as { pendingReplace?: string }).pendingReplace = text;
-        onChange(text);
-        return;
-      }
-      const model = editor.getModel();
-      // A full-model edit, so one Ctrl/Cmd+Z restores exactly what was on
-      // screen before the reopen — programmatic memory for free. Empty
-      // models need a range too: push a no-op edit first.
-      if (model) {
-        const fullRange = model.getFullModelRange();
-        editor.executeEdits("history-reopen", [{ range: fullRange, text }]);
-      } else {
-        onChange(text);
-      }
-      onChange(editor.getValue());
-      editor.focus();
+  /** Runs now on a mounted editor, or once Monaco has loaded. */
+  const withEditor = React.useCallback(
+    (apply: (instance: editor.IStandaloneCodeEditor) => void) => {
+      const instance = editorRef.current;
+      if (instance) apply(instance);
+      else pending.current.push(apply);
     },
-    [onChange],
+    [],
   );
 
-  // The workbench's history/saved reopen funnels through here.
-  (SqlEditor as { replaceAll?: (text: string) => void }).replaceAll =
-    replaceAll;
+  React.useImperativeHandle(
+    ref,
+    () => ({
+      insert: (text) =>
+        withEditor((instance) => {
+          insertAtCursor(instance, text);
+          onChangeRef.current(instance.getValue());
+          instance.focus();
+        }),
+      replaceAll: (text) => {
+        // The textarea fallback reads `value`: keep it current right away.
+        if (!editorRef.current) onChangeRef.current(text);
+        withEditor((instance) => {
+          const model = instance.getModel();
+          if (model) {
+            instance.executeEdits("replace-all", [
+              { range: model.getFullModelRange(), text },
+            ]);
+          }
+          onChangeRef.current(instance.getValue());
+          instance.focus();
+        });
+      },
+    }),
+    [withEditor],
+  );
 
   const undo = React.useCallback(() => {
-    editorRef.current?.trigger("history", "undo", null);
-    const editor = editorRef.current;
-    if (editor) onChange(editor.getValue());
-  }, [onChange]);
+    const instance = editorRef.current;
+    if (!instance) return;
+    instance.trigger("history", "undo", null);
+    onChangeRef.current(instance.getValue());
+  }, []);
 
   const redo = React.useCallback(() => {
-    editorRef.current?.trigger("history", "redo", null);
-    const editor = editorRef.current;
-    if (editor) onChange(editor.getValue());
-  }, [onChange]);
-
-  React.useEffect(() => {
-    const editor = editorRef.current;
-    if (!editor) return;
-    const pending = (SqlEditor as { pendingReplace?: string }).pendingReplace;
-    if (pending !== undefined) {
-      delete (SqlEditor as { pendingReplace?: string }).pendingReplace;
-      replaceAll(pending);
-    }
-  });
+    const instance = editorRef.current;
+    if (!instance) return;
+    instance.trigger("history", "redo", null);
+    onChangeRef.current(instance.getValue());
+  }, []);
 
   return (
-    <SqlEditorInsertContext.Provider
-      value={React.useCallback((text: string) => {
-        const editor = editorRef.current;
-        if (!editor) {
-          (SqlEditor as { pendingInsert?: string }).pendingInsert = text;
-          return;
-        }
-        insertAtCursor(editor, text);
-        onChange(editor.getValue());
-        editor.focus();
-      }, [onChange])}
-    >
-      <EditorShell
-        value={value}
-        onChange={onChange}
-        handleMount={handleMount}
-        resolvedTheme={resolvedTheme}
-        height={height}
-        path={path}
-        undo={undo}
-        redo={redo}
-      />
-    </SqlEditorInsertContext.Provider>
+    <EditorShell
+      value={value}
+      onChange={onChange}
+      handleMount={handleMount}
+      resolvedTheme={resolvedTheme}
+      height={height}
+      path={path}
+      undo={undo}
+      redo={redo}
+      undoLabel={t("dataQuery.editor.undo")}
+      redoLabel={t("dataQuery.editor.redo")}
+    />
   );
 }
-
-
 
 /** Insert where the cursor stands, replacing the selection when there is one. */
 function insertAtCursor(
@@ -420,15 +460,6 @@ function insertAtCursor(
   });
 }
 
-const SqlEditorInsertContext = React.createContext<(text: string) => void>(
-  () => undefined,
-);
-
-/** The nearest editor's cursor-aware insert, for explorer buttons beside it. */
-export function useSqlInsert(): (text: string) => void {
-  return React.useContext(SqlEditorInsertContext);
-}
-
 function EditorShell({
   value,
   onChange,
@@ -438,6 +469,8 @@ function EditorShell({
   path,
   undo,
   redo,
+  undoLabel,
+  redoLabel,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -450,6 +483,8 @@ function EditorShell({
   path: string;
   undo: () => void;
   redo: () => void;
+  undoLabel: string;
+  redoLabel: string;
 }) {
   return (
     <div
@@ -461,7 +496,8 @@ function EditorShell({
           type="button"
           className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
           onClick={undo}
-          title="Undo (Ctrl/Cmd+Z)"
+          title={undoLabel}
+          aria-label={undoLabel}
           data-testid="sql-undo"
         >
           <Undo2 className="h-3.5 w-3.5" />
@@ -470,7 +506,8 @@ function EditorShell({
           type="button"
           className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
           onClick={redo}
-          title="Redo (Ctrl/Cmd+Shift+Z)"
+          title={redoLabel}
+          aria-label={redoLabel}
           data-testid="sql-redo"
         >
           <Redo2 className="h-3.5 w-3.5" />

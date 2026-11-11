@@ -79,6 +79,12 @@ export interface GrantDto {
      * @memberof GrantDto
      */
     inherited?: boolean;
+    /**
+     * For a grant on one table: the source the table belongs to.
+     * @type {string}
+     * @memberof GrantDto
+     */
+    sourceId?: string;
 }
 
 
@@ -139,6 +145,7 @@ export function GrantDtoFromJSONTyped(json: any, ignoreDiscriminator: boolean): 
         'scopeLabel': json['scopeLabel'],
         'expiresAt': (json['expiresAt'] == null ? null : new Date(json['expiresAt'])),
         'inherited': json['inherited'] == null ? undefined : json['inherited'],
+        'sourceId': json['sourceId'] == null ? undefined : json['sourceId'],
     };
 }
 
@@ -163,6 +170,7 @@ export function GrantDtoToJSONTyped(value?: GrantDto | null, ignoreDiscriminator
         'scopeLabel': value['scopeLabel'],
         'expiresAt': value['expiresAt'] == null ? value['expiresAt'] : value['expiresAt'].toISOString(),
         'inherited': value['inherited'],
+        'sourceId': value['sourceId'],
     };
 }
 

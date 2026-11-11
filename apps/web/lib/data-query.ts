@@ -115,10 +115,12 @@ export function starterSql(catalog: QueryCatalog | null): {
     .flatMap((s) => s.tables)
     .find((t) => t.canQuery);
   if (!first) return { sql: "SELECT 1", title: "Empty query" };
-  return {
-    sql: `SELECT *\nFROM ${first.sqlName}\nLIMIT 100`,
-    title: first.sqlName,
-  };
+  return { sql: previewSql(first.sqlName), title: first.sqlName };
+}
+
+/** The preview query over one table: what a Data tab and a play button open. */
+export function previewSql(sqlName: string): string {
+  return `SELECT *\nFROM ${sqlName}\nLIMIT 100`;
 }
 
 /** How long polling rides out a gateway that does not answer (an API restart). */
@@ -265,4 +267,18 @@ export function catalogTableFor(
     if (table) return table;
   }
   return null;
+}
+
+/**
+ * The catalog narrowed to one source: a source's Data tab lists, and its
+ * editor completes, only that source's tables.
+ */
+export function catalogOfSource(
+  catalog: QueryCatalog,
+  sourceId: string,
+): QueryCatalog {
+  return {
+    ...catalog,
+    sources: (catalog.sources ?? []).filter((source) => source.id === sourceId),
+  };
 }

@@ -444,7 +444,9 @@ export class TenancyService implements OnModuleDestroy {
     if (query.action) push('action = $?', query.action);
     if (query.actor) push('actor = $?', query.actor);
     if (needle) {
-      params.push(`%${needle}%`);
+      // Literal text: `%`, `_` and a backslash typed into the search box
+      // match themselves, not any run of characters.
+      params.push(`%${needle.replace(/[\\%_]/g, (c) => `\\${c}`)}%`);
       const like = `$${params.length}`;
       conditions.push(
         `(action ILIKE ${like} OR actor ILIKE ${like} OR detail::text ILIKE ${like})`,

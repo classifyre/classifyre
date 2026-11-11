@@ -16,6 +16,7 @@ Name | Type
 `scopeLabel` | string
 `expiresAt` | Date
 `inherited` | boolean
+`sourceId` | string
 
 ## Example
 
@@ -34,6 +35,7 @@ const example = {
   "scopeLabel": Workspaces of /finance,
   "expiresAt": null,
   "inherited": null,
+  "sourceId": null,
 } satisfies GrantDto
 
 console.log(example)

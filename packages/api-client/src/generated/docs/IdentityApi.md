@@ -12,11 +12,11 @@ All URIs are relative to *http://localhost*
 
 ## auditControllerList
 
-> AuditEventsResponseDto auditControllerList(entityType, entityId, actor, capability, operation, search, before, limit, skip, sortBy, sortOrder)
+> AuditEventsResponseDto auditControllerList(entityType, entityId, actor, capability, operation, resource, search, before, limit, skip, sortBy, sortOrder)
 
 Changes made in this workspace, newest first
 
-Filter by entity (e.g. entityType&#x3D;sources&amp;entityId&#x3D;…), actor, capability, operation or free text. Sort any column; page with &#x60;skip&#x60;/&#x60;limit&#x60; or, for \&quot;load more\&quot;, with &#x60;before&#x60;, the id of the last event received.
+Filter by entity (e.g. entityType&#x3D;sources&amp;entityId&#x3D;…), by what it touched (resource&#x3D;data, source:&lt;id&gt; or asset:&lt;id&gt;), actor, capability, operation or free text. Sort any column; page with &#x60;skip&#x60;/&#x60;limit&#x60; or, for \&quot;load more\&quot;, with &#x60;before&#x60;, the id of the last event received.
 
 ### Example
 
@@ -42,6 +42,8 @@ async function example() {
     capability: capability_example,
     // string (optional)
     operation: operation_example,
+    // string | Only events that touched this: `data` (SQL reads and data-reader grants), `source:<id>` or `asset:<id>`. (optional)
+    resource: resource_example,
     // string (optional)
     search: search_example,
     // string (optional)
@@ -78,6 +80,7 @@ example().catch(console.error);
 | **actor** | `string` |  | [Optional] [Defaults to `undefined`] |
 | **capability** | `string` |  | [Optional] [Defaults to `undefined`] |
 | **operation** | `string` |  | [Optional] [Defaults to `undefined`] |
+| **resource** | `string` | Only events that touched this: &#x60;data&#x60; (SQL reads and data-reader grants), &#x60;source:&lt;id&gt;&#x60; or &#x60;asset:&lt;id&gt;&#x60;. | [Optional] [Defaults to `undefined`] |
 | **search** | `string` |  | [Optional] [Defaults to `undefined`] |
 | **before** | `string` |  | [Optional] [Defaults to `undefined`] |
 | **limit** | `number` |  | [Optional] [Defaults to `undefined`] |

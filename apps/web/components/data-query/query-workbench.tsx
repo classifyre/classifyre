@@ -3,7 +3,6 @@
 import * as React from "react";
 import { AlertCircle } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@workspace/ui/components/button";
 import { useTranslation } from "@/hooks/use-translation";
 import {
   apiErrorMessage,
@@ -18,22 +17,28 @@ import {
   type QueryRows,
   type QueryRun,
 } from "@/lib/data-query";
-import { SqlEditor } from "./sql-editor";
+import { SqlEditor, type SqlEditorHandle } from "./sql-editor";
 import { QueryToolbar } from "./query-toolbar";
 import { ResultsGrid } from "./results-grid";
 import { SaveQueryDialog } from "./save-query-dialog";
 
 export interface QueryWorkbenchHandle {
-  /** Insert at the cursor — the explorer writes through the editor itself. */
+  /** Insert at the cursor: the explorer's table and column names. */
   insert: (text: string) => void;
+  /** Replace the SQL as one undoable edit (saved queries, previews). */
   setSql: (sql: string) => void;
+  /**
+   * Reopen a past run from history: its SQL only, never its rows — results
+   * can be huge and expire after a day; Run again brings fresh ones.
+   */
+  showRun: (run: QueryRun) => void;
 }
 
 /**
  * One SQL editor and its result. The editor is the workbench: Run sits
  * beside it in a toolbar (Format, Save, Export alongside), the result below.
- * The SQL page puts the explorer beside it; an asset's Data tab pre-fills
- * that table.
+ * An explorer beside it (the SQL page, a source's Data tab) drives it
+ * through the handle; a table's Data tab pre-fills that table.
  *
  * React 19: `ref` arrives as a prop, not via `forwardRef`.
  */
@@ -60,17 +65,7 @@ export function QueryWorkbench({
 }) {
   const { t } = useTranslation();
   const [sql, setSql] = React.useState(initialSql);
-  // `setSql` from outside (history, saved, open-in-SQL) goes through here so
-  // the editor's own undo stack records it like a typed edit — Ctrl/Cmd+Z
-  // steps back through reopened queries, not just keystrokes.
-  const setActiveEditorSql = React.useCallback(
-    (next: string) => {
-      (SqlEditor as { replaceAll?: (text: string) => void }).replaceAll?.(
-        next,
-      ) ?? setSql(next);
-    },
-    [],
-  );
+  const editor = React.useRef<SqlEditorHandle>(null);
   const [run, setRun] = React.useState<QueryRun | null>(null);
   const [rows, setRows] = React.useState<QueryRows | null>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -81,20 +76,14 @@ export function QueryWorkbench({
   const abortRef = React.useRef<AbortController | null>(null);
   const startedRef = React.useRef(0);
 
-  // The explorer beside the editor inserts at the cursor through the
-  // editor's own context; this imperative escape stays for "open in SQL"
-  // and pages that set SQL from outside. Everything funnels into the
-  // editor model, so undo (Ctrl/Cmd+Z) treats it like a typed edit.
   React.useImperativeHandle(
     ref,
     () => ({
-      insert: (text) =>
-        setSql((current) =>
-          current.trim() ? `${current.trimEnd()}\n${text}` : text,
-        ),
-      setSql: setActiveEditorSql,
+      insert: (text) => editor.current?.insert(text),
+      setSql: (next) => editor.current?.replaceAll(next),
+      showRun: (past) => editor.current?.replaceAll(past.sql),
     }),
-    [setActiveEditorSql],
+    [],
   );
 
   React.useEffect(() => () => abortRef.current?.abort(), []);
@@ -188,7 +177,10 @@ export function QueryWorkbench({
   const format = React.useCallback(async () => {
     const { format: formatSql } = await import("sql-formatter");
     try {
-      setSql(formatSql(sql, { language: "duckdb", keywordCase: "upper" }));
+      // Through the editor, so one Ctrl/Cmd+Z undoes the formatting.
+      editor.current?.replaceAll(
+        formatSql(sql, { language: "duckdb", keywordCase: "upper" }),
+      );
     } catch {
       /* leave unparseable text as it is */
     }
@@ -212,18 +204,10 @@ export function QueryWorkbench({
     [saving, disabled, sql, onSaved, t],
   );
 
-  /**
-   * History reopens the SQL only — never the rows. Results can be huge and
-   * they expire after a day; the query itself is what the person wants back.
-   * They press Run again when they want fresh rows.
-   */
-  const runSql = React.useCallback((next: QueryRun) => {
-    setActiveEditorSql(next.sql);
-  }, []);
-
   return (
     <div className="space-y-3">
       <SqlEditor
+        ref={editor}
         value={sql}
         onChange={setSql}
         onRun={() => void execute()}
@@ -298,30 +282,6 @@ export function QueryWorkbench({
         onClose={() => setSaveOpen(false)}
         onSave={(name) => void save(name)}
       />
-
-      <RunLoader runSql={runSql} />
     </div>
   );
-}
-
-/**
- * Lets the page ask the workbench to show a run (from history) without
- * threading callbacks: the page sets `QueryWorkbench.showRun`, the loader
- * below picks it up. Kept deliberately tiny — a full store would be
- * over-engineering for one editor.
- */
-function RunLoader({ runSql }: { runSql: (run: QueryRun) => void }) {
-  const ref = React.useRef(runSql);
-  ref.current = runSql;
-  React.useEffect(() => {
-    (QueryWorkbench as { showRun?: (run: QueryRun) => void }).showRun = (
-      run: QueryRun,
-    ) => ref.current(run);
-  }, []);
-  return null;
-}
-
-export namespace QueryWorkbench {
-  /** Show a past run's SQL and rows in the workbench (from history). */
-  export let showRun: ((run: QueryRun) => void) | undefined;
 }

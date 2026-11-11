@@ -7,9 +7,8 @@ const handler = (name: string) =>
 
 describe('CliRunnerController endpoint access metadata', () => {
   it('reserves the CLI write-back endpoints for internal callers', () => {
-    // These accept ingestion payloads at face value and the API has no user
-    // auth, so they must never be reachable from the public web proxy — in
-    // demo mode or otherwise.
+    // These accept ingestion payloads at face value, so they must never be
+    // reachable from the public web proxy.
     for (const name of [
       'createExternalRunner',
       'updateRunnerStatus',
@@ -31,7 +30,7 @@ describe('CliRunnerController endpoint access metadata', () => {
     ).toBeUndefined();
   });
 
-  it('keeps operator-triggered runner endpoints blocked in demo mode', () => {
+  it('keeps operator-triggered runner endpoints out of the read-only set', () => {
     for (const name of [
       'startRunner',
       'stopRunner',
@@ -49,7 +48,7 @@ describe('CliRunnerController endpoint access metadata', () => {
     }
   });
 
-  it('keeps log search readable in demo mode', () => {
+  it('keeps log search a read, for read-only people too', () => {
     // POST only because the filter set does not fit a query string.
     expect(
       Reflect.getMetadata(READS_ONLY_KEY, handler('searchRunnerLogs')),

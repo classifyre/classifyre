@@ -1,0 +1,1 @@
+Activity now names what changed (the source, table or group at the time of the change), can be searched, sorted and paged, and reading table rows with SQL is recorded per table. Access given on a single table or source is now listed under that table's or source's name instead of "One table" or "One source".

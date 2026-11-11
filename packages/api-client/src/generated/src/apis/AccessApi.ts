@@ -237,7 +237,7 @@ export class AccessApi extends runtime.BaseAPI {
     /**
      * Remove any grant of the tenant
      */
-    async tenantAccessControllerRemoveGrantRaw(requestParameters: TenantAccessControllerRemoveGrantRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+    async tenantAccessControllerRemoveGrantRaw(requestParameters: TenantAccessControllerRemoveGrantRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GrantDto>> {
         if (requestParameters['id'] == null) {
             throw new runtime.RequiredError(
                 'id',
@@ -260,14 +260,15 @@ export class AccessApi extends runtime.BaseAPI {
             query: queryParameters,
         }, initOverrides);
 
-        return new runtime.VoidApiResponse(response);
+        return new runtime.JSONApiResponse(response, (jsonValue) => GrantDtoFromJSON(jsonValue));
     }
 
     /**
      * Remove any grant of the tenant
      */
-    async tenantAccessControllerRemoveGrant(requestParameters: TenantAccessControllerRemoveGrantRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
-        await this.tenantAccessControllerRemoveGrantRaw(requestParameters, initOverrides);
+    async tenantAccessControllerRemoveGrant(requestParameters: TenantAccessControllerRemoveGrantRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GrantDto> {
+        const response = await this.tenantAccessControllerRemoveGrantRaw(requestParameters, initOverrides);
+        return await response.value();
     }
 
     /**
@@ -541,7 +542,7 @@ export class AccessApi extends runtime.BaseAPI {
     /**
      * Remove a grant made on this workspace
      */
-    async workspaceAccessControllerRemoveGrantRaw(requestParameters: WorkspaceAccessControllerRemoveGrantRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+    async workspaceAccessControllerRemoveGrantRaw(requestParameters: WorkspaceAccessControllerRemoveGrantRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GrantDto>> {
         if (requestParameters['id'] == null) {
             throw new runtime.RequiredError(
                 'id',
@@ -564,14 +565,15 @@ export class AccessApi extends runtime.BaseAPI {
             query: queryParameters,
         }, initOverrides);
 
-        return new runtime.VoidApiResponse(response);
+        return new runtime.JSONApiResponse(response, (jsonValue) => GrantDtoFromJSON(jsonValue));
     }
 
     /**
      * Remove a grant made on this workspace
      */
-    async workspaceAccessControllerRemoveGrant(requestParameters: WorkspaceAccessControllerRemoveGrantRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
-        await this.workspaceAccessControllerRemoveGrantRaw(requestParameters, initOverrides);
+    async workspaceAccessControllerRemoveGrant(requestParameters: WorkspaceAccessControllerRemoveGrantRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GrantDto> {
+        const response = await this.workspaceAccessControllerRemoveGrantRaw(requestParameters, initOverrides);
+        return await response.value();
     }
 
     /**

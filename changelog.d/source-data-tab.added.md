@@ -1,0 +1,1 @@
+Sources with tables now have a Data tab: query the source's tables with its table list beside the editor, give a group the Data reader role on the whole source in one step, and see who read its tables and who was given access in its Activity.

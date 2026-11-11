@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 from ..utils.duckdb_engine import load_extension, quote_identifier, sql_literal
@@ -79,6 +78,10 @@ class TableLocation:
         )
 
 
+# How the scan names an endpoint, per source type (see ``label``).
+_ENDPOINT_SCHEMES = {"MYSQL": "mysql", "POSTGRESQL": "postgresql"}
+
+
 def _conninfo(values: dict[str, Any]) -> str:
     """A libpq-style ``key=value`` string for DuckDB's scanners.
 
@@ -121,23 +124,25 @@ class SourceBinding:
         self._attached: dict[str, str] = {}
         self._source: Any = None
         self._storage: Any = None
-        self._temp_files: list[Path] = []
 
     # ── recipe access ──────────────────────────────────────────────────
 
     def label(self) -> str:
         """What the source is called in errors: `mysql://host:port/`.
 
-        Mirrors the scan's ``_source_label`` (`host:port`, no database): the
-        query and the scan then name the same failing endpoint the same way,
-        so a person comparing the two sees one problem, not two wordings.
+        Mirrors the scan's ``_source_label`` (`scheme://host:port/`, no
+        database): the query and the scan then name the same failing endpoint
+        the same way, so a person comparing the two sees one problem, not two
+        wordings. A source without a host (files, catalogs) is called by its
+        SQL name, the one the person typed.
         """
         required = self._section("required")
         host = str(required.get("host") or "").strip()
         port = str(required.get("port") or "").strip()
-        if host:
-            return f"mysql://{host}:{port}/" if port else f"mysql://{host}/"
-        return self._hidden
+        scheme = _ENDPOINT_SCHEMES.get(self.source_type)
+        if host and scheme:
+            return f"{scheme}://{host}:{port}/" if port else f"{scheme}://{host}/"
+        return self.alias
 
     def _section(self, name: str) -> dict[str, Any]:
         value = self.recipe.get(name)
@@ -234,8 +239,15 @@ class SourceBinding:
             # mode key itself is what it chokes on, not the value. So the
             # mode is dropped entirely: the scanner then negotiates TLS on
             # its own (the server requires it), like the docs' bare
-            # `ATTACH 'host=… database=…'` example. CA pinning stays a scan
-            # concern (PyMySQL + ssl context), not a query concern.
+            # `ATTACH 'host=… database=…'` example. That cannot verify the
+            # server's certificate, so a source set to verify it is refused
+            # rather than silently queried without the check it asked for.
+            ssl_mode = str(self._connection_option("ssl_mode") or "").upper()
+            if ssl_mode in ("VERIFY_CA", "VERIFY_IDENTITY"):
+                raise BindingError(
+                    f"Could not open {self.label()}: the source verifies the server's "
+                    "certificate, which SQL queries cannot do yet. Scans still verify it."
+                )
             alias = f"{self._hidden}_{len(self._attached)}"
             conn.execute(
                 f"ATTACH {sql_literal(_conninfo(values))} AS {quote_identifier(alias)} "
@@ -309,5 +321,3 @@ class SourceBinding:
                 self._source.cleanup()
             except Exception:  # pragma: no cover - best effort
                 pass
-        for path in self._temp_files:
-            path.unlink(missing_ok=True)
