@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       release_type:
-        description: Release version increment
+        description: Version to release, counted up from main (patch 0.7.4 -> 0.7.5, minor -> 0.8.0, major -> 1.0.0)
         required: true
         default: patch
         type: choice
@@ -117,19 +117,20 @@ jobs:
           fi
 
           # ── Compute release version ──
-          # The SNAPSHOT base IS the release version (e.g. 0.5.0-SNAPSHOT → release 0.5.0).
-          # release_type controls the NEXT snapshot after release.
+          # release_type is the size of THIS release, counted up from main's
+          # version (main 0.7.4: patch -> 0.7.5, minor -> 0.8.0, major -> 1.0.0).
+          # It used to size the NEXT snapshot while this release always took
+          # develop's SNAPSHOT base, so "minor" shipped a patch and left the
+          # minor for the release after it.
+          # develop's SNAPSHOT base is a floor: a release can't go below the
+          # version develop already targets.
           if ! [[ "${RELEASE_TYPE}" =~ ^(patch|minor|major)$ ]]; then
             echo "::error::release_type must be one of: patch, minor, major"
             exit 1
           fi
 
-          version="${develop_base}"
-          tag="v${version}"
-
-          # Compute next snapshot version based on release_type
-          next_version="$(
-            CURRENT="${version}" node -e "
+          version="$(
+            CURRENT="${main_base}" node -e "
               const type = process.env.RELEASE_TYPE;
               const [major, minor, patch] = process.env.CURRENT.split('.').map(Number);
               const next =
@@ -137,6 +138,30 @@ jobs:
                 type === 'minor' ? [major, minor + 1, 0] :
                 [major, minor, patch + 1];
               process.stdout.write(next.join('.'));
+            "
+          )"
+          tag="v${version}"
+
+          below_develop="$(
+            VERSION="${version}" DEV="${develop_base}" node -e "
+              const cmp = (a, b) => {
+                const [a1,a2,a3] = a.split('.').map(Number);
+                const [b1,b2,b3] = b.split('.').map(Number);
+                return (a1 - b1) || (a2 - b2) || (a3 - b3);
+              };
+              process.stdout.write(cmp(process.env.VERSION, process.env.DEV) < 0 ? 'yes' : 'no');
+            "
+          )"
+          if [[ "${below_develop}" == "yes" ]]; then
+            echo "::error::${RELEASE_TYPE} from main ${main_base} gives ${version}, below the ${develop_base} develop already targets. Pick a larger release_type."
+            exit 1
+          fi
+
+          # The next SNAPSHOT is always the patch after this release
+          next_version="$(
+            CURRENT="${version}" node -e "
+              const [major, minor, patch] = process.env.CURRENT.split('.').map(Number);
+              process.stdout.write([major, minor, patch + 1].join('.'));
             "
           )"
 
