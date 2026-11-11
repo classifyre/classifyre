@@ -7556,8 +7556,11 @@
       "undo": "Rückgängig (Strg/⌘+Z)",
       "redo": "Wiederholen (Strg/⌘+Umschalt+Z)"
     },
-    "signInTitle": "Melden Sie sich an, um SQL zu nutzen",
-    "signInDescription": "Tabellen abzufragen braucht ein angemeldetes Konto mit Datenzugriff. Ein öffentlicher Arbeitsbereich ist zum Lesen seiner Funde, Quellen und Fälle da."
+    "teaser": {
+      "title": "SQL über die Tabellen dieses Arbeitsbereichs",
+      "description": "Fragen Sie die Zeilen seiner Datenbanken, Lakehouses und Dateien mit Standard-SQL ab, verknüpfen Sie sie und exportieren Sie sie nach Excel, CSV oder Parquet. Melden Sie sich mit einem Konto mit Datenzugriff an, um Abfragen auszuführen.",
+      "signIn": "Anmelden, um SQL zu nutzen"
+    }
   },
   "notificationAudiences": {
     "title": "Wer Benachrichtigungen erhält",

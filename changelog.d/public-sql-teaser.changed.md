@@ -1,0 +1,1 @@
+Visitors of a public workspace now see the SQL page with an example query and a Sign in button, so they know what signing in opens; nothing can be run, saved or exported without signing in. A source's page no longer shows who changed it last in its header.

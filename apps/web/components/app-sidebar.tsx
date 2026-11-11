@@ -19,7 +19,6 @@ import {
   SidebarMenuItem,
   SidebarSeparator,
 } from "@workspace/ui/components/sidebar";
-import { useTenant } from "@/hooks/use-tenant";
 import { useTranslation } from "@/hooks/use-translation";
 import { useNamespaceCategories } from "@/hooks/use-namespace-categories";
 import { useLocalePath } from "@/lib/app-path";
@@ -42,13 +41,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-type NavItem = {
-  titleKey: TranslationKey;
-  href: string;
-  icon: LucideIcon;
-  /** Only for people who signed in: SQL is never the public's. */
-  signedInOnly?: boolean;
-};
+type NavItem = { titleKey: TranslationKey; href: string; icon: LucideIcon };
 type NavGroup = { labelKey: TranslationKey; items: NavItem[] };
 
 // Grouped by what the operator is doing, not by data model:
@@ -62,12 +55,7 @@ const NAV_GROUPS: NavGroup[] = [
       { titleKey: "nav.overview", href: "/discovery", icon: LayoutDashboard },
       { titleKey: "nav.findings", href: "/findings", icon: SearchCheck },
       { titleKey: "nav.assets", href: "/assets", icon: FileText },
-      {
-        titleKey: "nav.query",
-        href: "/query",
-        icon: TerminalSquare,
-        signedInOnly: true,
-      },
+      { titleKey: "nav.query", href: "/query", icon: TerminalSquare },
     ],
   },
   {
@@ -102,7 +90,6 @@ export function AppSidebar() {
   const { nsHref, displayName, namespace, slug } = useNamespace();
   const localePath = useLocalePath();
   const { categories } = useNamespaceCategories();
-  const visitor = useTenant()?.visitor ?? false;
   // The categories this workspace is filed under, in the registry's own
   // (alphabetical) order. Empty only while the two requests are in flight —
   // a workspace always belongs to at least one.
@@ -197,9 +184,7 @@ export function AppSidebar() {
             </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {group.items
-                  .filter((item) => !(visitor && item.signedInOnly))
-                  .map((item) => {
+                {group.items.map((item) => {
                   const title = t(item.titleKey);
                   return (
                     <SidebarMenuItem key={item.href}>
