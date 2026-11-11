@@ -36,7 +36,7 @@ import type { TranslationKey } from "@/i18n";
 import { stripLocalePrefix } from "@/lib/locale-detection";
 import { useEntityName } from "./document-title-updater";
 import { LANGUAGE_OPTIONS, LanguageSwitcher, useSwitchLanguage } from "./language-switcher";
-import { Can } from "@/hooks/use-me";
+import { Can, useCan } from "@/hooks/use-me";
 import { NotificationCenter } from "./notification-center";
 import { ThemeToggle } from "./theme-toggle";
 import { PublicViewHeaderBadge } from "./public-view-badge";
@@ -310,6 +310,9 @@ export function HeaderActions({ visitor }: { visitor: boolean }) {
   const { nsHref } = useNamespace();
   const { resolvedTheme, setTheme } = useTheme();
   const { resolvedLanguage, switchLanguage } = useSwitchLanguage();
+  // The settings are not the public's to see: visitors and members reading
+  // a public workspace without a grant hold no settings.view.
+  const canSeeSettings = useCan("settings.view");
   return (
     <div className="flex shrink-0 items-center gap-1 sm:gap-2">
       {visitor && <PublicViewHeaderBadge />}
@@ -333,12 +336,14 @@ export function HeaderActions({ visitor }: { visitor: boolean }) {
           <span className="sr-only">{t("nav.documentation")}</span>
         </a>
       </Button>
-      <Button variant="ghost" size="icon" asChild className={cn(iconButton, "hidden sm:inline-flex")}>
-        <Link href={nsHref("/settings")}>
-          <Settings className="h-5 w-5" />
-          <span className="sr-only">{t("breadcrumb.settings")}</span>
-        </Link>
-      </Button>
+      {canSeeSettings && (
+        <Button variant="ghost" size="icon" asChild className={cn(iconButton, "hidden sm:inline-flex")}>
+          <Link href={nsHref("/settings")} data-testid="header-settings">
+            <Settings className="h-5 w-5" />
+            <span className="sr-only">{t("breadcrumb.settings")}</span>
+          </Link>
+        </Button>
+      )}
       <AccountMenu />
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -372,11 +377,13 @@ export function HeaderActions({ visitor }: { visitor: boolean }) {
               <BookOpen className="size-4" /> {t("nav.documentation")}
             </a>
           </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link href={nsHref("/settings")}>
-              <Settings className="size-4" /> {t("breadcrumb.settings")}
-            </Link>
-          </DropdownMenuItem>
+          {canSeeSettings && (
+            <DropdownMenuItem asChild>
+              <Link href={nsHref("/settings")}>
+                <Settings className="size-4" /> {t("breadcrumb.settings")}
+              </Link>
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

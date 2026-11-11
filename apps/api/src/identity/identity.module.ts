@@ -11,6 +11,7 @@ import { ActorContextService } from './actor-context.service';
 import { ActorDirectoryService } from './actor-directory.service';
 import { AuditController } from './audit.controller';
 import { AuditTrailService } from './audit-trail.service';
+import { SourceConfigAccess } from './source-config-access';
 import { IamAccessPolicy } from './iam-access-policy';
 import { IamBootstrapService } from './iam-bootstrap.service';
 import { readIamConfig, type IamConfig } from './iam-config';
@@ -43,6 +44,7 @@ import { SocketAccessService } from './socket-access.service';
     ActorContextService,
     ActorDirectoryService,
     AuditTrailService,
+    SourceConfigAccess,
     TenancyService,
     { provide: IAM_CONFIG, useFactory: () => readIamConfig() },
     {
@@ -65,6 +67,7 @@ import { SocketAccessService } from './socket-access.service';
     SocketAccessService,
     ActorContextService,
     AuditTrailService,
+    SourceConfigAccess,
     TenancyService,
     ACCESS_POLICY,
     IDENTITY,

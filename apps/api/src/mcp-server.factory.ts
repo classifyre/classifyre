@@ -21,6 +21,7 @@ import { FindingsService } from './findings.service';
 import { FindingBulkOperationService } from './findings-bulk/finding-bulk-operation.service';
 import { RetireOutOfScopeService } from './findings-bulk/retire-out-of-scope.service';
 import { MCP_CAPABILITY_GROUPS, MCP_PROMPTS } from './mcp-catalog';
+import { withoutConfig } from './identity/source-config-access';
 import type { Capability } from './identity/capabilities';
 import {
   mcpToolCapability,
@@ -499,6 +500,9 @@ export class McpServerFactoryService {
     }
     if (options?.capabilities) {
       this.restrictToCapabilities(server, options.capabilities);
+      if (!options.capabilities.has('source.manage')) {
+        this.hideSourceConfig(server);
+      }
     }
     if (this.auditTrail) {
       this.recordChanges(server, this.auditTrail);
@@ -548,6 +552,33 @@ export class McpServerFactoryService {
         }
         return result;
       };
+    }
+  }
+
+  /**
+   * Source and run tools answer without configurations or recipes for a
+   * caller who cannot change sources, like the REST routes do
+   * (identity/source-config-access.ts).
+   */
+  private hideSourceConfig(server: McpServer): void {
+    const registered = (
+      server as unknown as {
+        _registeredTools: Record<
+          string,
+          { handler: (...params: unknown[]) => unknown }
+        >;
+      }
+    )._registeredTools;
+    const tools = new Set(
+      MCP_CAPABILITY_GROUPS.filter(
+        (group) => group.id === 'sources' || group.id === 'runs',
+      ).flatMap((group) => group.toolNames),
+    );
+    for (const [name, tool] of Object.entries(registered)) {
+      if (!tools.has(name)) continue;
+      const handler = tool.handler;
+      tool.handler = async (...params: unknown[]) =>
+        redactToolResult(await handler(...params));
     }
   }
 
@@ -5422,4 +5453,27 @@ export class McpServerFactoryService {
     }
     return source;
   }
+}
+
+/** A tool result with its JSON text content stripped of source configuration. */
+function redactToolResult(result: unknown): unknown {
+  const content = (result as { content?: unknown } | undefined)?.content;
+  if (!Array.isArray(content)) return result;
+  return {
+    ...(result as object),
+    content: content.map((part: unknown) => {
+      const text = (part as { type?: string; text?: unknown }).text;
+      if ((part as { type?: string }).type !== 'text' || typeof text !== 'string') {
+        return part;
+      }
+      try {
+        return {
+          ...(part as object),
+          text: JSON.stringify(withoutConfig(JSON.parse(text)), null, 2),
+        };
+      } catch {
+        return part;
+      }
+    }),
+  };
 }

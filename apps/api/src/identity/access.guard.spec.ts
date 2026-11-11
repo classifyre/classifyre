@@ -3,7 +3,12 @@ import { Controller, Get, Post, type ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ReadsOnly } from '../reads-only.decorator';
 import { InternalOnly } from '../internal-only.decorator';
-import { AccessArea, PublicRoute, Requires } from './access.decorators';
+import {
+  AccessArea,
+  PublicRoute,
+  Requires,
+  SignedInOnly,
+} from './access.decorators';
 import { AccessGuard, CapabilityRequiredException } from './access.guard';
 import type { AccessPolicy } from './access-policy';
 import type { Actor } from './actor';
@@ -30,6 +35,10 @@ class SampleController {
   @InternalOnly()
   @Post(':id/assets')
   ingest() {}
+
+  @SignedInOnly()
+  @Get('sql')
+  sql() {}
 }
 
 @Controller()
@@ -271,6 +280,36 @@ describe('AccessGuard on signed-in writes', () => {
     await expect(visitorGuard.canActivate(context)).rejects.toMatchObject({
       response: { statusCode: 401, code: 'SIGN_IN_REQUIRED' },
     });
+  });
+
+  it('asks a visitor to sign in on signed-in-only routes, even where they may read', async () => {
+    allow = true;
+    const visitorGuard = new AccessGuard(
+      new Reflector(),
+      {
+        set: () => undefined,
+        workspaceId: () => 'ws-1',
+      } as unknown as ActorContextService,
+      { isInternalRequest: () => false } as never,
+      { check: () => ({ allow }), capabilities: () => new Set() },
+      {
+        ...identity,
+        authenticate: () =>
+          Promise.resolve({
+            actor: { ...actor, ref: undefined, kind: 'visitor' },
+            via: 'cookie',
+            grants: [],
+            visitor: true,
+          }),
+      } as never,
+    );
+    const { context } = contextFor(SampleController, 'sql', 'GET');
+    await expect(visitorGuard.canActivate(context)).rejects.toMatchObject({
+      response: { statusCode: 401, code: 'SIGN_IN_REQUIRED' },
+    });
+    // A signed-in person passes on the same route.
+    const signedIn = contextFor(SampleController, 'sql', 'GET');
+    await expect(guard.canActivate(signedIn.context)).resolves.toBe(true);
   });
 
   it('checks the route capability in the workspace', async () => {

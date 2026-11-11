@@ -75,6 +75,8 @@ export interface TenantDto {
  */
 export const TenantDtoCapabilitiesEnum = {
     WorkspaceView: 'workspace.view',
+    SettingsView: 'settings.view',
+    ActivityView: 'activity.view',
     WorkspaceSettings: 'workspace.settings',
     WorkspacePause: 'workspace.pause',
     WorkspacePublish: 'workspace.publish',

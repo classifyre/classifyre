@@ -345,7 +345,21 @@ test.describe.serial("smoke with sign-in", () => {
       await expect(tab.getByTestId("data-access")).toContainText(VIEWERS_GROUP, { timeout: 30_000 });
     }
 
+    // A viewer reads the source, never how it is set up.
+    const asViewer = await viewer.api.ok<{ config: Record<string, unknown> }>(
+      "GET",
+      `/${SLUG}/sources/${sourceId}`,
+    );
+    expect(asViewer.config).toEqual({ type: "LOCAL_FOLDER" });
+    const asAdmin = await admin.api.ok<{ config: { required?: unknown } }>(
+      "GET",
+      `/${SLUG}/sources/${sourceId}`,
+    );
+    expect(asAdmin.config.required).toBeTruthy();
+
     const { page } = viewer;
+    await page.goto(`/${SLUG}/sources/${sourceId}/edit/`);
+    await expect(page.getByTestId("source-edit-no-access")).toBeVisible({ timeout: 60_000 });
     await page.goto(`/${SLUG}/assets/${before.assetId}/?tab=data`);
     await expect(page.getByTestId("asset-data-tab")).toBeVisible();
     await page.getByTestId("run-query").click();
@@ -394,6 +408,19 @@ test.describe.serial("smoke with sign-in", () => {
       expect(write.status).toBe(401);
       expect((await visitor.call("GET", `/${SLUG}/access/grants`)).status).toBe(401);
       expect((await visitor.call("GET", `/${SLUG}/notifications`)).status).toBe(401);
+      // Nothing behind the scenes: no activity, no settings (only how dates
+      // are shown), no SQL at all, no source configuration.
+      expect((await visitor.call("GET", `/${SLUG}/audit-events`)).status).toBe(401);
+      expect((await visitor.call("GET", `/${SLUG}/instance-settings`)).status).toBe(401);
+      expect((await visitor.call("GET", `/${SLUG}/instance-settings/display`)).status).toBe(200);
+      expect((await visitor.call("GET", `/${SLUG}/data-query/catalog`)).status).toBe(401);
+      const read = await visitor.ok<{ config: Record<string, unknown> }>(
+        "GET",
+        `/${SLUG}/sources/${sourceId}`,
+      );
+      expect(read.config).toEqual({ type: "LOCAL_FOLDER" });
+      await visitorPage.goto(`/${SLUG}/settings/`);
+      await expect(visitorPage.getByTestId("settings-no-access")).toBeVisible();
       // Nor is saving SQL, which would pool every visitor's queries together.
       const saved = await visitor.call("POST", `/${SLUG}/saved-queries`, {
         name: "Shared pool",

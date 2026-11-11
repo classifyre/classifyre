@@ -47,6 +47,8 @@ export interface MeResponseDto {
  */
 export const MeResponseDtoCapabilitiesEnum = {
     WorkspaceView: 'workspace.view',
+    SettingsView: 'settings.view',
+    ActivityView: 'activity.view',
     WorkspaceSettings: 'workspace.settings',
     WorkspacePause: 'workspace.pause',
     WorkspacePublish: 'workspace.publish',

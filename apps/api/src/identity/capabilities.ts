@@ -22,7 +22,19 @@ export const CAPABILITIES = [
   {
     id: 'workspace.view',
     scope: 'workspace',
-    description: 'Open the workspace and read its settings and activity.',
+    description: 'Open the workspace.',
+  },
+  {
+    id: 'settings.view',
+    scope: 'workspace',
+    description:
+      'See the workspace settings: language and time, workers, cleanup, MCP, chat bots, SQL limits. Never held by visitors of a public workspace.',
+  },
+  {
+    id: 'activity.view',
+    scope: 'workspace',
+    description:
+      'Read who changed and read what in the workspace (Activity, History). Never held by visitors of a public workspace.',
   },
   {
     id: 'workspace.settings',
@@ -72,7 +84,8 @@ export const CAPABILITIES = [
   {
     id: 'source.view',
     scope: 'workspace',
-    description: 'Read sources, their notebooks and their scans.',
+    description:
+      'Read sources and their scans. Their configuration and notebook code need source.manage.',
   },
   {
     id: 'source.manage',

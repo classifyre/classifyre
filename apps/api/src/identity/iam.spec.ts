@@ -484,6 +484,9 @@ describe('IdentityService', () => {
       expect(open?.has('finding.view')).toBe(true);
       expect(open?.has('access.view')).toBe(false);
       expect(open?.has('notification.view')).toBe(false);
+      // Not the settings, not who did what.
+      expect(open?.has('settings.view')).toBe(false);
+      expect(open?.has('activity.view')).toBe(false);
       expect(open?.has('mcp.token.own')).toBe(false);
       expect(open?.has('source.manage')).toBe(false);
       // A private workspace of the same tenant is closed to them …

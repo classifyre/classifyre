@@ -24,6 +24,7 @@ import {
   type StartRunnerDto,
 } from "@workspace/api-client";
 import { toast } from "sonner";
+import { Can } from "@/hooks/use-me";
 import { useTranslation } from "@/hooks/use-translation";
 import { useEntityDocumentTitle } from "@/components/document-title-updater";
 import { useFormatDuration } from "@/hooks/use-format-duration";
@@ -436,6 +437,7 @@ export default function RunnerDetailPage() {
             <FileText className="h-4 w-4" />
             {t("sources.detail.sourceDetails")}
           </Button>
+          <Can capability="source.manage">
           <Button
             variant="outline"
             size="sm"
@@ -446,6 +448,7 @@ export default function RunnerDetailPage() {
             <Pencil className="h-4 w-4" />
             {t("sources.editSource")}
           </Button>
+          </Can>
           <Button
             variant="outline"
             size="sm"

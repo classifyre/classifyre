@@ -367,6 +367,7 @@ All URIs are relative to *http://localhost*
 *InquiriesApi* | [**inquiriesControllerRemove**](docs/InquiriesApi.md#inquiriescontrollerremove) | **DELETE** /inquiries/{id} | Delete an inquiry
 *InquiriesApi* | [**inquiriesControllerTimeline**](docs/InquiriesApi.md#inquiriescontrollertimeline) | **GET** /inquiries/{id}/timeline | The inquiry\&#39;s own history: config changes and each run\&#39;s deltas
 *InquiriesApi* | [**inquiriesControllerUpdate**](docs/InquiriesApi.md#inquiriescontrollerupdate) | **PATCH** /inquiries/{id} | Update an inquiry (matchers change → matches recomputed)
+*InstanceSettingsApi* | [**instanceSettingsControllerGetDisplaySettings**](docs/InstanceSettingsApi.md#instancesettingscontrollergetdisplaysettings) | **GET** /instance-settings/display | How dates and language are shown
 *InstanceSettingsApi* | [**instanceSettingsControllerGetSettings**](docs/InstanceSettingsApi.md#instancesettingscontrollergetsettings) | **GET** /instance-settings | Get instance settings
 *InstanceSettingsApi* | [**instanceSettingsControllerUpdateSettings**](docs/InstanceSettingsApi.md#instancesettingscontrollerupdatesettings) | **PUT** /instance-settings | Update instance settings
 *InstanceSettingsApi* | [**mcpSettingsControllerCreateToken**](docs/InstanceSettingsApi.md#mcpsettingscontrollercreatetoken) | **POST** /instance-settings/mcp/tokens | Create MCP access token
@@ -724,6 +725,7 @@ All URIs are relative to *http://localhost*
 - [DeprecateGlossaryTermDto](docs/DeprecateGlossaryTermDto.md)
 - [DiscoveryRecentRunDto](docs/DiscoveryRecentRunDto.md)
 - [DiscoveryRunSourceDto](docs/DiscoveryRunSourceDto.md)
+- [DisplaySettingsDto](docs/DisplaySettingsDto.md)
 - [EdgeClass](docs/EdgeClass.md)
 - [EdgeDetailDto](docs/EdgeDetailDto.md)
 - [EmbeddingAiProviderOptionDto](docs/EmbeddingAiProviderOptionDto.md)

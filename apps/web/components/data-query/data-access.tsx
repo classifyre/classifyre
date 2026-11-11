@@ -388,6 +388,7 @@ export function DataAccessTabs({
   const { t } = useTranslation();
   const canView = useCan("access.view");
   const canManage = useCan("access.manage");
+  const canSeeActivity = useCan("activity.view");
   if (!canView) return null;
 
   return (
@@ -398,15 +399,18 @@ export function DataAccessTabs({
           <TabsTrigger value="access" data-testid="data-access-tab">
             {t("dataQuery.access.open")}
           </TabsTrigger>
-          <TabsTrigger value="activity" data-testid="data-activity-tab">
-            {t("dataQuery.access.activity")}
-          </TabsTrigger>
+          {canSeeActivity && (
+            <TabsTrigger value="activity" data-testid="data-activity-tab">
+              {t("dataQuery.access.activity")}
+            </TabsTrigger>
+          )}
         </TabsList>
           {actions && <div className="ml-auto">{actions}</div>}
         </div>
         <TabsContent value="access" className="mt-2">
           <DataAccessOverview scope={scope} access={access} canManage={canManage} />
         </TabsContent>
+{canSeeActivity && (
         <TabsContent value="activity" className="mt-2">
           <p className="mb-2 text-xs text-muted-foreground">
             {t(`dataQuery.access.activityHint.${scope.kind}`)}
@@ -416,6 +420,7 @@ export function DataAccessTabs({
             showEntity={scope.kind !== "asset"}
           />
         </TabsContent>
+        )}
       </Tabs>
     </div>
   );

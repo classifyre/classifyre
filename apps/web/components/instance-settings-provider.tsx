@@ -94,6 +94,30 @@ const DEFAULT_SETTINGS: InstanceSettingsResponse = {
   updatedAt: new Date(0),
 };
 
+/**
+ * The workspace settings as the person may see them. Everyone gets how dates
+ * and language are shown; the rest (AI, autopilot, workers, MCP, …) needs
+ * `settings.view`, which visitors of a public workspace never hold — they
+ * keep the defaults for it.
+ */
+async function loadSettings(): Promise<InstanceSettingsResponse> {
+  try {
+    return await api.instanceSettings.instanceSettingsControllerGetSettings();
+  } catch (error) {
+    const status = (error as { response?: { status?: number } }).response
+      ?.status;
+    if (status !== 401 && status !== 403) throw error;
+    const display =
+      await api.instanceSettings.instanceSettingsControllerGetDisplaySettings();
+    return {
+      ...DEFAULT_SETTINGS,
+      language: display.language as InstanceSettingsResponse["language"],
+      timezone: display.timezone,
+      timeFormat: display.timeFormat as InstanceSettingsResponse["timeFormat"],
+    };
+  }
+}
+
 const InstanceSettingsContext =
   React.createContext<InstanceSettingsContextValue | null>(null);
 
@@ -119,9 +143,7 @@ export function InstanceSettingsProvider({
     try {
       setLoading(true);
       setError(null);
-      const response =
-        await api.instanceSettings.instanceSettingsControllerGetSettings();
-      setSettings(response);
+      setSettings(await loadSettings());
     } catch (loadError) {
       const message =
         loadError instanceof Error

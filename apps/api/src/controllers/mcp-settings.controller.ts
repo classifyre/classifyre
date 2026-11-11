@@ -26,7 +26,7 @@ import { ACCESS_POLICY, type AccessPolicy } from '../identity/access-policy';
 import { ActorContextService } from '../identity/actor-context.service';
 
 @ApiTags('Instance Settings')
-@AccessArea({ view: 'workspace.view', change: 'mcp.token.own' })
+@AccessArea({ view: 'settings.view', change: 'mcp.token.own' })
 @Controller('instance-settings/mcp')
 export class McpSettingsController {
   constructor(

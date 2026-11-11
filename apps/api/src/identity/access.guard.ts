@@ -11,6 +11,7 @@ import { ACCESS_POLICY, type AccessPolicy } from './access-policy';
 import { SYSTEM_ACTOR, type Actor } from './actor';
 import { ActorContextService } from './actor-context.service';
 import type { Capability } from './capabilities';
+import { SIGNED_IN_KEY } from './access.decorators';
 import { resolveRouteAccess } from './route-access';
 import {
   AuthenticationError,
@@ -118,6 +119,11 @@ export class AccessGuard implements CanActivate {
       );
     }
     this.remember(request, principal.actor);
+    if (principal.visitor && this.signedInOnly(context)) {
+      throwAuthenticationError(
+        new AuthenticationError('Sign in to continue.', 'SIGN_IN_REQUIRED'),
+      );
+    }
     // Visitors name nobody; they cannot write either.
     if (principal.actor.ref) {
       stampAuthorFields(request.body, principal.actor.ref);
@@ -145,6 +151,13 @@ export class AccessGuard implements CanActivate {
       this.denyAsSignInOrForbidden(principal, access.capability);
     }
     return true;
+  }
+
+  private signedInOnly(context: ExecutionContext): boolean {
+    return Boolean(
+      this.reflector.get<boolean>(SIGNED_IN_KEY, context.getHandler()) ??
+        this.reflector.get<boolean>(SIGNED_IN_KEY, context.getClass()),
+    );
   }
 
   /**

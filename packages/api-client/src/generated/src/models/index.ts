@@ -200,6 +200,7 @@ export * from './DeleteRunnerResponseDto';
 export * from './DeprecateGlossaryTermDto';
 export * from './DiscoveryRecentRunDto';
 export * from './DiscoveryRunSourceDto';
+export * from './DisplaySettingsDto';
 export * from './EdgeClass';
 export * from './EdgeDetailDto';
 export * from './EmbeddingAiProviderOptionDto';

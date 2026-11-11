@@ -22,7 +22,11 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { PublicRoute, Requires } from '../identity/access.decorators';
+import {
+  PublicRoute,
+  Requires,
+  SignedInOnly,
+} from '../identity/access.decorators';
 import { ReadsOnly } from '../reads-only.decorator';
 import {
   CreateQueryRunDto,
@@ -46,9 +50,11 @@ import {
  *
  * The routes need only `workspace.view`: what a person may read is decided
  * per table, by the catalog, from a role on the whole workspace or a
- * data-reader grant on single sources and tables.
+ * data-reader grant on single sources and tables. Never for visitors of a
+ * public workspace: no catalog, no runs, no history, nothing saved.
  */
 @ApiTags('Data query')
+@SignedInOnly()
 @Controller()
 export class DataQueryController {
   constructor(
