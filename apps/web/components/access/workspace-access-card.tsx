@@ -2,12 +2,12 @@
 
 import * as React from "react";
 import {
-  Plus,
   ShieldCheck,
   Trash2,
   UserPlus,
 } from "lucide-react";
 import { toast } from "sonner";
+import { GiveAccessDialog } from "@/components/access/give-access-dialog";
 import {
   SortableHead,
   sortRows,
@@ -22,23 +22,10 @@ import {
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import { Card, CardContent } from "@workspace/ui/components/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@workspace/ui/components/dialog";
-import { Input } from "@workspace/ui/components/input";
-import { Label } from "@workspace/ui/components/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@workspace/ui/components/select";
+
+
+
+
 import {
   Table,
   TableBody,
@@ -265,128 +252,6 @@ function GrantsTable({
         </TableBody>
       </Table>
     </div>
-  );
-}
-
-function GiveAccessDialog({
-  open,
-  onOpenChange,
-  groups,
-  roles,
-  onAdded,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  groups: TenantGroupDto[];
-  roles: RoleDto[];
-  onAdded: () => Promise<void>;
-}) {
-  const { t } = useTranslation();
-  const [groupId, setGroupId] = React.useState("");
-  const [roleKey, setRoleKey] = React.useState("viewer");
-  const [until, setUntil] = React.useState("");
-  const [saving, setSaving] = React.useState(false);
-
-  React.useEffect(() => {
-    if (open) {
-      setGroupId("");
-      setRoleKey("viewer");
-      setUntil("");
-    }
-  }, [open ]);
-
-  const submit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!groupId) return;
-    setSaving(true);
-    try {
-      await api.access.workspaceAccessControllerAddGrant({
-        createGrantDto: {
-          subjectType: "group",
-          subjectId: groupId,
-          roleKey,
-          expiresAt: until ? new Date(`${until}T23:59:59`) : null,
-        },
-      });
-      toast.success(t("access.added"));
-      onOpenChange(false);
-      await onAdded();
-    } catch (error) {
-      toast.error(await extractApiErrorMessage(error, t("access.addFailed")));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{t("access.giveAccessTitle")}</DialogTitle>
-          <DialogDescription>
-            {t("access.giveAccessDescription")}
-          </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={(event) => void submit(event)} className="grid gap-3">
-          <div className="grid gap-1">
-            <Label>{t("access.group")}</Label>
-            <Select value={groupId} onValueChange={setGroupId}>
-              <SelectTrigger>
-                <SelectValue placeholder={t("access.pickGroup")} />
-              </SelectTrigger>
-              <SelectContent>
-                {groups.map((group) => (
-                  <SelectItem key={group.id} value={group.id}>
-                    {group.path}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-1">
-            <Label>{t("access.role")}</Label>
-            <Select value={roleKey} onValueChange={setRoleKey}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {roles.map((role) => (
-                  <SelectItem key={role.key} value={role.key}>
-                    {role.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-1">
-            <Label htmlFor="access-until">{t("access.untilOptional")}</Label>
-            <Input
-              id="access-until"
-              type="date"
-              value={until}
-              onChange={(event) => setUntil(event.target.value)}
-            />
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {t("access.groupsHint")}
-          </p>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={saving}
-            >
-              {t("access.cancel")}
-            </Button>
-            <Button type="submit" disabled={!groupId || saving}>
-              <Plus className="h-4 w-4" />
-              {t("access.add")}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
   );
 }
 

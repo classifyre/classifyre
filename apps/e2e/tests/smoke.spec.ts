@@ -341,8 +341,15 @@ test.describe.serial("smoke with sign-in", () => {
       await expect(tab).toBeVisible({ timeout: 60_000 });
       await expect(tab.getByTestId(`catalog-table-${before.sqlName}`)).toBeVisible();
       await expect(tab.getByTestId("data-access-table")).toContainText(VIEWERS_GROUP);
-      await tab.getByTestId("data-activity-tab").click();
-      await expect(tab.getByTestId("data-access")).toContainText(VIEWERS_GROUP, { timeout: 30_000 });
+      // Activity is the table's, not the source's.
+      await expect(tab.getByTestId("data-activity-tab")).toHaveCount(0);
+      await page.goto(`/${SLUG}/assets/${before.assetId}/?tab=data`);
+      const tableTab = page.getByTestId("asset-data-tab");
+      await expect(tableTab).toBeVisible({ timeout: 60_000 });
+      await tableTab.getByTestId("data-activity-tab").click();
+      await expect(tableTab.getByTestId("data-access")).toContainText("POST /access/grants", {
+        timeout: 30_000,
+      });
     }
 
     // A viewer reads the source, never how it is set up.
@@ -419,6 +426,12 @@ test.describe.serial("smoke with sign-in", () => {
         `/${SLUG}/sources/${sourceId}`,
       );
       expect(read.config).toEqual({ type: "LOCAL_FOLDER" });
+      // A public workspace never sends a visitor to sign in by itself, even
+      // though pages ask for things closed to them (settings, activity, …).
+      await visitorPage.goto(`/${SLUG}/discovery/`);
+      await expect(visitorPage.getByTestId("sign-in")).toBeVisible({ timeout: 60_000 });
+      await visitorPage.waitForTimeout(3_000);
+      expect(new URL(visitorPage.url()).pathname).toContain(`/${SLUG}/discovery`);
       await visitorPage.goto(`/${SLUG}/settings/`);
       await expect(visitorPage.getByTestId("settings-no-access")).toBeVisible();
       // Nor is saving SQL, which would pool every visitor's queries together.

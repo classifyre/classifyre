@@ -12,7 +12,7 @@ Classifyre already knows every table in a workspace — database tables, Delta a
 
 - a table's **Data** tab, which starts with that table;
 - a source's **Data** tab, with the source's tables listed beside the editor;
-- the **SQL** page, to query and join tables of every source at once.
+- the **SQL** page, to query and join tables of every source at once (who may query is managed in **Settings → Access** and on the Data tabs).
 
 The SQL page works like a small IDE: the editor fills the space, and the **Tables**, **History** and **Saved** tabs sit beside it. A query can join tables of different sources.
 
@@ -127,21 +127,21 @@ People see tables they cannot query with a lock, so they know what exists and wh
 
 ### Giving access where the data is
 
-Each of the three places has the same block below its result, with two tabs, for people who can see who has access (**access.view**):
+The **Data reader** role is what opens SQL: whoever holds it on a table, a source or the workspace can query those tables. It is given in one dialog, the same everywhere — **Give access** in **Settings → Access**, on a source's **Data** tab and on a table's **Data** tab — with the same fields: the group, the role, what it applies to, and an optional end date.
 
-| Where | **Access** lists | **Give access** gives the Data reader role on | **Activity** shows |
-| --- | --- | --- | --- |
-| A table's **Data** tab | grants on the table, on its source, and wider ones | this table | reads and exports of the table, access given or removed on it |
-| A source's **Data** tab | grants on the source, on any of its tables, and wider ones | the whole source: every table in it | reads and exports of any of its tables, access given or removed on the source or its tables |
-| The **SQL** page | every Data reader grant in the workspace | the whole workspace: every table, today's and future ones | every table read and export, every change to data access |
+| Where you press **Give access** | Role | Applies to |
+| --- | --- | --- |
+| **Settings → Access** | any role; Data reader can also be given on one source or one table | the whole workspace, or — for Data reader — a source or a table you pick |
+| A source's **Data** tab | Data reader (fixed) | the whole source: every table in it (fixed) |
+| A table's **Data** tab | Data reader (fixed) | this table (fixed) |
+
+Below the result, people who can see who has access (**access.view**) see **Access**: the Data reader grants that reach the source or table — on it, on its tables or source, and wider ones — with their end dates. Grants made here can be removed with the bin button; inherited ones (from the tenant or an owning group) are changed in **Settings → Access**.
+
+A table's tab also has **Activity**: reads and exports of that table, and access given or removed on it. Every query is recorded per table it read; the workspace's whole trail is in **Settings → Activity**.
 
 ![A source's Data tab: the editor and result, the source's tables beside it, and who can query its tables below](./images/source-data-tab.png)
 
 ![A table's Activity: who read and exported it, and the access given on it](./images/table-activity.png)
-
-There is no scope to pick: where you press **Give access** decides what it opens. Grants made here can be removed here with the bin button; inherited ones (from the tenant or an owning group) are changed in **Settings → Access**.
-
-Every query is recorded: each table it read appears once in **Activity**, with who ran it. The workspace's own **Activity** (Settings) shows the same rows among all other changes.
 
 <Callout type="warning">
 Reading rows shows everything in them, including what detectors flagged as personal data. Give the Data reader role as narrowly as the work needs: one table or one source rather than a whole workspace.

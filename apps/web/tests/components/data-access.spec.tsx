@@ -24,8 +24,18 @@ const grants = [
   grant({ id: "g-tenant", subjectId: "auditors", subjectLabel: "/auditors", scopeType: "tenant", scopeId: "t1", scopeLabel: "Acme", inherited: true }),
 ];
 
+const ROLES = [
+  { key: "viewer", title: "Viewer", scopes: ["workspace", "group", "tenant"], capabilities: [] },
+  {
+    key: "data-reader",
+    title: "Data reader",
+    scopes: ["workspace", "group", "tenant", "source", "asset"],
+    capabilities: [],
+  },
+];
+
 async function mockApi(page: CtPage) {
-  const posted: unknown[] = [];
+  const posted: Array<Record<string, unknown>> = [];
   const audit: string[] = [];
   const json = (body: unknown) => ({
     status: 200,
@@ -45,6 +55,7 @@ async function mockApi(page: CtPage) {
   await page.route("**/access/groups", (route) =>
     route.fulfill(json([{ id: "sales", name: "sales", path: "/sales", parentId: null }])),
   );
+  await page.route("**/access/roles", (route) => route.fulfill(json(ROLES)));
   await page.route("**/*audit-events*", (route) => {
     audit.push(new URL(route.request().url()).searchParams.get("resource") ?? "");
     return route.fulfill(json({ items: [], total: 0, skip: 0, limit: 50 }));
@@ -55,7 +66,19 @@ async function mockApi(page: CtPage) {
 
 const ADMIN = ["workspace.view", "access.view", "access.manage", "activity.view"];
 
-test("a table lists the grants that open it, and gives access to it alone", async ({
+/** The shared dialog with its role and target fixed: only group and date to pick. */
+async function giveInFixedDialog(page: CtPage, until: string) {
+  const dialog = page.getByTestId("give-access-dialog");
+  await expect(dialog.getByTestId("give-access-role")).toBeDisabled();
+  await expect(dialog.getByTestId("give-access-role")).toContainText("Data reader");
+  await dialog.getByTestId("give-access-group").click();
+  await page.getByRole("option", { name: "/sales" }).click();
+  await dialog.getByTestId("give-access-until").fill(until);
+  await dialog.getByTestId("give-access-submit").click();
+  return dialog;
+}
+
+test("a table lists the grants that open it, and gives access to it alone, until a date", async ({
   mount,
   page,
 }) => {
@@ -76,31 +99,25 @@ test("a table lists the grants that open it, and gives access to it alone", asyn
   await expect(table.getByText("/ops")).toHaveCount(0);
   await expect(table.getByText("/hr")).toHaveCount(0);
   await expect(table.getByText("/everyone")).toHaveCount(0);
-  await expect(table.getByText("Shop lake")).toBeVisible();
 
   await component.getByTestId("data-access-dialog-trigger").click();
-  const dialog = page.getByTestId("data-access-dialog");
-  await expect(dialog.getByText("on the table orders")).toBeVisible();
-  // No scope picker: on a table's tab it is always the table.
-  await expect(dialog.getByRole("combobox")).toHaveCount(1);
-  await dialog.getByTestId("data-access-group").click();
-  await page.getByRole("option", { name: "/sales" }).click();
-  await dialog.getByTestId("data-access-give").click();
-  await expect.poll(() => posted).toEqual([
-    {
-      subjectType: "group",
-      subjectId: "sales",
-      roleKey: "data-reader",
-      scopeType: "asset",
-      resourceId: "a-orders",
-    },
-  ]);
+  await expect(page.getByTestId("give-access-target-fixed")).toHaveValue("One table: orders");
+  await giveInFixedDialog(page, "2027-03-31");
+  await expect.poll(() => posted.length).toBe(1);
+  expect(posted[0]).toMatchObject({
+    subjectType: "group",
+    subjectId: "sales",
+    roleKey: "data-reader",
+    scopeType: "asset",
+    resourceId: "a-orders",
+  });
+  expect(String(posted[0]!.expiresAt)).toContain("2027-03-31");
 
   await component.getByTestId("data-activity-tab").click();
   await expect.poll(() => audit).toContain("asset:a-orders");
 });
 
-test("a source lists grants on it and on any of its tables, and gives the whole source", async ({
+test("a source lists grants on it and its tables, gives the whole source, and has no Activity", async ({
   mount,
   page,
 }) => {
@@ -115,57 +132,21 @@ test("a source lists grants on it and on any of its tables, and gives the whole 
   await expect(table.getByText("/ops")).toBeVisible();
   await expect(table.getByText("/legal")).toBeVisible();
   await expect(table.getByText("/hr")).toHaveCount(0);
+  await expect(component.getByTestId("data-activity-tab")).toHaveCount(0);
 
   await component.getByTestId("data-access-dialog-trigger").click();
-  const dialog = page.getByTestId("data-access-dialog");
-  await expect(dialog.getByText("the whole source Shop lake")).toBeVisible();
-  await dialog.getByTestId("data-access-group").click();
-  await page.getByRole("option", { name: "/sales" }).click();
-  await dialog.getByTestId("data-access-give").click();
-  await expect.poll(() => posted).toEqual([
-    expect.objectContaining({ scopeType: "source", resourceId: "s-shop" }),
-  ]);
-
-  await component.getByTestId("data-activity-tab").click();
-  await expect.poll(() => audit).toContain("source:s-shop");
+  await expect(page.getByTestId("give-access-target-fixed")).toHaveValue("One source: Shop lake");
+  await giveInFixedDialog(page, "2027-01-15");
+  await expect.poll(() => posted.length).toBe(1);
+  expect(posted[0]).toMatchObject({ scopeType: "source", resourceId: "s-shop", roleKey: "data-reader" });
+  expect(audit).toEqual([]);
 });
 
-test("the SQL page shows every data grant and gives the whole workspace", async ({
-  mount,
-  page,
-}) => {
-  await signedInAs(page, ADMIN);
-  const { posted, audit } = await mockApi(page);
-  const component = await mount(<DataAccessHarness scope={{ kind: "workspace" }} />);
-
-  const table = component.getByTestId("data-access-table");
-  for (const group of ["/finance", "/ops", "/legal", "/hr", "/analysts"]) {
-    await expect(table.getByText(group)).toBeVisible();
-  }
-  await expect(table.getByText("/everyone")).toHaveCount(0);
-
-  await component.getByTestId("data-access-dialog-trigger").click();
-  const dialog = page.getByTestId("data-access-dialog");
-  await dialog.getByTestId("data-access-group").click();
-  await page.getByRole("option", { name: "/sales" }).click();
-  await dialog.getByTestId("data-access-give").click();
-  await expect.poll(() => posted).toEqual([
-    expect.objectContaining({ scopeType: "workspace" }),
-  ]);
-  expect(JSON.stringify(posted)).not.toContain("resourceId");
-
-  await component.getByTestId("data-activity-tab").click();
-  await expect.poll(() => audit).toContain("data");
-});
-
-test("without access.view there is neither Access nor Activity", async ({
-  mount,
-  page,
-}) => {
+test("without access.view there is no access block", async ({ mount, page }) => {
   await signedInAs(page, ["workspace.view", "data.query"]);
   const { audit } = await mockApi(page);
   const component = await mount(
-    <DataAccessHarness scope={{ kind: "source", sourceId: "s-shop", name: "Shop lake" }} />,
+    <DataAccessHarness scope={{ kind: "asset", assetId: "a-orders", sourceId: "s-shop", name: "orders" }} />,
   );
   await expect(component.getByTestId("data-access")).toHaveCount(0);
   await page.waitForTimeout(300);

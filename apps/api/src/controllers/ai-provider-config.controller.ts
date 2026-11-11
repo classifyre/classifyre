@@ -62,7 +62,9 @@ const TEST_MESSAGES = [
 ];
 
 @ApiTags('AI Provider Configs')
-@AccessArea({ view: 'agent.view', change: 'agent.configure' })
+// Which AI providers and tool servers are configured is a setting: never
+// the public's (visitors of a public workspace hold agent.view).
+@AccessArea({ view: 'settings.view', change: 'agent.configure' })
 @Controller('ai-provider-configs')
 export class AiProviderConfigController {
   constructor(

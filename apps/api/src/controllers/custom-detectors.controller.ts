@@ -12,6 +12,7 @@ import {
   Query,
   Req,
   Res,
+  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiBody,
@@ -46,9 +47,11 @@ import { RetireOutOfScopeService } from '../findings-bulk/retire-out-of-scope.se
 import { BlockWhenPaused } from '../namespace/block-when-paused.decorator';
 import { CustomDetectorFilesService } from '../custom-detector-files.service';
 import { CustomDetectorFileDto } from '../dto/custom-detector-file.dto';
+import { DetectorDefinitionInterceptor } from '../identity/source-config-access';
 import { AccessArea, Requires } from '../identity/access.decorators';
 
 @ApiTags('Custom Detectors')
+@UseInterceptors(DetectorDefinitionInterceptor)
 @AccessArea({ view: 'detector.view', change: 'detector.manage' })
 @Controller('custom-detectors')
 export class CustomDetectorsController {
@@ -187,6 +190,8 @@ export class CustomDetectorsController {
     return this.customDetectorsService.delete(id);
   }
 
+  // A code detector's files are part of its definition: detector.manage.
+  @Requires('detector.manage')
   @Get(':id/files')
   @ApiOperation({
     summary: "List a code detector's uploaded files",
@@ -237,6 +242,8 @@ export class CustomDetectorsController {
   // stream these bytes with the internal key; operator traffic uses the
   // normal session. The endpoint accepts both: @InternalOnly would lock
   // operators out of their own lists and models.
+  // A code detector's files are part of its definition: detector.manage.
+  @Requires('detector.manage')
   @Get(':id/files/:fileId/content')
   @ApiOperation({ summary: "Stream a code detector file's bytes" })
   async fileContent(

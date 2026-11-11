@@ -1,7 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { setUnauthorizedHandler } from "@workspace/api-client";
+import {
+  namespaceSlugFromPath,
+  setUnauthorizedHandler,
+} from "@workspace/api-client";
 
 const IamConsoleContext = React.createContext(false);
 
@@ -35,6 +38,41 @@ async function isOperator(): Promise<boolean> {
   }
 }
 
+/**
+ * Whether the page is a workspace the visitor may read (a public one). A
+ * visitor has no session to renew: inside a public workspace, a request for
+ * something closed to them (settings, activity, SQL, …) simply fails and the
+ * page goes on; only a workspace closed to them sends them to sign in.
+ */
+const publicSlugs = new Map<string, Promise<boolean>>();
+function readsPublicWorkspace(): Promise<boolean> {
+  const slug = namespaceSlugFromPath(window.location.pathname);
+  // Outside a workspace (the directory) the page itself decides.
+  if (!slug) return Promise.resolve(true);
+  let known = publicSlugs.get(slug);
+  if (!known) {
+    known = (async () => {
+      try {
+        const base = (process.env.NEXT_PUBLIC_API_URL || "/api").replace(
+          /\/+$/,
+          "",
+        );
+        // Plain fetch, not the API client: no re-entry into this handler.
+        const response = await fetch(`${base}/namespaces`, {
+          credentials: "same-origin",
+        });
+        if (!response.ok) return false;
+        const listed = (await response.json()) as Array<{ slug?: string }>;
+        return listed.some((workspace) => workspace.slug === slug);
+      } catch {
+        return false;
+      }
+    })();
+    publicSlugs.set(slug, known);
+  }
+  return known;
+}
+
 export function IamProvider({
   console: consoleEnabled = false,
   children,
@@ -61,6 +99,12 @@ export function IamProvider({
           return false;
         }
         window.location.assign(`/auth/no-tenant/?reason=${code}`);
+        return false;
+      }
+      // Not signed in at all (a visitor): nothing to renew. In a public
+      // workspace the refused request just fails — never an automatic trip
+      // to the sign-in page; **Sign in** is in the header for that.
+      if (code === "SIGN_IN_REQUIRED" && (await readsPublicWorkspace())) {
         return false;
       }
       const response = await fetch("/auth/refresh/", {

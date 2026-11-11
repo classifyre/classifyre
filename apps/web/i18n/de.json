@@ -2692,7 +2692,9 @@
       "templatesLoading": "Vorlagen werden geladen...",
       "templatesHint": "Beginnen Sie mit einer Vorlage. Jede ist eine funktionierende Regel mit Testszenarien; passen Sie sie an.",
       "templatesScenarios": "{{count}} Testszenario(s)"
-    }
+    },
+    "definitionHiddenTitle": "Wie dieser Detektor arbeitet, wird Ihnen nicht gezeigt",
+    "definitionHiddenDescription": "Seine Muster, Prompts oder sein Code sind nur für Personen sichtbar, die Detektoren ändern dürfen. Was er gefunden hat, steht unter Ergebnisse."
   },
   "scans": {
     "title": "Scans",
@@ -7335,7 +7337,7 @@
       "actions": "Aktionen"
     },
     "giveAccessTitle": "Zugriff gewähren",
-    "giveAccessDescription": "Einer Gruppe eine Rolle in diesem Arbeitsbereich geben, optional bis zu einem Datum. Sie können nur Rollen geben, deren Fähigkeiten Sie hier alle haben.",
+    "giveAccessDescription": "Geben Sie einer Gruppe eine Rolle für diesen Arbeitsbereich – beim Datenleser auch für eine Quelle oder eine Tabelle –, auf Wunsch bis zu einem Datum. Sie können nur Rollen geben, deren Fähigkeiten Sie hier alle selbst haben.",
     "cancel": "Abbrechen",
     "allWorkspaces": "Alle Arbeitsbereiche",
     "tenantTitle": "Mandant",
@@ -7367,6 +7369,16 @@
       "noMatch": "Keine Aktivität für diese Filter.",
       "search": "Aktivität filtern …",
       "allActions": "Alle Aktionen"
+    },
+    "appliesTo": {
+      "label": "Gilt für",
+      "workspace": "Diesen ganzen Arbeitsbereich",
+      "source": "Eine Quelle",
+      "asset": "Eine Tabelle",
+      "pickSource": "Quelle",
+      "pickTable": "Tabelle",
+      "choose": "Auswählen…",
+      "none": "Nichts zur Auswahl: scannen Sie zuerst eine Datenbank, ein Lakehouse oder einen Bucket."
     }
   },
   "platform": {
@@ -7512,32 +7524,16 @@
     "access": {
       "open": "Zugriff",
       "description": {
-        "workspace": "Jede Datenleser-Freigabe in diesem Arbeitsbereich: für den ganzen Arbeitsbereich, eine Quelle oder eine Tabelle. Datenzugriff geht immer an eine Gruppe.",
         "source": "Gruppen, die die Tabellen dieser Quelle abfragen dürfen: die Rolle Datenleser für die Quelle, eine ihrer Tabellen oder den ganzen Arbeitsbereich.",
         "asset": "Gruppen, die diese Tabelle abfragen dürfen: die Rolle Datenleser für die Tabelle, ihre Quelle oder den ganzen Arbeitsbereich."
       },
       "activity": "Aktivität",
       "activityHint": {
-        "workspace": "Lese- und Exportzugriffe auf die Tabellen dieses Arbeitsbereichs und Änderungen am Datenzugriff, neueste zuerst. Jede gelesene Tabelle zählt einmal pro Abfrage.",
-        "source": "Lese- und Exportzugriffe auf die Tabellen dieser Quelle und Zugriff, der für sie oder ihre Tabellen gegeben oder entfernt wurde, neueste zuerst.",
         "asset": "Lese- und Exportzugriffe auf diese Tabelle und Zugriff, der für sie gegeben oder entfernt wurde, neueste zuerst. Abfrageläufe selbst bleiben im Verlauf der jeweiligen Person."
       },
-      "giveTitle": "Datenzugriff geben",
-      "giveDescription": {
-        "workspace": "Geben Sie einer Gruppe die Rolle Datenleser für diesen Arbeitsbereich: jede Tabelle darin.",
-        "source": "Geben Sie einer Gruppe die Rolle Datenleser für die ganze Quelle {{name}}: jede Tabelle darin.",
-        "asset": "Geben Sie einer Gruppe die Rolle Datenleser für die Tabelle {{name}}."
-      },
-      "giveHint": {
-        "workspace": "Öffnet jede Tabelle des Arbeitsbereichs für die Gruppe, heutige und künftige. Für eine Quelle oder Tabelle nutzen Sie deren Daten-Tab. Jede Änderung wird in der Aktivität festgehalten.",
-        "source": "Öffnet jede Tabelle von {{name}} für die Gruppe. Für eine einzelne Tabelle nutzen Sie deren Daten-Tab. Jede Änderung wird in der Aktivität festgehalten.",
-        "asset": "Öffnet nur {{name}} für die Gruppe. Für die ganze Quelle nutzen Sie deren Daten-Tab. Jede Änderung wird in der Aktivität festgehalten."
-      },
       "none": "Niemand außer den Admins des Arbeitsbereichs.",
-      "pickGroup": "Gruppe wählen",
       "give": "Zugriff geben",
       "remove": "Zugriff entfernen",
-      "added": "Zugriff gegeben",
       "viewerNote": "Mitglieder brauchen außerdem eine Rolle, die den Arbeitsbereich öffnet, etwa Betrachter."
     },
     "settings": {

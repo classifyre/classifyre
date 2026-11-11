@@ -20,7 +20,9 @@ import {
 import { AccessArea } from '../../identity/access.decorators';
 
 @ApiTags('autopilot')
-@AccessArea({ view: 'agent.view', change: 'agent.configure' })
+// Which AI providers and tool servers are configured is a setting: never
+// the public's (visitors of a public workspace hold agent.view).
+@AccessArea({ view: 'settings.view', change: 'agent.configure' })
 @Controller('autopilot/mcp-servers')
 export class McpServersController {
   constructor(private readonly servers: McpServersService) {}

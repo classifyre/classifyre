@@ -318,6 +318,7 @@ check W "nor run SQL or even see its catalog" 401 "$(status - GET /sales-pipelin
 check W "nor read who did what" 401 "$(status - GET /sales-pipeline/audit-events)"
 check W "nor the settings" 401 "$(status - GET /sales-pipeline/instance-settings)"
 check W "only how dates and language are shown" 200 "$(status - GET /sales-pipeline/instance-settings/display)"
+check W "nor which AI providers are set up" 401 "$(status - GET /sales-pipeline/ai-provider-configs)"
 check W "a member without a grant does not read its activity either" 403 "$(status controller GET /sales-pipeline/audit-events)"
 check W "nor its settings" 403 "$(status controller GET /sales-pipeline/worker-queues)"
 check W "a member of the tenant without a grant on it reads it" 200 "$(status controller GET /sales-pipeline/sources)"

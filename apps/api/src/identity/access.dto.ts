@@ -12,7 +12,7 @@ export class RoleDto {
   title: string;
 
   @ApiProperty({
-    enum: ['tenant', 'group', 'workspace'],
+    enum: ['tenant', 'group', 'workspace', 'source', 'asset'],
     isArray: true,
     description: 'Where this role can be granted.',
   })

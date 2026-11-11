@@ -9,8 +9,8 @@ import { useCan } from "@/hooks/use-me";
 import { useTranslation } from "@/hooks/use-translation";
 import { previewSql, type QueryCatalog } from "@/lib/data-query";
 import {
-  DataAccessTabs,
-  GiveDataAccessDialog,
+  DataAccessSection,
+  GiveDataAccessButton,
   useDataAccessGrants,
   type DataScope,
 } from "./data-access";
@@ -33,7 +33,7 @@ export function DataTab({
   explorer = false,
   testId,
 }: {
-  scope: Exclude<DataScope, { kind: "workspace" }>;
+  scope: DataScope;
   /** What the editor completes and the explorer lists: just this scope. */
   catalog: QueryCatalog;
   sqlName: string;
@@ -71,7 +71,7 @@ export function DataTab({
           <span className="text-xs text-muted-foreground">{summary}</span>
         )}
         <div className="ml-auto flex flex-wrap items-center gap-1">
-          {canManage && <GiveDataAccessDialog scope={scope} access={access} />}
+          {canManage && <GiveDataAccessButton scope={scope} access={access} />}
           <Button asChild size="sm" variant="ghost">
             <Link
               href={`${nsHref("/query")}?sql=${encodeURIComponent(sql)}`}
@@ -107,7 +107,7 @@ export function DataTab({
         editor
       )}
 
-      <DataAccessTabs scope={scope} access={access} />
+      <DataAccessSection scope={scope} access={access} />
     </div>
   );
 }

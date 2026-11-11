@@ -1462,7 +1462,7 @@ const LOCALE_PREFIXES = new Set(["en", "de"]);
 
 /**
  * The namespace slug encoded in an app pathname, or undefined when the path is
- * outside any namespace (landing page, `/namespaces/<id>/settings`, or a static
+ * outside any namespace (landing page, `/namespaces/categories`, or a static
  * file).
  */
 export function namespaceSlugFromPath(
