@@ -376,7 +376,11 @@ export default function AssetDetailPage() {
           </TabsContent>
           {queryTable && queryCatalog && (
             <TabsContent value="data" className="space-y-4">
-              <AssetDataTab catalog={queryCatalog} table={queryTable} />
+              <AssetDataTab
+                catalog={queryCatalog}
+                table={queryTable}
+                sourceName={sourceLabel}
+              />
             </TabsContent>
           )}
         </Tabs>
