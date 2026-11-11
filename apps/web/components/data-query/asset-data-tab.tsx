@@ -9,7 +9,15 @@ import { useNamespace } from "@/components/namespace-provider";
 import { useCan } from "@/hooks/use-me";
 import type { QueryCatalog, QueryCatalogTable } from "@/lib/data-query";
 import { QueryWorkbench } from "./query-workbench";
-import { DataAccessPanel } from "./data-access-panel";
+import {
+  GiveTableAccessDialog,
+  TableAccessOverview,
+  useTableAccessGrants,
+} from "./data-access-dialog";
+import { apiErrorMessage } from "@/lib/data-query";
+import { extractApiErrorMessage } from "@/lib/extract-api-error-message";
+import { api } from "@workspace/api-client";
+import { toast } from "sonner";
 
 /**
  * An asset's rows, queried in place: the editor starts with this table and
@@ -19,14 +27,38 @@ import { DataAccessPanel } from "./data-access-panel";
 export function AssetDataTab({
   catalog,
   table,
+  sourceName,
 }: {
   catalog: QueryCatalog;
   table: QueryCatalogTable;
+  /** Display name of the table's source, for the access dialog. */
+  sourceName?: string;
 }) {
   const { t } = useTranslation();
   const { nsHref, namespace } = useNamespace();
   const canManage = useCan("access.manage");
   const sql = `SELECT *\nFROM ${table.sqlName}\nLIMIT 100`;
+  const access = useTableAccessGrants(
+    namespace?.id ?? "",
+    table.assetId,
+    table.sourceId,
+  );
+
+  React.useEffect(() => {
+    if (canManage && namespace?.id) void access.reload();
+  }, [canManage, namespace?.id, access.reload]);
+
+  const remove = async (grant: { id: string; subjectLabel: string }) => {
+    try {
+      await api.access.workspaceAccessControllerRemoveGrant({ id: grant.id });
+      toast.success(t("access.removed", { subject: grant.subjectLabel }));
+      await access.reload();
+    } catch (error) {
+      toast.error(await extractApiErrorMessage(error, t("access.removeFailed")));
+    }
+  };
+
+  const showOverview = canManage && (access.grants ?? []).length > 0;
 
   return (
     <div className="space-y-4" data-testid="asset-data-tab">
@@ -44,15 +76,27 @@ export function AssetDataTab({
             <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
               {table.sqlName}
             </code>
-            <Button asChild size="sm" variant="ghost" className="ml-auto">
-              <Link
-                href={`${nsHref("/query")}?sql=${encodeURIComponent(sql)}`}
-                title={t("dataQuery.openInQueryHint")}
-              >
-                <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
-                {t("dataQuery.openInQuery")}
-              </Link>
-            </Button>
+            <div className="ml-auto flex flex-wrap items-center gap-1">
+              {canManage && namespace?.id && (
+                <GiveTableAccessDialog
+                  access={access}
+                  assetId={table.assetId}
+                  sourceId={table.sourceId}
+                  sourceName={sourceName ?? table.sourceId}
+                  tableName={table.name}
+                  onChanged={() => void access.reload()}
+                />
+              )}
+              <Button asChild size="sm" variant="ghost">
+                <Link
+                  href={`${nsHref("/query")}?sql=${encodeURIComponent(sql)}`}
+                  title={t("dataQuery.openInQueryHint")}
+                >
+                  <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                  {t("dataQuery.openInQuery")}
+                </Link>
+              </Button>
+            </div>
           </div>
           <QueryWorkbench
             catalog={catalog}
@@ -61,14 +105,13 @@ export function AssetDataTab({
             editorHeight={140}
             resultHeight={380}
           />
+          {showOverview && (
+            <TableAccessOverview
+              access={access}
+              onRemove={(grant) => void remove(grant)}
+            />
+          )}
         </>
-      )}
-      {canManage && namespace?.id && (
-        <DataAccessPanel
-          workspaceId={namespace.id}
-          assetId={table.assetId}
-          sourceId={table.sourceId}
-        />
       )}
     </div>
   );
