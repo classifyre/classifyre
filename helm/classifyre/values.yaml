@@ -1029,7 +1029,7 @@ iam:
     # -- Identity server image repository.
     repository: quay.io/keycloak/keycloak
     # -- Identity server image tag. Keep it a quoted string so Dependabot can bump it.
-    tag: "26.8.1"
+    tag: "26.8.2-1"
     # -- Image pull policy.
     pullPolicy: IfNotPresent
   # -- Replicas. More than one forms a cluster over the headless service; minor upgrades still stop all of them.
