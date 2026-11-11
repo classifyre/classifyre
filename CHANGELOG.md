@@ -5,6 +5,41 @@ compiled at release time from per-PR fragments in `changelog.d/` (see
 `changelog.d/README.md`). Commit messages and PR titles are never used as
 release notes.
 
+## [0.8.0] - 2026-11-11
+
+### Added
+
+- Activity now names what changed (the source, table or group at the time of the change), can be searched, sorted and paged, and reading table rows with SQL is recorded per table. Access given on a single table or source is now listed under that table's or source's name instead of "One table" or "One source".
+- A table's Data tab, a source's Data tab and the SQL page now show Access and Activity for exactly that scope: who can query it, and which reads, exports and access changes touched it. Give access on a table's tab always opens just that table, and on the SQL page the whole workspace.
+- You can export the whole result of a SQL query as an Excel, CSV or Parquet file, up to a million rows by default, if you may export data from the workspace.
+- You can now query the rows of database, lakehouse and bucket tables with standard SQL, from a table's new Data tab or the new SQL page, and join tables across sources. Workspace admins can query straight away, and the new Data reader role gives a group access to a whole workspace, one source or a single table.
+- You can now make a workspace public, read-only for everyone in its tenant and for signed-out visitors of the first tenant, with the new workspace.publish capability. This replaces the public tenant and demo mode, which are gone.
+- Sources with tables now have a Data tab: query the source's tables with its table list beside the editor, give a group the Data reader role on the whole source in one step, and see who read its tables and who was given access in its Activity.
+
+### Changed
+
+- Chat bots now only read: a chat message has no signed-in person behind it, so the bot setting that allowed changes is gone.
+- The all-in-one Docker image now asks you to sign in: open it and sign in as `classifyre` with the password `classifyre`, then change the password under Your account. Set `CLASSIFYRE_URL` when you open it at another address or port than `http://localhost:3000`.
+- Giving access now uses one dialog everywhere — Settings → Access and the Data tabs of sources and tables — with the same fields: group, role, what it applies to and an optional end date. From Settings, the Data reader role (which opens SQL) can now be given on one source or one table, and access given on a Data tab can end on a date.
+- Notifications now go to groups: by default to the group that owns the workspace, or to the groups chosen for each kind under Settings → Access → Who gets notifications. Marking a notification read, important or dismissed now applies to you only, and visitors of a public workspace see none.
+- Visitors of a public workspace now see the SQL page with an example query and a Sign in button, so they know what signing in opens; nothing can be run, saved or exported without signing in. A source's page no longer shows who changed it last in its header.
+- Sign-in is now always on: every installation runs the identity server, and every change is recorded under the name of the person who signed in. Workspaces of an installation that ran without sign-in are copied into a tenant once with `node dist/src/admin.js workspaces copy --to-tenant default --all`; MCP tokens made without sign-in no longer exist, so create new ones after signing in.
+- The SQL page now works like a small IDE: Run, Format and Save sit in one toolbar above the editor, and your tables, recent queries and saved queries are in tabs beside it. Names complete as you type with access marks, a table or column from the list lands where the cursor stands, reopening a past query brings back just its SQL, and results can be searched, sorted and paged.
+- A workspace's name, address, description, categories, links and picture are now edited under Settings → General inside the workspace; the gear on a workspace card opens it there.
+
+### Removed
+
+- The Helm value `iam.enabled` is gone, and a release that still sets it fails with a message: remove it from your values and make sure `ingress.host` or `iam.appUrl` is set. The Platform page no longer imports workspaces made without sign-in; operators use the `workspaces copy --to-tenant` command instead.
+
+### Fixed
+
+- Tables you cannot query now say why, whether the table cannot be read or you need the Data reader role, and each finished query records exactly the tables it read.
+
+### Security
+
+- A custom detector's patterns, prompts and code, and the list of AI providers, are now shown only to people who can change detectors or see the settings; visitors of a public workspace no longer see them, and a public workspace no longer sends visitors to the sign-in page on its own.
+- Visitors of a public workspace, and members reading one without a role in it, no longer see its activity, its settings or how its sources are configured, and cannot use SQL; the API refuses them these too. People without the right to change sources now see a source's name, type and scans but not its configuration or notebook code.
+
 ## [0.7.4] - 2026-11-09
 
 ### Added

@@ -1,1 +1,0 @@
-The all-in-one Docker image now asks you to sign in: open it and sign in as `classifyre` with the password `classifyre`, then change the password under Your account. Set `CLASSIFYRE_URL` when you open it at another address or port than `http://localhost:3000`.

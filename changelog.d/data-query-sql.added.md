@@ -1,1 +1,0 @@
-You can now query the rows of database, lakehouse and bucket tables with standard SQL, from a table's new Data tab or the new SQL page, and join tables across sources. Workspace admins can query straight away, and the new Data reader role gives a group access to a whole workspace, one source or a single table.
