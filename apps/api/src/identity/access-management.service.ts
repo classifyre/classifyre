@@ -17,6 +17,7 @@ import {
   type GrantScopeType,
   type Tenant,
 } from './tenancy.service';
+import { PrismaService } from '../prisma.service';
 
 export interface GrantInput extends GrantScope {
   /** Always a group: people get access by being in one. */
@@ -72,6 +73,7 @@ export class AccessManagementService {
   constructor(
     private readonly tenancy: TenancyService,
     @Inject(IDENTITY) readonly identity: IdentityService,
+    private readonly prisma: PrismaService,
   ) {}
 
   roles() {
@@ -336,6 +338,9 @@ export class AccessManagementService {
     const groups = new Map(
       (await identity.groupsOf(principal, true)).map((g) => [g.id, g.path]),
     );
+    // Single-resource grants name their source or table, so the access
+    // screens and the audit trail read without extra lookups.
+    const names = await this.resourceNames(grants);
     return grants.map((grant) => ({
       ...grant,
       subjectLabel: groups.get(grant.subjectId) ?? 'Removed group',
@@ -344,12 +349,50 @@ export class AccessManagementService {
           ? principal.tenant.name
           : grant.scopeType === 'group'
             ? `Workspaces of ${groups.get(grant.scopeId) ?? 'a removed group'}`
-            : grant.scopeType === 'source'
-              ? 'One source'
-              : grant.scopeType === 'asset'
-                ? 'One table'
-                : 'This workspace',
+            : (names.get(`${grant.scopeType}/${grant.scopeId}`) ??
+              (grant.scopeType === 'source'
+                ? 'One source'
+                : grant.scopeType === 'asset'
+                  ? 'One table'
+                  : 'This workspace')),
       ...(inherited ? { inherited: inherited(grant) } : {}),
     }));
+  }
+
+  /**
+   * Display names for single-source/table grant scopes (`source/<id>`,
+   * `asset/<id>` → the source or asset name), batched in two reads. Deleted
+   * resources stay absent, and the generic fallbacks above apply.
+   */
+  private async resourceNames(
+    grants: Grant[],
+  ): Promise<Map<string, string>> {
+    const sourceIds = new Set<string>();
+    const assetIds = new Set<string>();
+    for (const grant of grants) {
+      const resourceId = grant.scopeId.split('/').slice(1).join('/');
+      if (grant.scopeType === 'source') sourceIds.add(resourceId);
+      if (grant.scopeType === 'asset') assetIds.add(resourceId);
+    }
+    const names = new Map<string, string>();
+    if (sourceIds.size) {
+      const rows = await this.prisma.source
+        .findMany({
+          where: { id: { in: [...sourceIds] } },
+          select: { id: true, name: true },
+        })
+        .catch(() => []);
+      for (const row of rows) names.set(`source/${row.id}`, row.name);
+    }
+    if (assetIds.size) {
+      const rows = await this.prisma.asset
+        .findMany({
+          where: { id: { in: [...assetIds] } },
+          select: { id: true, name: true },
+        })
+        .catch(() => []);
+      for (const row of rows) names.set(`asset/${row.id}`, row.name);
+    }
+    return names;
   }
 }

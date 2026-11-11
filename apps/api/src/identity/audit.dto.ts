@@ -36,6 +36,14 @@ export class AuditEventDto {
   entityId: string | null;
 
   @ApiProperty({
+    type: String,
+    nullable: true,
+    description:
+      'Display name of the entity at record time (source/table name, group path, workspace slug).',
+  })
+  entityName: string | null;
+
+  @ApiProperty({
     type: [String],
     description: 'Top-level input keys of the change, never their values.',
   })

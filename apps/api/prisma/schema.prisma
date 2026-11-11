@@ -4370,6 +4370,10 @@ model AuditEvent {
   /// What was changed, e.g. `source`; null for bulk operations.
   entityType String?  @map("entity_type")
   entityId   String?  @map("entity_id")
+  /// Display name of the entity at record time (source/table name, group
+  /// path, workspace slug), so the trail reads without extra lookups.
+  /// Never a secret: names only, like the rest of the row.
+  entityName String?  @map("entity_name")
   /// Top-level input keys of the change.
   fields     String[] @default([])
   /// HTTP status of the response (REST only).

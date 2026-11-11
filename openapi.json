@@ -31163,6 +31163,11 @@
             "type": "string",
             "nullable": true
           },
+          "entityName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Display name of the entity at record time (source/table name, group path, workspace slug)."
+          },
           "fields": {
             "description": "Top-level input keys of the change, never their values.",
             "type": "array",
@@ -31185,6 +31190,7 @@
           "operation",
           "entityType",
           "entityId",
+          "entityName",
           "fields",
           "status"
         ]

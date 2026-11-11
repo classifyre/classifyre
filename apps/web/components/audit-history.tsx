@@ -466,6 +466,9 @@ function WhereCell({
   const { t } = useTranslation();
   const entityType = event.entityType ?? "";
   const entityId = event.entityId ?? "";
+  // The name the backend recorded at record time ("orders", "/finance on
+  // shop.orders"): shown as-is, no id resolution needed.
+  const entityName = event.entityName ?? "";
 
   // Workspace-scoped change: link to the workspace it happened in. When the
   // trail spans workspaces (Settings → Activity), the id resolves against
@@ -485,12 +488,17 @@ function WhereCell({
       const label =
         (match as { name?: string } | null)?.name ?? entityId.slice(0, 8);
       return (
-        <Link
-          href={localePath(`/${slug}/settings?tab=access`)}
-          className="font-medium text-foreground hover:underline"
-        >
-          {label}
-        </Link>
+        <span>
+          <Link
+            href={localePath(`/${slug}/settings?tab=access`)}
+            className="font-medium text-foreground hover:underline"
+          >
+            {label}
+          </Link>
+          {entityName && (
+            <span className="text-muted-foreground"> · {entityName}</span>
+          )}
+        </span>
       );
     }
     return <span>{t("audit.table.thisWorkspace")}</span>;
@@ -499,8 +507,8 @@ function WhereCell({
   if (!entityType) return <span>—</span>;
   return (
     <span>
-      {entityType}
-      {entityId ? ` · ${entityId.slice(0, 8)}` : ""}
+      {entityName || entityType}
+      {!entityName && entityId ? ` · ${entityId.slice(0, 8)}` : ""}
     </span>
   );
 }
