@@ -8,7 +8,7 @@ All URIs are relative to *http://localhost*
 | [**maintenanceControllerListFeatures**](MaintenanceApi.md#maintenancecontrollerlistfeatures) | **GET** /maintenance/features | Workspace feature switches (embeddings, duplicate detection): state, how each was turned off, the data each owns and the queues held while off |
 | [**maintenanceControllerOverview**](MaintenanceApi.md#maintenancecontrolleroverview) | **GET** /maintenance/overview | Workspace storage overview: per-table row estimates and byte sizes, grouped into protected and cleanable datasets |
 | [**maintenanceControllerSetFeature**](MaintenanceApi.md#maintenancecontrollersetfeature) | **PUT** /maintenance/features/{key} | Turn a workspace feature on or off. Off holds its worker queues paused (every replica stops; the Workers tab cannot resume them) and either keeps its data (a pause — turning back on catches up) or, with deleteData, wipes it in the background (poll GET cleanup/runs/:runId). On resumes the queues and catches up: one full duplicate recompute, or an embedding backfill. Body: { enabled: boolean, deleteData?: boolean }. Allowed while the workspace is paused. |
-| [**maintenanceControllerStartCleanup**](MaintenanceApi.md#maintenancecontrollerstartcleanup) | **POST** /maintenance/cleanup/{key} | Start wiping one cleanable dataset in the background (scan history, duplicates, embeddings, harness runs, finished queue jobs, derived stats/graph, finished transfers). Protected data is never accepted here. Poll GET cleanup/runs/:runId for progress. Deliberately allowed while paused: freezing the workers first is the recommended quiet window (pause, clean, resume), since no writer can race the wipe. |
+| [**maintenanceControllerStartCleanup**](MaintenanceApi.md#maintenancecontrollerstartcleanup) | **POST** /maintenance/cleanup/{key} | Start wiping one cleanable dataset in the background (scan history, duplicates, embeddings, harness runs, finished queue jobs, derived stats/graph). Protected data is never accepted here. Poll GET cleanup/runs/:runId for progress. Deliberately allowed while paused: freezing the workers first is the recommended quiet window (pause, clean, resume), since no writer can race the wipe. |
 
 
 
@@ -264,7 +264,7 @@ No authorization required
 
 > maintenanceControllerStartCleanup(key)
 
-Start wiping one cleanable dataset in the background (scan history, duplicates, embeddings, harness runs, finished queue jobs, derived stats/graph, finished transfers). Protected data is never accepted here. Poll GET cleanup/runs/:runId for progress. Deliberately allowed while paused: freezing the workers first is the recommended quiet window (pause, clean, resume), since no writer can race the wipe.
+Start wiping one cleanable dataset in the background (scan history, duplicates, embeddings, harness runs, finished queue jobs, derived stats/graph). Protected data is never accepted here. Poll GET cleanup/runs/:runId for progress. Deliberately allowed while paused: freezing the workers first is the recommended quiet window (pause, clean, resume), since no writer can race the wipe.
 
 ### Example
 

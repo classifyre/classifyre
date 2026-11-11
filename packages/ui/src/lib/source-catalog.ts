@@ -77,7 +77,7 @@ export const SOURCE_CATEGORY_META: Record<
   OTHER: {
     label: "Other",
     description:
-      "Sources discovered in schema that have not been categorized yet.",
+      "Connectors you write yourself, direct file uploads and mounted folders.",
   },
 };
 
@@ -106,7 +106,7 @@ export const SOURCE_TYPE_CATALOG_META: Record<string, SourceCatalogMetaBase> = {
     description:
       "Upload files directly and scan them through the standard source lifecycle.",
     icon: CreateSourceDtoTypeEnum.Sandbox,
-    category: "WAREHOUSE_LAKEHOUSE",
+    category: "OTHER",
     keywords: ["upload", "files", "documents", "ad hoc", "sandbox"],
   },
   WORDPRESS: {
@@ -236,13 +236,6 @@ export const SOURCE_TYPE_CATALOG_META: Record<string, SourceCatalogMetaBase> = {
     category: "COLLABORATION",
     keywords: ["support", "requests", "tickets", "queues"],
   },
-  SQLITE: {
-    description:
-      "Scan tables in a local SQLite database file with no server required.",
-    icon: CreateSourceDtoTypeEnum.Sqlite,
-    category: "DATABASES",
-    keywords: ["sql", "file", "embedded", "local", "rdbms"],
-  },
   NOTION: {
     description:
       "Scan Notion pages, data sources, comments, and file attachments.",
@@ -363,7 +356,7 @@ export const SOURCE_TYPE_CATALOG_META: Record<string, SourceCatalogMetaBase> = {
     description:
       "Scan a folder of documents, spreadsheets and images — on this computer, or mounted into the cluster.",
     icon: CreateSourceDtoTypeEnum.LocalFolder,
-    category: "WAREHOUSE_LAKEHOUSE",
+    category: "OTHER",
     keywords: [
       "folder",
       "files",

@@ -17,18 +17,9 @@ import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
 import { Textarea } from "@workspace/ui/components/textarea";
 import { ThumbnailPicker } from "@/components/namespace/thumbnail-picker";
-import { NamespaceSeedPicker } from "@/components/namespace/namespace-seed-picker";
 import { CategorySelect } from "@/components/namespace/category-select";
 import { useNamespaceCategories } from "@/hooks/use-namespace-categories";
 import { useTranslation } from "@/hooks/use-translation";
-import { useTransferJob } from "@/hooks/use-transfer-job";
-import {
-  apiBaseForNamespace,
-  isTerminal,
-  startImport,
-  uploadArchive,
-  type UploadProgress,
-} from "@/lib/data-transfer-api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select";
 
 function slugify(name: string): string {
@@ -74,19 +65,6 @@ export function CreateNamespaceDialog({
   const [description, setDescription] = React.useState("");
   const [thumbnail, setThumbnail] = React.useState<string | null>(null);
   const [submitting, setSubmitting] = React.useState(false);
-  const [seedFile, setSeedFile] = React.useState<File | null>(null);
-  // Non-null only while the archive is going up, before there is a job to poll.
-  const [upload, setUpload] = React.useState<UploadProgress | null>(null);
-  // Set once the workspace exists and its seed import has been queued.
-  const [seed, setSeed] = React.useState<{
-    jobId: string;
-    apiBase: string;
-    namespace: Namespace;
-  } | null>(null);
-
-  const { job: seedJob } = useTransferJob(seed?.jobId ?? null, seed?.apiBase);
-  const seedDone = seedJob !== null && isTerminal(seedJob.status);
-
   const slug = slugify(name);
 
   const reset = () => {
@@ -95,34 +73,6 @@ export function CreateNamespaceDialog({
     setCategoryIds([]);
     setThumbnail(null);
     setSubmitting(false);
-    setSeedFile(null);
-    setUpload(null);
-    setSeed(null);
-  };
-
-  /**
-   * Load the attached archive into the freshly created workspace.
-   *
-   * Everything the archive holds is imported: this is a brand-new workspace, so
-   * there is nothing to choose between and nothing to collide with. Failure is
-   * reported but does not undo the workspace — an empty workspace the operator
-   * can retry into is a better outcome than losing the one they just named.
-   */
-  const seedFromArchive = async (namespace: Namespace, file: File) => {
-    const base = apiBaseForNamespace(namespace.id);
-    setUpload({ loaded: 0, total: file.size, percent: 0, finalising: false });
-    try {
-      const preview = await uploadArchive(file, base, setUpload);
-      const job = await startImport(
-        { uploadId: preview.uploadId, scopes: preview.scopes },
-        base,
-      );
-      setSeed({ jobId: job.id, apiBase: base, namespace });
-    } finally {
-      // From here the import runs on the worker and reports itself through the
-      // job; the upload meter has nothing left to say.
-      setUpload(null);
-    }
   };
 
   const finish = (namespace: Namespace) => {
@@ -135,12 +85,7 @@ export function CreateNamespaceDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Second press, once the seed import has finished: just close.
-    if (seed && seedDone) {
-      finish(seed.namespace);
-      return;
-    }
-    if (!name.trim() || submitting || seed) return;
+    if (!name.trim() || submitting) return;
 
     setSubmitting(true);
     try {
@@ -152,24 +97,7 @@ export function CreateNamespaceDialog({
         ownerGroupId,
       });
 
-      if (!seedFile) {
-        finish(namespace);
-        return;
-      }
-
-      try {
-        await seedFromArchive(namespace, seedFile);
-      } catch (seedError) {
-        toast.error(
-          seedError instanceof Error
-            ? seedError.message
-            : t("workspaces.seedFailed"),
-        );
-        finish(namespace);
-        return;
-      }
-
-      setSubmitting(false);
+      finish(namespace);
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : t("workspaces.createFailed"),
@@ -182,12 +110,6 @@ export function CreateNamespaceDialog({
     <Dialog
       open={open}
       onOpenChange={(next) => {
-        // Dismissing after the workspace was created still has to report it —
-        // the import keeps running on the server either way.
-        if (!next && seed) {
-          finish(seed.namespace);
-          return;
-        }
         if (!next) reset();
         onOpenChange(next);
       }}
@@ -268,7 +190,7 @@ export function CreateNamespaceDialog({
                 onChange={setCategoryIds}
                 onCategoryCreated={upsertCategory}
                 loading={categoriesLoading}
-                disabled={submitting || seed !== null}
+                disabled={submitting}
               />
             </div>
             <div className="grid gap-2">
@@ -276,17 +198,7 @@ export function CreateNamespaceDialog({
               <ThumbnailPicker
                 value={thumbnail}
                 onChange={setThumbnail}
-                disabled={submitting || seed !== null}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label>{t("workspaces.seedOptional")}</Label>
-              <NamespaceSeedPicker
-                file={seedFile}
-                onFileChange={setSeedFile}
-                job={seedJob}
-                upload={upload}
-                disabled={submitting || seed !== null}
+                disabled={submitting}
               />
             </div>
           </div>
@@ -295,37 +207,19 @@ export function CreateNamespaceDialog({
             <Button
               type="button"
               variant="outline"
-              // Once the workspace exists, closing is "leave it running", not
-              // "cancel" — the caller still has to learn the workspace is there.
-              onClick={() =>
-                seed ? finish(seed.namespace) : onOpenChange(false)
-              }
+              onClick={() => onOpenChange(false)}
               disabled={submitting}
             >
-              {seed
-                ? t("workspaces.seedContinueInBackground")
-                : t("common.cancel")}
+              {t("common.cancel")}
             </Button>
             <Button
               type="submit"
               variant="default"
               data-testid="workspace-create-submit"
-              disabled={
-                (!name.trim() && !seed) ||
-                submitting ||
-                (seed !== null && !seedDone)
-              }
+              disabled={!name.trim() || submitting}
             >
-              {(submitting || (seed !== null && !seedDone)) && (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              )}
-              {seed
-                ? seedDone
-                  ? t("workspaces.seedOpen")
-                  : t("workspaces.seedImportingShort")
-                : seedFile
-                  ? t("workspaces.createAndImport")
-                  : t("workspaces.createAction")}
+              {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {t("workspaces.createAction")}
             </Button>
           </DialogFooter>
         </form>

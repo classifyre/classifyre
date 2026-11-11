@@ -90,7 +90,7 @@ Full values reference: [`helm/classifyre`](https://github.com/classifyre/classif
 2. Pin all image tags to immutable versions.
 3. Configure ingress TLS, resource requests/limits and scheduling per environment.
 4. Provide `CLASSIFYRE_MASKED_CONFIG_KEY` via a Helm-managed or existing Secret.
-5. A namespace export moves work between the Docker and Kubernetes distributions — no lock-in.
+5. The Docker and Kubernetes distributions run the same images and carry the same features.
 
 ---
 

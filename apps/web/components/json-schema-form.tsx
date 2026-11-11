@@ -323,7 +323,7 @@ function hasRequiredFields(schema: JSONSchema7): boolean {
 
 /**
  * Whether a schema block would render at least one control. Sources with no
- * credentials (LOCAL_FOLDER, SQLITE) or no required settings (NOTION, SANDBOX)
+ * credentials (LOCAL_FOLDER) or no required settings (NOTION, SANDBOX)
  * declare an empty `masked` / `required` object; without this check the form
  * shows an "Authentication" or "Required fields" card whose only content is a
  * "nothing to configure" placeholder.
@@ -2451,7 +2451,7 @@ export const JsonSchemaForm = React.forwardRef<
   // every required option has a const discriminator (auth_mode, authentication_type, …).
   // When detected, render them as a single card with one dropdown instead of two.
   // Blocks a source declares but leaves empty (NOTION has no required settings,
-  // LOCAL_FOLDER and SQLITE have no credentials) are dropped entirely rather
+  // LOCAL_FOLDER has no credentials) are dropped entirely rather
   // than rendered as a card containing only a placeholder line. The block keys
   // stay reserved either way, so an empty block can never fall through to the
   // legacy top-level field renderer.
@@ -2493,7 +2493,6 @@ export const JsonSchemaForm = React.forwardRef<
     CONFLUENCE: false,
     JIRA: false,
     SERVICEDESK: false,
-    SQLITE: true,
     ICEBERG_REST: true,
     DUCKLAKE: true,
     TRINO: true,

@@ -316,10 +316,8 @@ Scan logs are in the UI, per run, and on disk under `/var/lib/classifyre/runner-
 
 ## Moving to Kubernetes
 
-Nothing here is a dead end. Export a workspace from this container and import it
-into a cluster install — sources, findings, cases and lineage all move
-([`docs/architecture`](../docs/architecture)). The [Helm chart](../helm/classifyre)
-runs the same images this one is composed from.
+The [Helm chart](../helm/classifyre) runs the same images this one is composed
+from.
 
 ---
 

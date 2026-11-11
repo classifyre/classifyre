@@ -1391,20 +1391,6 @@ telemetry:
 #   Backblaze B2: endpoint: https://s3.us-west-004.backblazeb2.com
 #   MinIO:        endpoint: http://minio:9000  forcePathStyle: true
 #   Garage:       endpoint: http://garage:3900  forcePathStyle: true
-# Namespace export/import (Settings -> Export & Import).
-#
-# Archives are stored in the tenant's own Postgres schema, so they are visible
-# to both the api and worker deployments with no extra infrastructure, and they
-# are removed with the namespace. Retention is deliberately short: an archive is
-# a full credential-stripped copy of a workspace and only needs to outlive the
-# click that downloads it.
-dataTransfer:
-  # -- Minutes an archive is kept after its export finishes, then it is deleted.
-  ttlMinutes: 60
-  # -- Largest archive accepted on import, in MB. `0` (the default) means no
-  # -- limit; set a positive value only if you want to cap uploads.
-  maxSizeMb: 0
-
 objectStorage:
   # -- Set to true to enable S3-compatible object storage.
   enabled: false

@@ -10,7 +10,7 @@
  *   them — there is no cleanup key for them at all.
  * - CLEANABLE_DATASETS are ephemeral or derived data: scan history, duplicate
  *   artefacts, vectors, harness runs, finished queue jobs, rebuilt stats and
- *   graphs, finished transfers. Each has a stable `key` used by
+ *   graphs. Each has a stable `key` used by
  *   `POST /maintenance/cleanup/:key`, the exact physical tables involved,
  *   and the safety rules the service enforces (terminal states only, running
  *   work skipped, FK dependants handled first).
@@ -67,8 +67,7 @@ export type CleanupKey =
   | 'semanticLinks'
   | 'suggestions'
   | 'semanticMap'
-  | 'entities'
-  | 'transfers';
+  | 'entities';
 
 export const CLEANUP_KEYS: readonly CleanupKey[] = [
   'scans',
@@ -82,7 +81,6 @@ export const CLEANUP_KEYS: readonly CleanupKey[] = [
   'suggestions',
   'semanticMap',
   'entities',
-  'transfers',
 ];
 
 export function isCleanupKey(value: string): value is CleanupKey {
@@ -262,9 +260,6 @@ export const CLEANABLE_DATASETS: readonly CleanableDataset[] = [
     key: 'semanticMap',
     tables: ['term_graph_nodes', 'term_graph_links', 'term_graph_state'],
   },
-  // Finished transfers (uploads waiting for import are staged, not finished,
-  // and stay). Chunks cascade from their job.
-  { key: 'transfers', tables: ['data_transfer_jobs', 'data_transfer_chunks'] },
 ];
 
 /** Every physical table the overview measures, for the "everything else" note. */

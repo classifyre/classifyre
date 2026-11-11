@@ -118,7 +118,6 @@ const RUNNER_ID_CHUNK = 500;
 const TERMINAL_RUNNER_STATES = ['COMPLETED', 'WARNING', 'ERROR'];
 const LIVE_RUNNER_STATES = ['PENDING', 'RUNNING'];
 
-const TERMINAL_TRANSFER_STATES = ['COMPLETED', 'FAILED', 'CANCELLED'];
 const FINISHED_JOB_STATES = ['completed', 'failed', 'cancelled'];
 
 /** TRUNCATE waits at most this long for writers, then falls back to DELETE. */
@@ -175,7 +174,7 @@ const NO_PROGRESS: ProgressTick = () => undefined;
  * - Wipes run as background runs with pollable progress (POST returns 202
  *   immediately), because a million-row drain takes minutes, not seconds.
  * - Live work is never deleted: running/pending scans, queued or active
- *   queue jobs, unfinished transfers are counted under `skipped` instead.
+ *   queue jobs are counted under `skipped` instead.
  * - FK dependants are handled in dependency order (children before parents;
  *   nullable references nulled first; auto-cascade/SET NULL left to
  *   Postgres), so cleanup cannot leave dangling references.
@@ -568,10 +567,6 @@ export class MaintenanceService {
         touched = ['semantic_suggestions'];
         break;
       }
-      case 'transfers':
-        result = await this.cleanupTransfers(this.tick(run, 'transfers'));
-        touched = ['data_transfer_jobs', 'data_transfer_chunks'];
-        break;
       default:
         assertNever(key);
     }
@@ -1249,50 +1244,6 @@ export class MaintenanceService {
       ),
     };
     return { deleted, skipped };
-  }
-
-  // ── transfers ───────────────────────────────────────────────────────────
-
-  private async cleanupTransfers(
-    onProgress: ProgressTick = NO_PROGRESS,
-  ): Promise<Omit<CleanupResult, 'key' | 'durationMs'>> {
-    const states = TERMINAL_TRANSFER_STATES.map((s) => `'${s}'`).join(', ');
-    // Chunks carry a composite (job_id, ordinal) key with no `id`, so they
-    // are removed per finished-job batch; the job delete cascades any
-    // remainder, and both passes stay small.
-    const finished = await this.prisma.$queryRawUnsafe<Array<{ id: string }>>(
-      `SELECT id FROM data_transfer_jobs WHERE status IN (${states})`,
-    );
-    let chunks = 0;
-    for (let i = 0; i < finished.length; i += RUNNER_ID_CHUNK) {
-      const batch = finished
-        .slice(i, i + RUNNER_ID_CHUNK)
-        .map((r) => quoteLiteral(r.id))
-        .join(', ');
-      const n = Number(
-        await this.prisma.$executeRawUnsafe(
-          `DELETE FROM "data_transfer_chunks" WHERE "job_id" IN (${batch})`,
-        ),
-      );
-      chunks += n;
-      onProgress(n, 'data_transfer_chunks');
-    }
-    const jobs = await this.deleteChunks(
-      'data_transfer_jobs',
-      `WHERE status IN (${states})`,
-      false,
-      'ctid',
-      onProgress,
-    );
-    const live = await this.countWhere(
-      'data_transfer_jobs',
-      `WHERE status NOT IN (${states})`,
-    );
-    return {
-      deleted: { data_transfer_jobs: jobs, data_transfer_chunks: chunks },
-      skipped:
-        live > 0 ? { 'data_transfer_jobs (staged/pending/running)': live } : {},
-    };
   }
 
   // ── SQL helpers ─────────────────────────────────────────────────────────

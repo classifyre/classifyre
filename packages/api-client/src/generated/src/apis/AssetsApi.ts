@@ -19,7 +19,6 @@ import type {
   AssetListResponseDto,
   BulkIngestAssetsDto,
   FinalizeIngestRunDto,
-  LiveQueryResponseDto,
   QuickSearchRequestDto,
   QuickSearchResponseDto,
   ReferencingFindingsResponseDto,
@@ -43,8 +42,6 @@ import {
     BulkIngestAssetsDtoToJSON,
     FinalizeIngestRunDtoFromJSON,
     FinalizeIngestRunDtoToJSON,
-    LiveQueryResponseDtoFromJSON,
-    LiveQueryResponseDtoToJSON,
     QuickSearchRequestDtoFromJSON,
     QuickSearchRequestDtoToJSON,
     QuickSearchResponseDtoFromJSON,
@@ -105,35 +102,6 @@ export interface SearchAssetsControllerExportFindingsRequest {
     severity?: Array<SearchAssetsControllerExportFindingsSeverityEnum>;
     status?: Array<SearchAssetsControllerExportFindingsStatusEnum>;
     includeResolved?: boolean;
-}
-
-export interface SearchAssetsControllerQueryAssetsRequest {
-    assetSearch?: string;
-    assetSourceId?: string;
-    assetStatus?: Array<SearchAssetsControllerQueryAssetsAssetStatusEnum>;
-    assetSourceType?: Array<SearchAssetsControllerQueryAssetsAssetSourceTypeEnum>;
-    findingDetectorType?: Array<SearchAssetsControllerQueryAssetsFindingDetectorTypeEnum>;
-    findingSeverity?: Array<SearchAssetsControllerQueryAssetsFindingSeverityEnum>;
-    findingStatus?: Array<SearchAssetsControllerQueryAssetsFindingStatusEnum>;
-    findingIncludeResolved?: boolean;
-    excludeFindings?: boolean;
-    includeAssetsWithoutFindings?: boolean;
-    limit?: string;
-    cursor?: string;
-}
-
-export interface SearchAssetsControllerQueryFindingsRequest {
-    search?: string;
-    sourceId?: Array<string>;
-    detectorType?: Array<SearchAssetsControllerQueryFindingsDetectorTypeEnum>;
-    customDetectorKey?: Array<string>;
-    findingType?: Array<string>;
-    category?: Array<string>;
-    severity?: Array<SearchAssetsControllerQueryFindingsSeverityEnum>;
-    status?: Array<SearchAssetsControllerQueryFindingsStatusEnum>;
-    includeResolved?: boolean;
-    limit?: string;
-    cursor?: string;
 }
 
 export interface SearchAssetsControllerQuickSearchRequest {
@@ -402,160 +370,6 @@ export class AssetsApi extends runtime.BaseAPI {
      */
     async searchAssetsControllerExportFindings(requestParameters: SearchAssetsControllerExportFindingsRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob> {
         const response = await this.searchAssetsControllerExportFindingsRaw(requestParameters, initOverrides);
-        return await response.value();
-    }
-
-    /**
-     * Returns a page of asset-finding rows as JSON for live consumption (e.g. Excel Power Query). Follow `nextCursor` to page through the full result set.
-     * Query assets with findings (cursor-paginated JSON)
-     */
-    async searchAssetsControllerQueryAssetsRaw(requestParameters: SearchAssetsControllerQueryAssetsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<LiveQueryResponseDto>> {
-        const queryParameters: any = {};
-
-        if (requestParameters['assetSearch'] != null) {
-            queryParameters['asset_search'] = requestParameters['assetSearch'];
-        }
-
-        if (requestParameters['assetSourceId'] != null) {
-            queryParameters['asset_sourceId'] = requestParameters['assetSourceId'];
-        }
-
-        if (requestParameters['assetStatus'] != null) {
-            queryParameters['asset_status'] = requestParameters['assetStatus'];
-        }
-
-        if (requestParameters['assetSourceType'] != null) {
-            queryParameters['asset_sourceType'] = requestParameters['assetSourceType'];
-        }
-
-        if (requestParameters['findingDetectorType'] != null) {
-            queryParameters['finding_detectorType'] = requestParameters['findingDetectorType'];
-        }
-
-        if (requestParameters['findingSeverity'] != null) {
-            queryParameters['finding_severity'] = requestParameters['findingSeverity'];
-        }
-
-        if (requestParameters['findingStatus'] != null) {
-            queryParameters['finding_status'] = requestParameters['findingStatus'];
-        }
-
-        if (requestParameters['findingIncludeResolved'] != null) {
-            queryParameters['finding_includeResolved'] = requestParameters['findingIncludeResolved'];
-        }
-
-        if (requestParameters['excludeFindings'] != null) {
-            queryParameters['excludeFindings'] = requestParameters['excludeFindings'];
-        }
-
-        if (requestParameters['includeAssetsWithoutFindings'] != null) {
-            queryParameters['includeAssetsWithoutFindings'] = requestParameters['includeAssetsWithoutFindings'];
-        }
-
-        if (requestParameters['limit'] != null) {
-            queryParameters['limit'] = requestParameters['limit'];
-        }
-
-        if (requestParameters['cursor'] != null) {
-            queryParameters['cursor'] = requestParameters['cursor'];
-        }
-
-        const headerParameters: runtime.HTTPHeaders = {};
-
-
-        let urlPath = `/search/assets/query`;
-
-        const response = await this.request({
-            path: urlPath,
-            method: 'GET',
-            headers: headerParameters,
-            query: queryParameters,
-        }, initOverrides);
-
-        return new runtime.JSONApiResponse(response, (jsonValue) => LiveQueryResponseDtoFromJSON(jsonValue));
-    }
-
-    /**
-     * Returns a page of asset-finding rows as JSON for live consumption (e.g. Excel Power Query). Follow `nextCursor` to page through the full result set.
-     * Query assets with findings (cursor-paginated JSON)
-     */
-    async searchAssetsControllerQueryAssets(requestParameters: SearchAssetsControllerQueryAssetsRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<LiveQueryResponseDto> {
-        const response = await this.searchAssetsControllerQueryAssetsRaw(requestParameters, initOverrides);
-        return await response.value();
-    }
-
-    /**
-     * Returns a page of findings as JSON for live consumption (e.g. Excel Power Query). Follow `nextCursor` to page through the full result set. Order is stable for incremental refresh; sort/filter in the client.
-     * Query findings (cursor-paginated JSON)
-     */
-    async searchAssetsControllerQueryFindingsRaw(requestParameters: SearchAssetsControllerQueryFindingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<LiveQueryResponseDto>> {
-        const queryParameters: any = {};
-
-        if (requestParameters['search'] != null) {
-            queryParameters['search'] = requestParameters['search'];
-        }
-
-        if (requestParameters['sourceId'] != null) {
-            queryParameters['sourceId'] = requestParameters['sourceId'];
-        }
-
-        if (requestParameters['detectorType'] != null) {
-            queryParameters['detectorType'] = requestParameters['detectorType'];
-        }
-
-        if (requestParameters['customDetectorKey'] != null) {
-            queryParameters['customDetectorKey'] = requestParameters['customDetectorKey'];
-        }
-
-        if (requestParameters['findingType'] != null) {
-            queryParameters['findingType'] = requestParameters['findingType'];
-        }
-
-        if (requestParameters['category'] != null) {
-            queryParameters['category'] = requestParameters['category'];
-        }
-
-        if (requestParameters['severity'] != null) {
-            queryParameters['severity'] = requestParameters['severity'];
-        }
-
-        if (requestParameters['status'] != null) {
-            queryParameters['status'] = requestParameters['status'];
-        }
-
-        if (requestParameters['includeResolved'] != null) {
-            queryParameters['includeResolved'] = requestParameters['includeResolved'];
-        }
-
-        if (requestParameters['limit'] != null) {
-            queryParameters['limit'] = requestParameters['limit'];
-        }
-
-        if (requestParameters['cursor'] != null) {
-            queryParameters['cursor'] = requestParameters['cursor'];
-        }
-
-        const headerParameters: runtime.HTTPHeaders = {};
-
-
-        let urlPath = `/search/findings/query`;
-
-        const response = await this.request({
-            path: urlPath,
-            method: 'GET',
-            headers: headerParameters,
-            query: queryParameters,
-        }, initOverrides);
-
-        return new runtime.JSONApiResponse(response, (jsonValue) => LiveQueryResponseDtoFromJSON(jsonValue));
-    }
-
-    /**
-     * Returns a page of findings as JSON for live consumption (e.g. Excel Power Query). Follow `nextCursor` to page through the full result set. Order is stable for incremental refresh; sort/filter in the client.
-     * Query findings (cursor-paginated JSON)
-     */
-    async searchAssetsControllerQueryFindings(requestParameters: SearchAssetsControllerQueryFindingsRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<LiveQueryResponseDto> {
-        const response = await this.searchAssetsControllerQueryFindingsRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -1006,7 +820,6 @@ export const SearchAssetsControllerExportAssetsAssetSourceTypeEnum = {
     Dremio: 'DREMIO',
     Mongodb: 'MONGODB',
     Neo4J: 'NEO4J',
-    Sqlite: 'SQLITE',
     Notion: 'NOTION',
     Powerbi: 'POWERBI',
     Tableau: 'TABLEAU',
@@ -1102,138 +915,6 @@ export type SearchAssetsControllerExportFindingsStatusEnum = typeof SearchAssets
 /**
  * @export
  */
-export const SearchAssetsControllerQueryAssetsAssetStatusEnum = {
-    New: 'NEW',
-    Updated: 'UPDATED',
-    Unchanged: 'UNCHANGED',
-    Deleted: 'DELETED'
-} as const;
-export type SearchAssetsControllerQueryAssetsAssetStatusEnum = typeof SearchAssetsControllerQueryAssetsAssetStatusEnum[keyof typeof SearchAssetsControllerQueryAssetsAssetStatusEnum];
-/**
- * @export
- */
-export const SearchAssetsControllerQueryAssetsAssetSourceTypeEnum = {
-    Jira: 'JIRA',
-    Confluence: 'CONFLUENCE',
-    Crowd: 'CROWD',
-    Bitbucket: 'BITBUCKET',
-    Servicedesk: 'SERVICEDESK',
-    Xray: 'XRAY',
-    GoogleDrive: 'GOOGLE_DRIVE',
-    GoogleSheets: 'GOOGLE_SHEETS',
-    GoogleDocs: 'GOOGLE_DOCS',
-    GoogleSlides: 'GOOGLE_SLIDES',
-    Wordpress: 'WORDPRESS',
-    Slack: 'SLACK',
-    S3CompatibleStorage: 'S3_COMPATIBLE_STORAGE',
-    AzureBlobStorage: 'AZURE_BLOB_STORAGE',
-    GoogleCloudStorage: 'GOOGLE_CLOUD_STORAGE',
-    Postgresql: 'POSTGRESQL',
-    Mysql: 'MYSQL',
-    Mssql: 'MSSQL',
-    Oracle: 'ORACLE',
-    Hive: 'HIVE',
-    Databricks: 'DATABRICKS',
-    Snowflake: 'SNOWFLAKE',
-    Dremio: 'DREMIO',
-    Mongodb: 'MONGODB',
-    Neo4J: 'NEO4J',
-    Sqlite: 'SQLITE',
-    Notion: 'NOTION',
-    Powerbi: 'POWERBI',
-    Tableau: 'TABLEAU',
-    Email: 'EMAIL',
-    Youtube: 'YOUTUBE',
-    Reddit: 'REDDIT',
-    Kafka: 'KAFKA',
-    Elasticsearch: 'ELASTICSEARCH',
-    Opensearch: 'OPENSEARCH',
-    Meilisearch: 'MEILISEARCH',
-    LocalFolder: 'LOCAL_FOLDER',
-    Microsoft365: 'MICROSOFT_365',
-    GoogleWorkspace: 'GOOGLE_WORKSPACE',
-    Dropbox: 'DROPBOX',
-    HuggingFace: 'HUGGING_FACE',
-    Git: 'GIT',
-    Sandbox: 'SANDBOX',
-    IcebergRest: 'ICEBERG_REST',
-    Ducklake: 'DUCKLAKE',
-    Trino: 'TRINO',
-    Athena: 'ATHENA',
-    Bigquery: 'BIGQUERY',
-    Redshift: 'REDSHIFT',
-    Custom: 'CUSTOM'
-} as const;
-export type SearchAssetsControllerQueryAssetsAssetSourceTypeEnum = typeof SearchAssetsControllerQueryAssetsAssetSourceTypeEnum[keyof typeof SearchAssetsControllerQueryAssetsAssetSourceTypeEnum];
-/**
- * @export
- */
-export const SearchAssetsControllerQueryAssetsFindingDetectorTypeEnum = {
-    Secrets: 'SECRETS',
-    Pii: 'PII',
-    Yara: 'YARA',
-    BrokenLinks: 'BROKEN_LINKS',
-    CodeSecurity: 'CODE_SECURITY',
-    Custom: 'CUSTOM'
-} as const;
-export type SearchAssetsControllerQueryAssetsFindingDetectorTypeEnum = typeof SearchAssetsControllerQueryAssetsFindingDetectorTypeEnum[keyof typeof SearchAssetsControllerQueryAssetsFindingDetectorTypeEnum];
-/**
- * @export
- */
-export const SearchAssetsControllerQueryAssetsFindingSeverityEnum = {
-    Critical: 'CRITICAL',
-    High: 'HIGH',
-    Medium: 'MEDIUM',
-    Low: 'LOW',
-    Info: 'INFO'
-} as const;
-export type SearchAssetsControllerQueryAssetsFindingSeverityEnum = typeof SearchAssetsControllerQueryAssetsFindingSeverityEnum[keyof typeof SearchAssetsControllerQueryAssetsFindingSeverityEnum];
-/**
- * @export
- */
-export const SearchAssetsControllerQueryAssetsFindingStatusEnum = {
-    Open: 'OPEN',
-    FalsePositive: 'FALSE_POSITIVE',
-    Resolved: 'RESOLVED',
-    Ignored: 'IGNORED'
-} as const;
-export type SearchAssetsControllerQueryAssetsFindingStatusEnum = typeof SearchAssetsControllerQueryAssetsFindingStatusEnum[keyof typeof SearchAssetsControllerQueryAssetsFindingStatusEnum];
-/**
- * @export
- */
-export const SearchAssetsControllerQueryFindingsDetectorTypeEnum = {
-    Secrets: 'SECRETS',
-    Pii: 'PII',
-    Yara: 'YARA',
-    BrokenLinks: 'BROKEN_LINKS',
-    CodeSecurity: 'CODE_SECURITY',
-    Custom: 'CUSTOM'
-} as const;
-export type SearchAssetsControllerQueryFindingsDetectorTypeEnum = typeof SearchAssetsControllerQueryFindingsDetectorTypeEnum[keyof typeof SearchAssetsControllerQueryFindingsDetectorTypeEnum];
-/**
- * @export
- */
-export const SearchAssetsControllerQueryFindingsSeverityEnum = {
-    Critical: 'CRITICAL',
-    High: 'HIGH',
-    Medium: 'MEDIUM',
-    Low: 'LOW',
-    Info: 'INFO'
-} as const;
-export type SearchAssetsControllerQueryFindingsSeverityEnum = typeof SearchAssetsControllerQueryFindingsSeverityEnum[keyof typeof SearchAssetsControllerQueryFindingsSeverityEnum];
-/**
- * @export
- */
-export const SearchAssetsControllerQueryFindingsStatusEnum = {
-    Open: 'OPEN',
-    FalsePositive: 'FALSE_POSITIVE',
-    Resolved: 'RESOLVED',
-    Ignored: 'IGNORED'
-} as const;
-export type SearchAssetsControllerQueryFindingsStatusEnum = typeof SearchAssetsControllerQueryFindingsStatusEnum[keyof typeof SearchAssetsControllerQueryFindingsStatusEnum];
-/**
- * @export
- */
 export const SourceAssetsControllerListSourceAssetsStatusEnum = {
     New: 'NEW',
     Updated: 'UPDATED',
@@ -1270,7 +951,6 @@ export const SourceAssetsControllerListSourceAssetsSourceTypesEnum = {
     Dremio: 'DREMIO',
     Mongodb: 'MONGODB',
     Neo4J: 'NEO4J',
-    Sqlite: 'SQLITE',
     Notion: 'NOTION',
     Powerbi: 'POWERBI',
     Tableau: 'TABLEAU',

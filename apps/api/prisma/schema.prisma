@@ -1359,7 +1359,6 @@ enum AssetType {
   DREMIO
   MONGODB
   NEO4J
-  SQLITE
   NOTION
   POWERBI
   TABLEAU
@@ -4028,106 +4027,6 @@ model ChatMessage {
 
   @@index([sessionId, createdAt])
   @@map("chat_messages")
-}
-
-// ── Namespace data transfer (export / import) ────────────────────────────────
-// One row per export or import run. Both execute asynchronously on the
-// per-namespace pg-boss worker at concurrency 1, so a large transfer never
-// competes with a running scan for database capacity. The UI polls this row
-// (and the websocket mirrors it) for progress.
-
-enum DataTransferKind {
-  EXPORT
-  IMPORT
-}
-
-enum DataTransferStatus {
-  /// An import archive has been uploaded and inspected, but the operator has
-  /// not yet chosen what to take from it. Nothing is queued.
-  STAGED
-  PENDING
-  RUNNING
-  COMPLETED
-  FAILED
-  CANCELLED
-}
-
-/// How an import treats a row whose primary key already exists in the target
-/// namespace. SKIP keeps what is already there; OVERWRITE replaces it.
-enum DataTransferConflict {
-  SKIP
-  OVERWRITE
-}
-
-model DataTransferJob {
-  id     String             @id @default(uuid())
-  kind   DataTransferKind
-  status DataTransferStatus @default(PENDING)
-  /// Selected scope ids (see data-transfer/transfer-scopes.ts). A partial
-  /// import carries the subset the operator picked, never more than the
-  /// archive actually holds.
-  scopes String[]           @default([])
-
-  conflictMode DataTransferConflict @default(SKIP) @map("conflict_mode")
-
-  /// The archive itself lives in {@link DataTransferChunk}, keyed by this job.
-  /// `fileName` is what the operator sees on the downloaded file; `fileSize`
-  /// and `checksum` describe the compressed bytes. `archived` says whether the
-  /// chunks are still there — they are dropped once `expiresAt` passes.
-  fileName String? @map("file_name")
-  fileSize BigInt? @map("file_size")
-  checksum String? @db.VarChar(64)
-  archived Boolean @default(false)
-
-  /// `totalRows` is an estimate counted before the run starts, so on a busy
-  /// namespace `processedRows` can drift against it — `percent` is clamped.
-  totalRows     Int     @default(0) @map("total_rows")
-  processedRows Int     @default(0) @map("processed_rows")
-  skippedRows   Int     @default(0) @map("skipped_rows")
-  percent       Int     @default(0)
-  currentTable  String? @map("current_table")
-
-  /// Per-table row counts, e.g. `{ "sources": 12, "findings": 4310 }`.
-  counts   Json @default("{}") @db.JsonB
-  /// Operator-facing notes: stripped credentials, rows skipped for missing
-  /// references, archive-version drift.
-  warnings Json @default("[]") @db.JsonB
-
-  errorMessage    String? @map("error_message") @db.Text
-  cancelRequested Boolean @default(false) @map("cancel_requested")
-
-  startedAt  DateTime? @map("started_at")
-  finishedAt DateTime? @map("finished_at")
-  expiresAt  DateTime? @map("expires_at")
-  createdBy  String?   @map("created_by")
-  createdAt  DateTime  @default(now()) @map("created_at")
-  updatedAt  DateTime  @updatedAt @map("updated_at")
-
-  chunks DataTransferChunk[]
-
-  @@index([status])
-  @@index([kind, createdAt(sort: Desc)])
-  @@index([expiresAt])
-  @@map("data_transfer_jobs")
-}
-
-/// One slice of an archive's compressed bytes.
-///
-/// The archive lives in Postgres because it is written by the worker and read
-/// by the API, and those are separate deployments that share nothing but the
-/// database. Split across rows rather than held in one `bytea` so both
-/// directions stay streaming and bounded: the export appends a chunk and
-/// forgets it, the download reads them back in order without ever assembling
-/// the whole archive in memory.
-model DataTransferChunk {
-  jobId   String @map("job_id")
-  ordinal Int
-  data    Bytes
-
-  job DataTransferJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
-
-  @@id([jobId, ordinal])
-  @@map("data_transfer_chunks")
 }
 
 /// Pre-aggregated finding counts, one row per (day × dimension).

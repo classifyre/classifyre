@@ -148,7 +148,7 @@ Back up two things: the database (`docker exec classifyre pg_dump -U postgres cl
 
 ## Moving to Kubernetes
 
-Nothing here is a dead end: export a workspace from this container and import it into a cluster install — sources, findings, cases and lineage all move. The [Helm chart](https://github.com/classifyre/classifyre/tree/develop/helm) (`classifyre/classifyre-core`) runs the same images this one is composed from (`classifyre/api`, `classifyre/web`, `classifyre/cli`).
+The [Helm chart](https://github.com/classifyre/classifyre/tree/develop/helm) (`classifyre/classifyre-core`) runs the same images this one is composed from (`classifyre/api`, `classifyre/web`, `classifyre/cli`).
 
 ---
 

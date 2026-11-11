@@ -65,6 +65,7 @@ export { FindingsApi } from "./generated/src/apis/FindingsApi";
 export { CustomDetectorsApi } from "./generated/src/apis/CustomDetectorsApi";
 export { NotificationsApi } from "./generated/src/apis/NotificationsApi";
 export { InstanceSettingsApi } from "./generated/src/apis/InstanceSettingsApi";
+export { SettingsApi } from "./generated/src/apis/SettingsApi";
 export { AIProviderConfigsApi } from "./generated/src/apis/AIProviderConfigsApi";
 export { CasesApi } from "./generated/src/apis/CasesApi";
 export { CaseBoardApi } from "./generated/src/apis/CaseBoardApi";
@@ -386,6 +387,9 @@ export type {
   SaveSavedQueryDto,
   DataQuerySettingsDto,
   UpdateDataQuerySettingsDto,
+  RunnerLimitDto,
+  RunnerLimitsDto,
+  UpdateRunnerLimitsDto,
   RoleDto,
   TenantDto,
   TenantMembershipDto,
@@ -1385,6 +1389,7 @@ import { FindingsApi } from "./generated/src/apis/FindingsApi";
 import { CustomDetectorsApi } from "./generated/src/apis/CustomDetectorsApi";
 import { NotificationsApi } from "./generated/src/apis/NotificationsApi";
 import { InstanceSettingsApi } from "./generated/src/apis/InstanceSettingsApi";
+import { SettingsApi } from "./generated/src/apis/SettingsApi";
 import { AIProviderConfigsApi } from "./generated/src/apis/AIProviderConfigsApi";
 import { CasesApi } from "./generated/src/apis/CasesApi";
 import { CaseBoardApi } from "./generated/src/apis/CaseBoardApi";
@@ -2030,6 +2035,7 @@ class ApiClient {
   public customDetectors: CustomDetectorsApi;
   public notifications: NotificationsApi;
   public instanceSettings: InstanceSettingsApi;
+  public deploymentSettings: SettingsApi;
   public aiProviderConfigs: AIProviderConfigsApi;
   public cases: CasesApi;
   public caseBoard: CaseBoardApi;
@@ -2065,6 +2071,7 @@ class ApiClient {
     this.customDetectors = new CustomDetectorsApi(this.config);
     this.notifications = new NotificationsApi(this.config);
     this.instanceSettings = new InstanceSettingsApi(this.config);
+    this.deploymentSettings = new SettingsApi(this.config);
     this.aiProviderConfigs = new AIProviderConfigsApi(this.config);
     this.cases = new CasesApi(this.config);
     this.caseBoard = new CaseBoardApi(this.config);

@@ -25,7 +25,6 @@ import type {
   CreateExternalRunnerDto,
   DeleteRunnerResponseDto,
   ListRunnersResponseDto,
-  LiveQueryResponseDto,
   RegisterDiscoveredAssetsDto,
   RegisterDiscoveredAssetsResponseDto,
   RunnerAssetProgressDto,
@@ -76,8 +75,6 @@ import {
     DeleteRunnerResponseDtoToJSON,
     ListRunnersResponseDtoFromJSON,
     ListRunnersResponseDtoToJSON,
-    LiveQueryResponseDtoFromJSON,
-    LiveQueryResponseDtoToJSON,
     RegisterDiscoveredAssetsDtoFromJSON,
     RegisterDiscoveredAssetsDtoToJSON,
     RegisterDiscoveredAssetsResponseDtoFromJSON,
@@ -251,14 +248,6 @@ export interface SearchRunnersControllerExportRunnerAssetsRequest {
     runnerId?: string;
     search?: string;
     status?: Array<SearchRunnersControllerExportRunnerAssetsStatusEnum>;
-}
-
-export interface SearchRunnersControllerQueryRunnerAssetsRequest {
-    runnerId?: string;
-    search?: string;
-    status?: Array<SearchRunnersControllerQueryRunnerAssetsStatusEnum>;
-    limit?: string;
-    cursor?: string;
 }
 
 export interface SearchRunnersControllerSearchRunnerAssetsRequest {
@@ -1331,57 +1320,6 @@ export class RunnersApi extends runtime.BaseAPI {
     }
 
     /**
-     * Returns a page of runner_assets rows as JSON for live consumption (e.g. Excel Power Query). Follow `nextCursor` to page through the full result set.
-     * Query runner assets (cursor-paginated JSON)
-     */
-    async searchRunnersControllerQueryRunnerAssetsRaw(requestParameters: SearchRunnersControllerQueryRunnerAssetsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<LiveQueryResponseDto>> {
-        const queryParameters: any = {};
-
-        if (requestParameters['runnerId'] != null) {
-            queryParameters['runnerId'] = requestParameters['runnerId'];
-        }
-
-        if (requestParameters['search'] != null) {
-            queryParameters['search'] = requestParameters['search'];
-        }
-
-        if (requestParameters['status'] != null) {
-            queryParameters['status'] = requestParameters['status'];
-        }
-
-        if (requestParameters['limit'] != null) {
-            queryParameters['limit'] = requestParameters['limit'];
-        }
-
-        if (requestParameters['cursor'] != null) {
-            queryParameters['cursor'] = requestParameters['cursor'];
-        }
-
-        const headerParameters: runtime.HTTPHeaders = {};
-
-
-        let urlPath = `/search/runner-assets/query`;
-
-        const response = await this.request({
-            path: urlPath,
-            method: 'GET',
-            headers: headerParameters,
-            query: queryParameters,
-        }, initOverrides);
-
-        return new runtime.JSONApiResponse(response, (jsonValue) => LiveQueryResponseDtoFromJSON(jsonValue));
-    }
-
-    /**
-     * Returns a page of runner_assets rows as JSON for live consumption (e.g. Excel Power Query). Follow `nextCursor` to page through the full result set.
-     * Query runner assets (cursor-paginated JSON)
-     */
-    async searchRunnersControllerQueryRunnerAssets(requestParameters: SearchRunnersControllerQueryRunnerAssetsRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<LiveQueryResponseDto> {
-        const response = await this.searchRunnersControllerQueryRunnerAssetsRaw(requestParameters, initOverrides);
-        return await response.value();
-    }
-
-    /**
      * Returns paginated runner_assets rows for a specific runner, joined with the resolved asset record and its findings.
      * Search runner assets
      */
@@ -1540,13 +1478,3 @@ export const SearchRunnersControllerExportRunnerAssetsStatusEnum = {
     Error: 'ERROR'
 } as const;
 export type SearchRunnersControllerExportRunnerAssetsStatusEnum = typeof SearchRunnersControllerExportRunnerAssetsStatusEnum[keyof typeof SearchRunnersControllerExportRunnerAssetsStatusEnum];
-/**
- * @export
- */
-export const SearchRunnersControllerQueryRunnerAssetsStatusEnum = {
-    Pending: 'PENDING',
-    Processing: 'PROCESSING',
-    Processed: 'PROCESSED',
-    Error: 'ERROR'
-} as const;
-export type SearchRunnersControllerQueryRunnerAssetsStatusEnum = typeof SearchRunnersControllerQueryRunnerAssetsStatusEnum[keyof typeof SearchRunnersControllerQueryRunnerAssetsStatusEnum];

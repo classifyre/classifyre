@@ -38,7 +38,6 @@ docs/AnnotateJournalDto.md
 docs/AppliedBoardOpDto.md
 docs/ApplyBoardOpsDto.md
 docs/ApplyBoardOpsResponseDto.md
-docs/ArchivePreviewDto.md
 docs/AssetChunkDto.md
 docs/AssetFindingDetectorCountDto.md
 docs/AssetFindingSeverityCountDto.md
@@ -204,14 +203,10 @@ docs/CustomDetectorTrainingRunDto.md
 docs/CustomDetectorsApi.md
 docs/DataQueryApi.md
 docs/DataQuerySettingsDto.md
-docs/DataTransferApi.md
-docs/DataTransferJobDto.md
-docs/DataTransferJobListDto.md
 docs/DecisionsToCaseDto.md
 docs/DecisionsToCaseResponseDto.md
 docs/DecisionsToInquiryDto.md
 docs/DecisionsToInquiryResponseDto.md
-docs/DeleteDataTransferJobResponseDto.md
 docs/DeleteGlossaryTermResponseDto.md
 docs/DeleteRunnerResponseDto.md
 docs/DeprecateGlossaryTermDto.md
@@ -321,7 +316,6 @@ docs/LineageGraphDto.md
 docs/LinkInquiriesDto.md
 docs/LinkThreadSupportDto.md
 docs/ListRunnersResponseDto.md
-docs/LiveQueryResponseDto.md
 docs/LocationDto.md
 docs/MaintenanceApi.md
 docs/MarkAllReadDto.md
@@ -457,6 +451,8 @@ docs/RunnerDto.md
 docs/RunnerFindingItemDto.md
 docs/RunnerFindingQueryDto.md
 docs/RunnerFindingQueryResponseDto.md
+docs/RunnerLimitDto.md
+docs/RunnerLimitsDto.md
 docs/RunnerLogEntryDto.md
 docs/RunnerLogsResponseDto.md
 docs/RunnerQueuePositionDto.md
@@ -519,6 +515,7 @@ docs/SemanticApi.md
 docs/SemanticFindingsSearchDto.md
 docs/SetInquiryAutoPullDto.md
 docs/SetWorkerQueuePausedDto.md
+docs/SettingsApi.md
 docs/SimilarFindingAssetDto.md
 docs/SimilarFindingDto.md
 docs/SimilarFindingEvidenceAnalysisDto.md
@@ -536,8 +533,6 @@ docs/SourcesApi.md
 docs/SourcesControllerGetSchedule200Response.md
 docs/SourcesControllerUpdateStatusRequest.md
 docs/SplitPairResponseDto.md
-docs/StartExportDto.md
-docs/StartImportDto.md
 docs/StartRunnerDto.md
 docs/StopRunnerResponseDto.md
 docs/SupervisorBudgetDto.md
@@ -568,7 +563,6 @@ docs/TrainingExampleDto.md
 docs/TrainingExampleItemDto.md
 docs/TrainingExamplesStatsDto.md
 docs/TrainingExamplesStatsDtoByLabelValue.md
-docs/TransferScopeDto.md
 docs/TriggerAutopilotDto.md
 docs/TriggerAutopilotResponseDto.md
 docs/UndoBatchDto.md
@@ -602,6 +596,7 @@ docs/UpdateNotebookResponseDto.md
 docs/UpdateNotificationAudienceDto.md
 docs/UpdateNotificationImportanceDto.md
 docs/UpdateRunnerAssetStatusDto.md
+docs/UpdateRunnerLimitsDto.md
 docs/UpdateSourceDto.md
 docs/UpdateSupervisorDto.md
 docs/UpdateSupervisorGoalDto.md
@@ -634,7 +629,6 @@ src/apis/CustomDetectorExtractionsApi.ts
 src/apis/CustomDetectorTestsApi.ts
 src/apis/CustomDetectorsApi.ts
 src/apis/DataQueryApi.ts
-src/apis/DataTransferApi.ts
 src/apis/EmbeddingsApi.ts
 src/apis/EntitiesApi.ts
 src/apis/ExploreApi.ts
@@ -652,6 +646,7 @@ src/apis/NotificationsApi.ts
 src/apis/PlatformApi.ts
 src/apis/RunnersApi.ts
 src/apis/SemanticApi.ts
+src/apis/SettingsApi.ts
 src/apis/SitemapApi.ts
 src/apis/SourcesApi.ts
 src/apis/ThreadsApi.ts
@@ -692,7 +687,6 @@ src/models/AnnotateJournalDto.ts
 src/models/AppliedBoardOpDto.ts
 src/models/ApplyBoardOpsDto.ts
 src/models/ApplyBoardOpsResponseDto.ts
-src/models/ArchivePreviewDto.ts
 src/models/AssetChunkDto.ts
 src/models/AssetFindingDetectorCountDto.ts
 src/models/AssetFindingSeverityCountDto.ts
@@ -846,13 +840,10 @@ src/models/CustomDetectorResponseDto.ts
 src/models/CustomDetectorResponseDtoSourcesUsingInner.ts
 src/models/CustomDetectorTrainingRunDto.ts
 src/models/DataQuerySettingsDto.ts
-src/models/DataTransferJobDto.ts
-src/models/DataTransferJobListDto.ts
 src/models/DecisionsToCaseDto.ts
 src/models/DecisionsToCaseResponseDto.ts
 src/models/DecisionsToInquiryDto.ts
 src/models/DecisionsToInquiryResponseDto.ts
-src/models/DeleteDataTransferJobResponseDto.ts
 src/models/DeleteGlossaryTermResponseDto.ts
 src/models/DeleteRunnerResponseDto.ts
 src/models/DeprecateGlossaryTermDto.ts
@@ -952,7 +943,6 @@ src/models/LineageGraphDto.ts
 src/models/LinkInquiriesDto.ts
 src/models/LinkThreadSupportDto.ts
 src/models/ListRunnersResponseDto.ts
-src/models/LiveQueryResponseDto.ts
 src/models/LocationDto.ts
 src/models/MarkAllReadDto.ts
 src/models/MatchOptionCustomDetectorDto.ts
@@ -1083,6 +1073,8 @@ src/models/RunnerDto.ts
 src/models/RunnerFindingItemDto.ts
 src/models/RunnerFindingQueryDto.ts
 src/models/RunnerFindingQueryResponseDto.ts
+src/models/RunnerLimitDto.ts
+src/models/RunnerLimitsDto.ts
 src/models/RunnerLogEntryDto.ts
 src/models/RunnerLogsResponseDto.ts
 src/models/RunnerQueuePositionDto.ts
@@ -1158,8 +1150,6 @@ src/models/SourceResponseDto.ts
 src/models/SourcesControllerGetSchedule200Response.ts
 src/models/SourcesControllerUpdateStatusRequest.ts
 src/models/SplitPairResponseDto.ts
-src/models/StartExportDto.ts
-src/models/StartImportDto.ts
 src/models/StartRunnerDto.ts
 src/models/StopRunnerResponseDto.ts
 src/models/SupervisorBudgetDto.ts
@@ -1189,7 +1179,6 @@ src/models/TrainingExampleDto.ts
 src/models/TrainingExampleItemDto.ts
 src/models/TrainingExamplesStatsDto.ts
 src/models/TrainingExamplesStatsDtoByLabelValue.ts
-src/models/TransferScopeDto.ts
 src/models/TriggerAutopilotDto.ts
 src/models/TriggerAutopilotResponseDto.ts
 src/models/UndoBatchDto.ts
@@ -1223,6 +1212,7 @@ src/models/UpdateNotebookResponseDto.ts
 src/models/UpdateNotificationAudienceDto.ts
 src/models/UpdateNotificationImportanceDto.ts
 src/models/UpdateRunnerAssetStatusDto.ts
+src/models/UpdateRunnerLimitsDto.ts
 src/models/UpdateSourceDto.ts
 src/models/UpdateSupervisorDto.ts
 src/models/UpdateSupervisorGoalDto.ts

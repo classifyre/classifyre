@@ -36,7 +36,6 @@ TYPE_TO_DEFINITION = {
     "CONFLUENCE": "ConfluenceInput",
     "JIRA": "JiraInput",
     "SERVICEDESK": "ServiceDeskInput",
-    "SQLITE": "SQLiteInput",
     "NOTION": "NotionInput",
     "EMAIL": "EmailInput",
     "YOUTUBE": "YouTubeInput",

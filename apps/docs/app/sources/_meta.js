@@ -40,7 +40,6 @@ const sourcePages = [
   "servicedesk",
   "slack",
   "snowflake",
-  "sqlite",
   "tableau",
   "trino",
   "wordpress",

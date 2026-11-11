@@ -1474,385 +1474,6 @@
         ]
       }
     },
-    "/search/findings/query": {
-      "get": {
-        "description": "Returns a page of findings as JSON for live consumption (e.g. Excel Power Query). Follow `nextCursor` to page through the full result set. Order is stable for incremental refresh; sort/filter in the client.",
-        "operationId": "SearchAssetsController_queryFindings",
-        "parameters": [
-          {
-            "name": "search",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "maxLength": 200,
-              "type": "string"
-            }
-          },
-          {
-            "name": "sourceId",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          },
-          {
-            "name": "detectorType",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "enum": [
-                  "SECRETS",
-                  "PII",
-                  "YARA",
-                  "BROKEN_LINKS",
-                  "CODE_SECURITY",
-                  "CUSTOM"
-                ]
-              }
-            }
-          },
-          {
-            "name": "customDetectorKey",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          },
-          {
-            "name": "findingType",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          },
-          {
-            "name": "category",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          },
-          {
-            "name": "severity",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "enum": [
-                  "CRITICAL",
-                  "HIGH",
-                  "MEDIUM",
-                  "LOW",
-                  "INFO"
-                ]
-              }
-            }
-          },
-          {
-            "name": "status",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "enum": [
-                  "OPEN",
-                  "FALSE_POSITIVE",
-                  "RESOLVED",
-                  "IGNORED"
-                ]
-              }
-            }
-          },
-          {
-            "name": "includeResolved",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": false,
-              "type": "boolean"
-            }
-          },
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "description": "Page size (default 1000, max 10000)",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "cursor",
-            "required": false,
-            "in": "query",
-            "description": "Opaque cursor from a previous page",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LiveQueryResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Query findings (cursor-paginated JSON)",
-        "tags": [
-          "Assets"
-        ]
-      }
-    },
-    "/search/assets/query": {
-      "get": {
-        "description": "Returns a page of asset-finding rows as JSON for live consumption (e.g. Excel Power Query). Follow `nextCursor` to page through the full result set.",
-        "operationId": "SearchAssetsController_queryAssets",
-        "parameters": [
-          {
-            "name": "asset_search",
-            "required": false,
-            "in": "query",
-            "description": "Search asset name / url / hash",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "asset_sourceId",
-            "required": false,
-            "in": "query",
-            "description": "Single source id filter",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "asset_status",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "enum": [
-                  "NEW",
-                  "UPDATED",
-                  "UNCHANGED",
-                  "DELETED"
-                ]
-              }
-            }
-          },
-          {
-            "name": "asset_sourceType",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "enum": [
-                  "JIRA",
-                  "CONFLUENCE",
-                  "CROWD",
-                  "BITBUCKET",
-                  "SERVICEDESK",
-                  "XRAY",
-                  "GOOGLE_DRIVE",
-                  "GOOGLE_SHEETS",
-                  "GOOGLE_DOCS",
-                  "GOOGLE_SLIDES",
-                  "WORDPRESS",
-                  "SLACK",
-                  "S3_COMPATIBLE_STORAGE",
-                  "AZURE_BLOB_STORAGE",
-                  "GOOGLE_CLOUD_STORAGE",
-                  "POSTGRESQL",
-                  "MYSQL",
-                  "MSSQL",
-                  "ORACLE",
-                  "HIVE",
-                  "DATABRICKS",
-                  "SNOWFLAKE",
-                  "DREMIO",
-                  "MONGODB",
-                  "NEO4J",
-                  "SQLITE",
-                  "NOTION",
-                  "POWERBI",
-                  "TABLEAU",
-                  "EMAIL",
-                  "YOUTUBE",
-                  "REDDIT",
-                  "KAFKA",
-                  "ELASTICSEARCH",
-                  "OPENSEARCH",
-                  "MEILISEARCH",
-                  "LOCAL_FOLDER",
-                  "MICROSOFT_365",
-                  "GOOGLE_WORKSPACE",
-                  "DROPBOX",
-                  "HUGGING_FACE",
-                  "GIT",
-                  "SANDBOX",
-                  "ICEBERG_REST",
-                  "DUCKLAKE",
-                  "TRINO",
-                  "ATHENA",
-                  "BIGQUERY",
-                  "REDSHIFT",
-                  "CUSTOM"
-                ]
-              }
-            }
-          },
-          {
-            "name": "finding_detectorType",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "enum": [
-                  "SECRETS",
-                  "PII",
-                  "YARA",
-                  "BROKEN_LINKS",
-                  "CODE_SECURITY",
-                  "CUSTOM"
-                ]
-              }
-            }
-          },
-          {
-            "name": "finding_severity",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "enum": [
-                  "CRITICAL",
-                  "HIGH",
-                  "MEDIUM",
-                  "LOW",
-                  "INFO"
-                ]
-              }
-            }
-          },
-          {
-            "name": "finding_status",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "enum": [
-                  "OPEN",
-                  "FALSE_POSITIVE",
-                  "RESOLVED",
-                  "IGNORED"
-                ]
-              }
-            }
-          },
-          {
-            "name": "finding_includeResolved",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": false,
-              "type": "boolean"
-            }
-          },
-          {
-            "name": "excludeFindings",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": false,
-              "type": "boolean"
-            }
-          },
-          {
-            "name": "includeAssetsWithoutFindings",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": false,
-              "type": "boolean"
-            }
-          },
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "description": "Page size (default 1000, max 10000)",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "cursor",
-            "required": false,
-            "in": "query",
-            "description": "Opaque cursor from a previous page",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LiveQueryResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Query assets with findings (cursor-paginated JSON)",
-        "tags": [
-          "Assets"
-        ]
-      }
-    },
     "/search/findings/export": {
       "get": {
         "description": "Streams all findings matching the current filters as a CSV download.",
@@ -2068,7 +1689,6 @@
                   "DREMIO",
                   "MONGODB",
                   "NEO4J",
-                  "SQLITE",
                   "NOTION",
                   "POWERBI",
                   "TABLEAU",
@@ -2452,7 +2072,6 @@
                   "DREMIO",
                   "MONGODB",
                   "NEO4J",
-                  "SQLITE",
                   "NOTION",
                   "POWERBI",
                   "TABLEAU",
@@ -10932,82 +10551,6 @@
         ]
       }
     },
-    "/search/runner-assets/query": {
-      "get": {
-        "description": "Returns a page of runner_assets rows as JSON for live consumption (e.g. Excel Power Query). Follow `nextCursor` to page through the full result set.",
-        "operationId": "SearchRunnersController_queryRunnerAssets",
-        "parameters": [
-          {
-            "name": "runnerId",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "search",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "maxLength": 200,
-              "type": "string"
-            }
-          },
-          {
-            "name": "status",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "enum": [
-                  "PENDING",
-                  "PROCESSING",
-                  "PROCESSED",
-                  "ERROR"
-                ]
-              }
-            }
-          },
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "description": "Page size (default 1000, max 10000)",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "cursor",
-            "required": false,
-            "in": "query",
-            "description": "Opaque cursor from a previous page",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LiveQueryResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Query runner assets (cursor-paginated JSON)",
-        "tags": [
-          "Runners"
-        ]
-      }
-    },
     "/search/runner-assets/export": {
       "get": {
         "description": "Streams runner_assets rows for a runner matching the current filters as a CSV download.",
@@ -12422,6 +11965,58 @@
         "summary": "Stop one of your queries",
         "tags": [
           "Data query"
+        ]
+      }
+    },
+    "/runner-limits": {
+      "get": {
+        "operationId": "DeploymentSettingsController_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunnerLimitsDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Scan limits of this deployment: what is saved in Settings and what the chart or image sets",
+        "tags": [
+          "Settings"
+        ]
+      },
+      "put": {
+        "operationId": "DeploymentSettingsController_update",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRunnerLimitsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunnerLimitsDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Set scan limits for the whole deployment; null hands a limit back to the chart or image",
+        "tags": [
+          "Settings"
         ]
       }
     },
@@ -17483,282 +17078,6 @@
         ]
       }
     },
-    "/data-transfer/scopes": {
-      "get": {
-        "operationId": "DataTransferController_scopes",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/TransferScopeDto"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "summary": "List the kinds of data that can be exported, with row counts",
-        "tags": [
-          "data-transfer"
-        ]
-      }
-    },
-    "/data-transfer/jobs": {
-      "get": {
-        "operationId": "DataTransferController_jobs",
-        "parameters": [
-          {
-            "name": "limit",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DataTransferJobListDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "List recent export and import jobs",
-        "tags": [
-          "data-transfer"
-        ]
-      }
-    },
-    "/data-transfer/jobs/{id}": {
-      "get": {
-        "operationId": "DataTransferController_job",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DataTransferJobDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Poll one transfer job for progress",
-        "tags": [
-          "data-transfer"
-        ]
-      },
-      "delete": {
-        "operationId": "DataTransferController_remove",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DeleteDataTransferJobResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Delete a finished job and its archive",
-        "tags": [
-          "data-transfer"
-        ]
-      }
-    },
-    "/data-transfer/exports": {
-      "post": {
-        "operationId": "DataTransferController_startExport",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/StartExportDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DataTransferJobDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Start an export of the selected scopes",
-        "tags": [
-          "data-transfer"
-        ]
-      }
-    },
-    "/data-transfer/exports/{id}/download": {
-      "get": {
-        "operationId": "DataTransferController_download",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "Download a completed export archive",
-        "tags": [
-          "data-transfer"
-        ]
-      }
-    },
-    "/data-transfer/imports/upload": {
-      "post": {
-        "operationId": "DataTransferController_upload",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "file"
-                ],
-                "properties": {
-                  "file": {
-                    "type": "string",
-                    "format": "binary"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ArchivePreviewDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Upload an archive and read its manifest without importing it",
-        "tags": [
-          "data-transfer"
-        ]
-      }
-    },
-    "/data-transfer/imports": {
-      "post": {
-        "operationId": "DataTransferController_startImport",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/StartImportDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DataTransferJobDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Import selected scopes from an uploaded archive",
-        "tags": [
-          "data-transfer"
-        ]
-      }
-    },
-    "/data-transfer/jobs/{id}/cancel": {
-      "post": {
-        "operationId": "DataTransferController_cancel",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DataTransferJobDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Ask a running transfer to stop",
-        "tags": [
-          "data-transfer"
-        ]
-      }
-    },
     "/maintenance/features": {
       "get": {
         "operationId": "MaintenanceController_listFeatures",
@@ -17843,7 +17162,7 @@
             "description": "Unknown cleanup key (incl. protected datasets)"
           }
         },
-        "summary": "Start wiping one cleanable dataset in the background (scan history, duplicates, embeddings, harness runs, finished queue jobs, derived stats/graph, finished transfers). Protected data is never accepted here. Poll GET cleanup/runs/:runId for progress. Deliberately allowed while paused: freezing the workers first is the recommended quiet window (pause, clean, resume), since no writer can race the wipe.",
+        "summary": "Start wiping one cleanable dataset in the background (scan history, duplicates, embeddings, harness runs, finished queue jobs, derived stats/graph). Protected data is never accepted here. Poll GET cleanup/runs/:runId for progress. Deliberately allowed while paused: freezing the workers first is the recommended quiet window (pause, clean, resume), since no writer can race the wipe.",
         "tags": [
           "maintenance"
         ]
@@ -17958,7 +17277,6 @@
                 "DREMIO",
                 "MONGODB",
                 "NEO4J",
-                "SQLITE",
                 "NOTION",
                 "POWERBI",
                 "TABLEAU",
@@ -18217,7 +17535,6 @@
               "CONFLUENCE",
               "JIRA",
               "SERVICEDESK",
-              "SQLITE",
               "NOTION",
               "EMAIL",
               "YOUTUBE",
@@ -18467,7 +17784,6 @@
               "CONFLUENCE",
               "JIRA",
               "SERVICEDESK",
-              "SQLITE",
               "NOTION",
               "EMAIL",
               "YOUTUBE",
@@ -19003,7 +18319,6 @@
               "DREMIO",
               "MONGODB",
               "NEO4J",
-              "SQLITE",
               "NOTION",
               "POWERBI",
               "TABLEAU",
@@ -19449,28 +18764,6 @@
           "truncated"
         ]
       },
-      "LiveQueryResponseDto": {
-        "type": "object",
-        "properties": {
-          "items": {
-            "type": "array",
-            "description": "Page of result rows. Each row is a flat object keyed by column name.",
-            "items": {
-              "type": "object",
-              "additionalProperties": true
-            }
-          },
-          "nextCursor": {
-            "type": "string",
-            "description": "Opaque cursor for the next page, or null when this is the last page. Pass it back as the `cursor` query param to fetch the next page.",
-            "nullable": true
-          }
-        },
-        "required": [
-          "items",
-          "nextCursor"
-        ]
-      },
       "SearchAssetsFiltersDto": {
         "type": "object",
         "properties": {
@@ -19530,7 +18823,6 @@
                 "DREMIO",
                 "MONGODB",
                 "NEO4J",
-                "SQLITE",
                 "NOTION",
                 "POWERBI",
                 "TABLEAU",
@@ -20599,7 +19891,6 @@
               "DREMIO",
               "MONGODB",
               "NEO4J",
-              "SQLITE",
               "NOTION",
               "POWERBI",
               "TABLEAU",
@@ -31151,7 +30442,6 @@
                 "workspace.pause",
                 "workspace.publish",
                 "workspace.delete",
-                "workspace.transfer",
                 "notification.view",
                 "access.view",
                 "access.manage",
@@ -31370,7 +30660,6 @@
                 "workspace.pause",
                 "workspace.publish",
                 "workspace.delete",
-                "workspace.transfer",
                 "notification.view",
                 "access.view",
                 "access.manage",
@@ -31595,7 +30884,6 @@
                 "workspace.pause",
                 "workspace.publish",
                 "workspace.delete",
-                "workspace.transfer",
                 "notification.view",
                 "access.view",
                 "access.manage",
@@ -32241,7 +31529,6 @@
                 "DREMIO",
                 "MONGODB",
                 "NEO4J",
-                "SQLITE",
                 "NOTION",
                 "POWERBI",
                 "TABLEAU",
@@ -36124,6 +35411,68 @@
           "truncated",
           "createdAt"
         ]
+      },
+      "RunnerLimitDto": {
+        "type": "object",
+        "properties": {
+          "override": {
+            "type": "number",
+            "nullable": true,
+            "description": "Saved in Settings, or null when the limit follows the deployment."
+          },
+          "deploymentDefault": {
+            "type": "number",
+            "description": "What the Helm chart or all-in-one image sets (or the built-in default)."
+          },
+          "effective": {
+            "type": "number",
+            "description": "What is in force right now."
+          }
+        },
+        "required": [
+          "override",
+          "deploymentDefault",
+          "effective"
+        ]
+      },
+      "RunnerLimitsDto": {
+        "type": "object",
+        "properties": {
+          "maxRunnersPerSource": {
+            "$ref": "#/components/schemas/RunnerLimitDto"
+          },
+          "maxConcurrentRunners": {
+            "$ref": "#/components/schemas/RunnerLimitDto"
+          },
+          "autoScheduleMaxConcurrent": {
+            "$ref": "#/components/schemas/RunnerLimitDto"
+          }
+        },
+        "required": [
+          "maxRunnersPerSource",
+          "maxConcurrentRunners",
+          "autoScheduleMaxConcurrent"
+        ]
+      },
+      "UpdateRunnerLimitsDto": {
+        "type": "object",
+        "properties": {
+          "maxRunnersPerSource": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 0
+          },
+          "maxConcurrentRunners": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 0
+          },
+          "autoScheduleMaxConcurrent": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 0
+          }
+        }
       },
       "TriggerAutopilotDto": {
         "type": "object",
@@ -41443,398 +40792,6 @@
         "required": [
           "deleted",
           "id"
-        ]
-      },
-      "TransferScopeDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "enum": [
-              "sources",
-              "sourceFiles",
-              "assets",
-              "findings",
-              "customDetectors",
-              "glossary",
-              "fingerprints",
-              "investigations",
-              "scanData",
-              "harness",
-              "instanceConfig"
-            ],
-            "example": "findings"
-          },
-          "label": {
-            "type": "string",
-            "example": "Findings"
-          },
-          "description": {
-            "type": "string"
-          },
-          "dependsOn": {
-            "type": "array",
-            "description": "Scopes this one references. Importing without them skips orphaned rows.",
-            "items": {
-              "type": "string",
-              "enum": [
-                "sources",
-                "sourceFiles",
-                "assets",
-                "findings",
-                "customDetectors",
-                "glossary",
-                "fingerprints",
-                "investigations",
-                "scanData",
-                "harness",
-                "instanceConfig"
-              ]
-            }
-          },
-          "heavy": {
-            "type": "boolean",
-            "description": "Large or binary payload — off by default in the UI."
-          },
-          "redactsSecrets": {
-            "type": "boolean",
-            "description": "Contains configuration whose credentials are stripped."
-          },
-          "rows": {
-            "type": "number",
-            "description": "Rows currently in this namespace for this scope.",
-            "example": 4312
-          }
-        },
-        "required": [
-          "id",
-          "label",
-          "description",
-          "dependsOn",
-          "heavy",
-          "redactsSecrets",
-          "rows"
-        ]
-      },
-      "DataTransferJobDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "kind": {
-            "type": "string",
-            "enum": [
-              "EXPORT",
-              "IMPORT"
-            ]
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "STAGED",
-              "PENDING",
-              "RUNNING",
-              "COMPLETED",
-              "FAILED",
-              "CANCELLED"
-            ]
-          },
-          "scopes": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "sources",
-                "sourceFiles",
-                "assets",
-                "findings",
-                "customDetectors",
-                "glossary",
-                "fingerprints",
-                "investigations",
-                "scanData",
-                "harness",
-                "instanceConfig"
-              ]
-            }
-          },
-          "conflictMode": {
-            "type": "string",
-            "enum": [
-              "SKIP",
-              "OVERWRITE"
-            ]
-          },
-          "fileName": {
-            "type": "string",
-            "nullable": true
-          },
-          "fileSize": {
-            "type": "number",
-            "description": "Compressed archive size in bytes; null until it is written.",
-            "nullable": true
-          },
-          "checksum": {
-            "type": "string",
-            "description": "SHA-256 of the compressed archive.",
-            "nullable": true
-          },
-          "downloadAvailable": {
-            "type": "boolean",
-            "description": "True while the archive is still stored and downloadable."
-          },
-          "totalRows": {
-            "type": "number",
-            "description": "Estimated total rows for this transfer."
-          },
-          "processedRows": {
-            "type": "number"
-          },
-          "skippedRows": {
-            "type": "number",
-            "description": "Rows not written: already present, or referencing an excluded scope."
-          },
-          "percent": {
-            "type": "number",
-            "description": "0–100, clamped to 99 until the job finishes."
-          },
-          "currentTable": {
-            "type": "string",
-            "description": "Model currently being read or written.",
-            "nullable": true
-          },
-          "counts": {
-            "type": "object",
-            "description": "Rows transferred per model.",
-            "example": {
-              "sources": 4,
-              "findings": 5120
-            }
-          },
-          "warnings": {
-            "description": "Operator-facing notes — stripped credentials, skipped rows, version drift.",
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "errorMessage": {
-            "type": "string",
-            "nullable": true
-          },
-          "cancelRequested": {
-            "type": "boolean"
-          },
-          "startedAt": {
-            "type": "string",
-            "nullable": true
-          },
-          "finishedAt": {
-            "type": "string",
-            "nullable": true
-          },
-          "expiresAt": {
-            "type": "string",
-            "description": "When the archive is dropped and stops being downloadable.",
-            "nullable": true
-          },
-          "createdAt": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "kind",
-          "status",
-          "scopes",
-          "conflictMode",
-          "fileName",
-          "fileSize",
-          "checksum",
-          "downloadAvailable",
-          "totalRows",
-          "processedRows",
-          "skippedRows",
-          "percent",
-          "currentTable",
-          "counts",
-          "warnings",
-          "errorMessage",
-          "cancelRequested",
-          "startedAt",
-          "finishedAt",
-          "expiresAt",
-          "createdAt"
-        ]
-      },
-      "DataTransferJobListDto": {
-        "type": "object",
-        "properties": {
-          "jobs": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/DataTransferJobDto"
-            }
-          }
-        },
-        "required": [
-          "jobs"
-        ]
-      },
-      "StartExportDto": {
-        "type": "object",
-        "properties": {
-          "scopes": {
-            "type": "array",
-            "description": "Scopes to include in the archive.",
-            "example": [
-              "sources",
-              "findings"
-            ],
-            "items": {
-              "type": "string",
-              "enum": [
-                "sources",
-                "sourceFiles",
-                "assets",
-                "findings",
-                "customDetectors",
-                "glossary",
-                "fingerprints",
-                "investigations",
-                "scanData",
-                "harness",
-                "instanceConfig"
-              ]
-            }
-          }
-        },
-        "required": [
-          "scopes"
-        ]
-      },
-      "ArchivePreviewDto": {
-        "type": "object",
-        "properties": {
-          "uploadId": {
-            "type": "string",
-            "description": "Pass back to the import endpoint."
-          },
-          "fileName": {
-            "type": "string"
-          },
-          "fileSize": {
-            "type": "number",
-            "description": "Compressed size in bytes."
-          },
-          "createdAt": {
-            "type": "string",
-            "description": "When the archive was exported."
-          },
-          "appVersion": {
-            "type": "string",
-            "description": "Classifyre version that wrote the archive."
-          },
-          "sourceNamespace": {
-            "type": "string",
-            "description": "Namespace the archive was exported from."
-          },
-          "scopes": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "sources",
-                "sourceFiles",
-                "assets",
-                "findings",
-                "customDetectors",
-                "glossary",
-                "fingerprints",
-                "investigations",
-                "scanData",
-                "harness",
-                "instanceConfig"
-              ]
-            }
-          },
-          "rowsByScope": {
-            "type": "object",
-            "description": "Rows per scope, keyed by scope id.",
-            "example": {
-              "sources": 4,
-              "findings": 5120
-            }
-          },
-          "totalRows": {
-            "type": "number"
-          }
-        },
-        "required": [
-          "uploadId",
-          "fileName",
-          "fileSize",
-          "createdAt",
-          "appVersion",
-          "sourceNamespace",
-          "scopes",
-          "rowsByScope",
-          "totalRows"
-        ]
-      },
-      "StartImportDto": {
-        "type": "object",
-        "properties": {
-          "uploadId": {
-            "type": "string",
-            "description": "Handle returned by the upload endpoint for the staged archive."
-          },
-          "scopes": {
-            "type": "array",
-            "description": "Scopes to take from the archive. May be a subset of what it holds.",
-            "items": {
-              "type": "string",
-              "enum": [
-                "sources",
-                "sourceFiles",
-                "assets",
-                "findings",
-                "customDetectors",
-                "glossary",
-                "fingerprints",
-                "investigations",
-                "scanData",
-                "harness",
-                "instanceConfig"
-              ]
-            }
-          },
-          "conflictMode": {
-            "type": "string",
-            "description": "What to do about an entry that already exists. Imported rows always get fresh ids, so this only applies where identity is natural rather than generated — glossary terms, MCP server slugs — and to singleton configuration. SKIP keeps what is there; OVERWRITE replaces it.",
-            "enum": [
-              "SKIP",
-              "OVERWRITE"
-            ],
-            "default": "SKIP"
-          }
-        },
-        "required": [
-          "uploadId",
-          "scopes"
-        ]
-      },
-      "DeleteDataTransferJobResponseDto": {
-        "type": "object",
-        "properties": {
-          "deleted": {
-            "type": "boolean",
-            "example": true
-          }
-        },
-        "required": [
-          "deleted"
         ]
       }
     }

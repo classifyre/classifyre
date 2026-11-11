@@ -137,7 +137,7 @@ const deKubernetes = {
 const deWhich = {
   marker: "Unschlüssig",
   title: "Entscheiden Sie danach, wo die Daten bleiben müssen",
-  lede: "Beide Runtimes tragen dieselben Features, und ein Namespace-Export trägt Ihre Arbeit von einer zur anderen; an diese Entscheidung sind Sie also nicht gekettet.",
+  lede: "Beide Runtimes tragen dieselben Features und laufen mit denselben Images; an diese Entscheidung sind Sie also nicht gekettet.",
   dockerHead: "Docker wählen, wenn",
   dockerPoints: [
     "Sie evaluieren oder allein ermitteln.",

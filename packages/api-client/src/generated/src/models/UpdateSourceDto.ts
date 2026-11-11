@@ -94,7 +94,6 @@ export const UpdateSourceDtoTypeEnum = {
     Confluence: 'CONFLUENCE',
     Jira: 'JIRA',
     Servicedesk: 'SERVICEDESK',
-    Sqlite: 'SQLITE',
     Notion: 'NOTION',
     Email: 'EMAIL',
     Youtube: 'YOUTUBE',

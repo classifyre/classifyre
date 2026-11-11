@@ -345,8 +345,6 @@ helm upgrade --install classifyre ./helm/classifyre \
 | api.workingDir | string | `""` | Working directory used by default shell command. |
 | commonAnnotations | object | `{}` | Additional annotations added to supported chart resources. |
 | commonLabels | object | `{}` | Additional labels added to all chart resources. |
-| dataTransfer.maxSizeMb | int | `0` | limit; set a positive value only if you want to cap uploads. |
-| dataTransfer.ttlMinutes | int | `60` | Minutes an archive is kept after its export finishes, then it is deleted. |
 | frontend.affinity | object | `{}` | Web scheduling: affinity rules. When empty, default soft anti-affinity is applied. |
 | frontend.args | list | `[]` | Optional web container args override. |
 | frontend.autoscaling.enabled | bool | `true` | Enable HPA for web deployment. |

@@ -541,14 +541,6 @@ which each deployment sets on its own after including this block.
   value: "1"
 {{- end }}
 {{- end }}
-{{- /* ── Namespace export/import ────────────────────────────── */}}
-{{- /* Archives live in the tenant's Postgres schema: they are produced by the
-       worker and downloaded from the API, and the database is the only thing
-       those two deployments share. Nothing to configure but retention. */}}
-- name: DATA_TRANSFER_TTL_MINUTES
-  value: {{ .Values.dataTransfer.ttlMinutes | quote }}
-- name: DATA_TRANSFER_MAX_MB
-  value: {{ .Values.dataTransfer.maxSizeMb | quote }}
 {{- /* ── S3 / object-storage configuration ─────────────────── */}}
 - name: S3_CONFIGURED
   value: {{ .Values.objectStorage.enabled | quote }}

@@ -132,13 +132,13 @@ const DIRECTORY: Array<{ name: string; blurb: string; href: string }> = [
   },
   {
     name: "Data Export",
-    blurb: "CSV downloads and live feeds into Excel, Sheets, or BI tools.",
+    blurb: "CSV downloads of findings, assets and scan assets.",
     href: "/data-export/",
   },
   {
     name: "Settings",
     blurb:
-      "Locale, scan capacity, MCP and chat integrations, and workspace transfer.",
+      "Locale, scan limits, SQL limits, and MCP and chat integrations.",
     href: "/settings/",
   },
 ];
