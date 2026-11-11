@@ -19,21 +19,15 @@ export class MeActorDto {
   kind: ActorKind;
 
   @ApiProperty({
-    enum: ['header', 'oidc', 'mcp-token', 'internal-key', 'autopilot', 'none'],
+    enum: ['oidc', 'mcp-token', 'internal-key', 'autopilot', 'none'],
     description: 'How the actor was identified.',
   })
-  via: 'header' | 'oidc' | 'mcp-token' | 'internal-key' | 'autopilot' | 'none';
+  via: 'oidc' | 'mcp-token' | 'internal-key' | 'autopilot' | 'none';
 }
 
 export class MeResponseDto {
   @ApiProperty({ type: MeActorDto })
   actor: MeActorDto;
-
-  @ApiProperty({
-    description:
-      'True when sign-in and access management are on. Without it every visitor holds every capability.',
-  })
-  iamEnabled: boolean;
 
   @ApiProperty({
     description: 'Capabilities the actor holds in this workspace.',

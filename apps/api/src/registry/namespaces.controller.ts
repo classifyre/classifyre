@@ -47,20 +47,19 @@ export class NamespacesController {
   constructor(
     private readonly registry: NamespaceRegistryService,
     private readonly tenancy: TenancyService,
-    @Inject(IDENTITY) private readonly identity: IdentityService | null,
+    @Inject(IDENTITY) private readonly identity: IdentityService,
   ) {}
 
   /**
-   * With sign-in, these routes run outside any workspace, so the access guard
-   * only checked tenant-wide capabilities.
+   * These routes run outside any workspace, so the access guard only checked
+   * tenant-wide capabilities.
    *
    * The guard already authenticated this request (registry routes pass through
    * it), so reuse its principal instead of verifying the token again:
    * `IdentityService.authenticate` returns the principal cached on the
    * request on repeat calls.
    */
-  private principal(request: FastifyRequest): Promise<Principal | null> {
-    if (!this.identity) return Promise.resolve(null);
+  private principal(request: FastifyRequest): Promise<Principal> {
     return this.identity.authenticate(request.raw);
   }
 
@@ -70,8 +69,7 @@ export class NamespacesController {
     ...needed: Capability[]
   ): Promise<void> {
     const principal = await this.principal(request);
-    if (!principal) return;
-    const capabilities = await this.identity!.capabilitiesIn(
+    const capabilities = await this.identity.capabilitiesIn(
       principal,
       namespaceId,
     );
@@ -82,11 +80,11 @@ export class NamespacesController {
     if (missing) throw new CapabilityRequiredException(missing);
   }
 
-  private async tenantId(request: FastifyRequest): Promise<string | undefined> {
-    return (await this.principal(request))?.tenant.id;
+  private async tenantId(request: FastifyRequest): Promise<string> {
+    return (await this.principal(request)).tenant.id;
   }
 
-  /** A workspace can only be filed under its tenant's categories (`local` without sign-in). */
+  /** A workspace can only be filed under its tenant's categories. */
   private async assertOwnCategories(
     request: FastifyRequest,
     categoryIds: string[] | undefined,
@@ -100,18 +98,14 @@ export class NamespacesController {
     if (foreign) throw new NotFoundException(`Unknown category '${foreign}'`);
   }
 
-  private async visibleIds(
-    request: FastifyRequest,
-  ): Promise<Set<string> | null> {
+  private async visibleIds(request: FastifyRequest): Promise<Set<string>> {
     const principal = await this.principal(request);
-    if (!principal) return null;
-    return new Set((await this.identity!.visibleWorkspaces(principal)).keys());
+    return new Set((await this.identity.visibleWorkspaces(principal)).keys());
   }
 
   @Get()
   @ApiOperation({
-    summary:
-      'List the namespaces the caller can see (all of them without sign-in)',
+    summary: 'List the namespaces the caller can see',
   })
   async list(
     @Req() request: FastifyRequest,
@@ -119,11 +113,10 @@ export class NamespacesController {
     const principal = await this.principal(request);
     const [namespaces, visible] = await Promise.all([
       this.registry.list(),
-      principal ? this.identity!.visibleWorkspaces(principal) : null,
+      this.identity.visibleWorkspaces(principal),
     ]);
-    if (!visible) return namespaces;
-    // With sign-in, what the caller may do in each, so the directory offers
-    // only the controls that will work (deleting, for instance).
+    // What the caller may do in each, so the directory offers only the
+    // controls that will work (deleting, for instance).
     return namespaces.flatMap((ns) => {
       const capabilities = visible.get(ns.id);
       return capabilities
@@ -137,7 +130,7 @@ export class NamespacesController {
   @ApiOperation({
     summary: 'Create a namespace (provisions its Postgres schema + migrations)',
     description:
-      'With sign-in, `ownerGroupId` is required: a group of your tenant that you belong to and may create workspaces for (GET /namespaces/owning-groups).',
+      '`ownerGroupId` is required: a group of your tenant that you belong to and may create workspaces for (GET /namespaces/owning-groups).',
   })
   async create(
     @Req() request: FastifyRequest,
@@ -145,15 +138,13 @@ export class NamespacesController {
   ): Promise<Namespace> {
     await this.assertOwnCategories(request, body.categoryIds);
     const principal = await this.principal(request);
-    if (!principal) return this.registry.create(body);
-
     if (!body.ownerGroupId) {
       throw new BadRequestException(
         'ownerGroupId is required: every workspace is owned by one group of your tenant.',
       );
     }
     if (
-      !(await this.identity!.canCreateWorkspace(principal, body.ownerGroupId))
+      !(await this.identity.canCreateWorkspace(principal, body.ownerGroupId))
     ) {
       throw new CapabilityRequiredException('tenant.workspace.create');
     }
@@ -176,15 +167,13 @@ export class NamespacesController {
 
   @Get('owning-groups')
   @ApiOperation({
-    summary:
-      'Groups the caller may create workspaces for (empty without sign-in)',
+    summary: 'Groups the caller may create workspaces for',
   })
   async owningGroups(
     @Req() request: FastifyRequest,
   ): Promise<{ id: string; name: string; path: string }[]> {
     const principal = await this.principal(request);
-    if (!principal) return [];
-    return (await this.identity!.owningGroups(principal)).map(
+    return (await this.identity.owningGroups(principal)).map(
       ({ id, name, path }) => ({ id, name, path }),
     );
   }
@@ -199,7 +188,7 @@ export class NamespacesController {
       this.registry.stats(),
       this.visibleIds(request),
     ]);
-    return visible ? stats.filter((row) => visible.has(row.id)) : stats;
+    return stats.filter((row) => visible.has(row.id));
   }
 
   // Category routes are declared BEFORE `:id` so `/namespaces/categories` is
@@ -294,9 +283,22 @@ export class NamespacesController {
       id,
       'workspace.settings',
       ...(body.paused !== undefined ? (['workspace.pause'] as const) : []),
+      ...(body.public !== undefined ? (['workspace.publish'] as const) : []),
     );
     await this.assertOwnCategories(request, body.categoryIds);
-    return this.registry.update(id, body);
+    return this.registry.updateWithPublishTransition(
+      id,
+      body,
+      async (published, updated) => {
+        const principal = await this.principal(request);
+        await this.tenancy.recordTenantEvent(
+          principal.tenant.id,
+          principal.actor.ref,
+          published ? 'workspace.published' : 'workspace.unpublished',
+          { namespaceId: id, slug: updated.slug },
+        );
+      },
+    );
   }
 
   @Requires('workspace.delete')
@@ -312,13 +314,11 @@ export class NamespacesController {
     await this.requireIn(request, id, 'workspace.delete');
     await this.registry.remove(id);
     const principal = await this.principal(request);
-    if (principal) {
-      await this.tenancy.recordTenantEvent(
-        principal.tenant.id,
-        principal.actor.ref,
-        'workspace.deleted',
-        { namespaceId: id },
-      );
-    }
+    await this.tenancy.recordTenantEvent(
+      principal.tenant.id,
+      principal.actor.ref,
+      'workspace.deleted',
+      { namespaceId: id },
+    );
   }
 }

@@ -63,7 +63,9 @@ import {
   type UploadedFileMetadata,
 } from "@/components/uploaded-files";
 import { deleteSourceFile, listSourceFiles, uploadSourceFile } from "@/lib/source-files-api";
-import { Eye, Play } from "lucide-react";
+import { Eye, Loader2, Play } from "lucide-react";
+import Link from "next/link";
+import { useMe } from "@/hooks/use-me";
 import { Button } from "@workspace/ui/components/button";
 import {
   PreviewAssetsDialog,
@@ -82,7 +84,46 @@ const normalizeDetectors = (detectors: DetectorConfigInput[]) =>
         : {}),
     }));
 
+/**
+ * Editing a source shows everything it is configured with — connection,
+ * sampling, detectors, a CUSTOM source's code — so the page is for people
+ * who can change sources (`source.manage`) only, like the API: anyone else,
+ * visitors of a public workspace included, sees neither the form nor what
+ * would be in it.
+ */
 export default function EditSourcePage() {
+  const { t } = useTranslation();
+  const me = useMe();
+  const sourceId = useRouteId();
+  if (!me) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center text-muted-foreground">
+        <Loader2 className="h-5 w-5 animate-spin" />
+      </div>
+    );
+  }
+  if (!(me.capabilities as string[]).includes("source.manage")) {
+    return (
+      <div
+        className="mx-auto max-w-lg rounded-md border border-dashed p-8 text-center"
+        data-testid="source-edit-no-access"
+      >
+        <p className="font-medium">{t("sources.editNoAccessTitle")}</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {t("sources.editNoAccessDescription")}
+        </p>
+        <Button asChild variant="outline" size="sm" className="mt-4">
+          <Link href={nsPath(`/sources/${sourceId}`)}>
+            {t("sources.editNoAccessBack")}
+          </Link>
+        </Button>
+      </div>
+    );
+  }
+  return <EditSourceForm />;
+}
+
+function EditSourceForm() {
   const router = useRouter();
   const { t } = useTranslation();
   const sourceId = useRouteId();

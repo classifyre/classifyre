@@ -23,19 +23,6 @@ export interface ServerConfig {
    * warns about.
    */
   logsPersisted: boolean;
-
-  /**
-   * True when the instance runs in read-only demo mode.
-   * Set by Helm from api.env.DEMO_MODE (shared with the API deployment).
-   * When true, all mutating operations should be blocked or hidden in the UI.
-   */
-  demoMode: boolean;
-
-  /**
-   * True when people sign in (Helm `iam.enabled`). The UI then shows the
-   * signed-in person instead of asking for a name, and offers sign-out.
-   */
-  iamEnabled: boolean;
 }
 
 /**
@@ -48,7 +35,5 @@ export function getServerConfig(): ServerConfig {
       !!process.env.RUNNER_LOG_DIR ||
       process.env.S3_CONFIGURED === "true" ||
       (process.env.S3_CONFIGURED !== "false" && !!process.env.S3_BUCKET),
-    demoMode: process.env.DEMO_MODE === "true",
-    iamEnabled: process.env.IAM_ENABLED === "true",
   };
 }

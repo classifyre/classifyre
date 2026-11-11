@@ -3,6 +3,7 @@ import { resolve } from 'path';
 // Safe to import statically: every DATABASE_URL read in this module happens
 // inside a function, so nothing is captured before the env is loaded below.
 import { applyAllPendingMigrations } from '../src/database-migrations';
+import { selectDatabaseForMode } from '../src/database-mode';
 
 /**
  * Jest globalSetup for the API integration suite: bring every schema the tests
@@ -46,5 +47,9 @@ export default async function globalSetup(): Promise<void> {
     );
   }
 
+  // Sign-in is always on: the suite works on the control database next to
+  // the configured one, with one tenant database (test/test-identity.ts).
+  process.env.CLASSIFYRE_TENANT_DATABASE_KEY ??= 'e2e-tenant-database-key';
+  selectDatabaseForMode();
   await applyAllPendingMigrations();
 }

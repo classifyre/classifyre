@@ -16,6 +16,7 @@
 import * as runtime from '../runtime';
 import type {
   CreateMcpTokenDto,
+  DisplaySettingsDto,
   InstanceSettingsResponseDto,
   McpOverviewResponseDto,
   McpTokenCreatedResponseDto,
@@ -27,6 +28,8 @@ import type {
 import {
     CreateMcpTokenDtoFromJSON,
     CreateMcpTokenDtoToJSON,
+    DisplaySettingsDtoFromJSON,
+    DisplaySettingsDtoToJSON,
     InstanceSettingsResponseDtoFromJSON,
     InstanceSettingsResponseDtoToJSON,
     McpOverviewResponseDtoFromJSON,
@@ -64,6 +67,37 @@ export interface McpSettingsControllerUpdateTokenRequest {
  * 
  */
 export class InstanceSettingsApi extends runtime.BaseAPI {
+
+    /**
+     * Language, time zone and time format: what every page needs to display dates, for anyone who can open the workspace. The rest of the settings need settings.view.
+     * How dates and language are shown
+     */
+    async instanceSettingsControllerGetDisplaySettingsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<DisplaySettingsDto>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/instance-settings/display`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => DisplaySettingsDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Language, time zone and time format: what every page needs to display dates, for anyone who can open the workspace. The rest of the settings need settings.view.
+     * How dates and language are shown
+     */
+    async instanceSettingsControllerGetDisplaySettings(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<DisplaySettingsDto> {
+        const response = await this.instanceSettingsControllerGetDisplaySettingsRaw(initOverrides);
+        return await response.value();
+    }
 
     /**
      * Retrieve global instance-level settings used across the entire application.

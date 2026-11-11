@@ -6,7 +6,6 @@ import {
   publicConnectionString,
 } from '../registry/namespace-registry.sql';
 import type { RoleKey } from './roles';
-import { LOCAL_TENANT_ID } from './tenancy.sql';
 import { dropTenantDatabase } from '../tenant-databases';
 
 export type TenantStatus = 'active' | 'suspended' | 'deleted';
@@ -55,9 +54,26 @@ export interface TenantSummary extends Tenant {
   upgradeError: string | null;
 }
 
-export type GrantScopeType = 'tenant' | 'group' | 'workspace';
+export type GrantScopeType =
+  | 'tenant'
+  | 'group'
+  | 'workspace'
+  | 'source'
+  | 'asset';
 
-/** Scope a grant applies to: the whole tenant, a group's workspaces, or one workspace. */
+/** The scopes a grant on one resource inside a workspace uses (data access). */
+export const RESOURCE_SCOPE_TYPES = ['source', 'asset'] as const;
+export type ResourceScopeType = (typeof RESOURCE_SCOPE_TYPES)[number];
+
+/** `<namespaceId>/<sourceId or assetId>`: the scope id of a resource grant. */
+export function resourceScopeId(namespaceId: string, resourceId: string) {
+  return `${namespaceId}/${resourceId}`;
+}
+
+/**
+ * Scope a grant applies to: the whole tenant, a group's workspaces, one
+ * workspace, or one source or table in a workspace (`<namespaceId>/<id>`).
+ */
 export interface GrantScope {
   scopeType: GrantScopeType;
   scopeId: string;
@@ -72,9 +88,17 @@ export interface Grant extends GrantScope {
   expiresAt: Date | null;
 }
 
+/**
+ * Whether a workspace is read-only for everyone of its tenant (and for
+ * visitors of the first tenant). `public` never opens a workspace to another
+ * tenant: every capability check still answers null across tenants first.
+ */
+export type WorkspaceVisibility = 'private' | 'public';
+
 export interface WorkspaceTenancy {
   tenantId: string;
   ownerGroupId: string | null;
+  visibility: WorkspaceVisibility;
 }
 
 const TENANT_TTL_MS = 60_000;
@@ -124,7 +148,7 @@ export class TenancyService implements OnModuleDestroy {
     return rows[0] ? toTenant(rows[0]) : null;
   }
 
-  /** Every tenant but `local`, with what the Platform page shows. */
+  /** Every tenant, with what the Platform page shows. */
   async tenantSummaries(): Promise<TenantSummary[]> {
     const { rows } = await this.pool.query<
       TenantRow & {
@@ -143,9 +167,7 @@ export class TenancyService implements OnModuleDestroy {
               (SELECT max(e.occurred_at) FROM iam_audit_events e
                 WHERE e.tenant_id = t.id) AS last_activity_at
          FROM iam_tenants t
-        WHERE t.id <> $1
         ORDER BY lower(t.name)`,
-      [LOCAL_TENANT_ID],
     );
     return rows.map((row) => ({
       ...toTenant(row),
@@ -247,11 +269,17 @@ export class TenancyService implements OnModuleDestroy {
     const { rows } = await this.pool.query<{
       tenant_id: string;
       owner_group_id: string | null;
-    }>(`SELECT tenant_id, owner_group_id FROM namespaces WHERE id = $1`, [
-      namespaceId,
-    ]);
+      is_public: boolean;
+    }>(
+      `SELECT tenant_id, owner_group_id, is_public FROM namespaces WHERE id = $1`,
+      [namespaceId],
+    );
     return rows[0]
-      ? { tenantId: rows[0].tenant_id, ownerGroupId: rows[0].owner_group_id }
+      ? {
+          tenantId: rows[0].tenant_id,
+          ownerGroupId: rows[0].owner_group_id,
+          visibility: rows[0].is_public ? 'public' : 'private',
+        }
       : null;
   }
 
@@ -394,25 +422,76 @@ export class TenancyService implements OnModuleDestroy {
     );
   }
 
-  async tenantEvents(tenantId: string, limit = 100) {
-    const { rows } = await this.pool.query<{
-      id: string;
-      occurred_at: Date;
-      actor: string | null;
-      action: string;
-      detail: Record<string, unknown>;
-    }>(
-      `SELECT id, occurred_at, actor, action, detail FROM iam_audit_events
-        WHERE tenant_id = $1 ORDER BY occurred_at DESC LIMIT $2`,
-      [tenantId, Math.min(Math.max(limit, 1), 500)],
-    );
-    return rows.map((row) => ({
-      id: row.id,
-      occurredAt: row.occurred_at,
-      actor: row.actor,
-      action: row.action,
-      detail: row.detail,
-    }));
+  async tenantEvents(
+    tenantId: string,
+    query: {
+      action?: string;
+      actor?: string;
+      search?: string;
+      skip?: number;
+      limit?: number;
+      sortBy?: 'OCCURRED_AT' | 'ACTOR' | 'ACTION';
+      sortOrder?: 'ASC' | 'DESC';
+    } = {},
+  ) {
+    const needle = query.search?.trim() ?? '';
+    const conditions: string[] = ['tenant_id = $1'];
+    const params: unknown[] = [tenantId];
+    const push = (sql: string, value: unknown) => {
+      params.push(value);
+      conditions.push(sql.replace('$?', `$${params.length}`));
+    };
+    if (query.action) push('action = $?', query.action);
+    if (query.actor) push('actor = $?', query.actor);
+    if (needle) {
+      // Literal text: `%`, `_` and a backslash typed into the search box
+      // match themselves, not any run of characters.
+      params.push(`%${needle.replace(/[\\%_]/g, (c) => `\\${c}`)}%`);
+      const like = `$${params.length}`;
+      conditions.push(
+        `(action ILIKE ${like} OR actor ILIKE ${like} OR detail::text ILIKE ${like})`,
+      );
+    }
+    const where = conditions.join(' AND ');
+    const sortDir = query.sortOrder === 'ASC' ? 'ASC' : 'DESC';
+    const sortCol =
+      query.sortBy === 'ACTOR'
+        ? 'actor'
+        : query.sortBy === 'ACTION'
+          ? 'action'
+          : 'occurred_at';
+    const skip = Math.max(query.skip ?? 0, 0);
+    const limit = Math.min(Math.max(query.limit ?? 100, 1), 500);
+    const [{ rows }, { rows: counted }] = await Promise.all([
+      this.pool.query<{
+        id: string;
+        occurred_at: Date;
+        actor: string | null;
+        action: string;
+        detail: Record<string, unknown>;
+      }>(
+        `SELECT id, occurred_at, actor, action, detail FROM iam_audit_events
+          WHERE ${where} ORDER BY ${sortCol} ${sortDir}, occurred_at DESC, id DESC
+          OFFSET $${params.length + 1} LIMIT $${params.length + 2}`,
+        [...params, skip, limit],
+      ),
+      this.pool.query<{ count: string }>(
+        `SELECT count(*)::text AS count FROM iam_audit_events WHERE ${where}`,
+        params,
+      ),
+    ]);
+    return {
+      items: rows.map((row) => ({
+        id: row.id,
+        occurredAt: row.occurred_at,
+        actor: row.actor,
+        action: row.action,
+        detail: row.detail,
+      })),
+      total: Number(counted[0]?.count ?? 0),
+      skip,
+      limit,
+    };
   }
 
   /**
@@ -519,14 +598,19 @@ export class TenancyService implements OnModuleDestroy {
       id: string;
       tenant_id: string;
       owner_group_id: string | null;
+      is_public: boolean;
     }>(
-      `SELECT id, tenant_id, owner_group_id FROM namespaces WHERE tenant_id = $1 AND status = 'active'`,
+      `SELECT id, tenant_id, owner_group_id, is_public FROM namespaces WHERE tenant_id = $1 AND status = 'active'`,
       [tenantId],
     );
     return new Map(
       rows.map((row) => [
         row.id,
-        { tenantId: row.tenant_id, ownerGroupId: row.owner_group_id },
+        {
+          tenantId: row.tenant_id,
+          ownerGroupId: row.owner_group_id,
+          visibility: row.is_public ? 'public' : 'private',
+        },
       ]),
     );
   }

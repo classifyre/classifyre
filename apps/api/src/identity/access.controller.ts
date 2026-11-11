@@ -4,7 +4,6 @@ import {
   Controller,
   Delete,
   Get,
-  HttpCode,
   Inject,
   Param,
   Post,
@@ -23,9 +22,12 @@ import { Requires } from './access.decorators';
 import {
   CreateGrantDto,
   GrantDto,
+  QueryTenantEventsDto,
   RoleDto,
   TenantDto,
-  TenantEventDto,
+  TenantEventsResponseDto,
+  TenantEventSortBy,
+  TenantEventSortOrder,
   TenantGroupDto,
   TenantMembershipDto,
 } from './access.dto';
@@ -36,13 +38,14 @@ import { ActorContextService } from './actor-context.service';
 import { isCapability } from './capabilities';
 import type { IdentityService, Principal } from './identity.service';
 import { IDENTITY } from './identity.tokens';
+import { resourceScopeId } from './tenancy.service';
 
-/** The signed-in principal; a 409 when sign-in is off (nothing to manage). */
+/** The signed-in principal. */
 function principalOf(
   access: AccessManagementService,
   request: FastifyRequest,
 ): Promise<Principal> {
-  return access.requireSignIn().authenticate(request.raw);
+  return access.identity.authenticate(request.raw);
 }
 
 /** Who has access to this workspace, and why (docs/prd §12.4). */
@@ -91,7 +94,8 @@ export class WorkspaceAccessController {
   @Post('grants')
   @Requires('access.manage')
   @ApiOperation({
-    summary: 'Give a group or a person a role on this workspace',
+    summary:
+      'Give a group a role on this workspace, or data access to one of its sources or tables',
     description:
       'You can only give a role whose capabilities you all hold here (no escalation).',
   })
@@ -101,14 +105,24 @@ export class WorkspaceAccessController {
     @Body() body: CreateGrantDto,
   ): Promise<GrantDto> {
     const principal = await this.principal(request);
+    const workspaceId = this.actors.workspaceId()!;
+    const onResource =
+      body.scopeType === 'source' || body.scopeType === 'asset';
+    if (onResource && !body.resourceId) {
+      throw new BadRequestException(
+        'A grant on one source or table needs resourceId.',
+      );
+    }
     return this.access.addGrant(
       principal,
       {
         subjectType: body.subjectType,
         subjectId: body.subjectId,
         roleKey: body.roleKey,
-        scopeType: 'workspace',
-        scopeId: this.actors.workspaceId()!,
+        scopeType: onResource ? body.scopeType! : 'workspace',
+        scopeId: onResource
+          ? resourceScopeId(workspaceId, body.resourceId!)
+          : workspaceId,
         expiresAt: body.expiresAt,
       },
       await this.policy.capabilities(principal.actor),
@@ -117,13 +131,13 @@ export class WorkspaceAccessController {
 
   @Delete('grants/:id')
   @Requires('access.manage')
-  @HttpCode(204)
   @ApiOperation({ summary: 'Remove a grant made on this workspace' })
+  @ApiOkResponse({ type: GrantDto, description: 'The grant that was removed.' })
   async removeGrant(
     @Req() request: FastifyRequest,
     @Param('id') id: string,
-  ): Promise<void> {
-    await this.access.removeGrant(
+  ): Promise<GrantDto> {
+    return this.access.removeGrant(
       await this.principal(request),
       id,
       this.actors.workspaceId(),
@@ -161,7 +175,7 @@ export class TenantAccessController {
   constructor(
     private readonly access: AccessManagementService,
     private readonly actors: ActorDirectoryService,
-    @Inject(IDENTITY) private readonly identity: IdentityService | null,
+    @Inject(IDENTITY) private readonly identity: IdentityService,
   ) {}
 
   private principal(request: FastifyRequest): Promise<Principal> {
@@ -178,13 +192,13 @@ export class TenantAccessController {
     const principal = await this.principal(request);
     const operator = principal.visitor
       ? false
-      : await this.identity!.isOperator(principal.sub);
+      : await this.identity.isOperator(principal.sub);
     return {
       id: principal.tenant.id,
       alias: principal.tenant.alias,
       name: principal.tenant.name,
       displayName: principal.actor.displayName,
-      capabilities: [...this.identity!.tenantCapabilities(principal)].sort(),
+      capabilities: [...this.identity.tenantCapabilities(principal)].sort(),
       operator,
       visitor: principal.visitor ?? false,
       organizationId: operator ? principal.orgId : null,
@@ -239,19 +253,19 @@ export class TenantAccessController {
         scopeId: body.scopeId,
         expiresAt: body.expiresAt,
       },
-      this.identity!.tenantCapabilities(principal),
+      this.identity.tenantCapabilities(principal),
     );
   }
 
   @Delete('grants/:id')
   @Requires('tenant.access.manage')
-  @HttpCode(204)
   @ApiOperation({ summary: 'Remove any grant of the tenant' })
+  @ApiOkResponse({ type: GrantDto, description: 'The grant that was removed.' })
   async removeGrant(
     @Req() request: FastifyRequest,
     @Param('id') id: string,
-  ): Promise<void> {
-    await this.access.removeGrant(await this.principal(request), id);
+  ): Promise<GrantDto> {
+    return this.access.removeGrant(await this.principal(request), id);
   }
 
   @Get('actors/resolve')
@@ -278,10 +292,43 @@ export class TenantAccessController {
   @ApiOperation({
     summary: 'Tenant-level changes: grants, workspaces created or deleted',
   })
-  @ApiOkResponse({ type: [TenantEventDto] })
-  async events(@Req() request: FastifyRequest): Promise<TenantEventDto[]> {
+  @ApiQuery({ name: 'action', required: false })
+  @ApiQuery({ name: 'actor', required: false })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'skip', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'sortBy', required: false, enum: TenantEventSortBy })
+  @ApiQuery({ name: 'sortOrder', required: false, enum: TenantEventSortOrder })
+  @ApiOkResponse({ type: TenantEventsResponseDto })
+  async events(
+    @Req() request: FastifyRequest,
+    @Query('action') action?: string,
+    @Query('actor') actor?: string,
+    @Query('search') search?: string,
+    @Query('skip') skip?: string,
+    @Query('limit') limit?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: string,
+  ): Promise<TenantEventsResponseDto> {
     const principal = await this.principal(request);
-    return this.access.tenantEvents(principal);
+    const dto: QueryTenantEventsDto = {
+      action,
+      actor,
+      search,
+      skip: skip ? Number(skip) : undefined,
+      limit: limit ? Number(limit) : undefined,
+      sortBy: (Object.values(TenantEventSortBy) as string[]).includes(
+        sortBy ?? '',
+      )
+        ? (sortBy as TenantEventSortBy)
+        : undefined,
+      sortOrder: (Object.values(TenantEventSortOrder) as string[]).includes(
+        sortOrder ?? '',
+      )
+        ? (sortOrder as TenantEventSortOrder)
+        : undefined,
+    };
+    return this.access.tenantEvents(principal, dto);
   }
 
   @Get('tenants')

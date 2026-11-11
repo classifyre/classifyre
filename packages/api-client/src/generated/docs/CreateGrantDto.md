@@ -10,6 +10,7 @@ Name | Type
 `subjectId` | string
 `roleKey` | string
 `scopeType` | string
+`resourceId` | string
 `scopeId` | string
 `expiresAt` | Date
 
@@ -24,6 +25,7 @@ const example = {
   "subjectId": null,
   "roleKey": viewer,
   "scopeType": null,
+  "resourceId": null,
   "scopeId": null,
   "expiresAt": null,
 } satisfies CreateGrantDto

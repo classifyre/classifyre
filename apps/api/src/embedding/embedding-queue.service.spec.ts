@@ -381,9 +381,11 @@ describe('EmbeddingQueueService', () => {
   it('reports the active space and a live worker from a process that registered none', async () => {
     const spaceId = '9c85727f-8b6f-4de0-aee6-08a96b57f79b';
     const registry = {
-      listRows: jest.fn().mockResolvedValue([
-        { queue: `semantic-embeddings-${spaceId}`, status: 'idle' },
-      ]),
+      listRows: jest
+        .fn()
+        .mockResolvedValue([
+          { queue: `semantic-embeddings-${spaceId}`, status: 'idle' },
+        ]),
     };
     const apiPod = new EmbeddingQueueService(
       prisma as never,
@@ -415,9 +417,11 @@ describe('EmbeddingQueueService', () => {
   it('reports no worker when its heartbeat has gone stale', async () => {
     const spaceId = '9c85727f-8b6f-4de0-aee6-08a96b57f79b';
     const registry = {
-      listRows: jest.fn().mockResolvedValue([
-        { queue: `semantic-embeddings-${spaceId}`, status: 'stale' },
-      ]),
+      listRows: jest
+        .fn()
+        .mockResolvedValue([
+          { queue: `semantic-embeddings-${spaceId}`, status: 'stale' },
+        ]),
     };
     const apiPod = new EmbeddingQueueService(
       prisma as never,

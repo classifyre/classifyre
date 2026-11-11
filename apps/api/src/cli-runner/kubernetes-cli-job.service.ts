@@ -18,7 +18,7 @@ import { MAX_ENV_VALUE_BYTES } from './sampling-cursor';
 
 type KubernetesModule = typeof import('@kubernetes/client-node');
 
-type CliJobMode = 'extract' | 'test' | 'evaluation' | 'notebook';
+type CliJobMode = 'extract' | 'test' | 'evaluation' | 'notebook' | 'query';
 type JobCleanupPolicy = 'none' | 'failed' | 'always';
 
 interface CliJobResult {
@@ -156,6 +156,49 @@ export class KubernetesCliJobService {
   /** Cancel a running notebook execution by deleting its Job. */
   async cancelNotebookJob(executionId: string): Promise<boolean> {
     const ref = this.runningJobsByRunnerId.get(executionId);
+    if (!ref) return false;
+    await this.deleteJobBestEffort(ref.namespace, ref.jobName);
+    return true;
+  }
+
+  /**
+   * Run one SQL query as a short-lived Job (docs/prd/DQ-data-query.md).
+   *
+   * The request carries the decrypted recipes of the sources the query may
+   * read, gzipped like an extract's recipe. Like a notebook the job gets
+   * neither CLASSIFYRE_INTERNAL_KEY nor HF_TOKEN: it posts its result with
+   * the run's own token and calls nothing else. It runs at the interactive
+   * priority, so a person waiting in the browser is not queued behind scans.
+   */
+  async runQueryJob(
+    runId: string,
+    request: Record<string, unknown>,
+    timeoutSeconds: number,
+    onJobCreated?: CliJobCreatedHandler,
+  ): Promise<CliJobResult> {
+    const encoded = gzipSync(
+      Buffer.from(JSON.stringify(request), 'utf8'),
+    ).toString('base64');
+    if (encoded.length > MAX_ENV_VALUE_BYTES) {
+      throw new Error(
+        `The query request is ${encoded.length} bytes compressed, over the ` +
+          `${MAX_ENV_VALUE_BYTES}-byte limit for one environment variable. ` +
+          'Query fewer sources at once.',
+      );
+    }
+    return this.runJob({
+      sourceId: runId,
+      mode: 'query',
+      queryRequestB64: encoded,
+      queryTimeoutSeconds: timeoutSeconds,
+      jobTrackingKey: runId,
+      onJobCreated,
+    });
+  }
+
+  /** Cancel a running query by deleting its Job. */
+  async cancelQueryJob(runId: string): Promise<boolean> {
+    const ref = this.runningJobsByRunnerId.get(runId);
     if (!ref) return false;
     await this.deleteJobBestEffort(ref.namespace, ref.jobName);
     return true;
@@ -308,6 +351,8 @@ export class KubernetesCliJobService {
     evaluationDetectorsB64?: string;
     notebookRequestB64?: string;
     notebookFilesB64?: string;
+    queryRequestB64?: string;
+    queryTimeoutSeconds?: number;
     jobTrackingKey?: string;
     onLogChunk?: CliJobLogHandler;
     onJobCreated?: CliJobCreatedHandler;
@@ -495,6 +540,8 @@ export class KubernetesCliJobService {
       evaluationDetectorsB64?: string;
       notebookRequestB64?: string;
       notebookFilesB64?: string;
+      queryRequestB64?: string;
+      queryTimeoutSeconds?: number;
     },
   ): Promise<V1Job> {
     const job = JSON.parse(JSON.stringify(template)) as V1Job;
@@ -642,6 +689,12 @@ export class KubernetesCliJobService {
         value: params.notebookRequestB64,
       });
     }
+    if (params.queryRequestB64) {
+      envMap.set('QUERY_REQUEST_GZ_B64', {
+        name: 'QUERY_REQUEST_GZ_B64',
+        value: params.queryRequestB64,
+      });
+    }
     if (params.notebookFilesB64) {
       envMap.set('NOTEBOOK_FILES_B64', {
         name: 'NOTEBOOK_FILES_B64',
@@ -669,7 +722,9 @@ export class KubernetesCliJobService {
     // API endpoint and downloads no model, so it is given neither the callback
     // key nor the Hugging Face token -- the code it runs was written by a user,
     // and a credential it has no use for is a credential worth withholding.
-    const isNotebook = params.mode === 'notebook';
+    // A query job is in the same position: it posts its result with the
+    // run's own token and needs no other credential.
+    const isNotebook = params.mode === 'notebook' || params.mode === 'query';
 
     // Proves to the API that the callbacks this job makes (asset ingest,
     // runner status, graph edges) come from a job the API itself launched.
@@ -712,7 +767,11 @@ export class KubernetesCliJobService {
     // given its own profile. Both get the small profile, request == limit so
     // the scheduler can place them next to an extract. Recipe `resources`
     // below can still raise it for one source.
-    if (params.mode === 'test' || params.mode === 'notebook') {
+    if (
+      params.mode === 'test' ||
+      params.mode === 'notebook' ||
+      params.mode === 'query'
+    ) {
       const memory =
         process.env.K8S_CLI_TEST_JOB_MEMORY ||
         process.env.K8S_CLI_QUICK_JOB_MEMORY ||
@@ -729,6 +788,62 @@ export class KubernetesCliJobService {
         requests: { memory, cpu: cpuRequest },
         limits: { memory, cpu },
       };
+    }
+
+    if (params.mode === 'query') {
+      // A query is someone waiting: its own deadline plus room to start, and
+      // the interactive priority class when the chart made one.
+      const deadline = Math.max(30, (params.queryTimeoutSeconds ?? 120) + 60);
+      jobAny.spec.activeDeadlineSeconds = deadline;
+      jobAny.spec.backoffLimit = 0;
+      const priority = process.env.K8S_CLI_QUERY_JOB_PRIORITY_CLASS;
+      if (priority) {
+        jobAny.spec.template.spec.priorityClassName = priority;
+      }
+      const memory = process.env.K8S_CLI_QUERY_JOB_MEMORY;
+      const cpu = process.env.K8S_CLI_QUERY_JOB_CPU;
+      container.resources = container.resources || {};
+      if (memory) {
+        container.resources.requests = {
+          ...(container.resources.requests || {}),
+          memory,
+        };
+        container.resources.limits = {
+          ...(container.resources.limits || {}),
+          memory,
+        };
+      }
+      if (cpu) {
+        container.resources.limits = {
+          ...(container.resources.limits || {}),
+          cpu,
+        };
+      }
+      // DuckDB sizes itself from the node, not the pod: told nothing it plans
+      // for the node's memory and cores and the pod is OOM-killed on a large
+      // sort or join. Give it the pod's budget, with headroom for Python and
+      // Arrow, so it spills to disk instead (docs/prd/DQ-data-query.md §5.3).
+      const limits = (container.resources.limits ?? {}) as Record<
+        string,
+        string
+      >;
+      const duckMemory = queryEngineMemory(limits.memory);
+      const duckThreads = queryEngineThreads(limits.cpu);
+      if (duckMemory) {
+        this.setEnvValue(envMap, 'CLASSIFYRE_QUERY_MEMORY_LIMIT', duckMemory);
+      }
+      if (duckThreads) {
+        this.setEnvValue(
+          envMap,
+          'CLASSIFYRE_QUERY_THREADS',
+          String(duckThreads),
+        );
+      }
+      const spill = process.env.K8S_CLI_QUERY_JOB_MAX_SPILL;
+      if (spill) {
+        this.setEnvValue(envMap, 'CLASSIFYRE_QUERY_MAX_SPILL', spill);
+      }
+      container.env = Array.from(envMap.values());
     }
 
     // Apply per-source resource overrides from recipe
@@ -858,6 +973,11 @@ export class KubernetesCliJobService {
         'printf "%s" "$NOTEBOOK_REQUEST_B64" | base64 -d > /tmp/notebook-request.json',
       );
       command = '"$PYTHON_BIN" -m src.main notebook /tmp/notebook-request.json';
+    } else if (mode === 'query') {
+      prelude.push(
+        'printf "%s" "$QUERY_REQUEST_GZ_B64" | base64 -d | gzip -dc > /tmp/query-request.json',
+      );
+      command = '"$PYTHON_BIN" -m src.main query /tmp/query-request.json';
     } else if (mode === 'test') {
       prelude.push(
         'printf "%s" "$RECIPE_GZ_B64" | base64 -d | gzip -dc > /tmp/recipe.json',
@@ -1582,4 +1702,38 @@ export class KubernetesCliJobService {
     this.batchApi = kubeConfig.makeApiClient(k8sModule.BatchV1Api);
     this.coreApi = kubeConfig.makeApiClient(k8sModule.CoreV1Api);
   }
+}
+
+const MEMORY_UNITS: Record<string, number> = {
+  '': 1,
+  k: 1e3,
+  M: 1e6,
+  G: 1e9,
+  T: 1e12,
+  Ki: 1024,
+  Mi: 1024 ** 2,
+  Gi: 1024 ** 3,
+  Ti: 1024 ** 4,
+};
+
+/** 70 % of a Kubernetes memory quantity, as DuckDB's `memory_limit` ("1433MB"). */
+export function queryEngineMemory(limit: string | undefined): string | null {
+  const match = /^(\d+(?:\.\d+)?)([a-zA-Z]*)$/.exec((limit ?? '').trim());
+  if (!match) return null;
+  const factor = MEMORY_UNITS[match[2]];
+  if (factor === undefined) return null;
+  const megabytes = Math.floor((Number(match[1]) * factor * 0.7) / 1e6);
+  return megabytes >= 64 ? `${megabytes}MB` : null;
+}
+
+/** Whole cores of a Kubernetes CPU quantity ("1500m" → 1, "2" → 2), at least 1. */
+export function queryEngineThreads(limit: string | undefined): number | null {
+  const value = (limit ?? '').trim();
+  if (!value) return null;
+  const cores = value.endsWith('m')
+    ? Number(value.slice(0, -1)) / 1000
+    : Number(value);
+  return Number.isFinite(cores) && cores > 0
+    ? Math.max(1, Math.floor(cores))
+    : null;
 }

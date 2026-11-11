@@ -18,7 +18,14 @@ import { transientDbErrorCode } from '../db/transient-db-error';
 import { InternalApiKeyService } from '../internal-api-key.service';
 import type { IdentityService } from '../identity/identity.service';
 import { CLS_ACTOR } from '../identity/actor-context.service';
-import { CLS_CAPABILITIES } from '../identity/iam-access-policy';
+import {
+  CLS_CAPABILITIES,
+  CLS_PERSON,
+  CLS_RESOURCE_GRANTS,
+  type ClsPerson,
+} from '../identity/iam-access-policy';
+import { RESOURCE_GRANTABLE_CAPABILITIES } from '../identity/access-policy';
+import { resourceGrantsInWorkspace } from '../identity/grant-evaluation';
 import {
   assertSameOrigin,
   authenticateOr,
@@ -78,7 +85,7 @@ export function registerNamespaceHook(
   cls: ClsService,
   prismaManager: PrismaClientManager,
   internalApiKey: InternalApiKeyService,
-  identity: IdentityService | null = null,
+  identity: IdentityService,
 ): void {
   const logger = new Logger('NamespaceHook');
 
@@ -142,7 +149,6 @@ export function registerNamespaceHook(
     }
 
     if (
-      identity &&
       !(await authorizeWorkspaceRequest(
         identity,
         cls,
@@ -190,7 +196,8 @@ export function registerNamespaceHook(
  * for the access guard. Scan callbacks (internal key) and MCP (its own
  * tokens) are not signed-in requests and pass through.
  */
-async function authorizeWorkspaceRequest(
+/** Exported for its spec: the 401/404 shape is the H7 contract. */
+export async function authorizeWorkspaceRequest(
   identity: IdentityService,
   cls: ClsService,
   request: {
@@ -205,6 +212,9 @@ async function authorizeWorkspaceRequest(
 ): Promise<boolean> {
   if (internalApiKey.isInternalRequest(request.headers)) return true;
   if (request.url.split('?')[0] === '/mcp') return true;
+  // A query job posting its result: it holds no key and no sign-in, only the
+  // run's own token, which the route checks (data-query/query-run-token.ts).
+  if (isQueryRunCallback(request)) return true;
 
   const principal = await authenticateOr(
     () => identity.authenticate(request.raw),
@@ -216,14 +226,16 @@ async function authorizeWorkspaceRequest(
   if (!principal) return false;
 
   try {
-    assertSameOrigin(
-      principal,
-      {
-        method: request.method,
-        headers: request.headers,
-      },
-      identity.config.appOrigin,
-    );
+    // A visitor brings no session for another site to ride on.
+    if (!principal.visitor)
+      assertSameOrigin(
+        principal,
+        {
+          method: request.method,
+          headers: request.headers,
+        },
+        identity.config.appOrigin,
+      );
   } catch {
     await reply.code(403).send({
       statusCode: 403,
@@ -235,7 +247,28 @@ async function authorizeWorkspaceRequest(
   }
 
   const capabilities = await identity.capabilitiesIn(principal, ns.namespaceId);
-  if (!capabilities?.has('workspace.view')) {
+  if (!capabilities) {
+    // Another tenant's workspace, or one with no tenancy row: H7 says it
+    // looks exactly like a workspace that does not exist. That holds for
+    // visitors too, so an unsigned probe of a foreign address gets a 404,
+    // not a 401 that would confirm the address belongs to someone.
+    await reply
+      .code(404)
+      .send({ error: 'Not Found', message: `Unknown namespace '${ns.slug}'` });
+    return false;
+  }
+  if (!capabilities.has('workspace.view') && principal.visitor) {
+    // Not public, but in the visitor's own (first) tenant: someone who has
+    // not signed in is asked to, rather than told it does not exist.
+    await reply.code(401).send({
+      statusCode: 401,
+      error: 'Unauthorized',
+      code: 'SIGN_IN_REQUIRED',
+      message: 'Sign in to continue.',
+    });
+    return false;
+  }
+  if (!capabilities.has('workspace.view')) {
     await reply
       .code(404)
       .send({ error: 'Not Found', message: `Unknown namespace '${ns.slug}'` });
@@ -243,7 +276,37 @@ async function authorizeWorkspaceRequest(
   }
   cls.set(CLS_ACTOR, principal.actor);
   cls.set(CLS_CAPABILITIES, capabilities);
+  if (principal.actor.id?.startsWith('user:')) {
+    cls.set<ClsPerson>(CLS_PERSON, {
+      actorRef: principal.actor.id,
+      groupIds: await identity.groupLineage(principal),
+    });
+  }
+  cls.set(
+    CLS_RESOURCE_GRANTS,
+    Object.fromEntries(
+      RESOURCE_GRANTABLE_CAPABILITIES.map((capability) => [
+        capability,
+        resourceGrantsInWorkspace(principal.grants, ns.namespaceId, capability),
+      ]),
+    ),
+  );
   return true;
+}
+
+const QUERY_RUN_CALLBACK_RE = /^\/query-runs\/[0-9a-f-]{36}\/result$/i;
+
+/** The one unauthenticated workspace route: a query job's result callback. */
+export function isQueryRunCallback(request: {
+  url: string;
+  method: string;
+  headers: Record<string, unknown>;
+}): boolean {
+  return (
+    request.method === 'POST' &&
+    QUERY_RUN_CALLBACK_RE.test(request.url.split('?')[0]) &&
+    typeof request.headers['x-query-run-token'] === 'string'
+  );
 }
 
 /**

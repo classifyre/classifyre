@@ -13,7 +13,7 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ActorRef } from '../identity/actor-ref.decorator';
-import { AllowInDemoMode } from '../demo-mode.decorator';
+import { ReadsOnly } from '../reads-only.decorator';
 import { ReadOnlyEndpoint } from '../db/read-only-endpoint.decorator';
 import { PrismaService } from '../prisma.service';
 import { CaseCleanupService } from '../cases/case-cleanup.service';
@@ -55,7 +55,7 @@ export class CaseCleanupController {
     private readonly escalation: CaseEscalationService,
   ) {}
 
-  @AllowInDemoMode()
+  @ReadsOnly()
   @ReadOnlyEndpoint()
   @Post('cleanup/preview')
   @HttpCode(HttpStatus.OK)
@@ -103,7 +103,7 @@ export class CaseCleanupController {
     return this.filters.options(id, inquiryId || null);
   }
 
-  @AllowInDemoMode()
+  @ReadsOnly()
   @ReadOnlyEndpoint()
   @Post('finding-filters/preview')
   @HttpCode(HttpStatus.OK)

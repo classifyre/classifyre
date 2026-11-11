@@ -78,6 +78,7 @@ export { ChatBotsApi } from "./generated/src/apis/ChatBotsApi";
 export { EmbeddingsApi } from "./generated/src/apis/EmbeddingsApi";
 export { GlossaryApi } from "./generated/src/apis/GlossaryApi";
 export { NotebooksApi } from "./generated/src/apis/NotebooksApi";
+export { DataQueryApi } from "./generated/src/apis/DataQueryApi";
 export { AIApi } from "./generated/src/apis/AIApi";
 export { WorkerQueuesApi } from "./generated/src/apis/WorkerQueuesApi";
 export { IdentityApi } from "./generated/src/apis/IdentityApi";
@@ -369,22 +370,33 @@ export type {
   ExploreViewDto,
   SaveExploreViewDto,
   AuditEventDto,
+  AuditEventsResponseDto,
   ResolvedActorDto,
   MeResponseDto,
   MeActorDto,
   GrantDto,
   CreateGrantDto,
+  QueryCatalogDto,
+  QueryCatalogSourceDto,
+  QueryCatalogTableDto,
+  QueryColumnDto,
+  QueryRunDto,
+  QueryRunErrorDto,
+  SavedQueryDto,
+  SaveSavedQueryDto,
+  DataQuerySettingsDto,
+  UpdateDataQuerySettingsDto,
   RoleDto,
   TenantDto,
   TenantMembershipDto,
   TenantEventDto,
+  TenantEventsResponseDto,
   TenantGroupDto,
+  NotificationAudienceDto,
+  UpdateNotificationAudienceDto,
   PlatformMeDto,
   PlatformTenantDto,
   TenantAdminDto,
-  LocalWorkspaceDto,
-  ImportWorkspacesDto,
-  ImportedWorkspacesDto,
   ExplorePositionDto,
   ExploreLinkStarterDto,
   ExploreAssetRefDto,
@@ -717,6 +729,44 @@ export const SearchSourcesSortOrderEnum = {
 } as const;
 export type SearchSourcesSortOrder =
   (typeof SearchSourcesSortOrderEnum)[keyof typeof SearchSourcesSortOrderEnum];
+
+export const AuditControllerListSortByEnum = {
+  OccurredAt: "OCCURRED_AT",
+  Actor: "ACTOR",
+  Operation: "OPERATION",
+  EntityType: "ENTITY_TYPE",
+  Capability: "CAPABILITY",
+} as const;
+export type AuditControllerListSortByEnum =
+  (typeof AuditControllerListSortByEnum)[keyof typeof AuditControllerListSortByEnum];
+
+export const AuditControllerListSortOrderEnum = {
+  Asc: "ASC",
+  Desc: "DESC",
+} as const;export type AuditControllerListSortOrderEnum =
+  (typeof AuditControllerListSortOrderEnum)[keyof typeof AuditControllerListSortOrderEnum];
+
+export const TenantAccessControllerEventsSortByEnum = {
+  OccurredAt: "OCCURRED_AT",
+  Actor: "ACTOR",
+  Action: "ACTION",
+} as const;
+export type TenantAccessControllerEventsSortByEnum =
+  (typeof TenantAccessControllerEventsSortByEnum)[keyof typeof TenantAccessControllerEventsSortByEnum];
+
+export const TenantAccessControllerEventsSortOrderEnum = {
+  Asc: "ASC",
+  Desc: "DESC",
+} as const;
+export type TenantAccessControllerEventsSortOrderEnum =
+  (typeof TenantAccessControllerEventsSortOrderEnum)[keyof typeof TenantAccessControllerEventsSortOrderEnum];
+
+export const AuditEventDtoChannelEnum = {
+  Rest: "rest",
+  Mcp: "mcp",
+} as const;
+export type AuditEventDtoChannelEnum =
+  (typeof AuditEventDtoChannelEnum)[keyof typeof AuditEventDtoChannelEnum];
 
 export type SearchAssetsPageInputDto = GeneratedSearchAssetsPageDto & {
   sortBy?: SearchAssetsSortBy;
@@ -1326,6 +1376,7 @@ export type RunTestsResponseDto = {
 // Import API classes for the client
 import { SourcesApi } from "./generated/src/apis/SourcesApi";
 import { NotebooksApi } from "./generated/src/apis/NotebooksApi";
+import { DataQueryApi } from "./generated/src/apis/DataQueryApi";
 import { AIApi } from "./generated/src/apis/AIApi";
 import { AssetsApi } from "./generated/src/apis/AssetsApi";
 import { HealthApi } from "./generated/src/apis/HealthApi";
@@ -1487,24 +1538,6 @@ function isReservedApiPath(pathAfterBase: string): boolean {
   );
 }
 
-let activeActorName: string | undefined;
-
-/**
- * The display name the current person typed in, sent as `X-Actor-Name` on
- * every generated API request so board ops and timeline rows are attributed.
- * Interim identity until the app has users (CASE_BOARD_PRD open question Q1):
- * attribution, not authorisation. Percent-encoded because header values must
- * be Latin-1 and names are not.
- */
-export function setActorName(name: string | null | undefined): void {
-  const trimmed = name?.trim();
-  activeActorName = trimmed ? trimmed.slice(0, 64) : undefined;
-}
-
-export function getActorName(): string | undefined {
-  return activeActorName;
-}
-
 // API configuration
 function createConfiguration(baseUrl?: string): Configuration {
   const basePath = baseUrl || getBaseUrl();
@@ -1526,19 +1559,6 @@ function createConfiguration(baseUrl?: string): Configuration {
             url: `${trimmedBase}/${slug}${normalized}`,
             init: context.init,
           };
-        },
-      },
-      {
-        pre: async (context) => {
-          if (!activeActorName) return;
-          const headers = {
-            ...((context.init.headers as Record<string, string> | undefined) ??
-              {}),
-          };
-          if (headers["X-Actor-Name"] === undefined) {
-            headers["X-Actor-Name"] = encodeURIComponent(activeActorName);
-          }
-          return { url: context.url, init: { ...context.init, headers } };
         },
       },
     ],
@@ -1599,6 +1619,11 @@ export interface Namespace {
   pausedAt: string | null;
   /** Operator note recorded at pause time; null when unset. */
   pausedReason: string | null;
+  /**
+   * Read-only for everyone of the tenant without a grant on it, and for
+   * people who have not signed in when it is in the first tenant.
+   */
+  public: boolean;
   settings: Record<string, unknown>;
   /** Ordered external links shown on the workspace card. */
   externalLinks: NamespaceExternalLink[];
@@ -1607,10 +1632,7 @@ export interface Namespace {
   createdAt: string;
   updatedAt: string;
   lastOpenedAt: string | null;
-  /**
-   * With sign-in, what the caller may do in this workspace (from the list);
-   * absent without sign-in, where everything is allowed.
-   */
+  /** What the caller may do in this workspace (from the list). */
   capabilities?: string[];
 }
 
@@ -1645,6 +1667,8 @@ export interface UpdateNamespaceInput {
    * pause state untouched.
    */
   paused?: boolean;
+  /** Make it public or private again; needs `workspace.publish`. */
+  public?: boolean;
   /**
    * Operator note stored alongside the pause. `null`/empty clears it.
    * Omit to leave it untouched.
@@ -1711,7 +1735,7 @@ class NamespacesApi {
     return this.absolutizeThumbnail((await res.json()) as Namespace);
   }
 
-  /** Groups you may create workspaces for; empty without sign-in. */
+  /** Groups you may create workspaces for. */
   async owningGroups(): Promise<OwningGroup[]> {
     const res = await resilientFetch(this.url("/owning-groups"));
     if (!res.ok) throw new Error(`Failed to load owning groups (${res.status})`);
@@ -1997,6 +2021,7 @@ class ApiClient {
 
   public sources: SourcesApi;
   public notebooks: NotebooksApi;
+  public dataQuery: DataQueryApi;
   public ai: AIApi;
   public assets: AssetsApi;
   public health: HealthApi;
@@ -2031,6 +2056,7 @@ class ApiClient {
 
     this.sources = new SourcesApi(this.config);
     this.notebooks = new NotebooksApi(this.config);
+    this.dataQuery = new DataQueryApi(this.config);
     this.ai = new AIApi(this.config);
     this.assets = new AssetsApi(this.config);
     this.health = new HealthApi(this.config);

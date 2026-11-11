@@ -35,20 +35,15 @@ export interface IamWebConfig {
   /** Where people open Classifyre; callbacks and logout return here. */
   appUrl: string;
   secureCookies: boolean;
-  /**
-   * People who have not signed in browse the public tenant instead of being
-   * sent to sign in (IAM_PUBLIC_TENANT; docs/prd/IAM step 8e).
-   */
-  publicTenant: boolean;
 }
 
+/** Sign-in is always on; throws when the identity server is not configured. */
 export function iamWebConfig(
   env: Record<string, string | undefined> = process.env,
-): IamWebConfig | null {
-  if (env.IAM_ENABLED !== "true") return null;
+): IamWebConfig {
   const need = (name: string) => {
     const value = env[name]?.trim();
-    if (!value) throw new Error(`IAM_ENABLED=true needs ${name}`);
+    if (!value) throw new Error(`Sign-in needs ${name} to be set`);
     return value.replace(/\/+$/, "");
   };
   const issuerUrl = need("IAM_ISSUER_URL");
@@ -62,7 +57,6 @@ export function iamWebConfig(
     clientSecret: need("IAM_WEB_CLIENT_SECRET"),
     appUrl,
     secureCookies: appUrl.startsWith("https://"),
-    publicTenant: Boolean(env.IAM_PUBLIC_TENANT?.trim()),
   };
 }
 

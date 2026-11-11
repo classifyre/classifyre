@@ -202,6 +202,11 @@ helm upgrade --install classifyre ./helm/classifyre \
 | api.cliJobs.podSecurityContext | object | `{"fsGroup":10001,"runAsGroup":10001,"runAsNonRoot":true,"runAsUser":10001,"seccompProfile":{"type":"RuntimeDefault"}}` | Pod security context for CLI job pods. |
 | api.cliJobs.pollIntervalMs | int | `2000` | Poll interval while waiting for job completion (milliseconds). |
 | api.cliJobs.priorityClassName | string | `"batch-low-priority"` | so a pending Job waits for room instead of displacing a service pod. |
+| api.cliJobs.query | object | `{"cpu":"1","maxSpill":"10GiB","memory":"2Gi","priorityClassName":"interactive"}` | SQL query jobs (docs/prd/DQ-data-query.md). Each query is one short-lived Job. |
+| api.cliJobs.query.cpu | string | `"1"` | CPU limit of one query Job; DuckDB uses as many threads as whole cores. |
+| api.cliJobs.query.maxSpill | string | `"10GiB"` | How much a query may spill to the pod's disk before it is stopped. |
+| api.cliJobs.query.memory | string | `"2Gi"` | and spills the rest of a large sort, join or aggregate to disk. |
+| api.cliJobs.query.priorityClassName | string | `"interactive"` | Priority class of query Jobs (`priorityClasses.interactiveName` by default). |
 | api.cliJobs.resources.limits | object | `{"cpu":"2","ephemeral-storage":"20Gi","memory":"4Gi"}` | CLI job resource limits. Memory must equal the request above. |
 | api.cliJobs.resources.requests | object | `{"cpu":"500m","ephemeral-storage":"6Gi","memory":"4Gi"}` | CLI job resource requests. |
 | api.cliJobs.serviceAccountName | string | `""` | Service account for CLI jobs. Empty uses API service account. |
@@ -259,7 +264,6 @@ helm upgrade --install classifyre ./helm/classifyre \
 | api.embedding.revision | string | `"751bff37182d3f1213fa05d7196b954e230abad9"` | Immutable model revision. Change it to create a new embedding space. |
 | api.embedding.workerConcurrency | int | `1` | Maximum embedding batches processed concurrently across all API replicas. |
 | api.env.CLI_JOB_REAP_CRON | string | `"*/5 * * * *"` | MAX_CONCURRENT_RUNNERS because that cap counts runner rows, not pods. |
-| api.env.DEMO_MODE | string | `"false"` | Enable read-only demo mode. When "true" all mutating API operations return 403. |
 | api.env.ENVIRONMENT | string | `"kubernetes"` | Execution mode used by API. |
 | api.env.MAX_CONCURRENT_RUNNERS | string | `"3"` | ceiling is this number times the number of workspaces running scans. |
 | api.env.MAX_RUNNERS_PER_SOURCE | string | `"5"` | exceeds this value. Set to "0" to disable cleanup. |
@@ -426,7 +430,7 @@ helm upgrade --install classifyre ./helm/classifyre \
 | iam.bootstrap.admin.email | string | `""` | Email of the first tenant admin. |
 | iam.bootstrap.admin.operator | bool | `true` | Also make the first tenant admin an operator (realm role `classifyre-operator`), who manages every tenant on the Platform page (`/platform`). Given once, when the account is created. |
 | iam.bootstrap.admin.username | string | `"admin"` | Username of the first tenant admin. Its temporary password is in the `<release>-iam` Secret, key `bootstrap-admin-password`, and must be changed at first sign-in. |
-| iam.bootstrap.tenant.alias | string | `"default"` | Alias of the first tenant (organization), created on install. |
+| iam.bootstrap.tenant.alias | string | `"default"` | Alias of the first tenant (organization), created on install. People who have not signed in read its public workspaces (a workspace setting), read-only. |
 | iam.bootstrap.tenant.name | string | `"Default"` | Display name of the first tenant. |
 | iam.configJob | object | `{"resources":{"limits":{"memory":"512Mi"},"requests":{"cpu":"100m","memory":"256Mi"}}}` | Resources of the realm setup job. |
 | iam.controlDatabase | string | `"classifyre_control"` | Database the API works on with sign-in: tenants, grants and the list of workspaces. Each tenant's workspace data is in a database of its own (`classifyre_t_<tenant id>`, own login role), made on its first workspace. The database user needs `CREATEDB` and `CREATEROLE`, and new databases need the `vector` extension (superuser, or installed in `template1`). Without sign-in the API uses `postgres.*.database`, the open database, which never holds a tenant. |
@@ -448,9 +452,6 @@ helm upgrade --install classifyre ./helm/classifyre \
 | iam.image.tag | string | `"26.8.1"` | Identity server image tag. Keep it a quoted string so Dependabot can bump it. |
 | iam.nodeSelector | object | `{}` | Node selector. |
 | iam.path | string | `"/iam"` | Path the identity server is served under: the web app proxies it there, the same way it proxies `/api`. Always on the web app's own host — there is no separate public URL to configure. |
-| iam.public.enabled | bool | `false` | Let people who have not signed in browse one tenant's workspaces, read-only, with **Sign in** at the top. They hold the Visitor role there: no access lists, no tenant activity, no MCP tokens. Signed-in people see only their own tenant, never the public one unless they belong to it. Off: everyone must sign in. Allows `frontend.sitemap.enabled`, which then lists only the public tenant. |
-| iam.public.name | string | `"Public"` | Display name of the public tenant when the setup job creates it. |
-| iam.public.tenant | string | `"public"` | Alias of the public tenant. The setup job creates its organization with an empty top-level `admins` group when it does not exist; add its editors there in the identity server. Can be the first tenant's alias (`iam.bootstrap.tenant.alias`), so the first admin edits what visitors see. |
 | iam.realm | string | `"classifyre"` | Realm that holds users, tenants (organizations) and groups. |
 | iam.realmConsole | bool | `true` | Forward the identity console of the `classifyre` realm through the web app, at `<appUrl>/iam/admin/<realm>/console/`, and give operators (realm role `classifyre-operator`) the rights running tenants takes there: people, organizations and their groups, identity providers. Realm settings, clients, sign-in flows, user federation and impersonation stay with the identity server's own admin. Classifyre links to it from the Platform and Tenant access pages. The master realm stays closed unless `exposeAdminConsole` is on. Off: the console is reached with a port-forward only. |
 | iam.replicas | int | `1` | Replicas. More than one forms a cluster over the headless service; minor upgrades still stop all of them. |
@@ -534,6 +535,8 @@ helm upgrade --install classifyre ./helm/classifyre \
 | priorityClasses.batchName | string | `"batch-low-priority"` | Priority class name for batch workloads. |
 | priorityClasses.batchValue | int | `1000` | Numeric priority value for batch workloads. |
 | priorityClasses.create | bool | `true` |  |
+| priorityClasses.interactiveName | string | `"interactive"` | evicts a running scan to get its place. |
+| priorityClasses.interactiveValue | int | `5000` | Numeric priority value for interactive CLI Jobs. |
 | priorityClasses.serviceName | string | `"service-standard"` | Priority class name for service workloads. |
 | priorityClasses.serviceValue | int | `10000` | Numeric priority value for service workloads. |
 | rbac.create | bool | `true` | Create Role/RoleBinding for API CLI job orchestration. |

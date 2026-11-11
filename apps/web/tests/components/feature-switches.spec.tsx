@@ -1,5 +1,6 @@
 import * as React from "react";
 import { expect, test } from "@playwright/experimental-ct-react";
+import { signedInAs } from "./fixtures/signed-in";
 import { FeatureSwitchesHarness } from "./fixtures/feature-switches-harness";
 
 type CtPage = Parameters<Parameters<typeof test>[2]>[0]["page"];
@@ -12,7 +13,6 @@ const settings = {
   timeFormat: "TWELVE_HOUR",
   aiProviderConfigId: null,
   harnessAiProviderConfigId: null,
-  demoMode: false,
   createdAt: "2026-03-10T00:00:00.000Z",
   updatedAt: "2026-03-10T00:00:00.000Z",
 };
@@ -116,6 +116,10 @@ async function mockFeaturesApi(
   );
   return { puts };
 }
+
+test.beforeEach(async ({ page }) => {
+  await signedInAs(page, ["workspace.view", "workspace.settings"]);
+});
 
 test("lists both switches with their state and what they cost", async ({
   mount,

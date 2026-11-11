@@ -7,7 +7,6 @@
 Name | Type
 ------------ | -------------
 `findingIds` | Array&lt;string&gt;
-`addedBy` | string
 
 ## Example
 
@@ -17,7 +16,6 @@ import type { AttachFindingsDto } from '@workspace/api-client'
 // TODO: Update the object below with actual values
 const example = {
   "findingIds": null,
-  "addedBy": null,
 } satisfies AttachFindingsDto
 
 console.log(example)

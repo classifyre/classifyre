@@ -45,7 +45,7 @@ export interface NamespacesControllerUpdateCategoryRequest {
 export class NamespacesApi extends runtime.BaseAPI {
 
     /**
-     * With sign-in, `ownerGroupId` is required: a group of your tenant that you belong to and may create workspaces for (GET /namespaces/owning-groups).
+     * `ownerGroupId` is required: a group of your tenant that you belong to and may create workspaces for (GET /namespaces/owning-groups).
      * Create a namespace (provisions its Postgres schema + migrations)
      */
     async namespacesControllerCreateRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
@@ -67,7 +67,7 @@ export class NamespacesApi extends runtime.BaseAPI {
     }
 
     /**
-     * With sign-in, `ownerGroupId` is required: a group of your tenant that you belong to and may create workspaces for (GET /namespaces/owning-groups).
+     * `ownerGroupId` is required: a group of your tenant that you belong to and may create workspaces for (GET /namespaces/owning-groups).
      * Create a namespace (provisions its Postgres schema + migrations)
      */
     async namespacesControllerCreate(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
@@ -139,7 +139,7 @@ export class NamespacesApi extends runtime.BaseAPI {
     }
 
     /**
-     * List the namespaces the caller can see (all of them without sign-in)
+     * List the namespaces the caller can see
      */
     async namespacesControllerListRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
         const queryParameters: any = {};
@@ -160,7 +160,7 @@ export class NamespacesApi extends runtime.BaseAPI {
     }
 
     /**
-     * List the namespaces the caller can see (all of them without sign-in)
+     * List the namespaces the caller can see
      */
     async namespacesControllerList(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.namespacesControllerListRaw(initOverrides);
@@ -195,7 +195,7 @@ export class NamespacesApi extends runtime.BaseAPI {
     }
 
     /**
-     * Groups the caller may create workspaces for (empty without sign-in)
+     * Groups the caller may create workspaces for
      */
     async namespacesControllerOwningGroupsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
         const queryParameters: any = {};
@@ -216,7 +216,7 @@ export class NamespacesApi extends runtime.BaseAPI {
     }
 
     /**
-     * Groups the caller may create workspaces for (empty without sign-in)
+     * Groups the caller may create workspaces for
      */
     async namespacesControllerOwningGroups(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.namespacesControllerOwningGroupsRaw(initOverrides);

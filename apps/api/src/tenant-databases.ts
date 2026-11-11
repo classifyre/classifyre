@@ -2,7 +2,6 @@ import { createHmac } from 'node:crypto';
 import { Client, type Pool } from 'pg';
 import { assertDatabaseKind, databaseKindDdl } from './database-kind';
 import { withDatabase } from './database-mode';
-import { iamEnabled } from './identity/iam-config';
 import { publicConnectionString } from './registry/namespace-registry.sql';
 
 /**
@@ -39,6 +38,26 @@ export function tenantDatabasePassword(
     .digest('base64url');
 }
 
+/**
+ * What a pooler that serves many projects needs after a role's name to know
+ * which project it is for: Supavisor (Supabase's pooler) routes a login by a
+ * `<role>.<project>` username, and refuses a bare role ("no tenant
+ * identifier provided"). Taken from the configured user (`postgres.<project>`)
+ * on Supabase's pooler hosts, or set with `CLASSIFYRE_DATABASE_USER_SUFFIX`
+ * for another such pooler. Empty for a plain Postgres or PgBouncer.
+ */
+export function databaseUserSuffix(
+  configured: URL,
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  const explicit = env.CLASSIFYRE_DATABASE_USER_SUFFIX?.trim();
+  if (explicit) return explicit.startsWith('.') ? explicit : `.${explicit}`;
+  if (!/\.pooler\.supabase\.com$/i.test(configured.hostname)) return '';
+  const user = decodeURIComponent(configured.username);
+  const dot = user.indexOf('.');
+  return dot > 0 ? user.slice(dot) : '';
+}
+
 /** The tenant's database, logged in as the tenant's role. */
 export function tenantDatabaseUrl(
   tenantId: string,
@@ -46,7 +65,7 @@ export function tenantDatabaseUrl(
 ): string {
   const name = tenantDatabaseName(tenantId);
   const url = new URL(withDatabase(publicConnectionString(), name));
-  url.username = name;
+  url.username = `${name}${databaseUserSuffix(url, env)}`;
   url.password = tenantDatabasePassword(name, env);
   return url.toString();
 }
@@ -69,12 +88,10 @@ export function rememberWorkspace(schemaName: string, tenantId: string): void {
 }
 
 /**
- * Connection string for a workspace schema: the open database without
- * sign-in, its tenant's database with it. Never falls back to the control
+ * Connection string for a workspace schema: its tenant's database. Never falls back to the control
  * database: a workspace whose tenant is unknown here is an error.
  */
 export function workspaceDatabaseUrl(schemaName: string): string {
-  if (!iamEnabled()) return publicConnectionString();
   const tenantId = workspaceTenants.get(schemaName);
   if (!tenantId) {
     throw new Error(
@@ -112,6 +129,17 @@ export async function provisionTenantDatabase(
       ? `ALTER ROLE "${name}" WITH LOGIN PASSWORD ${literal}`
       : `CREATE ROLE "${name}" WITH LOGIN PASSWORD ${literal}`,
   );
+  // Since PostgreSQL 16 a user that is not a superuser — every managed
+  // Postgres, and the CI database — can only make a database owned by a role
+  // it can SET ROLE to ("must be able to SET ROLE"). It created the role, so
+  // it may grant the role to itself. A superuser needs no grant, and one that
+  // cannot be given (a role made by someone else) leaves CREATE DATABASE to
+  // report the real problem.
+  try {
+    await control.query(`GRANT "${name}" TO CURRENT_USER`);
+  } catch {
+    /* see above */
+  }
   const database = await control.query(
     'SELECT 1 FROM pg_database WHERE datname = $1',
     [name],

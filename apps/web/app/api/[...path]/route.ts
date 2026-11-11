@@ -23,11 +23,11 @@ const HOP_BY_HOP_HEADERS = new Set([
 /**
  * Headers a browser must never be able to set on the upstream API.
  *
- * This proxy is the public entrance to an API that has no user authentication,
- * and it otherwise forwards request headers verbatim. The internal key marks a
- * caller as one of the CLI jobs the API launched, which exempts it from the
- * demo-mode read-only guard and unlocks the ingest endpoints — so stripping it
- * here means a visitor cannot forge that claim even if the secret leaks.
+ * This proxy is the public entrance to the API and otherwise forwards request
+ * headers verbatim (the session cookie included: the API reads it). The
+ * internal key marks a caller as one of the CLI jobs the API launched, which
+ * unlocks the ingest endpoints — so stripping it here means a visitor cannot
+ * forge that claim even if the secret leaks.
  */
 const STRIPPED_REQUEST_HEADERS = ["x-classifyre-internal-key"];
 
@@ -83,9 +83,11 @@ function createTargetUrl(
   request: NextRequest,
   path: string[],
 ) {
-  // A deployed frontend (`SHOWCASE_MODE`) answers `/api/<path>` with a 308 to
-  // `/api/<path>/` (trailingSlash), and `redirect: "manual"` would hand that
-  // redirect to the browser, so ask for the final URL straight away.
+  // Local showcase work (`SHOWCASE_MODE=1`, `bun run dev:showcase`) proxies a
+  // deployed frontend whose `trailingSlash` answers `/api/<path>` with a 308
+  // to `/api/<path>/`, and `redirect: "manual"` would hand that redirect to
+  // the browser, so ask for the final URL straight away. Unrelated to the
+  // removed demo mode: no bypass, only the trailing slash.
   const suffix = process.env.SHOWCASE_MODE === "1" ? "/" : "";
   const targetUrl = new URL(`${baseUrl}/${path.join("/")}${suffix}`);
   request.nextUrl.searchParams.forEach((value, key) => {
@@ -103,12 +105,6 @@ async function proxy(request: NextRequest, context: RouteContext) {
   }
   for (const header of STRIPPED_REQUEST_HEADERS) {
     headers.delete(header);
-  }
-  // Local frontend pointed at a demo-mode deployment (`bun dev:showcase`):
-  // the key lets writes through. Only in that mode, so the secret never goes
-  // to a local or unrelated upstream.
-  if (process.env.SHOWCASE_MODE === "1" && process.env.DEMO_BYPASS_KEY) {
-    headers.set("x-bypass-demo", process.env.DEMO_BYPASS_KEY);
   }
   headers.set("x-forwarded-host", request.headers.get("host") ?? "");
   headers.set("x-forwarded-proto", request.nextUrl.protocol.replace(":", ""));

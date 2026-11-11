@@ -33,7 +33,6 @@ function baseSettings(
     timeFormat: "TWELVE_HOUR",
     aiProviderConfigId,
     harnessAiProviderConfigId,
-    demoMode: false,
     createdAt: "2026-03-10T00:00:00.000Z",
     updatedAt: "2026-03-10T00:00:00.000Z",
   };

@@ -1,4 +1,3 @@
-{{- if .Values.iam.enabled }}
 {{- /* Classifyre's theme for the identity server's sign-in pages, console and
      account page (files/iam/theme). Plain files mounted into the stock
      Keycloak image at /opt/keycloak/themes/classifyre; Keycloak loads folder
@@ -26,4 +25,3 @@ binaryData:
   {{- end }}
   {{ include "classifyre.iam.themeKey" $path }}: {{ $content | b64enc }}
   {{- end }}
-{{- end }}

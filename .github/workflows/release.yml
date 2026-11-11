@@ -378,6 +378,7 @@ jobs:
             --build-arg "BASE_TAG=${VERSION}" \
             --build-arg "IMAGE_NS=${DOCKER_NAMESPACE}" \
             --build-context "models=${RUNNER_TEMP}/release-artifacts/models" \
+            --build-context "iam=${GITHUB_WORKSPACE}/helm/classifyre/files/iam" \
             --cache-from "type=registry,ref=${DOCKER_NAMESPACE}/all-in-one:build-cache" \
             --cache-to "type=registry,ref=${DOCKER_NAMESPACE}/all-in-one:build-cache,mode=max,image-manifest=true"
 

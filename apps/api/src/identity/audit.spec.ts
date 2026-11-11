@@ -10,7 +10,7 @@ import { Reflector } from '@nestjs/core';
 import { lastValueFrom, of } from 'rxjs';
 import { InternalOnly } from '../internal-only.decorator';
 import { AccessArea, Requires } from './access.decorators';
-import { parseActorName, type Actor } from './actor';
+import type { Actor } from './actor';
 import { parseActorRef } from './actor-ref';
 import { AuditInterceptor, routeEntity } from './audit.interceptor';
 import type { AuditEventInput, AuditTrailService } from './audit-trail.service';
@@ -33,12 +33,6 @@ describe('actor references', () => {
     ['note: urgent', { kind: 'name', id: 'note: urgent' }],
   ])('parses %s', (ref, expected) => {
     expect(parseActorRef(ref)).toEqual(expected);
-  });
-
-  it('refuses a self-declared name that would pass as a typed reference', () => {
-    expect(parseActorName('agent:autopilot')).toBeUndefined();
-    expect(parseActorName('system:scheduler')).toBeUndefined();
-    expect(parseActorName('Ops: night shift')).toBe('Ops: night shift');
   });
 });
 
@@ -66,6 +60,97 @@ describe('routeEntity', () => {
       entityType: 'findings/bulk-update',
       entityId: null,
     });
+  });
+
+  it('files access grants under the workspace, not access/grants', () => {
+    expect(
+      routeEntity('/access/grants', {}, { id: 'g-1', scopeId: 'ws-1' }, 'ws-1'),
+    ).toEqual({ entityType: 'workspaces', entityId: 'g-1' });
+    expect(
+      routeEntity('/access/grants/:id', { id: 'g-1' }, {}, 'ws-1'),
+    ).toEqual({ entityType: 'workspaces', entityId: 'g-1' });
+  });
+
+  it('names a grant change "<group> on <scope>" when the response says so', () => {
+    expect(
+      routeEntity(
+        '/access/grants',
+        {},
+        {
+          id: 'g-1',
+          subjectLabel: '/finance',
+          scopeLabel: 'shop_lake.shop.orders',
+        },
+        'ws-1',
+      ),
+    ).toEqual({
+      entityType: 'workspaces',
+      entityId: 'g-1',
+      entityName: '/finance on shop_lake.shop.orders',
+    });
+  });
+
+  it('tags data grants with what they open, given or removed', () => {
+    const tableGrant = {
+      id: 'g-2',
+      roleKey: 'data-reader',
+      scopeType: 'asset',
+      scopeId: 'ws-1/a-orders',
+      sourceId: 's-shop',
+      subjectLabel: '/finance',
+      scopeLabel: 'orders',
+    };
+    // Given: the table, its source (for the source's Activity) and `data`.
+    expect(routeEntity('/access/grants', {}, tableGrant, 'ws-1')).toMatchObject(
+      {
+        entityId: 'g-2',
+        resources: ['data', 'asset:a-orders', 'source:s-shop'],
+      },
+    );
+    // Removed: the response is the removed grant, so it is tagged alike.
+    expect(
+      routeEntity(
+        '/access/grants/:id',
+        { id: 'g-3' },
+        {
+          id: 'g-3',
+          roleKey: 'data-reader',
+          scopeType: 'source',
+          scopeId: 'ws-1/s-shop',
+          subjectLabel: '/finance',
+          scopeLabel: 'Shop',
+        },
+        'ws-1',
+      ),
+    ).toMatchObject({
+      entityName: '/finance on Shop',
+      resources: ['data', 'source:s-shop'],
+    });
+    // Not data access: no tags, nothing for a Data tab to show.
+    expect(
+      routeEntity(
+        '/access/grants',
+        {},
+        {
+          id: 'g-4',
+          roleKey: 'viewer',
+          scopeType: 'workspace',
+          scopeId: 'ws-1',
+        },
+        'ws-1',
+      ),
+    ).not.toHaveProperty('resources');
+  });
+
+  it('files notification audience changes under the workspace', () => {
+    expect(
+      routeEntity(
+        '/notifications/audiences/:type',
+        { type: 'SCAN' },
+        {},
+        'ws-1',
+      ),
+    ).toEqual({ entityType: 'workspaces', entityId: 'SCAN' });
   });
 });
 
@@ -108,6 +193,7 @@ describe('AuditInterceptor', () => {
   const recorded: AuditEventInput[] = [];
   const audit = {
     inWorkspace: () => true,
+    workspaceId: () => 'ws-1',
     record: (event: AuditEventInput) => {
       recorded.push(event);
       return Promise.resolve();
@@ -115,11 +201,11 @@ describe('AuditInterceptor', () => {
   } as unknown as AuditTrailService;
   const interceptor = new AuditInterceptor(new Reflector(), audit);
   const actor: Actor = {
-    id: null,
+    id: 'user:u1',
     displayName: 'Jordan Reyes',
     kind: 'person',
-    via: 'header',
-    ref: 'Jordan Reyes',
+    via: 'oidc',
+    ref: 'user:u1',
   };
 
   async function call(

@@ -1,4 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import { CAPABILITY_IDS } from './capabilities';
 import type { GrantScopeType } from './tenancy.service';
 
@@ -49,11 +51,18 @@ export class CreateGrantDto {
   roleKey: string;
 
   @ApiPropertyOptional({
-    enum: ['tenant', 'group', 'workspace'],
+    enum: ['tenant', 'group', 'workspace', 'source', 'asset'],
     description:
-      'Tenant-level grants only: where the role applies. Workspace grants are always on that workspace.',
+      'Tenant-level grants: where the role applies. Workspace grants are on that workspace, ' +
+      'or with `source` / `asset` and `resourceId` on one source or table of it (data-reader only).',
   })
   scopeType?: GrantScopeType;
+
+  @ApiPropertyOptional({
+    description:
+      'Workspace grants with scopeType `source` or `asset`: the source or asset id.',
+  })
+  resourceId?: string;
 
   @ApiPropertyOptional({
     description:
@@ -86,7 +95,7 @@ export class GrantDto {
   @ApiProperty({ example: 'viewer' })
   roleKey: string;
 
-  @ApiProperty({ enum: ['tenant', 'group', 'workspace'] })
+  @ApiProperty({ enum: ['tenant', 'group', 'workspace', 'source', 'asset'] })
   scopeType: string;
 
   @ApiProperty()
@@ -103,6 +112,11 @@ export class GrantDto {
       'True when the grant comes from the tenant or an owning group rather than this workspace.',
   })
   inherited?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'For a grant on one table: the source the table belongs to.',
+  })
+  sourceId?: string;
 }
 
 export class TenantDto {
@@ -182,4 +196,84 @@ export class TenantEventDto {
 
   @ApiProperty({ type: Object })
   detail: Record<string, unknown>;
+}
+
+export enum TenantEventSortBy {
+  OCCURRED_AT = 'OCCURRED_AT',
+  ACTOR = 'ACTOR',
+  ACTION = 'ACTION',
+}
+
+export enum TenantEventSortOrder {
+  ASC = 'ASC',
+  DESC = 'DESC',
+}
+
+/** Tenant-level activity paging: filters and offset pages like the workspace trail. */
+export class QueryTenantEventsDto {
+  @ApiPropertyOptional({ example: 'grant.added' })
+  @IsOptional()
+  @IsString()
+  action?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Actor reference; resolve display names with GET /tenant/actors/resolve.',
+  })
+  @IsOptional()
+  @IsString()
+  actor?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Free text over the action and its detail (group path, address, workspace slug).',
+  })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @ApiPropertyOptional({ default: 0 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  skip?: number = 0;
+
+  @ApiPropertyOptional({ default: 100 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(500)
+  limit?: number = 100;
+
+  @ApiPropertyOptional({
+    enum: TenantEventSortBy,
+    default: TenantEventSortBy.OCCURRED_AT,
+  })
+  @IsOptional()
+  @IsIn(Object.values(TenantEventSortBy))
+  sortBy?: TenantEventSortBy = TenantEventSortBy.OCCURRED_AT;
+
+  @ApiPropertyOptional({
+    enum: TenantEventSortOrder,
+    default: TenantEventSortOrder.DESC,
+  })
+  @IsOptional()
+  @IsIn(Object.values(TenantEventSortOrder))
+  sortOrder?: TenantEventSortOrder = TenantEventSortOrder.DESC;
+}
+
+export class TenantEventsResponseDto {
+  @ApiProperty({ type: [TenantEventDto] })
+  items: TenantEventDto[];
+
+  @ApiProperty()
+  total: number;
+
+  @ApiProperty()
+  skip: number;
+
+  @ApiProperty()
+  limit: number;
 }

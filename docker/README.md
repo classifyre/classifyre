@@ -23,18 +23,22 @@ docker run -d --name classifyre \
   classifyre/all-in-one:latest
 ```
 
-Then open **http://localhost:3000**.
+Then open **http://localhost:3000** and sign in as **`classifyre`**, password
+**`classifyre`**. Change it once you are in: account menu → **Your account** →
+**Account security** → **Signing in** → **Update**. On another port or host,
+tell the container its address with `-e CLASSIFYRE_URL=http://localhost:8080`:
+sign-in only sends people back to that address.
 
-The first boot initialises the database, applies the migrations and creates a
-workspace called `default`. On a laptop that takes a few minutes; the container
+The first boot initialises the database, applies the migrations, sets up
+sign-in and creates a workspace called `default`. On a laptop that takes a few minutes; the container
 reports `starting` until it is done. Watch it with:
 
 ```bash
 docker logs -f classifyre
 ```
 
-Nothing leaves your machine. There is no account, no signup, and no telemetry
-you have not opted into.
+Nothing leaves your machine: the accounts live in the identity server inside
+the container, and there is no telemetry you have not opted into.
 
 ### What to do next
 
@@ -72,7 +76,8 @@ no emulation on either.
 | Caddy | **3000** | the only published port; routes to the two servers below |
 | Web UI | 3100 (internal) | Next.js, and the bundled documentation at `/docs` |
 | API + worker | 8000 (internal) | REST, WebSockets, job queues, embeddings, and the parent of every scan |
-| PostgreSQL 18 + pgvector | 5432 (internal) | all data |
+| Identity server (Keycloak) | 8180 (internal) | sign-in, people, groups and tenants; reached through the web UI at `/iam` |
+| PostgreSQL 18 + pgvector | 5432 (internal) | all data, the identity server's too |
 
 They are supervised by [s6-overlay](https://github.com/just-containers/s6-overlay),
 which restarts anything that dies and makes `docker stop` and `docker restart`
@@ -347,10 +352,12 @@ done
 # The embedding model, downloaded once into a directory the build can copy from.
 EMBEDDING_CACHE_DIR=/tmp/cf-models bun run apps/api/scripts/cache-embedding-model.ts
 
-# Note the build context is docker/, not the repository root.
+# Note the build context is docker/, not the repository root. The `iam`
+# context is the identity server's realm setup and theme, shared with the chart.
 docker buildx build docker -f docker/Dockerfile \
   --build-arg BASE_TAG=local \
   --build-context models=/tmp/cf-models \
+  --build-context iam=helm/classifyre/files/iam \
   -t classifyre/all-in-one:local --load
 ```
 
@@ -362,9 +369,12 @@ current, grouped with the root Dockerfile into one PR. The two it cannot see —
 s6-overlay (a release tarball) and PostgreSQL (an apt repository) — are `ARG`s at
 the top of the file, tracked by hand.
 
-Then run the smoke test, which boots the image and scans a fixture corpus
-end to end — the UI, the docs, pgvector, the first-run workspace, a real scan
-with findings, and a restart:
+Then run the smoke test: it boots the image, checks sign-in, the docs,
+pgvector and the first-run workspace, then runs the same Playwright smoke test
+as the Helm release (sign in, create a workspace, a real scan with findings,
+access, SQL, notifications), restarts the container and checks the data
+survived. It needs bun and the e2e workspace installed
+(`bun install --filter @classifyre/e2e && cd apps/e2e && bunx playwright install chromium`):
 
 ```bash
 IMAGE=classifyre/all-in-one:local bash docker/scripts/smoke.sh

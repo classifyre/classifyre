@@ -3,18 +3,7 @@
 import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import {
-  ArrowRight,
-  ArrowUpRight,
-  Clock,
-  ExternalLink,
-  Layers,
-  Loader2,
-  OctagonPause,
-  Settings,
-  TriangleAlert,
-  Trash2,
-} from "lucide-react";
+import { ArrowRight, ArrowUpRight, Clock, ExternalLink, Globe, Layers, Loader2, OctagonPause, Settings, Trash2, TriangleAlert } from "lucide-react";
 import type { Namespace, NamespaceStats } from "@workspace/api-client";
 import { Button } from "@workspace/ui/components/button";
 import { Card, CardContent } from "@workspace/ui/components/card";
@@ -129,26 +118,40 @@ export function WorkspaceCard({
                   {t("workspaces.pausedBadge")}
                 </span>
               )}
+              {ns.public && (
+                <span
+                  data-testid={`workspace-public-${ns.slug}`}
+                  className="flex shrink-0 items-center gap-1 rounded-sm border border-border px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground"
+                >
+                  <Globe className="size-3 shrink-0" />
+                  {t("workspaces.publicBadge")}
+                </span>
+              )}
             </div>
             <p className="mt-1 truncate font-mono text-xs text-muted-foreground">
               /{ns.slug}
             </p>
           </div>
           <div className="-mr-2 -mt-2 flex shrink-0 items-center">
-            <Button
-              variant="ghost"
-              size="icon"
-              asChild
-              className="text-muted-foreground"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <Link
-                href={localePath(`/namespaces/${ns.id}/settings`)}
-                aria-label={t("workspaces.settingsAria", { name: ns.name })}
+            {/* The workspace's own settings (Settings → General), for
+                people who may see them: never visitors. */}
+            {(ns.capabilities?.includes("settings.view") ?? false) && (
+              <Button
+                variant="ghost"
+                size="icon"
+                asChild
+                className="text-muted-foreground"
+                onClick={(event) => event.stopPropagation()}
               >
-                <Settings className="h-4 w-4" />
-              </Link>
-            </Button>
+                <Link
+                  href={localePath(`/${ns.slug}/settings?tab=general`)}
+                  aria-label={t("workspaces.settingsAria", { name: ns.name })}
+                  data-testid={`workspace-settings-${ns.slug}`}
+                >
+                  <Settings className="h-4 w-4" />
+                </Link>
+              </Button>
+            )}
             {onDelete &&
               (ns.capabilities?.includes("workspace.delete") ?? true) && (
                 <Button

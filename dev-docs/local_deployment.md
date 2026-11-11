@@ -165,9 +165,8 @@ uv. Instead:
 
 ```bash
 # From repo root (defaults to ~/.kube/config-classifyre-vps)
-./scripts/deploy-develop.sh                         # deploys :develop with DEMO_MODE=true
+./scripts/deploy-develop.sh                         # deploys :develop
 ./scripts/deploy-develop.sh feat-x                  # deploys a specific image tag
-./scripts/deploy-develop.sh --demo-mode false       # override DEMO_MODE
 ./scripts/deploy-develop.sh --namespace other-ns \
   --values /tmp/override.yaml                       # override namespace and merge extra values
 ```

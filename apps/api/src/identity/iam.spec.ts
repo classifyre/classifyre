@@ -126,6 +126,47 @@ describe('JwtVerifier', () => {
     ).resolves.toMatchObject({ sub: 'u1' });
     expect(fetches).toBe(before + 1);
   });
+
+  it('tries again on the next request while the identity server is starting', async () => {
+    let up = false;
+    const starting = new JwtVerifier({
+      jwksUrl: 'http://iam/certs',
+      issuer: ISSUER,
+      audience: 'classifyre-api',
+      fetchImpl: () =>
+        up
+          ? Promise.resolve(
+              new Response(JSON.stringify({ keys: [current.jwk] }), {
+                status: 200,
+              }),
+            )
+          : Promise.reject(new TypeError('fetch failed')),
+    });
+    const token = signToken(current.privateKey, 'k1', claims);
+    // Down: unavailable (the caller answers 503), not a bad token (401).
+    const down = starting.verify(token);
+    await expect(down).rejects.toThrow('fetch failed');
+    await expect(starting.verify(token)).rejects.not.toBeInstanceOf(
+      InvalidTokenError,
+    );
+    // Up a moment later: accepted at once, no half-minute wait.
+    up = true;
+    await expect(starting.verify(token)).resolves.toMatchObject({ sub: 'u1' });
+  });
+
+  it('treats an error answer from the identity server as unavailable', async () => {
+    const failing = new JwtVerifier({
+      jwksUrl: 'http://iam/certs',
+      issuer: ISSUER,
+      audience: 'classifyre-api',
+      fetchImpl: () => Promise.resolve(new Response('', { status: 503 })),
+    });
+    const result = failing.verify(signToken(current.privateKey, 'k1', claims));
+    await expect(result).rejects.toThrow('Signing keys unavailable (503)');
+    await expect(
+      failing.verify(signToken(current.privateKey, 'k1', claims)),
+    ).rejects.not.toBeInstanceOf(InvalidTokenError);
+  });
 });
 
 describe('request tokens and tenants', () => {
@@ -225,7 +266,6 @@ describe('grant evaluation', () => {
 
 describe('sign-in configuration', () => {
   const env = {
-    IAM_ENABLED: 'true',
     IAM_ISSUER_URL: `${ISSUER}/`,
     IAM_INTERNAL_URL: 'http://classifyre-iam:8080/iam',
     IAM_REALM: 'classifyre',
@@ -234,8 +274,8 @@ describe('sign-in configuration', () => {
     IAM_APP_URL: 'https://classifyre.example/',
   };
 
-  it('is off unless IAM_ENABLED=true', () => {
-    expect(readIamConfig({})).toBeNull();
+  it('refuses to start without the identity server settings', () => {
+    expect(() => readIamConfig({})).toThrow(/IAM_REALM/);
   });
 
   it('reads the chart environment', () => {
@@ -247,11 +287,15 @@ describe('sign-in configuration', () => {
     });
   });
 
-  it('refuses to start in the all-in-one Docker image', () => {
-    expect(() => assertIamAllowed({ ...env, ENVIRONMENT: 'docker' })).toThrow(
-      /not supported in the all-in-one Docker image/,
-    );
-    expect(() => assertIamAllowed({ ENVIRONMENT: 'docker' })).not.toThrow();
+  it('starts in the all-in-one Docker image too', () => {
+    expect(() =>
+      assertIamAllowed({
+        ...env,
+        ENVIRONMENT: 'docker',
+        CLASSIFYRE_INTERNAL_KEY: 'k',
+        CLASSIFYRE_TENANT_DATABASE_KEY: 't',
+      }),
+    ).not.toThrow();
   });
 
   it('refuses to start without the internal key (scan callbacks stay closed)', () => {
@@ -274,13 +318,12 @@ describe('sign-in configuration', () => {
 
 describe('IdentityService', () => {
   const config = readIamConfig({
-    IAM_ENABLED: 'true',
     IAM_ISSUER_URL: ISSUER,
     IAM_INTERNAL_URL: 'http://iam',
     IAM_REALM: 'classifyre',
     IAM_API_CLIENT_ID: 'classifyre-api',
     IAM_API_CLIENT_SECRET: 's',
-  })!;
+  });
   const acme = {
     id: 't-acme',
     alias: 'acme',
@@ -360,13 +403,37 @@ describe('IdentityService', () => {
       },
       rememberPrincipal: () => Promise.resolve(),
       grantsFor: () => Promise.resolve(grants),
+      tenantByAlias: (alias: string) =>
+        Promise.resolve(
+          alias === 'acme'
+            ? { ...acme, orgId: tenantOrg, status: tenantStatus }
+            : null,
+        ),
       workspaceTenancy: (id: string) =>
         Promise.resolve(
           id === 'ws-globex'
-            ? { tenantId: 't-globex', ownerGroupId: 'finance' }
+            ? {
+                tenantId: 't-globex',
+                ownerGroupId: 'finance',
+                visibility: 'public',
+              }
             : id === 'ws-sales'
-              ? { tenantId: 't-acme', ownerGroupId: 'sales' }
-              : { tenantId: 't-acme', ownerGroupId: 'ap-team' },
+              ? {
+                  tenantId: 't-acme',
+                  ownerGroupId: 'sales',
+                  visibility: 'private',
+                }
+              : id === 'ws-public'
+                ? {
+                    tenantId: 't-acme',
+                    ownerGroupId: 'sales',
+                    visibility: 'public',
+                  }
+                : {
+                    tenantId: 't-acme',
+                    ownerGroupId: 'ap-team',
+                    visibility: 'private',
+                  },
         ),
     } as unknown as TenancyService;
     const verifier = {
@@ -398,47 +465,68 @@ describe('IdentityService', () => {
     expect(principal.tenant.alias).toBe('acme');
   });
 
-  describe('a public tenant (IAM step 8e)', () => {
-    const publicConfig = { ...config, publicTenantAlias: 'acme' };
+  describe('public workspaces (IAM step 8h)', () => {
+    const firstAcme = { ...config, bootstrapTenantAlias: 'acme' };
     const anonymous = () => ({ headers: {} });
 
-    it('makes someone without credentials a visitor who may only read it', async () => {
-      const identity = service({ enabled: true, orgs: [] }, publicConfig);
+    it('makes someone without credentials a visitor of the first tenant, who only reads its public workspaces', async () => {
+      const identity = service({ enabled: true, orgs: [] }, firstAcme);
       const visitor = await identity.authenticate(anonymous());
       expect(visitor).toMatchObject({
         visitor: true,
         sub: '',
         tenant: { alias: 'acme' },
+        grants: [],
         actor: { kind: 'visitor', ref: undefined },
       });
-      const capabilities = await identity.capabilitiesIn(visitor, 'ws-ledger');
-      expect(capabilities?.has('finding.view')).toBe(true);
-      expect(capabilities?.has('access.view')).toBe(false);
-      expect(capabilities?.has('mcp.token.own')).toBe(false);
-      expect(capabilities?.has('source.manage')).toBe(false);
+      const open = await identity.capabilitiesIn(visitor, 'ws-public');
+      expect(open?.has('workspace.view')).toBe(true);
+      expect(open?.has('finding.view')).toBe(true);
+      expect(open?.has('access.view')).toBe(false);
+      expect(open?.has('notification.view')).toBe(false);
+      // Not the settings, not who did what.
+      expect(open?.has('settings.view')).toBe(false);
+      expect(open?.has('activity.view')).toBe(false);
+      expect(open?.has('mcp.token.own')).toBe(false);
+      expect(open?.has('source.manage')).toBe(false);
+      // A private workspace of the same tenant is closed to them …
+      expect(
+        (await identity.capabilitiesIn(visitor, 'ws-sales'))?.has(
+          'workspace.view',
+        ),
+      ).toBe(false);
+      // … and another tenant's public one does not exist for them.
+      expect(await identity.capabilitiesIn(visitor, 'ws-globex')).toBeNull();
       expect(
         identity.tenantCapabilities(visitor).has('tenant.audit.view'),
       ).toBe(false);
-      // Another tenant's workspace does not exist for a visitor.
-      expect(await identity.capabilitiesIn(visitor, 'ws-globex')).toBeNull();
+    });
+
+    it('lets every member of the tenant read a public workspace without a grant on it', async () => {
+      orgClaim = ['acme'];
+      const identity = service({ enabled: true, orgs: ['acme'] });
+      const principal = await identity.authenticate(request());
+      const open = await identity.capabilitiesIn(principal, 'ws-public');
+      expect(open?.has('workspace.view')).toBe(true);
+      expect(open?.has('source.manage')).toBe(false);
+      expect((await identity.capabilitiesIn(principal, 'ws-sales'))?.size).toBe(
+        0,
+      );
+    });
+
+    it('never opens a public workspace to another tenant', async () => {
+      orgClaim = ['acme'];
+      const identity = service({ enabled: true, orgs: ['acme'] });
+      const principal = await identity.authenticate(request());
+      expect(await identity.capabilitiesIn(principal, 'ws-globex')).toBeNull();
     });
 
     it('never turns a request with a token into a visitor', async () => {
       orgClaim = [];
-      const identity = service({ enabled: true, orgs: [] }, publicConfig);
+      const identity = service({ enabled: true, orgs: [] }, firstAcme);
       await expect(
         identity.authenticate({ headers: { cookie: 'cf_session=a.b.c' } }),
       ).rejects.toMatchObject({ code: 'NO_TENANT' });
-    });
-
-    it('signs people in to their own tenant as before', async () => {
-      orgClaim = ['acme'];
-      const principal = await service(
-        { enabled: true, orgs: ['acme'] },
-        publicConfig,
-      ).authenticate(request());
-      expect(principal.visitor).toBeUndefined();
-      expect(principal.actor.kind).toBe('person');
     });
 
     it('never makes a visitor of a request that brings credentials of another kind', async () => {
@@ -446,17 +534,17 @@ describe('IdentityService', () => {
         headers: { authorization: 'Basic dXNlcjpwYXNz' },
       } as unknown as Parameters<IdentityService['authenticate']>[0];
       await expect(
-        service({ enabled: true, orgs: [] }, publicConfig).authenticate(basic),
+        service({ enabled: true, orgs: [] }, firstAcme).authenticate(basic),
       ).rejects.toMatchObject({ code: 'SIGN_IN_REQUIRED' });
     });
 
-    it('has no visitors without a public tenant, or while it is suspended', async () => {
+    it('has no visitors before the first tenant exists, or while it is suspended', async () => {
       await expect(
         service({ enabled: true, orgs: [] }).authenticate(anonymous()),
       ).rejects.toMatchObject({ code: 'SIGN_IN_REQUIRED' });
       tenantStatus = 'suspended';
       await expect(
-        service({ enabled: true, orgs: [] }, publicConfig).authenticate(
+        service({ enabled: true, orgs: [] }, firstAcme).authenticate(
           anonymous(),
         ),
       ).rejects.toMatchObject({ code: 'SIGN_IN_REQUIRED' });

@@ -9,7 +9,6 @@ Name | Type
 `entityType` | string
 `entityId` | string
 `note` | string
-`addedBy` | string
 
 ## Example
 
@@ -21,7 +20,6 @@ const example = {
   "entityType": null,
   "entityId": null,
   "note": null,
-  "addedBy": null,
 } satisfies AddEvidenceDto
 
 console.log(example)

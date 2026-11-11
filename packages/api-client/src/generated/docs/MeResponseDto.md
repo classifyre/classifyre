@@ -7,7 +7,6 @@
 Name | Type
 ------------ | -------------
 `actor` | [MeActorDto](MeActorDto.md)
-`iamEnabled` | boolean
 `capabilities` | Array&lt;string&gt;
 
 ## Example
@@ -18,7 +17,6 @@ import type { MeResponseDto } from '@workspace/api-client'
 // TODO: Update the object below with actual values
 const example = {
   "actor": null,
-  "iamEnabled": null,
   "capabilities": null,
 } satisfies MeResponseDto
 

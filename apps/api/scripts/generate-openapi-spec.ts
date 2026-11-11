@@ -40,6 +40,19 @@ async function generateSpec() {
     );
   }
 
+  // The identity server is never called while generating the spec, but the
+  // app needs its settings to build: placeholders for whatever is unset.
+  const PLACEHOLDER_IAM: Record<string, string> = {
+    IAM_ISSUER_URL: 'http://identity.invalid/iam/realms/classifyre',
+    IAM_INTERNAL_URL: 'http://identity.invalid/iam',
+    IAM_REALM: 'classifyre',
+    IAM_API_CLIENT_ID: 'classifyre-api',
+    IAM_API_CLIENT_SECRET: 'openapi',
+  };
+  for (const [name, value] of Object.entries(PLACEHOLDER_IAM)) {
+    process.env[name] ||= value;
+  }
+
   // `abortOnError: false` makes Nest reject the promise instead of logging
   // through its own logger and calling process.exit(1). With `logger: false`
   // that exit printed nothing whatsoever, which is how a real initialisation

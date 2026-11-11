@@ -13,16 +13,15 @@ import {
 } from "@/lib/iam/session";
 
 /**
- * With sign-in on (docs/prd/IAM-access-management.md §12.1): renews a session
- * about to expire, handing the new token to this very request, and sends
- * people without a session to sign in. While the identity server does not
- * answer, a session that has not expired yet keeps working. API requests without a session are
- * left alone: the API answers 401 and the browser renews or signs in.
- * Without sign-in it does nothing.
+ * Sign-in (docs/prd/IAM-access-management.md §12.1): renews a session about
+ * to expire, handing the new token to this very request, and sends people
+ * without a session to sign in. While the identity server does not answer, a
+ * session that has not expired yet keeps working. API requests without a
+ * session are left alone: the API answers 401 and the browser renews or signs
+ * in.
  */
 export async function proxy(request: NextRequest) {
   const config = iamWebConfig();
-  if (!config) return NextResponse.next();
 
   const session = request.cookies.get(SESSION_COOKIE)?.value;
   if (session && !needsRenewal(session)) return NextResponse.next();
@@ -52,17 +51,11 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
-  // Not signed in: with a public tenant they browse it; the API answers them
-  // as visitors, read-only.
-  if (config.publicTenant || request.nextUrl.pathname.startsWith("/api/")) {
-    return NextResponse.next();
-  }
-  const login = new URL("/auth/login", config.appUrl);
-  login.searchParams.set(
-    "returnTo",
-    `${request.nextUrl.pathname}${request.nextUrl.search}`,
-  );
-  return NextResponse.redirect(login);
+  // Not signed in: they may read the first tenant's public workspaces, as
+  // visitors. The API answers anything else with 401, which sends them to
+  // sign in (components/iam-session.tsx), and the workspace list sends them
+  // there when nothing is public.
+  return NextResponse.next();
 }
 
 export const config = {

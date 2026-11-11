@@ -3,13 +3,15 @@ import { expect, test } from "@playwright/experimental-ct-react";
 import { AiHealthProvider, AiHealthHarnessStatus } from "@/components/ai-health";
 import { ServerConfigContext } from "@/components/server-config-provider";
 import { AiHealthHarness } from "@/tests/components/fixtures/ai-health-harness";
+import { signedInAs } from "@/tests/components/fixtures/signed-in";
 
 type CtPage = Parameters<Parameters<typeof test>[2]>[0]["page"];
 
 /**
- * Records every call to the AI provider endpoints. The demo-mode contract is
- * that the health probe is never issued at all — a demo visitor cannot fix a
- * provider, and the probe itself is a POST the read-only guard rejects.
+ * Records every call to the AI provider endpoints. Someone who may not
+ * configure AI providers (a viewer, a visitor of a public workspace) never
+ * triggers the health probe: they cannot fix a provider, and the probe
+ * itself is a POST that needs agent.configure.
  */
 async function trackProviderCalls(page: CtPage) {
   const calls: string[] = [];
@@ -26,15 +28,16 @@ async function trackProviderCalls(page: CtPage) {
   return { calls };
 }
 
-test("demo mode issues no provider probe and renders no harness status", async ({
+test("without agent.configure no provider probe is issued and no harness status rendered", async ({
   mount,
   page,
 }) => {
   const { calls } = await trackProviderCalls(page);
+  await signedInAs(page, ["workspace.view"]);
 
   await mount(
     <ServerConfigContext.Provider
-      value={{ logsPersisted: false, demoMode: true, iamEnabled: false }}
+      value={{ logsPersisted: false }}
     >
       <AiHealthProvider>
         <AiHealthHarnessStatus />
@@ -49,15 +52,16 @@ test("demo mode issues no provider probe and renders no harness status", async (
   await expect(page.getByTestId("ai-health-harness-status")).toHaveCount(0);
 });
 
-test("outside demo mode a missing provider marks the Harness entry", async ({
+test("with agent.configure a missing provider marks the Harness entry", async ({
   mount,
   page,
 }) => {
   const { calls } = await trackProviderCalls(page);
+  await signedInAs(page, ["workspace.view", "agent.configure"]);
 
   await mount(
     <ServerConfigContext.Provider
-      value={{ logsPersisted: false, demoMode: false, iamEnabled: false }}
+      value={{ logsPersisted: false }}
     >
       <AiHealthProvider>
         <AiHealthHarnessStatus />
@@ -76,6 +80,7 @@ test("global warning ignores Assistant state once Harness is healthy", async ({
   mount,
   page,
 }) => {
+  await signedInAs(page, ["workspace.view", "agent.configure"]);
   let harnessTests = 0;
   await page.route("**/instance-settings", async (route) => {
     await route.fulfill({
@@ -89,7 +94,6 @@ test("global warning ignores Assistant state once Harness is healthy", async ({
         timeFormat: "TWELVE_HOUR",
         aiProviderConfigId: null,
         harnessAiProviderConfigId: "harness-provider",
-        demoMode: false,
         createdAt: "2026-08-10T00:00:00.000Z",
         updatedAt: "2026-08-10T00:00:00.000Z",
       }),

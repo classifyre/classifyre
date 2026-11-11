@@ -52,7 +52,6 @@ import {
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useIamEnabled } from "@/components/iam-session";
 import { useChatBots } from "@/hooks/use-chat-bots";
 import { useTranslation } from "@/hooks/use-translation";
 
@@ -120,7 +119,6 @@ type BotDraft = {
   enabled: boolean;
   capabilityGroups: string[];
   agentKinds: AgentKindValue[];
-  allowMutations: boolean;
 };
 
 const EMPTY_DRAFT: BotDraft = {
@@ -131,7 +129,6 @@ const EMPTY_DRAFT: BotDraft = {
   enabled: true,
   capabilityGroups: [],
   agentKinds: [],
-  allowMutations: true,
 };
 
 function draftFromBot(bot: ChatBotResponseDto): BotDraft {
@@ -145,13 +142,11 @@ function draftFromBot(bot: ChatBotResponseDto): BotDraft {
     agentKinds: bot.agentKinds.filter((k): k is AgentKindValue =>
       (AGENT_KINDS as string[]).includes(k),
     ),
-    allowMutations: bot.allowMutations,
   };
 }
 
 export function ChatBotsCard() {
   const { t } = useTranslation();
-  const iamEnabled = useIamEnabled();
   const { bots, loading, error, refresh } = useChatBots();
 
   const [groups, setGroups] = React.useState<McpCapabilityGroupDto[]>([]);
@@ -198,7 +193,6 @@ export function ChatBotsCard() {
             enabled: draft.enabled,
             capabilityGroups: draft.capabilityGroups,
             agentKinds: draft.agentKinds,
-            allowMutations: draft.allowMutations,
           },
         });
         toast.success(t("chatBots.updated"));
@@ -215,7 +209,6 @@ export function ChatBotsCard() {
             enabled: draft.enabled,
             capabilityGroups: draft.capabilityGroups,
             agentKinds: draft.agentKinds,
-            allowMutations: draft.allowMutations,
           },
         });
         toast.success(t("chatBots.created"));
@@ -433,25 +426,9 @@ export function ChatBotsCard() {
               />
             </div>
 
-            <div className="flex items-center justify-between rounded-[4px] border-2 border-border p-3">
-              <div>
-                <p className="text-sm font-medium">
-                  {t("chatBots.allowMutations")}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {iamEnabled
-                    ? t("chatBots.allowMutationsSignIn")
-                    : t("chatBots.allowMutationsHint")}
-                </p>
-              </div>
-              <Switch
-                disabled={iamEnabled}
-                checked={draft.allowMutations && !iamEnabled}
-                onCheckedChange={(checked) =>
-                  setDraft((d) => ({ ...d, allowMutations: checked === true }))
-                }
-              />
-            </div>
+            <p className="rounded-[4px] border-2 border-border p-3 text-xs text-muted-foreground">
+              {t("chatBots.readOnlyHint")}
+            </p>
 
             <div className="space-y-2">
               <Label>{t("chatBots.capabilityGroups")}</Label>
@@ -680,11 +657,6 @@ function BotRow({
                 {t("chatBots.disabledBadge")}
               </Badge>
             )}
-            {!bot.allowMutations ? (
-              <Badge variant="outline" className="text-[10px] uppercase">
-                {t("chatBots.readOnly")}
-              </Badge>
-            ) : null}
           </div>
           <p className="truncate text-xs text-muted-foreground">
             {bot.lastError

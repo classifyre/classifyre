@@ -2,16 +2,16 @@
 
 |                  |                                                                                                                   |
 | ---------------- | ----------------------------------------------------------------------------------------------------------------- |
-| **Status**       | Phases 0, 1 and 2 built 2026-11-07 (§6, §5.1, §4.7.1). Phases 3 and 4 wait until they are needed.               |
+| **Status**       | Phases 0, 1 and 2 built 2026-11-07 (§6, §5.1, §4.7.1). Phases 3 and 4 wait until they are needed. Since 2026-11-09 sign-in is always on (IAM §13 Step 8g): the open database is only a copy source, and the all-in-one image runs the control and tenant databases too. |
 | **Size**         | L (5 phases, each its own PR or set of PRs)                                                                       |
 | **Depends on**   | [IAM · Identity and access management](IAM-access-management.md) (steps 0–8c: tenants, grants, people and groups) |
-| **Not in scope** | billing, per-record rules, a second identity server, moving the all-in-one Docker image off its single database   |
+| **Not in scope** | billing, per-record rules, a second identity server                                                               |
 
 ## 1. Summary
 
 Three things are asked for:
 
-1. **Sign-in off and sign-in on must never see each other's data.** Today one database holds every workspace, and tenants are only a column (`namespaces.tenant_id`). With sign-in off the API ignores that column, so anyone who turns `iam.enabled` off, even by mistake, sees every tenant's workspaces. That is a security problem, not a convenience one.
+1. *(Since 2026-11-09 there is no sign-in off; the open database survives only as a copy source.)* **Sign-in off and sign-in on must never see each other's data.** Today one database holds every workspace, and tenants are only a column (`namespaces.tenant_id`). With sign-in off the API ignores that column, so anyone who turns `iam.enabled` off, even by mistake, sees every tenant's workspaces. That is a security problem, not a convenience one.
 2. **Someone must manage the tenants themselves.** A tenant admin manages one tenant. Creating tenants and giving them their first admins is done today in the identity server's console, which is not tenant-scoped and has no place in Classifyre.
 3. **A cloud version later**, where people sign up, get a tenant, and connect their own company sign-in (identity providers). Not built now, but the shape chosen here has to carry it.
 
@@ -63,7 +63,7 @@ flowchart LR
 | R9  | Operators see tenants, not their data. Entering a tenant's workspaces needs a grant inside that tenant, and is audited like any other access.                            |
 | R10 | Workspace addresses are per tenant: two tenants can both have `/finance`, and nobody learns about another tenant's workspaces.                                           |
 | R11 | Cloud (later): sign-up creates a tenant through the same provisioning as R8; a tenant admin connects the tenant's own identity providers; per-tenant limits.             |
-| R12 | The all-in-one Docker image keeps one open database and never sees any of this.                                                                                          |
+| R12 | *(Replaced 2026-11-09.)* The all-in-one Docker image runs like the chart: control database, one database per tenant, identity server beside them. Its open database from older versions is read only by `admin workspaces copy --to-tenant`. |
 
 ## 4. Design
 

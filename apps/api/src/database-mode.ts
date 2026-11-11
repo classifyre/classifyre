@@ -1,12 +1,10 @@
 import { Client } from 'pg';
-import { iamEnabled } from './identity/iam-config';
 
 /**
- * Which database a process works on (docs/prd/TEN §4.2). Without sign-in it
- * is the configured one, the open database. With sign-in it is the control
- * database next to it, so turning sign-in on or off switches databases rather
- * than reinterpreting one: the open database never shows a tenant, and a
- * tenant's data is never in the open database.
+ * Which database a process works on (docs/prd/TEN §4.2): the control database
+ * next to the configured one. The configured database itself is the open one
+ * of installs from before sign-in was always on, read only by the operator
+ * command that copies its workspaces into a tenant.
  */
 export const DEFAULT_CONTROL_DATABASE = 'classifyre_control';
 
@@ -41,14 +39,14 @@ function databaseOf(url: string): string {
 }
 
 /**
- * Points `DATABASE_URL` at the control database when sign-in is on. Every
+ * Points `DATABASE_URL` at the control database. Every
  * entry point calls it before anything connects (the API, the migration init
  * container, the operator command); calling it again is a no-op.
  */
 export function selectDatabaseForMode(
   env: NodeJS.ProcessEnv = process.env,
 ): void {
-  if (!iamEnabled(env) || !env.DATABASE_URL) return;
+  if (!env.DATABASE_URL) return;
   const control = controlDatabaseName(env);
   if (databaseOf(env.DATABASE_URL) === control) return;
   configuredUrl ??= env.DATABASE_URL;
@@ -56,15 +54,13 @@ export function selectDatabaseForMode(
 }
 
 /**
- * The open database, as seen from a process with sign-in on, for the one
- * thing that reads it: an operator copying workspaces made without sign-in
- * into a tenant. Null when the deployment points straight at the control
- * database and names no open one.
+ * The open database, for the one thing that reads it: an operator copying
+ * workspaces made without sign-in into a tenant. Null when the deployment
+ * points straight at the control database and names no open one.
  */
 export function openDatabaseUrl(
   env: NodeJS.ProcessEnv = process.env,
 ): string | null {
-  if (!iamEnabled(env)) return env.DATABASE_URL ?? null;
   const named = env.CLASSIFYRE_OPEN_DATABASE?.trim();
   if (named && env.DATABASE_URL) return withDatabase(env.DATABASE_URL, named);
   return configuredUrl
@@ -73,13 +69,13 @@ export function openDatabaseUrl(
 }
 
 /**
- * Creates the control database on first start with sign-in. The database
+ * Creates the control database on first start. The database
  * user needs `CREATEDB` for this, and later for tenant databases (§4.5).
  */
 export async function ensureControlDatabase(
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<void> {
-  if (!iamEnabled(env) || !env.DATABASE_URL) return;
+  if (!env.DATABASE_URL) return;
   const url = env.DATABASE_URL;
   const name = databaseOf(url);
   const probe = new Client({ connectionString: url });

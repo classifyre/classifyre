@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { api } from "@workspace/api-client";
-import { useServerConfig } from "@/components/server-config-provider";
+import { useCan } from "@/hooks/use-me";
 import { forgetSketch, rememberSketch, settleSketch } from "@/components/cases/sketch-cache";
 import { useBoardStore } from "../store/board-context";
 import type { BoardState } from "../store/board-store";
@@ -47,11 +47,11 @@ function whenIdle(fn: () => void): () => void {
  */
 export function useBoardThumbnail(caseId: string): void {
   const store = useBoardStore();
-  const { demoMode } = useServerConfig();
+  const canEdit = useCan("case.edit");
 
   React.useEffect(() => {
-    // A demo instance refuses every write.
-    if (demoMode) return;
+    // Someone who may only view the case does not save its thumbnail.
+    if (!canEdit) return;
     let timer: number | null = null;
     let cancelIdle: (() => void) | null = null;
     let owed = false;
@@ -115,5 +115,5 @@ export function useBoardThumbnail(caseId: string): void {
       cancelIdle?.();
       if (owed) sketchNow(true);
     };
-  }, [caseId, store, demoMode]);
+  }, [caseId, store, canEdit]);
 }

@@ -11,7 +11,6 @@ Name | Type
 `status` | string
 `severity` | string
 `assignee` | string
-`createdBy` | string
 `inquiryIds` | Array&lt;string&gt;
 `autoPullInquiryIds` | Array&lt;string&gt;
 `removeGoneFindings` | boolean
@@ -30,7 +29,6 @@ const example = {
   "status": null,
   "severity": null,
   "assignee": null,
-  "createdBy": null,
   "inquiryIds": null,
   "autoPullInquiryIds": null,
   "removeGoneFindings": null,

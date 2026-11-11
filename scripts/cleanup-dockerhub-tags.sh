@@ -10,6 +10,11 @@ fi
 DRY_RUN="${DRY_RUN:-0}"
 PAGE_SIZE="${PAGE_SIZE:-100}"
 KEEP_PATTERN='^(main|latest|develop|build-cache(|-.+)|[0-9]+\.[0-9]+\.[0-9]+)$'
+# Branch tags pushed this recently are kept: a CI run builds the service images
+# first and the all-in-one image from them minutes later, and a cleanup that
+# lands in between deleted the tags the second build was about to pull.
+KEEP_RECENT_HOURS="${KEEP_RECENT_HOURS:-24}"
+KEEP_AFTER_EPOCH=$(( $(date -u +%s) - KEEP_RECENT_HOURS * 3600 ))
 # Every repository the release and CI pipelines push to. all-in-one is one of
 # them: ci.yml tags it per branch exactly like the three service images, so
 # without it here those tags accumulate forever — and at ~4 GB each that is the
@@ -56,7 +61,8 @@ for repository in "${REPOSITORIES[@]}"; do
         "/v2/namespaces/${DOCKER_USERNAME}/repositories/${repository}/tags?page_size=${PAGE_SIZE}&page=${page}"
     )"
 
-    mapfile -t page_tags < <(jq -r '.results[].name' <<< "${response}")
+    # "<name> <epoch of last push>" (0 when Docker Hub gives no date).
+    mapfile -t page_tags < <(jq -r '.results[] | "\(.name) \((.last_updated // "") | if . == "" then 0 else (sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601) end)"' <<< "${response}")
     if [[ "${#page_tags[@]}" -eq 0 ]]; then
       break
     fi
@@ -71,9 +77,15 @@ for repository in "${REPOSITORIES[@]}"; do
     page=$((page + 1))
   done
 
-  for tag in "${tags[@]}"; do
+  for entry in "${tags[@]}"; do
+    tag="${entry% *}"
+    pushed="${entry##* }"
     if [[ "${tag}" =~ ${KEEP_PATTERN} ]]; then
       echo "keep   ${repository}:${tag}"
+      continue
+    fi
+    if (( pushed > KEEP_AFTER_EPOCH )); then
+      echo "keep   ${repository}:${tag} (pushed in the last ${KEEP_RECENT_HOURS} h)"
       continue
     fi
 

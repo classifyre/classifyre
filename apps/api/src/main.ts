@@ -14,12 +14,14 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { McpServerFactoryService } from './mcp-server.factory';
 import { McpTokenService } from './mcp-token.service';
 import { ActorContextService } from './identity/actor-context.service';
-import { ACCESS_POLICY, type AccessPolicy } from './identity/access-policy';
-import { integrationFromMcpToken } from './identity/actor';
 import { assertIamAllowed } from './identity/iam-config';
 import type { IdentityService } from './identity/identity.service';
 import { IDENTITY } from './identity/identity.tokens';
-import { CLS_CAPABILITIES } from './identity/iam-access-policy';
+import {
+  CLS_CAPABILITIES,
+  CLS_PERSON,
+  type ClsPerson,
+} from './identity/iam-access-policy';
 import { InstanceSettingsService } from './instance-settings.service';
 import { PrismaExceptionFilter } from './filters/prisma-exception.filter';
 import { DbRetryInterceptor } from './interceptors/db-retry.interceptor';
@@ -34,14 +36,12 @@ import {
 } from './namespace/namespace-request.hook';
 import {
   CLS_DATABASE_LANE,
-  CLS_DEMO_MODE_BYPASS,
   CLS_NAMESPACE_ID,
   CLS_SCHEMA,
   CLS_SLUG,
 } from './namespace/namespace.constants';
 import { PrismaClientManager } from './prisma/prisma-client-manager';
 import { InternalApiKeyService } from './internal-api-key.service';
-import { DemoModeService } from './demo-mode.service';
 import compress from '@fastify/compress';
 import { constants as zlibConstants } from 'node:zlib';
 import { resolveHeapGuard } from './utils/heap-guard';
@@ -62,9 +62,9 @@ const BODY_LIMIT_BYTES = (() => {
 })();
 
 async function bootstrap() {
-  // The all-in-one Docker image never uses sign-in (docs/prd §2 H2).
+  // Sign-in is always on: refuse a setup that misses its keys.
   assertIamAllowed();
-  // With sign-in, the control database rather than the open one.
+  // The control database, never the open one of older installs.
   selectDatabaseForMode();
   const logger = new Logger('Bootstrap');
   const port = process.env.PORT ?? 8000;
@@ -90,6 +90,17 @@ async function bootstrap() {
     // so without listing PUT/PATCH/DELETE every mutating request fails preflight.
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
+
+  // A query job posts its result as an Arrow IPC stream (docs/prd/DQ §5);
+  // the route stores the bytes as they came.
+  app
+    .getHttpAdapter()
+    .getInstance()
+    .addContentTypeParser(
+      'application/vnd.apache.arrow.stream',
+      { parseAs: 'buffer' },
+      (_request, body, done) => done(null, body),
+    );
 
   // Uploads follow the same rule as JSON bodies: no size ceiling. `files: 1`
   // stays because these routes accept exactly one file per request.
@@ -270,13 +281,11 @@ async function bootstrap() {
   const namespaceRegistry = app.get(NamespaceRegistryService);
   const prismaClientManager = app.get(PrismaClientManager);
   const internalApiKey = app.get(InternalApiKeyService);
-  const demoMode = app.get(DemoModeService);
   const actors = app.get(ActorContextService);
-  const accessPolicy = app.get<AccessPolicy>(ACCESS_POLICY);
 
   // Resolve the leading `/<slug>` into a tenant context (404 on unknown slug)
   // before any route runs. `/<slug>/mcp` was already rewritten to `/mcp`.
-  const identity = app.get<IdentityService | null>(IDENTITY);
+  const identity = app.get<IdentityService>(IDENTITY);
   registerNamespaceHook(
     fastify,
     namespaceRegistry,
@@ -311,9 +320,6 @@ async function bootstrap() {
         (request.raw as NamespaceRawRequest).classifyreDatabaseLane ??
           'interactive',
       );
-      // Write tools check demo mode deep inside their callbacks, where the
-      // request is gone, so hand them the bypass decision through CLS.
-      cls.set(CLS_DEMO_MODE_BYPASS, demoMode.isBypassRequest(request.headers));
 
       const settings = await instanceSettingsService.getSettings();
       if (!settings.mcpEnabled) {
@@ -328,7 +334,7 @@ async function bootstrap() {
         id: string;
         name: string;
         toolGroupIds: string[] | null;
-        ownerSub: string | null;
+        ownerSub: string;
       };
       try {
         authorizedToken = await mcpTokenService.authorizeBearerToken(
@@ -345,33 +351,28 @@ async function bootstrap() {
         return;
       }
 
-      let actor = integrationFromMcpToken(authorizedToken);
-      let capabilities = await accessPolicy.capabilities(actor);
-      if (identity) {
-        // With sign-in a token acts for its owner, as they are right now.
-        const owner = authorizedToken.ownerSub
-          ? await identity.principalForOwner(
-              authorizedToken.ownerSub,
-              authorizedToken.id,
-              ns.namespaceId,
-            )
-          : null;
-        if (!owner) {
-          reply.code(401).send({
-            error: 'Unauthorized',
-            code: authorizedToken.ownerSub
-              ? 'MCP_OWNER_NO_ACCESS'
-              : 'MCP_TOKEN_WITHOUT_OWNER',
-            message: authorizedToken.ownerSub
-              ? 'The person this token belongs to no longer has access to this workspace.'
-              : 'This token was created before sign-in and has no owner. Sign in and create a new one.',
-          });
-          return;
-        }
-        actor = owner.principal.actor;
-        capabilities = owner.capabilities;
-        cls.set(CLS_CAPABILITIES, capabilities);
+      // A token acts for its owner, as they are right now.
+      const owner = await identity.principalForOwner(
+        authorizedToken.ownerSub,
+        authorizedToken.id,
+        ns.namespaceId,
+      );
+      if (!owner) {
+        reply.code(401).send({
+          error: 'Unauthorized',
+          code: 'MCP_OWNER_NO_ACCESS',
+          message:
+            'The person this token belongs to no longer has access to this workspace.',
+        });
+        return;
       }
+      const actor = owner.principal.actor;
+      const capabilities = owner.capabilities;
+      cls.set(CLS_CAPABILITIES, capabilities);
+      cls.set<ClsPerson>(CLS_PERSON, {
+        actorRef: `user:${authorizedToken.ownerSub}`,
+        groupIds: await identity.groupLineage(owner.principal),
+      });
       actors.set(actor);
 
       reply.hijack();

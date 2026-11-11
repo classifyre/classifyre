@@ -4126,6 +4126,80 @@
         ]
       }
     },
+    "/notifications/audiences": {
+      "get": {
+        "description": "An empty list means the workspace's owning group. A notification keeps the groups it was sent to.",
+        "operationId": "NotificationsController_audiences",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NotificationAudienceDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Which groups get each kind of notification",
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
+    "/notifications/audiences/{type}": {
+      "put": {
+        "description": "Groups of your tenant; an empty list sends it to the owning group again. Applies to notifications made from now on.",
+        "operationId": "NotificationsController_setAudience",
+        "parameters": [
+          {
+            "name": "type",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "enum": [
+                "SCAN",
+                "FINDING",
+                "SOURCE",
+                "SYSTEM"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNotificationAudienceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationAudienceDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Choose which groups get a kind of notification",
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
     "/notifications": {
       "get": {
         "description": "Retrieve notifications with optional filters and pagination.",
@@ -4249,7 +4323,7 @@
     },
     "/notifications/mark-all-read": {
       "patch": {
-        "description": "Marks all unread notifications as read. Optional filters can narrow the update.",
+        "description": "Marks every unread notification you get as read, for you. Optional filters can narrow the update.",
         "operationId": "NotificationsController_markAllRead",
         "parameters": [],
         "requestBody": {
@@ -4292,7 +4366,7 @@
             }
           }
         },
-        "summary": "Mark all notifications as read",
+        "summary": "Mark all your notifications as read",
         "tags": [
           "Notifications"
         ]
@@ -4376,6 +4450,7 @@
     },
     "/notifications/{id}": {
       "delete": {
+        "description": "Hides it for you only; everyone else in its groups keeps it.",
         "operationId": "NotificationsController_deleteNotification",
         "parameters": [
           {
@@ -4391,7 +4466,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Notification deleted",
+            "description": "Notification dismissed for you",
             "content": {
               "application/json": {
                 "schema": {
@@ -4407,7 +4482,7 @@
             }
           }
         },
-        "summary": "Delete a notification",
+        "summary": "Dismiss a notification",
         "tags": [
           "Notifications"
         ]
@@ -4462,6 +4537,29 @@
           }
         },
         "summary": "Update instance settings",
+        "tags": [
+          "Instance Settings"
+        ]
+      }
+    },
+    "/instance-settings/display": {
+      "get": {
+        "description": "Language, time zone and time format: what every page needs to display dates, for anyone who can open the workspace. The rest of the settings need settings.view.",
+        "operationId": "InstanceSettingsController_getDisplaySettings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DisplaySettingsDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "How dates and language are shown",
         "tags": [
           "Instance Settings"
         ]
@@ -8694,13 +8792,13 @@
             "description": ""
           }
         },
-        "summary": "List the namespaces the caller can see (all of them without sign-in)",
+        "summary": "List the namespaces the caller can see",
         "tags": [
           "Namespaces"
         ]
       },
       "post": {
-        "description": "With sign-in, `ownerGroupId` is required: a group of your tenant that you belong to and may create workspaces for (GET /namespaces/owning-groups).",
+        "description": "`ownerGroupId` is required: a group of your tenant that you belong to and may create workspaces for (GET /namespaces/owning-groups).",
         "operationId": "NamespacesController_create",
         "parameters": [],
         "responses": {
@@ -8723,7 +8821,7 @@
             "description": ""
           }
         },
-        "summary": "Groups the caller may create workspaces for (empty without sign-in)",
+        "summary": "Groups the caller may create workspaces for",
         "tags": [
           "Namespaces"
         ]
@@ -9127,7 +9225,7 @@
     },
     "/audit-events": {
       "get": {
-        "description": "Filter by entity (e.g. entityType=sources&entityId=…) or by actor reference. Page with `before`, the id of the last event received.",
+        "description": "Filter by entity (e.g. entityType=sources&entityId=…), by what it touched (resource=data, source:<id> or asset:<id>), actor, capability, operation or free text. Sort any column; page with `skip`/`limit` or, for \"load more\", with `before`, the id of the last event received.",
         "operationId": "AuditController_list",
         "parameters": [
           {
@@ -9155,6 +9253,39 @@
             }
           },
           {
+            "name": "capability",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "operation",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "resource",
+            "required": false,
+            "in": "query",
+            "description": "Only events that touched this: `data` (SQL reads and data-reader grants), `source:<id>` or `asset:<id>`.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "before",
             "required": false,
             "in": "query",
@@ -9169,6 +9300,41 @@
             "schema": {
               "type": "number"
             }
+          },
+          {
+            "name": "skip",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "OCCURRED_AT",
+                "ACTOR",
+                "OPERATION",
+                "ENTITY_TYPE",
+                "CAPABILITY"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "ASC",
+                "DESC"
+              ],
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -9177,10 +9343,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/AuditEventDto"
-                  }
+                  "$ref": "#/components/schemas/AuditEventsResponseDto"
                 }
               }
             }
@@ -9330,7 +9493,7 @@
             }
           }
         },
-        "summary": "Give a group or a person a role on this workspace",
+        "summary": "Give a group a role on this workspace, or data access to one of its sources or tables",
         "tags": [
           "Access"
         ]
@@ -9350,8 +9513,15 @@
           }
         ],
         "responses": {
-          "204": {
-            "description": ""
+          "200": {
+            "description": "The grant that was removed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GrantDto"
+                }
+              }
+            }
           }
         },
         "summary": "Remove a grant made on this workspace",
@@ -9534,8 +9704,15 @@
           }
         ],
         "responses": {
-          "204": {
-            "description": ""
+          "200": {
+            "description": "The grant that was removed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GrantDto"
+                }
+              }
+            }
           }
         },
         "summary": "Remove any grant of the tenant",
@@ -9585,17 +9762,80 @@
     "/tenant/audit-events": {
       "get": {
         "operationId": "TenantAccessController_events",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "action",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "actor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "skip",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "OCCURRED_AT",
+                "ACTOR",
+                "ACTION"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "ASC",
+                "DESC"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/TenantEventDto"
-                  }
+                  "$ref": "#/components/schemas/TenantEventsResponseDto"
                 }
               }
             }
@@ -9769,72 +10009,6 @@
           }
         },
         "summary": "Remove a tenant whose organization was deleted",
-        "tags": [
-          "Platform"
-        ]
-      }
-    },
-    "/platform/workspaces/local": {
-      "get": {
-        "operationId": "PlatformController_localWorkspaces",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/LocalWorkspaceDto"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "summary": "Workspaces made without sign-in, which can be brought into a tenant",
-        "tags": [
-          "Platform"
-        ]
-      }
-    },
-    "/platform/tenants/{tenantId}/workspaces": {
-      "post": {
-        "operationId": "PlatformController_importWorkspaces",
-        "parameters": [
-          {
-            "name": "tenantId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ImportWorkspacesDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ImportedWorkspacesDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Copy workspaces made without sign-in into a tenant",
         "tags": [
           "Platform"
         ]
@@ -11838,6 +12012,416 @@
         "summary": "Stop a running execution",
         "tags": [
           "Notebooks"
+        ]
+      }
+    },
+    "/saved-queries": {
+      "get": {
+        "operationId": "DataQueryController_listSaved",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SavedQueryDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Your saved SQL in this workspace",
+        "tags": [
+          "Data query"
+        ]
+      },
+      "post": {
+        "operationId": "DataQueryController_createSaved",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveSavedQueryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedQueryDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Save SQL under a name",
+        "tags": [
+          "Data query"
+        ]
+      }
+    },
+    "/saved-queries/{id}": {
+      "get": {
+        "operationId": "DataQueryController_getSaved",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedQueryDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "One of your saved queries",
+        "tags": [
+          "Data query"
+        ]
+      },
+      "patch": {
+        "operationId": "DataQueryController_updateSaved",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveSavedQueryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedQueryDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Rename a saved query or save new SQL under it",
+        "tags": [
+          "Data query"
+        ]
+      },
+      "delete": {
+        "operationId": "DataQueryController_removeSaved",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Delete a saved query",
+        "tags": [
+          "Data query"
+        ]
+      }
+    },
+    "/data-query/catalog": {
+      "get": {
+        "operationId": "DataQueryController_getCatalog",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryCatalogDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "The tables you can query with SQL, and those you could with access",
+        "tags": [
+          "Data query"
+        ]
+      }
+    },
+    "/data-query/settings": {
+      "get": {
+        "operationId": "DataQueryController_getSettings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataQuerySettingsDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "The SQL limits of this workspace",
+        "tags": [
+          "Data query"
+        ]
+      },
+      "put": {
+        "operationId": "DataQueryController_updateSettings",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDataQuerySettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataQuerySettingsDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Set the limits of SQL queries in this workspace",
+        "tags": [
+          "Data query"
+        ]
+      }
+    },
+    "/query-runs": {
+      "post": {
+        "description": "Runs as a short-lived job. Only tables you may query exist for the query; name them `<source>.<schema>.<table>` as the catalog lists them.",
+        "operationId": "DataQueryController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateQueryRunDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryRunDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Run one SELECT; poll the run for its status",
+        "tags": [
+          "Data query"
+        ]
+      },
+      "get": {
+        "operationId": "DataQueryController_list",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/QueryRunDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Your recent queries in this workspace",
+        "tags": [
+          "Data query"
+        ]
+      }
+    },
+    "/query-runs/{id}": {
+      "get": {
+        "operationId": "DataQueryController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryRunDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "One of your queries",
+        "tags": [
+          "Data query"
+        ]
+      }
+    },
+    "/query-runs/{id}/result": {
+      "get": {
+        "operationId": "DataQueryController_result",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "The rows of a finished query (Arrow IPC stream), or its exported file",
+        "tags": [
+          "Data query"
+        ]
+      },
+      "post": {
+        "operationId": "DataQueryController_receive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-query-run-token",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-query-run-meta",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Internal: a query job posts its result here",
+        "tags": [
+          "Data query"
+        ]
+      }
+    },
+    "/query-runs/{id}/cancel": {
+      "post": {
+        "operationId": "DataQueryController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryRunDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Stop one of your queries",
+        "tags": [
+          "Data query"
         ]
       }
     },
@@ -17507,10 +18091,6 @@
                 "$ref": "#/components/schemas/BulkUpdateSourcesSamplingDto"
               }
             ]
-          },
-          "updatedBy": {
-            "type": "string",
-            "description": "Who made the change. Recorded on the SOURCE_CONFIG_CHANGED notification a sampling change raises."
           }
         }
       },
@@ -22194,6 +22774,55 @@
           }
         }
       },
+      "NotificationAudienceDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "SCAN",
+              "FINDING",
+              "SOURCE",
+              "SYSTEM"
+            ]
+          },
+          "groupIds": {
+            "description": "Group ids that get this kind; empty means the workspace's owning group.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "updatedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "updatedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "type",
+          "groupIds"
+        ]
+      },
+      "UpdateNotificationAudienceDto": {
+        "type": "object",
+        "properties": {
+          "groupIds": {
+            "description": "Group ids of your tenant; empty sends it to the workspace's owning group.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "groupIds"
+        ]
+      },
       "NotificationResponseDto": {
         "type": "object",
         "properties": {
@@ -22507,11 +23136,6 @@
             "description": "Master switch for adaptive (\"automatic\") source scheduling. When false, no AUTO source is started; each source keeps its phase, so turning this back on resumes exactly where it left off.",
             "example": true
           },
-          "demoMode": {
-            "type": "boolean",
-            "description": "Read-only. When true, the instance runs in demo mode and all mutating operations are rejected.",
-            "example": false
-          },
           "hfTokenSet": {
             "type": "boolean",
             "description": "Read-only. Whether a user-configured Hugging Face token is stored (encrypted at rest).",
@@ -22559,11 +23183,43 @@
           "harnessMaxRecalledMemories",
           "harnessDreamIntervalDays",
           "autoScheduleEnabled",
-          "demoMode",
           "hfTokenSet",
           "hfTokenInstanceSet",
           "createdAt",
           "updatedAt"
+        ]
+      },
+      "DisplaySettingsDto": {
+        "type": "object",
+        "properties": {
+          "language": {
+            "type": "string",
+            "enum": [
+              "AUTOMATIC",
+              "ENGLISH",
+              "GERMAN"
+            ],
+            "example": "ENGLISH"
+          },
+          "timezone": {
+            "type": "string",
+            "description": "Default IANA timezone used for date/time rendering. Use \"AUTOMATIC\" to detect from browser.",
+            "example": "AUTOMATIC"
+          },
+          "timeFormat": {
+            "type": "string",
+            "enum": [
+              "AUTOMATIC",
+              "TWELVE_HOUR",
+              "TWENTY_FOUR_HOUR"
+            ],
+            "example": "TWELVE_HOUR"
+          }
+        },
+        "required": [
+          "language",
+          "timezone",
+          "timeFormat"
         ]
       },
       "UpdateInstanceSettingsDto": {
@@ -23001,8 +23657,7 @@
           },
           "owner": {
             "type": "string",
-            "description": "With sign-in, the person the token acts for (actor reference `user:<sub>`); null for tokens made without sign-in.",
-            "nullable": true
+            "description": "The person the token acts for (actor reference `user:<sub>`)."
           },
           "tokenPreview": {
             "type": "string",
@@ -23094,8 +23749,7 @@
           },
           "owner": {
             "type": "string",
-            "description": "With sign-in, the person the token acts for (actor reference `user:<sub>`); null for tokens made without sign-in.",
-            "nullable": true
+            "description": "The person the token acts for (actor reference `user:<sub>`)."
           },
           "tokenPreview": {
             "type": "string",
@@ -23990,9 +24644,6 @@
           "assignee": {
             "type": "string"
           },
-          "createdBy": {
-            "type": "string"
-          },
           "inquiryIds": {
             "description": "Link these questions to the new case (guides)",
             "type": "array",
@@ -24626,9 +25277,6 @@
           },
           "note": {
             "type": "string"
-          },
-          "addedBy": {
-            "type": "string"
           }
         },
         "required": [
@@ -24669,9 +25317,6 @@
             "items": {
               "type": "string"
             }
-          },
-          "addedBy": {
-            "type": "string"
           }
         },
         "required": [
@@ -24739,9 +25384,6 @@
           "conclusion": {
             "type": "string",
             "description": "Final conclusion — required to close the case"
-          },
-          "closedBy": {
-            "type": "string"
           },
           "keepInquiries": {
             "type": "boolean",
@@ -26710,9 +27352,6 @@
           },
           "description": {
             "type": "string"
-          },
-          "createdBy": {
-            "type": "string"
           }
         },
         "required": [
@@ -27757,9 +28396,6 @@
             "type": "string",
             "description": "Display colour (hypothesis cards and chips on the case board)",
             "maxLength": 32
-          },
-          "createdBy": {
-            "type": "string"
           }
         },
         "required": [
@@ -27797,9 +28433,6 @@
           "color": {
             "type": "string",
             "nullable": true
-          },
-          "actor": {
-            "type": "string"
           }
         }
       },
@@ -27886,9 +28519,6 @@
             "type": "object",
             "nullable": true,
             "additionalProperties": true
-          },
-          "author": {
-            "type": "string"
           }
         },
         "required": [
@@ -29277,10 +29907,6 @@
               "$ref": "#/components/schemas/ExplorePositionDto"
             },
             "description": "Node id → where it was dragged to"
-          },
-          "createdBy": {
-            "type": "string",
-            "description": "Who saved it"
           }
         }
       },
@@ -29332,10 +29958,6 @@
               "type": "string"
             }
           },
-          "allowMutations": {
-            "type": "boolean",
-            "description": "When false, every mutating tool is recorded observe-only and never executed."
-          },
           "lastError": {
             "type": "string",
             "nullable": true,
@@ -29364,7 +29986,6 @@
           "appTokenPreview",
           "capabilityGroups",
           "agentKinds",
-          "allowMutations",
           "lastError",
           "lastConnectedAt",
           "createdAt",
@@ -29418,10 +30039,6 @@
                 "DUPLICATES"
               ]
             }
-          },
-          "allowMutations": {
-            "type": "boolean",
-            "default": true
           }
         },
         "required": [
@@ -29466,9 +30083,6 @@
                 "DUPLICATES"
               ]
             }
-          },
-          "allowMutations": {
-            "type": "boolean"
           }
         }
       },
@@ -29877,9 +30491,6 @@
               "DISMISS"
             ]
           },
-          "reviewedBy": {
-            "type": "string"
-          },
           "reason": {
             "type": "string",
             "description": "Why the lead was dismissed"
@@ -29923,9 +30534,6 @@
               "ACCEPT",
               "DISMISS"
             ]
-          },
-          "reviewedBy": {
-            "type": "string"
           },
           "reason": {
             "type": "string",
@@ -30059,10 +30667,6 @@
             "items": {
               "type": "string"
             }
-          },
-          "createdBy": {
-            "type": "string",
-            "description": "Actor recorded as createdBy"
           }
         },
         "required": [
@@ -30111,9 +30715,6 @@
           "verified": {
             "type": "boolean",
             "description": "Explicitly mark the event verified"
-          },
-          "updatedBy": {
-            "type": "string"
           }
         }
       },
@@ -30515,7 +31116,6 @@
           "via": {
             "type": "string",
             "enum": [
-              "header",
               "oidc",
               "mcp-token",
               "internal-key",
@@ -30538,10 +31138,6 @@
           "actor": {
             "$ref": "#/components/schemas/MeActorDto"
           },
-          "iamEnabled": {
-            "type": "boolean",
-            "description": "True when sign-in and access management are on. Without it every visitor holds every capability."
-          },
           "capabilities": {
             "type": "array",
             "description": "Capabilities the actor holds in this workspace.",
@@ -30549,10 +31145,14 @@
               "type": "string",
               "enum": [
                 "workspace.view",
+                "settings.view",
+                "activity.view",
                 "workspace.settings",
                 "workspace.pause",
+                "workspace.publish",
                 "workspace.delete",
                 "workspace.transfer",
+                "notification.view",
                 "access.view",
                 "access.manage",
                 "source.view",
@@ -30583,6 +31183,7 @@
                 "agent.configure",
                 "agent.use",
                 "data.export",
+                "data.query",
                 "mcp.token.own",
                 "mcp.token.admin",
                 "tenant.workspace.create",
@@ -30596,7 +31197,6 @@
         },
         "required": [
           "actor",
-          "iamEnabled",
           "capabilities"
         ]
       },
@@ -30644,6 +31244,11 @@
             "type": "string",
             "nullable": true
           },
+          "entityName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Display name of the entity at record time (source/table name, group path, workspace slug)."
+          },
           "fields": {
             "description": "Top-level input keys of the change, never their values.",
             "type": "array",
@@ -30666,8 +31271,35 @@
           "operation",
           "entityType",
           "entityId",
+          "entityName",
           "fields",
           "status"
+        ]
+      },
+      "AuditEventsResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditEventDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "skip": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "skip",
+          "limit"
         ]
       },
       "ResolvedActorDto": {
@@ -30730,10 +31362,14 @@
               "type": "string",
               "enum": [
                 "workspace.view",
+                "settings.view",
+                "activity.view",
                 "workspace.settings",
                 "workspace.pause",
+                "workspace.publish",
                 "workspace.delete",
                 "workspace.transfer",
+                "notification.view",
                 "access.view",
                 "access.manage",
                 "source.view",
@@ -30764,6 +31400,7 @@
                 "agent.configure",
                 "agent.use",
                 "data.export",
+                "data.query",
                 "mcp.token.own",
                 "mcp.token.admin",
                 "tenant.workspace.create",
@@ -30836,7 +31473,9 @@
             "enum": [
               "tenant",
               "group",
-              "workspace"
+              "workspace",
+              "source",
+              "asset"
             ]
           },
           "scopeId": {
@@ -30854,6 +31493,10 @@
           "inherited": {
             "type": "boolean",
             "description": "True when the grant comes from the tenant or an owning group rather than this workspace."
+          },
+          "sourceId": {
+            "type": "string",
+            "description": "For a grant on one table: the source the table belongs to."
           }
         },
         "required": [
@@ -30891,9 +31534,15 @@
             "enum": [
               "tenant",
               "group",
-              "workspace"
+              "workspace",
+              "source",
+              "asset"
             ],
-            "description": "Tenant-level grants only: where the role applies. Workspace grants are always on that workspace."
+            "description": "Tenant-level grants: where the role applies. Workspace grants are on that workspace, or with `source` / `asset` and `resourceId` on one source or table of it (data-reader only)."
+          },
+          "resourceId": {
+            "type": "string",
+            "description": "Workspace grants with scopeType `source` or `asset`: the source or asset id."
           },
           "scopeId": {
             "type": "string",
@@ -30938,10 +31587,14 @@
               "type": "string",
               "enum": [
                 "workspace.view",
+                "settings.view",
+                "activity.view",
                 "workspace.settings",
                 "workspace.pause",
+                "workspace.publish",
                 "workspace.delete",
                 "workspace.transfer",
+                "notification.view",
                 "access.view",
                 "access.manage",
                 "source.view",
@@ -30972,6 +31625,7 @@
                 "agent.configure",
                 "agent.use",
                 "data.export",
+                "data.query",
                 "mcp.token.own",
                 "mcp.token.admin",
                 "tenant.workspace.create",
@@ -31035,6 +31689,32 @@
           "actor",
           "action",
           "detail"
+        ]
+      },
+      "TenantEventsResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TenantEventDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "skip": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "skip",
+          "limit"
         ]
       },
       "TenantMembershipDto": {
@@ -31187,57 +31867,6 @@
           "database",
           "upgradeError",
           "problem"
-        ]
-      },
-      "LocalWorkspaceDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "slug": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "slug",
-          "name"
-        ]
-      },
-      "ImportWorkspacesDto": {
-        "type": "object",
-        "properties": {
-          "slugs": {
-            "example": [
-              "finance-ledger"
-            ],
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        },
-        "required": [
-          "slugs"
-        ]
-      },
-      "ImportedWorkspacesDto": {
-        "type": "object",
-        "properties": {
-          "copied": {
-            "description": "Copied into the tenant; the open database keeps them.",
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        },
-        "required": [
-          "copied"
         ]
       },
       "StartRunnerDto": {
@@ -35107,6 +35736,391 @@
         "required": [
           "revision",
           "mode"
+        ]
+      },
+      "SavedQueryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "sql": {
+            "type": "string",
+            "description": "One SELECT over tables named `<source>.<schema>.<table>`."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "sql",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "SaveSavedQueryDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "description": "The name shown in Scripts."
+          },
+          "sql": {
+            "type": "string",
+            "description": "One SELECT over tables named `<source>.<schema>.<table>`."
+          }
+        },
+        "required": [
+          "name",
+          "sql"
+        ]
+      },
+      "QueryLimitsDto": {
+        "type": "object",
+        "properties": {
+          "maxRows": {
+            "type": "number"
+          },
+          "timeoutSeconds": {
+            "type": "number"
+          },
+          "exportMaxRows": {
+            "type": "number",
+            "description": "Rows an export may hold."
+          }
+        },
+        "required": [
+          "maxRows",
+          "timeoutSeconds",
+          "exportMaxRows"
+        ]
+      },
+      "QueryColumnDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "description": "Type as the source or Arrow names it."
+          }
+        },
+        "required": [
+          "name",
+          "type"
+        ]
+      },
+      "QueryCatalogTableDto": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string"
+          },
+          "sourceId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "description": "The asset's name as the rest of the app shows it."
+          },
+          "schema": {
+            "type": "string"
+          },
+          "table": {
+            "type": "string"
+          },
+          "sqlName": {
+            "type": "string",
+            "example": "shop_lake.shop.orders",
+            "description": "What to type in SQL: `<source>.<schema>.<table>`."
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QueryColumnDto"
+            }
+          },
+          "queryable": {
+            "type": "boolean",
+            "description": "The table can be read with SQL at all."
+          },
+          "canQuery": {
+            "type": "boolean",
+            "description": "You may query it now: it is queryable, and a role or grant gives you access."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why it cannot be queried, when it cannot."
+          }
+        },
+        "required": [
+          "assetId",
+          "sourceId",
+          "name",
+          "schema",
+          "table",
+          "sqlName",
+          "columns",
+          "queryable",
+          "canQuery"
+        ]
+      },
+      "QueryCatalogSourceDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "sqlName": {
+            "type": "string",
+            "example": "shop_lake"
+          },
+          "queryable": {
+            "type": "boolean"
+          },
+          "tables": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QueryCatalogTableDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "type",
+          "sqlName",
+          "queryable",
+          "tables"
+        ]
+      },
+      "QueryCatalogDto": {
+        "type": "object",
+        "properties": {
+          "canQueryAll": {
+            "type": "boolean",
+            "description": "You may query every table here; false when only some sources or tables are granted."
+          },
+          "limits": {
+            "$ref": "#/components/schemas/QueryLimitsDto"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QueryCatalogSourceDto"
+            }
+          }
+        },
+        "required": [
+          "canQueryAll",
+          "limits",
+          "sources"
+        ]
+      },
+      "DataQuerySettingsDto": {
+        "type": "object",
+        "properties": {
+          "maxRows": {
+            "type": "number"
+          },
+          "timeoutSeconds": {
+            "type": "number"
+          },
+          "exportMaxRows": {
+            "type": "number"
+          },
+          "updatedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "updatedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "maxRows",
+          "timeoutSeconds",
+          "exportMaxRows"
+        ]
+      },
+      "UpdateDataQuerySettingsDto": {
+        "type": "object",
+        "properties": {
+          "maxRows": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 100000
+          },
+          "timeoutSeconds": {
+            "type": "number",
+            "minimum": 5,
+            "maximum": 900
+          },
+          "exportMaxRows": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 10000000
+          }
+        }
+      },
+      "CreateQueryRunDto": {
+        "type": "object",
+        "properties": {
+          "sql": {
+            "type": "string",
+            "example": "SELECT * FROM shop_lake.shop.orders LIMIT 100",
+            "description": "One SELECT over tables named `<source>.<schema>.<table>`."
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "xlsx",
+              "csv",
+              "parquet"
+            ],
+            "description": "Export the whole result (up to the export row limit) as a file instead of showing rows. Needs data.export."
+          }
+        },
+        "required": [
+          "sql"
+        ]
+      },
+      "QueryRunErrorDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "table_not_available",
+            "description": "invalid_sql, select_only, function_not_allowed, table_name_required, table_not_available, source_unavailable, execution_error, timeout, result_too_large, job_failed, no_result"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ]
+      },
+      "QueryRunDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "sql": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "RUNNING",
+              "SUCCESS",
+              "ERROR",
+              "TIMEOUT",
+              "CANCELLED"
+            ]
+          },
+          "actorRef": {
+            "type": "string",
+            "nullable": true
+          },
+          "assetIds": {
+            "description": "The tables it read, as assets.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "rowCount": {
+            "type": "number",
+            "nullable": true
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "truncatedReason": {
+            "type": "string",
+            "nullable": true,
+            "description": "`rows` (the row limit) or `bytes` (the result size limit)."
+          },
+          "columns": {
+            "nullable": true,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QueryColumnDto"
+            }
+          },
+          "timings": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "setupMs, executeMs, totalMs (inside the job)."
+          },
+          "error": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/QueryRunErrorDto"
+              }
+            ]
+          },
+          "resultBytes": {
+            "type": "number",
+            "nullable": true
+          },
+          "resultFormat": {
+            "type": "string",
+            "nullable": true,
+            "description": "Null for rows shown in the app; xlsx, csv or parquet for an export."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "startedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "sql",
+          "status",
+          "assetIds",
+          "truncated",
+          "createdAt"
         ]
       },
       "TriggerAutopilotDto": {
@@ -39736,10 +40750,6 @@
           },
           "refId": {
             "type": "string"
-          },
-          "author": {
-            "type": "string",
-            "description": "Operator identity recorded as approver. Defaults to the X-Actor-Name header or \"operator\"."
           }
         },
         "required": [

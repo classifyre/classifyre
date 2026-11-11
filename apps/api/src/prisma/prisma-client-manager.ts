@@ -119,8 +119,8 @@ export class PrismaClientManager implements OnModuleDestroy {
       return existing;
     }
 
-    // The open database without sign-in, the workspace's tenant database
-    // with it (docs/prd/TEN §4.3). Schema names are unique across databases.
+    // The workspace's tenant database (docs/prd/TEN §4.3). Schema names are
+    // unique across databases.
     const rawUrl = new URL(workspaceDatabaseUrl(schema));
     rawUrl.searchParams.delete('schema');
     // Pass config (not a Pool instance) so PrismaPg builds its own pool with its

@@ -63,6 +63,7 @@ docs/AssistantControllerRespondRequestMessagesInner.md
 docs/AttachFindingsDto.md
 docs/AttachFindingsResponseDto.md
 docs/AuditEventDto.md
+docs/AuditEventsResponseDto.md
 docs/AutopilotApi.md
 docs/AutopilotStatsDto.md
 docs/BoardEndpointDto.md
@@ -189,6 +190,7 @@ docs/CreateManualEdgeDto.md
 docs/CreateMcpServerDto.md
 docs/CreateMcpTokenDto.md
 docs/CreateNotebookExecutionDto.md
+docs/CreateQueryRunDto.md
 docs/CreateSourceDto.md
 docs/CreateSupervisorGoalDto.md
 docs/CreateThreadDto.md
@@ -200,6 +202,8 @@ docs/CustomDetectorResponseDtoSourcesUsingInner.md
 docs/CustomDetectorTestsApi.md
 docs/CustomDetectorTrainingRunDto.md
 docs/CustomDetectorsApi.md
+docs/DataQueryApi.md
+docs/DataQuerySettingsDto.md
 docs/DataTransferApi.md
 docs/DataTransferJobDto.md
 docs/DataTransferJobListDto.md
@@ -213,6 +217,7 @@ docs/DeleteRunnerResponseDto.md
 docs/DeprecateGlossaryTermDto.md
 docs/DiscoveryRecentRunDto.md
 docs/DiscoveryRunSourceDto.md
+docs/DisplaySettingsDto.md
 docs/EdgeClass.md
 docs/EdgeDetailDto.md
 docs/EmbeddingAiProviderOptionDto.md
@@ -300,8 +305,6 @@ docs/HealthApi.md
 docs/HealthControllerGetHealth200Response.md
 docs/HypothesisStatus.md
 docs/IdentityApi.md
-docs/ImportWorkspacesDto.md
-docs/ImportedWorkspacesDto.md
 docs/IngestEdgeDto.md
 docs/InquiriesApi.md
 docs/InquiryActivityDto.md
@@ -319,7 +322,6 @@ docs/LinkInquiriesDto.md
 docs/LinkThreadSupportDto.md
 docs/ListRunnersResponseDto.md
 docs/LiveQueryResponseDto.md
-docs/LocalWorkspaceDto.md
 docs/LocationDto.md
 docs/MaintenanceApi.md
 docs/MarkAllReadDto.md
@@ -345,6 +347,7 @@ docs/NotebookExecutionDto.md
 docs/NotebookScaffoldDto.md
 docs/NotebookTemplateDto.md
 docs/NotebooksApi.md
+docs/NotificationAudienceDto.md
 docs/NotificationListResponseDto.md
 docs/NotificationResponseDto.md
 docs/NotificationsApi.md
@@ -375,6 +378,13 @@ docs/PurgeQueuedJobsResponseDto.md
 docs/PurgeSourceAssetsResponseDto.md
 docs/PutAssetChunksDto.md
 docs/PutBoardThumbnailDto.md
+docs/QueryCatalogDto.md
+docs/QueryCatalogSourceDto.md
+docs/QueryCatalogTableDto.md
+docs/QueryColumnDto.md
+docs/QueryLimitsDto.md
+docs/QueryRunDto.md
+docs/QueryRunErrorDto.md
 docs/QuickSearchAssetDto.md
 docs/QuickSearchFindingDto.md
 docs/QuickSearchRequestDto.md
@@ -458,7 +468,9 @@ docs/RunnersChartsTimelineBucketDto.md
 docs/RunnersChartsTopSourceDto.md
 docs/RunnersChartsTotalsDto.md
 docs/SaveExploreViewDto.md
+docs/SaveSavedQueryDto.md
 docs/SaveTrainingExamplesDto.md
+docs/SavedQueryDto.md
 docs/ScanCacheEntryDto.md
 docs/SearchAssetFindingDto.md
 docs/SearchAssetItemDto.md
@@ -539,6 +551,7 @@ docs/SupervisorStateDto.md
 docs/TenantAdminDto.md
 docs/TenantDto.md
 docs/TenantEventDto.md
+docs/TenantEventsResponseDto.md
 docs/TenantGroupDto.md
 docs/TenantMembershipDto.md
 docs/TestConnectionResponseDto.md
@@ -574,6 +587,7 @@ docs/UpdateCaseHypothesisRuleDto.md
 docs/UpdateChatBotDto.md
 docs/UpdateCorrelationConfigDto.md
 docs/UpdateCustomDetectorDto.md
+docs/UpdateDataQuerySettingsDto.md
 docs/UpdateEdgeDto.md
 docs/UpdateEmbeddingSettingsDto.md
 docs/UpdateEmbeddingSettingsResponseDto.md
@@ -585,6 +599,7 @@ docs/UpdateMcpServerDto.md
 docs/UpdateMcpTokenDto.md
 docs/UpdateNotebookDto.md
 docs/UpdateNotebookResponseDto.md
+docs/UpdateNotificationAudienceDto.md
 docs/UpdateNotificationImportanceDto.md
 docs/UpdateRunnerAssetStatusDto.md
 docs/UpdateSourceDto.md
@@ -618,6 +633,7 @@ src/apis/CorrelationReviewApi.ts
 src/apis/CustomDetectorExtractionsApi.ts
 src/apis/CustomDetectorTestsApi.ts
 src/apis/CustomDetectorsApi.ts
+src/apis/DataQueryApi.ts
 src/apis/DataTransferApi.ts
 src/apis/EmbeddingsApi.ts
 src/apis/EntitiesApi.ts
@@ -699,6 +715,7 @@ src/models/AssistantControllerRespondRequestMessagesInner.ts
 src/models/AttachFindingsDto.ts
 src/models/AttachFindingsResponseDto.ts
 src/models/AuditEventDto.ts
+src/models/AuditEventsResponseDto.ts
 src/models/AutopilotStatsDto.ts
 src/models/BoardEndpointDto.ts
 src/models/BoardItemDto.ts
@@ -819,6 +836,7 @@ src/models/CreateManualEdgeDto.ts
 src/models/CreateMcpServerDto.ts
 src/models/CreateMcpTokenDto.ts
 src/models/CreateNotebookExecutionDto.ts
+src/models/CreateQueryRunDto.ts
 src/models/CreateSourceDto.ts
 src/models/CreateSupervisorGoalDto.ts
 src/models/CreateThreadDto.ts
@@ -827,6 +845,7 @@ src/models/CustomDetectorFileDto.ts
 src/models/CustomDetectorResponseDto.ts
 src/models/CustomDetectorResponseDtoSourcesUsingInner.ts
 src/models/CustomDetectorTrainingRunDto.ts
+src/models/DataQuerySettingsDto.ts
 src/models/DataTransferJobDto.ts
 src/models/DataTransferJobListDto.ts
 src/models/DecisionsToCaseDto.ts
@@ -839,6 +858,7 @@ src/models/DeleteRunnerResponseDto.ts
 src/models/DeprecateGlossaryTermDto.ts
 src/models/DiscoveryRecentRunDto.ts
 src/models/DiscoveryRunSourceDto.ts
+src/models/DisplaySettingsDto.ts
 src/models/EdgeClass.ts
 src/models/EdgeDetailDto.ts
 src/models/EmbeddingAiProviderOptionDto.ts
@@ -918,8 +938,6 @@ src/models/HarnessToolDto.ts
 src/models/HarnessToolsResponseDto.ts
 src/models/HealthControllerGetHealth200Response.ts
 src/models/HypothesisStatus.ts
-src/models/ImportWorkspacesDto.ts
-src/models/ImportedWorkspacesDto.ts
 src/models/IngestEdgeDto.ts
 src/models/InquiryActivityDto.ts
 src/models/InquiryLinkedCaseDto.ts
@@ -935,7 +953,6 @@ src/models/LinkInquiriesDto.ts
 src/models/LinkThreadSupportDto.ts
 src/models/ListRunnersResponseDto.ts
 src/models/LiveQueryResponseDto.ts
-src/models/LocalWorkspaceDto.ts
 src/models/LocationDto.ts
 src/models/MarkAllReadDto.ts
 src/models/MatchOptionCustomDetectorDto.ts
@@ -958,6 +975,7 @@ src/models/NotebookDto.ts
 src/models/NotebookExecutionDto.ts
 src/models/NotebookScaffoldDto.ts
 src/models/NotebookTemplateDto.ts
+src/models/NotificationAudienceDto.ts
 src/models/NotificationListResponseDto.ts
 src/models/NotificationResponseDto.ts
 src/models/NotificationsControllerDeleteNotification200Response.ts
@@ -986,6 +1004,13 @@ src/models/PurgeQueuedJobsResponseDto.ts
 src/models/PurgeSourceAssetsResponseDto.ts
 src/models/PutAssetChunksDto.ts
 src/models/PutBoardThumbnailDto.ts
+src/models/QueryCatalogDto.ts
+src/models/QueryCatalogSourceDto.ts
+src/models/QueryCatalogTableDto.ts
+src/models/QueryColumnDto.ts
+src/models/QueryLimitsDto.ts
+src/models/QueryRunDto.ts
+src/models/QueryRunErrorDto.ts
 src/models/QuickSearchAssetDto.ts
 src/models/QuickSearchFindingDto.ts
 src/models/QuickSearchRequestDto.ts
@@ -1068,7 +1093,9 @@ src/models/RunnersChartsTimelineBucketDto.ts
 src/models/RunnersChartsTopSourceDto.ts
 src/models/RunnersChartsTotalsDto.ts
 src/models/SaveExploreViewDto.ts
+src/models/SaveSavedQueryDto.ts
 src/models/SaveTrainingExamplesDto.ts
+src/models/SavedQueryDto.ts
 src/models/ScanCacheEntryDto.ts
 src/models/SearchAssetFindingDto.ts
 src/models/SearchAssetItemDto.ts
@@ -1146,6 +1173,7 @@ src/models/SupervisorStateDto.ts
 src/models/TenantAdminDto.ts
 src/models/TenantDto.ts
 src/models/TenantEventDto.ts
+src/models/TenantEventsResponseDto.ts
 src/models/TenantGroupDto.ts
 src/models/TenantMembershipDto.ts
 src/models/TestConnectionResponseDto.ts
@@ -1180,6 +1208,7 @@ src/models/UpdateCaseHypothesisRuleDto.ts
 src/models/UpdateChatBotDto.ts
 src/models/UpdateCorrelationConfigDto.ts
 src/models/UpdateCustomDetectorDto.ts
+src/models/UpdateDataQuerySettingsDto.ts
 src/models/UpdateEdgeDto.ts
 src/models/UpdateEmbeddingSettingsDto.ts
 src/models/UpdateEmbeddingSettingsResponseDto.ts
@@ -1191,6 +1220,7 @@ src/models/UpdateMcpServerDto.ts
 src/models/UpdateMcpTokenDto.ts
 src/models/UpdateNotebookDto.ts
 src/models/UpdateNotebookResponseDto.ts
+src/models/UpdateNotificationAudienceDto.ts
 src/models/UpdateNotificationImportanceDto.ts
 src/models/UpdateRunnerAssetStatusDto.ts
 src/models/UpdateSourceDto.ts

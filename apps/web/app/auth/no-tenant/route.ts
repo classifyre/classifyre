@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import de from "@/i18n/de.json";
 import en from "@/i18n/en.json";
-import { ID_COOKIE, iamWebConfig } from "@/lib/iam/session";
+import { ID_COOKIE } from "@/lib/iam/session";
 
 /**
  * Shown to someone who signed in but belongs to no tenant (API code
@@ -23,7 +23,6 @@ const REASONS = {
 } as const satisfies Record<string, readonly (keyof typeof en.noTenantPage)[]>;
 
 export function GET(request: NextRequest) {
-  if (!iamWebConfig()) return new NextResponse(null, { status: 404 });
   const t = request.headers.get("accept-language")?.toLowerCase().startsWith("de")
     ? TEXT.de
     : TEXT.en;

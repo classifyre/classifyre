@@ -3,7 +3,17 @@
     {
       "id": "workspace.view",
       "scope": "workspace",
-      "description": "Open the workspace and read its settings and activity."
+      "description": "Open the workspace."
+    },
+    {
+      "id": "settings.view",
+      "scope": "workspace",
+      "description": "See the workspace settings: language and time, workers, cleanup, MCP, chat bots, SQL limits. Never held by visitors of a public workspace."
+    },
+    {
+      "id": "activity.view",
+      "scope": "workspace",
+      "description": "Read who changed and read what in the workspace (Activity, History). Never held by visitors of a public workspace."
     },
     {
       "id": "workspace.settings",
@@ -16,6 +26,11 @@
       "description": "Pause and resume the workspace."
     },
     {
+      "id": "workspace.publish",
+      "scope": "workspace",
+      "description": "Make the workspace public (read-only for everyone of the tenant, and for visitors of the first tenant) or private again."
+    },
+    {
       "id": "workspace.delete",
       "scope": "workspace",
       "description": "Delete the workspace."
@@ -24,6 +39,11 @@
       "id": "workspace.transfer",
       "scope": "workspace",
       "description": "Export, import or copy workspace data."
+    },
+    {
+      "id": "notification.view",
+      "scope": "workspace",
+      "description": "Get the notifications sent to your groups in the workspace, and mark them read, important or dismissed for yourself."
     },
     {
       "id": "access.view",
@@ -38,7 +58,7 @@
     {
       "id": "source.view",
       "scope": "workspace",
-      "description": "Read sources, their notebooks and their scans."
+      "description": "Read sources and their scans. Their configuration and notebook code need source.manage."
     },
     {
       "id": "source.manage",
@@ -176,6 +196,11 @@
       "description": "Export data out of the workspace (CSV, archives)."
     },
     {
+      "id": "data.query",
+      "scope": "workspace",
+      "description": "Query the rows of tables with SQL: every table here, or only the sources and tables a grant names."
+    },
+    {
       "id": "mcp.token.own",
       "scope": "workspace",
       "description": "Create and revoke your own MCP tokens."
@@ -218,6 +243,9 @@
       "scope": "workspace",
       "capabilities": [
         "workspace.view",
+        "settings.view",
+        "activity.view",
+        "notification.view",
         "access.view",
         "source.view",
         "finding.view",
@@ -237,6 +265,9 @@
       "scope": "workspace",
       "capabilities": [
         "workspace.view",
+        "settings.view",
+        "activity.view",
+        "notification.view",
         "access.view",
         "source.view",
         "finding.view",
@@ -262,6 +293,9 @@
       "scope": "workspace",
       "capabilities": [
         "workspace.view",
+        "settings.view",
+        "activity.view",
+        "notification.view",
         "access.view",
         "source.view",
         "finding.view",
@@ -286,6 +320,7 @@
       "scope": "workspace",
       "capabilities": [
         "workspace.view",
+        "notification.view",
         "mcp.token.own",
         "source.view",
         "source.manage",
@@ -304,10 +339,14 @@
       "scope": "workspace",
       "capabilities": [
         "workspace.view",
+        "settings.view",
+        "activity.view",
         "workspace.settings",
         "workspace.pause",
+        "workspace.publish",
         "workspace.delete",
         "workspace.transfer",
+        "notification.view",
         "access.view",
         "access.manage",
         "source.view",
@@ -337,8 +376,18 @@
         "agent.configure",
         "agent.use",
         "data.export",
+        "data.query",
         "mcp.token.own",
         "mcp.token.admin"
+      ]
+    },
+    {
+      "key": "data-reader",
+      "title": "Data reader",
+      "scope": "workspace",
+      "capabilities": [
+        "data.query",
+        "notification.view"
       ]
     },
     {
@@ -346,7 +395,8 @@
       "title": "Code author",
       "scope": "workspace",
       "capabilities": [
-        "code.author"
+        "code.author",
+        "notification.view"
       ]
     },
     {
@@ -356,10 +406,14 @@
       "capabilities": [
         "tenant.workspace.create",
         "workspace.view",
+        "settings.view",
+        "activity.view",
         "workspace.settings",
         "workspace.pause",
+        "workspace.publish",
         "workspace.delete",
         "workspace.transfer",
+        "notification.view",
         "access.view",
         "access.manage",
         "source.view",
@@ -389,6 +443,7 @@
         "agent.configure",
         "agent.use",
         "data.export",
+        "data.query",
         "mcp.token.own",
         "mcp.token.admin"
       ]
@@ -400,7 +455,9 @@
       "capabilities": [
         "tenant.audit.view",
         "access.view",
-        "workspace.view"
+        "workspace.view",
+        "activity.view",
+        "notification.view"
       ]
     },
     {
@@ -409,10 +466,14 @@
       "scope": "tenant",
       "capabilities": [
         "workspace.view",
+        "settings.view",
+        "activity.view",
         "workspace.settings",
         "workspace.pause",
+        "workspace.publish",
         "workspace.delete",
         "workspace.transfer",
+        "notification.view",
         "access.view",
         "access.manage",
         "source.view",
@@ -443,6 +504,7 @@
         "agent.configure",
         "agent.use",
         "data.export",
+        "data.query",
         "mcp.token.own",
         "mcp.token.admin",
         "tenant.workspace.create",

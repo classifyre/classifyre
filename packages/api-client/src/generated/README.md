@@ -68,7 +68,7 @@ All URIs are relative to *http://localhost*
 *AccessApi* | [**tenantAccessControllerRoles**](docs/AccessApi.md#tenantaccesscontrollerroles) | **GET** /tenant/roles | The built-in roles and where each can be granted
 *AccessApi* | [**tenantAccessControllerTenant**](docs/AccessApi.md#tenantaccesscontrollertenant) | **GET** /tenant | The caller’s tenant and what they may do across it
 *AccessApi* | [**tenantAccessControllerTenants**](docs/AccessApi.md#tenantaccesscontrollertenants) | **GET** /tenant/tenants | Every tenant the caller belongs to, for switching (§12.2)
-*AccessApi* | [**workspaceAccessControllerAddGrant**](docs/AccessApi.md#workspaceaccesscontrolleraddgrant) | **POST** /access/grants | Give a group or a person a role on this workspace
+*AccessApi* | [**workspaceAccessControllerAddGrant**](docs/AccessApi.md#workspaceaccesscontrolleraddgrant) | **POST** /access/grants | Give a group a role on this workspace, or data access to one of its sources or tables
 *AccessApi* | [**workspaceAccessControllerExplain**](docs/AccessApi.md#workspaceaccesscontrollerexplain) | **GET** /access/explain | Why can I do this? The grants that give you a capability here
 *AccessApi* | [**workspaceAccessControllerGrants**](docs/AccessApi.md#workspaceaccesscontrollergrants) | **GET** /access/grants | Grants that reach this workspace, including inherited ones
 *AccessApi* | [**workspaceAccessControllerGroups**](docs/AccessApi.md#workspaceaccesscontrollergroups) | **GET** /access/groups | Groups of this tenant, to grant access to
@@ -237,6 +237,20 @@ All URIs are relative to *http://localhost*
 *CustomDetectorsApi* | [**customDetectorsControllerTrainingHistory**](docs/CustomDetectorsApi.md#customdetectorscontrollertraininghistory) | **GET** /custom-detectors/{id}/training-history | List training history for custom detector
 *CustomDetectorsApi* | [**customDetectorsControllerUpdate**](docs/CustomDetectorsApi.md#customdetectorscontrollerupdate) | **PATCH** /custom-detectors/{id} | Update custom detector
 *CustomDetectorsApi* | [**customDetectorsControllerUploadFile**](docs/CustomDetectorsApi.md#customdetectorscontrolleruploadfile) | **POST** /custom-detectors/{id}/files | Upload one file to a code detector
+*DataQueryApi* | [**dataQueryControllerCancel**](docs/DataQueryApi.md#dataquerycontrollercancel) | **POST** /query-runs/{id}/cancel | Stop one of your queries
+*DataQueryApi* | [**dataQueryControllerCreate**](docs/DataQueryApi.md#dataquerycontrollercreate) | **POST** /query-runs | Run one SELECT; poll the run for its status
+*DataQueryApi* | [**dataQueryControllerCreateSaved**](docs/DataQueryApi.md#dataquerycontrollercreatesaved) | **POST** /saved-queries | Save SQL under a name
+*DataQueryApi* | [**dataQueryControllerGet**](docs/DataQueryApi.md#dataquerycontrollerget) | **GET** /query-runs/{id} | One of your queries
+*DataQueryApi* | [**dataQueryControllerGetCatalog**](docs/DataQueryApi.md#dataquerycontrollergetcatalog) | **GET** /data-query/catalog | The tables you can query with SQL, and those you could with access
+*DataQueryApi* | [**dataQueryControllerGetSaved**](docs/DataQueryApi.md#dataquerycontrollergetsaved) | **GET** /saved-queries/{id} | One of your saved queries
+*DataQueryApi* | [**dataQueryControllerGetSettings**](docs/DataQueryApi.md#dataquerycontrollergetsettings) | **GET** /data-query/settings | The SQL limits of this workspace
+*DataQueryApi* | [**dataQueryControllerList**](docs/DataQueryApi.md#dataquerycontrollerlist) | **GET** /query-runs | Your recent queries in this workspace
+*DataQueryApi* | [**dataQueryControllerListSaved**](docs/DataQueryApi.md#dataquerycontrollerlistsaved) | **GET** /saved-queries | Your saved SQL in this workspace
+*DataQueryApi* | [**dataQueryControllerReceive**](docs/DataQueryApi.md#dataquerycontrollerreceive) | **POST** /query-runs/{id}/result | Internal: a query job posts its result here
+*DataQueryApi* | [**dataQueryControllerRemoveSaved**](docs/DataQueryApi.md#dataquerycontrollerremovesaved) | **DELETE** /saved-queries/{id} | Delete a saved query
+*DataQueryApi* | [**dataQueryControllerResult**](docs/DataQueryApi.md#dataquerycontrollerresult) | **GET** /query-runs/{id}/result | The rows of a finished query (Arrow IPC stream), or its exported file
+*DataQueryApi* | [**dataQueryControllerUpdateSaved**](docs/DataQueryApi.md#dataquerycontrollerupdatesaved) | **PATCH** /saved-queries/{id} | Rename a saved query or save new SQL under it
+*DataQueryApi* | [**dataQueryControllerUpdateSettings**](docs/DataQueryApi.md#dataquerycontrollerupdatesettings) | **PUT** /data-query/settings | Set the limits of SQL queries in this workspace
 *DataTransferApi* | [**dataTransferControllerCancel**](docs/DataTransferApi.md#datatransfercontrollercancel) | **POST** /data-transfer/jobs/{id}/cancel | Ask a running transfer to stop
 *DataTransferApi* | [**dataTransferControllerDownload**](docs/DataTransferApi.md#datatransfercontrollerdownload) | **GET** /data-transfer/exports/{id}/download | Download a completed export archive
 *DataTransferApi* | [**dataTransferControllerJob**](docs/DataTransferApi.md#datatransfercontrollerjob) | **GET** /data-transfer/jobs/{id} | Poll one transfer job for progress
@@ -353,6 +367,7 @@ All URIs are relative to *http://localhost*
 *InquiriesApi* | [**inquiriesControllerRemove**](docs/InquiriesApi.md#inquiriescontrollerremove) | **DELETE** /inquiries/{id} | Delete an inquiry
 *InquiriesApi* | [**inquiriesControllerTimeline**](docs/InquiriesApi.md#inquiriescontrollertimeline) | **GET** /inquiries/{id}/timeline | The inquiry\&#39;s own history: config changes and each run\&#39;s deltas
 *InquiriesApi* | [**inquiriesControllerUpdate**](docs/InquiriesApi.md#inquiriescontrollerupdate) | **PATCH** /inquiries/{id} | Update an inquiry (matchers change → matches recomputed)
+*InstanceSettingsApi* | [**instanceSettingsControllerGetDisplaySettings**](docs/InstanceSettingsApi.md#instancesettingscontrollergetdisplaysettings) | **GET** /instance-settings/display | How dates and language are shown
 *InstanceSettingsApi* | [**instanceSettingsControllerGetSettings**](docs/InstanceSettingsApi.md#instancesettingscontrollergetsettings) | **GET** /instance-settings | Get instance settings
 *InstanceSettingsApi* | [**instanceSettingsControllerUpdateSettings**](docs/InstanceSettingsApi.md#instancesettingscontrollerupdatesettings) | **PUT** /instance-settings | Update instance settings
 *InstanceSettingsApi* | [**mcpSettingsControllerCreateToken**](docs/InstanceSettingsApi.md#mcpsettingscontrollercreatetoken) | **POST** /instance-settings/mcp/tokens | Create MCP access token
@@ -369,9 +384,9 @@ All URIs are relative to *http://localhost*
 *NamespacesApi* | [**namespacesControllerCreate**](docs/NamespacesApi.md#namespacescontrollercreate) | **POST** /namespaces | Create a namespace (provisions its Postgres schema + migrations)
 *NamespacesApi* | [**namespacesControllerCreateCategory**](docs/NamespacesApi.md#namespacescontrollercreatecategory) | **POST** /namespaces/categories | Create a workspace category
 *NamespacesApi* | [**namespacesControllerGet**](docs/NamespacesApi.md#namespacescontrollerget) | **GET** /namespaces/{id} | Get a namespace by id
-*NamespacesApi* | [**namespacesControllerList**](docs/NamespacesApi.md#namespacescontrollerlist) | **GET** /namespaces | List the namespaces the caller can see (all of them without sign-in)
+*NamespacesApi* | [**namespacesControllerList**](docs/NamespacesApi.md#namespacescontrollerlist) | **GET** /namespaces | List the namespaces the caller can see
 *NamespacesApi* | [**namespacesControllerListCategories**](docs/NamespacesApi.md#namespacescontrollerlistcategories) | **GET** /namespaces/categories | List workspace categories with workspace counts
-*NamespacesApi* | [**namespacesControllerOwningGroups**](docs/NamespacesApi.md#namespacescontrollerowninggroups) | **GET** /namespaces/owning-groups | Groups the caller may create workspaces for (empty without sign-in)
+*NamespacesApi* | [**namespacesControllerOwningGroups**](docs/NamespacesApi.md#namespacescontrollerowninggroups) | **GET** /namespaces/owning-groups | Groups the caller may create workspaces for
 *NamespacesApi* | [**namespacesControllerRemove**](docs/NamespacesApi.md#namespacescontrollerremove) | **DELETE** /namespaces/{id} | Soft-delete a namespace (hidden from listings; data retained)
 *NamespacesApi* | [**namespacesControllerRemoveCategory**](docs/NamespacesApi.md#namespacescontrollerremovecategory) | **DELETE** /namespaces/categories/{categoryId} | Delete a category (its workspaces fall back to the default category)
 *NamespacesApi* | [**namespacesControllerStats**](docs/NamespacesApi.md#namespacescontrollerstats) | **GET** /namespaces/stats | Per-namespace source rollups (total + failing + running + pending)
@@ -389,13 +404,13 @@ All URIs are relative to *http://localhost*
 *NotebooksApi* | [**notebookControllerScaffold**](docs/NotebooksApi.md#notebookcontrollerscaffold) | **GET** /notebooks/scaffold | The starter cells and the functions a notebook must define
 *NotebooksApi* | [**notebookControllerTemplates**](docs/NotebooksApi.md#notebookcontrollertemplates) | **GET** /notebooks/templates | Worked notebooks an author can start from or borrow cells out of
 *NotebooksApi* | [**notebookControllerUpdate**](docs/NotebooksApi.md#notebookcontrollerupdate) | **PUT** /sources/{sourceId}/notebook | Save a notebook
-*NotificationsApi* | [**notificationsControllerDeleteNotification**](docs/NotificationsApi.md#notificationscontrollerdeletenotification) | **DELETE** /notifications/{id} | Delete a notification
+*NotificationsApi* | [**notificationsControllerAudiences**](docs/NotificationsApi.md#notificationscontrolleraudiences) | **GET** /notifications/audiences | Which groups get each kind of notification
+*NotificationsApi* | [**notificationsControllerDeleteNotification**](docs/NotificationsApi.md#notificationscontrollerdeletenotification) | **DELETE** /notifications/{id} | Dismiss a notification
 *NotificationsApi* | [**notificationsControllerListNotifications**](docs/NotificationsApi.md#notificationscontrollerlistnotifications) | **GET** /notifications | List notifications
-*NotificationsApi* | [**notificationsControllerMarkAllRead**](docs/NotificationsApi.md#notificationscontrollermarkallread) | **PATCH** /notifications/mark-all-read | Mark all notifications as read
+*NotificationsApi* | [**notificationsControllerMarkAllRead**](docs/NotificationsApi.md#notificationscontrollermarkallread) | **PATCH** /notifications/mark-all-read | Mark all your notifications as read
 *NotificationsApi* | [**notificationsControllerMarkRead**](docs/NotificationsApi.md#notificationscontrollermarkread) | **PATCH** /notifications/{id}/read | Mark a notification as read
+*NotificationsApi* | [**notificationsControllerSetAudience**](docs/NotificationsApi.md#notificationscontrollersetaudience) | **PUT** /notifications/audiences/{type} | Choose which groups get a kind of notification
 *NotificationsApi* | [**notificationsControllerSetImportant**](docs/NotificationsApi.md#notificationscontrollersetimportant) | **PATCH** /notifications/{id}/important | Set notification importance
-*PlatformApi* | [**platformControllerImportWorkspaces**](docs/PlatformApi.md#platformcontrollerimportworkspaces) | **POST** /platform/tenants/{tenantId}/workspaces | Copy workspaces made without sign-in into a tenant
-*PlatformApi* | [**platformControllerLocalWorkspaces**](docs/PlatformApi.md#platformcontrollerlocalworkspaces) | **GET** /platform/workspaces/local | Workspaces made without sign-in, which can be brought into a tenant
 *PlatformApi* | [**platformControllerMe**](docs/PlatformApi.md#platformcontrollerme) | **GET** /platform/me | Whether the caller is an operator (403 when not)
 *PlatformApi* | [**platformControllerRemove**](docs/PlatformApi.md#platformcontrollerremove) | **DELETE** /platform/tenants/{tenantId} | Remove a tenant whose organization was deleted
 *PlatformApi* | [**platformControllerResume**](docs/PlatformApi.md#platformcontrollerresume) | **POST** /platform/tenants/{tenantId}/resume | Resume a suspended tenant
@@ -567,6 +582,7 @@ All URIs are relative to *http://localhost*
 - [AttachFindingsDto](docs/AttachFindingsDto.md)
 - [AttachFindingsResponseDto](docs/AttachFindingsResponseDto.md)
 - [AuditEventDto](docs/AuditEventDto.md)
+- [AuditEventsResponseDto](docs/AuditEventsResponseDto.md)
 - [AutopilotStatsDto](docs/AutopilotStatsDto.md)
 - [BoardEndpointDto](docs/BoardEndpointDto.md)
 - [BoardItemDto](docs/BoardItemDto.md)
@@ -687,6 +703,7 @@ All URIs are relative to *http://localhost*
 - [CreateMcpServerDto](docs/CreateMcpServerDto.md)
 - [CreateMcpTokenDto](docs/CreateMcpTokenDto.md)
 - [CreateNotebookExecutionDto](docs/CreateNotebookExecutionDto.md)
+- [CreateQueryRunDto](docs/CreateQueryRunDto.md)
 - [CreateSourceDto](docs/CreateSourceDto.md)
 - [CreateSupervisorGoalDto](docs/CreateSupervisorGoalDto.md)
 - [CreateThreadDto](docs/CreateThreadDto.md)
@@ -695,6 +712,7 @@ All URIs are relative to *http://localhost*
 - [CustomDetectorResponseDto](docs/CustomDetectorResponseDto.md)
 - [CustomDetectorResponseDtoSourcesUsingInner](docs/CustomDetectorResponseDtoSourcesUsingInner.md)
 - [CustomDetectorTrainingRunDto](docs/CustomDetectorTrainingRunDto.md)
+- [DataQuerySettingsDto](docs/DataQuerySettingsDto.md)
 - [DataTransferJobDto](docs/DataTransferJobDto.md)
 - [DataTransferJobListDto](docs/DataTransferJobListDto.md)
 - [DecisionsToCaseDto](docs/DecisionsToCaseDto.md)
@@ -707,6 +725,7 @@ All URIs are relative to *http://localhost*
 - [DeprecateGlossaryTermDto](docs/DeprecateGlossaryTermDto.md)
 - [DiscoveryRecentRunDto](docs/DiscoveryRecentRunDto.md)
 - [DiscoveryRunSourceDto](docs/DiscoveryRunSourceDto.md)
+- [DisplaySettingsDto](docs/DisplaySettingsDto.md)
 - [EdgeClass](docs/EdgeClass.md)
 - [EdgeDetailDto](docs/EdgeDetailDto.md)
 - [EmbeddingAiProviderOptionDto](docs/EmbeddingAiProviderOptionDto.md)
@@ -786,8 +805,6 @@ All URIs are relative to *http://localhost*
 - [HarnessToolsResponseDto](docs/HarnessToolsResponseDto.md)
 - [HealthControllerGetHealth200Response](docs/HealthControllerGetHealth200Response.md)
 - [HypothesisStatus](docs/HypothesisStatus.md)
-- [ImportWorkspacesDto](docs/ImportWorkspacesDto.md)
-- [ImportedWorkspacesDto](docs/ImportedWorkspacesDto.md)
 - [IngestEdgeDto](docs/IngestEdgeDto.md)
 - [InquiryActivityDto](docs/InquiryActivityDto.md)
 - [InquiryLinkedCaseDto](docs/InquiryLinkedCaseDto.md)
@@ -803,7 +820,6 @@ All URIs are relative to *http://localhost*
 - [LinkThreadSupportDto](docs/LinkThreadSupportDto.md)
 - [ListRunnersResponseDto](docs/ListRunnersResponseDto.md)
 - [LiveQueryResponseDto](docs/LiveQueryResponseDto.md)
-- [LocalWorkspaceDto](docs/LocalWorkspaceDto.md)
 - [LocationDto](docs/LocationDto.md)
 - [MarkAllReadDto](docs/MarkAllReadDto.md)
 - [MatchOptionCustomDetectorDto](docs/MatchOptionCustomDetectorDto.md)
@@ -826,6 +842,7 @@ All URIs are relative to *http://localhost*
 - [NotebookExecutionDto](docs/NotebookExecutionDto.md)
 - [NotebookScaffoldDto](docs/NotebookScaffoldDto.md)
 - [NotebookTemplateDto](docs/NotebookTemplateDto.md)
+- [NotificationAudienceDto](docs/NotificationAudienceDto.md)
 - [NotificationListResponseDto](docs/NotificationListResponseDto.md)
 - [NotificationResponseDto](docs/NotificationResponseDto.md)
 - [NotificationsControllerDeleteNotification200Response](docs/NotificationsControllerDeleteNotification200Response.md)
@@ -854,6 +871,13 @@ All URIs are relative to *http://localhost*
 - [PurgeSourceAssetsResponseDto](docs/PurgeSourceAssetsResponseDto.md)
 - [PutAssetChunksDto](docs/PutAssetChunksDto.md)
 - [PutBoardThumbnailDto](docs/PutBoardThumbnailDto.md)
+- [QueryCatalogDto](docs/QueryCatalogDto.md)
+- [QueryCatalogSourceDto](docs/QueryCatalogSourceDto.md)
+- [QueryCatalogTableDto](docs/QueryCatalogTableDto.md)
+- [QueryColumnDto](docs/QueryColumnDto.md)
+- [QueryLimitsDto](docs/QueryLimitsDto.md)
+- [QueryRunDto](docs/QueryRunDto.md)
+- [QueryRunErrorDto](docs/QueryRunErrorDto.md)
 - [QuickSearchAssetDto](docs/QuickSearchAssetDto.md)
 - [QuickSearchFindingDto](docs/QuickSearchFindingDto.md)
 - [QuickSearchRequestDto](docs/QuickSearchRequestDto.md)
@@ -936,7 +960,9 @@ All URIs are relative to *http://localhost*
 - [RunnersChartsTopSourceDto](docs/RunnersChartsTopSourceDto.md)
 - [RunnersChartsTotalsDto](docs/RunnersChartsTotalsDto.md)
 - [SaveExploreViewDto](docs/SaveExploreViewDto.md)
+- [SaveSavedQueryDto](docs/SaveSavedQueryDto.md)
 - [SaveTrainingExamplesDto](docs/SaveTrainingExamplesDto.md)
+- [SavedQueryDto](docs/SavedQueryDto.md)
 - [ScanCacheEntryDto](docs/ScanCacheEntryDto.md)
 - [SearchAssetFindingDto](docs/SearchAssetFindingDto.md)
 - [SearchAssetItemDto](docs/SearchAssetItemDto.md)
@@ -1014,6 +1040,7 @@ All URIs are relative to *http://localhost*
 - [TenantAdminDto](docs/TenantAdminDto.md)
 - [TenantDto](docs/TenantDto.md)
 - [TenantEventDto](docs/TenantEventDto.md)
+- [TenantEventsResponseDto](docs/TenantEventsResponseDto.md)
 - [TenantGroupDto](docs/TenantGroupDto.md)
 - [TenantMembershipDto](docs/TenantMembershipDto.md)
 - [TestConnectionResponseDto](docs/TestConnectionResponseDto.md)
@@ -1048,6 +1075,7 @@ All URIs are relative to *http://localhost*
 - [UpdateChatBotDto](docs/UpdateChatBotDto.md)
 - [UpdateCorrelationConfigDto](docs/UpdateCorrelationConfigDto.md)
 - [UpdateCustomDetectorDto](docs/UpdateCustomDetectorDto.md)
+- [UpdateDataQuerySettingsDto](docs/UpdateDataQuerySettingsDto.md)
 - [UpdateEdgeDto](docs/UpdateEdgeDto.md)
 - [UpdateEmbeddingSettingsDto](docs/UpdateEmbeddingSettingsDto.md)
 - [UpdateEmbeddingSettingsResponseDto](docs/UpdateEmbeddingSettingsResponseDto.md)
@@ -1059,6 +1087,7 @@ All URIs are relative to *http://localhost*
 - [UpdateMcpTokenDto](docs/UpdateMcpTokenDto.md)
 - [UpdateNotebookDto](docs/UpdateNotebookDto.md)
 - [UpdateNotebookResponseDto](docs/UpdateNotebookResponseDto.md)
+- [UpdateNotificationAudienceDto](docs/UpdateNotificationAudienceDto.md)
 - [UpdateNotificationImportanceDto](docs/UpdateNotificationImportanceDto.md)
 - [UpdateRunnerAssetStatusDto](docs/UpdateRunnerAssetStatusDto.md)
 - [UpdateSourceDto](docs/UpdateSourceDto.md)

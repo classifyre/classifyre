@@ -8,8 +8,6 @@
 # Usage:
 #   ./scripts/demo-deployment.sh
 #   ./scripts/demo-deployment.sh 0.3.2
-#   ./scripts/demo-deployment.sh --demo-mode false
-#   ./scripts/demo-deployment.sh 0.3.2 --demo-mode false
 
 set -euo pipefail
 
@@ -21,25 +19,18 @@ Usage:
 
 Options:
   -t, --image-tag TAG    Docker tag to deploy. Default: main
-      --demo-mode BOOL   Set api.env.DEMO_MODE to true or false. Default: true
       --timeout DURATION Helm and rollout timeout. Default: 15m
   -h, --help             Show this help
 
 Examples:
-  # Deploy latest main tag with demo mode ON (default)
+  # Deploy the latest main tag
   ./scripts/demo-deployment.sh
 
-  # Deploy a specific tag with demo mode ON
+  # Deploy a specific tag
   ./scripts/demo-deployment.sh 0.3.2
 
-  # Deploy a specific tag with demo mode OFF
-  ./scripts/demo-deployment.sh 0.3.2 --demo-mode false
-
-  # Keep current tag, just toggle demo mode OFF
-  ./scripts/demo-deployment.sh --demo-mode false
-
-  # Keep current tag, just toggle demo mode ON
-  ./scripts/demo-deployment.sh --demo-mode true
+What visitors see is the first tenant's public workspaces, a workspace
+setting (Settings → Access), not a deployment flag.
 EOF
 }
 
@@ -74,7 +65,6 @@ IMAGE_TAG="main"
 HELM_NAMESPACE="classifyre"
 HELM_RELEASE_NAME="classifyre"
 BASE_VALUES_FILE="./helm/develop/values-vps.yaml"
-DEMO_MODE="true"
 DEPLOY_TIMEOUT="15m"
 DOCKER_NAMESPACE="${DOCKER_NAMESPACE:-classifyre}"
 POSITIONAL_IMAGE_TAG=""
@@ -84,11 +74,6 @@ while [[ $# -gt 0 ]]; do
     -t|--image-tag)
       require_arg "$1" "${2:-}"
       IMAGE_TAG="$2"
-      shift 2
-      ;;
-    --demo-mode)
-      require_arg "$1" "${2:-}"
-      DEMO_MODE="$(normalize_bool "$2")"
       shift 2
       ;;
     --timeout)
@@ -141,7 +126,6 @@ echo "╔═══════════════════════�
 echo "║  Showcase deploy: tag=${IMAGE_TAG}"
 echo "║  Namespace: ${HELM_NAMESPACE}"
 echo "║  Release: ${HELM_RELEASE_NAME}"
-echo "║  Demo mode: ${DEMO_MODE}"
 echo "╚══════════════════════════════════════════════════╝"
 
 # ── Resolve kubeconfig ────────────────────────────────────────────────────────
@@ -174,7 +158,6 @@ helm upgrade --install "${HELM_RELEASE_NAME}" ./helm/classifyre \
   --set api.cliJobs.image.tag="${IMAGE_TAG}" \
   --set frontend.image.repository="${DOCKER_NAMESPACE}/web" \
   --set frontend.image.tag="${IMAGE_TAG}" \
-  --set-string api.env.DEMO_MODE="${DEMO_MODE}" \
   --wait \
   --timeout "${DEPLOY_TIMEOUT}"
 

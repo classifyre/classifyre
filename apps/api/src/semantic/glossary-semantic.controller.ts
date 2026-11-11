@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ActorRef } from '../identity/actor-ref.decorator';
-import { AllowInDemoMode } from '../demo-mode.decorator';
+import { ReadsOnly } from '../reads-only.decorator';
 import {
   GlossaryProposalsService,
   PROPOSAL_KINDS,
@@ -147,7 +147,7 @@ export class GlossarySemanticController {
 
   @Post('terms/:idOrKey/find-in-text/preview')
   @HttpCode(HttpStatus.OK)
-  @AllowInDemoMode()
+  @ReadsOnly()
   findInTextPreviewWith(
     @Param('idOrKey') idOrKey: string,
     @Body() body: FindInTextInput,

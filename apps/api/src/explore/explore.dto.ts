@@ -1,4 +1,8 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  ApiHideProperty,
+  ApiProperty,
+  ApiPropertyOptional,
+} from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -423,7 +427,8 @@ export class SaveExploreViewDto {
   @IsObject()
   positions?: Record<string, ExplorePositionDto>;
 
-  @ApiPropertyOptional({ description: 'Who saved it' })
+  // Set by the server from the signed-in person; never sent by clients.
+  @ApiHideProperty()
   @IsOptional()
   @IsString()
   createdBy?: string;

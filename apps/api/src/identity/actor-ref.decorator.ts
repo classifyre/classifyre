@@ -1,5 +1,4 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
-import { ACTOR_NAME_HEADER, personFromHeader } from './actor';
 import type { ActorRequest } from './access.guard';
 
 /**
@@ -8,13 +7,6 @@ import type { ActorRequest } from './access.guard';
  * {@link AccessGuard} resolved, so every route attributes the same way.
  */
 export const ActorRef = createParamDecorator(
-  (_data: unknown, ctx: ExecutionContext): string | undefined => {
-    const request = ctx
-      .switchToHttp()
-      .getRequest<ActorRequest & { headers?: Record<string, unknown> }>();
-    const actor =
-      request.classifyreActor ??
-      personFromHeader(request.headers?.[ACTOR_NAME_HEADER]);
-    return actor.ref;
-  },
+  (_data: unknown, ctx: ExecutionContext): string | undefined =>
+    ctx.switchToHttp().getRequest<ActorRequest>().classifyreActor?.ref,
 );

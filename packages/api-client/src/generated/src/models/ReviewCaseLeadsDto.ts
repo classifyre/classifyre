@@ -26,12 +26,6 @@ export interface ReviewCaseLeadsDto {
      */
     action: ReviewCaseLeadsDtoActionEnum;
     /**
-     * 
-     * @type {string}
-     * @memberof ReviewCaseLeadsDto
-     */
-    reviewedBy?: string;
-    /**
      * Why the lead was dismissed
      * @type {string}
      * @memberof ReviewCaseLeadsDto
@@ -76,7 +70,6 @@ export function ReviewCaseLeadsDtoFromJSONTyped(json: any, ignoreDiscriminator: 
     return {
         
         'action': json['action'],
-        'reviewedBy': json['reviewedBy'] == null ? undefined : json['reviewedBy'],
         'reason': json['reason'] == null ? undefined : json['reason'],
         'leadIds': json['leadIds'],
     };
@@ -94,7 +87,6 @@ export function ReviewCaseLeadsDtoToJSONTyped(value?: ReviewCaseLeadsDto | null,
     return {
         
         'action': value['action'],
-        'reviewedBy': value['reviewedBy'],
         'reason': value['reason'],
         'leadIds': value['leadIds'],
     };

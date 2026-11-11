@@ -120,16 +120,21 @@ export class JwtVerifier {
     return entry.key;
   }
 
+  /**
+   * Fetches the published keys. Only a successful fetch starts the refetch
+   * interval: when the identity server is still starting (the all-in-one
+   * image restarts the API first) or briefly down, the next request tries
+   * again instead of refusing every token as "Unknown signing key" for half a
+   * minute. A server that does not answer is unavailability (503, try again),
+   * not a bad token (401).
+   */
   private async refresh(): Promise<void> {
-    this.lastFetch = Date.now();
     const response = await (this.options.fetchImpl ?? fetch)(
       this.options.jwksUrl,
       { signal: AbortSignal.timeout(3_000) },
     );
     if (!response.ok) {
-      throw new InvalidTokenError(
-        `Signing keys unavailable (${response.status})`,
-      );
+      throw new Error(`Signing keys unavailable (${response.status})`);
     }
     const body = (await response.json()) as {
       keys?: (JsonWebKey & { kid?: string; use?: string; alg?: string })[];
@@ -147,5 +152,6 @@ export class JwtVerifier {
       }
     }
     this.keys = keys;
+    this.lastFetch = Date.now();
   }
 }

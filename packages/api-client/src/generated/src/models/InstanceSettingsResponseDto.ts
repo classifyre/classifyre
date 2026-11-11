@@ -182,12 +182,6 @@ export interface InstanceSettingsResponseDto {
      */
     autoScheduleEnabled: boolean;
     /**
-     * Read-only. When true, the instance runs in demo mode and all mutating operations are rejected.
-     * @type {boolean}
-     * @memberof InstanceSettingsResponseDto
-     */
-    demoMode: boolean;
-    /**
      * Read-only. Whether a user-configured Hugging Face token is stored (encrypted at rest).
      * @type {boolean}
      * @memberof InstanceSettingsResponseDto
@@ -266,7 +260,6 @@ export function instanceOfInstanceSettingsResponseDto(value: object): value is I
     if (!('harnessMaxRecalledMemories' in value) || value['harnessMaxRecalledMemories'] === undefined) return false;
     if (!('harnessDreamIntervalDays' in value) || value['harnessDreamIntervalDays'] === undefined) return false;
     if (!('autoScheduleEnabled' in value) || value['autoScheduleEnabled'] === undefined) return false;
-    if (!('demoMode' in value) || value['demoMode'] === undefined) return false;
     if (!('hfTokenSet' in value) || value['hfTokenSet'] === undefined) return false;
     if (!('hfTokenInstanceSet' in value) || value['hfTokenInstanceSet'] === undefined) return false;
     if (!('createdAt' in value) || value['createdAt'] === undefined) return false;
@@ -311,7 +304,6 @@ export function InstanceSettingsResponseDtoFromJSONTyped(json: any, ignoreDiscri
         'harnessMaxRecalledMemories': json['harnessMaxRecalledMemories'],
         'harnessDreamIntervalDays': json['harnessDreamIntervalDays'],
         'autoScheduleEnabled': json['autoScheduleEnabled'],
-        'demoMode': json['demoMode'],
         'hfTokenSet': json['hfTokenSet'],
         'hfTokenInstanceSet': json['hfTokenInstanceSet'],
         'createdAt': (new Date(json['createdAt'])),
@@ -357,7 +349,6 @@ export function InstanceSettingsResponseDtoToJSONTyped(value?: InstanceSettingsR
         'harnessMaxRecalledMemories': value['harnessMaxRecalledMemories'],
         'harnessDreamIntervalDays': value['harnessDreamIntervalDays'],
         'autoScheduleEnabled': value['autoScheduleEnabled'],
-        'demoMode': value['demoMode'],
         'hfTokenSet': value['hfTokenSet'],
         'hfTokenInstanceSet': value['hfTokenInstanceSet'],
         'createdAt': value['createdAt'].toISOString(),

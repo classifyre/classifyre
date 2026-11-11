@@ -85,12 +85,6 @@ export interface CreateInquiryDto {
      * @memberof CreateInquiryDto
      */
     description?: string;
-    /**
-     * 
-     * @type {string}
-     * @memberof CreateInquiryDto
-     */
-    createdBy?: string;
 }
 
 
@@ -137,7 +131,6 @@ export function CreateInquiryDtoFromJSONTyped(json: any, ignoreDiscriminator: bo
         'termsIncludeNarrower': json['termsIncludeNarrower'] == null ? undefined : json['termsIncludeNarrower'],
         'title': json['title'],
         'description': json['description'] == null ? undefined : json['description'],
-        'createdBy': json['createdBy'] == null ? undefined : json['createdBy'],
     };
 }
 
@@ -163,7 +156,6 @@ export function CreateInquiryDtoToJSONTyped(value?: CreateInquiryDto | null, ign
         'termsIncludeNarrower': value['termsIncludeNarrower'],
         'title': value['title'],
         'description': value['description'],
-        'createdBy': value['createdBy'],
     };
 }
 

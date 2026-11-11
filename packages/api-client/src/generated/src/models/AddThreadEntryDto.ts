@@ -37,12 +37,6 @@ export interface AddThreadEntryDto {
      * @memberof AddThreadEntryDto
      */
     metadata?: { [key: string]: any; } | null;
-    /**
-     * 
-     * @type {string}
-     * @memberof AddThreadEntryDto
-     */
-    author?: string;
 }
 
 
@@ -79,7 +73,6 @@ export function AddThreadEntryDtoFromJSONTyped(json: any, ignoreDiscriminator: b
         'entryType': json['entryType'],
         'body': json['body'] == null ? undefined : json['body'],
         'metadata': json['metadata'] == null ? undefined : json['metadata'],
-        'author': json['author'] == null ? undefined : json['author'],
     };
 }
 
@@ -97,7 +90,6 @@ export function AddThreadEntryDtoToJSONTyped(value?: AddThreadEntryDto | null, i
         'entryType': value['entryType'],
         'body': value['body'],
         'metadata': value['metadata'],
-        'author': value['author'],
     };
 }
 

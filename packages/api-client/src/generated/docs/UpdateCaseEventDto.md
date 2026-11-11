@@ -14,7 +14,6 @@ Name | Type
 `findingIds` | Array&lt;string&gt;
 `evidenceIds` | Array&lt;string&gt;
 `verified` | boolean
-`updatedBy` | string
 
 ## Example
 
@@ -31,7 +30,6 @@ const example = {
   "findingIds": null,
   "evidenceIds": null,
   "verified": null,
-  "updatedBy": null,
 } satisfies UpdateCaseEventDto
 
 console.log(example)

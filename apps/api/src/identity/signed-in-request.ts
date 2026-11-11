@@ -98,9 +98,8 @@ export function assertSameOrigin(
 }
 
 /**
- * Body fields in which clients name who made a change. Without sign-in they
- * are a self-declared name; with sign-in the author is whoever signed in, so
- * the request cannot claim someone else.
+ * Body fields that name who made a change. The author is whoever signed in,
+ * so a request cannot claim someone else: any value sent is replaced.
  */
 export const AUTHOR_FIELDS = [
   'actor',

@@ -1,9 +1,14 @@
 import 'reflect-metadata';
 import { Controller, Get, Post, type ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { AllowInDemoMode } from '../demo-mode.decorator';
+import { ReadsOnly } from '../reads-only.decorator';
 import { InternalOnly } from '../internal-only.decorator';
-import { AccessArea, PublicRoute, Requires } from './access.decorators';
+import {
+  AccessArea,
+  PublicRoute,
+  Requires,
+  SignedInOnly,
+} from './access.decorators';
 import { AccessGuard, CapabilityRequiredException } from './access.guard';
 import type { AccessPolicy } from './access-policy';
 import type { Actor } from './actor';
@@ -19,7 +24,7 @@ class SampleController {
   @Post()
   create() {}
 
-  @AllowInDemoMode()
+  @ReadsOnly()
   @Post('search')
   search() {}
 
@@ -30,6 +35,10 @@ class SampleController {
   @InternalOnly()
   @Post(':id/assets')
   ingest() {}
+
+  @SignedInOnly()
+  @Get('sql')
+  sql() {}
 }
 
 @Controller()
@@ -78,17 +87,31 @@ describe('AccessGuard', () => {
     set: (actor: Actor) => {
       current = actor;
     },
+    workspaceId: () => 'ws-1',
   } as unknown as ActorContextService;
   const internalKey = {
     isInternalRequest: (headers?: Record<string, unknown>) =>
       headers?.['x-internal'] === 'yes',
+  };
+  const person: Actor = {
+    id: 'user:u1',
+    ref: 'user:u1',
+    displayName: 'Jordan Reyes',
+    kind: 'person',
+    via: 'oidc',
+  };
+  const identity = {
+    config: { appOrigin: null },
+    authenticate: () =>
+      Promise.resolve({ actor: person, via: 'bearer', grants: [] }),
+    tenantCapabilities: () => new Set(),
   };
   const guard = new AccessGuard(
     new Reflector(),
     actors,
     internalKey as never,
     policy,
-    null,
+    identity as never,
   );
 
   beforeEach(() => {
@@ -139,18 +162,13 @@ describe('AccessGuard', () => {
     );
   });
 
-  it('resolves the actor from X-Actor-Name and leaves it on the request', async () => {
+  it('takes the actor from the token, never from X-Actor-Name', async () => {
     const { context, request } = contextFor(SampleController, 'list', 'GET', {
-      'x-actor-name': encodeURIComponent('Jordan Reyes'),
+      'x-actor-name': 'Someone Else',
     });
     await guard.canActivate(context);
-    expect(current).toMatchObject({
-      kind: 'person',
-      via: 'header',
-      displayName: 'Jordan Reyes',
-      ref: 'Jordan Reyes',
-    });
-    expect(request.classifyreActor).toBe(current);
+    expect(current).toBe(person);
+    expect(request.classifyreActor).toBe(person);
   });
 
   it('marks internal-key callers as the system actor', async () => {
@@ -162,7 +180,7 @@ describe('AccessGuard', () => {
   });
 });
 
-describe('AccessGuard with sign-in', () => {
+describe('AccessGuard on signed-in writes', () => {
   const APP = 'https://classifyre.example';
   const actor: Actor = {
     id: 'user:u1',
@@ -234,6 +252,64 @@ describe('AccessGuard with sign-in', () => {
       createdBy: 'user:u1',
       author: 'user:u1',
     });
+  });
+
+  it('asks a visitor to sign in instead of refusing them a capability', async () => {
+    allow = false;
+    const visitorIdentity = {
+      ...identity,
+      authenticate: () =>
+        Promise.resolve({
+          actor: { ...actor, ref: undefined, kind: 'visitor' },
+          via: 'cookie',
+          grants: [],
+          visitor: true,
+        }),
+    };
+    const visitorGuard = new AccessGuard(
+      new Reflector(),
+      {
+        set: () => undefined,
+        workspaceId: () => 'ws-1',
+      } as unknown as ActorContextService,
+      { isInternalRequest: () => false } as never,
+      { check: () => ({ allow }), capabilities: () => new Set() },
+      visitorIdentity as never,
+    );
+    const { context } = contextFor(SampleController, 'create', 'POST');
+    await expect(visitorGuard.canActivate(context)).rejects.toMatchObject({
+      response: { statusCode: 401, code: 'SIGN_IN_REQUIRED' },
+    });
+  });
+
+  it('asks a visitor to sign in on signed-in-only routes, even where they may read', async () => {
+    allow = true;
+    const visitorGuard = new AccessGuard(
+      new Reflector(),
+      {
+        set: () => undefined,
+        workspaceId: () => 'ws-1',
+      } as unknown as ActorContextService,
+      { isInternalRequest: () => false } as never,
+      { check: () => ({ allow }), capabilities: () => new Set() },
+      {
+        ...identity,
+        authenticate: () =>
+          Promise.resolve({
+            actor: { ...actor, ref: undefined, kind: 'visitor' },
+            via: 'cookie',
+            grants: [],
+            visitor: true,
+          }),
+      } as never,
+    );
+    const { context } = contextFor(SampleController, 'sql', 'GET');
+    await expect(visitorGuard.canActivate(context)).rejects.toMatchObject({
+      response: { statusCode: 401, code: 'SIGN_IN_REQUIRED' },
+    });
+    // A signed-in person passes on the same route.
+    const signedIn = contextFor(SampleController, 'sql', 'GET');
+    await expect(guard.canActivate(signedIn.context)).resolves.toBe(true);
   });
 
   it('checks the route capability in the workspace', async () => {

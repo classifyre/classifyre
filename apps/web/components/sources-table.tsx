@@ -72,6 +72,7 @@ import { mergeRunnerIntoSearchSourceItem } from "@/lib/runner-ws-merge";
 import { DeleteSourceAction } from "./delete-source-action";
 import { useUrlParams } from "../lib/url-filters";
 import { useRunnerWebSocket } from "@/hooks/use-runner-websocket";
+import { Can } from "@/hooks/use-me";
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
 import { BulkUpdateSourcesDialog } from "./bulk-update-sources-dialog";
@@ -1075,6 +1076,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
                               )}
                             </Button>
                           )}
+                          <Can capability="source.manage">
                           <Button
                             size="sm"
                             variant="outline"
@@ -1085,6 +1087,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
                           >
                             <Settings className="h-3.5 w-3.5" />
                           </Button>
+                          </Can>
                           <DeleteSourceAction
                             sourceId={source.id}
                             iconOnly

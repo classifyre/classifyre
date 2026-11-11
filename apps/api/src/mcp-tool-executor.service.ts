@@ -3,16 +3,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ClsService } from 'nestjs-cls';
-import { DemoModeService } from './demo-mode.service';
-import { DemoModeException } from './demo-mode.exception';
 import { CliRunnerService } from './cli-runner/cli-runner.service';
 import { CustomDetectorsService } from './custom-detectors.service';
 import { CustomDetectorTestsService } from './custom-detector-tests.service';
 import { SchedulerService } from './scheduler/scheduler.service';
 import { SourceService } from './source.service';
 import { ValidationService } from './validation.service';
-import { CLS_DEMO_MODE_BYPASS } from './namespace/namespace.constants';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -57,21 +53,9 @@ export class McpToolExecutorService {
     private readonly customDetectorTests: CustomDetectorTestsService,
     private readonly cliRunnerService: CliRunnerService,
     private readonly schedulerService: SchedulerService,
-    private readonly demoMode: DemoModeService,
-    private readonly cls: ClsService,
   ) {}
 
-  /** Guard for any mutating MCP tool. Public so the factory can call it
-   * directly for tools that talk to a domain service without an executor
-   * passthrough method. Passes when the MCP request carried the bypass key. */
-  assertNotDemoMode(): void {
-    if (this.demoMode.isDemoMode && !this.cls.get(CLS_DEMO_MODE_BYPASS)) {
-      throw new DemoModeException();
-    }
-  }
-
   async createSource(args: CreateSourceArgs) {
-    this.assertNotDemoMode();
     const normalizedConfig = await this.prepareSourceConfig(
       args.type,
       args.config,
@@ -95,7 +79,6 @@ export class McpToolExecutorService {
   }
 
   async updateSource(args: UpdateSourceArgs) {
-    this.assertNotDemoMode();
     const source = await this.requireSource(args.id);
     let normalizedConfig: JsonRecord | undefined;
 
@@ -134,17 +117,14 @@ export class McpToolExecutorService {
   }
 
   async testSourceConnection(id: string) {
-    this.assertNotDemoMode();
     return this.cliRunnerService.testConnection(id);
   }
 
   async createCustomDetector(args: CreateCustomDetectorArgs) {
-    this.assertNotDemoMode();
     return this.customDetectorsService.create(args);
   }
 
   async trainCustomDetector(args: TrainCustomDetectorArgs) {
-    this.assertNotDemoMode();
     return this.customDetectorsService.train(args.id, {
       sourceId: args.sourceId,
     });
@@ -162,7 +142,6 @@ export class McpToolExecutorService {
     inputAsset?: Record<string, unknown>;
     expectedOutcome: Record<string, unknown>;
   }) {
-    this.assertNotDemoMode();
     return this.customDetectorTests.createScenario(args.detectorId, args);
   }
 
@@ -171,7 +150,6 @@ export class McpToolExecutorService {
     triggeredBy?: string;
     scenarioIds?: string[];
   }) {
-    this.assertNotDemoMode();
     return this.customDetectorTests.runScenarios(
       args.detectorId,
       (args.triggeredBy as any) || 'ASSISTANT',
@@ -180,7 +158,6 @@ export class McpToolExecutorService {
   }
 
   async deleteDetectorTestScenario(detectorId: string, scenarioId: string) {
-    this.assertNotDemoMode();
     await this.customDetectorTests.deleteScenario(detectorId, scenarioId);
     return { deleted: true, scenarioId };
   }

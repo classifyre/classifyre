@@ -285,12 +285,8 @@ which each deployment sets on its own after including this block.
         secretKeyRef:
           name: {{ include "classifyre.apiMaskedConfigSecretName" . }}
           key: {{ include "classifyre.apiMaskedConfigSecretKey" . }}
-    {{- if .Values.iam.enabled }}
-    # With sign-in it upgrades the control database and every tenant's.
-    - name: IAM_ENABLED
-      value: "true"
+    # It upgrades the control database and every tenant's.
     {{- include "classifyre.tenantDatabases.env" . | nindent 4 }}
-    {{- end }}
     {{- if and (eq .Values.postgres.mode "external") .Values.postgres.external.existingSecret .Values.postgres.external.existingSecretUrlKey }}
     - name: DATABASE_URL
       valueFrom:
@@ -527,6 +523,19 @@ which each deployment sets on its own after including this block.
   value: {{ .Values.api.cliJobs.cleanupPolicy | quote }}
 - name: K8S_CLI_JOB_WORKDIR
   value: {{ .Values.api.cliJobs.workDir | quote }}
+{{- with .Values.api.cliJobs.query }}
+- name: K8S_CLI_QUERY_JOB_MEMORY
+  value: {{ .memory | quote }}
+- name: K8S_CLI_QUERY_JOB_CPU
+  value: {{ .cpu | quote }}
+- name: K8S_CLI_QUERY_JOB_MAX_SPILL
+  value: {{ .maxSpill | quote }}
+{{- $queryPriority := include "classifyre.priorityClassName" (dict "name" .priorityClassName "root" $.root) }}
+{{- if $queryPriority }}
+- name: K8S_CLI_QUERY_JOB_PRIORITY_CLASS
+  value: {{ $queryPriority | quote }}
+{{- end }}
+{{- end }}
 {{- if .Values.api.cliJobs.huggingFace.existingSecret }}
 - name: HF_TOKEN_INSTANCE_SET
   value: "1"
@@ -570,7 +579,6 @@ which each deployment sets on its own after including this block.
 {{- end }}
 {{- include "classifyre.telemetryEnv" . | nindent 0 }}
 {{- include "classifyre.iam.env" . | nindent 0 }}
-{{- if .Values.iam.enabled }}
 {{- include "classifyre.tenantDatabases.env" . | nindent 0 }}
 - name: IAM_API_CLIENT_ID
   value: classifyre-api
@@ -579,7 +587,6 @@ which each deployment sets on its own after including this block.
     secretKeyRef:
       name: {{ include "classifyre.iam.secretName" . }}
       key: api-client-secret
-{{- end }}
 {{- with .Values.api.extraEnv }}
 {{- toYaml . | nindent 0 }}
 {{- end }}
@@ -662,6 +669,10 @@ Usage: {{ include "classifyre.priorityClassServiceName" . }}
 {{- printf "%s-%s" .Release.Name .Values.priorityClasses.batchName -}}
 {{- end -}}
 
+{{- define "classifyre.priorityClassInteractiveName" -}}
+{{- printf "%s-%s" .Release.Name .Values.priorityClasses.interactiveName -}}
+{{- end -}}
+
 {{/*
 Resolve a pod's priorityClassName, refusing to name a class this release has
 not created.
@@ -692,6 +703,8 @@ Usage: {{ include "classifyre.priorityClassName" (dict "name" .Values.api.priori
 {{- if $pc.create -}}{{- include "classifyre.priorityClassServiceName" .root -}}{{- end -}}
 {{- else if eq $name $pc.batchName -}}
 {{- if $pc.create -}}{{- include "classifyre.priorityClassBatchName" .root -}}{{- end -}}
+{{- else if eq $name $pc.interactiveName -}}
+{{- if $pc.create -}}{{- include "classifyre.priorityClassInteractiveName" .root -}}{{- end -}}
 {{- else -}}
 {{- $name -}}
 {{- end -}}
@@ -845,9 +858,6 @@ password
 {{- end -}}
 
 {{- define "classifyre.iam.env" -}}
-- name: IAM_ENABLED
-  value: {{ .Values.iam.enabled | quote }}
-{{- if .Values.iam.enabled }}
 - name: IAM_ISSUER_URL
   value: {{ include "classifyre.iam.issuerUrl" . | quote }}
 - name: IAM_INTERNAL_URL
@@ -860,13 +870,8 @@ password
   value: {{ include "classifyre.iam.appUrl" . | quote }}
 - name: IAM_BOOTSTRAP_TENANT
   value: {{ .Values.iam.bootstrap.tenant.alias | quote }}
-{{- if .Values.iam.public.enabled }}
-- name: IAM_PUBLIC_TENANT
-  value: {{ .Values.iam.public.tenant | quote }}
-{{- end }}
 - name: IAM_EXPOSE_ADMIN_CONSOLE
   value: {{ .Values.iam.exposeAdminConsole | quote }}
 - name: IAM_REALM_CONSOLE
   value: {{ .Values.iam.realmConsole | quote }}
-{{- end }}
 {{- end -}}

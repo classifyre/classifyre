@@ -1,15 +1,11 @@
 import {
-  Inject,
   Injectable,
   Logger,
   OnModuleDestroy,
   OnModuleInit,
-  Optional,
 } from '@nestjs/common';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import type { IamConfig } from '../identity/iam-config';
-import { IAM_CONFIG } from '../identity/identity.tokens';
 import { McpServerFactoryService } from '../mcp-server.factory';
 import { ToolRegistry } from '../autopilot/tools/tool-registry.service';
 import {
@@ -37,7 +33,6 @@ export class BuiltinMcpToolsService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly factory: McpServerFactoryService,
     private readonly registry: ToolRegistry,
-    @Optional() @Inject(IAM_CONFIG) private readonly iam?: IamConfig | null,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -96,11 +91,11 @@ export class BuiltinMcpToolsService implements OnModuleInit, OnModuleDestroy {
     if (!this.client) {
       throw new Error('Built-in MCP bridge is not connected.');
     }
-    // Chat bots act without a signed-in person. With sign-in on they may only
-    // read until they get a role of their own (docs/prd IAM, step 9).
-    if (this.iam && this.readOnly.get(name) !== true) {
+    // Chat bots act without a signed-in person, so they only read until they
+    // get a role of their own (docs/prd IAM, step 9).
+    if (this.readOnly.get(name) !== true) {
       throw new Error(
-        `With sign-in on, chat bots can only use read tools; "${name}" changes data.`,
+        `Chat bots can only use read tools; "${name}" changes data.`,
       );
     }
     const result = await this.client.callTool(

@@ -194,13 +194,6 @@ export class InstanceSettingsResponseDto {
 
   @ApiProperty({
     description:
-      'Read-only. When true, the instance runs in demo mode and all mutating operations are rejected.',
-    example: false,
-  })
-  demoMode: boolean;
-
-  @ApiProperty({
-    description:
       'Read-only. Whether a user-configured Hugging Face token is stored (encrypted at rest).',
     example: false,
   })
@@ -219,4 +212,20 @@ export class InstanceSettingsResponseDto {
 
   @ApiProperty()
   updatedAt: Date;
+}
+
+/** What every page needs to show dates and text, for anyone in the workspace. */
+export class DisplaySettingsDto {
+  @ApiProperty({ enum: INSTANCE_LANGUAGE_VALUES, example: 'ENGLISH' })
+  language: InstanceLanguageValue;
+
+  @ApiProperty({
+    description:
+      'Default IANA timezone used for date/time rendering. Use "AUTOMATIC" to detect from browser.',
+    example: 'AUTOMATIC',
+  })
+  timezone: string;
+
+  @ApiProperty({ enum: INSTANCE_TIME_FORMAT_VALUES, example: 'TWELVE_HOUR' })
+  timeFormat: InstanceTimeFormatValue;
 }

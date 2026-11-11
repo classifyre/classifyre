@@ -82,6 +82,18 @@ Each notification has a severity that reflects how urgently it needs your attent
 
 High-severity notifications are also marked as **Important** automatically, so they stay visible even after you read them. You can toggle the Important flag on any notification manually.
 
+## Who Gets Them
+
+Notifications go to groups. By default they go to the group that owns the
+workspace, and so to everyone in it or in a group below it; under **Settings →
+Access → Who gets notifications** someone who manages access sends each kind
+(Scans, Findings, Sources, System) to other groups instead. Each notification
+keeps the groups it was sent to. See
+[Access → Notifications go to groups](/access/#notifications-go-to-groups).
+
+Read, Important and Dismiss are yours alone: your colleagues still see what you
+marked read or dismissed.
+
 ## The Notifications Page
 
 The bell shows your most recent alerts. For the full history — with filtering by severity, type, and read status — open the **Notifications** page from the sidebar.
@@ -89,8 +101,8 @@ The bell shows your most recent alerts. For the full history — with filtering 
 From there you can:
 
 - Filter by severity, type, or source
-- Mark a subset as read using the active filters
-- Dismiss notifications you no longer need
-- Pin notifications as Important to keep them accessible
+- Mark a subset as read (for you) using the active filters
+- Dismiss notifications you no longer need (for you)
+- Pin notifications as Important to keep them accessible (for you)
 
 Notifications are stored indefinitely and are not automatically deleted, so you can always look back at when a source first failed or when an anomaly was detected.

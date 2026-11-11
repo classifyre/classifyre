@@ -23,6 +23,18 @@ const VIEWS: readonly Capability[] = WORKSPACE_CAPABILITIES.filter((id) =>
   id.endsWith('.view'),
 );
 
+/**
+ * Views a visitor of a public workspace never gets (docs/prd/IAM §13 step
+ * 8h): who has access, notifications, the settings, and the activity — what
+ * people did is not the public's to read.
+ */
+const NOT_FOR_VISITORS: ReadonlySet<Capability> = new Set<Capability>([
+  'access.view',
+  'notification.view',
+  'settings.view',
+  'activity.view',
+]);
+
 const WORKSPACE_ADMIN: readonly Capability[] = WORKSPACE_CAPABILITIES.filter(
   (id) => id !== 'code.author',
 );
@@ -70,6 +82,7 @@ export const BUILT_IN_ROLES = [
     scope: 'workspace',
     capabilities: [
       'workspace.view',
+      'notification.view',
       'mcp.token.own',
       'source.view',
       'source.manage',
@@ -89,11 +102,20 @@ export const BUILT_IN_ROLES = [
     capabilities: WORKSPACE_ADMIN,
   },
   {
+    // Add-on to Viewer (or any role with workspace.view): reading table rows
+    // with SQL. Granted on a workspace, a group's workspaces, or one source or
+    // table (docs/prd/DQ-data-query.md §4).
+    key: 'data-reader',
+    title: 'Data reader',
+    scope: 'workspace',
+    capabilities: ['data.query', 'notification.view'],
+  },
+  {
     // Add-on: combined with another role, never granted alone in practice.
     key: 'code-author',
     title: 'Code author',
     scope: 'workspace',
-    capabilities: ['code.author'],
+    capabilities: ['code.author', 'notification.view'],
   },
   {
     // Access group, not a business unit: its members create workspaces for
@@ -108,7 +130,13 @@ export const BUILT_IN_ROLES = [
     key: 'auditor',
     title: 'Auditor',
     scope: 'tenant',
-    capabilities: ['tenant.audit.view', 'access.view', 'workspace.view'],
+    capabilities: [
+      'tenant.audit.view',
+      'access.view',
+      'workspace.view',
+      'activity.view',
+      'notification.view',
+    ],
   },
   {
     key: 'tenant-admin',
@@ -123,13 +151,14 @@ export const BUILT_IN_ROLES = [
     capabilities: ['platform.tenants.manage'],
   },
   {
-    // People who have not signed in, on an installation with a public tenant
-    // (docs/prd/IAM §13 step 8e): they read its workspaces. Not who has
-    // access, not the tenant's activity, no MCP tokens; never granted.
+    // People who have not signed in (docs/prd/IAM §13 step 8h): they read the
+    // public workspaces of the first tenant. Not who has access, not the
+    // settings, not the activity, no notifications (they belong to groups,
+    // and a visitor is in none), no MCP tokens, no SQL; never granted.
     key: 'visitor',
     title: 'Visitor',
     scope: 'public',
-    capabilities: VIEWS.filter((id) => id !== 'access.view'),
+    capabilities: VIEWS.filter((id) => !NOT_FOR_VISITORS.has(id)),
   },
 ] as const satisfies readonly RoleDefinition[];
 

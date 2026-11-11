@@ -50,12 +50,6 @@ export interface CreateCaseDto {
      */
     assignee?: string;
     /**
-     * 
-     * @type {string}
-     * @memberof CreateCaseDto
-     */
-    createdBy?: string;
-    /**
      * Link these questions to the new case (guides)
      * @type {Array<string>}
      * @memberof CreateCaseDto
@@ -135,7 +129,6 @@ export function CreateCaseDtoFromJSONTyped(json: any, ignoreDiscriminator: boole
         'status': json['status'] == null ? undefined : json['status'],
         'severity': json['severity'] == null ? undefined : json['severity'],
         'assignee': json['assignee'] == null ? undefined : json['assignee'],
-        'createdBy': json['createdBy'] == null ? undefined : json['createdBy'],
         'inquiryIds': json['inquiryIds'] == null ? undefined : json['inquiryIds'],
         'autoPullInquiryIds': json['autoPullInquiryIds'] == null ? undefined : json['autoPullInquiryIds'],
         'removeGoneFindings': json['removeGoneFindings'] == null ? undefined : json['removeGoneFindings'],
@@ -160,7 +153,6 @@ export function CreateCaseDtoToJSONTyped(value?: CreateCaseDto | null, ignoreDis
         'status': value['status'],
         'severity': value['severity'],
         'assignee': value['assignee'],
-        'createdBy': value['createdBy'],
         'inquiryIds': value['inquiryIds'],
         'autoPullInquiryIds': value['autoPullInquiryIds'],
         'removeGoneFindings': value['removeGoneFindings'],

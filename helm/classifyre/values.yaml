@@ -255,8 +255,6 @@ api:
     # -- How often (milliseconds) worker pods re-evaluate namespace idleness
     # -- and wake sleeping namespaces. Code default when unset: 60000.
     NAMESPACE_IDLE_CHECK_MS: "60000"
-    # -- Enable read-only demo mode. When "true" all mutating API operations return 403.
-    DEMO_MODE: "false"
 
   maskedConfigEncryption:
     # -- Existing secret name that contains API masked-config encryption key.
@@ -282,8 +280,8 @@ api:
   # -- injected into the API and worker pods, forwarded by them into every CLI
   # -- job's environment, and stripped from inbound requests by the web proxy so
   # -- a browser can never present it. It also exempts those CLI callbacks from
-  # -- the demo-mode read-only guard, which is what lets scheduled scans and the
-  # -- autopilot agents keep working on a demo instance.
+  # -- the read-only guard, which is what lets scheduled scans and the
+  # -- autopilot agents keep working while nobody signed in can write.
   internalApiKey:
     # -- Existing secret name that contains the internal API key.
     # -- When set, chart will not create or manage this secret.
@@ -501,6 +499,17 @@ api:
           - ALL
 
   cliJobs:
+    # -- SQL query jobs (docs/prd/DQ-data-query.md). Each query is one short-lived Job.
+    query:
+      # -- Memory of one query Job (request = limit). DuckDB is given 70 % of it
+      # -- and spills the rest of a large sort, join or aggregate to disk.
+      memory: 2Gi
+      # -- CPU limit of one query Job; DuckDB uses as many threads as whole cores.
+      cpu: "1"
+      # -- Priority class of query Jobs (`priorityClasses.interactiveName` by default).
+      priorityClassName: interactive
+      # -- How much a query may spill to the pod's disk before it is stopped.
+      maxSpill: 10GiB
     # -- Enable Kubernetes-backed CLI jobs.
     enabled: true
     # -- Namespace used for CLI jobs. Empty means release namespace.
@@ -1013,11 +1022,9 @@ ingress:
   tls: []
 
 iam:
-  # Sign-in and access management (docs/prd/IAM-access-management.md). With it
-  # off, anyone who reaches the instance can do everything. On by default in
-  # this chart; the all-in-one Docker image never uses it.
-  # -- Turn sign-in and access management on. Off restores open access.
-  enabled: true
+  # Sign-in and access management (docs/prd/IAM-access-management.md). Always
+  # on: every install has the identity server, and the all-in-one Docker image
+  # ships it too. People open Classifyre at ingress.host (or iam.appUrl).
   image:
     # -- Identity server image repository.
     repository: quay.io/keycloak/keycloak
@@ -1065,16 +1072,9 @@ iam:
       existingSecret: ""
       # -- Key of the password in `existingSecret`.
       existingSecretPasswordKey: password
-  public:
-    # -- Let people who have not signed in browse one tenant's workspaces, read-only, with **Sign in** at the top. They hold the Visitor role there: no access lists, no tenant activity, no MCP tokens. Signed-in people see only their own tenant, never the public one unless they belong to it. Off: everyone must sign in. Allows `frontend.sitemap.enabled`, which then lists only the public tenant.
-    enabled: false
-    # -- Alias of the public tenant. The setup job creates its organization with an empty top-level `admins` group when it does not exist; add its editors there in the identity server. Can be the first tenant's alias (`iam.bootstrap.tenant.alias`), so the first admin edits what visitors see.
-    tenant: public
-    # -- Display name of the public tenant when the setup job creates it.
-    name: Public
   bootstrap:
     tenant:
-      # -- Alias of the first tenant (organization), created on install.
+      # -- Alias of the first tenant (organization), created on install. People who have not signed in read its public workspaces (a workspace setting), read-only.
       alias: default
       # -- Display name of the first tenant.
       name: Default
@@ -1347,6 +1347,13 @@ priorityClasses:
   batchName: batch-low-priority
   # -- Numeric priority value for batch workloads.
   batchValue: 1000
+  # -- Priority class name for interactive CLI Jobs: SQL queries someone is
+  # -- waiting for in the browser. Between service and batch, so a query is
+  # -- scheduled before queued scans; preemptionPolicy Never, so it never
+  # -- evicts a running scan to get its place.
+  interactiveName: interactive
+  # -- Numeric priority value for interactive CLI Jobs.
+  interactiveValue: 5000
 
 telemetry:
   # -- Enable OpenTelemetry instrumentation for API, web, and CLI components.

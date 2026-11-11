@@ -2056,11 +2056,6 @@
               "required": false
             },
             {
-              "name": "createdBy",
-              "type": "string",
-              "required": false
-            },
-            {
               "name": "matchAllSources",
               "type": "boolean",
               "required": false,
@@ -2542,11 +2537,6 @@
             },
             {
               "name": "assignee",
-              "type": "string",
-              "required": false
-            },
-            {
-              "name": "createdBy",
               "type": "string",
               "required": false
             },
@@ -3448,11 +3438,6 @@
             {
               "name": "confidence",
               "type": "number",
-              "required": false
-            },
-            {
-              "name": "createdBy",
-              "type": "string",
               "required": false
             }
           ]

@@ -47,7 +47,7 @@ import { SearchAssetsRequestDto } from '../dto/search-assets-request.dto';
 import { SearchAssetsResponseDto } from '../dto/search-assets-response.dto';
 import { SearchAssetsChartsRequestDto } from '../dto/search-assets-charts-request.dto';
 import { SearchAssetsChartsResponseDto } from '../dto/search-assets-charts-response.dto';
-import { AllowInDemoMode } from '../demo-mode.decorator';
+import { ReadsOnly } from '../reads-only.decorator';
 import { ReadOnlyEndpoint } from '../db/read-only-endpoint.decorator';
 import { InternalOnly } from '../internal-only.decorator';
 import { CliBackpressureGuard } from '../guards/cli-backpressure.guard';
@@ -127,7 +127,7 @@ export class AssetsController {
   }
 }
 
-@AllowInDemoMode()
+@ReadsOnly()
 @ReadOnlyEndpoint()
 @AccessArea({ view: 'asset.view', change: 'asset.tag' })
 @Controller('search')

@@ -8,11 +8,17 @@ import {
 import { Reflector } from '@nestjs/core';
 import { InternalApiKeyService } from '../internal-api-key.service';
 import { ACCESS_POLICY, type AccessPolicy } from './access-policy';
-import { resolveLocalRequestActor, SYSTEM_ACTOR, type Actor } from './actor';
+import { SYSTEM_ACTOR, type Actor } from './actor';
 import { ActorContextService } from './actor-context.service';
 import type { Capability } from './capabilities';
+import { SIGNED_IN_KEY } from './access.decorators';
 import { resolveRouteAccess } from './route-access';
-import type { IdentityService, Operator, Principal } from './identity.service';
+import {
+  AuthenticationError,
+  type IdentityService,
+  type Operator,
+  type Principal,
+} from './identity.service';
 import { IDENTITY } from './identity.tokens';
 import {
   assertSameOrigin,
@@ -42,7 +48,7 @@ export class CapabilityRequiredException extends ForbiddenException {
 /**
  * Resolves the actor of every HTTP request and checks the capability its
  * route declares (docs/prd/S1 R6) against the access policy. Registered after
- * the internal-key, demo-mode and paused guards, which answer other
+ * the internal-key and paused guards, which answer other
  * questions.
  */
 @Injectable()
@@ -52,7 +58,7 @@ export class AccessGuard implements CanActivate {
     private readonly actors: ActorContextService,
     private readonly internalApiKey: InternalApiKeyService,
     @Inject(ACCESS_POLICY) private readonly policy: AccessPolicy,
-    @Inject(IDENTITY) private readonly identity: IdentityService | null,
+    @Inject(IDENTITY) private readonly identity: IdentityService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -77,21 +83,7 @@ export class AccessGuard implements CanActivate {
     );
     if (!access) throw new CapabilityRequiredException(null);
 
-    if (!this.identity) {
-      const actor = resolveLocalRequestActor(
-        request.headers,
-        this.internalApiKey,
-      );
-      this.remember(request, actor);
-      if (access.kind !== 'capability') return true;
-      const decision = await this.policy.check(actor, access.capability);
-      if (!decision.allow) {
-        throw new CapabilityRequiredException(access.capability);
-      }
-      return true;
-    }
-
-    // Sign-in on: the actor is whoever the token says, never a header.
+    // The actor is whoever the token says, never a header.
     if (this.internalApiKey.isInternalRequest(request.headers)) {
       this.remember(request, SYSTEM_ACTOR);
       return true;
@@ -118,12 +110,21 @@ export class AccessGuard implements CanActivate {
     }
 
     const principal = await this.authenticate(request);
-    assertSameOrigin(
-      principal,
-      { method: request.method, headers: request.headers },
-      this.identity.config.appOrigin,
-    );
+    // A visitor brings no session for another site to ride on.
+    if (!principal.visitor) {
+      assertSameOrigin(
+        principal,
+        { method: request.method, headers: request.headers },
+        this.identity.config.appOrigin,
+      );
+    }
     this.remember(request, principal.actor);
+    if (principal.visitor && this.signedInOnly(context)) {
+      throwAuthenticationError(
+        new AuthenticationError('Sign in to continue.', 'SIGN_IN_REQUIRED'),
+      );
+    }
+    // Visitors name nobody; they cannot write either.
     if (principal.actor.ref) {
       stampAuthorFields(request.body, principal.actor.ref);
     }
@@ -134,9 +135,8 @@ export class AccessGuard implements CanActivate {
         principal.actor,
         access.capability,
       );
-      if (!decision.allow) {
-        throw new CapabilityRequiredException(access.capability);
-      }
+      if (!decision.allow)
+        this.denyAsSignInOrForbidden(principal, access.capability);
       return true;
     }
 
@@ -148,9 +148,33 @@ export class AccessGuard implements CanActivate {
       access.capability !== 'tenant.workspace.create' &&
       !this.identity.tenantCapabilities(principal).has(access.capability)
     ) {
-      throw new CapabilityRequiredException(access.capability);
+      this.denyAsSignInOrForbidden(principal, access.capability);
     }
     return true;
+  }
+
+  private signedInOnly(context: ExecutionContext): boolean {
+    return Boolean(
+      this.reflector.get<boolean>(SIGNED_IN_KEY, context.getHandler()) ??
+        this.reflector.get<boolean>(SIGNED_IN_KEY, context.getClass()),
+    );
+  }
+
+  /**
+   * Someone who has not signed in only reads public workspaces: anything
+   * more asks them to sign in (401), which the web app turns into the
+   * sign-in page. A signed-in person lacks a grant (403).
+   */
+  private denyAsSignInOrForbidden(
+    principal: Principal,
+    capability: Capability,
+  ): never {
+    if (principal.visitor) {
+      throwAuthenticationError(
+        new AuthenticationError('Sign in to continue.', 'SIGN_IN_REQUIRED'),
+      );
+    }
+    throw new CapabilityRequiredException(capability);
   }
 
   private remember(request: ActorRequest, actor: Actor): void {
@@ -167,7 +191,7 @@ export class AccessGuard implements CanActivate {
     raw?: { classifyreOperator?: Operator | null };
   }): Promise<Operator | null> {
     try {
-      return await this.identity!.authenticateOperator(request.raw ?? request);
+      return await this.identity.authenticateOperator(request.raw ?? request);
     } catch (error) {
       throwAuthenticationError(error);
     }
@@ -178,7 +202,7 @@ export class AccessGuard implements CanActivate {
     raw?: { classifyrePrincipal?: Principal | null };
   }): Promise<Principal> {
     try {
-      return await this.identity!.authenticate(request.raw ?? request);
+      return await this.identity.authenticate(request.raw ?? request);
     } catch (error) {
       throwAuthenticationError(error);
     }

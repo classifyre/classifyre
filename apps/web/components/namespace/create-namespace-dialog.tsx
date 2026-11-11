@@ -29,7 +29,6 @@ import {
   uploadArchive,
   type UploadProgress,
 } from "@/lib/data-transfer-api";
-import { useIamEnabled } from "@/components/iam-session";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select";
 
 function slugify(name: string): string {
@@ -61,19 +60,17 @@ export function CreateNamespaceDialog({
   // Empty is fine: the API files an uncategorised workspace under the default
   // category rather than rejecting the create.
   const [categoryIds, setCategoryIds] = React.useState<string[]>([]);
-  const iamEnabled = useIamEnabled();
   const [owningGroups, setOwningGroups] = React.useState<OwningGroup[]>([]);
   const [ownerGroupId, setOwnerGroupId] = React.useState("");
 
-  // With sign-in every workspace is owned by one group the creator belongs to
-  // and may create for (docs/prd §8.2).
+  // Every workspace is owned by one group the creator belongs to and may
+  // create for (docs/prd §8.2).
   React.useEffect(() => {
-    if (!iamEnabled) return;
     void api.namespaces.owningGroups().then((groups) => {
       setOwningGroups(groups);
       if (groups.length === 1 && groups[0]) setOwnerGroupId(groups[0].id);
     }, () => setOwningGroups([]));
-  }, [iamEnabled]);
+  }, []);
   const [description, setDescription] = React.useState("");
   const [thumbnail, setThumbnail] = React.useState<string | null>(null);
   const [submitting, setSubmitting] = React.useState(false);
@@ -152,7 +149,7 @@ export function CreateNamespaceDialog({
         description: description.trim() || undefined,
         thumbnail: thumbnail ?? undefined,
         categoryIds,
-        ...(iamEnabled ? { ownerGroupId } : {}),
+        ownerGroupId,
       });
 
       if (!seedFile) {
@@ -239,32 +236,30 @@ export function CreateNamespaceDialog({
                 rows={2}
               />
             </div>
-            {iamEnabled && (
-              <div className="grid gap-2">
-                <Label>{t("workspaces.owningGroup")}</Label>
-                <Select value={ownerGroupId} onValueChange={setOwnerGroupId}>
-                  <SelectTrigger data-testid="workspace-create-owner">
-                    <SelectValue placeholder={t("workspaces.owningGroupPick")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {owningGroups.map((group) => (
-                      <SelectItem
-                        key={group.id}
-                        value={group.id}
-                        data-testid={`workspace-create-owner-${group.path}`}
-                      >
-                        {group.path}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  {owningGroups.length === 0
-                    ? t("workspaces.owningGroupNone")
-                    : t("workspaces.owningGroupHint")}
-                </p>
-              </div>
-            )}
+            <div className="grid gap-2">
+              <Label>{t("workspaces.owningGroup")}</Label>
+              <Select value={ownerGroupId} onValueChange={setOwnerGroupId}>
+                <SelectTrigger data-testid="workspace-create-owner">
+                  <SelectValue placeholder={t("workspaces.owningGroupPick")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {owningGroups.map((group) => (
+                    <SelectItem
+                      key={group.id}
+                      value={group.id}
+                      data-testid={`workspace-create-owner-${group.path}`}
+                    >
+                      {group.path}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {owningGroups.length === 0
+                  ? t("workspaces.owningGroupNone")
+                  : t("workspaces.owningGroupHint")}
+              </p>
+            </div>
             <div className="grid gap-2">
               <Label>{t("categories.label")}</Label>
               <CategorySelect

@@ -10,7 +10,11 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  ApiHideProperty,
+  ApiProperty,
+  ApiPropertyOptional,
+} from '@nestjs/swagger';
 import { SearchSourcesFiltersDto } from './search-sources-request.dto';
 
 const SOURCE_SCHEDULE_MODES = ['OFF', 'CRON', 'AUTO'] as const;
@@ -104,10 +108,9 @@ export class BulkUpdateSourcesDto {
   @Type(() => BulkUpdateSourcesSamplingDto)
   sampling?: BulkUpdateSourcesSamplingDto;
 
-  @ApiPropertyOptional({
-    description:
-      'Who made the change. Recorded on the SOURCE_CONFIG_CHANGED notification a sampling change raises.',
-  })
+  // Set by the server from the signed-in person; never sent by clients.
+  // Recorded on the SOURCE_CONFIG_CHANGED notification a sampling change raises.
+  @ApiHideProperty()
   @IsOptional()
   @IsString()
   updatedBy?: string;

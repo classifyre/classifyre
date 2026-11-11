@@ -1,0 +1,56 @@
+#!/command/with-contenv bash
+# The identity server (Keycloak): sign-in, people, groups and tenants.
+#
+# Loopback only, like the API and the web server: browsers reach it through
+# the web app's /iam proxy, which Caddy sends everything else to. Its data is
+# a database `iam` next to Classifyre's own, on the same server.
+set -euo pipefail
+
+PGPORT="${PGPORT:-5432}"
+IAM_DB_NAME="${IAM_DB_NAME:-iam}"
+
+echo "iam: waiting for the database"
+for _ in $(seq 1 180); do
+  if pg_isready -d "${DATABASE_URL}" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
+
+# Host, port and login of the database server, from DATABASE_URL.
+eval "$(python3 -I -c '
+import os, shlex
+from urllib.parse import urlsplit, unquote
+u = urlsplit(os.environ["DATABASE_URL"])
+print("DB_HOST=" + shlex.quote(u.hostname or "127.0.0.1"))
+print("DB_PORT=" + shlex.quote(str(u.port or 5432)))
+print("DB_USER=" + shlex.quote(unquote(u.username or "postgres")))
+print("DB_PASSWORD=" + shlex.quote(unquote(u.password or "")))
+# The maintenance database of the server: the Classifyre one may not exist yet.
+print("MAINTENANCE_URL=" + shlex.quote(u._replace(path="/postgres").geturl()))
+')"
+
+if ! psql "${MAINTENANCE_URL}" -tAc "SELECT 1 FROM pg_database WHERE datname='${IAM_DB_NAME}'" | grep -q 1; then
+  echo "iam: creating database ${IAM_DB_NAME}"
+  psql "${MAINTENANCE_URL}" -v ON_ERROR_STOP=1 -c "CREATE DATABASE \"${IAM_DB_NAME}\";"
+fi
+
+cd /opt/keycloak
+exec s6-setuidgid classifyre \
+  env KC_DB=postgres \
+      KC_DB_URL_HOST="${DB_HOST}" \
+      KC_DB_URL_PORT="${DB_PORT}" \
+      KC_DB_URL_DATABASE="${IAM_DB_NAME}" \
+      KC_DB_USERNAME="${DB_USER}" \
+      KC_DB_PASSWORD="${DB_PASSWORD}" \
+      KC_DB_POOL_MAX_SIZE="${IAM_DB_POOL_MAX_SIZE:-5}" \
+      KC_HTTP_ENABLED=true \
+      KC_HTTP_HOST=127.0.0.1 \
+      KC_HTTP_PORT="${IAM_PORT:-8180}" \
+      KC_HOSTNAME="${CLASSIFYRE_URL}/iam" \
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC=true \
+      KC_PROXY_HEADERS=xforwarded \
+      KC_BOOTSTRAP_ADMIN_USERNAME="${CLASSIFYRE_ADMIN_USER}" \
+      KC_BOOTSTRAP_ADMIN_PASSWORD="${CLASSIFYRE_ADMIN_PASSWORD}" \
+      JAVA_OPTS_KC_HEAP="${JAVA_OPTS_KC_HEAP}" \
+  /opt/keycloak/bin/kc.sh start --optimized

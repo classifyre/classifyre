@@ -7,9 +7,9 @@ All URIs are relative to *http://localhost*
 | [**namespacesControllerCreate**](NamespacesApi.md#namespacescontrollercreate) | **POST** /namespaces | Create a namespace (provisions its Postgres schema + migrations) |
 | [**namespacesControllerCreateCategory**](NamespacesApi.md#namespacescontrollercreatecategory) | **POST** /namespaces/categories | Create a workspace category |
 | [**namespacesControllerGet**](NamespacesApi.md#namespacescontrollerget) | **GET** /namespaces/{id} | Get a namespace by id |
-| [**namespacesControllerList**](NamespacesApi.md#namespacescontrollerlist) | **GET** /namespaces | List the namespaces the caller can see (all of them without sign-in) |
+| [**namespacesControllerList**](NamespacesApi.md#namespacescontrollerlist) | **GET** /namespaces | List the namespaces the caller can see |
 | [**namespacesControllerListCategories**](NamespacesApi.md#namespacescontrollerlistcategories) | **GET** /namespaces/categories | List workspace categories with workspace counts |
-| [**namespacesControllerOwningGroups**](NamespacesApi.md#namespacescontrollerowninggroups) | **GET** /namespaces/owning-groups | Groups the caller may create workspaces for (empty without sign-in) |
+| [**namespacesControllerOwningGroups**](NamespacesApi.md#namespacescontrollerowninggroups) | **GET** /namespaces/owning-groups | Groups the caller may create workspaces for |
 | [**namespacesControllerRemove**](NamespacesApi.md#namespacescontrollerremove) | **DELETE** /namespaces/{id} | Soft-delete a namespace (hidden from listings; data retained) |
 | [**namespacesControllerRemoveCategory**](NamespacesApi.md#namespacescontrollerremovecategory) | **DELETE** /namespaces/categories/{categoryId} | Delete a category (its workspaces fall back to the default category) |
 | [**namespacesControllerStats**](NamespacesApi.md#namespacescontrollerstats) | **GET** /namespaces/stats | Per-namespace source rollups (total + failing + running + pending) |
@@ -25,7 +25,7 @@ All URIs are relative to *http://localhost*
 
 Create a namespace (provisions its Postgres schema + migrations)
 
-With sign-in, &#x60;ownerGroupId&#x60; is required: a group of your tenant that you belong to and may create workspaces for (GET /namespaces/owning-groups).
+&#x60;ownerGroupId&#x60; is required: a group of your tenant that you belong to and may create workspaces for (GET /namespaces/owning-groups).
 
 ### Example
 
@@ -204,7 +204,7 @@ No authorization required
 
 > namespacesControllerList()
 
-List the namespaces the caller can see (all of them without sign-in)
+List the namespaces the caller can see
 
 ### Example
 
@@ -318,7 +318,7 @@ No authorization required
 
 > namespacesControllerOwningGroups()
 
-Groups the caller may create workspaces for (empty without sign-in)
+Groups the caller may create workspaces for
 
 ### Example
 

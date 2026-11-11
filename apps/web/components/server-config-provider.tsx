@@ -11,8 +11,6 @@ import type { ServerConfig } from "@/lib/server-config";
 // layout renders (ai-health, …) can read it without an import cycle.
 export const DEFAULT_SERVER_CONFIG: ServerConfig = {
   logsPersisted: true,
-  demoMode: false,
-  iamEnabled: false,
 };
 
 export const ServerConfigContext = React.createContext<ServerConfig>(

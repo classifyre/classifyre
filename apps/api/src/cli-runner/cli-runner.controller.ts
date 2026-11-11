@@ -11,6 +11,7 @@ import {
   HttpStatus,
   UseGuards,
   Res,
+  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -30,7 +31,7 @@ import {
 } from '../dto/export-query.dto';
 import { CliRunnerService } from './cli-runner.service';
 import { RunnerStatus } from '@prisma/client';
-import { AllowInDemoMode } from '../demo-mode.decorator';
+import { ReadsOnly } from '../reads-only.decorator';
 import { AllowWhenPaused } from '../namespace/allow-when-paused.decorator';
 import { BlockWhenPaused } from '../namespace/block-when-paused.decorator';
 import { ReadOnlyEndpoint } from '../db/read-only-endpoint.decorator';
@@ -81,9 +82,11 @@ import { SearchRunnersChartsRequestDto } from '../dto/search-runners-charts-requ
 import { SearchRunnersChartsResponseDto } from '../dto/search-runners-charts-response.dto';
 import { SearchRunnersAssetsRequestDto } from '../dto/search-runners-assets-request.dto';
 import { SearchRunnersAssetsResponseDto } from '../dto/search-runners-assets-response.dto';
+import { SourceConfigInterceptor } from '../identity/source-config-access';
 import { AccessArea, Requires } from '../identity/access.decorators';
 
 @ApiTags('Runners')
+@UseInterceptors(SourceConfigInterceptor)
 @AccessArea({ view: 'source.view', change: 'source.run' })
 @Controller()
 export class CliRunnerController {
@@ -422,7 +425,7 @@ export class CliRunnerController {
     return this.runnerAugmentation.finish(runnerId);
   }
 
-  @AllowInDemoMode()
+  @ReadsOnly()
   @Get('runners/:runnerId/assets/progress')
   @ApiOperation({ summary: 'Get runner asset processing progress' })
   @ApiResponse({ status: 200, type: RunnerAssetProgressDto })
@@ -437,7 +440,7 @@ export class CliRunnerController {
     return this.cliRunnerService.getRunnerStatus(runnerId);
   }
 
-  @AllowInDemoMode()
+  @ReadsOnly()
   @Get('runners/:runnerId/queue-position')
   @ApiOperation({
     summary: 'Why a queued run has not started yet',
@@ -451,7 +454,7 @@ export class CliRunnerController {
 
   // POST only because the filter set does not fit a query string — this reads
   // logs, so it stays available on a read-only demo instance.
-  @AllowInDemoMode()
+  @ReadsOnly()
   @Post('runners/:runnerId/logs')
   @ApiOperation({
     summary:
@@ -502,9 +505,10 @@ export class CliRunnerController {
   }
 }
 
-@AllowInDemoMode()
+@ReadsOnly()
 @ReadOnlyEndpoint()
 @ApiTags('Runners')
+@UseInterceptors(SourceConfigInterceptor)
 @AccessArea({ view: 'source.view', change: 'source.run' })
 @Controller('search')
 export class SearchRunnersController {

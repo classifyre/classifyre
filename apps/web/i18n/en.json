@@ -114,8 +114,9 @@
     "owningGroupPick": "Choose the group that owns it",
     "owningGroupHint": "Members of this group and its admins get access as their grants allow.",
     "owningGroupNone": "You cannot create workspaces: ask a tenant admin to make you a workspace manager for your group.",
-    "emptyPublicTitle": "Nothing published yet",
-    "emptyPublicDescription": "Workspaces of the public tenant show here once they are published. Sign in to see your own."
+    "emptyPublicTitle": "Nothing public yet",
+    "emptyPublicDescription": "Public workspaces show here. Sign in to see your own.",
+    "publicBadge": "Public"
   },
   "categories": {
     "label": "Categories",
@@ -164,30 +165,28 @@
     "emptyWorkspacesTitle": "Nothing filed here yet",
     "emptyWorkspacesDescription": "Add this category to a workspace from its settings, and it will appear here."
   },
-  "demo": {
-    "badge": "Demo",
-    "headerCta": "Get your own",
-    "bannerCta": "Read-only demo — get your own Classifyre",
-    "tooltip": "You are exploring a shared, read-only demo. Viewing, search, and dashboards work normally — creating, editing, deleting, running scans, training detectors, and the browser assistant are disabled.",
-    "mcpNotice": "Demo mode is active. MCP read-only access works with an existing token, but creating, editing, or deleting tokens is disabled. Run your own instance to issue tokens.",
-    "upgradeTitle": "Run Classifyre on your own data",
-    "upgradeDescription": "This demo is shared and read-only. Your own instance takes minutes, costs nothing, and never sends your documents anywhere.",
-    "blockedTitle": "This action needs your own instance",
-    "blockedDescription": "The demo is read-only, so creating, editing, deleting, and running scans are turned off here. Everything unlocks the moment you run Classifyre yourself.",
+  "publicView": {
+    "badge": "Public",
+    "headerCta": "Read-only",
+    "bannerCta": "Public and read-only — sign in or get your own Classifyre",
+    "tooltip": "You are reading a public workspace. Browsing and search work; changing anything needs you to sign in.",
+    "upgradeTitle": "This workspace is public and read-only",
+    "upgradeDescription": "Sign in if you have an account here, or run Classifyre on your own data: it takes minutes, costs nothing and never sends your documents anywhere.",
+    "signIn": "Sign in",
     "dockerTitle": "Docker",
     "dockerDescription": "One `docker run` on macOS, Windows or Linux. Everything stays on your machine — no server, no account.",
     "dockerCta": "Get the image",
     "helmTitle": "Kubernetes (Helm)",
     "helmDescription": "Self-host for your team with the production Helm chart and your own database.",
     "helmCta": "Installation guide",
-    "upgradeFootnote": "Both options are free and open source. Your documents stay on your machine or in your own cluster.",
-    "keepExploring": "Keep exploring the demo"
+    "upgradeFootnote": "Both options are free and open source. Your documents stay on your machine or in your own cluster."
   },
   "nav": {
     "overview": "Overview",
     "explore": "Explore",
     "findings": "Findings",
     "assets": "Assets",
+    "query": "SQL",
     "sources": "Sources",
     "detectors": "Custom Detectors",
     "investigations": "Investigations",
@@ -1001,7 +1000,9 @@
         "failed": "The last batch threw. pg-boss retries on its own schedule.",
         "stale": "No worker has reported recently. The process may have been killed mid-job."
       }
-    }
+    },
+    "noAccessTitle": "You can't see this workspace's settings",
+    "noAccessDescription": "Settings are for people with a role in this workspace. Sign in, or ask a workspace admin for access."
   },
   "features": {
     "title": "Features",
@@ -1395,7 +1396,8 @@
       "textCoverageValue": "{{pct}}% extracted",
       "lowTextCoverageBadge": "Low text coverage ({{pct}}%)",
       "lowTextCoverageTooltip": "Some assets produced no extractable text; findings may be incomplete.",
-      "tabConnections": "Connections"
+      "tabConnections": "Connections",
+      "tabData": "Data"
     },
     "edit": {
       "loading": "Loading source configuration...",
@@ -1564,7 +1566,10 @@
       "started": "Queued {{count}} scan(s)",
       "skipped": "{{count}} source(s) could not be started",
       "failed": "Failed to start scans"
-    }
+    },
+    "editNoAccessTitle": "You can't edit this source",
+    "editNoAccessDescription": "How a source is set up — its connection, sampling, detectors and code — is shown only to people who can change sources.",
+    "editNoAccessBack": "Back to the source"
   },
   "findings": {
     "title": "Findings",
@@ -4682,14 +4687,6 @@
       "you": "You ({{name}})",
       "others": "{{count}} others here"
     },
-    "actor": {
-      "prompt": "Your name on this board",
-      "placeholder": "e.g. Maria K.",
-      "save": "Save",
-      "hint": "Shown on your notes, links and timeline entries. Stored in this browser only.",
-      "change": "Change name",
-      "anonymous": "Set your name"
-    },
     "changedBy": "{{name}} {{summary}}",
     "someone": "Someone",
     "staleEdit": "Changed by {{name}} meanwhile. Your text was copied to the clipboard.",
@@ -5992,9 +5989,7 @@
     "name": "Name",
     "enabled": "Enabled",
     "enabledHint": "Connect this bot and start answering messages.",
-    "allowMutations": "Allow changes",
-    "allowMutationsHint": "When off, the bot is read-only: it can inspect but never create, update or delete.",
-    "allowMutationsSignIn": "With sign-in on, bots are always read-only: a chat message has no signed-in person behind it.",
+    "readOnlyHint": "Bots only read: a chat message has no signed-in person behind it, so they can inspect but never create, change or delete.",
     "capabilityGroups": "Capabilities",
     "capabilityGroupsHint": "Which tool groups the bot may use. All are enabled by default.",
     "agents": "Autopilot agents",
@@ -6002,7 +5997,6 @@
     "connected": "Connected",
     "errorBadge": "Error",
     "disabledBadge": "Disabled",
-    "readOnly": "Read-only",
     "lastConnected": "Last connected",
     "neverConnected": "Never connected",
     "tokenLabel": "Token",
@@ -6652,6 +6646,12 @@
       "ogTitle": "Explore connections | Classifyre",
       "ogDescription": "Search, then follow lineage, duplicates, shared concepts and look-alikes — each link with its reason."
     },
+    "query": {
+      "title": "SQL — Query Your Tables",
+      "description": "Query the rows of the database, lakehouse and file tables you have access to with standard SQL, and join tables across sources.",
+      "ogTitle": "SQL over your tables | Classifyre",
+      "ogDescription": "Standard SQL over the tables you may read, joined across sources."
+    },
     "findings": {
       "title": "Findings — Triage Every Detection by Severity, Source & Detector",
       "description": "Triage every detection in one place — filter by severity, status, confidence, source and detector. Track PII, secrets, security issues and custom detections from open to resolved across every scan.",
@@ -7261,7 +7261,25 @@
     "empty": "No changes recorded yet.",
     "loadMore": "Load more",
     "activityTitle": "Activity",
-    "activityDescription": "Every change made in this workspace, from the web app, the API or agents through MCP. Reads are not recorded."
+    "activityDescription": "Every change made in this workspace, from the web app, the API or agents through MCP. Reads are not recorded.",
+    "table": {
+      "when": "When",
+      "who": "Who",
+      "what": "What",
+      "where": "Where",
+      "fields": "Fields",
+      "channel": "Channel",
+      "search": "Filter activity…",
+      "capability": "Capability",
+      "allCapabilities": "All capabilities",
+      "allChannels": "All channels",
+      "allActors": "All actors",
+      "rest": "Web & API",
+      "mcp": "MCP",
+      "empty": "No changes match these filters.",
+      "rangeOf": "of {{total}}",
+      "thisWorkspace": "This workspace"
+    }
   },
   "account": {
     "menu": "Account",
@@ -7293,13 +7311,39 @@
     "role": "Role",
     "untilOptional": "Until (optional)",
     "add": "Give access",
-    "whyTitle": "Why can I…?",
+    "whyTitle": "What I can do",
+    "whyDescription": "Every capability you hold here, with the group, role and scope that gives it. Sort any column.",
     "pickCapability": "Choose something you can do",
     "becauseOf": "{{subject}} as {{role}} on {{scope}}",
+    "canDo": {
+      "capability": "Capability",
+      "group": "Group",
+      "role": "Role",
+      "tenant": "Tenant",
+      "scope": "Scope",
+      "via": "Via",
+      "empty": "Nothing explains that capability yet.",
+      "none": "You hold nothing here yet."
+    },
+    "grantsTable": {
+      "group": "Group",
+      "role": "Role",
+      "scope": "Scope",
+      "until": "Until",
+      "origin": "Origin",
+      "here": "This workspace",
+      "actions": "Actions"
+    },
+    "giveAccessTitle": "Give access",
+    "giveAccessDescription": "Give a group a role on this workspace, optionally until a date. You can only give roles whose capabilities you all hold here.",
+    "cancel": "Cancel",
     "allWorkspaces": "All workspaces",
     "tenantTitle": "Tenant",
     "tenantDenied": "Only tenant admins can manage access for the whole tenant.",
     "tenantGrants": "Access across the tenant",
+    "tenantGrantsGrouped": "Grouped by group",
+    "tenantGrantsUngrouped": "All grants",
+    "removedGroupId": "Removed group {{id}}",
     "scope": "Applies to",
     "scopes": {
       "tenant": "The whole tenant",
@@ -7315,7 +7359,15 @@
     },
     "peopleElsewhere": "People and groups are managed in the identity server, or the company directory behind it. Grants here decide what they may do in Classifyre; a renamed group keeps its grants, a removed one shows as removed.",
     "managePeople": "Manage people and groups",
-    "peopleByOperators": "Ask an operator of this installation to add people or change groups."
+    "peopleByOperators": "Ask an operator of this installation to add people or change groups.",
+    "tenantActivity": {
+      "description": "Grants, workspaces created or deleted across the tenant. Sort any column, filter by action, actor or free text.",
+      "action": "Action",
+      "empty": "No activity yet.",
+      "noMatch": "No activity matches these filters.",
+      "search": "Filter activity…",
+      "allActions": "All actions"
+    }
   },
   "platform": {
     "title": "Platform",
@@ -7330,7 +7382,6 @@
     "noAdmins": "No admins",
     "lastActivity": "Last change {{when}}",
     "created": "Created {{when}}",
-    "localWaiting": "Workspaces made without sign-in: {{count}}. Bring them into a tenant from its menu.",
     "actions": "Actions for {{name}}",
     "status": {
       "suspended": "suspended",
@@ -7345,11 +7396,6 @@
     },
     "database": "Database",
     "upgradeError": "Its workspaces are unavailable until the next start upgrades its database: {{error}}",
-    "import": "Bring in workspaces",
-    "importTitle": "Bring workspaces into {{name}}",
-    "importDescription": "These workspaces were made without sign-in. They are copied with all their data into the tenant's database, owned by its admins group. The originals stay where they are, for sign-in off.",
-    "importConfirm": "Bring in {{count}}",
-    "imported": "Workspaces copied into {{name}}: {{count}}",
     "suspend": "Suspend",
     "suspendTitle": "Suspend {{name}}?",
     "suspendDescription": "Nobody in the tenant can work in Classifyre until it is resumed, and their agents stop too. Its data is kept, and scheduled scans keep running.",
@@ -7384,5 +7430,169 @@
     "signedInAs": "Signed in as",
     "retry": "Try again",
     "signOut": "Sign out"
+  },
+  "dataQuery": {
+    "title": "SQL",
+    "subtitle": "Query the rows of the tables you have access to with standard SQL. A query can join tables of different sources.",
+    "run": "Run",
+    "cancel": "Cancel",
+    "format": "Format",
+    "shortcut": "Ctrl/⌘ + Enter runs the query",
+    "status": {
+      "PENDING": "Queued",
+      "RUNNING": "Running",
+      "SUCCESS": "Done",
+      "ERROR": "Failed",
+      "TIMEOUT": "Timed out",
+      "CANCELLED": "Cancelled"
+    },
+    "elapsed": "{{seconds}} s",
+    "timings": "setup {{setup}} s · query {{query}} s",
+    "rows": "{{count}} rows",
+    "columns": "{{count}} columns",
+    "results": {
+      "count": "{{shown}} of {{total}} rows",
+      "search": "Search these rows…",
+      "noMatch": "No rows match this search.",
+      "sortHint": "Sort by {{name}}"
+    },
+    "truncatedRows": "Showing the first {{count}} rows: the workspace's row limit.",
+    "truncatedBytes": "Showing the first {{count}} rows: the whole result is larger than the result limit.",
+    "noResult": "Run a query to see its rows here.",
+    "emptyResult": "The query returned no rows.",
+    "catalogTitle": "Tables",
+    "catalogSearch": "Filter tables and columns",
+    "onlyQueryable": "Only what I can query",
+    "catalogFailed": "The list of tables could not be loaded.",
+    "locked": "You cannot query this table. A workspace admin can give your group data access.",
+    "notQueryable": "Cannot be queried with SQL",
+    "noTables": "No tables to query yet. Scan a database, lakehouse or bucket source first.",
+    "partialAccess": "You can query {{count}} tables here, the ones with a play mark. The others need a data-reader grant.",
+    "openInQuery": "Open in SQL",
+    "openInQueryHint": "Open this query in the SQL page",
+    "assetTab": "Data",
+    "assetLockedTitle": "No data access",
+    "assetLocked": "You can see this table but not its rows. A workspace admin can give your group the Data reader role on this table or its source.",
+    "sourceTables": "{{count}} of {{total}} tables you can query",
+    "sourceLocked": "You cannot query any table of {{name}}. A workspace admin can give your group the Data reader role on the source or its tables.",
+    "explorer": {
+      "tables": "Tables",
+      "history": "History",
+      "saved": "Saved",
+      "star": "Pin this source to the top",
+      "queryableCount": "{{count}} you can query",
+      "insertHint": "Insert {{name}} where the cursor stands",
+      "runTableHint": "Replace the editor with a preview query over {{name}}",
+      "copyNameHint": "Copy the full table name {{name}}",
+      "copied": "Copied {{name}}.",
+      "copySourceHint": "Copy the source name {{name}}",
+      "openSourceHint": "Open {{name}}",
+      "noColumns": "No columns listed — the scan has not read them yet.",
+      "loadingHistory": "Loading your recent queries…",
+      "noHistory": "Nothing here yet. Run a query and it will appear in this list.",
+      "loadingSaved": "Loading your saved queries…",
+      "noSaved": "No saved queries yet. Name the SQL on screen with Save and find it here.",
+      "reopenHint": "Load this query into the editor",
+      "save": "Save",
+      "saveTitle": "Save this query",
+      "saveHint": "Kept for you only, under Saved beside the editor.",
+      "saveName": "Name",
+      "discard": "Cancel"
+    },
+    "export": {
+      "button": "Export",
+      "running": "Exporting…",
+      "xlsx": "Excel (.xlsx)",
+      "csv": "CSV",
+      "parquet": "Parquet",
+      "done": "Exported {{count}} rows.",
+      "truncated": "Exported the first {{count}} rows: the export row limit.",
+      "failed": "The export failed."
+    },
+    "access": {
+      "open": "Access",
+      "description": {
+        "workspace": "Every Data reader grant in this workspace: on the whole workspace, on a source, or on one table. Data access always goes to a group.",
+        "source": "Groups that can query this source's tables: the Data reader role on the source, on one of its tables, or on the whole workspace.",
+        "asset": "Groups that can query this table: the Data reader role on the table, on its source, or on the whole workspace."
+      },
+      "activity": "Activity",
+      "activityHint": {
+        "workspace": "Reads and exports of this workspace's tables and changes to data access, newest first. Each table read counts once per query.",
+        "source": "Reads and exports of this source's tables and access given or removed on it or its tables, newest first.",
+        "asset": "Reads and exports of this table and access given or removed on it, newest first. Query runs themselves stay in each person's History."
+      },
+      "giveTitle": "Give data access",
+      "giveDescription": {
+        "workspace": "Give a group the Data reader role on this workspace: every table in it.",
+        "source": "Give a group the Data reader role on the whole source {{name}}: every table in it.",
+        "asset": "Give a group the Data reader role on the table {{name}}."
+      },
+      "giveHint": {
+        "workspace": "Opens every table of the workspace to the group, today's and future ones. For one source or table, use its Data tab. Every change is recorded in Activity.",
+        "source": "Opens every table of {{name}} to the group. For a single table, use the table's Data tab. Every change is recorded in Activity.",
+        "asset": "Opens only {{name}} to the group. For the whole source, use the source's Data tab. Every change is recorded in Activity."
+      },
+      "none": "Nobody beyond workspace admins.",
+      "pickGroup": "Choose a group",
+      "give": "Give access",
+      "remove": "Remove access",
+      "added": "Access given",
+      "viewerNote": "Members also need a role that opens the workspace, such as Viewer."
+    },
+    "settings": {
+      "title": "SQL over tables",
+      "description": "Limits for SQL over this workspace's tables. Who may query which table follows their roles and data-reader grants. Every query is recorded in Activity.",
+      "maxRows": "Rows per result",
+      "timeout": "Time limit (seconds)",
+      "exportMaxRows": "Rows per export",
+      "save": "Save limits",
+      "saved": "Saved",
+      "changedBy": "Last changed by"
+    },
+    "completion": {
+      "schema": "{{source}} · {{count}} tables you can query",
+      "table": "{{name}} · {{count}} columns",
+      "locked": "{{name}} (no access)",
+      "source": "{{source}} · {{count}} tables"
+    },
+    "editor": {
+      "undo": "Undo (Ctrl/⌘+Z)",
+      "redo": "Redo (Ctrl/⌘+Shift+Z)"
+    },
+    "signInTitle": "Sign in to use SQL",
+    "signInDescription": "Querying tables needs a signed-in account with data access. A public workspace is for reading its findings, sources and cases."
+  },
+  "notificationAudiences": {
+    "title": "Who gets notifications",
+    "description": "Notifications go to groups: by default the group that owns this workspace, including its subgroups. Choose other groups for a kind of notification here; each notification keeps the groups it was sent to, and everyone marks it read for themselves.",
+    "owningGroup": "Owning group",
+    "add": "Add a group",
+    "remove": "Stop sending to {{group}}",
+    "reset": "Owning group only",
+    "saved": "Saved. New notifications go to these groups.",
+    "saveFailed": "Could not save who gets them",
+    "loadFailed": "Could not load who gets notifications",
+    "notForYou": "Notifications go to the groups of a workspace. Sign in to get the ones sent to yours.",
+    "removedGroup": "Removed group",
+    "groups": "Groups",
+    "members": "{{count}} members",
+    "types": {
+      "SCAN": "Scans",
+      "FINDING": "Findings",
+      "SOURCE": "Sources",
+      "SYSTEM": "System"
+    }
+  },
+  "publicWorkspace": {
+    "title": "Public workspace",
+    "label": "Public, read-only",
+    "description": "Everyone of your tenant can read it without a grant, and people who have not signed in can too when it is in the installation's first tenant. Nobody gains any right to change it, and no other tenant ever sees it.",
+    "confirmTitle": "Make this workspace public?",
+    "confirmDescription": "Its sources, findings, cases and everything else become readable, read-only, for everyone of your tenant and, in the first tenant, for anyone who opens Classifyre without signing in. You can make it private again at any time.",
+    "confirm": "Make public",
+    "published": "The workspace is public, read-only.",
+    "unpublished": "The workspace is private again.",
+    "saveFailed": "Could not change whether the workspace is public"
   }
 }
