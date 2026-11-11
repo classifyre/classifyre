@@ -65,12 +65,6 @@ export interface BulkUpdateSourcesDto {
      * @memberof BulkUpdateSourcesDto
      */
     sampling?: BulkUpdateSourcesSamplingDto;
-    /**
-     * Who made the change. Recorded on the SOURCE_CONFIG_CHANGED notification a sampling change raises.
-     * @type {string}
-     * @memberof BulkUpdateSourcesDto
-     */
-    updatedBy?: string;
 }
 
 /**
@@ -94,7 +88,6 @@ export function BulkUpdateSourcesDtoFromJSONTyped(json: any, ignoreDiscriminator
         'filters': json['filters'] == null ? undefined : SearchSourcesFiltersDtoFromJSON(json['filters']),
         'schedule': json['schedule'] == null ? undefined : BulkUpdateSourcesScheduleDtoFromJSON(json['schedule']),
         'sampling': json['sampling'] == null ? undefined : BulkUpdateSourcesSamplingDtoFromJSON(json['sampling']),
-        'updatedBy': json['updatedBy'] == null ? undefined : json['updatedBy'],
     };
 }
 
@@ -113,7 +106,6 @@ export function BulkUpdateSourcesDtoToJSONTyped(value?: BulkUpdateSourcesDto | n
         'filters': SearchSourcesFiltersDtoToJSON(value['filters']),
         'schedule': BulkUpdateSourcesScheduleDtoToJSON(value['schedule']),
         'sampling': BulkUpdateSourcesSamplingDtoToJSON(value['sampling']),
-        'updatedBy': value['updatedBy'],
     };
 }
 

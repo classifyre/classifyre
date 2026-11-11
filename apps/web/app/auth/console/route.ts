@@ -15,12 +15,10 @@ export const dynamic = "force-dynamic";
  */
 export function GET(request: NextRequest) {
   const config = iamWebConfig();
-  const path = config
-    ? identityConsolePath(
-        process.env,
-        request.nextUrl.searchParams.get("organization"),
-      )
-    : null;
+  const path = identityConsolePath(
+    process.env,
+    request.nextUrl.searchParams.get("organization"),
+  );
   if (!path) return new NextResponse(null, { status: 404 });
-  return NextResponse.redirect(new URL(path, config!.appUrl), 307);
+  return NextResponse.redirect(new URL(path, config.appUrl), 307);
 }

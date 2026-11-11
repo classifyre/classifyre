@@ -19,7 +19,7 @@ describe('McpServerFactoryService retire_out_of_scope_findings', () => {
   const findingBulkOperations = {
     toDto: jest.fn((operation: unknown) => operation),
   };
-  const mcpToolExecutor = { assertNotDemoMode: jest.fn() };
+  const mcpToolExecutor = {};
   let tool: RegisteredTool;
 
   beforeEach(() => {

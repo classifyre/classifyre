@@ -13,7 +13,7 @@ All URIs are relative to *http://localhost*
 | [**tenantAccessControllerRoles**](AccessApi.md#tenantaccesscontrollerroles) | **GET** /tenant/roles | The built-in roles and where each can be granted |
 | [**tenantAccessControllerTenant**](AccessApi.md#tenantaccesscontrollertenant) | **GET** /tenant | The caller’s tenant and what they may do across it |
 | [**tenantAccessControllerTenants**](AccessApi.md#tenantaccesscontrollertenants) | **GET** /tenant/tenants | Every tenant the caller belongs to, for switching (§12.2) |
-| [**workspaceAccessControllerAddGrant**](AccessApi.md#workspaceaccesscontrolleraddgrant) | **POST** /access/grants | Give a group or a person a role on this workspace |
+| [**workspaceAccessControllerAddGrant**](AccessApi.md#workspaceaccesscontrolleraddgrant) | **POST** /access/grants | Give a group a role on this workspace, or data access to one of its sources or tables |
 | [**workspaceAccessControllerExplain**](AccessApi.md#workspaceaccesscontrollerexplain) | **GET** /access/explain | Why can I do this? The grants that give you a capability here |
 | [**workspaceAccessControllerGrants**](AccessApi.md#workspaceaccesscontrollergrants) | **GET** /access/grants | Grants that reach this workspace, including inherited ones |
 | [**workspaceAccessControllerGroups**](AccessApi.md#workspaceaccesscontrollergroups) | **GET** /access/groups | Groups of this tenant, to grant access to |
@@ -89,7 +89,7 @@ No authorization required
 
 ## tenantAccessControllerEvents
 
-> Array&lt;TenantEventDto&gt; tenantAccessControllerEvents()
+> TenantEventsResponseDto tenantAccessControllerEvents(action, actor, search, skip, limit, sortBy, sortOrder)
 
 Tenant-level changes: grants, workspaces created or deleted
 
@@ -106,8 +106,25 @@ async function example() {
   console.log("🚀 Testing @workspace/api-client SDK...");
   const api = new AccessApi();
 
+  const body = {
+    // string (optional)
+    action: action_example,
+    // string (optional)
+    actor: actor_example,
+    // string (optional)
+    search: search_example,
+    // number (optional)
+    skip: 8.14,
+    // number (optional)
+    limit: 8.14,
+    // 'OCCURRED_AT' | 'ACTOR' | 'ACTION' (optional)
+    sortBy: sortBy_example,
+    // 'ASC' | 'DESC' (optional)
+    sortOrder: sortOrder_example,
+  } satisfies TenantAccessControllerEventsRequest;
+
   try {
-    const data = await api.tenantAccessControllerEvents();
+    const data = await api.tenantAccessControllerEvents(body);
     console.log(data);
   } catch (error) {
     console.error(error);
@@ -120,11 +137,20 @@ example().catch(console.error);
 
 ### Parameters
 
-This endpoint does not need any parameter.
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **action** | `string` |  | [Optional] [Defaults to `undefined`] |
+| **actor** | `string` |  | [Optional] [Defaults to `undefined`] |
+| **search** | `string` |  | [Optional] [Defaults to `undefined`] |
+| **skip** | `number` |  | [Optional] [Defaults to `undefined`] |
+| **limit** | `number` |  | [Optional] [Defaults to `undefined`] |
+| **sortBy** | `OCCURRED_AT`, `ACTOR`, `ACTION` |  | [Optional] [Defaults to `undefined`] [Enum: OCCURRED_AT, ACTOR, ACTION] |
+| **sortOrder** | `ASC`, `DESC` |  | [Optional] [Defaults to `undefined`] [Enum: ASC, DESC] |
 
 ### Return type
 
-[**Array&lt;TenantEventDto&gt;**](TenantEventDto.md)
+[**TenantEventsResponseDto**](TenantEventsResponseDto.md)
 
 ### Authorization
 
@@ -260,7 +286,7 @@ No authorization required
 
 ## tenantAccessControllerRemoveGrant
 
-> tenantAccessControllerRemoveGrant(id)
+> GrantDto tenantAccessControllerRemoveGrant(id)
 
 Remove any grant of the tenant
 
@@ -303,7 +329,7 @@ example().catch(console.error);
 
 ### Return type
 
-`void` (Empty response body)
+[**GrantDto**](GrantDto.md)
 
 ### Authorization
 
@@ -312,13 +338,13 @@ No authorization required
 ### HTTP request headers
 
 - **Content-Type**: Not defined
-- **Accept**: Not defined
+- **Accept**: `application/json`
 
 
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-| **204** |  |  -  |
+| **200** | The grant that was removed. |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
@@ -565,7 +591,7 @@ No authorization required
 
 > GrantDto workspaceAccessControllerAddGrant(createGrantDto)
 
-Give a group or a person a role on this workspace
+Give a group a role on this workspace, or data access to one of its sources or tables
 
 You can only give a role whose capabilities you all hold here (no escalation).
 
@@ -809,7 +835,7 @@ No authorization required
 
 ## workspaceAccessControllerRemoveGrant
 
-> workspaceAccessControllerRemoveGrant(id)
+> GrantDto workspaceAccessControllerRemoveGrant(id)
 
 Remove a grant made on this workspace
 
@@ -852,7 +878,7 @@ example().catch(console.error);
 
 ### Return type
 
-`void` (Empty response body)
+[**GrantDto**](GrantDto.md)
 
 ### Authorization
 
@@ -861,13 +887,13 @@ No authorization required
 ### HTTP request headers
 
 - **Content-Type**: Not defined
-- **Accept**: Not defined
+- **Accept**: `application/json`
 
 
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-| **204** |  |  -  |
+| **200** | The grant that was removed. |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 

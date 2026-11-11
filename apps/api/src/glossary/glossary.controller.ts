@@ -23,7 +23,7 @@ import { GlossaryService } from './glossary.service';
 import { GlossaryRelationsService } from './glossary-relations.service';
 import { GlossaryImportExportService } from './glossary-import-export.service';
 import { ActorRef } from '../identity/actor-ref.decorator';
-import { AllowInDemoMode } from '../demo-mode.decorator';
+import { ReadsOnly } from '../reads-only.decorator';
 import {
   BulkUpdateGlossaryTermsDto,
   BulkUpdateGlossaryTermsResponseDto,
@@ -358,7 +358,7 @@ export class GlossaryController {
 
   @Requires('data.export')
   @Get('export')
-  @AllowInDemoMode()
+  @ReadsOnly()
   @ApiOperation({ summary: 'Export as CSV or SKOS JSON-LD' })
   async export(
     @Res() reply: FastifyReply,

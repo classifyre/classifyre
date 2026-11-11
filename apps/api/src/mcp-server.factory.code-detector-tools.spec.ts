@@ -23,7 +23,6 @@ const CODE_SCHEMA = {
  */
 describe('McpServerFactoryService code detectors (CODE_DETECTOR)', () => {
   const mcpToolExecutor = {
-    assertNotDemoMode: jest.fn(),
     createCustomDetector: jest.fn().mockResolvedValue({ id: 'd1' }),
   };
   const customDetectorsService = {

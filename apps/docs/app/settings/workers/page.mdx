@@ -85,7 +85,7 @@ of that one queue:
   Cleanup instead.
 - Housekeeping queues (`__pgboss__*`) refuse with a 400; purging is allowed
   while the workspace is paused (nothing refills the queue until resume) and
-  blocked in demo mode like any other mutation.
+  needs `workspace.settings`.
 
 ## Why there is no "run now" button
 

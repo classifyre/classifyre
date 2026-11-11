@@ -15,6 +15,7 @@ Name | Type
 `operation` | string
 `entityType` | string
 `entityId` | string
+`entityName` | string
 `fields` | Array&lt;string&gt;
 `status` | number
 
@@ -34,6 +35,7 @@ const example = {
   "operation": PUT /sources/:id,
   "entityType": sources,
   "entityId": null,
+  "entityName": null,
   "fields": null,
   "status": null,
 } satisfies AuditEventDto

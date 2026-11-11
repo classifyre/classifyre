@@ -1,4 +1,8 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  ApiHideProperty,
+  ApiProperty,
+  ApiPropertyOptional,
+} from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsArray,
@@ -112,7 +116,8 @@ export class CreateInquiryDto extends InquiryMatchersDto {
   @IsString()
   description?: string;
 
-  @ApiPropertyOptional()
+  // Set by the server from the signed-in person; never sent by clients.
+  @ApiHideProperty()
   @IsOptional()
   @IsString()
   createdBy?: string;

@@ -82,12 +82,6 @@ export interface SaveExploreViewDto {
      * @memberof SaveExploreViewDto
      */
     positions?: { [key: string]: ExplorePositionDto; };
-    /**
-     * Who saved it
-     * @type {string}
-     * @memberof SaveExploreViewDto
-     */
-    createdBy?: string;
 }
 
 
@@ -138,7 +132,6 @@ export function SaveExploreViewDtoFromJSONTyped(json: any, ignoreDiscriminator: 
         'depth': json['depth'] == null ? undefined : json['depth'],
         'direction': json['direction'] == null ? undefined : json['direction'],
         'positions': json['positions'] == null ? undefined : (mapValues(json['positions'], ExplorePositionDtoFromJSON)),
-        'createdBy': json['createdBy'] == null ? undefined : json['createdBy'],
     };
 }
 
@@ -161,7 +154,6 @@ export function SaveExploreViewDtoToJSONTyped(value?: SaveExploreViewDto | null,
         'depth': value['depth'],
         'direction': value['direction'],
         'positions': value['positions'] == null ? undefined : (mapValues(value['positions'], ExplorePositionDtoToJSON)),
-        'createdBy': value['createdBy'],
     };
 }
 

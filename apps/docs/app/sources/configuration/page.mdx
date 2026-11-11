@@ -21,6 +21,17 @@ graph LR
 
 ---
 
+## Who sees a configuration
+
+How a source is set up — every group below, and a custom source's notebook
+code — is shown only to people who can change sources (**source.manage**:
+workspace admins and roles with it). Everyone else who reads the workspace,
+viewers and visitors of a [public workspace](/access#public-workspaces)
+included, sees a source's name, type and scans, but its settings page is
+closed to them and the API sends them the source without its configuration
+(`config` holds only `type`; a scan's `recipe` is empty). MCP tokens follow the
+same rule as their owner.
+
 ## Required fields (mandatory)
 
 **Required** fields are the minimum needed to reach the system — the things

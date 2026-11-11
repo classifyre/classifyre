@@ -61,12 +61,6 @@ export interface CreateThreadDto {
      * @memberof CreateThreadDto
      */
     color?: string;
-    /**
-     * 
-     * @type {string}
-     * @memberof CreateThreadDto
-     */
-    createdBy?: string;
 }
 
 
@@ -117,7 +111,6 @@ export function CreateThreadDtoFromJSONTyped(json: any, ignoreDiscriminator: boo
         'confidence': json['confidence'] == null ? undefined : json['confidence'],
         'testablePredicate': json['testablePredicate'] == null ? undefined : json['testablePredicate'],
         'color': json['color'] == null ? undefined : json['color'],
-        'createdBy': json['createdBy'] == null ? undefined : json['createdBy'],
     };
 }
 
@@ -139,7 +132,6 @@ export function CreateThreadDtoToJSONTyped(value?: CreateThreadDto | null, ignor
         'confidence': value['confidence'],
         'testablePredicate': value['testablePredicate'],
         'color': value['color'],
-        'createdBy': value['createdBy'],
     };
 }
 

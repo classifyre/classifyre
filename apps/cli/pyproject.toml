@@ -451,6 +451,8 @@ module = [
     "hudi.*",
     "pypaimon.*",
     "duckdb.*",
+    "sqlglot",
+    "sqlglot.*",
     "confluent_kafka.*",
     "boto3.*",
     "botocore.*",

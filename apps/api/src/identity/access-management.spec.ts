@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ConflictException,
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
@@ -83,7 +82,17 @@ describe('AccessManagementService', () => {
     ownerLineage: () => Promise.resolve(['finance']),
   } as unknown as IdentityService;
 
-  const service = new AccessManagementService(tenancy, identity);
+  const service = new AccessManagementService(tenancy, identity, {
+    source: {
+      findMany: () => Promise.resolve([{ id: 's-shop', name: 'Shop lake' }]),
+    },
+    asset: {
+      findMany: () =>
+        Promise.resolve([
+          { id: 'a-orders', name: 'orders', sourceId: 's-shop' },
+        ]),
+    },
+  } as never);
   const base = {
     subjectType: 'group' as const,
     subjectId: 'legal',
@@ -195,14 +204,12 @@ describe('AccessManagementService', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
     await expect(
       service.removeGrant(principal, 'g-inherited'),
-    ).resolves.toBeUndefined();
+    ).resolves.toMatchObject({ id: 'g-inherited', subjectLabel: '/finance' });
     expect(events).toEqual(['grant.removed']);
   });
 
-  it('says there is nothing to manage without sign-in', () => {
-    const off = new AccessManagementService(tenancy, null);
-    expect(() => off.requireSignIn()).toThrow(ConflictException);
-    expect(off.roles().map((role) => role.key)).not.toContain(
+  it('never offers the operator role as a grant', () => {
+    expect(service.roles().map((role) => role.key)).not.toContain(
       'platform-operator',
     );
   });
@@ -211,5 +218,33 @@ describe('AccessManagementService', () => {
     const tenants = await service.tenants(principal);
     // `unknown` is an organization without a tenant row: not offered.
     expect(tenants.map((tenant) => tenant.alias)).toEqual(['acme']);
+  });
+
+  it("names single-table and single-source grants, and the table's source", async () => {
+    stored = [
+      {
+        ...base,
+        id: 'g-src',
+        tenantId: 't1',
+        roleKey: 'data-reader',
+        scopeType: 'source',
+        scopeId: 'ws-q3/s-shop',
+        expiresAt: null,
+      },
+      {
+        ...base,
+        id: 'g-tbl',
+        tenantId: 't1',
+        roleKey: 'data-reader',
+        scopeType: 'asset',
+        scopeId: 'ws-q3/a-orders',
+        expiresAt: null,
+      },
+    ] as Grant[];
+    const removed = await service.removeGrant(principal, 'g-tbl');
+    expect(removed).toMatchObject({ scopeLabel: 'orders', sourceId: 's-shop' });
+    const source = await service.removeGrant(principal, 'g-src');
+    expect(source).toMatchObject({ scopeLabel: 'Shop lake' });
+    expect(source).not.toHaveProperty('sourceId');
   });
 });

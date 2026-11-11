@@ -13,7 +13,6 @@ Name | Type
 `confidence` | number
 `testablePredicate` | string
 `color` | string
-`createdBy` | string
 
 ## Example
 
@@ -29,7 +28,6 @@ const example = {
   "confidence": null,
   "testablePredicate": null,
   "color": null,
-  "createdBy": null,
 } satisfies CreateThreadDto
 
 console.log(example)

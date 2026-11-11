@@ -555,7 +555,8 @@ export class EmbeddingQueueService {
       spaceId = active?.id;
     }
     const queueName =
-      rt.queueName ?? (spaceId ? `${EMBEDDING_QUEUE_PREFIX}-${spaceId}` : undefined);
+      rt.queueName ??
+      (spaceId ? `${EMBEDDING_QUEUE_PREFIX}-${spaceId}` : undefined);
     const recalibrateQueueName =
       rt.recalibrateQueueName ??
       (spaceId ? `${RECALIBRATE_QUEUE_PREFIX}-${spaceId}` : undefined);

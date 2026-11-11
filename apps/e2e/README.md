@@ -10,13 +10,18 @@ push to `develop`:
    the file shows up as an asset with at least one finding.
 4. A viewer does not see the workspace until the admin gives their group the
    viewer role on it; then they see and read it, and cannot change it.
+5. SQL over tables is off until the admin turns it on; then the admin queries
+   the fixture's `orders.csv` on the SQL page, exports it to Excel and CSV, and
+   is refused a file read. The viewer sees the table locked until their group
+   gets the Data reader role on that one table, then queries it from the
+   asset's Data tab, and cannot export it.
 
 Selectors are `data-testid` attributes or the identity server's own form ids,
 never visible text, so translations cannot break it.
 
 ## Run it against the local dev stack
 
-The dev stack must run with sign-in (`CLASSIFYRE_IAM=true ./scripts/dev/start.sh`)
+The dev stack must be running (`./scripts/dev/start.sh`)
 and the web app on `localhost:3000`.
 
 ```bash

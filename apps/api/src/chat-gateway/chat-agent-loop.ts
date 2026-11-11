@@ -181,8 +181,8 @@ export async function runChatTurn(
       const dedupeKey = `chat:${iteration}:${i}:${call.tool}`;
       const result = await deps.dispatcher.dispatch(
         { ctx, audit: deps.audit, log: deps.log },
-        // In chat, the bot's allowMutations flag is the mutation gate —
-        // autopilot enablement settings apply to autonomous cycles only.
+        // In chat every change is recorded, never run: a chat message has no
+        // signed-in person behind it.
         withChatBotGate(tool),
         call.input,
         dedupeKey,

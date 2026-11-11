@@ -91,7 +91,6 @@ test.describe("graph performance", () => {
         body: JSON.stringify({
           id: 1,
           mcpEnabled: false,
-          demoMode: false,
           language: "ENGLISH",
           timezone: "UTC",
           timeFormat: "TWELVE_HOUR",

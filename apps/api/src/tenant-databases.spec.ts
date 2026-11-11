@@ -15,22 +15,15 @@ import {
 const TENANT = '7f3a0c1e-2b4d-4e5f-8a9b-0c1d2e3f4a5b';
 const OPEN = 'postgresql://owner:secret@db:5432/classifyre?sslmode=disable';
 
-describe('databases per sign-in mode', () => {
+describe('control and tenant databases', () => {
   const saved = { ...process.env };
   afterEach(() => {
     process.env = { ...saved };
     forgetWorkspacesForTests();
   });
 
-  it('keeps the configured database without sign-in', () => {
+  it('switches to the control database, and still knows the open one', () => {
     const env: NodeJS.ProcessEnv = { DATABASE_URL: OPEN };
-    selectDatabaseForMode(env);
-    expect(env.DATABASE_URL).toBe(OPEN);
-    expect(openDatabaseUrl(env)).toBe(OPEN);
-  });
-
-  it('switches to the control database with sign-in, and still knows the open one', () => {
-    const env: NodeJS.ProcessEnv = { DATABASE_URL: OPEN, IAM_ENABLED: 'true' };
     selectDatabaseForMode(env);
     selectDatabaseForMode(env);
     expect(new URL(env.DATABASE_URL ?? '').pathname).toBe(
@@ -70,6 +63,24 @@ describe('databases per sign-in mode', () => {
     expect(other).not.toBe(url.password);
   });
 
+  it('keeps the project suffix a routing pooler needs on the tenant role', () => {
+    process.env.CLASSIFYRE_TENANT_DATABASE_KEY = 'key-1';
+    const name = tenantDatabaseName(TENANT);
+    process.env.DATABASE_URL =
+      'postgresql://postgres.abcdproject:secret@aws-0-eu-west-1.pooler.supabase.com:6543/postgres';
+    expect(new URL(tenantDatabaseUrl(TENANT)).username).toBe(
+      `${name}.abcdproject`,
+    );
+    // A plain Postgres keeps the bare role, also when the user has a dot.
+    process.env.DATABASE_URL = 'postgresql://ops.team:secret@db:5432/postgres';
+    expect(new URL(tenantDatabaseUrl(TENANT)).username).toBe(name);
+    // Another such pooler is told explicitly.
+    process.env.CLASSIFYRE_DATABASE_USER_SUFFIX = 'tenant-7';
+    expect(new URL(tenantDatabaseUrl(TENANT)).username).toBe(
+      `${name}.tenant-7`,
+    );
+  });
+
   it('refuses tenant databases without the key', () => {
     process.env.DATABASE_URL = withControl();
     delete process.env.CLASSIFYRE_TENANT_DATABASE_KEY;
@@ -78,15 +89,8 @@ describe('databases per sign-in mode', () => {
     );
   });
 
-  it('routes a workspace to the open database without sign-in', () => {
-    process.env.DATABASE_URL = OPEN;
-    delete process.env.IAM_ENABLED;
-    expect(new URL(workspaceDatabaseUrl('ns_x')).pathname).toBe('/classifyre');
-  });
-
-  it('routes a workspace to its tenant database with sign-in, and never guesses', () => {
+  it('routes a workspace to its tenant database, and never guesses', () => {
     process.env.DATABASE_URL = withControl();
-    process.env.IAM_ENABLED = 'true';
     process.env.CLASSIFYRE_TENANT_DATABASE_KEY = 'key-1';
     expect(() => workspaceDatabaseUrl('ns_unknown')).toThrow(
       /No tenant is known/,

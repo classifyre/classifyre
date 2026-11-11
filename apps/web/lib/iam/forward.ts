@@ -54,9 +54,6 @@ export async function forwardIamRequest(
   request: NextRequest,
   segments: string[],
 ): Promise<Response> {
-  if (process.env.IAM_ENABLED !== "true") {
-    return new Response(null, { status: 404 });
-  }
   const base = upstreamIamBaseUrl();
   if (!base) {
     return Response.json(

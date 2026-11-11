@@ -106,12 +106,10 @@ say "install throwaway release $REL in $NS"
 kubectl get namespace "$NS" >/dev/null 2>&1 && { echo "namespace $NS exists; remove it first"; exit 1; }
 kubectl create namespace "$NS" >/dev/null
 helm install "$REL" "$ROOT/helm/classifyre" -n "$NS" \
-  -f "$ROOT/helm/develop/values-dev.yaml" -f "$ROOT/helm/develop/values-dev-iam.yaml" \
+  -f "$ROOT/helm/develop/values-dev.yaml" \
   --set worker.replicaCount=0 --set ingress.enabled=false --set priorityClasses.create=false \
   --set postgres.embedded.persistence.enabled=false --set api.cliCache.enabled=false \
-  --set api.embedding.enabled=false \
-  `# Visitors of a public tenant are checked by the smoke test (apps/e2e).` \
-  --set iam.public.enabled=false >/dev/null
+  --set api.embedding.enabled=false >/dev/null
 
 say "wait for the API, the identity server and the realm setup"
 # Give up after ten minutes and say why, instead of waiting forever on pods
@@ -198,7 +196,7 @@ check U14 "tenant admin manages tenant grants" 200 "$(status admin GET /tenant/g
 check U14 "a viewer does not" 403 "$(status controller GET /tenant/grants)"
 check H7 "another tenant sees nothing" "" "$(slugs outsider globex)"
 check H7 "another tenant gets 404" 404 "$(status outsider@globex GET /fin-ledger/sources)"
-check H7 "no sign-in is 401" 401 "$(status - GET /namespaces)"
+check H7 "no sign-in gets nothing private: 401" 401 "$(status - GET /fin-ledger/sources)"
 check U10 "contractor works until the end date" 200 "$(status contractor GET /fin-ledger/sources)"
 
 say "people and groups live in the identity server; Classifyre only reads them"
@@ -249,22 +247,90 @@ check T1 "the tenant's database holds its three workspaces" 3 "$(pg "$DEFAULT_DB
 check T1 "it is marked as that tenant's" "tenant|$DEFAULT_ID" "$(pg "$DEFAULT_DB" "SELECT kind || '|' || tenant_id FROM classifyre_database")"
 check T1 "its role opens no other database" "false,false" "$(pg postgres "SELECT string_agg(has_database_privilege('$DEFAULT_DB', d, 'CONNECT')::text, ',' ORDER BY d) FROM unnest(ARRAY['classifyre', 'classifyre_control']) AS d")"
 
-say "operator copies workspaces between a tenant and the open database (docs/prd/TEN §4.9)"
-operator workspaces copy --to-local fin-q3 >/dev/null
-check T0 "a copy to the open database leaves the tenant's in place" "fin-ledger,fin-q3,sales-pipeline" "$(slugs admin)"
-check T0 "and is in the open database" fin-q3 "$(pg classifyre "SELECT string_agg(slug, ',') FROM namespaces WHERE status = 'active'")"
-check T0 "the open database holds no tenant's workspace or access" "0|0" "$(pg classifyre "SELECT (SELECT count(*) FROM namespaces WHERE tenant_id <> '00000000-0000-4000-8000-0000000000aa') || '|' || (SELECT count(*) FROM iam_grants)")"
-Q3_SCHEMA=$(pg classifyre_control "SELECT schema_name FROM namespaces WHERE slug = 'fin-q3'")
-Q3_COPY=$(pg classifyre "SELECT schema_name FROM namespaces WHERE slug = 'fin-q3'")
-check T0 "with its data, as a new workspace" "$(pg "$DEFAULT_DB" "SELECT count(*) FROM $Q3_SCHEMA.audit_events"),new" "$(pg classifyre "SELECT count(*) FROM $Q3_COPY.audit_events"),$([ "$Q3_COPY" != "$Q3_SCHEMA" ] && echo new || echo same)"
-check T0 "a copy to a taken address is refused" 2 "$(operator workspaces copy --to-tenant globex fin-q3 >/dev/null 2>&1; echo $?)"
-EVENTS=$(get admin /tenant/audit-events)
-COPIES=$(echo "$EVENTS" | json "a=[e['action'] for e in d if (e.get('detail') or {}).get('slug')=='fin-q3']; print('yes' if 'workspace.copied_out' in a else a)")
-[ "$COPIES" = yes ] || COPIES="$COPIES; body: ${EVENTS:0:300}"
-check T0 "the copy is in the tenant's activity" yes "$COPIES"
-# A second workspace made without sign-in, under an address no tenant uses,
-# for the Platform page to bring in.
-pg classifyre "UPDATE namespaces SET slug = 'fin-q3-local' WHERE slug = 'fin-q3'" >/dev/null
+say "SQL over tables: who may query which table (docs/prd/DQ-data-query.md §4)"
+LEDGER_SCHEMA=$(pg classifyre_control "SELECT schema_name FROM namespaces WHERE slug = 'fin-ledger'")
+LAKE=00000000-0000-4000-8000-00000000d001
+ORDERS=00000000-0000-4000-8000-00000000d002
+PAYROLL=00000000-0000-4000-8000-00000000d003
+# A bucket source with two Delta tables, as a scan would have left them.
+pg "$DEFAULT_DB" "INSERT INTO $LEDGER_SCHEMA.sources (id, name, type, config, updated_at)
+  VALUES ('$LAKE', 'Ledger lake', 'S3_COMPATIBLE_STORAGE',
+  '{\"type\":\"S3_COMPATIBLE_STORAGE\",\"required\":{\"bucket\":\"ledger\"}}', now());
+  INSERT INTO $LEDGER_SCHEMA.assets (id, hash, checksum, name, external_url, asset_type, source_type, source_id, metadata, updated_at)
+  SELECT id, id, id, name, 's3://ledger/' || key, 'table', 'S3_COMPATIBLE_STORAGE', '$LAKE',
+    jsonb_build_object('object_key', key, 'table_format', 'delta', 'columns', '[{\"name\":\"id\",\"type\":\"long\"}]'::jsonb), now()
+  FROM (VALUES ('$ORDERS', 'orders', 'ap/orders'), ('$PAYROLL', 'payroll', 'hr/payroll')) AS t(id, name, key)" >/dev/null
+data_grant() { # data_grant <group> <role> <asset|source> <id>: a grant body on one resource
+  printf '{"subjectType":"group","subjectId":"%s","roleKey":"%s","scopeType":"%s","resourceId":"%s"}' "$1" "$2" "$3" "$4"
+}
+can_query() { # can_query <user> <sql name>: yes / no / absent
+  get "$1" /fin-ledger/data-query/catalog | json "t=[t for s in d.get('sources',[]) for t in s['tables'] if t['sqlName']=='$2']; print(('yes' if t[0]['canQuery'] else 'no') if t else 'absent')"
+}
+run_code() { # run_code <user> <sql> [format]: the run's status and error code, or the refusal's code
+  post "$1" /fin-ledger/query-runs "{\"sql\":\"$2\"${3:+,\"format\":\"$3\"}}" \
+    | json "e=d.get('error'); print((d.get('status') or '') + ':' + ((e.get('code') if isinstance(e, dict) else None) or d.get('code') or ''))"
+}
+check D "a viewer cannot change the query limits" 403 "$(status controller PUT /fin-ledger/data-query/settings '{"maxRows":500}')"
+check D "the tenant admin may query every table" "yes,yes" "$(can_query admin ledger_lake.ap.orders),$(can_query admin ledger_lake.hr.payroll)"
+check D "a viewer sees the tables, locked" "no,no" "$(can_query controller ledger_lake.ap.orders),$(can_query controller ledger_lake.hr.payroll)"
+check D "and is refused without a job" ":NO_QUERYABLE_TABLES" "$(run_code controller "SELECT * FROM ledger_lake.ap.orders")"
+check D "a viewer cannot give data access" 403 "$(status controller POST /fin-ledger/access/grants "$(data_grant "$AP" data-reader asset "$ORDERS")")"
+check D "a workspace admin gives the AP team one table" 201 "$(status admin POST /fin-ledger/access/grants "$(data_grant "$AP" data-reader asset "$ORDERS")")"
+check D "only data-reader is given on a single table" 400 "$(status admin POST /fin-ledger/access/grants "$(data_grant "$AP" viewer asset "$ORDERS")")"
+check D "and data engineering the whole source" 201 "$(status admin POST /fin-ledger/access/grants "$(data_grant "$DATA" data-reader source "$LAKE")")"
+check D "the AP investigator may query that table only" "yes,no" "$(can_query investigator ledger_lake.ap.orders),$(can_query investigator ledger_lake.hr.payroll)"
+check D "the other table is refused before any job" "ERROR:table_not_available" "$(run_code investigator "SELECT * FROM ledger_lake.hr.payroll")"
+check D "files and table functions are refused too" "ERROR:function_not_allowed" "$(run_code investigator "SELECT * FROM read_csv('/etc/passwd')")"
+check D "the source grant opens both tables" "yes,yes" "$(can_query engineer ledger_lake.ap.orders),$(can_query engineer ledger_lake.hr.payroll)"
+check D "exporting needs data.export as well" ":EXPORT_NOT_ALLOWED" "$(run_code investigator "SELECT * FROM ledger_lake.ap.orders" xlsx)"
+check D "the grants are listed with the workspace's" "asset,source" "$(get admin /fin-ledger/access/grants | json "print(','.join(sorted(g['scopeType'] for g in d if g['roleKey']=='data-reader')))")"
+check D "another tenant gets 404" 404 "$(status outsider@globex GET /fin-ledger/data-query/catalog)"
+
+say "notifications go to groups (docs/prd/IAM §6.4)"
+pg "$DEFAULT_DB" "INSERT INTO $LEDGER_SCHEMA.notifications (id, type, severity, title, message, audience_group_ids, updated_at)
+  VALUES ('00000000-0000-4000-8000-00000000a001', 'SCAN', 'INFO', 'to-owner', 'm', '{}', now()),
+         ('00000000-0000-4000-8000-00000000a002', 'SOURCE', 'INFO', 'to-data', 'm', ARRAY['$DATA'], now())" >/dev/null
+seen() { get "$1" /fin-ledger/notifications | json "print(','.join(sorted(n['title'] for n in d.get('notifications', []))) or '-')"; }
+check N "the owning group gets what is sent to no group in particular" to-owner "$(seen controller)"
+check N "so do members of its subgroups" to-owner "$(seen investigator)"
+check N "a chosen group gets what is sent to it, and only that" to-data "$(seen engineer)"
+check N "a role alone does not make anyone a recipient" - "$(seen admin)"
+status controller PATCH /fin-ledger/notifications/00000000-0000-4000-8000-00000000a001/read >/dev/null
+unread() { get "$1" /fin-ledger/notifications | json "print(d.get('unreadCount'))"; }
+check N "reading it is each person's own" "0,1" "$(unread controller),$(unread investigator)"
+check N "nobody marks what was not sent to them" 404 "$(status controller PATCH /fin-ledger/notifications/00000000-0000-4000-8000-00000000a002/read)"
+check N "a viewer cannot choose who gets them" 403 "$(status controller PUT /fin-ledger/notifications/audiences/SCAN "{\"groupIds\":[\"$AP\"]}")"
+check N "a workspace admin can" 200 "$(status admin PUT /fin-ledger/notifications/audiences/SCAN "{\"groupIds\":[\"$AP\"]}")"
+check N "only groups of the tenant" 400 "$(status admin PUT /fin-ledger/notifications/audiences/SCAN '{"groupIds":["no-such-group"]}')"
+
+say "public workspaces: read-only within their tenant (docs/prd/IAM step 8h)"
+anon_slugs() { curl -s "$B/namespaces" | json "print(','.join(sorted(n['slug'] for n in d)) or '-')"; }
+check W "without signing in nothing is listed while nothing is public" - "$(anon_slugs)"
+check W "and a private workspace asks to sign in" 401 "$(status - GET /sales-pipeline/sources)"
+check W "a viewer cannot make a workspace public" 403 "$(status controller PATCH "/namespaces/$WS_LEDGER" '{"public":true}')"
+check W "a tenant admin can" 200 "$(status admin PATCH "/namespaces/$WS_SALES" '{"public":true}')"
+check W "visitors then see it listed" sales-pipeline "$(anon_slugs)"
+check W "and read it" 200 "$(status - GET /sales-pipeline/sources)"
+check W "but change nothing: they are asked to sign in" 401 "$(status - POST /sales-pipeline/sources '{"name":"x","type":"LOCAL_FOLDER","config":{}}')"
+check W "nor see who has access" 401 "$(status - GET /sales-pipeline/access/grants)"
+check W "nor save SQL into a pool shared by every visitor" 401 "$(status - POST /sales-pipeline/saved-queries '{"name":"x","sql":"SELECT 1"}')"
+check W "nor run SQL or even see its catalog" 401 "$(status - GET /sales-pipeline/data-query/catalog)"
+check W "nor read who did what" 401 "$(status - GET /sales-pipeline/audit-events)"
+check W "nor the settings" 401 "$(status - GET /sales-pipeline/instance-settings)"
+check W "only how dates and language are shown" 200 "$(status - GET /sales-pipeline/instance-settings/display)"
+check W "a member without a grant does not read its activity either" 403 "$(status controller GET /sales-pipeline/audit-events)"
+check W "nor its settings" 403 "$(status controller GET /sales-pipeline/worker-queues)"
+check W "a member of the tenant without a grant on it reads it" 200 "$(status controller GET /sales-pipeline/sources)"
+check W "but cannot change it" 403 "$(status controller POST /sales-pipeline/sources '{"name":"x","type":"LOCAL_FOLDER","config":{}}')"
+check W "another tenant never sees it" 404 "$(status outsider@globex GET /sales-pipeline/sources)"
+check W "making it public is in the tenant's activity" workspace.published "$(pg classifyre_control "SELECT action FROM iam_audit_events WHERE action = 'workspace.published' LIMIT 1")"
+status admin PATCH "/namespaces/$WS_SALES" '{"public":false}' >/dev/null
+check W "private again, it closes at once" 401 "$(status - GET /sales-pipeline/sources)"
+
+say "operator commands (docs/prd/TEN §4.9)"
+check T0 "copies go only into a tenant" 2 "$(operator workspaces copy --to-local fin-q3 >/dev/null 2>&1; echo $?)"
+check T0 "a copy into an unknown tenant is refused" 2 "$(operator workspaces copy --to-tenant nowhere --all >/dev/null 2>&1; echo $?)"
+check T0 "an open database without workspaces has nothing to copy" "Nothing to copy to globex." "$(operator workspaces copy --to-tenant globex --all 2>&1 | tail -1)"
 
 say "operators manage tenants on the Platform page (docs/prd/TEN §4.7)"
 optoken() { # an operator's token names no tenant
@@ -300,8 +366,7 @@ check P "suspending a tenant" suspended "$(op POST "/platform/tenants/$GLOBEX_ID
 check P "refuses its people" TENANT_SUSPENDED "$(get outsider /namespaces globex | json "print(d.get('code'))")"
 op POST "/platform/tenants/$GLOBEX_ID/resume" >/dev/null
 check P "and resuming lets them back in" 200 "$(status outsider@globex GET /namespaces)"
-check P "workspaces made without sign-in are offered for import" fin-q3-local "$(op GET /platform/workspaces/local | json "print(','.join(w['slug'] for w in d))")"
-check P "and copied into a tenant" fin-q3-local "$(op POST "/platform/tenants/$INITECH_ID/workspaces" '{"slugs":["fin-q3-local"]}' | json "print(','.join(d['copied']))")"
+check P "the operator command makes a tenant's first workspace" "Created initech-ops in tenant initech." "$(operator workspaces create --tenant initech --slug initech-ops --owner-group "$INITECH_ADMINS" 2>&1 | tail -1)"
 INITECH_DB="classifyre_t_${INITECH_ID//-/}"
 check P "which gets the tenant its own database" "$INITECH_DB" "$(op GET /platform/tenants | json "print(next(t['database'] for t in d if t['alias']=='initech'))")"
 check P "its data is not removed while its organization exists" ORGANIZATION_EXISTS "$(op DELETE "/platform/tenants/$INITECH_ID?confirm=initech" | json "print(d.get('code'))")"
@@ -311,19 +376,8 @@ check P "nor without its alias typed" 400 "$(opstatus DELETE "/platform/tenants/
 check P "then its data is removed" 204 "$(opstatus DELETE "/platform/tenants/$INITECH_ID?confirm=initech")"
 check P "it stays listed as deleted, alias reserved" deleted "$(op GET /platform/tenants | json "print(next(t['status'] for t in d if t['alias']=='initech'))")"
 check P "with its database and workspaces gone" "0|0" "$(pg postgres "SELECT count(*) FROM pg_database WHERE datname = '$INITECH_DB'")|$(pg classifyre_control "SELECT count(*) FROM namespaces WHERE tenant_id = '$INITECH_ID'")"
-check P "the copy is in that tenant's activity" workspace.copied_in "$(pg classifyre_control "SELECT action FROM iam_audit_events WHERE tenant_id = '$INITECH_ID' AND action LIKE 'workspace.%'")"
+check P "the workspace is in that tenant's activity" workspace.created "$(pg classifyre_control "SELECT action FROM iam_audit_events WHERE tenant_id = '$INITECH_ID' AND action LIKE 'workspace.%'")"
 check P "globex's activity has the suspension and the resume" "tenant.resumed,tenant.suspended" "$(pg classifyre_control "SELECT string_agg(action, ',' ORDER BY action) FROM iam_audit_events WHERE tenant_id = '$GLOBEX_ID' AND action LIKE 'tenant.%'")"
-
-say "sign-in turned off by mistake (docs/prd/TEN §4.2)"
-helm upgrade "$REL" "$ROOT/helm/classifyre" -n "$NS" --reuse-values --set iam.enabled=false >/dev/null
-kubectl -n "$NS" rollout status "deploy/$REL-classifyre-api" --timeout=600s >/dev/null
-# The forward was bound to the replaced pod.
-kill "${PF_PIDS[0]}" 2>/dev/null || true
-kubectl -n "$NS" port-forward "svc/$REL-classifyre-api" "$API_PORT:8000" >/dev/null 2>&1 & PF_PIDS+=($!)
-until curl -s -m 3 "$B/ping" | grep -q pong; do sleep 2; done
-check T0 "without sign-in only the open database is listed" "fin-q3-local" "$(curl -s "$B/namespaces" | json "print(','.join(sorted(n['slug'] for n in d)))")"
-check T0 "a tenant's workspace answers 404 by its address" 404 "$(status - GET /fin-ledger/sources)"
-check T0 "the tenants are untouched in their databases" 3 "$(pg "$DEFAULT_DB" "SELECT count(*) FROM pg_namespace WHERE nspname LIKE 'ns\_%'")"
 
 say "results"
 printf '%s\n' "${RESULTS[@]}"

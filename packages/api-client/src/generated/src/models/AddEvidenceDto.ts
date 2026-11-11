@@ -37,12 +37,6 @@ export interface AddEvidenceDto {
      * @memberof AddEvidenceDto
      */
     note?: string;
-    /**
-     * 
-     * @type {string}
-     * @memberof AddEvidenceDto
-     */
-    addedBy?: string;
 }
 
 /**
@@ -67,7 +61,6 @@ export function AddEvidenceDtoFromJSONTyped(json: any, ignoreDiscriminator: bool
         'entityType': json['entityType'],
         'entityId': json['entityId'],
         'note': json['note'] == null ? undefined : json['note'],
-        'addedBy': json['addedBy'] == null ? undefined : json['addedBy'],
     };
 }
 
@@ -85,7 +78,6 @@ export function AddEvidenceDtoToJSONTyped(value?: AddEvidenceDto | null, ignoreD
         'entityType': value['entityType'],
         'entityId': value['entityId'],
         'note': value['note'],
-        'addedBy': value['addedBy'],
     };
 }
 

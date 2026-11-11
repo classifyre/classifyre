@@ -3,13 +3,7 @@
 import * as React from "react";
 import { setUnauthorizedHandler } from "@workspace/api-client";
 
-const IamEnabledContext = React.createContext(false);
 const IamConsoleContext = React.createContext(false);
-
-/** True when people sign in; available everywhere, also outside a workspace. */
-export function useIamEnabled(): boolean {
-  return React.useContext(IamEnabledContext);
-}
 
 /**
  * True when the realm's identity console is reachable through the app
@@ -20,8 +14,7 @@ export function useIamConsole(): boolean {
 }
 
 /**
- * Sign-in state for the whole app (docs/prd §12.1). With sign-in on, a 401
- * from the API means the session ran out between page loads: renew it once
+ * Sign-in state for the whole app (docs/prd §12.1). A 401 from the API means the session ran out between page loads: renew it once
  * and retry, or go to sign-in. The tokens never reach the browser; only the
  * server can renew.
  */
@@ -43,16 +36,13 @@ async function isOperator(): Promise<boolean> {
 }
 
 export function IamProvider({
-  enabled,
   console: consoleEnabled = false,
   children,
 }: {
-  enabled: boolean;
   console?: boolean;
   children: React.ReactNode;
 }) {
   React.useEffect(() => {
-    if (!enabled) return;
     setUnauthorizedHandler(async ({ code }) => {
       // Signed in, but in no tenant, in several or in a suspended one: a new
       // session would be refused the same way, so say so instead of retrying.
@@ -88,13 +78,11 @@ export function IamProvider({
       return false;
     });
     return () => setUnauthorizedHandler(null);
-  }, [enabled]);
+  }, []);
 
   return (
-    <IamEnabledContext.Provider value={enabled}>
-      <IamConsoleContext.Provider value={enabled && consoleEnabled}>
-        {children}
-      </IamConsoleContext.Provider>
-    </IamEnabledContext.Provider>
+    <IamConsoleContext.Provider value={consoleEnabled}>
+      {children}
+    </IamConsoleContext.Provider>
   );
 }

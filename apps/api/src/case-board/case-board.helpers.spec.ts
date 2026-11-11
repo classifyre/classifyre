@@ -2,7 +2,6 @@ import {
   ApplyBoardOpsSchema,
   BoardOpSchema,
 } from '@workspace/schemas/case-board';
-import { parseActorName } from '../identity/actor';
 import { claimHolds, mergeStyle, toRelationType } from './case-board.service';
 import { summarizeOps } from './case-board.events';
 
@@ -238,20 +237,5 @@ describe('summarizeOps', () => {
       ]),
     ).toBe('moved 3 items · added a note or frame');
     expect(summarizeOps([])).toBe('changed the board');
-  });
-});
-
-describe('parseActorName', () => {
-  it('decodes, trims and caps the self-declared name', () => {
-    expect(parseActorName(encodeURIComponent('Jürgen Müller'))).toBe(
-      'Jürgen Müller',
-    );
-    expect(parseActorName('  MK  ')).toBe('MK');
-    expect(parseActorName('100%')).toBe('100%');
-    expect(parseActorName('a\u0000b')).toBe('a b');
-    expect(parseActorName('x'.repeat(200))).toHaveLength(64);
-    expect(parseActorName('')).toBeUndefined();
-    expect(parseActorName(undefined)).toBeUndefined();
-    expect(parseActorName(['first', 'second'])).toBe('first');
   });
 });

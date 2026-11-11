@@ -67,7 +67,6 @@ async function mockAccess(page: CtPage, capabilities: string[]) {
     route.fulfill(
       json({
         actor: { id: "user:u1", displayName: "Ada Kowalczyk", kind: "person", via: "oidc" },
-        iamEnabled: true,
         capabilities,
       }),
     ),
@@ -79,7 +78,7 @@ test("lists inherited grants read-only and grants made here with a remove button
   mount,
   page,
 }) => {
-  const calls = await mockAccess(page, ["workspace.view", "access.view", "access.manage"]);
+  const calls = await mockAccess(page, ["workspace.view", "access.view", "access.manage", "source.manage"]);
   const card = await mount(<WorkspaceAccessCard />);
 
   await expect(card.getByText("/admins")).toBeVisible();
@@ -91,15 +90,18 @@ test("lists inherited grants read-only and grants made here with a remove button
   await expect.poll(() => calls.some((c) => c.method === "DELETE" && c.url.endsWith("/access/grants/g-legal"))).toBe(true);
 });
 
-test("gives a group a role from the form", async ({ mount, page }) => {
-  const calls = await mockAccess(page, ["workspace.view", "access.view", "access.manage"]);
+test("gives a group a role from the dialog", async ({ mount, page }) => {
+  const calls = await mockAccess(page, ["workspace.view", "access.view", "access.manage", "source.manage"]);
   const card = await mount(<WorkspaceAccessCard />);
 
-  // The groups arrive with the grants: open the picker only once they are in.
-  await expect(card.getByText("/legal")).toBeVisible();
-  await card.getByRole("combobox").first().click();
-  await page.getByRole("option", { name: "/sales" }).click();
+  // Giving access now lives in a dialog opened from the card header.
+  await expect(card.getByRole("cell", { name: "/legal", exact: true }).first()).toBeVisible();
   await card.getByRole("button", { name: "Give access" }).click();
+
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("combobox").first().click();
+  await page.getByRole("option", { name: "/sales" }).click();
+  await dialog.getByRole("button", { name: "Give access" }).click();
 
   await expect
     .poll(() => calls.find((c) => c.method === "POST")?.body ?? "")
@@ -107,10 +109,25 @@ test("gives a group a role from the form", async ({ mount, page }) => {
 });
 
 test("hides changes from people who may only look", async ({ mount, page }) => {
-  await mockAccess(page, ["workspace.view", "access.view"]);
+  await mockAccess(page, ["workspace.view", "access.view", "source.manage"]);
   const card = await mount(<WorkspaceAccessCard />);
 
   await expect(card.getByText("/legal")).toBeVisible();
   await expect(card.getByRole("button", { name: "Remove access" })).toHaveCount(0);
   await expect(card.getByRole("button", { name: "Give access" })).toHaveCount(0);
+});
+
+test("what I can do lists capabilities in a sortable table", async ({
+  mount,
+  page,
+}) => {
+  await mockAccess(page, ["workspace.view", "access.view", "source.manage"]);
+  const card = await mount(<WorkspaceAccessCard />);
+
+  await expect(card.getByText("What I can do")).toBeVisible();
+  // One row per (capability, grant): the mocked explain answers one grant
+  // for each of the caller's capabilities.
+  await expect(card.getByText("source.manage", { exact: true }).first()).toBeVisible();
+  await expect(card.getByRole("columnheader", { name: /Capability/ })).toBeVisible();
+  await expect(card.getByRole("columnheader", { name: /Tenant/ })).toBeVisible();
 });

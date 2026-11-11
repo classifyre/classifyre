@@ -83,10 +83,7 @@ export default async function RootLayout({
             a small same-origin script that must run before hydration so the
             PostHog provider sees its config on first effect. */}
         <script src={ANALYTICS_CONFIG_PATH} />
-        <IamProvider
-          enabled={process.env.IAM_ENABLED === "true"}
-          console={process.env.IAM_REALM_CONSOLE === "true"}
-        >
+        <IamProvider console={process.env.IAM_REALM_CONSOLE === "true"}>
           <Providers locale={locale}>{children}</Providers>
         </IamProvider>
       </body>

@@ -9,7 +9,6 @@ import { ClsService } from 'nestjs-cls';
 import { CLS_SCHEMA } from '../namespace/namespace.constants';
 import { NamespaceRegistryService } from '../registry/namespace-registry.service';
 import { SocketAccessService } from '../identity/socket-access.service';
-import { parseActorName } from '../identity/actor';
 import type {
   BoardChangedEvent,
   CaseBoardEvents,
@@ -59,7 +58,7 @@ export class CaseBoardGateway implements OnGatewayDisconnect, CaseBoardEvents {
   @SubscribeMessage('subscribe')
   async subscribe(
     client: Socket,
-    body: { caseId?: unknown; actor?: unknown },
+    body: { caseId?: unknown },
   ): Promise<{ success: boolean; message?: string }> {
     const schema = await this.resolveClientSchema(client);
     if (!schema) return { success: false, message: 'Unknown namespace' };
@@ -75,15 +74,13 @@ export class CaseBoardGateway implements OnGatewayDisconnect, CaseBoardEvents {
     }
     await client.join(room);
     const members = this.presence.get(room) ?? new Map<string, string>();
-    // With sign-in the board shows who signed in, not a name the client sends.
+    // The board shows who signed in, never a name the client sends.
     const principal = client.data['classifyrePrincipal'] as
       | { actor: { displayName: string | null; ref?: string } }
       | undefined;
     members.set(
       client.id,
-      principal
-        ? (principal.actor.displayName ?? principal.actor.ref ?? '')
-        : (parseActorName(body?.actor) ?? ''),
+      principal?.actor.displayName ?? principal?.actor.ref ?? '',
     );
     this.presence.set(room, members);
     this.broadcastPresence(room);

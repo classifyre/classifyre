@@ -7,7 +7,6 @@
 Name | Type
 ------------ | -------------
 `action` | string
-`reviewedBy` | string
 `reason` | string
 `leadIds` | Array&lt;string&gt;
 
@@ -19,7 +18,6 @@ import type { ReviewCaseLeadsDto } from '@workspace/api-client'
 // TODO: Update the object below with actual values
 const example = {
   "action": null,
-  "reviewedBy": null,
   "reason": null,
   "leadIds": null,
 } satisfies ReviewCaseLeadsDto

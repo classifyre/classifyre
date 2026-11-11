@@ -69,7 +69,6 @@ export class ChatBotsService {
         appTokenEnc: appToken ? this.crypto.encryptString(appToken) : null,
         capabilityGroups: this.normalizeCapabilityGroups(dto.capabilityGroups),
         agentKinds: this.normalizeAgentKinds(dto.agentKinds),
-        allowMutations: dto.allowMutations !== false,
       },
     });
     await this.refreshGateway();
@@ -82,9 +81,6 @@ export class ChatBotsService {
     const data: Prisma.ChatBotUpdateInput = {};
     if (dto.name !== undefined) data.name = this.normalizeName(dto.name);
     if (dto.enabled !== undefined) data.enabled = dto.enabled === true;
-    if (dto.allowMutations !== undefined) {
-      data.allowMutations = dto.allowMutations === true;
-    }
     if (dto.capabilityGroups !== undefined) {
       data.capabilityGroups = this.normalizeCapabilityGroups(
         dto.capabilityGroups,
@@ -165,7 +161,6 @@ export class ChatBotsService {
       appTokenPreview: this.preview(bot.appTokenEnc),
       capabilityGroups: bot.capabilityGroups,
       agentKinds: bot.agentKinds,
-      allowMutations: bot.allowMutations,
       lastError: bot.lastError,
       lastConnectedAt: bot.lastConnectedAt,
       createdAt: bot.createdAt,

@@ -1,5 +1,6 @@
 "use client";
 
+import { useCan } from "@/hooks/use-me";
 import * as React from "react";
 import { AlertTriangle } from "lucide-react";
 import { api } from "@workspace/api-client";
@@ -9,7 +10,6 @@ import {
   TooltipTrigger,
 } from "@workspace/ui/components/tooltip";
 import { useInstanceSettings } from "./instance-settings-provider";
-import { useServerConfig } from "./server-config-provider";
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
 
@@ -20,9 +20,9 @@ import type { TranslationKey } from "@/i18n";
  * - `not_configured` — Harness has no provider assigned.
  * - `error`          — an assigned provider failed the live test (no connection,
  *                      no structured output, bad key, …). `detail` holds why.
- * - `unavailable`    — demo mode: never probed, never warned on. The probe is a
- *                      mutating call the demo guard rejects anyway, and the
- *                      provider is not something a demo visitor could fix.
+ * - `unavailable`    — the person cannot configure AI (a viewer, a visitor of a
+ *                      public workspace): never probed, never warned on. The
+ *                      probe needs `agent.configure`, and they could not fix it.
  */
 export type AiHealthStatus =
   | "ok"
@@ -41,27 +41,22 @@ const AiHealthContext = React.createContext<AiHealthValue | null>(null);
 
 export function AiHealthProvider({ children }: { children: React.ReactNode }) {
   const { settings, loading: settingsLoading } = useInstanceSettings();
-  const serverConfig = useServerConfig();
   const [status, setStatus] = React.useState<AiHealthStatus>("loading");
   const [detail, setDetail] = React.useState<string | null>(null);
 
   const harnessProviderId = settings.harnessAiProviderConfigId;
-  // Two sources on purpose. `serverConfig` is the web pod's own DEMO_MODE env,
-  // known synchronously, so the probe is suppressed even before instance
-  // settings arrive. `settings.demoMode` is what the API actually enforces and
-  // covers deployments where only the API has the flag.
-  const demoMode = serverConfig.demoMode || settings.demoMode;
+  const readOnly = !useCan("agent.configure");
 
   const check = React.useCallback(async () => {
     if (settingsLoading) {
       setStatus("loading");
       return;
     }
-    // On a demo instance the provider probe (POST .../test) is blocked by the
-    // read-only guard, so running it would only ever produce a red "AI provider
-    // problem — Fix" banner pointing at a Settings page the visitor cannot
-    // change. Skip the request entirely.
-    if (demoMode) {
+    // The provider probe (POST .../test) needs agent.configure. Without it
+    // (a viewer, a visitor of a public workspace) running it would only ever
+    // produce a red "AI provider problem — Fix" banner pointing at a Settings
+    // page they cannot change. Skip the request entirely.
+    if (readOnly) {
       setStatus("unavailable");
       setDetail(null);
       return;
@@ -96,7 +91,7 @@ export function AiHealthProvider({ children }: { children: React.ReactNode }) {
       setStatus("error");
       setDetail(e instanceof Error ? e.message : null);
     }
-  }, [demoMode, harnessProviderId, settingsLoading]);
+  }, [readOnly, harnessProviderId, settingsLoading]);
 
   React.useEffect(() => {
     void check();
@@ -135,8 +130,8 @@ export function useAiHealth(): AiHealthValue {
 }
 
 /** True when there is something the operator should fix. `unavailable` is
- * deliberately excluded: nothing is broken and nobody viewing a demo can act
- * on it, so neither the sidebar warning nor the top-bar pill renders. */
+ * deliberately excluded: nothing is broken and someone who cannot configure
+ * AI cannot act on it, so neither the sidebar warning nor the top-bar pill renders. */
 function isUnhealthy(status: AiHealthStatus): boolean {
   return status === "not_configured" || status === "error";
 }

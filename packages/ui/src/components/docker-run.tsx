@@ -168,7 +168,7 @@ export function DockerRunHint({ className }: { className?: string }) {
       >
         localhost:3000
       </a>
-      . Needs Docker and 4 GB of memory. No account, no signup.
+       and sign in as classifyre / classifyre. Needs Docker and 4 GB of memory.
     </p>
   );
 }

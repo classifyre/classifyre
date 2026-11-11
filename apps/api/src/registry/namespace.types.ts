@@ -56,6 +56,12 @@ export interface Namespace {
   pausedAt: string | null;
   /** Operator note recorded at pause time; null when unset. */
   pausedReason: string | null;
+  /**
+   * Readable by everyone of the workspace's tenant, read-only for those
+   * without a grant; and by people who have not signed in when it is in the
+   * first tenant. Never by another tenant.
+   */
+  public: boolean;
   settings: Record<string, unknown>;
   /** Ordered external links shown on the workspace card. */
   externalLinks: NamespaceExternalLink[];
@@ -76,10 +82,7 @@ export interface CreateNamespaceInput {
   externalLinks?: NamespaceExternalLinkInput[];
   /** Categories to file it under. Defaults to the built-in default category. */
   categoryIds?: string[];
-  /**
-   * With sign-in: the group of the caller's tenant that owns the workspace.
-   * Ignored without sign-in.
-   */
+  /** Required: the group of the caller's tenant that owns the workspace. */
   ownerGroupId?: string;
 }
 
@@ -100,6 +103,8 @@ export interface UpdateNamespaceInput {
    * leave the pause state untouched.
    */
   paused?: boolean;
+  /** Make the workspace public (`true`) or private again. Needs `workspace.publish`. */
+  public?: boolean;
   /**
    * Operator note stored alongside the pause (shown in the directory and the
    * paused banner). `null`/empty clears it. Omit to leave it untouched.

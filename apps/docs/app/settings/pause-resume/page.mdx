@@ -87,4 +87,5 @@ config change waits the same way.
   it stays available while paused, because a frozen workspace is the ideal
   quiet window — pause, clean, resume, and no worker can re-insert rows
   while a wipe drains (see Storage & Cleanup).
-- Demo mode blocks pausing entirely, like any other mutation.
+- Pausing needs `workspace.pause`; read-only people (a viewer, a visitor of a
+  public workspace) see the control but cannot use it.

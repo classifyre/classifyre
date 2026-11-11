@@ -68,12 +68,6 @@ export interface ChatBotResponseDto {
      */
     agentKinds: Array<string>;
     /**
-     * When false, every mutating tool is recorded observe-only and never executed.
-     * @type {boolean}
-     * @memberof ChatBotResponseDto
-     */
-    allowMutations: boolean;
-    /**
      * Last connector error, if any.
      * @type {string}
      * @memberof ChatBotResponseDto
@@ -122,7 +116,6 @@ export function instanceOfChatBotResponseDto(value: object): value is ChatBotRes
     if (!('appTokenPreview' in value) || value['appTokenPreview'] === undefined) return false;
     if (!('capabilityGroups' in value) || value['capabilityGroups'] === undefined) return false;
     if (!('agentKinds' in value) || value['agentKinds'] === undefined) return false;
-    if (!('allowMutations' in value) || value['allowMutations'] === undefined) return false;
     if (!('lastError' in value) || value['lastError'] === undefined) return false;
     if (!('lastConnectedAt' in value) || value['lastConnectedAt'] === undefined) return false;
     if (!('createdAt' in value) || value['createdAt'] === undefined) return false;
@@ -148,7 +141,6 @@ export function ChatBotResponseDtoFromJSONTyped(json: any, ignoreDiscriminator: 
         'appTokenPreview': json['appTokenPreview'],
         'capabilityGroups': json['capabilityGroups'],
         'agentKinds': json['agentKinds'],
-        'allowMutations': json['allowMutations'],
         'lastError': json['lastError'],
         'lastConnectedAt': (json['lastConnectedAt'] == null ? null : new Date(json['lastConnectedAt'])),
         'createdAt': (new Date(json['createdAt'])),
@@ -175,7 +167,6 @@ export function ChatBotResponseDtoToJSONTyped(value?: ChatBotResponseDto | null,
         'appTokenPreview': value['appTokenPreview'],
         'capabilityGroups': value['capabilityGroups'],
         'agentKinds': value['agentKinds'],
-        'allowMutations': value['allowMutations'],
         'lastError': value['lastError'],
         'lastConnectedAt': value['lastConnectedAt'] == null ? value['lastConnectedAt'] : value['lastConnectedAt'].toISOString(),
         'createdAt': value['createdAt'].toISOString(),

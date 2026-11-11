@@ -64,7 +64,6 @@ export interface SemanticMcpDeps {
 export interface SemanticMcpHelpers {
   json: (payload: unknown) => unknown;
   /** Every write calls this first. */
-  assertNotDemoMode: () => void;
 }
 
 /** The slice of the MCP server these registrations use. */
@@ -333,7 +332,7 @@ export function registerSemanticMcpTools(
   deps: SemanticMcpDeps,
   helpers: SemanticMcpHelpers,
 ): void {
-  const { json, assertNotDemoMode } = helpers;
+  const { json } = helpers;
   const tool = <K extends keyof typeof schemas>(
     name: K,
     title: string,
@@ -341,12 +340,10 @@ export function registerSemanticMcpTools(
     annotations: typeof READ | typeof WRITE | typeof DESTRUCTIVE,
     run: (args: Args<K>) => Promise<unknown>,
   ) => {
-    const write = annotations !== READ;
     server.registerTool(
       name,
       { title, description, inputSchema: schemas[name], annotations },
       async (args: Args<K>) => {
-        if (write) assertNotDemoMode();
         return json(await run(args));
       },
     );

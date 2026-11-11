@@ -2,7 +2,7 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import { AgentKind, AgentRunStatus, AiManagementMode } from '@prisma/client';
 import { AutopilotService } from '../autopilot/autopilot.service';
 import { ToolRegistry } from '../autopilot/tools/tool-registry.service';
-import type { Tool, ToolContext } from '../autopilot/tools/tool.types';
+import type { Tool } from '../autopilot/tools/tool.types';
 import { chatBotState } from './builtin-mcp-tool-adapter';
 
 /** AgentKinds a chat bot may steer (CHAT itself is never steerable). */
@@ -71,11 +71,10 @@ export class ChatHarnessToolset implements OnModuleInit {
       },
       sideEffect: 'mutate',
       domain: 'system',
-      resolveGate: (_input, tc: ToolContext) =>
+      // Chat bots only read: steering is recorded, never run.
+      resolveGate: () =>
         Promise.resolve({
-          mode: chatBotState(tc)?.allowMutations
-            ? AiManagementMode.MANAGED
-            : AiManagementMode.OBSERVE_ONLY,
+          mode: AiManagementMode.OBSERVE_ONLY,
           entityType: 'system' as const,
         }),
       handler: async (input, tc) => {

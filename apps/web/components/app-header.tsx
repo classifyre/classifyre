@@ -36,11 +36,11 @@ import type { TranslationKey } from "@/i18n";
 import { stripLocalePrefix } from "@/lib/locale-detection";
 import { useEntityName } from "./document-title-updater";
 import { LANGUAGE_OPTIONS, LanguageSwitcher, useSwitchLanguage } from "./language-switcher";
+import { Can, useCan } from "@/hooks/use-me";
 import { NotificationCenter } from "./notification-center";
 import { ThemeToggle } from "./theme-toggle";
-import { DemoModeHeaderBadge } from "./demo-mode-badge";
+import { PublicViewHeaderBadge } from "./public-view-badge";
 import { AccountMenu } from "@/components/account-menu";
-import { useServerConfig } from "@/components/server-config-provider";
 
 type T = (key: TranslationKey, params?: Record<string, string | number>) => string;
 
@@ -305,20 +305,25 @@ const iconButton = "relative rounded-[4px] border-2 border-transparent hover:bor
  * theme, the documentation and settings move into one menu, so the trail
  * keeps the room.
  */
-export function HeaderActions({ demoMode }: { demoMode: boolean }) {
+export function HeaderActions({ visitor }: { visitor: boolean }) {
   const { t } = useTranslation();
-  const { iamEnabled } = useServerConfig();
   const { nsHref } = useNamespace();
   const { resolvedTheme, setTheme } = useTheme();
   const { resolvedLanguage, switchLanguage } = useSwitchLanguage();
+  // The settings are not the public's to see: visitors and members reading
+  // a public workspace without a grant hold no settings.view.
+  const canSeeSettings = useCan("settings.view");
   return (
     <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-      {demoMode && <DemoModeHeaderBadge />}
+      {visitor && <PublicViewHeaderBadge />}
       <div className="hidden items-center gap-2 sm:flex">
         <LanguageSwitcher />
         <ThemeToggle />
       </div>
-      <NotificationCenter />
+      {/* Notifications go to groups; visitors are in none. */}
+      <Can capability="notification.view">
+        <NotificationCenter />
+      </Can>
       {/*
         A plain <a>, not next/link: the documentation is a separate Next app
         (apps/docs) exported into apps/web/public/docs, so /docs is static
@@ -331,13 +336,15 @@ export function HeaderActions({ demoMode }: { demoMode: boolean }) {
           <span className="sr-only">{t("nav.documentation")}</span>
         </a>
       </Button>
-      <Button variant="ghost" size="icon" asChild className={cn(iconButton, "hidden sm:inline-flex")}>
-        <Link href={nsHref("/settings")}>
-          <Settings className="h-5 w-5" />
-          <span className="sr-only">{t("breadcrumb.settings")}</span>
-        </Link>
-      </Button>
-      {iamEnabled && <AccountMenu />}
+      {canSeeSettings && (
+        <Button variant="ghost" size="icon" asChild className={cn(iconButton, "hidden sm:inline-flex")}>
+          <Link href={nsHref("/settings")} data-testid="header-settings">
+            <Settings className="h-5 w-5" />
+            <span className="sr-only">{t("breadcrumb.settings")}</span>
+          </Link>
+        </Button>
+      )}
+      <AccountMenu />
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="icon" className={cn(iconButton, "sm:hidden")} data-testid="header-more">
@@ -370,11 +377,13 @@ export function HeaderActions({ demoMode }: { demoMode: boolean }) {
               <BookOpen className="size-4" /> {t("nav.documentation")}
             </a>
           </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link href={nsHref("/settings")}>
-              <Settings className="size-4" /> {t("breadcrumb.settings")}
-            </Link>
-          </DropdownMenuItem>
+          {canSeeSettings && (
+            <DropdownMenuItem asChild>
+              <Link href={nsHref("/settings")}>
+                <Settings className="size-4" /> {t("breadcrumb.settings")}
+              </Link>
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

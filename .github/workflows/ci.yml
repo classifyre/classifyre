@@ -19,7 +19,6 @@ concurrency:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
   DOCKER_PLATFORMS: linux/amd64,linux/arm64
-  INTEGRATION_DATABASE_URL: ${{ secrets.INTEGRATION_DATABASE_URL || vars.INTEGRATION_DATABASE_URL || '' }}
 
 jobs:
   validate:
@@ -27,6 +26,27 @@ jobs:
     # Pinned: Playwright has no Chromium for ubuntu-latest (26.04) yet.
     runs-on: ubuntu-24.04
     timeout-minutes: 25
+
+    # The API integration tests make workspaces, and with sign-in always on
+    # each tenant gets its own database and login role (docs/prd/TEN §4.1).
+    # That needs a Postgres where the test user may create both and connect to
+    # any database: a throwaway superuser, as the chart's own Postgres has. A
+    # shared pooler such as Supabase's routes logins to the project's one
+    # database only, so it cannot reach a tenant database.
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: classifyre
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
 
     steps:
       - name: Checkout
@@ -168,6 +188,9 @@ jobs:
             exit 1
           fi
 
+      - name: The identity server is the same version in Docker and Helm
+        run: bash scripts/check-keycloak-version.sh
+
       - name: Lint
         if: success() || failure()
         run: bun run lint
@@ -181,9 +204,9 @@ jobs:
         run: bun run test
 
       - name: API integration tests
-        if: (success() || failure()) && env.INTEGRATION_DATABASE_URL != ''
+        if: success() || failure()
         env:
-          DATABASE_URL: ${{ env.INTEGRATION_DATABASE_URL }}
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/classifyre
           INTEGRATION_TEST_RESET_DB: "1"
           INTEGRATION_TEST_SCHEMA_KEY: ${{ github.head_ref || github.ref_name }}
         run: cd apps/api && bun run test:integration:run
@@ -357,20 +380,23 @@ jobs:
             IMAGE_NS=${{ secrets.DOCKER_USERNAME }}
           build-contexts: |
             models=${{ github.workspace }}/models
+            iam=${{ github.workspace }}/helm/classifyre/files/iam
           cache-from: type=registry,ref=${{ format('{0}/all-in-one:build-cache', secrets.DOCKER_USERNAME) }}
           cache-to: type=registry,ref=${{ format('{0}/all-in-one:build-cache', secrets.DOCKER_USERNAME) }},mode=max,image-manifest=true
 
   # ── Smoke test ──────────────────────────────────────────────────────────────
-  # Boots the image and scans a fixture corpus end to end. A health check only
-  # proves the API answers; this proves the part that actually breaks — the
-  # Python subprocess, the detector pool, and the REST callback that writes
-  # findings back — plus that the data survives a restart.
+  # Boots the image and runs the same Playwright smoke test as the Helm
+  # release (develop.yml): sign in, create a workspace, scan a folder end to
+  # end (the Python subprocess, the detector pool and the REST callback that
+  # writes findings back), access, SQL and notifications — then restarts the
+  # container and checks the data survived.
   smoke:
     name: Smoke test the all-in-one image
     needs: [all-in-one]
     if: always() && !cancelled() && needs['all-in-one'].result == 'success'
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # Playwright has no Chromium for ubuntu-latest (26.04) yet.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
 
     steps:
       - name: Checkout
@@ -382,10 +408,19 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Set up the smoke test
+        uses: ./.github/actions/e2e-smoke
+
       - name: Run the smoke test
         env:
           IMAGE: ${{ format('{0}/all-in-one:{1}', secrets.DOCKER_USERNAME, needs['all-in-one'].outputs.tag) }}
         run: bash docker/scripts/smoke.sh
+
+      - name: Upload the smoke report
+        if: always()
+        uses: ./.github/actions/e2e-smoke/report
+        with:
+          name: smoke-report-all-in-one
 
   deploy-develop:
     name: Smoke deploy → classifyre-develop
@@ -395,5 +430,4 @@ jobs:
     with:
       environment: classifyre-develop
       image_tag: develop
-      demo_mode: 'false'
     secrets: inherit

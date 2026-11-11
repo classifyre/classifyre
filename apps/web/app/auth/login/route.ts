@@ -17,7 +17,6 @@ import { LANGUAGE_COOKIE } from "@/lib/language-cookie";
  */
 export function GET(request: NextRequest) {
   const config = iamWebConfig();
-  if (!config) return new NextResponse(null, { status: 404 });
 
   const flow = newFlow();
   const returnTo = safeReturnTo(request.nextUrl.searchParams.get("returnTo"));

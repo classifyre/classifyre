@@ -1,4 +1,8 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  ApiHideProperty,
+  ApiProperty,
+  ApiPropertyOptional,
+} from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsArray,
@@ -45,7 +49,8 @@ export class CreateCaseDto {
   @IsString()
   assignee?: string;
 
-  @ApiPropertyOptional()
+  // Set by the server from the signed-in person; never sent by clients.
+  @ApiHideProperty()
   @IsOptional()
   @IsString()
   createdBy?: string;
@@ -243,7 +248,8 @@ export class AddEvidenceDto {
   @IsString()
   note?: string;
 
-  @ApiPropertyOptional()
+  // Set by the server from the signed-in person; never sent by clients.
+  @ApiHideProperty()
   @IsOptional()
   @IsString()
   addedBy?: string;
@@ -259,7 +265,8 @@ export class AttachFindingsDto {
   @IsString({ each: true })
   findingIds!: string[];
 
-  @ApiPropertyOptional()
+  // Set by the server from the signed-in person; never sent by clients.
+  @ApiHideProperty()
   @IsOptional()
   @IsString()
   addedBy?: string;
@@ -624,7 +631,8 @@ export class CloseCaseDto {
   @IsString()
   conclusion!: string;
 
-  @ApiPropertyOptional()
+  // Set by the server from the signed-in person; never sent by clients.
+  @ApiHideProperty()
   @IsOptional()
   @IsString()
   closedBy?: string;

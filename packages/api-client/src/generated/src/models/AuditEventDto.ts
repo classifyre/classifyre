@@ -74,6 +74,12 @@ export interface AuditEventDto {
      */
     entityId: string | null;
     /**
+     * Display name of the entity at record time (source/table name, group path, workspace slug).
+     * @type {string}
+     * @memberof AuditEventDto
+     */
+    entityName: string | null;
+    /**
      * Top-level input keys of the change, never their values.
      * @type {Array<string>}
      * @memberof AuditEventDto
@@ -111,6 +117,7 @@ export function instanceOfAuditEventDto(value: object): value is AuditEventDto {
     if (!('operation' in value) || value['operation'] === undefined) return false;
     if (!('entityType' in value) || value['entityType'] === undefined) return false;
     if (!('entityId' in value) || value['entityId'] === undefined) return false;
+    if (!('entityName' in value) || value['entityName'] === undefined) return false;
     if (!('fields' in value) || value['fields'] === undefined) return false;
     if (!('status' in value) || value['status'] === undefined) return false;
     return true;
@@ -135,6 +142,7 @@ export function AuditEventDtoFromJSONTyped(json: any, ignoreDiscriminator: boole
         'operation': json['operation'],
         'entityType': json['entityType'],
         'entityId': json['entityId'],
+        'entityName': json['entityName'],
         'fields': json['fields'],
         'status': json['status'],
     };
@@ -160,6 +168,7 @@ export function AuditEventDtoToJSONTyped(value?: AuditEventDto | null, ignoreDis
         'operation': value['operation'],
         'entityType': value['entityType'],
         'entityId': value['entityId'],
+        'entityName': value['entityName'],
         'fields': value['fields'],
         'status': value['status'],
     };

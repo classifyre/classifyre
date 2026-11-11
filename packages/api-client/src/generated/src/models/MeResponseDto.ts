@@ -34,12 +34,6 @@ export interface MeResponseDto {
      */
     actor: MeActorDto;
     /**
-     * True when sign-in and access management are on. Without it every visitor holds every capability.
-     * @type {boolean}
-     * @memberof MeResponseDto
-     */
-    iamEnabled: boolean;
-    /**
      * Capabilities the actor holds in this workspace.
      * @type {Array<string>}
      * @memberof MeResponseDto
@@ -53,10 +47,14 @@ export interface MeResponseDto {
  */
 export const MeResponseDtoCapabilitiesEnum = {
     WorkspaceView: 'workspace.view',
+    SettingsView: 'settings.view',
+    ActivityView: 'activity.view',
     WorkspaceSettings: 'workspace.settings',
     WorkspacePause: 'workspace.pause',
+    WorkspacePublish: 'workspace.publish',
     WorkspaceDelete: 'workspace.delete',
     WorkspaceTransfer: 'workspace.transfer',
+    NotificationView: 'notification.view',
     AccessView: 'access.view',
     AccessManage: 'access.manage',
     SourceView: 'source.view',
@@ -87,6 +85,7 @@ export const MeResponseDtoCapabilitiesEnum = {
     AgentConfigure: 'agent.configure',
     AgentUse: 'agent.use',
     DataExport: 'data.export',
+    DataQuery: 'data.query',
     McpTokenOwn: 'mcp.token.own',
     McpTokenAdmin: 'mcp.token.admin',
     TenantWorkspaceCreate: 'tenant.workspace.create',
@@ -103,7 +102,6 @@ export type MeResponseDtoCapabilitiesEnum = typeof MeResponseDtoCapabilitiesEnum
  */
 export function instanceOfMeResponseDto(value: object): value is MeResponseDto {
     if (!('actor' in value) || value['actor'] === undefined) return false;
-    if (!('iamEnabled' in value) || value['iamEnabled'] === undefined) return false;
     if (!('capabilities' in value) || value['capabilities'] === undefined) return false;
     return true;
 }
@@ -119,7 +117,6 @@ export function MeResponseDtoFromJSONTyped(json: any, ignoreDiscriminator: boole
     return {
         
         'actor': MeActorDtoFromJSON(json['actor']),
-        'iamEnabled': json['iamEnabled'],
         'capabilities': json['capabilities'],
     };
 }
@@ -136,7 +133,6 @@ export function MeResponseDtoToJSONTyped(value?: MeResponseDto | null, ignoreDis
     return {
         
         'actor': MeActorDtoToJSON(value['actor']),
-        'iamEnabled': value['iamEnabled'],
         'capabilities': value['capabilities'],
     };
 }

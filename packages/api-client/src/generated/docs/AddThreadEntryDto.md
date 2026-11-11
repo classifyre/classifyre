@@ -9,7 +9,6 @@ Name | Type
 `entryType` | string
 `body` | string
 `metadata` | { [key: string]: any; }
-`author` | string
 
 ## Example
 
@@ -21,7 +20,6 @@ const example = {
   "entryType": null,
   "body": null,
   "metadata": null,
-  "author": null,
 } satisfies AddThreadEntryDto
 
 console.log(example)

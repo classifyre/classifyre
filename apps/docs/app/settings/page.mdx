@@ -8,9 +8,15 @@ description: Manage workspace-wide preferences, scan capacity, integrations, and
 The Settings page controls workspace-wide preferences and integrations. Its
 tabs stay in the URL, so a link to a specific tab opens that tab directly.
 
+Only people with a role in the workspace see it (**settings.view**, part of
+every role). Visitors of a [public workspace](/access#public-workspaces), and
+members reading one without a grant, see neither the page nor the settings
+behind it; the gear on the workspace card and in the header is not shown to
+them.
+
 | Tab                 | What it controls                                                                                        |
 | ------------------- | ------------------------------------------------------------------------------------------------------- |
-| **General**         | Software version, concurrent scan capacity, language, timezone, time format, and the Hugging Face token |
+| **General**         | The workspace itself (name, address, description, categories, links, picture), software version, concurrent scan capacity, language, timezone, time format, and the Hugging Face token |
 | **MCP Servers**     | The Classifyre MCP endpoint, bearer tokens, and client connection guides                                |
 | **Chat Bots**       | Telegram and Slack bots, permissions, and connection diagnostics                                        |
 | **Export & Import** | Portable workspace archives and transfer history                                                        |
@@ -20,6 +26,13 @@ tabs stay in the URL, so a link to a specific tab opens that tab directly.
 ## General
 
 General settings cover the workspace itself rather than AI behavior.
+
+### The workspace
+
+Its name, URL slug, description, categories, links and picture — what the
+workspace directory shows on its card. The gear on the card opens this tab.
+Changing them needs **workspace.settings**; a new slug moves the page to the
+new address. Pausing and resuming are under **Workers**.
 
 ### Software and scanning
 

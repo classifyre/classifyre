@@ -8,10 +8,15 @@ import {
 } from "@playwright/test";
 
 /**
- * The deploy smoke test, against a release with sign-in on
- * (.github/workflows/develop.yml, or the k3d dev stack locally). The seed
- * (scripts/smoke/seed.sh) made two people in the identity server and mounted
- * a folder with one file holding a fake secret into the scan jobs.
+ * The smoke test, one spec for every way Classifyre ships: the Helm release
+ * (.github/workflows/develop.yml, or the k3d dev stack locally) and the
+ * all-in-one Docker image (docker/scripts/smoke.sh). Sign-in is always on. The
+ * seed (scripts/smoke/seed.sh) made two people in the identity server and put
+ * a folder with one file holding a fake secret where scans can read it.
+ *
+ * Run twice around a restart: first everything, keeping the workspace
+ * (SMOKE_KEEP_WORKSPACE=1, SMOKE_RUN fixed), then `--grep @after-restart` with
+ * SMOKE_AFTER_RESTART=1, which checks it survived and removes it.
  *
  * Selectors are data-testid or the identity server's own form ids, never
  * visible text, so a translation change cannot break it.
@@ -27,25 +32,20 @@ const BASE_URL = env("BASE_URL", "http://localhost:3000").replace(/\/$/, "");
 const ADMIN = { user: env("SMOKE_ADMIN_USER"), password: env("SMOKE_ADMIN_PASSWORD") };
 const VIEWER = { user: env("SMOKE_VIEWER_USER"), password: env("SMOKE_VIEWER_PASSWORD") };
 const VIEWERS_GROUP = env("SMOKE_VIEWERS_GROUP", "/smoke-viewers");
-// Set by the seed when the release has a public tenant (iam.public).
-const PUBLISHER = process.env.SMOKE_PUBLISHER_USER
-  ? { user: env("SMOKE_PUBLISHER_USER"), password: env("SMOKE_PUBLISHER_PASSWORD") }
-  : null;
 const FOLDER = env("SMOKE_FOLDER", "/mnt/corpora/smoke");
 
-const RUN = Date.now().toString(36);
+const RUN = process.env.SMOKE_RUN || Date.now().toString(36);
+const AFTER_RESTART = process.env.SMOKE_AFTER_RESTART === "1";
 const WORKSPACE_NAME = `Smoke ${RUN}`;
 const SLUG = `smoke-${RUN}`;
 const SOURCE_NAME = `Smoke folder ${RUN}`;
-const PUBLIC_NAME = `Smoke public ${RUN}`;
-const PUBLIC_SLUG = `smoke-public-${RUN}`;
 
 /** Calls the API through the web app, signed in by the page's cookies. */
 class Api {
   constructor(private readonly request: APIRequestContext) {}
 
   async call<T = unknown>(
-    method: "GET" | "POST" | "DELETE",
+    method: "GET" | "POST" | "PATCH" | "DELETE",
     path: string,
     body?: unknown,
   ): Promise<{ status: number; body: T }> {
@@ -65,7 +65,7 @@ class Api {
     return { status: response.status(), body: parsed as T };
   }
 
-  async ok<T = unknown>(method: "GET" | "POST" | "DELETE", path: string, body?: unknown): Promise<T> {
+  async ok<T = unknown>(method: "GET" | "POST" | "PATCH" | "DELETE", path: string, body?: unknown): Promise<T> {
     const result = await this.call<T>(method, path, body);
     expect(result.status, `${method} ${path}: ${JSON.stringify(result.body)}`).toBeLessThan(300);
     return result.body;
@@ -107,11 +107,9 @@ async function createWorkspace(
     .click();
   const dialog = page.getByTestId("workspace-create-dialog");
   await dialog.getByTestId("workspace-create-name").fill(name);
-  const owner = dialog.getByTestId("workspace-create-owner");
-  if (await owner.isVisible()) {
-    await owner.click();
-    await page.getByTestId("workspace-create-owner-/admins").click();
-  }
+  // Every workspace is owned by a group; the admin's is /admins.
+  await dialog.getByTestId("workspace-create-owner").click();
+  await page.getByTestId("workspace-create-owner-/admins").click();
   await dialog.getByTestId("workspace-create-submit").click();
   await expect(dialog).toBeHidden({ timeout: 120_000 });
 
@@ -132,15 +130,36 @@ test.describe.serial("smoke with sign-in", () => {
   });
 
   test.afterAll(async () => {
-    if (workspaceId) await admin.api.call("DELETE", `/namespaces/${workspaceId}`);
+    if (workspaceId && process.env.SMOKE_KEEP_WORKSPACE !== "1") {
+      await admin.api.call("DELETE", `/namespaces/${workspaceId}`);
+    }
     await viewer?.context.close();
     await admin?.context.close();
   });
 
-  test("without signing in: sign-in required, or only the public tenant", async () => {
+  test("after a restart the workspace and its findings are still there @after-restart", async () => {
+    test.skip(!AFTER_RESTART, "runs once the deployment restarted (SMOKE_AFTER_RESTART=1)");
+    const workspaces = await admin.api.ok<Array<{ id: string; slug: string }>>("GET", "/namespaces");
+    const kept = workspaces.find((ws) => ws.slug === SLUG);
+    expect(kept, `workspace ${SLUG} after the restart`).toBeTruthy();
+    workspaceId = kept!.id;
+    await expect
+      .poll(
+        async () => (await admin.api.ok<{ total: number }>("GET", `/${SLUG}/findings/stats`)).total,
+        { timeout: 2 * 60_000, intervals: [5_000] },
+      )
+      .toBeGreaterThanOrEqual(1);
+    await admin.page.goto(`/${SLUG}/sources`);
+    await expect(admin.page.getByText(SOURCE_NAME, { exact: true }).first()).toBeVisible();
+  });
+
+  test("without signing in: only public workspaces, nothing to change", async () => {
     const anonymous = await playwrightRequest.newContext();
-    const response = await anonymous.get(`${BASE_URL}/api/namespaces`);
-    expect(response.status()).toBe(PUBLISHER ? 200 : 401);
+    const listed = await anonymous.get(`${BASE_URL}/api/namespaces`);
+    expect(listed.status()).toBe(200);
+    expect(Array.isArray(await listed.json())).toBe(true);
+    const tenant = await anonymous.get(`${BASE_URL}/api/tenant/grants`);
+    expect(tenant.status()).toBe(401);
     await anonymous.dispose();
   });
 
@@ -186,6 +205,21 @@ test.describe.serial("smoke with sign-in", () => {
 
     await page.goto(`/${SLUG}/sources`);
     await expect(page.getByText(SOURCE_NAME, { exact: true }).first()).toBeVisible();
+
+    // "First scan complete" went to the workspace's owning group, which the
+    // admin is in (notifications go to groups).
+    await expect
+      .poll(
+        async () =>
+          (
+            await api.ok<{ notifications: Array<{ type: string; sourceId?: string | null }> }>(
+              "GET",
+              `/${SLUG}/notifications`,
+            )
+          ).notifications.some((n) => n.type === "SOURCE" && n.sourceId === sourceId),
+        { timeout: 60_000, intervals: [5_000] },
+      )
+      .toBe(true);
   });
 
   test("a viewer sees the workspace only once given access, and only reads", async ({ browser }) => {
@@ -220,52 +254,188 @@ test.describe.serial("smoke with sign-in", () => {
     expect(write.status).toBe(403);
   });
 
-  test("a visitor reads the public tenant, and it never mixes with signed-in tenants", async ({
+  // ── SQL over tables (docs/prd/DQ-data-query.md) ─────────────────────────
+  // The scan made the fixture's orders.csv a table asset.
+  type CatalogTable = { assetId: string; name: string; sqlName: string; canQuery: boolean };
+  type QueryRun = { id: string; status: string; rowCount: number | null; error: { code: string } | null };
+  const ordersTable = async (api: Api) => {
+    const catalog = await api.ok<{ sources: Array<{ tables: CatalogTable[] }> }>(
+      "GET",
+      `/${SLUG}/data-query/catalog`,
+    );
+    const table = catalog.sources.flatMap((s) => s.tables).find((t) => t.name === "orders.csv");
+    expect(table, "orders.csv in the SQL catalog").toBeTruthy();
+    return table!;
+  };
+  const finished = async (api: Api, id: string) => {
+    await expect
+      .poll(async () => (await api.ok<QueryRun>("GET", `/${SLUG}/query-runs/${id}`)).status, {
+        timeout: 5 * 60_000,
+        intervals: [2_000],
+      })
+      .toMatch(/^(SUCCESS|ERROR|TIMEOUT|CANCELLED)$/);
+    return api.ok<QueryRun>("GET", `/${SLUG}/query-runs/${id}`);
+  };
+
+  test("the admin queries the table straight away and exports it", async () => {
+    const { page, api } = admin;
+    const table = await ordersTable(api);
+    expect(table.canQuery).toBe(true);
+    const sql = `SELECT region, sum(amount) AS total FROM ${table.sqlName} GROUP BY region ORDER BY region`;
+    await page.goto(`/${SLUG}/query/?sql=${encodeURIComponent(sql)}`);
+    await page.getByTestId("run-query").click();
+    // north, south, west
+    await expect(page.getByTestId("query-row-count")).toContainText("3", { timeout: 5 * 60_000 });
+    await expect(page.getByTestId("query-results")).toContainText("north");
+
+    // The same table as Excel, from the menu, downloaded by the browser.
+    const download = page.waitForEvent("download", { timeout: 5 * 60_000 });
+    await page.getByTestId("export-query").click();
+    await page.getByTestId("export-xlsx").click();
+    expect((await download).suggestedFilename()).toMatch(/\.xlsx$/);
+
+    // And as CSV through the API: the whole table, with its header.
+    const run = await api.ok<QueryRun>("POST", `/${SLUG}/query-runs`, {
+      sql: `SELECT * FROM ${table.sqlName} ORDER BY order_id`,
+      format: "csv",
+    });
+    expect((await finished(api, run.id)).rowCount).toBe(6);
+    const file = await page.request.fetch(`${BASE_URL}/api/${SLUG}/query-runs/${run.id}/result`);
+    expect(file.headers()["content-type"]).toContain("text/csv");
+    expect((await file.text()).split("\n")[0]).toBe("order_id,region,amount,placed_on");
+
+    // Nothing but SELECT, and nothing but the tables in the catalog.
+    const refused = await api.ok<QueryRun>("POST", `/${SLUG}/query-runs`, {
+      sql: "SELECT * FROM read_csv('/etc/passwd')",
+    });
+    expect(refused.error?.code).toBe("function_not_allowed");
+  });
+
+  test("a viewer sees the table locked until their group is given data access to it", async () => {
+    const before = await ordersTable(viewer.api);
+    expect(before.canQuery).toBe(false);
+    const refused = await viewer.api.call<{ code?: string }>("POST", `/${SLUG}/query-runs`, {
+      sql: `SELECT * FROM ${before.sqlName}`,
+    });
+    expect(refused.status).toBe(403);
+
+    const groups = await admin.api.ok<Array<{ id: string; path: string }>>("GET", `/${SLUG}/access/groups`);
+    const group = groups.find((g) => g.path === VIEWERS_GROUP)!;
+    await admin.api.ok("POST", `/${SLUG}/access/grants`, {
+      subjectType: "group",
+      subjectId: group.id,
+      roleKey: "data-reader",
+      scopeType: "asset",
+      resourceId: before.assetId,
+    });
+    await expect
+      .poll(async () => (await ordersTable(viewer.api)).canQuery, { timeout: 90_000, intervals: [5_000] })
+      .toBe(true);
+
+    // The source's Data tab: its tables beside the editor, and the access
+    // just given on one of them in the source's Access and Activity.
+    {
+      const { page } = admin;
+      await page.goto(`/${SLUG}/sources/${sourceId}/?tab=data`);
+      const tab = page.getByTestId("source-data-tab");
+      await expect(tab).toBeVisible({ timeout: 60_000 });
+      await expect(tab.getByTestId(`catalog-table-${before.sqlName}`)).toBeVisible();
+      await expect(tab.getByTestId("data-access-table")).toContainText(VIEWERS_GROUP);
+      await tab.getByTestId("data-activity-tab").click();
+      await expect(tab.getByTestId("data-access")).toContainText(VIEWERS_GROUP, { timeout: 30_000 });
+    }
+
+    // A viewer reads the source, never how it is set up.
+    const asViewer = await viewer.api.ok<{ config: Record<string, unknown> }>(
+      "GET",
+      `/${SLUG}/sources/${sourceId}`,
+    );
+    expect(asViewer.config).toEqual({ type: "LOCAL_FOLDER" });
+    const asAdmin = await admin.api.ok<{ config: { required?: unknown } }>(
+      "GET",
+      `/${SLUG}/sources/${sourceId}`,
+    );
+    expect(asAdmin.config.required).toBeTruthy();
+
+    const { page } = viewer;
+    await page.goto(`/${SLUG}/sources/${sourceId}/edit/`);
+    await expect(page.getByTestId("source-edit-no-access")).toBeVisible({ timeout: 60_000 });
+    await page.goto(`/${SLUG}/assets/${before.assetId}/?tab=data`);
+    await expect(page.getByTestId("asset-data-tab")).toBeVisible();
+    await page.getByTestId("run-query").click();
+    await expect(page.getByTestId("query-row-count")).toContainText("6", { timeout: 5 * 60_000 });
+    // Reading is not taking out: no export without data.export.
+    await expect(page.getByTestId("export-query")).toHaveCount(0);
+    const exported = await viewer.api.call<{ code?: string }>("POST", `/${SLUG}/query-runs`, {
+      sql: `SELECT * FROM ${before.sqlName}`,
+      format: "xlsx",
+    });
+    expect(exported.status).toBe(403);
+    expect(exported.body.code).toBe("EXPORT_NOT_ALLOWED");
+  });
+
+  test("a public workspace is read-only for visitors, and closes again when made private", async ({
     browser,
   }) => {
-    test.skip(!PUBLISHER, "the release has no public tenant (iam.public)");
-    const publisher = await signedIn(browser, PUBLISHER!);
     const visitorContext = await browser.newContext();
-    let publicId = "";
+    const visitor = new Api(visitorContext.request);
     try {
-      publicId = await createWorkspace(publisher, PUBLIC_NAME, PUBLIC_SLUG);
-      expect(
-        (await publisher.api.ok<Array<{ slug: string }>>("GET", "/namespaces")).map((ws) => ws.slug),
-        "the public tenant's editor sees only the public tenant",
-      ).not.toContain(SLUG);
+      expect((await visitor.call("GET", `/${SLUG}/sources`)).status, "private: sign in").toBe(401);
 
-      // No session: the app opens on the public tenant, with Sign in on top.
-      const page = await visitorContext.newPage();
-      await page.goto("/");
-      await expect(page.getByTestId("sign-in")).toBeVisible();
-      await expect(page.getByTestId(`workspace-card-${PUBLIC_SLUG}`)).toBeVisible();
-      await expect(page.getByTestId(`workspace-card-${SLUG}`)).toHaveCount(0);
+      // The admin makes it public from Settings → Access.
+      const { page } = admin;
+      await page.goto(`/${SLUG}/settings/?tab=access`);
+      await page.getByTestId("public-workspace-switch").click();
+      await page.getByTestId("public-workspace-confirm").click();
+      await expect(page.getByTestId("public-workspace-switch")).toHaveAttribute("data-state", "checked");
 
-      const visitor = new Api(visitorContext.request);
+      // No session: the directory lists it, with Sign in on top, and it reads.
+      const visitorPage = await visitorContext.newPage();
+      await visitorPage.goto("/");
+      await expect(visitorPage.getByTestId("sign-in")).toBeVisible();
+      await expect(visitorPage.getByTestId(`workspace-card-${SLUG}`)).toBeVisible();
       const listed = (await visitor.ok<Array<{ slug: string }>>("GET", "/namespaces")).map((ws) => ws.slug);
-      expect(listed).toContain(PUBLIC_SLUG);
-      expect(listed, "a signed-in tenant's workspace").not.toContain(SLUG);
-      expect((await visitor.call("GET", `/${SLUG}/sources`)).status).toBe(404);
-      expect((await visitor.call("GET", `/${PUBLIC_SLUG}/sources`)).status).toBe(200);
-      // Read-only, and not who has access.
-      expect((await visitor.call("GET", `/${PUBLIC_SLUG}/access/grants`)).status).toBe(403);
-      const write = await visitor.call("POST", `/${PUBLIC_SLUG}/sources`, {
+      expect(listed).toContain(SLUG);
+      expect((await visitor.call("GET", `/${SLUG}/sources`)).status).toBe(200);
+      expect((await visitor.call("GET", `/${SLUG}/findings/stats`)).status).toBe(200);
+      // Read-only: changing anything, who has access and notifications ask
+      // them to sign in.
+      const write = await visitor.call("POST", `/${SLUG}/sources`, {
         type: "LOCAL_FOLDER",
         name: "Not allowed",
         config: { type: "LOCAL_FOLDER", required: { path: FOLDER } },
       });
-      expect(write.status).toBe(403);
-
-      // Signed in to another tenant: the public tenant is not there.
-      const adminSees = (await admin.api.ok<Array<{ slug: string }>>("GET", "/namespaces")).map(
-        (ws) => ws.slug,
+      expect(write.status).toBe(401);
+      expect((await visitor.call("GET", `/${SLUG}/access/grants`)).status).toBe(401);
+      expect((await visitor.call("GET", `/${SLUG}/notifications`)).status).toBe(401);
+      // Nothing behind the scenes: no activity, no settings (only how dates
+      // are shown), no SQL at all, no source configuration.
+      expect((await visitor.call("GET", `/${SLUG}/audit-events`)).status).toBe(401);
+      expect((await visitor.call("GET", `/${SLUG}/instance-settings`)).status).toBe(401);
+      expect((await visitor.call("GET", `/${SLUG}/instance-settings/display`)).status).toBe(200);
+      expect((await visitor.call("GET", `/${SLUG}/data-query/catalog`)).status).toBe(401);
+      const read = await visitor.ok<{ config: Record<string, unknown> }>(
+        "GET",
+        `/${SLUG}/sources/${sourceId}`,
       );
-      expect(adminSees).not.toContain(PUBLIC_SLUG);
-      expect((await admin.api.call("GET", `/${PUBLIC_SLUG}/sources`)).status).toBe(404);
+      expect(read.config).toEqual({ type: "LOCAL_FOLDER" });
+      await visitorPage.goto(`/${SLUG}/settings/`);
+      await expect(visitorPage.getByTestId("settings-no-access")).toBeVisible();
+      // Nor is saving SQL, which would pool every visitor's queries together.
+      const saved = await visitor.call("POST", `/${SLUG}/saved-queries`, {
+        name: "Shared pool",
+        sql: "SELECT 1",
+      });
+      expect(saved.status).toBe(401);
+
+      // Private again: closed to visitors at once.
+      await admin.api.ok("PATCH", `/namespaces/${workspaceId}`, { public: false });
+      expect((await visitor.call("GET", `/${SLUG}/sources`)).status).toBe(401);
+      expect(
+        (await visitor.ok<Array<{ slug: string }>>("GET", "/namespaces")).map((ws) => ws.slug),
+      ).not.toContain(SLUG);
     } finally {
-      if (publicId) await publisher.api.call("DELETE", `/namespaces/${publicId}`);
       await visitorContext.close();
-      await publisher.context.close();
     }
   });
 });

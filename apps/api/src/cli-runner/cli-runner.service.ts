@@ -281,7 +281,7 @@ export class CliRunnerService {
     const schema = this.cls?.get<string>(CLS_SCHEMA);
     if (!schema || !process.env.DATABASE_URL) return undefined;
     try {
-      // With sign-in, the tenant's database as the tenant's own role, which
+      // The tenant's database as the tenant's own role, which
       // can open no other tenant's database (docs/prd/TEN R7).
       const url = new URL(workspaceDatabaseUrl(schema));
       url.searchParams.set('schema', schema);
@@ -2523,6 +2523,87 @@ export class CliRunnerService {
           .rm(filesDir, { recursive: true, force: true })
           .catch(() => undefined);
       }
+    }
+  }
+
+  /**
+   * The callback base a query job posts its result under: this workspace's
+   * API, reachable from wherever the job runs (docs/prd/DQ-data-query.md).
+   */
+  queryCallbackBaseUrl(namespaceId?: string): string {
+    const environment = process.env.ENVIRONMENT || 'development';
+    return this.resolveOutputRestUrl(
+      this.isKubernetesExecutionEnabled(environment)
+        ? 'kubernetes'
+        : environment,
+      namespaceId,
+    );
+  }
+
+  /**
+   * Run one SQL query (`python -m src.main query`) and return what it printed.
+   *
+   * The result itself reaches the API through the job's callback; the
+   * printed status line is only read when that callback never came. Local
+   * runs get the notebook environment (no database URL, no callback key).
+   */
+  async runQueryExecution(params: {
+    runId: string;
+    request: Record<string, unknown>;
+    timeoutSeconds: number;
+    onJobCreated?: (job: {
+      jobName: string;
+      namespace: string;
+    }) => void | Promise<void>;
+  }): Promise<{ output: string; exitCode: number }> {
+    const environment = process.env.ENVIRONMENT || 'development';
+    if (this.isKubernetesExecutionEnabled(environment)) {
+      if (!this.kubernetesCliJobService) {
+        throw new Error(
+          'Kubernetes execution is enabled but the Kubernetes CLI job service is unavailable',
+        );
+      }
+      const result = await this.kubernetesCliJobService.runQueryJob(
+        params.runId,
+        params.request,
+        params.timeoutSeconds,
+        params.onJobCreated,
+      );
+      return { output: result.output, exitCode: result.exitCode };
+    }
+
+    const cliPath = this.getCliPath(environment);
+    const venvPath = this.getVenvPath(environment);
+    const requestFile = await this.createTempJsonFile('query', params.request);
+    try {
+      const command =
+        `cd ${this.shellEscape(cliPath)} && ` +
+        `uv run --locked --no-dev --python ${this.shellEscape(this.getVenvPython(venvPath))} ` +
+        `python -m src.main query ${this.shellEscape(requestFile)}`;
+      const { stdout, stderr, exitCode } = await this.executeCli(
+        command,
+        () => undefined,
+        undefined,
+        `query:${params.runId}`,
+        { mode: 'head', maxBytes: 1024 * 1024, maxLines: 10_000 },
+        buildNotebookEnvironment(process.env, {}),
+      );
+      return { output: `${stdout}\n${stderr}`, exitCode };
+    } finally {
+      await fs.unlink(requestFile).catch(() => undefined);
+    }
+  }
+
+  /** Stop a running query: delete its Job, or end its local process. */
+  async cancelQueryExecution(runId: string): Promise<void> {
+    if (this.kubernetesCliJobService) {
+      await this.kubernetesCliJobService
+        .cancelQueryJob(runId)
+        .catch(() => undefined);
+    }
+    const child = this.runningProcessesByRunnerId.get(`query:${runId}`);
+    if (child) {
+      this.terminateProcessTree(child, 'SIGTERM');
     }
   }
 

@@ -11,8 +11,8 @@ import { DockerQuickstart } from "../../../components/install-options";
 # Docker (all-in-one)
 
 The fastest way to get Classifyre running: one image carrying the whole stack —
-the API, the web UI, the Python scan workers, and PostgreSQL — with nothing to
-provision and nothing to connect.
+the API, the web UI, the Python scan workers, PostgreSQL and the identity
+server for sign-in — with nothing to provision and nothing to connect.
 
 <DockerQuickstart />
 
@@ -30,7 +30,8 @@ provision and nothing to connect.
 | Caddy | **3000** | the only published port; routes to the two servers below |
 | Web UI | 3100 (internal) | Next.js, and this documentation at `/docs` |
 | API + worker | 8000 (internal) | REST, WebSockets, job queues, embeddings, and the parent of every scan |
-| PostgreSQL 18 + pgvector | 5432 (internal) | all data |
+| Identity server (Keycloak) | 8180 (internal) | sign-in, people, groups and tenants; reached through the web UI at `/iam` |
+| PostgreSQL 18 + pgvector | 5432 (internal) | all data, the identity server's too |
 
 They are supervised by [s6-overlay](https://github.com/just-containers/s6-overlay),
 which restarts anything that dies and makes `docker stop` and `docker restart`
@@ -65,8 +66,19 @@ natively with no emulation.
 ### Run it
 
 The command above. The first boot initialises the database, applies the
-migrations, and creates a workspace called `default` — a few minutes on a
-laptop. Follow it with `docker logs -f classifyre`.
+migrations, sets up sign-in and creates a workspace called `default` — a few
+minutes on a laptop. Follow it with `docker logs -f classifyre`: it ends with
+_Classifyre is ready_.
+
+### Sign in
+
+Open [localhost:3000](http://localhost:3000) and sign in as **`classifyre`**, password
+**`classifyre`**. That account is the first tenant's admin, so it sees every
+workspace and can give others access. Change the password right away: account
+menu (top right) → **Your account** → **Account security** → **Signing in** →
+**Update**. The identity server keeps it; restarts and upgrades never reset
+it. To add people and groups, see [Getting started with
+sign-in](/access/getting-started/).
 
 ### Connect a source
 
@@ -115,7 +127,7 @@ Three volumes, and you want all three:
 | Volume | Holds | If you drop it |
 | --- | --- | --- |
 | `/var/lib/postgresql/data` | the database | everything is lost |
-| `/var/lib/classifyre` | scan logs, the credential encryption key, the model cache | stored credentials become unreadable |
+| `/var/lib/classifyre` | scan logs, the credential encryption key, the sign-in secrets | stored credentials become unreadable and the tenant databases no longer open |
 | `/cache/uv` | optional Python dependencies and file-format readers, installed on first use | they are downloaded again after every upgrade |
 
 ## Configuration
@@ -130,13 +142,29 @@ Pass them with `-e NAME=value`, or with `--env-file`.
 | `PORT_HTTP` | `3000` | Port inside the container. Usually easier to remap with `-p 8080:3000`. |
 | `CLASSIFYRE_BOOTSTRAP_NAMESPACE` | `default` | Slug of the workspace created on first boot. Set to `""` to create your own. |
 | `CLASSIFYRE_MASKED_CONFIG_KEY` | *generated* | Encrypts stored source credentials and MCP tokens. |
-| `DEMO_MODE` | `false` | Read-only mode; blocks every write. |
 | `TELEMETRY_DISABLED` / `DO_NOT_TRACK` | unset | Set either to `1` to disable [telemetry](/deployment/telemetry/). |
 | `CORS_ORIGIN` | same-origin | Only needed if the UI is served from another host. |
 
-The image has no sign-in and no identity server, on purpose: everyone who can
-reach it uses every workspace. For sign-in, tenants or a public tenant next to
-private ones, use the [Helm chart](/deployment/kubernetes/#sign-in).
+### Sign-in
+
+Sign-in is always on. The image sets up one tenant, `default`, with one admin,
+and serves the identity server under `/iam` of the same address.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `CLASSIFYRE_URL` | `http://localhost:3000` | The address people open. The identity server signs tokens for it and only sends people back to it: set it when you publish another port (`-p 8080:3000` → `http://localhost:8080`) or a host name. |
+| `CLASSIFYRE_ADMIN_USER` | `classifyre` | The first admin, made on the first start. Also the identity server's own administrator. |
+| `CLASSIFYRE_ADMIN_PASSWORD` | `classifyre` | Their first password. Change it in the app afterwards; setting this later changes nothing. |
+| `CLASSIFYRE_ADMIN_EMAIL` | `admin@classifyre.example` | Their email. |
+| `CLASSIFYRE_IAM_HEAP_MB` | `512` | The identity server's Java heap. |
+
+The identity server's client secrets and the key every tenant database's
+password is made from are generated on the first start and kept in
+`/var/lib/classifyre/iam.secrets`.
+
+Everyone signs in, starting with the seeded admin, who can add people and
+groups in the identity console (see [Access](/access/)). For a team, prefer
+the [Helm chart](/deployment/kubernetes/#sign-in).
 
 ### Database
 
@@ -149,9 +177,11 @@ Leave unset to use the PostgreSQL inside the image.
 | `PGDATA` | `/var/lib/postgresql/data` | Data directory (bundled server only). |
 | `CLASSIFYRE_AUTO_MIGRATE` | `true` | `false` skips migrations at startup. |
 
-An external server must have **pgvector** available, and the user must be able
-to `CREATE SCHEMA` and `CREATE EXTENSION` — each workspace gets its own schema,
-created on demand. See [PostgreSQL](/deployment/database/).
+An external server must have **pgvector** available, and the user needs
+`CREATEDB` and `CREATEROLE`: Classifyre makes a control database
+(`classifyre_control`), one database per tenant with its own role, and the
+identity server's database `iam` next to the one you name. See
+[PostgreSQL](/deployment/database/).
 
 ```bash
 -e DATABASE_URL="postgresql://user:pass@db.internal:5432/classifyre?sslmode=require"
@@ -240,14 +270,27 @@ on the first boot of the new version. Pin a version tag to control when that
 happens. Downgrades are not supported — migrations only go forwards. See
 [upgrade & versioning](/deployment/upgrade-and-versioning/).
 
+<Callout type="info">
+  **From a version without sign-in** (0.7 and older): the new image signs you
+  in as `classifyre` and starts with an empty `default` workspace; your
+  workspaces are still in the database, out of sight. Copy them into the
+  tenant once:
+  `docker exec classifyre sh -c 'cd /app/api && node dist/src/admin.js workspaces copy --to-tenant default --all'`.
+  See [Workspaces made without sign-in](/access/operations/#workspaces-made-without-sign-in).
+</Callout>
+
 ## Backup
 
-Two things, and you need both:
+Three things, and you need all of them:
 
 ```bash
-docker exec classifyre pg_dump -U postgres classifyre > classifyre.sql
+docker exec classifyre pg_dumpall -U postgres > classifyre.sql
 docker exec classifyre cat /var/lib/classifyre/masked-config.key
+docker exec classifyre cat /var/lib/classifyre/iam.secrets
 ```
+
+`pg_dumpall` takes every database: the control database, each tenant's and
+the identity server's.
 
 <Callout type="warning">
   Without the key, a restored dump still holds every stored source credential —

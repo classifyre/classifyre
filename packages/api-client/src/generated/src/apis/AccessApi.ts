@@ -20,7 +20,7 @@ import type {
   ResolvedActorDto,
   RoleDto,
   TenantDto,
-  TenantEventDto,
+  TenantEventsResponseDto,
   TenantGroupDto,
   TenantMembershipDto,
 } from '../models/index';
@@ -35,8 +35,8 @@ import {
     RoleDtoToJSON,
     TenantDtoFromJSON,
     TenantDtoToJSON,
-    TenantEventDtoFromJSON,
-    TenantEventDtoToJSON,
+    TenantEventsResponseDtoFromJSON,
+    TenantEventsResponseDtoToJSON,
     TenantGroupDtoFromJSON,
     TenantGroupDtoToJSON,
     TenantMembershipDtoFromJSON,
@@ -45,6 +45,16 @@ import {
 
 export interface TenantAccessControllerAddGrantRequest {
     createGrantDto: CreateGrantDto;
+}
+
+export interface TenantAccessControllerEventsRequest {
+    action?: string;
+    actor?: string;
+    search?: string;
+    skip?: number;
+    limit?: number;
+    sortBy?: TenantAccessControllerEventsSortByEnum;
+    sortOrder?: TenantAccessControllerEventsSortOrderEnum;
 }
 
 export interface TenantAccessControllerRemoveGrantRequest {
@@ -114,8 +124,36 @@ export class AccessApi extends runtime.BaseAPI {
     /**
      * Tenant-level changes: grants, workspaces created or deleted
      */
-    async tenantAccessControllerEventsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<TenantEventDto>>> {
+    async tenantAccessControllerEventsRaw(requestParameters: TenantAccessControllerEventsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantEventsResponseDto>> {
         const queryParameters: any = {};
+
+        if (requestParameters['action'] != null) {
+            queryParameters['action'] = requestParameters['action'];
+        }
+
+        if (requestParameters['actor'] != null) {
+            queryParameters['actor'] = requestParameters['actor'];
+        }
+
+        if (requestParameters['search'] != null) {
+            queryParameters['search'] = requestParameters['search'];
+        }
+
+        if (requestParameters['skip'] != null) {
+            queryParameters['skip'] = requestParameters['skip'];
+        }
+
+        if (requestParameters['limit'] != null) {
+            queryParameters['limit'] = requestParameters['limit'];
+        }
+
+        if (requestParameters['sortBy'] != null) {
+            queryParameters['sortBy'] = requestParameters['sortBy'];
+        }
+
+        if (requestParameters['sortOrder'] != null) {
+            queryParameters['sortOrder'] = requestParameters['sortOrder'];
+        }
 
         const headerParameters: runtime.HTTPHeaders = {};
 
@@ -129,14 +167,14 @@ export class AccessApi extends runtime.BaseAPI {
             query: queryParameters,
         }, initOverrides);
 
-        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(TenantEventDtoFromJSON));
+        return new runtime.JSONApiResponse(response, (jsonValue) => TenantEventsResponseDtoFromJSON(jsonValue));
     }
 
     /**
      * Tenant-level changes: grants, workspaces created or deleted
      */
-    async tenantAccessControllerEvents(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<TenantEventDto>> {
-        const response = await this.tenantAccessControllerEventsRaw(initOverrides);
+    async tenantAccessControllerEvents(requestParameters: TenantAccessControllerEventsRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantEventsResponseDto> {
+        const response = await this.tenantAccessControllerEventsRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -199,7 +237,7 @@ export class AccessApi extends runtime.BaseAPI {
     /**
      * Remove any grant of the tenant
      */
-    async tenantAccessControllerRemoveGrantRaw(requestParameters: TenantAccessControllerRemoveGrantRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+    async tenantAccessControllerRemoveGrantRaw(requestParameters: TenantAccessControllerRemoveGrantRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GrantDto>> {
         if (requestParameters['id'] == null) {
             throw new runtime.RequiredError(
                 'id',
@@ -222,14 +260,15 @@ export class AccessApi extends runtime.BaseAPI {
             query: queryParameters,
         }, initOverrides);
 
-        return new runtime.VoidApiResponse(response);
+        return new runtime.JSONApiResponse(response, (jsonValue) => GrantDtoFromJSON(jsonValue));
     }
 
     /**
      * Remove any grant of the tenant
      */
-    async tenantAccessControllerRemoveGrant(requestParameters: TenantAccessControllerRemoveGrantRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
-        await this.tenantAccessControllerRemoveGrantRaw(requestParameters, initOverrides);
+    async tenantAccessControllerRemoveGrant(requestParameters: TenantAccessControllerRemoveGrantRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GrantDto> {
+        const response = await this.tenantAccessControllerRemoveGrantRaw(requestParameters, initOverrides);
+        return await response.value();
     }
 
     /**
@@ -363,7 +402,7 @@ export class AccessApi extends runtime.BaseAPI {
 
     /**
      * You can only give a role whose capabilities you all hold here (no escalation).
-     * Give a group or a person a role on this workspace
+     * Give a group a role on this workspace, or data access to one of its sources or tables
      */
     async workspaceAccessControllerAddGrantRaw(requestParameters: WorkspaceAccessControllerAddGrantRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GrantDto>> {
         if (requestParameters['createGrantDto'] == null) {
@@ -395,7 +434,7 @@ export class AccessApi extends runtime.BaseAPI {
 
     /**
      * You can only give a role whose capabilities you all hold here (no escalation).
-     * Give a group or a person a role on this workspace
+     * Give a group a role on this workspace, or data access to one of its sources or tables
      */
     async workspaceAccessControllerAddGrant(requestParameters: WorkspaceAccessControllerAddGrantRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GrantDto> {
         const response = await this.workspaceAccessControllerAddGrantRaw(requestParameters, initOverrides);
@@ -503,7 +542,7 @@ export class AccessApi extends runtime.BaseAPI {
     /**
      * Remove a grant made on this workspace
      */
-    async workspaceAccessControllerRemoveGrantRaw(requestParameters: WorkspaceAccessControllerRemoveGrantRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+    async workspaceAccessControllerRemoveGrantRaw(requestParameters: WorkspaceAccessControllerRemoveGrantRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GrantDto>> {
         if (requestParameters['id'] == null) {
             throw new runtime.RequiredError(
                 'id',
@@ -526,14 +565,15 @@ export class AccessApi extends runtime.BaseAPI {
             query: queryParameters,
         }, initOverrides);
 
-        return new runtime.VoidApiResponse(response);
+        return new runtime.JSONApiResponse(response, (jsonValue) => GrantDtoFromJSON(jsonValue));
     }
 
     /**
      * Remove a grant made on this workspace
      */
-    async workspaceAccessControllerRemoveGrant(requestParameters: WorkspaceAccessControllerRemoveGrantRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
-        await this.workspaceAccessControllerRemoveGrantRaw(requestParameters, initOverrides);
+    async workspaceAccessControllerRemoveGrant(requestParameters: WorkspaceAccessControllerRemoveGrantRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GrantDto> {
+        const response = await this.workspaceAccessControllerRemoveGrantRaw(requestParameters, initOverrides);
+        return await response.value();
     }
 
     /**
@@ -566,3 +606,21 @@ export class AccessApi extends runtime.BaseAPI {
     }
 
 }
+
+/**
+ * @export
+ */
+export const TenantAccessControllerEventsSortByEnum = {
+    OccurredAt: 'OCCURRED_AT',
+    Actor: 'ACTOR',
+    Action: 'ACTION'
+} as const;
+export type TenantAccessControllerEventsSortByEnum = typeof TenantAccessControllerEventsSortByEnum[keyof typeof TenantAccessControllerEventsSortByEnum];
+/**
+ * @export
+ */
+export const TenantAccessControllerEventsSortOrderEnum = {
+    Asc: 'ASC',
+    Desc: 'DESC'
+} as const;
+export type TenantAccessControllerEventsSortOrderEnum = typeof TenantAccessControllerEventsSortOrderEnum[keyof typeof TenantAccessControllerEventsSortOrderEnum];

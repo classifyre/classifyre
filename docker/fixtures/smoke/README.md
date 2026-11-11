@@ -11,3 +11,6 @@ of the all-in-one image works.
 **Every credential in here is fake.** The values are syntactically valid so that
 the detectors recognise their shape, and they authenticate against nothing —
 they were written by hand for this test and have never existed anywhere.
+
+`orders.csv` is a small table of invented orders: the smoke test queries it
+with SQL (docs/prd/DQ-data-query.md) once the scan has made it an asset.

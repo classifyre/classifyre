@@ -25,8 +25,8 @@ export interface Principal {
   /** How the token arrived: a cookie needs a same-origin check on writes. */
   via: 'bearer' | 'cookie';
   /**
-   * Someone who has not signed in, browsing the public tenant: `sub` is
-   * empty, the only grant is Visitor on that tenant.
+   * Someone who has not signed in: `sub` is empty and there are no grants;
+   * they read the public workspaces of the first tenant, nothing else.
    */
   visitor?: true;
 }
@@ -158,7 +158,6 @@ export class IdentityService {
     // No credentials at all, never a bad or expired token: that one stays a
     // 401, so the web renews the session instead of dropping to a visitor.
     if (
-      this.config.publicTenantAlias &&
       header(request.headers, 'authorization') === undefined &&
       !tokenOf(request.headers)
     ) {
@@ -253,10 +252,11 @@ export class IdentityService {
   } | null = null;
 
   /**
-   * The principal of everyone who has not signed in: Visitor on the public
-   * tenant, nothing else. Looked up at most once a minute, also when there
-   * is none (not set up, suspended), so anonymous requests never reach the
-   * identity server one by one.
+   * The principal of everyone who has not signed in: a visitor of the first
+   * tenant (IAM_BOOTSTRAP_TENANT) without grants, so they read its public
+   * workspaces and nothing else. Read from the control database at most once
+   * a minute, also when there is none yet, so anonymous requests never reach
+   * the identity server.
    */
   private async visitor(): Promise<Principal> {
     if (!this.visitorCache || this.visitorCache.until <= Date.now()) {
@@ -271,19 +271,12 @@ export class IdentityService {
   }
 
   private async lookUpVisitor(): Promise<Principal | null> {
-    const alias = this.config.publicTenantAlias!;
-    const org = await this.membership.organizationByAlias(alias);
-    const tenant = org ? await this.tenancy.ensureTenant(org) : null;
-    if (
-      !org ||
-      !tenant ||
-      tenant.status !== 'active' ||
-      tenant.orgId !== org.id
-    ) {
-      // Not set up (yet), suspended or replaced: nothing is public.
-      return null;
-    }
-    const principal: Principal = {
+    const tenant = await this.tenancy.tenantByAlias(
+      this.config.bootstrapTenantAlias,
+    );
+    // Not set up yet, suspended or deleted: nothing is public.
+    if (!tenant?.orgId || tenant.status !== 'active') return null;
+    return {
       sub: '',
       actor: {
         id: null,
@@ -294,25 +287,13 @@ export class IdentityService {
         ref: undefined,
       },
       tenant,
-      orgId: org.id,
+      orgId: tenant.orgId,
       groupIds: new Set(),
-      grants: [
-        {
-          id: 'visitor',
-          tenantId: tenant.id,
-          subjectType: 'group',
-          subjectId: '',
-          roleKey: 'visitor',
-          scopeType: 'tenant',
-          scopeId: tenant.id,
-          expiresAt: null,
-        },
-      ],
+      grants: [],
       // No credentials at all; it never writes, so no origin check applies.
       via: 'cookie',
       visitor: true,
     };
-    return principal;
   }
 
   /**
@@ -468,6 +449,7 @@ export class IdentityService {
   /**
    * Capabilities in one workspace, or null when the workspace is in another
    * tenant (which must look exactly like a workspace that does not exist).
+   * A public workspace adds read-only access for everyone of its tenant.
    */
   async capabilitiesIn(
     principal: Principal,
@@ -475,13 +457,43 @@ export class IdentityService {
   ): Promise<Set<Capability> | null> {
     const tenancy = await this.tenancy.workspaceTenancy(namespaceId);
     if (!tenancy || tenancy.tenantId !== principal.tenant.id) return null;
-    const ownerLineage = tenancy.ownerGroupId
-      ? await this.membership.ancestry(principal.orgId, tenancy.ownerGroupId)
-      : [];
     return capabilitiesInWorkspace(principal.grants, {
       namespaceId,
-      ownerLineage,
+      ownerLineage: await this.lineageFor(principal, tenancy.ownerGroupId),
+      visibility: tenancy.visibility,
     });
+  }
+
+  /**
+   * The owner group and the groups above it, for evaluating grants. Without
+   * grants (visitors) there is nothing to evaluate, so the identity server is
+   * not asked: anonymous reads never reach it.
+   */
+  private async lineageFor(
+    principal: Principal,
+    ownerGroupId: string | null,
+  ): Promise<string[]> {
+    if (!ownerGroupId || principal.grants.length === 0) return [];
+    return this.membership.ancestry(principal.orgId, ownerGroupId);
+  }
+
+  /**
+   * The person's groups and every group above them: who a notification sent
+   * to a group reaches (members of its subgroups included). Empty for
+   * visitors, who are in no group.
+   */
+  async groupLineage(principal: Principal): Promise<string[]> {
+    if (principal.visitor) return [];
+    const lineage = new Set<string>();
+    for (const groupId of principal.groupIds) {
+      for (const id of await this.membership.ancestry(
+        principal.orgId,
+        groupId,
+      )) {
+        lineage.add(id);
+      }
+    }
+    return [...lineage];
   }
 
   /** The owner group of a workspace and the groups above it; empty without an owner. */
@@ -510,6 +522,22 @@ export class IdentityService {
     return this.membership.groups(principal.orgId, { fresh });
   }
 
+  /**
+   * The first of `groupIds` that is not a group of the principal's tenant,
+   * or undefined when all belong. Fresh read: an admin who just made one
+   * expects to find it here.
+   */
+  async unknownGroupId(
+    principal: Principal,
+    groupIds: string[],
+  ): Promise<string | undefined> {
+    if (!groupIds.length) return undefined;
+    const known = new Set(
+      (await this.groupsOf(principal, true)).map((group) => group.id),
+    );
+    return groupIds.find((id) => !known.has(id));
+  }
+
   /** Every workspace of the principal's tenant they can see, with what they may do there. */
   async visibleWorkspaces(
     principal: Principal,
@@ -517,12 +545,10 @@ export class IdentityService {
     const workspaces = await this.tenancy.workspacesOf(principal.tenant.id);
     const visible = new Map<string, Set<Capability>>();
     for (const [namespaceId, tenancy] of workspaces) {
-      const ownerLineage = tenancy.ownerGroupId
-        ? await this.membership.ancestry(principal.orgId, tenancy.ownerGroupId)
-        : [];
       const capabilities = capabilitiesInWorkspace(principal.grants, {
         namespaceId,
-        ownerLineage,
+        ownerLineage: await this.lineageFor(principal, tenancy.ownerGroupId),
+        visibility: tenancy.visibility,
       });
       if (capabilities.has('workspace.view'))
         visible.set(namespaceId, capabilities);
@@ -574,10 +600,10 @@ export class IdentityService {
   }
 
   /**
-   * First-tenant setup when sign-in is turned on: the tenant row for the
-   * bootstrap organization and Tenant admin for its `admins` group (once).
-   * Workspaces made without sign-in stay in `local`, out of sight, until an
-   * operator moves them (src/admin.ts, docs/prd/TEN §6).
+   * First-tenant setup: the tenant row for the bootstrap organization and
+   * Tenant admin for its `admins` group (once). Workspaces of installs from
+   * before sign-in was always on stay in their open database until an
+   * operator copies them (src/admin.ts, docs/prd/TEN §6).
    */
   async bootstrap(): Promise<void> {
     const org = await this.membership.organizationByAlias(

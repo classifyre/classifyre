@@ -20,6 +20,7 @@ import {
   PrismaClientManager,
   connectionBudgetVerdict,
 } from './prisma-client-manager';
+import { rememberWorkspace } from '../tenant-databases';
 
 describe('PrismaClientManager workload lanes', () => {
   const originalEnv = { ...process.env };
@@ -30,6 +31,8 @@ describe('PrismaClientManager workload lanes', () => {
     process.env.SERVICE_ROLE = 'all';
     process.env.PRISMA_POOL_MAX = '10';
     process.env.PRISMA_INTERACTIVE_POOL_MAX = '4';
+    process.env.CLASSIFYRE_TENANT_DATABASE_KEY = 'test-key';
+    rememberWorkspace('ns_acme', '7f3a0c1e-2b4d-4e5f-8a9b-0c1d2e3f4a5b');
     mockAdapterConfigs.length = 0;
     mockDisconnects.length = 0;
   });

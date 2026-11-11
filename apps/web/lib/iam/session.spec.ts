@@ -11,7 +11,6 @@ import {
 } from "./session";
 
 const env = {
-  IAM_ENABLED: "true",
   IAM_ISSUER_URL: "https://classifyre.example/iam/realms/classifyre/",
   IAM_INTERNAL_URL: "http://classifyre-iam:8080/iam",
   IAM_REALM: "classifyre",
@@ -27,15 +26,10 @@ function jwtExpiringIn(seconds: number): string {
 }
 
 describe("web sign-in session", () => {
-  const config = iamWebConfig(env)!;
+  const config = iamWebConfig(env);
 
-  it("is off without IAM_ENABLED", () => {
-    expect(iamWebConfig({})).toBeNull();
-  });
-
-  it("lets visitors in only with a public tenant", () => {
-    expect(config.publicTenant).toBe(false);
-    expect(iamWebConfig({ ...env, IAM_PUBLIC_TENANT: "public" })!.publicTenant).toBe(true);
+  it("refuses to start without the identity server settings", () => {
+    expect(() => iamWebConfig({})).toThrow(/IAM_ISSUER_URL/);
   });
 
   it("exchanges tokens in-cluster but sends browsers to the public issuer", () => {

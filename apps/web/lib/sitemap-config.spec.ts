@@ -18,7 +18,6 @@ import {
 
 const ENV_KEYS = [
   "SITEMAP_ENABLED",
-  "IAM_ENABLED",
   "SITEMAP_BASE_URL",
   "PUBLIC_BASE_URL",
   "SITEMAP_CHUNK_SIZE",
@@ -52,11 +51,6 @@ describe("sitemap-config", () => {
       expect(isSitemapEnabled()).toBe(true);
     });
 
-    it("is off with sign-in, whatever SITEMAP_ENABLED says", () => {
-      process.env.SITEMAP_ENABLED = "true";
-      process.env.IAM_ENABLED = "true";
-      expect(isSitemapEnabled()).toBe(false);
-    });
   });
 
   describe("sitemapChunkSize", () => {

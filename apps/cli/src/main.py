@@ -1162,6 +1162,12 @@ def run_evaluate_file_command(args: argparse.Namespace) -> None:
 def main() -> None:
     setup_logging()
     load_local_env()
+    if len(sys.argv) > 1 and sys.argv[1] == "query":
+        # A query answers a person waiting in the browser: skip importing every
+        # connector (list_available_sources) and telemetry start-up.
+        from .query.runner import run_query_command
+
+        sys.exit(run_query_command(sys.argv[2] if len(sys.argv) > 2 else None))
     from .telemetry import init_telemetry
 
     init_telemetry()

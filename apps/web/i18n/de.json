@@ -114,8 +114,9 @@
     "owningGroupPick": "Gruppe wählen, der er gehört",
     "owningGroupHint": "Mitglieder dieser Gruppe erhalten Zugriff gemäß ihren Freigaben.",
     "owningGroupNone": "Sie können keine Arbeitsbereiche anlegen: Bitten Sie eine Mandanten-Admin, Sie zur Arbeitsbereichs-Verwaltung Ihrer Gruppe zu machen.",
-    "emptyPublicTitle": "Noch nichts veröffentlicht",
-    "emptyPublicDescription": "Arbeitsbereiche des öffentlichen Mandanten erscheinen hier, sobald sie veröffentlicht sind. Melden Sie sich an, um Ihre eigenen zu sehen."
+    "emptyPublicTitle": "Noch nichts öffentlich",
+    "emptyPublicDescription": "Öffentliche Arbeitsbereiche erscheinen hier. Melden Sie sich an, um Ihre eigenen zu sehen.",
+    "publicBadge": "Öffentlich"
   },
   "categories": {
     "label": "Kategorien",
@@ -164,30 +165,28 @@
     "emptyWorkspacesTitle": "Hier ist noch nichts abgelegt",
     "emptyWorkspacesDescription": "Füge diese Kategorie in den Einstellungen eines Arbeitsbereichs hinzu, dann erscheint er hier."
   },
-  "demo": {
-    "badge": "Demo",
-    "headerCta": "Eigene Instanz",
-    "bannerCta": "Demo im Nur-Lese-Modus — eigene Instanz holen",
-    "tooltip": "Sie erkunden eine gemeinsam genutzte Demo im Nur-Lese-Modus. Ansicht, Suche und Dashboards funktionieren normal — Erstellen, Bearbeiten, Löschen, Scans ausführen, Detektoren trainieren und der Browser-Assistent sind deaktiviert.",
-    "mcpNotice": "Demo-Modus ist aktiv. MCP-Lesezugriff funktioniert mit einem vorhandenen Token, aber das Erstellen, Bearbeiten oder Löschen von Tokens ist deaktiviert. Mit einer eigenen Instanz können Sie Tokens ausstellen.",
-    "upgradeTitle": "Classifyre mit Ihren eigenen Daten betreiben",
-    "upgradeDescription": "Diese Demo wird geteilt und ist schreibgeschützt. Ihre eigene Instanz ist in Minuten eingerichtet, kostenlos und sendet Ihre Dokumente nirgendwohin.",
-    "blockedTitle": "Dafür brauchen Sie eine eigene Instanz",
-    "blockedDescription": "Die Demo ist schreibgeschützt, daher sind Erstellen, Bearbeiten, Löschen und das Ausführen von Scans hier deaktiviert. Mit einer eigenen Classifyre-Instanz steht alles zur Verfügung.",
+  "publicView": {
+    "badge": "Öffentlich",
+    "headerCta": "Nur lesen",
+    "bannerCta": "Öffentlich und nur lesbar — anmelden oder eigenes Classifyre holen",
+    "tooltip": "Sie lesen einen öffentlichen Arbeitsbereich. Stöbern und Suchen funktionieren; um etwas zu ändern, melden Sie sich an.",
+    "upgradeTitle": "Dieser Arbeitsbereich ist öffentlich und nur lesbar",
+    "upgradeDescription": "Melden Sie sich an, wenn Sie hier ein Konto haben, oder betreiben Sie Classifyre mit Ihren eigenen Daten: in Minuten, kostenlos, und Ihre Dokumente verlassen nie Ihre Umgebung.",
+    "signIn": "Anmelden",
     "dockerTitle": "Docker",
     "dockerDescription": "Ein einziges `docker run` unter macOS, Windows oder Linux. Alles bleibt auf Ihrem Rechner — ohne Server, ohne Konto.",
     "dockerCta": "Image holen",
     "helmTitle": "Kubernetes (Helm)",
     "helmDescription": "Für Ihr Team selbst hosten — mit dem Produktions-Helm-Chart und Ihrer eigenen Datenbank.",
     "helmCta": "Installationsanleitung",
-    "upgradeFootnote": "Beide Optionen sind kostenlos und Open Source. Ihre Dokumente bleiben auf Ihrem Rechner oder in Ihrem eigenen Cluster.",
-    "keepExploring": "Demo weiter erkunden"
+    "upgradeFootnote": "Beide Optionen sind kostenlos und Open Source. Ihre Dokumente bleiben auf Ihrem Rechner oder in Ihrem eigenen Cluster."
   },
   "nav": {
     "overview": "Übersicht",
     "explore": "Erkunden",
     "findings": "Befunde",
     "assets": "Assets",
+    "query": "SQL",
     "sources": "Quellen",
     "detectors": "Custom-Detektoren",
     "investigations": "Ermittlungen",
@@ -1001,7 +1000,9 @@
         "failed": "Der letzte Batch ist fehlgeschlagen. pg-boss wiederholt ihn nach eigenem Zeitplan.",
         "stale": "Kein Worker hat sich kürzlich gemeldet. Der Prozess wurde möglicherweise mitten im Job beendet."
       }
-    }
+    },
+    "noAccessTitle": "Sie können die Einstellungen dieses Arbeitsbereichs nicht sehen",
+    "noAccessDescription": "Die Einstellungen sind für Personen mit einer Rolle in diesem Arbeitsbereich. Melden Sie sich an oder bitten Sie einen Admin des Arbeitsbereichs um Zugriff."
   },
   "features": {
     "title": "Funktionen",
@@ -1395,7 +1396,8 @@
       "textCoverageValue": "{{pct}} % extrahiert",
       "lowTextCoverageBadge": "Geringe Texterfassung ({{pct}} %)",
       "lowTextCoverageTooltip": "Einige Assets lieferten keinen extrahierbaren Text; Befunde könnten unvollständig sein.",
-      "tabConnections": "Verbindungen"
+      "tabConnections": "Verbindungen",
+      "tabData": "Daten"
     },
     "edit": {
       "loading": "Quellkonfiguration wird geladen...",
@@ -1564,7 +1566,10 @@
       "started": "{{count}} Scan(s) eingereiht",
       "skipped": "{{count}} Quelle(n) konnten nicht gestartet werden",
       "failed": "Scans konnten nicht gestartet werden"
-    }
+    },
+    "editNoAccessTitle": "Sie können diese Quelle nicht bearbeiten",
+    "editNoAccessDescription": "Wie eine Quelle eingerichtet ist – Verbindung, Stichprobe, Detektoren und Code –, sehen nur Personen, die Quellen ändern dürfen.",
+    "editNoAccessBack": "Zurück zur Quelle"
   },
   "findings": {
     "title": "Befunde",
@@ -4682,14 +4687,6 @@
       "you": "Du ({{name}})",
       "others": "{{count}} weitere hier"
     },
-    "actor": {
-      "prompt": "Dein Name auf diesem Board",
-      "placeholder": "z. B. Maria K.",
-      "save": "Speichern",
-      "hint": "Wird bei deinen Notizen, Verknüpfungen und Zeitleisteneinträgen angezeigt. Nur in diesem Browser gespeichert.",
-      "change": "Namen ändern",
-      "anonymous": "Namen festlegen"
-    },
     "changedBy": "{{name}} {{summary}}",
     "someone": "Jemand",
     "staleEdit": "Inzwischen von {{name}} geändert. Dein Text wurde in die Zwischenablage kopiert.",
@@ -5992,9 +5989,7 @@
     "name": "Name",
     "enabled": "Aktiviert",
     "enabledHint": "Bot verbinden und Nachrichten beantworten.",
-    "allowMutations": "Änderungen erlauben",
-    "allowMutationsHint": "Wenn deaktiviert, ist der Bot schreibgeschützt: Er kann lesen, aber nie erstellen, ändern oder löschen.",
-    "allowMutationsSignIn": "Mit Anmeldung sind Bots immer schreibgeschützt: Hinter einer Chat-Nachricht steht keine angemeldete Person.",
+    "readOnlyHint": "Bots lesen nur: Hinter einer Chat-Nachricht steht keine angemeldete Person, daher können sie nachsehen, aber nie erstellen, ändern oder löschen.",
     "capabilityGroups": "Fähigkeiten",
     "capabilityGroupsHint": "Welche Tool-Gruppen der Bot nutzen darf. Standardmäßig sind alle aktiviert.",
     "agents": "Autopilot-Agenten",
@@ -6002,7 +5997,6 @@
     "connected": "Verbunden",
     "errorBadge": "Fehler",
     "disabledBadge": "Deaktiviert",
-    "readOnly": "Nur Lesen",
     "lastConnected": "Zuletzt verbunden",
     "neverConnected": "Nie verbunden",
     "tokenLabel": "Token",
@@ -6652,6 +6646,12 @@
       "ogTitle": "Verbindungen erkunden | Classifyre",
       "ogDescription": "Suchen, dann Herkunft, Duplikaten, gemeinsamen Begriffen und Ähnlichem folgen — jede Verbindung mit ihrem Grund."
     },
+    "query": {
+      "title": "SQL — Tabellen abfragen",
+      "description": "Fragen Sie die Zeilen der Datenbank-, Lakehouse- und Dateitabellen, auf die Sie Zugriff haben, mit Standard-SQL ab und verknüpfen Sie Tabellen über Quellen hinweg.",
+      "ogTitle": "SQL über Ihre Tabellen | Classifyre",
+      "ogDescription": "Standard-SQL über die Tabellen, die Sie lesen dürfen, quellenübergreifend verknüpft."
+    },
     "findings": {
       "title": "Funde — jede Erkennung nach Schweregrad, Quelle & Detektor triagieren",
       "description": "Triagieren Sie jede Erkennung an einem Ort — filtern Sie nach Schweregrad, Status, Konfidenz, Quelle und Detektor. Verfolgen Sie personenbezogene Daten, Geheimnisse, Sicherheitsprobleme und eigene Erkennungen von offen bis erledigt über alle Scans hinweg.",
@@ -7261,7 +7261,25 @@
     "empty": "Noch keine Änderungen erfasst.",
     "loadMore": "Mehr laden",
     "activityTitle": "Aktivität",
-    "activityDescription": "Jede Änderung in diesem Arbeitsbereich, aus der Web-App, der API oder von Agenten über MCP. Lesezugriffe werden nicht erfasst."
+    "activityDescription": "Jede Änderung in diesem Arbeitsbereich, aus der Web-App, der API oder von Agenten über MCP. Lesezugriffe werden nicht erfasst.",
+    "table": {
+      "when": "Wann",
+      "who": "Wer",
+      "what": "Was",
+      "where": "Wo",
+      "fields": "Felder",
+      "channel": "Kanal",
+      "search": "Aktivität filtern …",
+      "capability": "Fähigkeit",
+      "allCapabilities": "Alle Fähigkeiten",
+      "allChannels": "Alle Kanäle",
+      "allActors": "Alle Akteure",
+      "rest": "Web & API",
+      "mcp": "MCP",
+      "empty": "Keine Änderungen für diese Filter.",
+      "rangeOf": "von {{total}}",
+      "thisWorkspace": "Dieser Arbeitsbereich"
+    }
   },
   "account": {
     "menu": "Konto",
@@ -7293,13 +7311,39 @@
     "role": "Rolle",
     "untilOptional": "Bis (optional)",
     "add": "Zugriff gewähren",
-    "whyTitle": "Warum darf ich …?",
+    "whyTitle": "Was ich darf",
+    "whyDescription": "Jede Fähigkeit, die Sie hier haben, mit Gruppe, Rolle und Bereich, der sie gibt. Jede Spalte ist sortierbar.",
     "pickCapability": "Etwas wählen, das Sie dürfen",
     "becauseOf": "{{subject}} als {{role}} auf {{scope}}",
+    "canDo": {
+      "capability": "Fähigkeit",
+      "group": "Gruppe",
+      "role": "Rolle",
+      "tenant": "Mandant",
+      "scope": "Bereich",
+      "via": "Über",
+      "empty": "Nichts erklärt diese Fähigkeit bisher.",
+      "none": "Sie haben hier noch nichts."
+    },
+    "grantsTable": {
+      "group": "Gruppe",
+      "role": "Rolle",
+      "scope": "Bereich",
+      "until": "Bis",
+      "origin": "Herkunft",
+      "here": "Dieser Arbeitsbereich",
+      "actions": "Aktionen"
+    },
+    "giveAccessTitle": "Zugriff gewähren",
+    "giveAccessDescription": "Einer Gruppe eine Rolle in diesem Arbeitsbereich geben, optional bis zu einem Datum. Sie können nur Rollen geben, deren Fähigkeiten Sie hier alle haben.",
+    "cancel": "Abbrechen",
     "allWorkspaces": "Alle Arbeitsbereiche",
     "tenantTitle": "Mandant",
     "tenantDenied": "Nur Mandanten-Admins verwalten den Zugriff für den ganzen Mandanten.",
     "tenantGrants": "Zugriff im ganzen Mandanten",
+    "tenantGrantsGrouped": "Nach Gruppe",
+    "tenantGrantsUngrouped": "Alle Freigaben",
+    "removedGroupId": "Entfernte Gruppe {{id}}",
     "scope": "Gilt für",
     "scopes": {
       "tenant": "Den ganzen Mandanten",
@@ -7315,7 +7359,15 @@
     },
     "peopleElsewhere": "Personen und Gruppen werden im Identitätsserver verwaltet oder im Firmenverzeichnis dahinter. Die Freigaben hier legen fest, was sie in Classifyre dürfen; eine umbenannte Gruppe behält ihre Freigaben, eine entfernte wird als entfernt angezeigt.",
     "managePeople": "Personen und Gruppen verwalten",
-    "peopleByOperators": "Bitten Sie einen Betreiber dieser Installation, Personen hinzuzufügen oder Gruppen zu ändern."
+    "peopleByOperators": "Bitten Sie einen Betreiber dieser Installation, Personen hinzuzufügen oder Gruppen zu ändern.",
+    "tenantActivity": {
+      "description": "Freigaben, erstellte oder gelöschte Arbeitsbereiche im ganzen Mandanten. Jede Spalte ist sortierbar, nach Aktion, Akteur oder freiem Text filterbar.",
+      "action": "Aktion",
+      "empty": "Noch keine Aktivität.",
+      "noMatch": "Keine Aktivität für diese Filter.",
+      "search": "Aktivität filtern …",
+      "allActions": "Alle Aktionen"
+    }
   },
   "platform": {
     "title": "Plattform",
@@ -7330,7 +7382,6 @@
     "noAdmins": "Keine Admins",
     "lastActivity": "Letzte Änderung {{when}}",
     "created": "Angelegt {{when}}",
-    "localWaiting": "Ohne Anmeldung angelegte Arbeitsbereiche: {{count}}. Holen Sie sie über das Menü eines Mandanten hinein.",
     "actions": "Aktionen für {{name}}",
     "status": {
       "suspended": "gesperrt",
@@ -7345,11 +7396,6 @@
     },
     "database": "Datenbank",
     "upgradeError": "Seine Arbeitsbereiche sind nicht verfügbar, bis der nächste Start seine Datenbank aktualisiert: {{error}}",
-    "import": "Arbeitsbereiche hereinholen",
-    "importTitle": "Arbeitsbereiche in {{name}} holen",
-    "importDescription": "Diese Arbeitsbereiche wurden ohne Anmeldung angelegt. Sie werden mit allen Daten in die Datenbank des Mandanten kopiert und gehören seiner Admin-Gruppe. Die Originale bleiben, wo sie sind, für die Arbeit ohne Anmeldung.",
-    "importConfirm": "{{count}} hereinholen",
-    "imported": "In {{name}} kopierte Arbeitsbereiche: {{count}}",
     "suspend": "Sperren",
     "suspendTitle": "{{name}} sperren?",
     "suspendDescription": "Niemand im Mandanten kann in Classifyre arbeiten, bis er wieder freigegeben ist, und ihre Agenten stoppen ebenfalls. Seine Daten bleiben erhalten, geplante Scans laufen weiter.",
@@ -7384,5 +7430,169 @@
     "signedInAs": "Angemeldet als",
     "retry": "Erneut versuchen",
     "signOut": "Abmelden"
+  },
+  "dataQuery": {
+    "title": "SQL",
+    "subtitle": "Fragen Sie die Zeilen der Tabellen, auf die Sie Zugriff haben, mit Standard-SQL ab. Eine Abfrage kann Tabellen verschiedener Quellen verknüpfen.",
+    "run": "Ausführen",
+    "cancel": "Abbrechen",
+    "format": "Formatieren",
+    "shortcut": "Strg/⌘ + Enter führt die Abfrage aus",
+    "status": {
+      "PENDING": "Wartet",
+      "RUNNING": "Läuft",
+      "SUCCESS": "Fertig",
+      "ERROR": "Fehlgeschlagen",
+      "TIMEOUT": "Zeit überschritten",
+      "CANCELLED": "Abgebrochen"
+    },
+    "elapsed": "{{seconds}} s",
+    "timings": "Vorbereitung {{setup}} s · Abfrage {{query}} s",
+    "rows": "{{count}} Zeilen",
+    "columns": "{{count}} Spalten",
+    "results": {
+      "count": "{{shown}} von {{total}} Zeilen",
+      "search": "Diese Zeilen durchsuchen…",
+      "noMatch": "Keine Zeile passt zu dieser Suche.",
+      "sortHint": "Nach {{name}} sortieren"
+    },
+    "truncatedRows": "Es werden die ersten {{count}} Zeilen gezeigt: das Zeilenlimit des Arbeitsbereichs.",
+    "truncatedBytes": "Es werden die ersten {{count}} Zeilen gezeigt: das ganze Ergebnis ist größer als das Ergebnislimit.",
+    "noResult": "Führen Sie eine Abfrage aus, um hier ihre Zeilen zu sehen.",
+    "emptyResult": "Die Abfrage hat keine Zeilen geliefert.",
+    "catalogTitle": "Tabellen",
+    "catalogSearch": "Tabellen und Spalten filtern",
+    "onlyQueryable": "Nur was ich abfragen darf",
+    "catalogFailed": "Die Tabellenliste konnte nicht geladen werden.",
+    "locked": "Sie dürfen diese Tabelle nicht abfragen. Ein Admin des Arbeitsbereichs kann Ihrer Gruppe Datenzugriff geben.",
+    "notQueryable": "Nicht mit SQL abfragbar",
+    "noTables": "Noch keine Tabellen zum Abfragen. Scannen Sie zuerst eine Datenbank-, Lakehouse- oder Bucket-Quelle.",
+    "partialAccess": "Sie dürfen hier {{count}} Tabellen abfragen, die mit dem Abspielzeichen. Die anderen brauchen eine Datenleser-Freigabe.",
+    "openInQuery": "In SQL öffnen",
+    "openInQueryHint": "Diese Abfrage auf der SQL-Seite öffnen",
+    "assetTab": "Daten",
+    "assetLockedTitle": "Kein Datenzugriff",
+    "assetLocked": "Sie sehen diese Tabelle, aber nicht ihre Zeilen. Ein Admin des Arbeitsbereichs kann Ihrer Gruppe die Rolle Datenleser für diese Tabelle oder ihre Quelle geben.",
+    "sourceTables": "{{count}} von {{total}} Tabellen abfragbar",
+    "sourceLocked": "Sie dürfen keine Tabelle von {{name}} abfragen. Ein Admin des Arbeitsbereichs kann Ihrer Gruppe die Rolle Datenleser für die Quelle oder ihre Tabellen geben.",
+    "explorer": {
+      "tables": "Tabellen",
+      "history": "Verlauf",
+      "saved": "Gesichert",
+      "star": "Diese Quelle oben anheften",
+      "queryableCount": "{{count}} abfragbar",
+      "insertHint": "{{name}} an der Cursorposition einfügen",
+      "runTableHint": "Editor durch eine Vorschauabfrage über {{name}} ersetzen",
+      "copyNameHint": "Vollständigen Tabellennamen {{name}} kopieren",
+      "copied": "{{name}} kopiert.",
+      "copySourceHint": "Quellnamen {{name}} kopieren",
+      "openSourceHint": "{{name}} öffnen",
+      "noColumns": "Keine Spalten aufgeführt — der Scan hat sie noch nicht gelesen.",
+      "loadingHistory": "Ihre letzten Abfragen werden geladen…",
+      "noHistory": "Noch nichts hier. Führen Sie eine Abfrage aus, dann erscheint sie in dieser Liste.",
+      "loadingSaved": "Ihre gesicherten Abfragen werden geladen…",
+      "noSaved": "Noch keine gesicherten Abfragen. Benennen Sie das SQL mit Sichern und finden Sie es hier.",
+      "reopenHint": "Diese Abfrage in den Editor laden",
+      "save": "Sichern",
+      "saveTitle": "Diese Abfrage sichern",
+      "saveHint": "Nur für Sie aufgehoben, unter Gesichert neben dem Editor.",
+      "saveName": "Name",
+      "discard": "Abbrechen"
+    },
+    "export": {
+      "button": "Exportieren",
+      "running": "Wird exportiert…",
+      "xlsx": "Excel (.xlsx)",
+      "csv": "CSV",
+      "parquet": "Parquet",
+      "done": "{{count}} Zeilen exportiert.",
+      "truncated": "Die ersten {{count}} Zeilen exportiert: das Zeilenlimit für Exporte.",
+      "failed": "Der Export ist fehlgeschlagen."
+    },
+    "access": {
+      "open": "Zugriff",
+      "description": {
+        "workspace": "Jede Datenleser-Freigabe in diesem Arbeitsbereich: für den ganzen Arbeitsbereich, eine Quelle oder eine Tabelle. Datenzugriff geht immer an eine Gruppe.",
+        "source": "Gruppen, die die Tabellen dieser Quelle abfragen dürfen: die Rolle Datenleser für die Quelle, eine ihrer Tabellen oder den ganzen Arbeitsbereich.",
+        "asset": "Gruppen, die diese Tabelle abfragen dürfen: die Rolle Datenleser für die Tabelle, ihre Quelle oder den ganzen Arbeitsbereich."
+      },
+      "activity": "Aktivität",
+      "activityHint": {
+        "workspace": "Lese- und Exportzugriffe auf die Tabellen dieses Arbeitsbereichs und Änderungen am Datenzugriff, neueste zuerst. Jede gelesene Tabelle zählt einmal pro Abfrage.",
+        "source": "Lese- und Exportzugriffe auf die Tabellen dieser Quelle und Zugriff, der für sie oder ihre Tabellen gegeben oder entfernt wurde, neueste zuerst.",
+        "asset": "Lese- und Exportzugriffe auf diese Tabelle und Zugriff, der für sie gegeben oder entfernt wurde, neueste zuerst. Abfrageläufe selbst bleiben im Verlauf der jeweiligen Person."
+      },
+      "giveTitle": "Datenzugriff geben",
+      "giveDescription": {
+        "workspace": "Geben Sie einer Gruppe die Rolle Datenleser für diesen Arbeitsbereich: jede Tabelle darin.",
+        "source": "Geben Sie einer Gruppe die Rolle Datenleser für die ganze Quelle {{name}}: jede Tabelle darin.",
+        "asset": "Geben Sie einer Gruppe die Rolle Datenleser für die Tabelle {{name}}."
+      },
+      "giveHint": {
+        "workspace": "Öffnet jede Tabelle des Arbeitsbereichs für die Gruppe, heutige und künftige. Für eine Quelle oder Tabelle nutzen Sie deren Daten-Tab. Jede Änderung wird in der Aktivität festgehalten.",
+        "source": "Öffnet jede Tabelle von {{name}} für die Gruppe. Für eine einzelne Tabelle nutzen Sie deren Daten-Tab. Jede Änderung wird in der Aktivität festgehalten.",
+        "asset": "Öffnet nur {{name}} für die Gruppe. Für die ganze Quelle nutzen Sie deren Daten-Tab. Jede Änderung wird in der Aktivität festgehalten."
+      },
+      "none": "Niemand außer den Admins des Arbeitsbereichs.",
+      "pickGroup": "Gruppe wählen",
+      "give": "Zugriff geben",
+      "remove": "Zugriff entfernen",
+      "added": "Zugriff gegeben",
+      "viewerNote": "Mitglieder brauchen außerdem eine Rolle, die den Arbeitsbereich öffnet, etwa Betrachter."
+    },
+    "settings": {
+      "title": "SQL über Tabellen",
+      "description": "Grenzen für SQL über die Tabellen dieses Arbeitsbereichs. Wer welche Tabelle abfragen darf, folgt den Rollen und Datenleser-Freigaben. Jede Abfrage wird in der Aktivität festgehalten.",
+      "maxRows": "Zeilen pro Ergebnis",
+      "timeout": "Zeitlimit (Sekunden)",
+      "exportMaxRows": "Zeilen pro Export",
+      "save": "Limits speichern",
+      "saved": "Gespeichert",
+      "changedBy": "Zuletzt geändert von"
+    },
+    "completion": {
+      "schema": "{{source}} · {{count}} abfragbare Tabellen",
+      "table": "{{name}} · {{count}} Spalten",
+      "locked": "{{name}} (kein Zugriff)",
+      "source": "{{source}} · {{count}} Tabellen"
+    },
+    "editor": {
+      "undo": "Rückgängig (Strg/⌘+Z)",
+      "redo": "Wiederholen (Strg/⌘+Umschalt+Z)"
+    },
+    "signInTitle": "Melden Sie sich an, um SQL zu nutzen",
+    "signInDescription": "Tabellen abzufragen braucht ein angemeldetes Konto mit Datenzugriff. Ein öffentlicher Arbeitsbereich ist zum Lesen seiner Funde, Quellen und Fälle da."
+  },
+  "notificationAudiences": {
+    "title": "Wer Benachrichtigungen erhält",
+    "description": "Benachrichtigungen gehen an Gruppen: standardmäßig an die Gruppe, der dieser Arbeitsbereich gehört, samt Untergruppen. Hier wählen Sie für eine Art von Benachrichtigung andere Gruppen; jede Benachrichtigung behält die Gruppen, an die sie ging, und jede Person markiert sie für sich als gelesen.",
+    "owningGroup": "Besitzende Gruppe",
+    "add": "Gruppe hinzufügen",
+    "remove": "Nicht mehr an {{group}} senden",
+    "reset": "Nur besitzende Gruppe",
+    "saved": "Gespeichert. Neue Benachrichtigungen gehen an diese Gruppen.",
+    "saveFailed": "Konnte nicht speichern, wer sie erhält",
+    "loadFailed": "Konnte nicht laden, wer Benachrichtigungen erhält",
+    "notForYou": "Benachrichtigungen gehen an die Gruppen eines Arbeitsbereichs. Melden Sie sich an, um die an Ihre Gruppen zu erhalten.",
+    "removedGroup": "Entfernte Gruppe",
+    "groups": "Gruppen",
+    "members": "{{count}} Mitglieder",
+    "types": {
+      "SCAN": "Scans",
+      "FINDING": "Funde",
+      "SOURCE": "Quellen",
+      "SYSTEM": "System"
+    }
+  },
+  "publicWorkspace": {
+    "title": "Öffentlicher Arbeitsbereich",
+    "label": "Öffentlich, nur lesbar",
+    "description": "Alle Ihres Mandanten können ihn ohne Freigabe lesen, und ist er im ersten Mandanten der Installation, auch Leute ohne Anmeldung. Niemand erhält ein Recht, ihn zu ändern, und kein anderer Mandant sieht ihn je.",
+    "confirmTitle": "Diesen Arbeitsbereich öffentlich machen?",
+    "confirmDescription": "Seine Quellen, Funde, Fälle und alles andere werden lesbar, nur lesend, für alle Ihres Mandanten und, im ersten Mandanten, für alle, die Classifyre ohne Anmeldung öffnen. Sie können ihn jederzeit wieder privat machen.",
+    "confirm": "Öffentlich machen",
+    "published": "Der Arbeitsbereich ist öffentlich, nur lesbar.",
+    "unpublished": "Der Arbeitsbereich ist wieder privat.",
+    "saveFailed": "Konnte nicht ändern, ob der Arbeitsbereich öffentlich ist"
   }
 }

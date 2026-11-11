@@ -1,15 +1,11 @@
 {
-  "demo": {
-    "readOnly": "Diese Instanz befindet sich im schreibgeschützten Demo-Modus. Erstellen, Aktualisieren und Löschen sind deaktiviert.",
-    "tooltip": "Demo-Modus ist aktiv. Ansicht, Suche und Dashboards funktionieren normal. Erstellen, Bearbeiten, Löschen, Scans ausführen, Detektoren trainieren und der Browser-Assistent sind deaktiviert."
-  },
   "errors": {
     "asset": {
       "notFound": "Asset mit ID {{id}} nicht gefunden"
     },
     "source": {
       "notFound": "Quelle mit ID {{id}} nicht gefunden",
-      "invalidCron": "Ung\u00fcltiger Cron-Ausdruck.",
+      "invalidCron": "Ungültiger Cron-Ausdruck.",
       "noFile": "Keine Datei hochgeladen.",
       "timezoneEmpty": "Zeitzone darf nicht leer sein"
     },

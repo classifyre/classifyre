@@ -196,7 +196,6 @@ the account menu. What they can do there:
 
 | Action                  | What happens                                                                                                                                                                                         |
 | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Bring in workspaces** | Copies workspaces made without sign-in into the tenant's database, owned by its `admins` group. The originals stay. The same as `workspaces copy --to-tenant` below.                                |
 | **Suspend / Resume**    | A suspended tenant's people, and the MCP agents they created, are refused within a minute, with a page that says the tenant is suspended. Its data is kept and its scheduled scans keep running.     |
 | **Remove tenant data**  | Only for a tenant whose organization was deleted in the identity server, and after its alias is typed. Its workspaces, their database and its grants are deleted. Cannot be undone.                 |
 
@@ -222,65 +221,58 @@ database, once its first workspace made one.
 
 ---
 
-## The public tenant
+## Public workspaces
 
-To let people browse one tenant without signing in, as on a public showcase,
-turn on a public tenant:
-
-```yaml
-iam:
-  public:
-    enabled: true
-    tenant: public # its alias; can be the first tenant, iam.bootstrap.tenant.alias
-    name: Public # display name when the setup job creates it
-```
-
-- The realm setup job creates its organization with an empty top-level
-  `admins` group when it does not exist. Add its editors to that group in the
-  console; the group gets Tenant admin the first time one of them signs in,
-  as in every tenant. When the public tenant is the first tenant, the first
-  admin edits it from the start.
-- Visitors hold the **Visitor** role on that tenant and nothing else: the read
-  capabilities of a Viewer without `access.view` (who has access) and without
-  MCP tokens, and no tenant capabilities. It is never offered when giving
-  access and cannot be granted.
-- A request with no credentials at all is a visitor. A request with a bad or
-  expired sign-in still answers _sign in again_, so a session is renewed, never
-  quietly dropped to a visitor.
-- Signed-in people work in their own tenant only, as without a public tenant.
-- **Suspend** the public tenant on the [Platform page](#the-platform-page) to
-  close it within a minute: visitors are sent to sign in until it is resumed.
-- `frontend.sitemap.enabled` is allowed with sign-in only together with a
-  public tenant, and the sitemap then lists only its workspaces.
-- **Demo mode** (`api.env.DEMO_MODE: "true"`) still makes everything read-only
-  for everyone without the bypass key, editors included. Use it for a public
-  showcase whose content operators load with the bypass key; leave it off when
-  the public tenant's editors work in the app.
-
-To publish workspaces that were made without sign-in, copy them into the
-public tenant once (see [Turning sign-in on for an existing
-install](#turning-sign-in-on-for-an-existing-install)):
+A public workspace is read-only for everyone of its tenant without a grant
+on it and, in the first tenant (`iam.bootstrap.tenant`), for people who have
+not signed in. People make it public in its **Settings → Access** (needs
+`workspace.publish`: Workspace admin, Tenant admin); operators can do it for
+many at once:
 
 ```bash
 kubectl -n classifyre exec deploy/classifyre-api -- \
-  node dist/src/admin.js workspaces copy --to-tenant public --all
+  node dist/src/admin.js workspaces publish --tenant default --all
+kubectl -n classifyre exec deploy/classifyre-api -- \
+  node dist/src/admin.js workspaces publish --tenant default finance-ledger --off
 ```
 
-The all-in-one Docker image has no sign-in and no identity server, on
-purpose: everyone who reaches it uses every workspace, as if everything were
-public.
+- Visitors hold the read capabilities of a Viewer without `access.view` (who
+  has access), notifications and MCP tokens, and no tenant capabilities.
+  Anything more answers _sign in_ (401), which the app turns into the sign-in
+  page.
+- A request with no credentials at all is a visitor. A request with a bad or
+  expired sign-in still answers _sign in again_, so a session is renewed, never
+  quietly dropped to a visitor.
+- Anonymous requests never reach the identity server: the first tenant is
+  read from Classifyre's own database, at most once a minute.
+- **Suspend** the first tenant on the [Platform page](#the-platform-page) to
+  close its public workspaces within a minute.
+- `frontend.sitemap.enabled` lists only the first tenant's public workspaces.
+- A showcase is a first tenant whose workspaces are public; its editors sign
+  in to change them. There is no read-only mode for the whole installation.
+
+To publish workspaces of an install from before sign-in was always on, copy
+them into the first tenant and publish them (see [Workspaces made without
+sign-in](#workspaces-made-without-sign-in)):
+
+```bash
+kubectl -n classifyre exec deploy/classifyre-api -- \
+  node dist/src/admin.js workspaces copy --to-tenant default --all
+kubectl -n classifyre exec deploy/classifyre-api -- \
+  node dist/src/admin.js workspaces publish --tenant default --all
+```
 
 ---
 
 ## Where the data is
 
-With sign-in, every tenant has a **database of its own**, so it can be
+Every tenant has a **database of its own**, so it can be
 backed up, restored, moved and deleted on its own, and a mistake in one
 place never shows one tenant another's data:
 
 | Database                           | Holds                                                                                                      |
 | ---------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `classifyre` (`postgres.*.database`) | Everything made **without** sign-in. Used only while sign-in is off.                                       |
+| `classifyre` (`postgres.*.database`) | Only on installs from before sign-in was always on: what was made without it, until copied into a tenant. Classifyre no longer reads it. |
 | `classifyre_control` (`iam.controlDatabase`) | Tenants, their grants, people and activity, and the list of every tenant's workspaces. No workspace data. |
 | `classifyre_t_<tenant id>`         | One tenant's workspaces, made on its first workspace. Logged in with its own role, which opens no other database. |
 
@@ -298,25 +290,14 @@ restarting the API rotates them all.
 
 ---
 
-## Turning sign-in on or off
+## Workspaces made without sign-in
 
-Sign-in on and sign-in off use different databases, so switching it never
-opens a tenant's data to everyone:
-
-- **Sign-in off** uses only `classifyre`: the workspaces made without
-  sign-in. Tenants' workspaces are not there at all.
-- **Sign-in on** uses only the control database and the tenants' databases.
-  Workspaces made without sign-in stay out of sight until an operator copies
-  them into a tenant.
-
-Every database records what it is, and the API refuses to start on the wrong
-one, with a message that names what it found.
-
-### Turning sign-in on for an existing install
-
-Upgrade with `iam.enabled: true`. Once the API is up, the first tenant
-exists; copy the existing workspaces into it, with **Bring in workspaces** on
-the [Platform page](#the-platform-page) or from an API pod:
+Before sign-in was always on, an install could run without it, and kept its
+workspaces in the `classifyre` database. Classifyre now runs only on the
+control database and the tenants' databases, so after the upgrade those
+workspaces are out of sight until an operator copies them into a tenant, from
+an API pod (or the all-in-one container: `docker exec <container> sh -c 'cd
+/app/api && node dist/src/admin.js …'`):
 
 ```bash
 kubectl -n classifyre exec deploy/classifyre-api -- \
@@ -334,54 +315,27 @@ instead of `--all` to copy only some. What happens:
   owned by the tenant's `admins` group, or by the group you pass with
   `--owner-group <group id>`; its admins hand out access from there. Large
   workspaces take a while: the command prints each table as it goes.
-- The originals stay in `classifyre`, where sign-in off still finds them.
-  Delete them there once you are satisfied, with sign-in off.
+- The originals stay in `classifyre`. Drop that database once you are
+  satisfied.
 - Categories stay behind: the copies are filed under _General_ until a tenant
   admin files them again.
 - Queued background jobs are not copied; schedules are made again when the
   copy's workers start.
 - Names people typed in are kept on existing records. New changes are
-  attributed to the signed-in person; a typed-in name is ignored.
-- MCP tokens created before have no owner and stop working. People create new
-  ones after signing in; those act for them.
-- A sitemap is no longer allowed (`frontend.sitemap.enabled` must be off).
+  attributed to the signed-in person.
+- MCP tokens created without sign-in had no owner and are gone. People create
+  new ones after signing in; those act for them.
 
 Running API pods show a copy within a minute, and each one is in the
 tenant's **Activity**.
 
-### Installs that had sign-in on before tenants had their own databases
-
-Then the tenants and their workspaces are still in `classifyre`. After the
-upgrade the API starts on an empty control database, and sign-in off shows
-none of the tenants' workspaces either (it logs how many it hides). Move them
-once:
+The same command makes an empty workspace in a tenant, which the all-in-one
+image uses for its first one:
 
 ```bash
 kubectl -n classifyre exec deploy/classifyre-api -- \
-  node dist/src/admin.js tenants split --keep-source
+  node dist/src/admin.js workspaces create --tenant default --slug finance --name Finance
 ```
-
-It copies the tenants, their grants, people and activity to the control
-database and each tenant's workspaces, soft-deleted ones too, to the tenant's
-database, checking every table's row count. If it stops halfway, run it
-again: what was copied is skipped. With `--keep-source` the originals stay
-in `classifyre`; run it again without it to remove them once the tenants look
-right. Workspaces made without sign-in are never touched.
-
-### Copying a workspace out of a tenant
-
-To make a tenant's workspace reachable without sign-in, copy it to
-`classifyre`:
-
-```bash
-kubectl -n classifyre exec deploy/classifyre-api -- \
-  node dist/src/admin.js workspaces copy --to-local finance-ledger
-```
-
-The tenant keeps its own. A workspace reaches another tenant only through
-`classifyre`, never directly: copying it out and then in is two deliberate
-actions, each in the tenant's activity. Its address must be free in the
-target; rename one of them first if it is not.
 
 ---
 

@@ -4,11 +4,7 @@ import {
   BUILTIN_MCP_PREFIX,
   CHAT_BOT_STATE_KEY,
 } from './builtin-mcp-tool-adapter';
-import {
-  allowedBuiltinToolNames,
-  chatMutationsAllowed,
-  withChatBotGate,
-} from './chat-permissions';
+import { allowedBuiltinToolNames, withChatBotGate } from './chat-permissions';
 import { runChatTurn } from './chat-agent-loop';
 import type { AgentLoopDeps } from '../autopilot/harness/agent-loop';
 import type { AgentContext } from '../autopilot/autopilot.types';
@@ -16,7 +12,6 @@ import type { Tool, ToolContext } from '../autopilot/tools/tool.types';
 
 function makeToolContext(botState?: {
   id: string;
-  allowMutations: boolean;
   agentKinds: string[];
 }): ToolContext {
   return {
@@ -61,22 +56,16 @@ describe('adaptBuiltinMcpTool', () => {
     expect(typeof tool.resolveGate).toBe('function');
   });
 
-  it('gates mutations on the invoking bot allowMutations flag', async () => {
+  it('never lets a chat bot run a mutation', async () => {
     const tool = adaptBuiltinMcpTool({
       remote: { name: 'delete_source' },
       call,
     });
-    const allowed = await tool.resolveGate!(
+    const bot = await tool.resolveGate!(
       {},
-      makeToolContext({ id: 'b1', allowMutations: true, agentKinds: [] }),
+      makeToolContext({ id: 'b1', agentKinds: [] }),
     );
-    expect(allowed.mode).toBe(AiManagementMode.MANAGED);
-
-    const readOnlyBot = await tool.resolveGate!(
-      {},
-      makeToolContext({ id: 'b1', allowMutations: false, agentKinds: [] }),
-    );
-    expect(readOnlyBot.mode).toBe(AiManagementMode.OBSERVE_ONLY);
+    expect(bot.mode).toBe(AiManagementMode.OBSERVE_ONLY);
 
     // No chat-bot state (e.g. an autopilot mission) → fail closed.
     const noBot = await tool.resolveGate!({}, makeToolContext());
@@ -84,21 +73,15 @@ describe('adaptBuiltinMcpTool', () => {
   });
 });
 
-describe('chat bots with sign-in', () => {
-  it('may change things only when allowed and sign-in is off', () => {
-    expect(chatMutationsAllowed({ allowMutations: true }, false)).toBe(true);
-    expect(chatMutationsAllowed({ allowMutations: false }, false)).toBe(false);
-    expect(chatMutationsAllowed({ allowMutations: true }, true)).toBe(false);
-  });
-
-  it('turns a write tool into observe-only when mutations are off', async () => {
+describe('chat bots', () => {
+  it('turn every write tool into observe-only', async () => {
     const tool = withChatBotGate({
       name: 'cases.close',
       sideEffect: 'mutate',
     } as unknown as Tool);
     const gate = await tool.resolveGate!(
       {},
-      makeToolContext({ id: 'b1', allowMutations: false, agentKinds: [] }),
+      makeToolContext({ id: 'b1', agentKinds: [] }),
     );
     expect(gate.mode).toBe(AiManagementMode.OBSERVE_ONLY);
   });

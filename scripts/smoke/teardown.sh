@@ -15,7 +15,7 @@ kubectl -n "$NS" exec -i "deploy/$RELEASE-iam" -c iam -- env ADMIN_PW="$ADMIN_PW
 K=/opt/keycloak/bin/kcadm.sh
 R=classifyre
 $K config credentials --server http://localhost:8080/iam --realm master --user admin --password "$ADMIN_PW" >/dev/null
-for name in smoke-admin smoke-viewer smoke-publisher; do
+for name in smoke-admin smoke-viewer; do
   id=$($K get users -r $R -q "username=$name" -q exact=true --fields id --format csv --noquotes | head -1)
   [ -z "$id" ] || $K delete "users/$id" -r $R
 done

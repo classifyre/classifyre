@@ -1,21 +1,31 @@
 ---
 title: Getting started with sign-in
 sidebarTitle: Getting started
-description: The first sign-in after installing the Helm chart — where the first password is, how to reach the identity console, and how to add the first group, person and grant.
+description: The first sign-in after installing Classifyre with the Helm chart or the Docker image — where the first password is, how to change it, how to reach the identity console, and how to add the first group, person and grant.
 ---
 
 import { Callout, Steps } from "nextra/components";
 
 # Getting started with sign-in
 
-This page takes a fresh Helm install from its first sign-in to a second
-person working in a workspace. It assumes the chart's defaults: release and
-namespace `classifyre`, sign-in on, the first tenant `default`. For what the
-words mean, see the [Overview](/access/).
+This page takes a fresh install from its first sign-in to a second person
+working in a workspace. Sign-in is always on. For the Helm chart it assumes
+the defaults: release and namespace `classifyre`, the first tenant `default`.
+For what the words mean, see the [Overview](/access/).
+
+<Callout type="info">
+  **The all-in-one Docker image** signs you in as `classifyre` with the
+  password `classifyre` (both changeable with `CLASSIFYRE_ADMIN_USER` and
+  `CLASSIFYRE_ADMIN_PASSWORD` before the first start). That account is the
+  first tenant admin and an operator, and the identity server's own
+  administrator too. Change the password once you are in: account menu →
+  **Your account** → **Account security** → **Signing in** → **Update**. Then continue with
+  [Open the identity console](#open-the-identity-console).
+</Callout>
 
 <Steps>
 
-### Find the first password
+### Find the first password (Helm)
 
 The chart creates one account: the first tenant admin, `admin`
 (`iam.bootstrap.admin.username`). It is also an **operator**, the person who

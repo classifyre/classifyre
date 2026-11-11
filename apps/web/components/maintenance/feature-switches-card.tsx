@@ -1,5 +1,6 @@
 "use client";
 
+import { useCan } from "@/hooks/use-me";
 import * as React from "react";
 import Link from "next/link";
 import {
@@ -35,8 +36,6 @@ import { toast } from "sonner";
 import type { TranslationKey } from "@/i18n";
 import { useTranslation } from "@/hooks/use-translation";
 import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
-import { useServerConfig } from "@/components/server-config-provider";
-import { useInstanceSettings } from "@/components/instance-settings-provider";
 import { useNsPath } from "@/lib/ns-path";
 import { formatDate } from "@/lib/date";
 import { emitStorageChanged } from "@/lib/storage-events";
@@ -100,9 +99,8 @@ type Pending =
 export function FeatureSwitchesCard() {
   const { t } = useTranslation();
   const nsPath = useNsPath();
-  const serverConfig = useServerConfig();
-  const { settings } = useInstanceSettings();
-  const demoMode = serverConfig.demoMode || settings.demoMode;
+  // Without the right to change it, the control is shown but cannot run.
+  const readOnly = !useCan("workspace.settings");
   const { features, loading, failed, refresh } = useWorkspaceFeatures();
 
   const [pending, setPending] = React.useState<Pending | null>(null);
@@ -193,7 +191,7 @@ export function FeatureSwitchesCard() {
   }, [features, follow]);
 
   const apply = async () => {
-    if (!pending || demoMode) return;
+    if (!pending || readOnly) return;
     const { kind, feature } = pending;
     const key = feature.key;
     const deleteData = kind === "delete" || (kind === "off" && deleteChoice);
@@ -323,7 +321,7 @@ export function FeatureSwitchesCard() {
               size="sm"
               variant="outline"
               className="mt-1 h-7 gap-1 rounded-[4px] text-[11px]"
-              disabled={demoMode || busy}
+              disabled={readOnly || busy}
               onClick={() => setPending({ kind: "delete", feature })}
             >
               <Trash2 className="h-3 w-3" aria-hidden />
@@ -337,7 +335,7 @@ export function FeatureSwitchesCard() {
           ) : null}
           <Switch
             checked={feature.enabled}
-            disabled={demoMode || busy}
+            disabled={readOnly || busy}
             aria-label={t("features.switchLabel", { name: name(key) })}
             data-testid={`feature-switch-${key}`}
             onCheckedChange={(checked) => {

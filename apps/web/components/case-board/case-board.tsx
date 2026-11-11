@@ -22,13 +22,13 @@ import {
 } from "@workspace/ui/components/alert-dialog";
 import { useRegisterAssistantBridge } from "@/components/assistant-workflow-provider";
 import { useEntityDocumentTitle } from "@/components/document-title-updater";
-import { useServerConfig } from "@/components/server-config-provider";
 import { RunAutopilotDialog } from "@/components/autopilot/run-autopilot-dialog";
 import { FindingFilterDialog } from "@/components/case-cleanup/finding-filter-dialog";
 import { useFullBleedHeight } from "@/hooks/use-full-bleed-height";
 import { useTranslation } from "@/hooks/use-translation";
 import { BoardProviders, useBoard, useBoardStore, useUi, useUiStore } from "./store/board-context";
-import { createBoardStore } from "./store/board-store";
+import { createBoardStore, setBoardActor } from "./store/board-store";
+import { useMe } from "@/hooks/use-me";
 import { createUiStore, writePanelWidth } from "./store/ui-store";
 import { addNote, combine, moveItems, resetFindingPositions, type Move } from "./store/commands";
 import { parseFindingNodeId } from "./store/relations";
@@ -39,7 +39,6 @@ import { CommandPalette } from "./ui/command-palette";
 import { BoardDrawers } from "./drawers/board-drawers";
 import { PanelRail } from "./ui/panel-rail";
 import { useVisibleCentre } from "./hooks/use-visible-centre";
-import { primeActorName } from "./hooks/use-actor-name";
 import { elkLayout } from "./hooks/elk-layout";
 import { layoutBox } from "./hooks/use-auto-place";
 import { boardFileName, exportBoardPng, untilMeasured } from "./hooks/export-board";
@@ -60,11 +59,33 @@ const POLL_MS = 60_000;
  * right edge), so the canvas shrinks instead of being covered.
  */
 export function CaseBoard({ caseId }: { caseId: string }) {
-  const { demoMode } = useServerConfig();
-  const [stores] = React.useState(() => {
-    primeActorName();
-    return { board: createBoardStore(caseId, { demo: demoMode }), ui: createUiStore() };
-  });
+  const me = useMe();
+  // What the person may do decides whether the board opens for editing, so
+  // it opens once that is known.
+  if (!me) return null;
+  return (
+    <LoadedCaseBoard
+      caseId={caseId}
+      actorId={me.actor.id}
+      viewOnly={!(me.capabilities as string[]).includes("case.edit")}
+    />
+  );
+}
+
+function LoadedCaseBoard({
+  caseId,
+  actorId,
+  viewOnly,
+}: {
+  caseId: string;
+  actorId: string | null;
+  viewOnly: boolean;
+}) {
+  React.useEffect(() => setBoardActor(actorId), [actorId]);
+  const [stores] = React.useState(() => ({
+    board: createBoardStore(caseId, { viewOnly }),
+    ui: createUiStore(),
+  }));
   React.useEffect(() => stores.board.getState().connect(), [stores]);
 
   return (
@@ -83,8 +104,8 @@ function BoardShell({ caseId }: { caseId: string }) {
   const flyTo = useFlyTo();
   const loaded = useBoard((s) => s.loaded);
   const loadError = useBoard((s) => s.loadError);
-  // Read-only because the case is closed (a demo instance is read-only too,
-  // and says so in its own banner).
+  // Read-only because the case is closed (a board someone may only view is
+  // read-only too, without a notice: their whole workspace reads that way).
   const closed = useBoard((s) => s.caseStatus === "CLOSED" || s.caseStatus === "ARCHIVED");
   const notice = useBoard((s) => s.notice);
   const isEmpty = useBoard((s) => s.items.size === 0);

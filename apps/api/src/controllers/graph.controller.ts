@@ -27,7 +27,7 @@ import {
   UpdateEdgeDto,
 } from '../dto/graph.dto';
 import { InternalOnly } from '../internal-only.decorator';
-import { AllowInDemoMode } from '../demo-mode.decorator';
+import { ReadsOnly } from '../reads-only.decorator';
 import { ReadOnlyEndpoint } from '../db/read-only-endpoint.decorator';
 import { AccessArea } from '../identity/access.decorators';
 
@@ -37,7 +37,7 @@ import { AccessArea } from '../identity/access.decorators';
 export class GraphController {
   constructor(private readonly graphService: GraphService) {}
 
-  @AllowInDemoMode()
+  @ReadsOnly()
   @ReadOnlyEndpoint()
   @Post('lineage')
   @HttpCode(HttpStatus.OK)
@@ -59,7 +59,7 @@ export class GraphController {
     return this.graphService.lineage(dto);
   }
 
-  @AllowInDemoMode()
+  @ReadsOnly()
   @ReadOnlyEndpoint()
   @Post('lineage/column')
   @HttpCode(HttpStatus.OK)
@@ -78,7 +78,7 @@ export class GraphController {
     return this.graphService.columnLineage(dto);
   }
 
-  @AllowInDemoMode()
+  @ReadsOnly()
   @Post('expand')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -89,7 +89,7 @@ export class GraphController {
     return this.graphService.expand(dto);
   }
 
-  @AllowInDemoMode()
+  @ReadsOnly()
   @Post('pivot')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({

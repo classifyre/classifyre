@@ -1,4 +1,8 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  ApiHideProperty,
+  ApiProperty,
+  ApiPropertyOptional,
+} from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsArray,
@@ -55,7 +59,8 @@ export class CreateCaseEventDto {
   @IsString({ each: true })
   evidenceIds?: string[];
 
-  @ApiPropertyOptional({ description: 'Actor recorded as createdBy' })
+  // Set by the server from the signed-in person; never sent by clients.
+  @ApiHideProperty()
   @IsOptional()
   @IsString()
   createdBy?: string;
@@ -109,7 +114,8 @@ export class UpdateCaseEventDto {
   @IsBoolean()
   verified?: boolean;
 
-  @ApiPropertyOptional()
+  // Set by the server from the signed-in person; never sent by clients.
+  @ApiHideProperty()
   @IsOptional()
   @IsString()
   updatedBy?: string;

@@ -73,7 +73,6 @@ spec:
               protocol: TCP
           env:
             {{- include "classifyre.iam.env" . | nindent 12 }}
-            {{- if .Values.iam.enabled }}
             - name: IAM_WEB_CLIENT_ID
               value: classifyre-web
             - name: IAM_WEB_CLIENT_SECRET
@@ -81,13 +80,10 @@ spec:
                 secretKeyRef:
                   name: {{ include "classifyre.iam.secretName" . }}
                   key: web-client-secret
-            {{- end }}
             - name: API_URL
               value: {{ printf "http://%s:%v" (include "classifyre.api.fullname" .) .Values.api.service.port | quote }}
             - name: S3_CONFIGURED
               value: {{ .Values.objectStorage.enabled | quote }}
-            - name: DEMO_MODE
-              value: {{ default "false" (index .Values.api.env "DEMO_MODE") | quote }}
             {{- range $key, $value := .Values.frontend.env }}
             - name: {{ $key }}
               value: {{ $value | quote }}

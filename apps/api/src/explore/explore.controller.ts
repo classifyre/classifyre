@@ -15,7 +15,7 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { AllowInDemoMode } from '../demo-mode.decorator';
+import { ReadsOnly } from '../reads-only.decorator';
 import { ReadOnlyEndpoint } from '../db/read-only-endpoint.decorator';
 import {
   ExploreNeighbourhoodRequestDto,
@@ -41,7 +41,7 @@ export class ExploreController {
     private readonly views: ExploreViewsService,
   ) {}
 
-  @AllowInDemoMode()
+  @ReadsOnly()
   @ReadOnlyEndpoint()
   @Post('neighbourhood')
   @HttpCode(HttpStatus.OK)
@@ -62,7 +62,7 @@ export class ExploreController {
     return this.explore.neighbourhood(body);
   }
 
-  @AllowInDemoMode()
+  @ReadsOnly()
   @ReadOnlyEndpoint()
   @Post('find')
   @HttpCode(HttpStatus.OK)
@@ -78,7 +78,7 @@ export class ExploreController {
     return this.explore.find(body);
   }
 
-  @AllowInDemoMode()
+  @ReadsOnly()
   @ReadOnlyEndpoint()
   @Get('starters')
   @ApiOperation({
@@ -92,7 +92,7 @@ export class ExploreController {
     return this.explore.starters();
   }
 
-  @AllowInDemoMode()
+  @ReadsOnly()
   @ReadOnlyEndpoint()
   @Get('views')
   @ApiOperation({
@@ -106,7 +106,7 @@ export class ExploreController {
     return this.views.list();
   }
 
-  @AllowInDemoMode()
+  @ReadsOnly()
   @ReadOnlyEndpoint()
   @Get('views/:id')
   @ApiOperation({ summary: 'One saved Explore view' })

@@ -24,7 +24,7 @@ function initials(name: string | null | undefined): string {
 
 /**
  * The signed-in person, their tenant, and sign-out. Only rendered with sign-in.
- * Someone browsing the public tenant without signing in gets Sign in instead.
+ * Someone reading public workspaces without signing in gets Sign in instead.
  */
 export function AccountMenu() {
   const { t } = useTranslation();

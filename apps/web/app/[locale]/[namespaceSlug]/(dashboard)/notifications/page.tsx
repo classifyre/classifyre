@@ -56,6 +56,7 @@ import {
 import { formatRelative, formatShortUTC } from "@/lib/date";
 import { useNotificationsWebSocket } from "@/hooks/use-notifications-websocket";
 import { useTranslation } from "@/hooks/use-translation";
+import { useMe } from "@/hooks/use-me";
 import { ActorName } from "@/components/actor-chip";
 
 type ListNotificationsRequest = NonNullable<
@@ -124,6 +125,24 @@ function getPageItems(current: number, total: number) {
 }
 
 export default function NotificationsPage() {
+  const me = useMe();
+  // Notifications go to groups; a visitor is in none (docs/prd/IAM §6.4).
+  if (me && !(me.capabilities as string[]).includes("notification.view")) {
+    return <NoNotifications />;
+  }
+  return <NotificationsInbox />;
+}
+
+function NoNotifications() {
+  const { t } = useTranslation();
+  return (
+    <p className="p-6 text-sm text-muted-foreground" data-testid="notifications-none">
+      {t("notificationAudiences.notForYou")}
+    </p>
+  );
+}
+
+function NotificationsInbox() {
   const { t } = useTranslation();
   const [notifications, setNotifications] = useState<NotificationResponseDto[]>(
     [],

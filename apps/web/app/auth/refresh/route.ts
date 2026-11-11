@@ -18,7 +18,6 @@ import {
  */
 export async function POST(request: NextRequest) {
   const config = iamWebConfig();
-  if (!config) return new NextResponse(null, { status: 404 });
 
   let tokens: TokenSet | null;
   try {

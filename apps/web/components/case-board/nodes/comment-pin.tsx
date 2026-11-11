@@ -5,7 +5,7 @@ import { type NodeProps } from "@xyflow/react";
 import { formatDistanceToNowStrict } from "date-fns";
 import { Check, Loader2, RotateCcw, Send } from "lucide-react";
 import { toast } from "sonner";
-import { api, getActorName, type ThreadEntryDto } from "@workspace/api-client";
+import { api, type ThreadEntryDto } from "@workspace/api-client";
 import { Popover, PopoverAnchor, PopoverContent } from "@workspace/ui/components/popover";
 import { Button } from "@workspace/ui/components/button";
 import { Textarea } from "@workspace/ui/components/textarea";
@@ -123,7 +123,7 @@ function CommentThread({
     try {
       await api.threads.caseThreadsControllerAddEntry({
         id: threadId,
-        addThreadEntryDto: { entryType: "NOTE", body, author: getActorName() },
+        addThreadEntryDto: { entryType: "NOTE", body },
       });
       setReply("");
       await load();

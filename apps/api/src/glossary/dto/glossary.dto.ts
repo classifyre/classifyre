@@ -1,4 +1,8 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  ApiHideProperty,
+  ApiProperty,
+  ApiPropertyOptional,
+} from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -231,10 +235,8 @@ export class UpsertGlossaryTermDto {
   @IsString()
   refId?: string;
 
-  @ApiPropertyOptional({
-    description:
-      'Operator identity recorded as approver. Defaults to the X-Actor-Name header or "operator".',
-  })
+  // Set by the server from the signed-in person; never sent by clients.
+  @ApiHideProperty()
   @IsOptional()
   @IsString()
   author?: string;

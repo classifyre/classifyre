@@ -100,12 +100,14 @@ describe('route access completeness', () => {
     expect(unknown).toEqual([]);
   });
 
-  it('keeps public routes to health and crawler files', () => {
+  it('keeps public routes to health, crawler files and the query callback', () => {
     const publicRoutes = routes
       .filter((route) => route.access?.kind === 'public')
       .map((route) => `${route.controller}.${route.handler}`)
       .sort();
     expect(publicRoutes).toEqual([
+      // A query job's result: checked against the run's own token instead.
+      'DataQueryController.receive',
       'HealthController.getHealth',
       'HealthController.ping',
       'SitemapController.getEntries',
@@ -157,5 +159,37 @@ describe('built-in roles', () => {
       BUILT_IN_ROLES.flatMap((role) => [...role.capabilities]),
     );
     expect(CAPABILITY_IDS.filter((id) => !granted.has(id))).toEqual([]);
+  });
+
+  it("give notification.view to every workspace/tenant role but the visitor's (IAM §6.4)", () => {
+    // platform-operator never acts in a workspace, so it carries no
+    // workspace capabilities.
+    for (const role of BUILT_IN_ROLES) {
+      if (role.key === 'visitor' || role.key === 'platform-operator') {
+        expect(role.capabilities).not.toContain('notification.view');
+      } else {
+        expect(role.capabilities).toContain('notification.view');
+      }
+    }
+  });
+
+  it('give workspace.publish only to Workspace admin, Workspace manager and Tenant admin', () => {
+    // Pinned so a future workspace capability added next to `code.author`
+    // cannot silently grant publish again: publish arrives only through the
+    // WORKSPACE_ADMIN derivation and the tenant-admin bundle.
+    for (const role of BUILT_IN_ROLES) {
+      const has = (role.capabilities as readonly string[]).includes(
+        'workspace.publish',
+      );
+      if (
+        role.key === 'workspace-admin' ||
+        role.key === 'workspace-manager' ||
+        role.key === 'tenant-admin'
+      ) {
+        expect(has).toBe(true);
+      } else {
+        expect(has).toBe(false);
+      }
+    }
   });
 });

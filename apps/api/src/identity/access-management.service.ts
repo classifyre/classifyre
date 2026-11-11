@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ConflictException,
   ForbiddenException,
   Inject,
   Injectable,
@@ -18,6 +17,7 @@ import {
   type GrantScopeType,
   type Tenant,
 } from './tenancy.service';
+import { PrismaService } from '../prisma.service';
 
 export interface GrantInput extends GrantScope {
   /** Always a group: people get access by being in one. */
@@ -33,6 +33,8 @@ export interface GrantView extends Grant {
   scopeLabel: string;
   /** True when the grant comes from the tenant or a group, not this workspace. */
   inherited?: boolean;
+  /** For a table grant: the source the table belongs to. */
+  sourceId?: string;
   createdBy?: string | null;
   createdAt?: Date;
 }
@@ -43,13 +45,30 @@ const ROLE_SCOPES: Record<string, GrantScopeType[]> = Object.fromEntries(
     role.key,
     role.key === 'workspace-manager'
       ? ['group', 'tenant']
-      : role.scope === 'workspace'
-        ? ['workspace', 'group', 'tenant']
-        : role.scope === 'tenant'
-          ? ['tenant']
-          : [],
+      : role.key === 'data-reader'
+        ? // Data access is the one thing given on a single source or table.
+          ['workspace', 'group', 'tenant', 'source', 'asset']
+        : role.scope === 'workspace'
+          ? ['workspace', 'group', 'tenant']
+          : role.scope === 'tenant'
+            ? ['tenant']
+            : [],
   ]),
 );
+
+function isResourceScope(scopeType: GrantScopeType): boolean {
+  return scopeType === 'source' || scopeType === 'asset';
+}
+
+/** The workspace a resource grant's scope id (`<namespaceId>/<id>`) is in. */
+function resourceWorkspace(scopeId: string): string {
+  return scopeId.split('/')[0] ?? '';
+}
+
+/** The source or table id in a resource grant's scope id. */
+function resourceIdOf(scopeId: string): string {
+  return scopeId.split('/').slice(1).join('/');
+}
 
 /**
  * Giving and removing access (docs/prd §10 item 11, §12.4). A grant can never
@@ -60,18 +79,9 @@ const ROLE_SCOPES: Record<string, GrantScopeType[]> = Object.fromEntries(
 export class AccessManagementService {
   constructor(
     private readonly tenancy: TenancyService,
-    @Inject(IDENTITY) private readonly identity: IdentityService | null,
+    @Inject(IDENTITY) readonly identity: IdentityService,
+    private readonly prisma: PrismaService,
   ) {}
-
-  /** The identity service; a 409 explaining why when sign-in is off. */
-  requireSignIn(): IdentityService {
-    if (!this.identity) {
-      throw new ConflictException(
-        'Sign-in is off: everyone can do everything, so there is no access to manage.',
-      );
-    }
-    return this.identity;
-  }
 
   roles() {
     return BUILT_IN_ROLES.filter(
@@ -84,14 +94,24 @@ export class AccessManagementService {
     }));
   }
 
-  tenantEvents(principal: Principal) {
-    this.requireSignIn();
-    return this.tenancy.tenantEvents(principal.tenant.id);
+  tenantEvents(
+    principal: Principal,
+    query?: {
+      action?: string;
+      actor?: string;
+      search?: string;
+      skip?: number;
+      limit?: number;
+      sortBy?: 'OCCURRED_AT' | 'ACTOR' | 'ACTION';
+      sortOrder?: 'ASC' | 'DESC';
+    },
+  ) {
+    return this.tenancy.tenantEvents(principal.tenant.id, query);
   }
 
   /** Every tenant the principal belongs to, for the account menu's switcher (§12.2). */
   async tenants(principal: Principal): Promise<Tenant[]> {
-    const identity = this.requireSignIn();
+    const identity = this.identity;
     if (principal.visitor) return [];
     const { organizations } = await identity.membership.membership(
       principal.sub,
@@ -106,7 +126,7 @@ export class AccessManagementService {
 
   /** For the access screens: always as the identity server has them now. */
   async groups(principal: Principal) {
-    const groups = await this.requireSignIn().groupsOf(principal, true);
+    const groups = await this.identity.groupsOf(principal, true);
     return groups.map(({ id, name, path, parentId }) => ({
       id,
       name,
@@ -120,15 +140,19 @@ export class AccessManagementService {
     principal: Principal,
     namespaceId: string,
   ): Promise<GrantView[]> {
-    const identity = this.requireSignIn();
+    const identity = this.identity;
     const lineage = await identity.ownerLineage(principal, namespaceId);
     const grants = (await this.tenancy.listGrants(principal.tenant.id)).filter(
-      (grant) => grantApplies(grant, { namespaceId, ownerLineage: lineage }),
+      (grant) =>
+        grantApplies(grant, { namespaceId, ownerLineage: lineage }) ||
+        (isResourceScope(grant.scopeType) &&
+          resourceWorkspace(grant.scopeId) === namespaceId),
     );
     return this.label(
       principal,
       grants,
-      (grant) => grant.scopeType !== 'workspace',
+      (grant) =>
+        grant.scopeType !== 'workspace' && !isResourceScope(grant.scopeType),
     );
   }
 
@@ -145,10 +169,7 @@ export class AccessManagementService {
     namespaceId: string,
     capability: Capability,
   ): Promise<GrantView[]> {
-    const lineage = await this.requireSignIn().ownerLineage(
-      principal,
-      namespaceId,
-    );
+    const lineage = await this.identity.ownerLineage(principal, namespaceId);
     const giving = principal.grants.filter(
       (grant) =>
         grantApplies(grant, { namespaceId, ownerLineage: lineage }) &&
@@ -166,7 +187,7 @@ export class AccessManagementService {
     input: GrantInput,
     granterCapabilities: ReadonlySet<Capability>,
   ): Promise<GrantView> {
-    const identity = this.requireSignIn();
+    const identity = this.identity;
     // The DTO says so too; a caller that skips validation still gets told.
     if ((input.subjectType as string) !== 'group') {
       throw new BadRequestException(
@@ -203,10 +224,22 @@ export class AccessManagementService {
     if (input.scopeType === 'tenant' && input.scopeId !== principal.tenant.id) {
       throw new BadRequestException('A tenant grant is on your own tenant.');
     }
-    if (input.scopeType === 'workspace') {
-      const tenancy = await this.tenancy.workspaceTenancy(input.scopeId);
+    if (input.scopeType === 'workspace' || isResourceScope(input.scopeType)) {
+      const namespaceId =
+        input.scopeType === 'workspace'
+          ? input.scopeId
+          : resourceWorkspace(input.scopeId);
+      if (
+        isResourceScope(input.scopeType) &&
+        !/^[^/]+\/[^/]+$/.test(input.scopeId)
+      ) {
+        throw new BadRequestException(
+          'A grant on a source or table is scoped as <workspace id>/<id>.',
+        );
+      }
+      const tenancy = await this.tenancy.workspaceTenancy(namespaceId);
       if (tenancy?.tenantId !== principal.tenant.id) {
-        throw new NotFoundException(`Unknown namespace '${input.scopeId}'`);
+        throw new NotFoundException(`Unknown namespace '${namespaceId}'`);
       }
     }
 
@@ -273,13 +306,17 @@ export class AccessManagementService {
     principal: Principal,
     id: string,
     onlyWorkspace?: string,
-  ): Promise<void> {
-    this.requireSignIn();
+  ): Promise<GrantView> {
     const grant = await this.tenancy.grantById(principal.tenant.id, id);
     if (
       !grant ||
       (onlyWorkspace &&
-        (grant.scopeType !== 'workspace' || grant.scopeId !== onlyWorkspace))
+        !(
+          (grant.scopeType === 'workspace' &&
+            grant.scopeId === onlyWorkspace) ||
+          (isResourceScope(grant.scopeType) &&
+            resourceWorkspace(grant.scopeId) === onlyWorkspace)
+        ))
     ) {
       throw new NotFoundException('No such grant here.');
     }
@@ -297,6 +334,10 @@ export class AccessManagementService {
         scopeId: grant.scopeId,
       },
     );
+    // What was removed, labelled like the list: the trail names it and the
+    // caller can say what went.
+    const [view] = await this.label(principal, [grant]);
+    return view;
   }
 
   private async label<T extends Grant>(
@@ -304,20 +345,75 @@ export class AccessManagementService {
     grants: T[],
     inherited?: (grant: T) => boolean,
   ): Promise<(T & GrantView)[]> {
-    const identity = this.requireSignIn();
+    const identity = this.identity;
     const groups = new Map(
       (await identity.groupsOf(principal, true)).map((g) => [g.id, g.path]),
     );
-    return grants.map((grant) => ({
-      ...grant,
-      subjectLabel: groups.get(grant.subjectId) ?? 'Removed group',
-      scopeLabel:
-        grant.scopeType === 'tenant'
-          ? principal.tenant.name
-          : grant.scopeType === 'group'
-            ? `Workspaces of ${groups.get(grant.scopeId) ?? 'a removed group'}`
-            : 'This workspace',
-      ...(inherited ? { inherited: inherited(grant) } : {}),
-    }));
+    // Single-resource grants name their source or table, so the access
+    // screens and the audit trail read without extra lookups.
+    const resources = await this.resources(grants);
+    return grants.map((grant) => {
+      const resource = isResourceScope(grant.scopeType)
+        ? resources.get(`${grant.scopeType}/${resourceIdOf(grant.scopeId)}`)
+        : undefined;
+      return {
+        ...grant,
+        subjectLabel: groups.get(grant.subjectId) ?? 'Removed group',
+        scopeLabel:
+          grant.scopeType === 'tenant'
+            ? principal.tenant.name
+            : grant.scopeType === 'group'
+              ? `Workspaces of ${groups.get(grant.scopeId) ?? 'a removed group'}`
+              : (resource?.name ??
+                (grant.scopeType === 'source'
+                  ? 'One source'
+                  : grant.scopeType === 'asset'
+                    ? 'One table'
+                    : 'This workspace')),
+        ...(resource?.sourceId ? { sourceId: resource.sourceId } : {}),
+        ...(inherited ? { inherited: inherited(grant) } : {}),
+      };
+    });
+  }
+
+  /**
+   * Single-source/table grant scopes (`source/<id>`, `asset/<id>`) → the
+   * source or table name, and a table's source, batched in two reads of the
+   * current workspace. Deleted resources (or ones of another workspace in a
+   * tenant-wide list) stay absent, and the generic labels apply.
+   */
+  private async resources(
+    grants: Grant[],
+  ): Promise<Map<string, { name: string; sourceId?: string }>> {
+    const sourceIds = new Set<string>();
+    const assetIds = new Set<string>();
+    for (const grant of grants) {
+      if (grant.scopeType === 'source')
+        sourceIds.add(resourceIdOf(grant.scopeId));
+      if (grant.scopeType === 'asset')
+        assetIds.add(resourceIdOf(grant.scopeId));
+    }
+    const out = new Map<string, { name: string; sourceId?: string }>();
+    if (sourceIds.size) {
+      const rows = await this.prisma.source
+        .findMany({
+          where: { id: { in: [...sourceIds] } },
+          select: { id: true, name: true },
+        })
+        .catch(() => []);
+      for (const row of rows) out.set(`source/${row.id}`, { name: row.name });
+    }
+    if (assetIds.size) {
+      const rows = await this.prisma.asset
+        .findMany({
+          where: { id: { in: [...assetIds] } },
+          select: { id: true, name: true, sourceId: true },
+        })
+        .catch(() => []);
+      for (const row of rows) {
+        out.set(`asset/${row.id}`, { name: row.name, sourceId: row.sourceId });
+      }
+    }
+    return out;
   }
 }

@@ -37,13 +37,9 @@ Two modes:
 
 ## Sign-in (iam)
 
-Sign-in is off on the dev stack by default. Start with it on:
-
-```bash
-CLASSIFYRE_IAM=true ./scripts/dev/start.sh
-```
-
-The `iam` skaffold profile adds `helm/develop/values-dev-iam.yaml` and
+Sign-in is always on, on the dev stack too. `./scripts/dev/start.sh` deploys
+the identity server with the rest (its settings are in
+`helm/develop/values-dev.yaml`) and
 port-forwards the identity server's service to `localhost:8280/iam` for the
 local web server's (`./scripts/dev/web-iam.sh`) token calls. The browser
 does not use the ingress for sign-in: the web app is not deployed in-cluster
@@ -64,7 +60,7 @@ Default → Members**, and to a group under **Organizations → Default → Grou
 Groups made under the realm's own **Groups** menu are not used by Classifyre;
 a user in no organization sees a "not in a tenant yet" page.
 
-Run the web app with sign-in in a second terminal. Its `/iam` proxy serves
+Run the web app in a second terminal. Its `/iam` proxy serves
 the browser and its server-side token calls need the identity server, so
 `web-iam.sh` points the issuer at the local server and the token calls at
 the skaffold port-forward. The script reads the web client's secret from
@@ -74,11 +70,11 @@ the cluster:
 ./scripts/dev/web-iam.sh
 ```
 
-Starting again without `CLASSIFYRE_IAM=true` turns it off; the `iam` database
-and the `classifyre-iam` Secret both stay for next time (the identity server
-keeps the admin password it was first started with, so the two must match).
-Turning sign-in on moves every workspace into the `default` tenant, owned by
-its `admins` group; with sign-in off they are all visible again as before.
+The `iam` database and the `classifyre-iam` Secret both outlive the release
+(the identity server keeps the admin password it was first started with, so
+the two must match). Workspaces made on an older dev stack without sign-in
+are still in the open `classifyre` database; copy them into a tenant with
+`bun src/admin.ts workspaces copy --to-tenant default --all` in the API pod.
 
 To check every access case of the plan at once, run the persona suite. It
 installs its own throwaway release next to the dev stack, so it never touches

@@ -67,12 +67,6 @@ export interface UpdateCaseEventDto {
      * @memberof UpdateCaseEventDto
      */
     verified?: boolean;
-    /**
-     * 
-     * @type {string}
-     * @memberof UpdateCaseEventDto
-     */
-    updatedBy?: string;
 }
 
 
@@ -112,7 +106,6 @@ export function UpdateCaseEventDtoFromJSONTyped(json: any, ignoreDiscriminator: 
         'findingIds': json['findingIds'] == null ? undefined : json['findingIds'],
         'evidenceIds': json['evidenceIds'] == null ? undefined : json['evidenceIds'],
         'verified': json['verified'] == null ? undefined : json['verified'],
-        'updatedBy': json['updatedBy'] == null ? undefined : json['updatedBy'],
     };
 }
 
@@ -135,7 +128,6 @@ export function UpdateCaseEventDtoToJSONTyped(value?: UpdateCaseEventDto | null,
         'findingIds': value['findingIds'],
         'evidenceIds': value['evidenceIds'],
         'verified': value['verified'],
-        'updatedBy': value['updatedBy'],
     };
 }
 

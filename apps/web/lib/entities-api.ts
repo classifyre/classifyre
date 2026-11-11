@@ -1,4 +1,4 @@
-import { getActorName, getNamespacedApiBaseUrl } from "@workspace/api-client";
+import { getNamespacedApiBaseUrl } from "@workspace/api-client";
 import {
   request,
   type EntityType,
@@ -280,12 +280,8 @@ export async function downloadEntityMentions(
   idOrKey: string,
   format: "csv" | "json",
 ): Promise<void> {
-  const headers: Record<string, string> = {};
-  const actor = getActorName();
-  if (actor) headers["X-Actor-Name"] = encodeURIComponent(actor);
   const response = await fetch(
     `${getNamespacedApiBaseUrl()}/entities/${encodeURIComponent(idOrKey)}/export?format=${format}`,
-    { headers },
   );
   if (!response.ok) throw new Error(`Export failed (${response.status})`);
   const blob = await response.blob();

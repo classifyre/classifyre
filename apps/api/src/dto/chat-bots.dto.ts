@@ -66,12 +66,6 @@ export class ChatBotResponseDto {
   })
   agentKinds: string[];
 
-  @ApiProperty({
-    description:
-      'When false, every mutating tool is recorded observe-only and never executed.',
-  })
-  allowMutations: boolean;
-
   @ApiProperty({ nullable: true, description: 'Last connector error, if any.' })
   lastError: string | null;
 
@@ -135,11 +129,6 @@ export class CreateChatBotDto {
   @IsOptional()
   @IsArray()
   agentKinds?: string[];
-
-  @ApiPropertyOptional({ default: true })
-  @IsOptional()
-  @IsBoolean()
-  allowMutations?: boolean;
 }
 
 export class UpdateChatBotDto {
@@ -184,11 +173,6 @@ export class UpdateChatBotDto {
   @IsOptional()
   @IsArray()
   agentKinds?: string[];
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsBoolean()
-  allowMutations?: boolean;
 }
 
 export const CHAT_ACTIVITY_LEVEL_VALUES = ['INFO', 'ERROR'] as const;

@@ -22,7 +22,19 @@ export const CAPABILITIES = [
   {
     id: 'workspace.view',
     scope: 'workspace',
-    description: 'Open the workspace and read its settings and activity.',
+    description: 'Open the workspace.',
+  },
+  {
+    id: 'settings.view',
+    scope: 'workspace',
+    description:
+      'See the workspace settings: language and time, workers, cleanup, MCP, chat bots, SQL limits. Never held by visitors of a public workspace.',
+  },
+  {
+    id: 'activity.view',
+    scope: 'workspace',
+    description:
+      'Read who changed and read what in the workspace (Activity, History). Never held by visitors of a public workspace.',
   },
   {
     id: 'workspace.settings',
@@ -36,6 +48,12 @@ export const CAPABILITIES = [
     description: 'Pause and resume the workspace.',
   },
   {
+    id: 'workspace.publish',
+    scope: 'workspace',
+    description:
+      'Make the workspace public (read-only for everyone of the tenant, and for visitors of the first tenant) or private again.',
+  },
+  {
     id: 'workspace.delete',
     scope: 'workspace',
     description: 'Delete the workspace.',
@@ -44,6 +62,12 @@ export const CAPABILITIES = [
     id: 'workspace.transfer',
     scope: 'workspace',
     description: 'Export, import or copy workspace data.',
+  },
+  {
+    id: 'notification.view',
+    scope: 'workspace',
+    description:
+      'Get the notifications sent to your groups in the workspace, and mark them read, important or dismissed for yourself.',
   },
   // Access
   {
@@ -60,7 +84,8 @@ export const CAPABILITIES = [
   {
     id: 'source.view',
     scope: 'workspace',
-    description: 'Read sources, their notebooks and their scans.',
+    description:
+      'Read sources and their scans. Their configuration and notebook code need source.manage.',
   },
   {
     id: 'source.manage',
@@ -204,6 +229,15 @@ export const CAPABILITIES = [
     id: 'data.export',
     scope: 'workspace',
     description: 'Export data out of the workspace (CSV, archives).',
+  },
+  {
+    // The rows themselves, not what was found in them. Given on a whole
+    // workspace by a role, or on one source or table by a data-reader grant
+    // (docs/prd/DQ-data-query.md §4).
+    id: 'data.query',
+    scope: 'workspace',
+    description:
+      'Query the rows of tables with SQL: every table here, or only the sources and tables a grant names.',
   },
   // Tokens
   {

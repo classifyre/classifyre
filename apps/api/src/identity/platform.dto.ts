@@ -90,27 +90,3 @@ export class PlatformTenantDto {
     | 'UPGRADE_FAILED'
     | null;
 }
-
-export class LocalWorkspaceDto {
-  @ApiProperty()
-  id: string;
-
-  @ApiProperty()
-  slug: string;
-
-  @ApiProperty()
-  name: string;
-}
-
-export class ImportWorkspacesDto {
-  @ApiProperty({ type: [String], example: ['finance-ledger'] })
-  slugs: string[];
-}
-
-export class ImportedWorkspacesDto {
-  @ApiProperty({
-    type: [String],
-    description: 'Copied into the tenant; the open database keeps them.',
-  })
-  copied: string[];
-}

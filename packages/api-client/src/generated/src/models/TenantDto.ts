@@ -75,10 +75,14 @@ export interface TenantDto {
  */
 export const TenantDtoCapabilitiesEnum = {
     WorkspaceView: 'workspace.view',
+    SettingsView: 'settings.view',
+    ActivityView: 'activity.view',
     WorkspaceSettings: 'workspace.settings',
     WorkspacePause: 'workspace.pause',
+    WorkspacePublish: 'workspace.publish',
     WorkspaceDelete: 'workspace.delete',
     WorkspaceTransfer: 'workspace.transfer',
+    NotificationView: 'notification.view',
     AccessView: 'access.view',
     AccessManage: 'access.manage',
     SourceView: 'source.view',
@@ -109,6 +113,7 @@ export const TenantDtoCapabilitiesEnum = {
     AgentConfigure: 'agent.configure',
     AgentUse: 'agent.use',
     DataExport: 'data.export',
+    DataQuery: 'data.query',
     McpTokenOwn: 'mcp.token.own',
     McpTokenAdmin: 'mcp.token.admin',
     TenantWorkspaceCreate: 'tenant.workspace.create',

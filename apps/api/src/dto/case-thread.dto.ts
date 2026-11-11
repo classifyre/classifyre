@@ -1,4 +1,8 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  ApiHideProperty,
+  ApiProperty,
+  ApiPropertyOptional,
+} from '@nestjs/swagger';
 import {
   IsEnum,
   IsIn,
@@ -65,7 +69,8 @@ export class CreateThreadDto {
   @MaxLength(32)
   color?: string;
 
-  @ApiPropertyOptional()
+  // Set by the server from the signed-in person; never sent by clients.
+  @ApiHideProperty()
   @IsOptional()
   @IsString()
   createdBy?: string;
@@ -100,7 +105,8 @@ export class UpdateThreadDto {
   @IsString()
   color?: string | null;
 
-  @ApiPropertyOptional()
+  // Set by the server from the signed-in person; never sent by clients.
+  @ApiHideProperty()
   @IsOptional()
   @IsString()
   actor?: string;
@@ -129,7 +135,8 @@ export class AddThreadEntryDto {
   @IsObject()
   metadata?: Record<string, unknown> | null;
 
-  @ApiPropertyOptional()
+  // Set by the server from the signed-in person; never sent by clients.
+  @ApiHideProperty()
   @IsOptional()
   @IsString()
   author?: string;

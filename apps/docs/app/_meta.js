@@ -10,6 +10,7 @@ export default {
   investigations: "Investigations",
   duplicates: "Duplicate Review",
   notifications: "Notifications",
+  "data-query": "SQL",
   "data-export": "Data Export",
   access: "Access & Sign-in",
   settings: "Settings",

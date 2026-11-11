@@ -34,7 +34,7 @@ import {
 } from '../dto/inquiry.dto';
 import { InquiryTimelineResponseDto } from '../dto/inquiry-activity.dto';
 import { activityTypes } from '../activity-page';
-import { AllowInDemoMode } from '../demo-mode.decorator';
+import { ReadsOnly } from '../reads-only.decorator';
 import { AccessArea, Requires } from '../identity/access.decorators';
 
 class RematchResponseDto {
@@ -58,7 +58,7 @@ export class InquiriesController {
     return this.inquiries.create(dto);
   }
 
-  @AllowInDemoMode()
+  @ReadsOnly()
   @Post('preview')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({

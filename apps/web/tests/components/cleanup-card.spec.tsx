@@ -1,5 +1,6 @@
 import * as React from "react";
 import { expect, test } from "@playwright/experimental-ct-react";
+import { signedInAs } from "./fixtures/signed-in";
 import { CleanupCardHarness } from "./fixtures/cleanup-card-harness";
 
 // Derive the page fixture type from the component-test `test` so this helper
@@ -56,7 +57,6 @@ const settings = {
   timeFormat: "TWELVE_HOUR",
   aiProviderConfigId: null,
   harnessAiProviderConfigId: null,
-  demoMode: false,
   createdAt: "2026-03-10T00:00:00.000Z",
   updatedAt: "2026-03-10T00:00:00.000Z",
 };
@@ -77,6 +77,10 @@ async function mockCardApi(page: CtPage) {
     });
   });
 }
+
+test.beforeEach(async ({ page }) => {
+  await signedInAs(page, ["workspace.view", "workspace.settings"]);
+});
 
 test("cleanable datasets render in the first table, protected in the second", async ({
   mount,

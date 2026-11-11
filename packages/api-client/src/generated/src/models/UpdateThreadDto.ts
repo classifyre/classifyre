@@ -49,12 +49,6 @@ export interface UpdateThreadDto {
      * @memberof UpdateThreadDto
      */
     color?: string | null;
-    /**
-     * 
-     * @type {string}
-     * @memberof UpdateThreadDto
-     */
-    actor?: string;
 }
 
 
@@ -92,7 +86,6 @@ export function UpdateThreadDtoFromJSONTyped(json: any, ignoreDiscriminator: boo
         'confidence': json['confidence'] == null ? undefined : json['confidence'],
         'testablePredicate': json['testablePredicate'] == null ? undefined : json['testablePredicate'],
         'color': json['color'] == null ? undefined : json['color'],
-        'actor': json['actor'] == null ? undefined : json['actor'],
     };
 }
 
@@ -112,7 +105,6 @@ export function UpdateThreadDtoToJSONTyped(value?: UpdateThreadDto | null, ignor
         'confidence': value['confidence'],
         'testablePredicate': value['testablePredicate'],
         'color': value['color'],
-        'actor': value['actor'],
     };
 }
 

@@ -1,4 +1,4 @@
-import { ALLOW_IN_DEMO_MODE_KEY } from '../demo-mode.decorator';
+import { READS_ONLY_KEY } from '../reads-only.decorator';
 import { INTERNAL_ONLY_KEY } from '../internal-only.decorator';
 import {
   ACCESS_AREA_KEY,
@@ -49,6 +49,6 @@ export function resolveRouteAccess(
   if (!area) return null;
   const isRead =
     READ_METHODS.has(httpMethod.toUpperCase()) ||
-    onEither<boolean>(ALLOW_IN_DEMO_MODE_KEY) === true;
+    onEither<boolean>(READS_ONLY_KEY) === true;
   return { kind: 'capability', capability: isRead ? area.view : area.change };
 }
