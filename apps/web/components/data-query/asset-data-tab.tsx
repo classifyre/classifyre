@@ -11,9 +11,9 @@ import type { QueryCatalog, QueryCatalogTable } from "@/lib/data-query";
 import { QueryWorkbench } from "./query-workbench";
 import {
   GiveTableAccessDialog,
-  TableAccessOverview,
   useTableAccessGrants,
 } from "./data-access-dialog";
+import { TableAccessTabs } from "./table-access-tabs";
 import { apiErrorMessage } from "@/lib/data-query";
 import { extractApiErrorMessage } from "@/lib/extract-api-error-message";
 import { api } from "@workspace/api-client";
@@ -106,8 +106,9 @@ export function AssetDataTab({
             resultHeight={380}
           />
           {showOverview && (
-            <TableAccessOverview
+            <TableAccessTabs
               access={access}
+              assetId={table.assetId}
               onRemove={(grant) => void remove(grant)}
             />
           )}

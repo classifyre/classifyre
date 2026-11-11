@@ -7505,6 +7505,8 @@
       "open": "Access",
       "title": "Who can query this table",
       "description": "Data access always goes to a group: the Data reader role on this table, on its whole source, or on the workspace.",
+      "activity": "Activity",
+      "activityHint": "Access changes and queries touching this table, newest first. Reads are recorded per table; query runs themselves stay in History.",
       "giveTitle": "Give data access",
       "giveDescription": "Give a group the Data reader role on this table or its whole source. Every change is recorded in Activity.",
       "none": "Nobody beyond workspace admins.",
