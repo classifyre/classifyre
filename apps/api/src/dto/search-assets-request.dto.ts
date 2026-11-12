@@ -59,6 +59,31 @@ export class SearchAssetsFiltersDto extends OmitType(QueryAssetsDto, [
   @IsArray()
   @IsString({ each: true })
   meaningMethod?: string[];
+
+  @ApiPropertyOptional({
+    enum: ['ungoverned', 'governed', 'draft', 'active', 'deprecated', 'retired'],
+    description:
+      'Governance (docs/prd/GOV-governed-data-assets.md): owned or not, or a lifecycle of owned assets.',
+  })
+  @IsOptional()
+  @IsString()
+  governance?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Assets this person owns (their own or their source’s owner): `user:<id>`, or `me`.',
+  })
+  @IsOptional()
+  @IsString()
+  ownerRef?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Assets this person or group stewards, on the asset or its source: `user:<id>`, `group:<id>`, or `me` (you and your groups).',
+  })
+  @IsOptional()
+  @IsString()
+  stewardRef?: string;
 }
 
 const normalizeToStringArray = (value: unknown, uppercase = false) => {

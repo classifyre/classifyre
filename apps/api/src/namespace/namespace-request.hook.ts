@@ -20,6 +20,7 @@ import type { IdentityService } from '../identity/identity.service';
 import { CLS_ACTOR } from '../identity/actor-context.service';
 import {
   CLS_CAPABILITIES,
+  CLS_ORG_ID,
   CLS_PERSON,
   CLS_RESOURCE_GRANTS,
   type ClsPerson,
@@ -276,6 +277,7 @@ export async function authorizeWorkspaceRequest(
   }
   cls.set(CLS_ACTOR, principal.actor);
   cls.set(CLS_CAPABILITIES, capabilities);
+  if (principal.orgId) cls.set(CLS_ORG_ID, principal.orgId);
   if (principal.actor.id?.startsWith('user:')) {
     cls.set<ClsPerson>(CLS_PERSON, {
       actorRef: principal.actor.id,

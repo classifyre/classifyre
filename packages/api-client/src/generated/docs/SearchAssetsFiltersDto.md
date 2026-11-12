@@ -15,6 +15,9 @@ Name | Type
 `term` | Array&lt;string&gt;
 `includeNarrower` | boolean
 `meaningMethod` | Array&lt;string&gt;
+`governance` | string
+`ownerRef` | string
+`stewardRef` | string
 
 ## Example
 
@@ -32,6 +35,9 @@ const example = {
   "term": null,
   "includeNarrower": null,
   "meaningMethod": null,
+  "governance": null,
+  "ownerRef": null,
+  "stewardRef": null,
 } satisfies SearchAssetsFiltersDto
 
 console.log(example)

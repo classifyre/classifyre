@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import type { ReactNode } from "react";
-import { Bot, KeyRound, Server, Sparkles, User } from "lucide-react";
+import { Bot, KeyRound, Server, Sparkles, User, Users } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 import { useActor, useActorName } from "@/hooks/use-actors";
 import { useTranslation } from "@/hooks/use-translation";
@@ -10,6 +10,7 @@ import type { ActorKind } from "@/lib/actor-ref";
 
 const ICONS: Record<ActorKind, typeof User> = {
   user: User,
+  group: Users,
   name: User,
   mcp: KeyRound,
   agent: Bot,

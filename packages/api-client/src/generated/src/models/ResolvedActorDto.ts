@@ -43,6 +43,12 @@ export interface ResolvedActorDto {
      * @memberof ResolvedActorDto
      */
     viaDisplayName?: string;
+    /**
+     * For a group: its path in the tenant.
+     * @type {string}
+     * @memberof ResolvedActorDto
+     */
+    path?: string;
 }
 
 
@@ -51,6 +57,7 @@ export interface ResolvedActorDto {
  */
 export const ResolvedActorDtoKindEnum = {
     User: 'user',
+    Group: 'group',
     Mcp: 'mcp',
     Agent: 'agent',
     System: 'system',
@@ -83,6 +90,7 @@ export function ResolvedActorDtoFromJSONTyped(json: any, ignoreDiscriminator: bo
         'kind': json['kind'],
         'displayName': json['displayName'],
         'viaDisplayName': json['viaDisplayName'] == null ? undefined : json['viaDisplayName'],
+        'path': json['path'] == null ? undefined : json['path'],
     };
 }
 
@@ -101,6 +109,7 @@ export function ResolvedActorDtoToJSONTyped(value?: ResolvedActorDto | null, ign
         'kind': value['kind'],
         'displayName': value['displayName'],
         'viaDisplayName': value['viaDisplayName'],
+        'path': value['path'],
     };
 }
 

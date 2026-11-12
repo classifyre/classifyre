@@ -80,6 +80,7 @@ export const RoleDtoCapabilitiesEnum = {
     FindingTriage: 'finding.triage',
     AssetView: 'asset.view',
     AssetTag: 'asset.tag',
+    AssetGovern: 'asset.govern',
     DetectorView: 'detector.view',
     DetectorManage: 'detector.manage',
     DetectorTrain: 'detector.train',

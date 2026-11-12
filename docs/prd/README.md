@@ -17,6 +17,7 @@ These PRDs turn the findings of [palantir-use-case-gap-analysis.md](../../palant
 | [IAM · Identity and access management](IAM-access-management.md) | Anyone who reaches an instance can do everything, and tenants and groups cannot be kept apart | L | after M0 | builds on F6 |
 | [TEN · Tenant isolation, operators and the cloud playground](TEN-tenant-isolation-and-cloud.md) | Turning sign-in off shows every tenant's workspaces, and nobody manages the tenants themselves | L | after IAM | — |
 | [DQ · Data query: SQL over the tables of a workspace](DQ-data-query.md) | Classifyre knows every table and what was found in it, but nobody can read the rows, join them, or be given access to one table | L | after IAM | grants on one source or table |
+| [GOV · Governed data assets](GOV-governed-data-assets.md) | Nobody owns an asset, its meaning is hidden in a drawer, and quality is only failures from a sample: no owner, steward, column metadata, thresholds or results | L | after DQ 0–2 | owners for access requests, column classification for masks |
 | [G1 · PYTHON detector](G1-python-detector.md) | Rules and quality checks live in connector notebooks as TAG workarounds (67 of 68 GENESIS detectors) | M | M1 | C1, C2 |
 | [G3 · Domain events, webhooks, push, case export](G3-outbound-webhooks-notifications-export.md) | Nothing leaves the app: no webhook, no push, no case export | S–M | M1 | F1 |
 | [G2 · European detection coverage and bundles](G2-eu-detection-coverage.md) | National IDs for only 6 of 27 member states, no GDPR Art. 9 detection, no way to share detectors | S–M | M2 | F5 |
@@ -38,6 +39,7 @@ These PRDs turn the findings of [palantir-use-case-gap-analysis.md](../../palant
 |---|---|
 | [G5 · Entities](G5-entities.md) | Shipped on this branch, 2026-10-03 ([as built](G5-entities.md#13-as-built)) |
 | [DQ · Data query](DQ-data-query.md) | Phases 0–2 built 2026-11-09 ([as built](DQ-data-query.md#9-as-built)); 3–6 proposed |
+| [GOV · Governed data assets](GOV-governed-data-assets.md) | Proposed, 2026-11-12 |
 | All others | Proposed, 2026-09-30 |
 
 Update this table as PRDs move to *Accepted*, *In progress* and *Shipped*.

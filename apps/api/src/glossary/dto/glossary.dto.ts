@@ -64,7 +64,9 @@ export class ListGlossaryQueryDto {
   @IsString()
   status?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    description: 'Terms of one steward: `user:<id>` or `group:<id>`.',
+  })
   @IsOptional()
   @IsString()
   steward?: string;
@@ -197,7 +199,11 @@ export class UpsertGlossaryTermDto {
   @IsString()
   schemeKey?: string | null;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({
+    nullable: true,
+    description:
+      'A person (`user:<id>`) or group (`group:<id>`) of the tenant who maintains the term.',
+  })
   @IsOptional()
   @IsString()
   steward?: string | null;

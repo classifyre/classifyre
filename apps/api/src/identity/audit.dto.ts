@@ -171,7 +171,7 @@ export class ResolvedActorDto {
   @ApiProperty()
   ref: string;
 
-  @ApiProperty({ enum: ['user', 'mcp', 'agent', 'system', 'name'] })
+  @ApiProperty({ enum: ['user', 'group', 'mcp', 'agent', 'system', 'name'] })
   kind: string;
 
   @ApiProperty({ example: 'Jordan Reyes' })
@@ -181,4 +181,10 @@ export class ResolvedActorDto {
     description: 'For an action delegated through an MCP token: the token.',
   })
   viaDisplayName?: string;
+
+  @ApiPropertyOptional({
+    description: 'For a group: its path in the tenant.',
+    example: '/finance/controlling',
+  })
+  path?: string;
 }

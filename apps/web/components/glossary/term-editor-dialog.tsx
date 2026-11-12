@@ -20,6 +20,7 @@ import {
   Textarea,
 } from "@workspace/ui/components";
 import { useTranslation } from "@/hooks/use-translation";
+import { StewardPicker } from "@/components/governance/steward-picker";
 import type { TranslationKey } from "@/i18n";
 import {
   listSchemes,
@@ -334,10 +335,10 @@ export function TermEditorDialog({
               <Label htmlFor="term-steward">
                 {t("glossary.editor.stewardLabel")}
               </Label>
-              <Input
+              <StewardPicker
                 id="term-steward"
                 value={form.steward}
-                onChange={(event) => set("steward", event.target.value)}
+                onChange={(ref) => set("steward", ref)}
               />
             </div>
           </div>

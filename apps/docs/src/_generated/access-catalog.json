@@ -91,6 +91,11 @@
       "description": "Tag assets, add or remove connections, save explore views."
     },
     {
+      "id": "asset.govern",
+      "scope": "workspace",
+      "description": "Govern assets: owners, stewards, custodians, descriptions and lifecycle."
+    },
+    {
       "id": "detector.view",
       "scope": "workspace",
       "description": "Read detectors, their tests and training history."
@@ -306,7 +311,8 @@
         "glossary.edit",
         "glossary.approve",
         "entity.manage",
-        "correlation.review"
+        "correlation.review",
+        "asset.govern"
       ]
     },
     {
@@ -351,6 +357,7 @@
         "finding.triage",
         "asset.view",
         "asset.tag",
+        "asset.govern",
         "detector.view",
         "detector.manage",
         "detector.train",
@@ -417,6 +424,7 @@
         "finding.triage",
         "asset.view",
         "asset.tag",
+        "asset.govern",
         "detector.view",
         "detector.manage",
         "detector.train",
@@ -476,6 +484,7 @@
         "finding.triage",
         "asset.view",
         "asset.tag",
+        "asset.govern",
         "detector.view",
         "detector.manage",
         "detector.train",

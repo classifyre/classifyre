@@ -5,6 +5,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { stewardRefOrThrow } from './steward';
 import { createHash } from 'node:crypto';
 import {
   GlossaryEntityType,
@@ -108,7 +109,6 @@ const LEXICAL_OVERFETCH = 5;
 const LEXICAL_FETCH_CAP = 200;
 
 const MAX_DEFINITION = 10_000;
-const MAX_STEWARD = 200;
 
 type TermWithScheme = GlossaryTerm & { scheme?: GlossaryScheme | null };
 
@@ -231,9 +231,7 @@ export class GlossaryService {
       ...(params.kind ? { kind: params.kind } : {}),
       ...(schemeId !== undefined ? { schemeId } : {}),
       ...this.statusFilter(params.status),
-      ...(params.steward
-        ? { steward: { contains: params.steward, mode: 'insensitive' } }
-        : {}),
+      ...(params.steward ? { steward: params.steward.trim() } : {}),
       ...(params.query
         ? {
             OR: [
@@ -545,11 +543,7 @@ export class GlossaryService {
         `Definition is at most ${MAX_DEFINITION} characters`,
       );
     }
-    if (input.steward && input.steward.length > MAX_STEWARD) {
-      throw new BadRequestException(
-        `Steward is at most ${MAX_STEWARD} characters`,
-      );
-    }
+    stewardRefOrThrow(input.steward);
     if (input.origin === 'AGENT') {
       const deleted = await this.prisma.agentMemory.findUnique({
         where: {
@@ -735,7 +729,7 @@ export class GlossaryService {
           : (existing?.definition ?? null),
       steward:
         input.steward !== undefined
-          ? input.steward?.trim() || null
+          ? (stewardRefOrThrow(input.steward) ?? null)
           : (existing?.steward ?? null),
       schemeId: nextScheme,
       sourceIri:

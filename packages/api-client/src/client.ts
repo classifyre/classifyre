@@ -80,6 +80,7 @@ export { EmbeddingsApi } from "./generated/src/apis/EmbeddingsApi";
 export { GlossaryApi } from "./generated/src/apis/GlossaryApi";
 export { NotebooksApi } from "./generated/src/apis/NotebooksApi";
 export { DataQueryApi } from "./generated/src/apis/DataQueryApi";
+export { GovernanceApi } from "./generated/src/apis/GovernanceApi";
 export { AIApi } from "./generated/src/apis/AIApi";
 export { WorkerQueuesApi } from "./generated/src/apis/WorkerQueuesApi";
 export { IdentityApi } from "./generated/src/apis/IdentityApi";
@@ -622,6 +623,16 @@ export type {
   UpdateNotificationImportanceDto,
   // Asset list types used by web app directly
   AssetListItemDto,
+  // Governed data assets (docs/prd/GOV-governed-data-assets.md)
+  AssetGovernanceDto,
+  GovernanceChecklistItemDto,
+  GovernancePrincipalDto,
+  GovernanceRoleDto,
+  SourceGovernanceDto,
+  SourceGovernanceCoverageDto,
+  UpdateAssetGovernanceDto,
+  AssignGovernanceRoleDto,
+  SearchAssetGovernanceDto,
   // Correlation / duplicate detection
   ValueOccurrencesResponseDto,
   ValueOccurrenceAssetDto,
@@ -689,6 +700,7 @@ export {
   SearchAssetFindingDtoDetectorTypeEnum,
   SearchAssetFindingDtoStatusEnum,
   SearchAssetsFiltersDtoStatusEnum,
+  SearchAssetsFiltersDtoGovernanceEnum,
   SearchFindingsFiltersDtoDetectorTypeEnum,
   SearchFindingsFiltersDtoSeverityEnum,
   SearchFindingsFiltersInputDtoDetectorTypeEnum,
@@ -1381,6 +1393,7 @@ export type RunTestsResponseDto = {
 import { SourcesApi } from "./generated/src/apis/SourcesApi";
 import { NotebooksApi } from "./generated/src/apis/NotebooksApi";
 import { DataQueryApi } from "./generated/src/apis/DataQueryApi";
+import { GovernanceApi } from "./generated/src/apis/GovernanceApi";
 import { AIApi } from "./generated/src/apis/AIApi";
 import { AssetsApi } from "./generated/src/apis/AssetsApi";
 import { HealthApi } from "./generated/src/apis/HealthApi";
@@ -2027,6 +2040,7 @@ class ApiClient {
   public sources: SourcesApi;
   public notebooks: NotebooksApi;
   public dataQuery: DataQueryApi;
+  public governance: GovernanceApi;
   public ai: AIApi;
   public assets: AssetsApi;
   public health: HealthApi;
@@ -2063,6 +2077,7 @@ class ApiClient {
     this.sources = new SourcesApi(this.config);
     this.notebooks = new NotebooksApi(this.config);
     this.dataQuery = new DataQueryApi(this.config);
+    this.governance = new GovernanceApi(this.config);
     this.ai = new AIApi(this.config);
     this.assets = new AssetsApi(this.config);
     this.health = new HealthApi(this.config);

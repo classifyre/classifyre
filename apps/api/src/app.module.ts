@@ -25,6 +25,7 @@ import { CliRunnerModule } from './cli-runner/cli-runner.module';
 import { NotebookModule } from './notebook/notebook.module';
 import { DeploymentSettingsModule } from './deployment-settings/deployment-settings.module';
 import { DataQueryModule } from './data-query/data-query.module';
+import { GovernanceModule } from './governance/governance.module';
 import { WebSocketModule } from './websocket/websocket.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { MatchingModule } from './matching/matching.module';
@@ -133,6 +134,7 @@ import {
     CliRunnerModule,
     NotebookModule,
     DataQueryModule,
+    GovernanceModule,
     DeploymentSettingsModule,
     WebSocketModule,
     SchedulerModule,

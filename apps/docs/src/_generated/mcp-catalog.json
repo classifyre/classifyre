@@ -5329,7 +5329,8 @@
             {
               "name": "steward",
               "type": "string",
-              "required": false
+              "required": false,
+              "description": "A person (user:<id>) or group (group:<id>): their terms."
             },
             {
               "name": "take",
@@ -5481,7 +5482,8 @@
             {
               "name": "steward",
               "type": "string",
-              "required": false
+              "required": false,
+              "description": "A person (user:<id>) or group (group:<id>) of the tenant; never a plain name."
             },
             {
               "name": "notes",

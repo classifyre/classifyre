@@ -80,7 +80,7 @@ export interface UpsertGlossaryTermDto {
      */
     schemeKey?: string | null;
     /**
-     * 
+     * A person (`user:<id>`) or group (`group:<id>`) of the tenant who maintains the term.
      * @type {string}
      * @memberof UpsertGlossaryTermDto
      */

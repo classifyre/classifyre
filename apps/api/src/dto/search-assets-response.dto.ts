@@ -40,6 +40,21 @@ export class SearchAssetMatchDto {
   via: 'meaning' | 'words';
 }
 
+export class SearchAssetGovernanceDto {
+  @ApiPropertyOptional({
+    enum: ['DRAFT', 'ACTIVE', 'DEPRECATED', 'RETIRED'],
+    nullable: true,
+    description: 'Lifecycle; null while nobody owns the asset.',
+  })
+  status: string | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'The owner, its own or its source’s (`user:<id>`).',
+  })
+  ownerRef: string | null;
+}
+
 export class SearchAssetItemDto {
   @ApiProperty({ type: AssetListItemDto })
   asset: AssetListItemDto;
@@ -53,6 +68,9 @@ export class SearchAssetItemDto {
       'Semantic and hybrid search: where in the asset the query matched best. Absent when only the asset name matched.',
   })
   match?: SearchAssetMatchDto;
+
+  @ApiPropertyOptional({ type: SearchAssetGovernanceDto })
+  governance?: SearchAssetGovernanceDto;
 }
 
 export class SearchAssetsResponseDto {

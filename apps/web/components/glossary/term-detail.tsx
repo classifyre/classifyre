@@ -409,8 +409,9 @@ export default function GlossaryTermDetail() {
             </p>
             {term.notes && <p className="max-w-3xl text-xs text-muted-foreground">{term.notes}</p>}
             {term.steward && (
-              <p className="text-xs text-muted-foreground">
-                {t("glossary.term.steward", { steward: term.steward })}
+              <p className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                {t("glossary.term.stewardLabel")}
+                <ActorChip actorRef={term.steward} />
               </p>
             )}
           </section>

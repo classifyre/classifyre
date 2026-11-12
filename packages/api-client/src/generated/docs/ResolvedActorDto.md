@@ -10,6 +10,7 @@ Name | Type
 `kind` | string
 `displayName` | string
 `viaDisplayName` | string
+`path` | string
 
 ## Example
 
@@ -22,6 +23,7 @@ const example = {
   "kind": null,
   "displayName": Jordan Reyes,
   "viaDisplayName": null,
+  "path": /finance/controlling,
 } satisfies ResolvedActorDto
 
 console.log(example)

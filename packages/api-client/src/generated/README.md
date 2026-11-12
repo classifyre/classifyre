@@ -330,6 +330,14 @@ All URIs are relative to *http://localhost*
 *GlossaryApi* | [**glossarySemanticControllerFindInTextStatus**](docs/GlossaryApi.md#glossarysemanticcontrollerfindintextstatus) | **GET** /glossary/terms/{idOrKey}/find-in-text/detectors | Detectors generated from a term, with out-of-date flags
 *GlossaryApi* | [**glossarySemanticControllerLinkGroups**](docs/GlossaryApi.md#glossarysemanticcontrollerlinkgroups) | **GET** /glossary/proposals/link-groups | Document suggestions grouped per concept, with a score histogram
 *GlossaryApi* | [**glossarySemanticControllerList**](docs/GlossaryApi.md#glossarysemanticcontrollerlist) | **GET** /glossary/proposals | The review queue: every proposal, one paged list
+*GovernanceApi* | [**governanceControllerAssetGovernance**](docs/GovernanceApi.md#governancecontrollerassetgovernance) | **GET** /assets/{id}/governance | An asset\&#39;s owners, description, lifecycle and checklist
+*GovernanceApi* | [**governanceControllerAssignAssetRole**](docs/GovernanceApi.md#governancecontrollerassignassetrole) | **POST** /assets/{id}/governance/roles | Make someone owner, steward or custodian of an asset
+*GovernanceApi* | [**governanceControllerAssignSourceRole**](docs/GovernanceApi.md#governancecontrollerassignsourcerole) | **POST** /sources/{id}/governance/roles | Make someone owner, steward or custodian of a source
+*GovernanceApi* | [**governanceControllerPrincipals**](docs/GovernanceApi.md#governancecontrollerprincipals) | **GET** /governance/principals | People and groups of the tenant, for the owner and steward pickers
+*GovernanceApi* | [**governanceControllerRemoveAssetRole**](docs/GovernanceApi.md#governancecontrollerremoveassetrole) | **DELETE** /assets/{id}/governance/roles/{roleId} | End a role on an asset (kept as history)
+*GovernanceApi* | [**governanceControllerRemoveSourceRole**](docs/GovernanceApi.md#governancecontrollerremovesourcerole) | **DELETE** /sources/{id}/governance/roles/{roleId} | End a role on a source (kept as history)
+*GovernanceApi* | [**governanceControllerSourceGovernance**](docs/GovernanceApi.md#governancecontrollersourcegovernance) | **GET** /sources/{id}/governance | A source\&#39;s owners, stewards and custodians, and its coverage
+*GovernanceApi* | [**governanceControllerUpdateAssetGovernance**](docs/GovernanceApi.md#governancecontrollerupdateassetgovernance) | **PUT** /assets/{id}/governance | Change an asset\&#39;s description, legal basis or lifecycle
 *GraphApi* | [**graphControllerColumnLineage**](docs/GraphApi.md#graphcontrollercolumnlineage) | **POST** /graph/lineage/column | Trace one column back through the transformations that produced it
 *GraphApi* | [**graphControllerCreateManualEdge**](docs/GraphApi.md#graphcontrollercreatemanualedge) | **POST** /graph/edges/manual | Create a manual edge between two entities (user-defined relation type)
 *GraphApi* | [**graphControllerDeleteEdge**](docs/GraphApi.md#graphcontrollerdeleteedge) | **DELETE** /graph/edges/{id} | Delete an edge
@@ -556,6 +564,7 @@ All URIs are relative to *http://localhost*
 - [AssetFindingSummaryDto](docs/AssetFindingSummaryDto.md)
 - [AssetFindingSummaryListResponseDto](docs/AssetFindingSummaryListResponseDto.md)
 - [AssetFindingTypeCountDto](docs/AssetFindingTypeCountDto.md)
+- [AssetGovernanceDto](docs/AssetGovernanceDto.md)
 - [AssetListItemDto](docs/AssetListItemDto.md)
 - [AssetListResponseDto](docs/AssetListResponseDto.md)
 - [AssetMediaChunkDto](docs/AssetMediaChunkDto.md)
@@ -564,6 +573,7 @@ All URIs are relative to *http://localhost*
 - [AssetSeverityCountsRequestDto](docs/AssetSeverityCountsRequestDto.md)
 - [AssetSeverityCountsResponseDto](docs/AssetSeverityCountsResponseDto.md)
 - [AssetSimilarityDto](docs/AssetSimilarityDto.md)
+- [AssignGovernanceRoleDto](docs/AssignGovernanceRoleDto.md)
 - [AssistantCapabilityReportDto](docs/AssistantCapabilityReportDto.md)
 - [AssistantControllerRespond200Response](docs/AssistantControllerRespond200Response.md)
 - [AssistantControllerRespondRequest](docs/AssistantControllerRespondRequest.md)
@@ -782,6 +792,9 @@ All URIs are relative to *http://localhost*
 - [GlossarySchemeRefDto](docs/GlossarySchemeRefDto.md)
 - [GlossaryTermDto](docs/GlossaryTermDto.md)
 - [GlossaryTermUsageDto](docs/GlossaryTermUsageDto.md)
+- [GovernanceChecklistItemDto](docs/GovernanceChecklistItemDto.md)
+- [GovernancePrincipalDto](docs/GovernancePrincipalDto.md)
+- [GovernanceRoleDto](docs/GovernanceRoleDto.md)
 - [GrantDto](docs/GrantDto.md)
 - [GraphEdgeDto](docs/GraphEdgeDto.md)
 - [GraphNodeDto](docs/GraphNodeDto.md)
@@ -952,6 +965,7 @@ All URIs are relative to *http://localhost*
 - [SavedQueryDto](docs/SavedQueryDto.md)
 - [ScanCacheEntryDto](docs/ScanCacheEntryDto.md)
 - [SearchAssetFindingDto](docs/SearchAssetFindingDto.md)
+- [SearchAssetGovernanceDto](docs/SearchAssetGovernanceDto.md)
 - [SearchAssetItemDto](docs/SearchAssetItemDto.md)
 - [SearchAssetMatchDto](docs/SearchAssetMatchDto.md)
 - [SearchAssetsChartsOptionsDto](docs/SearchAssetsChartsOptionsDto.md)
@@ -1007,6 +1021,8 @@ All URIs are relative to *http://localhost*
 - [SitemapIndexDto](docs/SitemapIndexDto.md)
 - [SitemapSectionDto](docs/SitemapSectionDto.md)
 - [SourceAssetsControllerBulkIngest201Response](docs/SourceAssetsControllerBulkIngest201Response.md)
+- [SourceGovernanceCoverageDto](docs/SourceGovernanceCoverageDto.md)
+- [SourceGovernanceDto](docs/SourceGovernanceDto.md)
 - [SourceInfoDto](docs/SourceInfoDto.md)
 - [SourceResponseDto](docs/SourceResponseDto.md)
 - [SourcesControllerGetSchedule200Response](docs/SourcesControllerGetSchedule200Response.md)
@@ -1050,6 +1066,7 @@ All URIs are relative to *http://localhost*
 - [UpdateAgentConfigDto](docs/UpdateAgentConfigDto.md)
 - [UpdateAgentMemoryDto](docs/UpdateAgentMemoryDto.md)
 - [UpdateAiProviderConfigDto](docs/UpdateAiProviderConfigDto.md)
+- [UpdateAssetGovernanceDto](docs/UpdateAssetGovernanceDto.md)
 - [UpdateCapabilitiesDto](docs/UpdateCapabilitiesDto.md)
 - [UpdateCaseDto](docs/UpdateCaseDto.md)
 - [UpdateCaseEventDto](docs/UpdateCaseEventDto.md)
