@@ -191,7 +191,8 @@
       "intelligence": "Intelligence",
       "casework": "Casework",
       "pipeline": "Pipeline"
-    }
+    },
+    "governance": "Governance"
   },
   "glossary": {
     "title": "Entities & glossary",
@@ -7578,7 +7579,8 @@
       "steward": "A steward",
       "description": "A description",
       "meaning": "An approved glossary term",
-      "certified": "Certified"
+      "certified": "Certified",
+      "classification": "Column classification reviewed"
     },
     "coverage": {
       "owned": "{{owned}} of {{assets}} assets owned",
@@ -7595,6 +7597,83 @@
       "retired": "Retired",
       "mine": "Owned by me",
       "stewarding": "Stewarded by me"
+    },
+    "classification": {
+      "public": "Public",
+      "internal": "Internal",
+      "confidential": "Confidential",
+      "personal": "Personal data",
+      "sensitive": "Sensitive",
+      "secret": "Secret"
+    },
+    "columns": {
+      "title": "Columns",
+      "description": "{{count}} columns: what they mean, and what open findings say they hold.",
+      "toReviewCount": "{{count}} to review.",
+      "loose": "{{count}} open findings name no column.",
+      "column": "Column",
+      "businessName": "Business name",
+      "term": "Glossary term",
+      "classification": "Classification",
+      "cde": "Critical data element",
+      "cdeHint": "Data the business cannot do without: watched more closely.",
+      "derived": "From findings",
+      "override": "Set by a steward",
+      "setBySteward": "no open findings back it",
+      "reviewed": "Reviewed",
+      "toReview": "Not reviewed yet",
+      "confirm": "Confirm",
+      "edit": "Edit {{name}}",
+      "noType": "Type unknown",
+      "useDerived": "From findings: {{value}}",
+      "none": "None",
+      "findings": "Open findings: {{list}}",
+      "saveAndConfirm": "Save and confirm classification",
+      "removedTitle": "Columns no longer in the table",
+      "removedHint": "What was said about these columns stays until it is moved to the column they became, or forgotten.",
+      "moveTo": "Move to…",
+      "move": "Move",
+      "forget": "Forget"
+    },
+    "usage": {
+      "title": "Usage",
+      "description": "Reads and exports through Classifyre in the last {{days}} days.",
+      "reads": "Reads",
+      "exports": "Exports",
+      "readers": "Readers",
+      "chart": "Reads and exports per day over {{days}} days",
+      "topReaders": "Read most by",
+      "readerCounts": "{{reads}} reads · {{exports}} exports",
+      "formats": "Exported as {{list}}",
+      "none": "Nobody read it here in this period."
+    },
+    "page": {
+      "title": "Governance",
+      "lead": "Who answers for the data of this workspace, and what is still nobody's.",
+      "totals": {
+        "assets": "Assets",
+        "owned": "Owned",
+        "active": "Certified",
+        "ungoverned": "Ungoverned"
+      },
+      "first": {
+        "title": "Govern these first",
+        "description": "Tables without an owner that people read in the last {{days}} days.",
+        "none": "No ungoverned table was read in this period.",
+        "asset": "Table"
+      },
+      "mine": {
+        "title": "Yours",
+        "description": "Where you, or a group you are in, answer for data.",
+        "owned": "Owner of {{count}}",
+        "stewarded": "Steward of {{count}}",
+        "ungoverned": "All ungoverned assets"
+      },
+      "sources": {
+        "title": "By source",
+        "description": "Owned and certified assets per source. Roles set on a source count for its assets."
+      },
+      "activity": "Recent changes"
     }
   }
 }

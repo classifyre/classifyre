@@ -1589,7 +1589,8 @@
       "operations": [
         "Search assets with nested finding filters",
         "Inspect a single asset",
-        "Browse asset-level finding summaries"
+        "Browse asset-level finding summaries",
+        "Read and assign who governs an asset"
       ],
       "tools": [
         {
@@ -1965,6 +1966,44 @@
               "name": "limit",
               "type": "integer",
               "required": false
+            }
+          ]
+        },
+        {
+          "name": "get_asset_governance",
+          "title": "Get Asset Governance",
+          "description": "Who answers for an asset (owner, stewards, custodian; its own or its source’s), its description, lifecycle (DRAFT, ACTIVE = certified, DEPRECATED, RETIRED; null = nobody owns it), what is missing to be fully governed, and its columns with their business names and classification (from findings or set by a steward).",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "assetId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            }
+          ]
+        },
+        {
+          "name": "set_asset_owner",
+          "title": "Set Asset Owner",
+          "description": "Make one person (user:<id>) the owner of an asset; the current owner is replaced and kept as history. The asset becomes governed. Look the person up with get_asset_governance on an asset they own, or ask for their user reference.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "assetId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "principalRef",
+              "type": "string",
+              "required": true,
+              "description": "user:<id> of a person in this tenant"
             }
           ]
         }

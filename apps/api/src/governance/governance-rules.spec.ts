@@ -1,8 +1,11 @@
 import { BadRequestException } from '@nestjs/common';
 import { governanceAssetWhere } from './governance-filter';
+import { columnsOf } from './governance-columns.service';
 import {
   canGovern,
   checklist,
+  classificationReviewed,
+  deriveClassification,
   effectiveRoles,
   effectiveStatus,
   holdsRole,
@@ -274,5 +277,84 @@ describe('governanceAssetWhere (GOV §5.6)', () => {
     await expect(
       governanceAssetWhere(db, { ownerRef: 'me' }, null),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+});
+
+describe('column classification (GOV R6)', () => {
+  const group = (detectorType: string, findingType: string) => ({
+    detectorType,
+    findingType,
+    count: 1,
+    maxSeverity: 'HIGH',
+  });
+
+  it('derives the most guarded label the findings give', () => {
+    expect(deriveClassification([])).toBeNull();
+    expect(deriveClassification([group('PII', 'EMAIL_ADDRESS')])).toBe(
+      'personal',
+    );
+    expect(
+      deriveClassification([
+        group('PII', 'EMAIL_ADDRESS'),
+        group('PII', 'iban_code'),
+      ]),
+    ).toBe('sensitive');
+    expect(
+      deriveClassification([
+        group('PII', 'CREDIT_CARD'),
+        group('SECRETS', 'aws_access_key'),
+      ]),
+    ).toBe('secret');
+    expect(deriveClassification([group('CUSTOM', 'tag:legal_hold')])).toBe(
+      null,
+    );
+  });
+
+  it('counts a column reviewed only when findings classify it', () => {
+    expect(
+      classificationReviewed([
+        { derived: null, reviewedAt: null },
+        { derived: 'personal', reviewedAt: new Date() },
+      ]),
+    ).toBe(true);
+    expect(
+      classificationReviewed([{ derived: 'personal', reviewedAt: null }]),
+    ).toBe(false);
+  });
+
+  it('adds the checklist item only for assets with columns', () => {
+    const base = {
+      roles: [],
+      description: null,
+      approvedTerms: 0,
+      status: null,
+    };
+    expect(checklist(base).map((item) => item.key)).not.toContain(
+      'classification',
+    );
+    expect(
+      checklist({ ...base, classificationReviewed: false }).find(
+        (item) => item.key === 'classification',
+      ),
+    ).toEqual({ key: 'classification', done: false });
+  });
+});
+
+describe('columnsOf', () => {
+  it('reads [{name, type}], plain names, and skips duplicates', () => {
+    expect(
+      columnsOf({
+        columns: [
+          { name: 'id', type: 'long' },
+          'email',
+          { name: 'id', type: 'int' },
+          { type: 'x' },
+        ],
+      }),
+    ).toEqual([
+      { name: 'id', type: 'long' },
+      { name: 'email', type: '' },
+    ]);
+    expect(columnsOf(null)).toEqual([]);
   });
 });

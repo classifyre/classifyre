@@ -191,7 +191,8 @@
       "intelligence": "Erkenntnisse",
       "casework": "Fallarbeit",
       "pipeline": "Pipeline"
-    }
+    },
+    "governance": "Governance"
   },
   "glossary": {
     "title": "Entitäten & Glossar",
@@ -7578,7 +7579,8 @@
       "steward": "Ein Steward",
       "description": "Eine Beschreibung",
       "meaning": "Ein freigegebener Glossarbegriff",
-      "certified": "Zertifiziert"
+      "certified": "Zertifiziert",
+      "classification": "Spaltenklassifizierung geprüft"
     },
     "coverage": {
       "owned": "{{owned}} von {{assets}} Assets mit Owner",
@@ -7595,6 +7597,83 @@
       "retired": "Stillgelegt",
       "mine": "Meine (Owner)",
       "stewarding": "Meine (Steward)"
+    },
+    "classification": {
+      "public": "Öffentlich",
+      "internal": "Intern",
+      "confidential": "Vertraulich",
+      "personal": "Personenbezogen",
+      "sensitive": "Sensibel",
+      "secret": "Geheim"
+    },
+    "columns": {
+      "title": "Spalten",
+      "description": "{{count}} Spalten: was sie bedeuten und was offene Funde über ihren Inhalt sagen.",
+      "toReviewCount": "{{count}} zu prüfen.",
+      "loose": "{{count}} offene Funde nennen keine Spalte.",
+      "column": "Spalte",
+      "businessName": "Fachlicher Name",
+      "term": "Glossarbegriff",
+      "classification": "Klassifizierung",
+      "cde": "Kritisches Datenelement",
+      "cdeHint": "Daten, ohne die das Geschäft nicht auskommt: genauer beobachtet.",
+      "derived": "Aus Funden",
+      "override": "Von einem Steward gesetzt",
+      "setBySteward": "keine offenen Funde dahinter",
+      "reviewed": "Geprüft",
+      "toReview": "Noch nicht geprüft",
+      "confirm": "Bestätigen",
+      "edit": "{{name}} bearbeiten",
+      "noType": "Typ unbekannt",
+      "useDerived": "Aus Funden: {{value}}",
+      "none": "Keine",
+      "findings": "Offene Funde: {{list}}",
+      "saveAndConfirm": "Speichern und Klassifizierung bestätigen",
+      "removedTitle": "Spalten, die es in der Tabelle nicht mehr gibt",
+      "removedHint": "Was zu diesen Spalten gesagt wurde, bleibt, bis es auf die neue Spalte verschoben oder verworfen wird.",
+      "moveTo": "Verschieben nach…",
+      "move": "Verschieben",
+      "forget": "Verwerfen"
+    },
+    "usage": {
+      "title": "Nutzung",
+      "description": "Abfragen und Exporte über Classifyre in den letzten {{days}} Tagen.",
+      "reads": "Abfragen",
+      "exports": "Exporte",
+      "readers": "Lesende",
+      "chart": "Abfragen und Exporte pro Tag über {{days}} Tage",
+      "topReaders": "Am meisten gelesen von",
+      "readerCounts": "{{reads}} Abfragen · {{exports}} Exporte",
+      "formats": "Exportiert als {{list}}",
+      "none": "In diesem Zeitraum hat es hier niemand gelesen."
+    },
+    "page": {
+      "title": "Governance",
+      "lead": "Wer für die Daten dieses Workspaces verantwortlich ist und was noch niemandem gehört.",
+      "totals": {
+        "assets": "Assets",
+        "owned": "Mit Owner",
+        "active": "Zertifiziert",
+        "ungoverned": "Ohne Verantwortliche"
+      },
+      "first": {
+        "title": "Zuerst steuern",
+        "description": "Tabellen ohne Owner, die in den letzten {{days}} Tagen gelesen wurden.",
+        "none": "In diesem Zeitraum wurde keine Tabelle ohne Owner gelesen.",
+        "asset": "Tabelle"
+      },
+      "mine": {
+        "title": "Ihre",
+        "description": "Wo Sie oder eine Ihrer Gruppen für Daten verantwortlich sind.",
+        "owned": "Owner von {{count}}",
+        "stewarded": "Steward von {{count}}",
+        "ungoverned": "Alle Assets ohne Verantwortliche"
+      },
+      "sources": {
+        "title": "Nach Quelle",
+        "description": "Assets mit Owner und zertifizierte Assets pro Quelle. Rollen einer Quelle zählen für ihre Assets."
+      },
+      "activity": "Letzte Änderungen"
     }
   }
 }

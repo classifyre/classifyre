@@ -136,6 +136,8 @@ function renderValue(key: string, value: unknown): ReactNode {
 }
 
 type Props = {
+  /** The Overview's columns card already shows them (GOV §5.7). */
+  hideColumns?: boolean;
   metadata: Record<string, unknown> | null | undefined;
 };
 
@@ -159,7 +161,7 @@ function asColumns(value: unknown): Column[] | null {
   return columns.length > 0 ? columns : null;
 }
 
-export function AssetMetadataCard({ metadata }: Props) {
+export function AssetMetadataCard({ metadata, hideColumns }: Props) {
   const { t } = useTranslation();
 
   if (!metadata || typeof metadata !== "object") return null;
@@ -245,7 +247,7 @@ export function AssetMetadataCard({ metadata }: Props) {
           </dl>
         )}
 
-        {columns && <ColumnSchema columns={columns} />}
+        {columns && !hideColumns && <ColumnSchema columns={columns} />}
       </CardContent>
     </Card>
   );

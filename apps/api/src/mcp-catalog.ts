@@ -112,11 +112,14 @@ export const MCP_CAPABILITY_GROUPS: McpCapabilityGroupDto[] = [
       'get_asset',
       'list_source_assets',
       'list_asset_finding_summaries',
+      'get_asset_governance',
+      'set_asset_owner',
     ],
     operations: [
       'Search assets with nested finding filters',
       'Inspect a single asset',
       'Browse asset-level finding summaries',
+      'Read and assign who governs an asset',
     ],
   },
   {

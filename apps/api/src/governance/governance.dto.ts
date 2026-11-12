@@ -59,7 +59,14 @@ export class GovernanceRoleDto {
 
 export class GovernanceChecklistItemDto {
   @ApiProperty({
-    enum: ['owner', 'steward', 'description', 'meaning', 'certified'],
+    enum: [
+      'owner',
+      'steward',
+      'description',
+      'meaning',
+      'classification',
+      'certified',
+    ],
   })
   key: string;
 
@@ -215,4 +222,286 @@ export class AssignGovernanceRoleDto {
   @IsString()
   @MaxLength(200)
   principalRef: string;
+}
+
+// ── Columns (G-2) ───────────────────────────────────────────────────────────
+
+const CLASSIFICATION_VALUES = [
+  'public',
+  'internal',
+  'confidential',
+  'personal',
+  'sensitive',
+  'secret',
+];
+
+export class ColumnFindingGroupDto {
+  @ApiProperty({ example: 'PII' })
+  detectorType: string;
+
+  @ApiProperty({ example: 'EMAIL_ADDRESS' })
+  findingType: string;
+
+  @ApiProperty()
+  count: number;
+
+  @ApiProperty({ enum: ['INFO', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] })
+  maxSeverity: string;
+}
+
+export class ColumnTermDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  key: string;
+
+  @ApiProperty()
+  term: string;
+
+  @ApiProperty()
+  status: string;
+}
+
+export class AssetColumnDto {
+  @ApiProperty()
+  name: string;
+
+  @ApiProperty({ description: 'As the scan recorded it; empty when unknown.' })
+  type: string;
+
+  @ApiPropertyOptional({ nullable: true })
+  businessName: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  description: string | null;
+
+  @ApiPropertyOptional({ type: ColumnTermDto, nullable: true })
+  term: ColumnTermDto | null;
+
+  @ApiProperty({ description: 'ODCS criticalDataElement.' })
+  criticalDataElement: boolean;
+
+  @ApiPropertyOptional({
+    enum: CLASSIFICATION_VALUES,
+    nullable: true,
+    description: "A steward's classification; null when derived.",
+  })
+  classification: string | null;
+
+  @ApiPropertyOptional({
+    enum: CLASSIFICATION_VALUES,
+    nullable: true,
+    description: 'What open findings in this column say.',
+  })
+  derivedClassification: string | null;
+
+  @ApiPropertyOptional({ enum: CLASSIFICATION_VALUES, nullable: true })
+  effectiveClassification: string | null;
+
+  @ApiProperty({ type: [ColumnFindingGroupDto] })
+  findings: ColumnFindingGroupDto[];
+
+  @ApiPropertyOptional({ nullable: true })
+  reviewedAt: Date | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  reviewedBy: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  updatedAt: Date | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  updatedBy: string | null;
+}
+
+export class AssetColumnsDto {
+  @ApiProperty({ type: [AssetColumnDto] })
+  columns: AssetColumnDto[];
+
+  @ApiProperty({
+    type: [AssetColumnDto],
+    description: 'Annotations of columns the last scan no longer has.',
+  })
+  removed: AssetColumnDto[];
+
+  @ApiProperty({
+    description: 'Open findings of a table that name no column.',
+  })
+  findingsWithoutColumn: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Whether every column findings classify was reviewed; absent without columns.',
+  })
+  classificationReviewed?: boolean;
+
+  @ApiProperty()
+  canGovern: boolean;
+}
+
+export class UpdateAssetColumnDto {
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @IsString()
+  businessName?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @IsString()
+  description?: string | null;
+
+  @ApiPropertyOptional({ nullable: true, description: 'A glossary term id.' })
+  @IsOptional()
+  @IsString()
+  termId?: string | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  criticalDataElement?: boolean;
+
+  @ApiPropertyOptional({
+    enum: CLASSIFICATION_VALUES,
+    nullable: true,
+    description: 'Null returns to the derived classification.',
+  })
+  @IsOptional()
+  classification?: string | null;
+
+  @ApiPropertyOptional({
+    description: 'Confirm the classification as it stands.',
+  })
+  @IsOptional()
+  reviewClassification?: boolean;
+}
+
+export class MoveAssetColumnDto {
+  @ApiProperty({ description: 'The column it became.' })
+  @IsString()
+  to: string;
+}
+
+// ── Usage and summary (G-2) ─────────────────────────────────────────────────
+
+export class UsageDayDto {
+  @ApiProperty({ example: '2026-11-12' })
+  day: string;
+
+  @ApiProperty()
+  reads: number;
+
+  @ApiProperty()
+  exports: number;
+}
+
+export class UsageReaderDto {
+  @ApiProperty()
+  actorRef: string;
+
+  @ApiProperty()
+  reads: number;
+
+  @ApiProperty()
+  exports: number;
+}
+
+export class UsageFormatDto {
+  @ApiProperty({ example: 'xlsx' })
+  format: string;
+
+  @ApiProperty()
+  count: number;
+}
+
+export class AssetUsageDto {
+  @ApiProperty()
+  days: number;
+
+  @ApiProperty()
+  reads: number;
+
+  @ApiProperty()
+  exports: number;
+
+  @ApiProperty({ description: 'Distinct people and tokens.' })
+  readers: number;
+
+  @ApiProperty({ type: [UsageDayDto] })
+  perDay: UsageDayDto[];
+
+  @ApiProperty({ type: [UsageReaderDto] })
+  topReaders: UsageReaderDto[];
+
+  @ApiProperty({ type: [UsageFormatDto] })
+  exportsByFormat: UsageFormatDto[];
+}
+
+export class GovernanceTotalsDto {
+  @ApiProperty()
+  assets: number;
+
+  @ApiProperty()
+  owned: number;
+
+  @ApiProperty()
+  active: number;
+}
+
+export class SourceCoverageDto extends GovernanceTotalsDto {
+  @ApiProperty()
+  sourceId: string;
+
+  @ApiProperty()
+  name: string;
+}
+
+export class GovernFirstDto {
+  @ApiProperty()
+  assetId: string;
+
+  @ApiProperty()
+  name: string;
+
+  @ApiProperty()
+  sourceId: string;
+
+  @ApiProperty()
+  sourceName: string;
+
+  @ApiProperty()
+  reads: number;
+
+  @ApiProperty()
+  readers: number;
+}
+
+export class GovernanceMineDto {
+  @ApiProperty({ description: 'Sources and assets you own.' })
+  owned: number;
+
+  @ApiProperty({
+    description: 'Sources and assets you or your groups steward.',
+  })
+  stewarded: number;
+}
+
+export class GovernanceSummaryDto {
+  @ApiProperty()
+  days: number;
+
+  @ApiProperty({ type: GovernanceTotalsDto })
+  totals: GovernanceTotalsDto;
+
+  @ApiProperty({ type: [SourceCoverageDto] })
+  sources: SourceCoverageDto[];
+
+  @ApiProperty({
+    type: [GovernFirstDto],
+    description:
+      'Ungoverned tables read most in the period: govern these first.',
+  })
+  governFirst: GovernFirstDto[];
+
+  @ApiProperty({ type: GovernanceMineDto })
+  mine: GovernanceMineDto;
 }

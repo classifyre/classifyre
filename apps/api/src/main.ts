@@ -19,6 +19,7 @@ import type { IdentityService } from './identity/identity.service';
 import { IDENTITY } from './identity/identity.tokens';
 import {
   CLS_CAPABILITIES,
+  CLS_ORG_ID,
   CLS_PERSON,
   type ClsPerson,
 } from './identity/iam-access-policy';
@@ -369,6 +370,7 @@ async function bootstrap() {
       const actor = owner.principal.actor;
       const capabilities = owner.capabilities;
       cls.set(CLS_CAPABILITIES, capabilities);
+      if (owner.principal.orgId) cls.set(CLS_ORG_ID, owner.principal.orgId);
       cls.set<ClsPerson>(CLS_PERSON, {
         actorRef: `user:${authorizedToken.ownerSub}`,
         groupIds: await identity.groupLineage(owner.principal),

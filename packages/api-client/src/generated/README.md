@@ -330,14 +330,20 @@ All URIs are relative to *http://localhost*
 *GlossaryApi* | [**glossarySemanticControllerFindInTextStatus**](docs/GlossaryApi.md#glossarysemanticcontrollerfindintextstatus) | **GET** /glossary/terms/{idOrKey}/find-in-text/detectors | Detectors generated from a term, with out-of-date flags
 *GlossaryApi* | [**glossarySemanticControllerLinkGroups**](docs/GlossaryApi.md#glossarysemanticcontrollerlinkgroups) | **GET** /glossary/proposals/link-groups | Document suggestions grouped per concept, with a score histogram
 *GlossaryApi* | [**glossarySemanticControllerList**](docs/GlossaryApi.md#glossarysemanticcontrollerlist) | **GET** /glossary/proposals | The review queue: every proposal, one paged list
+*GovernanceApi* | [**governanceControllerAssetColumns**](docs/GovernanceApi.md#governancecontrollerassetcolumns) | **GET** /assets/{id}/columns | A table\&#39;s columns: what stewards said and what open findings classify
 *GovernanceApi* | [**governanceControllerAssetGovernance**](docs/GovernanceApi.md#governancecontrollerassetgovernance) | **GET** /assets/{id}/governance | An asset\&#39;s owners, description, lifecycle and checklist
 *GovernanceApi* | [**governanceControllerAssignAssetRole**](docs/GovernanceApi.md#governancecontrollerassignassetrole) | **POST** /assets/{id}/governance/roles | Make someone owner, steward or custodian of an asset
 *GovernanceApi* | [**governanceControllerAssignSourceRole**](docs/GovernanceApi.md#governancecontrollerassignsourcerole) | **POST** /sources/{id}/governance/roles | Make someone owner, steward or custodian of a source
+*GovernanceApi* | [**governanceControllerMoveColumn**](docs/GovernanceApi.md#governancecontrollermovecolumn) | **POST** /assets/{id}/columns/{name}/move | Move a removed column\&#39;s annotations to the column it became
 *GovernanceApi* | [**governanceControllerPrincipals**](docs/GovernanceApi.md#governancecontrollerprincipals) | **GET** /governance/principals | People and groups of the tenant, for the owner and steward pickers
 *GovernanceApi* | [**governanceControllerRemoveAssetRole**](docs/GovernanceApi.md#governancecontrollerremoveassetrole) | **DELETE** /assets/{id}/governance/roles/{roleId} | End a role on an asset (kept as history)
+*GovernanceApi* | [**governanceControllerRemoveColumn**](docs/GovernanceApi.md#governancecontrollerremovecolumn) | **DELETE** /assets/{id}/columns/{name} | Forget what was said about one column
 *GovernanceApi* | [**governanceControllerRemoveSourceRole**](docs/GovernanceApi.md#governancecontrollerremovesourcerole) | **DELETE** /sources/{id}/governance/roles/{roleId} | End a role on a source (kept as history)
 *GovernanceApi* | [**governanceControllerSourceGovernance**](docs/GovernanceApi.md#governancecontrollersourcegovernance) | **GET** /sources/{id}/governance | A source\&#39;s owners, stewards and custodians, and its coverage
+*GovernanceApi* | [**governanceControllerSummary**](docs/GovernanceApi.md#governancecontrollersummary) | **GET** /governance/summary | How far the workspace is governed: coverage per source, what to govern first, yours
 *GovernanceApi* | [**governanceControllerUpdateAssetGovernance**](docs/GovernanceApi.md#governancecontrollerupdateassetgovernance) | **PUT** /assets/{id}/governance | Change an asset\&#39;s description, legal basis or lifecycle
+*GovernanceApi* | [**governanceControllerUpdateColumn**](docs/GovernanceApi.md#governancecontrollerupdatecolumn) | **PUT** /assets/{id}/columns/{name} | Describe, classify or confirm one column
+*GovernanceApi* | [**governanceControllerUsage**](docs/GovernanceApi.md#governancecontrollerusage) | **GET** /assets/{id}/usage | Who read and exported a table, per day, over the last days
 *GraphApi* | [**graphControllerColumnLineage**](docs/GraphApi.md#graphcontrollercolumnlineage) | **POST** /graph/lineage/column | Trace one column back through the transformations that produced it
 *GraphApi* | [**graphControllerCreateManualEdge**](docs/GraphApi.md#graphcontrollercreatemanualedge) | **POST** /graph/edges/manual | Create a manual edge between two entities (user-defined relation type)
 *GraphApi* | [**graphControllerDeleteEdge**](docs/GraphApi.md#graphcontrollerdeleteedge) | **DELETE** /graph/edges/{id} | Delete an edge
@@ -558,6 +564,8 @@ All URIs are relative to *http://localhost*
 - [ApplyBoardOpsDto](docs/ApplyBoardOpsDto.md)
 - [ApplyBoardOpsResponseDto](docs/ApplyBoardOpsResponseDto.md)
 - [AssetChunkDto](docs/AssetChunkDto.md)
+- [AssetColumnDto](docs/AssetColumnDto.md)
+- [AssetColumnsDto](docs/AssetColumnsDto.md)
 - [AssetFindingDetectorCountDto](docs/AssetFindingDetectorCountDto.md)
 - [AssetFindingSeverityCountDto](docs/AssetFindingSeverityCountDto.md)
 - [AssetFindingStatusCountDto](docs/AssetFindingStatusCountDto.md)
@@ -573,6 +581,7 @@ All URIs are relative to *http://localhost*
 - [AssetSeverityCountsRequestDto](docs/AssetSeverityCountsRequestDto.md)
 - [AssetSeverityCountsResponseDto](docs/AssetSeverityCountsResponseDto.md)
 - [AssetSimilarityDto](docs/AssetSimilarityDto.md)
+- [AssetUsageDto](docs/AssetUsageDto.md)
 - [AssignGovernanceRoleDto](docs/AssignGovernanceRoleDto.md)
 - [AssistantCapabilityReportDto](docs/AssistantCapabilityReportDto.md)
 - [AssistantControllerRespond200Response](docs/AssistantControllerRespond200Response.md)
@@ -678,9 +687,11 @@ All URIs are relative to *http://localhost*
 - [CloseCaseResponseDto](docs/CloseCaseResponseDto.md)
 - [CohortRunYieldDto](docs/CohortRunYieldDto.md)
 - [CohortWeightsPreviewDto](docs/CohortWeightsPreviewDto.md)
+- [ColumnFindingGroupDto](docs/ColumnFindingGroupDto.md)
 - [ColumnLineageDto](docs/ColumnLineageDto.md)
 - [ColumnLineageResponseDto](docs/ColumnLineageResponseDto.md)
 - [ColumnLineageStepDto](docs/ColumnLineageStepDto.md)
+- [ColumnTermDto](docs/ColumnTermDto.md)
 - [ConnectionTestStatusDto](docs/ConnectionTestStatusDto.md)
 - [CorrelationConfigResponseDto](docs/CorrelationConfigResponseDto.md)
 - [CorrelationGraphResponseDto](docs/CorrelationGraphResponseDto.md)
@@ -792,9 +803,13 @@ All URIs are relative to *http://localhost*
 - [GlossarySchemeRefDto](docs/GlossarySchemeRefDto.md)
 - [GlossaryTermDto](docs/GlossaryTermDto.md)
 - [GlossaryTermUsageDto](docs/GlossaryTermUsageDto.md)
+- [GovernFirstDto](docs/GovernFirstDto.md)
 - [GovernanceChecklistItemDto](docs/GovernanceChecklistItemDto.md)
+- [GovernanceMineDto](docs/GovernanceMineDto.md)
 - [GovernancePrincipalDto](docs/GovernancePrincipalDto.md)
 - [GovernanceRoleDto](docs/GovernanceRoleDto.md)
+- [GovernanceSummaryDto](docs/GovernanceSummaryDto.md)
+- [GovernanceTotalsDto](docs/GovernanceTotalsDto.md)
 - [GrantDto](docs/GrantDto.md)
 - [GraphEdgeDto](docs/GraphEdgeDto.md)
 - [GraphNodeDto](docs/GraphNodeDto.md)
@@ -835,6 +850,7 @@ All URIs are relative to *http://localhost*
 - [McpToolSummaryDto](docs/McpToolSummaryDto.md)
 - [MeActorDto](docs/MeActorDto.md)
 - [MeResponseDto](docs/MeResponseDto.md)
+- [MoveAssetColumnDto](docs/MoveAssetColumnDto.md)
 - [NotebookCellDto](docs/NotebookCellDto.md)
 - [NotebookDto](docs/NotebookDto.md)
 - [NotebookExecutionDto](docs/NotebookExecutionDto.md)
@@ -1021,6 +1037,7 @@ All URIs are relative to *http://localhost*
 - [SitemapIndexDto](docs/SitemapIndexDto.md)
 - [SitemapSectionDto](docs/SitemapSectionDto.md)
 - [SourceAssetsControllerBulkIngest201Response](docs/SourceAssetsControllerBulkIngest201Response.md)
+- [SourceCoverageDto](docs/SourceCoverageDto.md)
 - [SourceGovernanceCoverageDto](docs/SourceGovernanceCoverageDto.md)
 - [SourceGovernanceDto](docs/SourceGovernanceDto.md)
 - [SourceInfoDto](docs/SourceInfoDto.md)
@@ -1066,6 +1083,7 @@ All URIs are relative to *http://localhost*
 - [UpdateAgentConfigDto](docs/UpdateAgentConfigDto.md)
 - [UpdateAgentMemoryDto](docs/UpdateAgentMemoryDto.md)
 - [UpdateAiProviderConfigDto](docs/UpdateAiProviderConfigDto.md)
+- [UpdateAssetColumnDto](docs/UpdateAssetColumnDto.md)
 - [UpdateAssetGovernanceDto](docs/UpdateAssetGovernanceDto.md)
 - [UpdateCapabilitiesDto](docs/UpdateCapabilitiesDto.md)
 - [UpdateCaseDto](docs/UpdateCaseDto.md)
@@ -1101,6 +1119,9 @@ All URIs are relative to *http://localhost*
 - [UpsertGlossarySchemeDto](docs/UpsertGlossarySchemeDto.md)
 - [UpsertGlossaryTermDto](docs/UpsertGlossaryTermDto.md)
 - [UpsertGlossaryTermResponseDto](docs/UpsertGlossaryTermResponseDto.md)
+- [UsageDayDto](docs/UsageDayDto.md)
+- [UsageFormatDto](docs/UsageFormatDto.md)
+- [UsageReaderDto](docs/UsageReaderDto.md)
 - [ValueOccurrenceAssetDto](docs/ValueOccurrenceAssetDto.md)
 - [ValueOccurrencesResponseDto](docs/ValueOccurrencesResponseDto.md)
 - [WakeSupervisorDto](docs/WakeSupervisorDto.md)

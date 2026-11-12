@@ -39,7 +39,12 @@ import {
   fetchCatalog,
   type QueryCatalog,
 } from "@/lib/data-query";
-import { useAssetGovernance } from "@/lib/governance";
+import {
+  useAssetColumns,
+  useAssetGovernance,
+  useAssetUsage,
+} from "@/lib/governance";
+import { useCan } from "@/hooks/use-me";
 import { AssetOverview } from "@/components/governance/asset-overview";
 import { GovernanceBadge } from "@/components/governance/governance-badge";
 import { ActorChip } from "@/components/actor-chip";
@@ -47,13 +52,18 @@ import { ActorChip } from "@/components/actor-chip";
 // Monaco and the results grid: client-only, loaded when the Data tab opens.
 const AssetDataTab = dynamic(
   () =>
-    import("@/components/data-query/asset-data-tab").then((m) => m.AssetDataTab),
+    import("@/components/data-query/asset-data-tab").then(
+      (m) => m.AssetDataTab,
+    ),
   { ssr: false },
 );
 
 // The canvas measures the DOM: client-only, loaded when the tab opens.
 const ExploreWorkspace = dynamic(
-  () => import("@/components/explore/explore-workspace").then((m) => m.ExploreWorkspace),
+  () =>
+    import("@/components/explore/explore-workspace").then(
+      (m) => m.ExploreWorkspace,
+    ),
   { ssr: false },
 );
 
@@ -72,7 +82,9 @@ function columnNames(metadata: unknown): string[] {
         ? column
         : ((column as { name?: unknown })?.name ?? ""),
     )
-    .filter((name): name is string => typeof name === "string" && name.length > 0);
+    .filter(
+      (name): name is string => typeof name === "string" && name.length > 0,
+    );
 }
 
 export default function AssetDetailPage() {
@@ -105,6 +117,8 @@ export default function AssetDetailPage() {
   const queryTable = assetId ? catalogTableFor(queryCatalog, assetId) : null;
   // Owners, description, lifecycle (docs/prd/GOV-governed-data-assets.md).
   const governance = useAssetGovernance(assetId);
+  const columns = useAssetColumns(assetId);
+  const usage = useAssetUsage(assetId, useCan("activity.view"));
   const owner = governance.data?.roles.find(
     (role: { role: string }) => role.role === "OWNER",
   );
@@ -271,7 +285,6 @@ export default function AssetDetailPage() {
         )}
       </div>
 
-
       {lockedFilters && (
         <Tabs
           // Remounted once the Data tab is known, so ?tab=data opens it: the
@@ -288,7 +301,10 @@ export default function AssetDetailPage() {
             <TabsTrigger value="findings">
               {t("correlation.findingsTab")}
             </TabsTrigger>
-            <TabsTrigger value="connections" data-testid="asset-connections-tab">
+            <TabsTrigger
+              value="connections"
+              data-testid="asset-connections-tab"
+            >
               {t("explore.assetTab")}
             </TabsTrigger>
             {queryTable && (
@@ -302,84 +318,99 @@ export default function AssetDetailPage() {
               governance={governance.data}
               loading={governance.loading}
               onChange={governance.setData}
+              columns={columns.data}
+              onColumnsChange={(next) => {
+                columns.setData(next);
+                // Reviewing a classification can tick the checklist.
+                void governance.reload();
+              }}
+              usage={usage.data}
+              usageLoading={usage.loading}
               sourceHref={sourceId ? nsPath(`/sources/${sourceId}`) : undefined}
             >
-            <Card className="lg:col-span-2">
-              <CardHeader>
-                <CardTitle>{t("assets.detail.metadata")}</CardTitle>
-                <CardDescription>{t("assets.detail.metadataDesc")}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <SourceIcon source={sourceType} size="md" />
-                  <div>
-                    <div className="text-sm text-muted-foreground">
-                      {t("common.source")}
-                    </div>
-                    {sourceId ? (
-                      <Link
-                        href={nsPath(`/sources/${sourceId}`)}
-                        className="text-base font-semibold underline-offset-4 hover:underline"
-                        title={sourceLabel}
-                      >
-                        {sourceLabel}
-                      </Link>
-                    ) : (
-                      <div className="text-base font-semibold">{sourceLabel}</div>
-                    )}
-                  </div>
-                </div>
-                <Separator />
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <div className="text-xs text-muted-foreground">
-                      {t("assets.detail.assetName")}
-                    </div>
-                    <div className="text-sm font-semibold break-words">
-                      {assetLabel}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-muted-foreground">
-                      {t("assets.detail.assetType")}
-                    </div>
-                    <div className="text-sm font-semibold">
-                      {formatAssetKind(assetDetails.assetType)}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-muted-foreground">
-                      {t("assets.detail.externalUrl")}
-                    </div>
-                    <div className="text-sm font-mono break-all">
-                      {assetDetails.externalUrl || "—"}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-muted-foreground">
-                      {t("assets.detail.sourceProfile")}
-                    </div>
-                    {sourceId ? (
-                      <Link
-                        href={nsPath(`/sources/${sourceId}`)}
-                        className="text-sm font-semibold underline-offset-4 hover:underline"
-                      >
-                        {t("assets.detail.openSourceDetails")}
-                      </Link>
-                    ) : (
-                      <div className="text-sm font-semibold">
-                        {t("assets.detail.unavailable")}
+              <Card className="lg:col-span-2">
+                <CardHeader>
+                  <CardTitle>{t("assets.detail.metadata")}</CardTitle>
+                  <CardDescription>
+                    {t("assets.detail.metadataDesc")}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <SourceIcon source={sourceType} size="md" />
+                    <div>
+                      <div className="text-sm text-muted-foreground">
+                        {t("common.source")}
                       </div>
-                    )}
+                      {sourceId ? (
+                        <Link
+                          href={nsPath(`/sources/${sourceId}`)}
+                          className="text-base font-semibold underline-offset-4 hover:underline"
+                          title={sourceLabel}
+                        >
+                          {sourceLabel}
+                        </Link>
+                      ) : (
+                        <div className="text-base font-semibold">
+                          {sourceLabel}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                  <Separator />
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <div className="text-xs text-muted-foreground">
+                        {t("assets.detail.assetName")}
+                      </div>
+                      <div className="text-sm font-semibold break-words">
+                        {assetLabel}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">
+                        {t("assets.detail.assetType")}
+                      </div>
+                      <div className="text-sm font-semibold">
+                        {formatAssetKind(assetDetails.assetType)}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">
+                        {t("assets.detail.externalUrl")}
+                      </div>
+                      <div className="text-sm font-mono break-all">
+                        {assetDetails.externalUrl || "—"}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">
+                        {t("assets.detail.sourceProfile")}
+                      </div>
+                      {sourceId ? (
+                        <Link
+                          href={nsPath(`/sources/${sourceId}`)}
+                          className="text-sm font-semibold underline-offset-4 hover:underline"
+                        >
+                          {t("assets.detail.openSourceDetails")}
+                        </Link>
+                      ) : (
+                        <div className="text-sm font-semibold">
+                          {t("assets.detail.unavailable")}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-            {assetDetails.metadata &&
-              Object.keys(assetDetails.metadata).length > 0 && (
-                <AssetMetadataCard metadata={assetDetails.metadata} />
-              )}
+              {assetDetails.metadata &&
+                Object.keys(assetDetails.metadata).length > 0 && (
+                  <AssetMetadataCard
+                    metadata={assetDetails.metadata}
+                    hideColumns={Boolean(columns.data?.columns.length)}
+                  />
+                )}
             </AssetOverview>
           </TabsContent>
           <TabsContent value="findings" className="space-y-4">

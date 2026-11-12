@@ -17,12 +17,18 @@ import {
 } from '@nestjs/swagger';
 import { Requires, SignedInOnly } from '../identity/access.decorators';
 import {
+  AssetColumnsDto,
+  AssetUsageDto,
+  GovernanceSummaryDto,
+  MoveAssetColumnDto,
+  UpdateAssetColumnDto,
   AssetGovernanceDto,
   AssignGovernanceRoleDto,
   GovernancePrincipalDto,
   SourceGovernanceDto,
   UpdateAssetGovernanceDto,
 } from './governance.dto';
+import { GovernanceInsightsService } from './governance-insights.service';
 import { GovernanceService } from './governance.service';
 
 /**
@@ -36,7 +42,93 @@ import { GovernanceService } from './governance.service';
 @ApiTags('Governance')
 @Controller()
 export class GovernanceController {
-  constructor(private readonly governance: GovernanceService) {}
+  constructor(
+    private readonly governance: GovernanceService,
+    private readonly insights: GovernanceInsightsService,
+  ) {}
+
+  @Get('assets/:id/columns')
+  @Requires('asset.view')
+  @ApiOperation({
+    summary:
+      "A table's columns: what stewards said and what open findings classify",
+  })
+  @ApiOkResponse({ type: AssetColumnsDto })
+  assetColumns(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<AssetColumnsDto> {
+    return this.governance.assetColumns(id);
+  }
+
+  @Put('assets/:id/columns/:name')
+  @Requires('asset.view')
+  @SignedInOnly()
+  @ApiOperation({
+    summary: 'Describe, classify or confirm one column',
+    description:
+      'Needs asset.govern, or the owner or steward role on the asset or its source.',
+  })
+  @ApiOkResponse({ type: AssetColumnsDto })
+  updateColumn(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('name') name: string,
+    @Body() body: UpdateAssetColumnDto,
+  ): Promise<AssetColumnsDto> {
+    return this.governance.updateColumn(id, name, body ?? {});
+  }
+
+  @Post('assets/:id/columns/:name/move')
+  @Requires('asset.view')
+  @SignedInOnly()
+  @ApiOperation({
+    summary: "Move a removed column's annotations to the column it became",
+  })
+  @ApiOkResponse({ type: AssetColumnsDto })
+  moveColumn(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('name') name: string,
+    @Body() body: MoveAssetColumnDto,
+  ): Promise<AssetColumnsDto> {
+    return this.governance.moveColumn(id, name, body?.to);
+  }
+
+  @Delete('assets/:id/columns/:name')
+  @Requires('asset.view')
+  @SignedInOnly()
+  @ApiOperation({ summary: 'Forget what was said about one column' })
+  @ApiOkResponse({ type: AssetColumnsDto })
+  removeColumn(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('name') name: string,
+  ): Promise<AssetColumnsDto> {
+    return this.governance.removeColumn(id, name);
+  }
+
+  @Get('assets/:id/usage')
+  @Requires('activity.view')
+  @ApiOperation({
+    summary: 'Who read and exported a table, per day, over the last days',
+  })
+  @ApiQuery({ name: 'days', required: false, description: '1–365, default 30' })
+  @ApiOkResponse({ type: AssetUsageDto })
+  usage(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('days') days?: string,
+  ): Promise<AssetUsageDto> {
+    return this.insights.usage(id, Number(days ?? 30));
+  }
+
+  @Get('governance/summary')
+  @Requires('asset.view')
+  @ApiOperation({
+    summary:
+      'How far the workspace is governed: coverage per source, what to govern first, yours',
+  })
+  @ApiQuery({ name: 'days', required: false, description: '1–365, default 30' })
+  @ApiOkResponse({ type: GovernanceSummaryDto })
+  summary(@Query('days') days?: string): Promise<GovernanceSummaryDto> {
+    return this.insights.summary(this.governance.person(), Number(days ?? 30));
+  }
 
   @Get('assets/:id/governance')
   @Requires('asset.view')
