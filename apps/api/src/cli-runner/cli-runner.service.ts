@@ -5102,7 +5102,10 @@ export class CliRunnerService {
     /** True when this run is in the lane that goes ahead of scheduled sweeps. */
     priority: boolean;
     runningNow: number;
-    /** Concurrent scans this deployment allows. 0 means unlimited. */
+    /**
+     * Concurrent scans the installation allows (the ceiling a workspace cap
+     * sits under). 0 means unlimited.
+     */
     concurrencyLimit: number;
     reason: string | null;
   }> {
@@ -5144,7 +5147,9 @@ export class CliRunnerService {
       runner.triggerType === TriggerType.API ||
       !hasCompleted;
 
-    const [ahead, runningNow] = await Promise.all([
+    const workspaceLimit =
+      (await this.deploymentSettings?.override('maxConcurrentRunners')) ?? 0;
+    const [ahead, runningNow, runningHere] = await Promise.all([
       this.prisma.runner.count({
         where: {
           status: RunnerStatus.PENDING,
@@ -5153,6 +5158,9 @@ export class CliRunnerService {
         },
       }),
       this.countRunningRunners(),
+      workspaceLimit > 0
+        ? this.prisma.runner.count({ where: { status: RunnerStatus.RUNNING } })
+        : Promise.resolve(0),
     ]);
 
     // countRunningRunners answers MAX_SAFE_INTEGER when the cross-namespace
@@ -5166,6 +5174,11 @@ export class CliRunnerService {
     } else if (concurrencyLimit > 0 && runningNow >= concurrencyLimit) {
       parts.push(
         `${runningNow} scan(s) running across the instance (limit ${concurrencyLimit})`,
+      );
+    }
+    if (workspaceLimit > 0 && runningHere >= workspaceLimit) {
+      parts.push(
+        `${runningHere} scan(s) running in this workspace (workspace limit ${workspaceLimit})`,
       );
     }
     if (ahead > 0) {
@@ -5821,13 +5834,14 @@ export class CliRunnerService {
   /**
    * How many scans this machine may run at once. 0 means unlimited.
    *
-   * Deployment-wide rather than per-workspace: two scans contend for the same
-   * cores whichever workspace started them, so the budget belongs to whoever
-   * owns the machine. `MAX_CONCURRENT_RUNNERS` is set by the Helm chart on
-   * Kubernetes, and derived from the container's CPU and memory limits by the
-   * all-in-one image (docker/entrypoint.sh) — it used to also be a
-   * per-workspace row in instance_settings, but that control was inert on
-   * every real deployment because the environment variable always won.
+   * The installation-wide CEILING, and it is deliberately not a Settings value:
+   * two scans contend for the same cores whichever workspace started them, so
+   * the budget belongs to whoever owns the machine. `MAX_CONCURRENT_RUNNERS` is
+   * set by the Helm chart on Kubernetes, and derived from the container's CPU
+   * and memory limits by the all-in-one image (docker/entrypoint.sh).
+   *
+   * A workspace can hold ITSELF below this in Settings (see
+   * `hasWorkspaceCapacity`), never above it.
    */
   private resolveMaxConcurrentRunners(): number {
     const raw = process.env.MAX_CONCURRENT_RUNNERS;
@@ -5838,17 +5852,31 @@ export class CliRunnerService {
     return DEFAULT_MAX_CONCURRENT_RUNNERS;
   }
 
+  /** Whether a new scan fits under both this workspace's cap and the ceiling. */
   private async canStartNewRunner(): Promise<boolean> {
-    // A workspace may hold itself below the deployment ceiling in Settings.
+    return (
+      (await this.hasWorkspaceCapacity()) && (await this.hasInstanceCapacity())
+    );
+  }
+
+  /**
+   * The calling workspace's own cap from Settings. Reads the CURRENT
+   * namespace, so it must only run inside the namespace being decided about.
+   * A workspace without a cap (null or 0) always has capacity here.
+   */
+  private async hasWorkspaceCapacity(): Promise<boolean> {
     const workspaceLimit = await this.deploymentSettings?.override(
       'maxConcurrentRunners',
     );
-    if (workspaceLimit) {
-      const own = await this.prisma.runner.count({
-        where: { status: RunnerStatus.RUNNING },
-      });
-      if (own >= workspaceLimit) return false;
-    }
+    if (!workspaceLimit) return true;
+    const own = await this.prisma.runner.count({
+      where: { status: RunnerStatus.RUNNING },
+    });
+    return own < workspaceLimit;
+  }
+
+  /** Whether the installation-wide ceiling still has a free slot. */
+  private async hasInstanceCapacity(): Promise<boolean> {
     const limit = this.resolveMaxConcurrentRunners();
     if (limit === 0) return true;
     return (await this.countRunningRunners()) < limit;
@@ -5927,7 +5955,11 @@ export class CliRunnerService {
     if (!this.namespaceRegistry || !this.cls) {
       return this.dequeuePendingRunnerInCurrentNamespace();
     }
-    if (!(await this.canStartNewRunner())) return false;
+    // Only the instance-wide ceiling is decided here. The caller's own
+    // workspace cap says nothing about the namespace the next run belongs to:
+    // `findNextPendingRunner` skips namespaces already at their cap, and the
+    // claim re-checks the target's cap inside the target's context.
+    if (!(await this.hasInstanceCapacity())) return false;
 
     let next: Awaited<
       ReturnType<NamespaceRegistryService['findNextPendingRunner']>

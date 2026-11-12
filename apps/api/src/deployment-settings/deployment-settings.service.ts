@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 
 /** The scan limits an operator can change without redeploying. */
@@ -30,11 +30,31 @@ export interface RunnerLimit {
   override: number | null;
   /** What the Helm chart or the all-in-one image sets (or the built-in default). */
   deploymentDefault: number;
-  /** What is in force: the override when there is one. */
+  /**
+   * What is in force: the override when there is one. For scans at once the
+   * deployment value stays a ceiling, so the smaller of the two (0 = no cap).
+   */
   effective: number;
 }
 
 export type RunnerLimits = Record<RunnerLimitKey, RunnerLimit>;
+
+/**
+ * The scans-at-once cap one workspace actually runs under.
+ *
+ * A workspace may hold itself BELOW the installation-wide ceiling, never above
+ * it: two scans contend for the same cores whichever workspace started them.
+ * `0` means "no cap" on both sides, so a workspace value of 0 adds nothing and
+ * a ceiling of 0 (unlimited) leaves the workspace value as the only cap.
+ */
+export function effectiveConcurrentRunners(
+  workspaceLimit: number | null,
+  ceiling: number,
+): number {
+  if (!workspaceLimit) return ceiling;
+  if (ceiling === 0) return workspaceLimit;
+  return Math.min(workspaceLimit, ceiling);
+}
 
 function parseLimit(raw: string | undefined | null): number | null {
   if (raw === undefined || raw === null || raw.trim() === '') return null;
@@ -54,6 +74,8 @@ function parseLimit(raw: string | undefined | null): number | null {
  */
 @Injectable()
 export class DeploymentSettingsService {
+  private readonly logger = new Logger(DeploymentSettingsService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   /** The environment value for a limit, or the built-in default. */
@@ -70,7 +92,12 @@ export class DeploymentSettingsService {
       });
       const value = (row as Record<string, number | null> | null)?.[key];
       return typeof value === 'number' ? value : null;
-    } catch {
+    } catch (error) {
+      // Falls back to the deployment value, which is the ceiling for the
+      // scans-at-once cap, so this never lets a workspace exceed the machine.
+      this.logger.warn(
+        `Could not read the ${key} setting, using the deployment value: ${String(error)}`,
+      );
       return null;
     }
   }
@@ -90,7 +117,10 @@ export class DeploymentSettingsService {
       result[key] = {
         override,
         deploymentDefault,
-        effective: override ?? deploymentDefault,
+        effective:
+          key === 'maxConcurrentRunners'
+            ? effectiveConcurrentRunners(override, deploymentDefault)
+            : (override ?? deploymentDefault),
       };
     }
     return result;

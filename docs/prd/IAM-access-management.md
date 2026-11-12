@@ -149,7 +149,7 @@ Every REST route declares one with `@Requires('<capability>')`. Every MCP tool d
 
 | Area                | Capabilities                                                                                                                      |
 | ------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| Workspace           | `workspace.view`, `workspace.settings`, `workspace.pause`, `workspace.delete`, `workspace.transfer` (export/import/copy)          |
+| Workspace           | `workspace.view`, `workspace.settings`, `workspace.pause`, `workspace.delete`                                                 |
 | Access              | `access.view`, `access.manage` (grants on this workspace)                                                                         |
 | Sources and scans   | `source.view`, `source.manage`, `source.run`, `source.purge`                                                                      |
 | Findings and assets | `finding.view`, `finding.triage` (status, severity, bulk), `asset.view`, `asset.tag`                                              |
@@ -438,7 +438,6 @@ One component set in `@workspace/ui`, built from today's `ai-actor-badge.tsx`:
 | Settings: MCP tokens                           | Owner column, last used, "acting as"; admins see every token in the workspace and can revoke                                                                                  |
 | Settings: AI providers, MCP servers, chat bots | `ChangedBy` on each                                                                                                                                                           |
 | Notifications                                  | Who caused the event                                                                                                                                                          |
-| Data transfer                                  | Who exported, imported or copied, and when                                                                                                                                    |
 
 Without IAM the same components show the self-declared name with a small "unverified" mark, so H1 and H6 hold together.
 

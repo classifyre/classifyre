@@ -27,9 +27,10 @@ const FIELDS = [
 type Field = (typeof FIELDS)[number];
 
 /**
- * Settings → General: the scan limits of the deployment. A value saved here
- * outranks the Helm chart and the all-in-one image; an empty field hands the
- * limit back to them.
+ * Settings → General: the scan limits of this workspace. A value saved here
+ * outranks the Helm chart and the all-in-one image for this workspace; an
+ * empty field hands the limit back to them. Scans at once can only hold the
+ * workspace below the installation-wide limit, which `effective` reflects.
  */
 export function RunnerLimitsCard() {
   const { t } = useTranslation();
@@ -63,8 +64,7 @@ export function RunnerLimitsCard() {
   const save = async () => {
     setBusy(true);
     try {
-      const toValue = (raw: string) =>
-        raw.trim() === "" ? null : Number(raw);
+      const toValue = (raw: string) => (raw.trim() === "" ? null : Number(raw));
       apply(
         await api.deploymentSettings.deploymentSettingsControllerUpdate({
           updateRunnerLimitsDto: {
@@ -130,6 +130,19 @@ export function RunnerLimitsCard() {
                         })}
                   </p>
                 )}
+                {limit &&
+                  limit.override !== null &&
+                  limit.override > 0 &&
+                  limit.effective !== limit.override && (
+                    <p
+                      className="text-xs text-amber-600 dark:text-amber-400"
+                      data-testid={`runner-limit-${field}-capped`}
+                    >
+                      {t("runnerLimits.cappedByInstallation", {
+                        value: limit.effective,
+                      })}
+                    </p>
+                  )}
               </div>
             );
           })}

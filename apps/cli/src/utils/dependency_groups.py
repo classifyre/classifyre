@@ -28,7 +28,7 @@ DETECTOR_TYPE_GROUPS: dict[str, set[str]] = {
 }
 
 # Source type -> primary driver group. Sources whose driver is in the base image
-# (slack, wordpress, confluence, jira, notion, sitemap, servicedesk, sqlite,
+# (slack, wordpress, confluence, jira, notion, sitemap, servicedesk,
 # powerbi) are omitted. Attachment/file parsing installs on demand.
 SOURCE_TYPE_GROUPS: dict[str, set[str]] = {
     "POSTGRESQL": {"postgresql"},

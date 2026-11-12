@@ -7465,6 +7465,7 @@
     "maxRunnersPerSourceHint": "Finished runs kept for each source of this workspace; older ones are removed. 0 keeps everything.",
     "followsDeployment": "Following the chart or image: {{value}}",
     "overridden": "Set here (chart or image: {{value}})",
+    "cappedByInstallation": "The installation-wide limit is lower, so {{value}} applies.",
     "save": "Save scan limits",
     "saved": "Saved"
   }

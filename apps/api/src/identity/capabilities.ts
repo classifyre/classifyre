@@ -28,7 +28,7 @@ export const CAPABILITIES = [
     id: 'settings.view',
     scope: 'workspace',
     description:
-      'See the workspace settings: language and time, workers, cleanup, MCP, chat bots, SQL limits. Never held by visitors of a public workspace.',
+      'See the workspace settings: language and time, workers, cleanup, MCP, chat bots, SQL and scan limits. Never held by visitors of a public workspace.',
   },
   {
     id: 'activity.view',

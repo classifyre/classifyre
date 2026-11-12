@@ -7465,6 +7465,7 @@
     "maxRunnersPerSourceHint": "Abgeschlossene Läufe, die je Quelle dieses Arbeitsbereichs aufbewahrt werden; ältere werden entfernt. 0 behält alles.",
     "followsDeployment": "Folgt Chart bzw. Image: {{value}}",
     "overridden": "Hier festgelegt (Chart bzw. Image: {{value}})",
+    "cappedByInstallation": "Das Limit der gesamten Installation ist niedriger, daher gilt {{value}}.",
     "save": "Scan-Limits speichern",
     "saved": "Gespeichert"
   }

@@ -587,6 +587,19 @@ describe('AutoScheduleService', () => {
       expect(cliRunner.startRun).not.toHaveBeenCalled();
     });
 
+    it("takes the auto-scan limit from this workspace's Settings when it has one", async () => {
+      const effective = jest.fn().mockResolvedValue(1);
+      Object.assign(service, { deploymentSettings: { effective } });
+      // One scan in flight fills a limit of 1 (the default of 2 would not).
+      prisma.source.count.mockResolvedValue(1);
+
+      await service.tick();
+
+      expect(effective).toHaveBeenCalledWith('autoScheduleMaxConcurrent');
+      expect(cliRunner.startRun).not.toHaveBeenCalled();
+      Object.assign(service, { deploymentSettings: undefined });
+    });
+
     it('promotes queued runs while yielding, so a stranded queue cannot pass for a busy one', async () => {
       // Observed 2026-09-14: two PENDING runs in two namespaces and an idle
       // runner slot. Each namespace's tick counted its own PENDING run as in

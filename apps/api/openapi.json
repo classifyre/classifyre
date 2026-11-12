@@ -11984,7 +11984,7 @@
             }
           }
         },
-        "summary": "Scan limits of this deployment: what is saved in Settings and what the chart or image sets",
+        "summary": "Scan limits of this workspace: what is saved in Settings and what the chart or image sets",
         "tags": [
           "Settings"
         ]
@@ -12014,7 +12014,7 @@
             }
           }
         },
-        "summary": "Set scan limits for the whole deployment; null hands a limit back to the chart or image",
+        "summary": "Set scan limits for this workspace; null hands a limit back to the chart or image. Scans at once can only be held below the installation-wide ceiling",
         "tags": [
           "Settings"
         ]
