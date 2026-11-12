@@ -24,15 +24,53 @@ There is nothing to switch on: who may query which table follows roles and grant
 
 ## What you can query
 
+SQL runs on DuckDB, so a source is queryable when DuckDB has a built-in way to reach it. Scan a source first: SQL only knows the tables a scan found.
+
 | Source | What becomes a table |
 | --- | --- |
 | PostgreSQL, MySQL | Every scanned table and view |
+| Databricks | Every scanned Unity Catalog table stored as Delta (not views) — see [Databricks](#databricks) |
 | Iceberg REST catalogs, DuckLake | Every scanned table |
-| S3-compatible storage, Azure Blob, Google Cloud Storage, Local folder | Delta and Iceberg tables, and Parquet, CSV, TSV, JSON-lines and Avro files |
+| S3-compatible storage, Azure Blob, Google Cloud Storage, Local folder | Delta and Iceberg tables, and the [files](#files-in-a-bucket-or-folder) below |
 
-Lance, Hudi and Paimon tables, and other source types, are listed with the reason they cannot be queried yet. Scan a source first: SQL only knows the tables a scan found.
+### Files in a bucket or folder
 
-A MySQL source set to verify the server's certificate (**SSL mode** *Verify CA* or *Verify identity*) cannot be queried with SQL yet: the query engine cannot check the certificate, so it refuses rather than connect without the check. Scans still verify it.
+| Format | Extensions | Notes |
+| --- | --- | --- |
+| Parquet | `.parquet` | Reads only the columns and row groups a query needs. |
+| CSV, TSV | `.csv`, `.tsv` | Header and column types are detected. |
+| JSON Lines | `.jsonl`, `.ndjson` | One JSON object per line. |
+| JSON | `.json` | A file holding an array of objects (or one object) is one row per object. |
+| Avro | `.avro` | |
+| Geospatial | `.geojson`, `.fgb` (FlatGeobuf), `.dbf` (the table of a shapefile) | One row per feature; the geometry column is WKT text, for example `POINT (1 2)`. |
+| Delta, Iceberg tables | a table folder | Read as they are now, not as the last scan saw them. |
+
+These are what DuckDB can read straight from a bucket without downloading the object. A file of another format is listed with the reason it cannot be queried yet:
+
+| Format | Why not |
+| --- | --- |
+| Excel (`.xlsx`, `.xls`, `.ods`) | DuckDB's spreadsheet reader stalls on objects in a bucket, and a title row above the header costs it columns. |
+| SQLite, GeoPackage (`.sqlite`, `.db`, `.gpkg`) | SQLite files can only be opened from a local disk. |
+| DuckDB database files, ORC, Arrow IPC (`.arrow`), Vortex | Not readable from a bucket by the query engine yet. |
+| Lance, Hudi and Paimon tables | Not supported yet. |
+| Compressed files and archives (`.csv.gz`, `.zip`, `.tar.gz`) | Not unpacked for SQL; scans read what is inside them. |
+
+Scans read all of these (see [File formats](/sources/file-formats/)); SQL is the narrower list.
+
+### Databricks
+
+A Databricks source is queried through Unity Catalog with the same credentials the scan uses (a personal access token, or the OAuth token of its service principal). DuckDB asks Unity Catalog for short-lived credentials to the table's files, so you do not give Classifyre any storage keys. Two things must be switched on in Databricks, otherwise a query answers that Databricks would not hand out storage credentials:
+
+- an admin turns on **External data access** for the metastore, and
+- the source's principal holds the **EXTERNAL USE SCHEMA** privilege on each schema you want to query.
+
+Only Delta tables can be read. **Views** are listed but cannot be queried, because they have no files of their own; query the tables they read instead.
+
+### Sources that cannot be queried
+
+DuckDB has no built-in connector for Snowflake, BigQuery, SQL Server, Oracle, Redshift, Athena, Trino, Dremio, Hive, MongoDB, Elasticsearch, OpenSearch, Meilisearch, Neo4j or Kafka, so their tables are listed with the reason. The same holds for sources of documents and messages (Confluence, Jira, SharePoint, Slack and the like): they have no tables. Use the source's own query tool, or land the data in a bucket as Parquet or Delta.
+
+A MySQL source set to verify the server's certificate (**SSL mode** *Verify CA* or *Verify identity*) is queried the same way it is scanned: the query checks the server's certificate against the CA you stored on the source (or the system's trusted roots when there is none), and fails to connect if it does not match.
 
 ## Names
 

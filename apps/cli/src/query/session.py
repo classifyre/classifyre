@@ -226,7 +226,12 @@ class QuerySession:
                 )
                 created_schemas.add((name.source, name.schema))
             target = ".".join(quote_identifier(p) for p in (name.source, name.schema, name.table))
-            conn.execute(f"CREATE VIEW {target} AS SELECT * FROM {relation}")
+            try:
+                conn.execute(f"CREATE VIEW {target} AS SELECT * FROM {relation}")
+            except Exception as exc:
+                raise BindingError(
+                    f"Failed to read {binding.label()}: {binding.explain(exc) or _first_line(exc)}"
+                ) from exc
 
     @contextmanager
     def _deadline(self, conn: Any, seconds: float) -> Iterator[threading.Event]:

@@ -14,12 +14,13 @@ import { stripLiteralsAndComments } from './sql-precheck';
  * Source types the CLI can attach or scan with DuckDB.
  *
  * Keep in sync with `QUERYABLE_SOURCE_TYPES` in
- * apps/cli/src/query/bindings.py (same eight values); the API names them,
+ * apps/cli/src/query/bindings.py (same nine values); the API names them,
  * the job attaches them.
  */
 export const QUERYABLE_SOURCE_TYPES = new Set([
   'POSTGRESQL',
   'MYSQL',
+  'DATABRICKS',
   'ICEBERG_REST',
   'DUCKLAKE',
   'S3_COMPATIBLE_STORAGE',
@@ -58,6 +59,10 @@ const FILE_FORMATS: Record<string, string> = {
   'application/x-jsonlines': 'jsonl',
   'application/avro': 'avro',
   'application/vnd.apache.avro': 'avro',
+  'application/json': 'json',
+  'application/geo+json': 'geojson',
+  'application/vnd.flatgeobuf': 'fgb',
+  'application/vnd.dbf': 'dbf',
 };
 
 const FILE_FORMATS_BY_EXTENSION: Record<string, string> = {
@@ -67,6 +72,10 @@ const FILE_FORMATS_BY_EXTENSION: Record<string, string> = {
   jsonl: 'jsonl',
   ndjson: 'jsonl',
   avro: 'avro',
+  json: 'json',
+  geojson: 'geojson',
+  fgb: 'fgb',
+  dbf: 'dbf',
 };
 
 /** Names DuckDB keeps for itself, never given to a source. */
@@ -194,6 +203,28 @@ export function tableAddress(
         ? { kind: 'catalog', database, table: tableName }
         : null,
       reason: database ? undefined : 'Scan the source again to locate it.',
+    };
+  }
+  if (sourceType === 'DATABRICKS') {
+    // Unity Catalog: catalog.schema.table. DuckDB reads its Delta tables;
+    // views have no files of their own to read.
+    const catalog = text(metadata.catalog) ?? database;
+    const s = schema ?? 'default';
+    const isView = /view/i.test(
+      text(metadata.object_type) ?? text(metadata.table_type) ?? '',
+    );
+    const located = Boolean(catalog && schema) && !isView;
+    return {
+      schema: multiDatabase && catalog ? `${catalog}_${s}` : s,
+      table: tableName,
+      location: located
+        ? { kind: 'catalog', database: catalog, schema: s, table: tableName }
+        : null,
+      reason: isView
+        ? 'Views in Databricks cannot be queried with SQL yet.'
+        : located
+          ? undefined
+          : 'Scan the source again to locate it.',
     };
   }
   if (sourceType === 'ICEBERG_REST' || sourceType === 'DUCKLAKE') {
