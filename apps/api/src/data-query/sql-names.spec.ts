@@ -235,4 +235,40 @@ describe('resource grants', () => {
     );
     expect(grants).toEqual({ sourceIds: ['src-a'], assetIds: ['asset-b'] });
   });
+
+  it('reads an ODBC table by the name the scan recorded', () => {
+    const meta = {
+      database: 'warehouse',
+      catalog: 'warehouse',
+      schema: 'sales',
+      table_name: 'orders',
+      qualified_name: '"warehouse"."sales"."orders"',
+    };
+    expect(tableAddress('ODBC', 'table', 'x', meta)).toEqual({
+      schema: 'sales',
+      table: 'orders',
+      location: {
+        kind: 'catalog',
+        database: 'warehouse',
+        schema: 'sales',
+        table: 'orders',
+        qualifiedName: '"warehouse"."sales"."orders"',
+      },
+      reason: undefined,
+    });
+    expect(tableAddress('ODBC', 'table', 'x', meta, true).schema).toBe(
+      'warehouse_sales',
+    );
+    // A catalog-free driver: the schema alone names it; nothing recorded, no location.
+    const bare = tableAddress('ODBC', 'table', 'x', {
+      database: 'default',
+      table_name: 'log_lines',
+      qualified_name: '"log_lines"',
+    });
+    expect(bare.schema).toBe('main');
+    expect(bare.location).toMatchObject({ qualifiedName: '"log_lines"' });
+    const old = tableAddress('ODBC', 'table', 'x', { table_name: 'orders' });
+    expect(old.location).toBeNull();
+    expect(old.reason).toContain('Scan the source again');
+  });
 });

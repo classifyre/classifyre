@@ -132,9 +132,12 @@ ENV UV_LINK_MODE=copy \
 # spend most of its time installing them. The DuckDB extensions those queries
 # and the table readers use are downloaded here too, into a read-only directory
 # the CLI loads from before it tries the shared extension cache or INSTALL.
+# ODBC is in the same list: pyodbc (group `odbc`) and DuckDB's ODBC scanner, which
+# DuckDB publishes only in its nightly repository (`INSTALL odbc FROM core_nightly`).
 RUN uv venv --python /usr/local/bin/python3 .venv \
-    && uv sync --locked --no-dev --group file-processing --group lineage \
-    && .venv/bin/python -c "import duckdb; c = duckdb.connect(); c.execute(\"SET extension_directory = '/opt/duckdb-extensions'\"); [c.execute('INSTALL ' + e) for e in ('httpfs', 'postgres', 'mysql', 'sqlite', 'delta', 'iceberg', 'ducklake', 'azure', 'avro', 'excel', 'unity_catalog', 'spatial')]"
+    && uv sync --locked --no-dev --group file-processing --group lineage --group odbc \
+    && .venv/bin/python -c "import duckdb; c = duckdb.connect(); c.execute(\"SET extension_directory = '/opt/duckdb-extensions'\"); [c.execute('INSTALL ' + e) for e in ('httpfs', 'postgres', 'mysql', 'sqlite', 'delta', 'iceberg', 'ducklake', 'azure', 'avro', 'excel', 'unity_catalog', 'spatial')]" \
+    && .venv/bin/python -c "import duckdb; c = duckdb.connect(); c.execute(\"SET extension_directory = '/opt/duckdb-extensions'\"); c.execute('INSTALL odbc FROM core_nightly')"
 
 # ── web-final: standalone Next.js server ──────────────────────────────────────
 FROM node:${NODE_VERSION}-bookworm-slim AS web-final
@@ -214,6 +217,11 @@ ENV UV_LINK_MODE=copy \
 #     desktop suite. -core carries the conversion engine; writer/calc/impress
 #     carry the .doc / .xls / .ppt import filters respectively — dropping any
 #     one of them turns that format back into a silent "no content" asset.
+#   unixodbc + odbc-postgresql — the ODBC source (a scan through pyodbc, SQL
+#     through DuckDB's odbc_scanner) needs the driver manager and a driver for
+#     the database it reaches. PostgreSQL's is here because it is free, small,
+#     and what the smoke test signs in with; every other vendor's driver is the
+#     operator's to add (docs/sources/odbc).
 #   git + openssh-client — the Git source, which talks the wire protocol through
 #     the git binary rather than any provider REST API. openssh-client is what
 #     makes an ssh:// remote and a deploy key work; without it only http(s)
@@ -227,6 +235,7 @@ RUN set -eux; \
     apt-get install -y --no-install-recommends \
         libgl1 libglib2.0-0 ca-certificates \
         git openssh-client \
+        unixodbc odbc-postgresql \
         libreoffice-core-nogui libreoffice-writer-nogui \
         libreoffice-calc-nogui libreoffice-impress-nogui \
         fonts-dejavu-core; \

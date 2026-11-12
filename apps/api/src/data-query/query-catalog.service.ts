@@ -255,7 +255,8 @@ export class QueryCatalogService {
       if (!list.length) continue;
       const type = String(source.type);
       // Catalog-per-database sources: PostgreSQL's databases, Databricks'
-      // catalogs. More than one and the database joins the schema name.
+      // catalogs, an ODBC driver's catalogs. More than one and the database
+      // joins the schema name.
       const databases = new Set(
         list
           .map((a) => (a.metadata as Record<string, unknown> | null)?.database)
@@ -268,7 +269,7 @@ export class QueryCatalogService {
           asset.assetType,
           asset.name,
           (asset.metadata ?? {}) as Record<string, unknown>,
-          (type === 'POSTGRESQL' || type === 'DATABRICKS') &&
+          (type === 'POSTGRESQL' || type === 'DATABRICKS' || type === 'ODBC') &&
             databases.size > 1,
         ),
       }));

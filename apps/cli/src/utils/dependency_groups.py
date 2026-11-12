@@ -50,6 +50,7 @@ SOURCE_TYPE_GROUPS: dict[str, set[str]] = {
     "KAFKA": {"kafka"},
     "ICEBERG_REST": {"iceberg-rest"},
     "TRINO": {"trino"},
+    "ODBC": {"odbc"},
     "ATHENA": {"athena"},
     "BIGQUERY": {"bigquery"},
     "REDSHIFT": {"redshift"},

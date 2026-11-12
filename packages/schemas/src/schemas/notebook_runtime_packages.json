@@ -376,6 +376,15 @@
       "group": "mysql"
     },
     {
+      "name": "pyodbc",
+      "version": "5.5.0",
+      "modules": [
+        "pyodbc"
+      ],
+      "availability": "on-demand",
+      "group": "odbc"
+    },
+    {
       "name": "pypaimon",
       "version": "2.1.0",
       "modules": [

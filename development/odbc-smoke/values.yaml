@@ -1,0 +1,6 @@
+# Throwaway credentials of a throwaway database, only ever reachable inside the
+# dev cluster (a ClusterIP Service). Never reuse them anywhere else.
+image: postgres:16-alpine
+database: warehouse
+username: admin
+password: admin

@@ -1,0 +1,5 @@
+apiVersion: v2
+name: odbc-smoke
+description: A PostgreSQL (admin/admin) with a small invented sales schema, for smoke-testing the ODBC source on the dev stack
+version: 0.1.0
+appVersion: "16"

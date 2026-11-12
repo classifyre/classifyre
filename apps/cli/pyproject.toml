@@ -294,6 +294,12 @@ reddit = [
     "yt-dlp>=2025.1.0",
     "youtube-transcript-api>=1.0.0",
 ]
+odbc = [
+    # ODBC driver manager binding. Discovery and the scan's row reads go
+    # through ODBC's own catalog calls; the driver itself and unixODBC are
+    # system packages (see the Dockerfile).
+    "pyodbc>=5.2.0,<6.0.0",
+]
 trino = [
     # Trino's own DB-API client; also Starburst Galaxy and Enterprise.
     "trino>=0.330.0,<1.0.0",

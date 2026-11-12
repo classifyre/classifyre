@@ -14,13 +14,14 @@ import { stripLiteralsAndComments } from './sql-precheck';
  * Source types the CLI can attach or scan with DuckDB.
  *
  * Keep in sync with `QUERYABLE_SOURCE_TYPES` in
- * apps/cli/src/query/bindings.py (same nine values); the API names them,
+ * apps/cli/src/query/bindings.py (same ten values); the API names them,
  * the job attaches them.
  */
 export const QUERYABLE_SOURCE_TYPES = new Set([
   'POSTGRESQL',
   'MYSQL',
   'DATABRICKS',
+  'ODBC',
   'ICEBERG_REST',
   'DUCKLAKE',
   'S3_COMPATIBLE_STORAGE',
@@ -115,7 +116,14 @@ export function uniqueSourceSqlName(name: string, taken: Set<string>): string {
 
 /** Where a table lives, as the CLI's bindings read it. */
 export type TableLocation =
-  | { kind: 'catalog'; database?: string; schema?: string; table: string }
+  | {
+      kind: 'catalog';
+      database?: string;
+      schema?: string;
+      table: string;
+      /** ODBC: the table as the driver's own SQL names it, quoted. */
+      qualifiedName?: string;
+    }
   | { kind: 'lakehouse'; format: string; objectKey: string }
   | { kind: 'file'; format: string; objectKey: string };
 
@@ -225,6 +233,27 @@ export function tableAddress(
         : located
           ? undefined
           : 'Scan the source again to locate it.',
+    };
+  }
+  if (sourceType === 'ODBC') {
+    // Any database behind an ODBC driver. The scan recorded the table the way
+    // the driver quotes and qualifies it, so the query reads it by that name.
+    const qualifiedName = text(metadata.qualified_name);
+    const catalog = text(metadata.catalog);
+    const s = schema ?? catalog ?? 'main';
+    return {
+      schema: multiDatabase && catalog ? `${catalog}_${s}` : s,
+      table: tableName,
+      location: qualifiedName
+        ? {
+            kind: 'catalog',
+            database: catalog,
+            schema,
+            table: tableName,
+            qualifiedName,
+          }
+        : null,
+      reason: qualifiedName ? undefined : 'Scan the source again to locate it.',
     };
   }
   if (sourceType === 'ICEBERG_REST' || sourceType === 'DUCKLAKE') {

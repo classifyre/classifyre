@@ -13,6 +13,7 @@ TYPE_TO_DEFINITION = {
     "ICEBERG_REST": "IcebergRestInput",
     "DUCKLAKE": "DuckLakeInput",
     "TRINO": "TrinoInput",
+    "ODBC": "OdbcInput",
     "ATHENA": "AthenaInput",
     "BIGQUERY": "BigQueryInput",
     "REDSHIFT": "RedshiftInput",

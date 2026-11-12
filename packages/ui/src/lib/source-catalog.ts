@@ -307,6 +307,13 @@ export const SOURCE_TYPE_CATALOG_META: Record<string, SourceCatalogMetaBase> = {
     category: "WAREHOUSE_LAKEHOUSE",
     keywords: ["trino", "starburst", "galaxy", "presto", "lakehouse", "federation"],
   },
+  ODBC: {
+    description:
+      "Scan any database that has an ODBC driver — SQL Server, Oracle, DB2, Teradata, Informix or a data source set up on the scanning host.",
+    icon: CreateSourceDtoTypeEnum.Odbc,
+    category: "DATABASES",
+    keywords: ["odbc", "driver", "dsn", "jdbc", "legacy", "sql server", "oracle", "db2", "teradata", "informix"],
+  },
   ATHENA: {
     description: "Scan the AWS Glue Data Catalog through Amazon Athena — Iceberg, Delta, Hudi and file tables in S3.",
     icon: CreateSourceDtoTypeEnum.Athena,

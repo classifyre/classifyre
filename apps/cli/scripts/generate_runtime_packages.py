@@ -81,6 +81,7 @@ INCLUDED_GROUPS = (
     "lakehouse",
     "iceberg-rest",
     "trino",
+    "odbc",
     "athena",
     "bigquery",
     "redshift",

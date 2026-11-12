@@ -1,0 +1,114 @@
+---
+title: ODBC
+description: Scan any database that has an ODBC driver — SQL Server, Oracle, DB2, Teradata, Informix, a mainframe DSN — with its tables, views, keys and a sample of real rows, and query it with SQL.
+---
+
+import { Callout } from "nextra/components";
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { SqlSourceNotes, SharedSettingsNote } from "@/components/source-notes";
+
+# ODBC
+
+<SourceFacts
+  type="ODBC"
+  vendor={{ label: "ODBC", href: "https://learn.microsoft.com/sql/odbc/microsoft-open-database-connectivity-odbc" }}
+  links={[
+    { label: "unixODBC", href: "https://www.unixodbc.org/" },
+    { label: "DuckDB ODBC extension", href: "https://duckdb.org/docs/current/core_extensions/odbc/overview" },
+  ]}
+/>
+
+ODBC is the interface almost every database ships a driver for. Use this source
+for one that has no connector of its own here — SQL Server, Oracle, DB2,
+Teradata, Informix, Firebird, Vertica, ClickHouse, a data source on a mainframe —
+or when your organisation only allows access through a specific driver.
+
+## What you need to connect
+
+- **The database's ODBC driver, installed where scans and queries run.** The
+  Classifyre image ships the unixODBC driver manager and the PostgreSQL driver.
+  Any other driver is the vendor's to supply: build an image from the Classifyre
+  one, install the driver (and register it in `/etc/odbcinst.ini`), and use it
+  for the CLI jobs (`api.cliJobs.image` in the Helm chart).
+- **How to reach it**, in one of three forms:
+  - **Server and driver** (the usual one): the driver's name, the host, and
+    optionally the port and database. Classifyre writes the connection string,
+    using each driver family's own spelling (`Server=host,port` for SQL Server,
+    `DBQ=//host:port/service` for Oracle, `HostName` / `Port` for DB2,
+    `DBCName` for Teradata, `Host` / `Port` for Spark, Hive and Databricks,
+    `Server` / `Port` / `Database` for the rest). The driver field suggests
+    common names, and takes any other: it must match what the host registered
+    (`odbcinst -q -d`).
+  - **Data source name (DSN):** a data source defined in the host's `odbc.ini`.
+  - **Connection string:** the whole string, for a driver the other two cannot
+    describe.
+
+  More driver settings (`TrustServerCertificate=Yes`, `SSLmode=require`) go under
+  **Connection → Attributes**. They are added after the fields, so one named like
+  a field replaces it.
+- **A user and password**, stored encrypted. They are added to the connection
+  string as `UID` and `PWD`, with any `;` or `}` in them protected. Leave them
+  empty if the data source signs in by itself.
+
+Do not put a password in the connection string or an attribute: only the user
+and password fields are encrypted.
+
+<Callout type="info">
+JDBC drivers are not supported: they need a Java runtime next to every scan.
+Most databases that ship a JDBC driver also ship an ODBC one.
+</Callout>
+
+## What Classifyre reads
+
+Tables and views in every catalog and schema the user can see, or only the ones
+you list. The database's own system schemas (`information_schema`, `sys`,
+`pg_catalog`, DB2's `SYS*`, Oracle's `SYS`, and so on) are skipped.
+
+Discovery uses ODBC's own catalog calls (`SQLTables`, `SQLColumns`,
+`SQLPrimaryKeys`, `SQLForeignKeys`), which every driver answers in its own
+dialect, so nothing is guessed from an `information_schema`. Foreign keys become
+links between the tables they join.
+
+<SqlSourceNotes viewLineage={false} />
+
+## Metadata on every asset
+
+<SourceMetadata type="ODBC" />
+
+A database that has no catalogs (Oracle, DB2, SQLite) shows its tables under the
+catalog name `default`.
+
+## Worth knowing
+
+- **Rows are limited the way the database does it.** The driver names its
+  database, and that picks `LIMIT … OFFSET …` (PostgreSQL, MySQL, SQLite,
+  Snowflake, Vertica, ClickHouse, Spark) or `OFFSET … FETCH` (SQL Server, Oracle,
+  DB2). For a database that is not known, Classifyre reads from the start of the
+  table and stops after the rows it needs: correct everywhere, slower for a
+  window that starts deep into a large table. Set **Paging** to choose by hand.
+- **Random sampling needs the database's random function**, known for the
+  engines above. For any other, `RANDOM` reads the table in its own order.
+- **A read-only user is the right user.** ODBC has no portable read-only mode,
+  and a scan only ever sends `SELECT`.
+- **Types the driver reports but the client cannot map** stop a table's read
+  with an error naming the type; the other tables are unaffected. Cast the column
+  in a view on the database side.
+- **Views have no lineage here.** ODBC has no portable way to ask what a view
+  selects from. A source with its own connector (PostgreSQL, MySQL, SQL Server,
+  Oracle) reads it from the catalog.
+- **The same table through two sources shares one name.** For PostgreSQL, MySQL
+  and SQL Server, a connection string that names the server gives each table the
+  same cross-system identity the engine's own source gives it, so a scan through
+  ODBC and a scan through the native source meet on one object. A DSN hides the
+  server, so it gets none.
+
+## SQL
+
+An ODBC table can be queried with [SQL](/data-query/#odbc). ODBC is the slowest
+way in: every query reads the table over the wire, so start with a `LIMIT`.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="ODBC" />

@@ -23,6 +23,15 @@ profiles:
               - helm/develop/values-dev.yaml
             skipBuildDependencies: true
             wait: false
+          # A PostgreSQL (admin/admin, in-cluster only) with an invented sales
+          # schema: what the ODBC source and SQL smoke tests connect to, as
+          # odbc-smoke-postgres.classifyre-dev.svc:5432
+          # (development/odbc-smoke/README.md).
+          - name: odbc-smoke
+            chartPath: development/odbc-smoke
+            namespace: classifyre-dev
+            skipBuildDependencies: true
+            wait: false
 
     portForward:
       - resourceType: service

@@ -203,7 +203,7 @@ async function bootstrap() {
     .setTitle('Classifyre API')
     .setDescription(
       'Metadata ingestion and detection API for unstructured data sources. ' +
-        'Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, Dremio, Trino/Starburst, Amazon Athena, Google BigQuery, Amazon Redshift, Iceberg REST catalogs, DuckLake, MongoDB, PowerBI, Tableau, Confluence, Jira, and Service Desk sources. ' +
+        'Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, Dremio, Trino/Starburst, ODBC, Amazon Athena, Google BigQuery, Amazon Redshift, Iceberg REST catalogs, DuckLake, MongoDB, PowerBI, Tableau, Confluence, Jira, and Service Desk sources. ' +
         'Built-in detectors for secrets, PII, toxic content, image classification, broken links, and security threats.\n\n' +
         '**Every path below is namespace-scoped**: the real URL is ' +
         '`/{namespace}/<path>`, where `{namespace}` is a workspace slug or its ' +

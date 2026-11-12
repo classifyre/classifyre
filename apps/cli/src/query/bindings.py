@@ -15,6 +15,13 @@ What is reused rather than rewritten:
 * PostgreSQL and MySQL are attached with DuckDB's own scanners, read-only, from
   the same recipe fields their connectors read. Their Python drivers are not
   needed, so a query never installs them.
+* Any database with an ODBC driver is read through DuckDB's official
+  ``odbc_scanner`` extension (``odbc_query``) over the same connection string the
+  ODBC source scans with. The string sits in a DuckDB variable, so a view holds
+  only the variable's name, and every scan of a view opens a connection of its
+  own (see :meth:`SourceBinding._odbc`). ``odbc_query`` is
+  a plain remote ``SELECT``: nothing is pushed down, so a query reads the whole
+  table unless a ``LIMIT`` ends the read early.
 * Databricks is attached through the ``unity_catalog`` extension with the token
   the scan authenticates with (a personal access token, or the OAuth token of
   its service principal). The extension asks Unity Catalog for short-lived
@@ -50,9 +57,11 @@ OBJECT_STORAGE_TYPES = frozenset(
 )
 ATTACHED_CATALOG_TYPES = frozenset({"ICEBERG_REST", "DUCKLAKE"})
 #: Keep in sync with ``QUERYABLE_SOURCE_TYPES`` in
-#: apps/api/src/data-query/sql-names.ts (same nine values).
+#: apps/api/src/data-query/sql-names.ts (same ten values).
 QUERYABLE_SOURCE_TYPES = (
-    OBJECT_STORAGE_TYPES | ATTACHED_CATALOG_TYPES | frozenset({"POSTGRESQL", "MYSQL", "DATABRICKS"})
+    OBJECT_STORAGE_TYPES
+    | ATTACHED_CATALOG_TYPES
+    | frozenset({"POSTGRESQL", "MYSQL", "DATABRICKS", "ODBC"})
 )
 
 
@@ -71,6 +80,8 @@ class TableLocation:
     format: str | None = None
     object_key: str | None = None
     version: str | None = None
+    #: ODBC: the table as the driver's SQL names it (quoted), as the scan recorded it.
+    qualified_name: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> TableLocation:
@@ -86,6 +97,7 @@ class TableLocation:
             format=(text("format") or "").lower() or None,
             object_key=text("objectKey"),
             version=text("version"),
+            qualified_name=text("qualifiedName"),
         )
 
 
@@ -132,6 +144,7 @@ class SourceBinding:
         self._source: Any = None
         self._storage: Any = None
         self._ca_path: str | None = None
+        self._odbc_variable: str | None = None
 
     # ── recipe access ──────────────────────────────────────────────────
 
@@ -147,6 +160,13 @@ class SourceBinding:
         required = self._section("required")
         host = str(required.get("host") or "").strip()
         port = str(required.get("port") or "").strip()
+        if self.source_type == "ODBC":
+            from ..utils.odbc_connection import build_connection_string, endpoint_label
+
+            try:
+                return f"odbc://{endpoint_label(build_connection_string(self.recipe))}/"
+            except ValueError:
+                return self.alias
         if self.source_type == "DATABRICKS":
             workspace = str(required.get("workspace_url") or "").strip()
             netloc = urlparse(workspace).netloc or workspace.removeprefix("https://").strip("/")
@@ -181,6 +201,8 @@ class SourceBinding:
             return self._mysql(conn, location)
         if self.source_type == "DATABRICKS":
             return self._databricks(conn, location)
+        if self.source_type == "ODBC":
+            return self._odbc(conn, location)
         if self.source_type in ATTACHED_CATALOG_TYPES:
             return self._attached_catalog(conn, location)
         if self.source_type in OBJECT_STORAGE_TYPES:
@@ -328,9 +350,39 @@ class SourceBinding:
             self._attached[catalog] = alias
         return ".".join(quote_identifier(part) for part in (alias, schema, table))
 
+    def _odbc(self, conn: Any, location: TableLocation) -> str:
+        (qualified,) = self._require_location_fields(location, "qualified_name")
+        if self._odbc_variable is None:
+            from ..utils.odbc_connection import build_connection_string
+
+            load_extension(conn, "odbc_scanner")
+            variable = f"{self._hidden}_odbc"
+            # A variable, not a literal in the view: the view's own text (what
+            # DuckDB stores and prints) then carries a name, never a password.
+            conn.execute(
+                f"SET VARIABLE {quote_identifier(variable)} = "
+                f"{sql_literal(build_connection_string(self.recipe))}"
+            )
+            self._odbc_variable = variable
+        remote = sql_literal(f"SELECT * FROM {qualified}")
+        # `odbc_connect` inside the call: every scan of a view opens its own
+        # connection, which is what a query that reads two tables, or one table
+        # twice, needs. (Two scans on one handle fail, and the connection-string
+        # form of `odbc_query` frees a connection before its statement, which
+        # crashes unixODBC on Linux as soon as a query holds two scans.) The
+        # connections live until the query job exits.
+        return (
+            f"odbc_query(odbc_connect(getvariable({sql_literal(self._odbc_variable)})), {remote})"
+        )
+
     def explain(self, exc: Exception) -> str | None:
         """What a failed read of this source's table means, when it is known."""
         message = str(exc)
+        if self.source_type == "ODBC" and "Can't open lib" in message:
+            return (
+                "The ODBC driver named in the connection string is not installed where "
+                "queries run. Install it there, or use a DSN that exists on that host."
+            )
         if self.source_type == "DATABRICKS" and "temporary-table-credentials" in message:
             return (
                 "Databricks would not hand out storage credentials for the table. "

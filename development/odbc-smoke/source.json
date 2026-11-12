@@ -1,0 +1,27 @@
+{
+  "type": "ODBC",
+  "name": "ODBC · smoke warehouse",
+  "config": {
+    "type": "ODBC",
+    "required": {
+      "driver": "PostgreSQL Unicode",
+      "host": "odbc-smoke-postgres.classifyre-dev.svc",
+      "port": 5432,
+      "database": "warehouse"
+    },
+    "masked": {
+      "username": "admin",
+      "password": "admin"
+    },
+    "sampling": {
+      "strategy": "ALL",
+      "rows_per_page": 50
+    },
+    "detectors": [
+      {
+        "type": "PII",
+        "enabled": true
+      }
+    ]
+  }
+}

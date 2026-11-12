@@ -118,6 +118,9 @@
       "$ref": "#/definitions/TrinoInput"
     },
     {
+      "$ref": "#/definitions/OdbcInput"
+    },
+    {
       "$ref": "#/definitions/AthenaInput"
     },
     {
@@ -415,6 +418,31 @@
             "location": {
               "type": "string",
               "description": "Table location in S3"
+            }
+          }
+        }
+      },
+      "ODBC": {
+        "table": {
+          "use": [
+            "tabularTable"
+          ],
+          "properties": {
+            "object_type": {
+              "type": "string",
+              "description": "Source object type"
+            },
+            "catalog": {
+              "type": "string",
+              "description": "Catalog the driver reported for the table (absent when the driver has none)"
+            },
+            "dbms_name": {
+              "type": "string",
+              "description": "Database product behind the driver, as the driver names it (SQL_DBMS_NAME)"
+            },
+            "qualified_name": {
+              "type": "string",
+              "description": "The table as the driver's own SQL names it, quoted and qualified, ready for a FROM clause"
             }
           }
         }
@@ -3993,6 +4021,7 @@
         "BIGQUERY",
         "ATHENA",
         "TRINO",
+        "ODBC",
         "DUCKLAKE",
         "ICEBERG_REST",
         "GIT",
@@ -13551,6 +13580,353 @@
             },
             "optional": {
               "$ref": "#/definitions/DuckLakeOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
+            },
+            "cleanup_removed_detector_findings": {
+              "type": "boolean",
+              "default": true,
+              "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
+            }
+          },
+          "required": [
+            "required",
+            "masked",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "OdbcRequiredServer": {
+      "title": "OdbcRequiredServer",
+      "label": "Server and driver",
+      "type": "object",
+      "description": "Name the ODBC driver and the server; the connection string is built from them. Add any further driver setting under Optional > Connection > Attributes.",
+      "properties": {
+        "driver": {
+          "type": "string",
+          "description": "Name of the ODBC driver as it is registered on the scanning host (odbcinst -q -d). Pick a common one or type your own.",
+          "examples": [
+            "PostgreSQL Unicode",
+            "PostgreSQL ANSI",
+            "ODBC Driver 18 for SQL Server",
+            "ODBC Driver 17 for SQL Server",
+            "ODBC Driver 13 for SQL Server",
+            "SQL Server Native Client 11.0",
+            "FreeTDS",
+            "MySQL ODBC 9.0 Unicode Driver",
+            "MySQL ODBC 8.0 Unicode Driver",
+            "MariaDB ODBC 3.1 Driver",
+            "MariaDB",
+            "Oracle in instantclient_23_0",
+            "Oracle in instantclient_21_1",
+            "Oracle in OraClient19Home1",
+            "IBM DB2 ODBC DRIVER",
+            "IBM INFORMIX ODBC DRIVER",
+            "Teradata Database ODBC Driver 20.00",
+            "Teradata",
+            "SnowflakeDSIIDriver",
+            "Simba Spark ODBC Driver",
+            "Cloudera ODBC Driver for Apache Hive",
+            "Cloudera ODBC Driver for Impala",
+            "Simba Apache Drill ODBC Driver",
+            "Databricks",
+            "Simba Amazon Redshift ODBC Driver",
+            "Amazon Redshift (x64)",
+            "Simba Athena ODBC Driver",
+            "Simba ODBC Driver for Google BigQuery",
+            "ClickHouse ODBC Driver (Unicode)",
+            "ClickHouse ODBC Driver (ANSI)",
+            "Vertica",
+            "Firebird ODBC Driver",
+            "HDBODBC",
+            "Sybase ASE ODBC Driver",
+            "Sybase IQ",
+            "Dremio Flight SQL ODBC Driver",
+            "Dremio ODBC Driver 64-bit",
+            "Starburst ODBC Driver",
+            "SingleStore ODBC Unicode Driver",
+            "Exasol Driver",
+            "MonetDB ODBC Driver",
+            "Netezza",
+            "InterSystems IRIS ODBC35",
+            "Progress OpenEdge Wire Protocol",
+            "SQLite3",
+            "SQLite3 ODBC Driver",
+            "DuckDB"
+          ]
+        },
+        "host": {
+          "type": "string",
+          "description": "Server name or address (for Oracle: the listener; for Teradata: the DBC name)"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "description": "Server port; leave empty for the driver's default"
+        },
+        "database": {
+          "type": "string",
+          "description": "Database to connect to (for Oracle: the service name); leave empty for the user's default"
+        }
+      },
+      "required": [
+        "driver",
+        "host"
+      ],
+      "additionalProperties": false
+    },
+    "OdbcRequiredDsn": {
+      "title": "OdbcRequiredDsn",
+      "label": "Data source name (DSN)",
+      "type": "object",
+      "description": "A data source defined on the scanning host in odbc.ini; the driver, server and database come from it.",
+      "properties": {
+        "dsn": {
+          "type": "string",
+          "description": "Name of the data source"
+        }
+      },
+      "required": [
+        "dsn"
+      ],
+      "additionalProperties": false
+    },
+    "OdbcRequiredConnectionString": {
+      "title": "OdbcRequiredConnectionString",
+      "label": "Connection string",
+      "type": "object",
+      "description": "Write the whole ODBC connection string yourself, for a driver the other two cannot describe.",
+      "properties": {
+        "connection_string": {
+          "type": "string",
+          "description": "ODBC connection string without the user name and password, e.g. Driver={ODBC Driver 18 for SQL Server};Server=tcp:db.internal,1433;Database=sales"
+        }
+      },
+      "required": [
+        "connection_string"
+      ],
+      "additionalProperties": false
+    },
+    "OdbcRequired": {
+      "title": "OdbcRequired",
+      "label": "ODBC Connection",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/OdbcRequiredServer"
+        },
+        {
+          "$ref": "#/definitions/OdbcRequiredDsn"
+        },
+        {
+          "$ref": "#/definitions/OdbcRequiredConnectionString"
+        }
+      ]
+    },
+    "OdbcMasked": {
+      "title": "OdbcMasked",
+      "label": "ODBC Credentials",
+      "type": "object",
+      "description": "Appended to the connection string as UID and PWD. Leave empty when the data source signs in by itself.",
+      "properties": {
+        "username": {
+          "type": "string",
+          "description": "User to sign in as (UID)"
+        },
+        "password": {
+          "type": "string",
+          "description": "Password (PWD)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "OdbcAttribute": {
+      "title": "OdbcAttribute",
+      "label": "Driver setting",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Setting name, e.g. SSLmode"
+        },
+        "value": {
+          "type": "string",
+          "description": "Its value"
+        }
+      },
+      "required": [
+        "name",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OdbcOptionalConnection": {
+      "title": "OdbcOptionalConnection",
+      "label": "ODBC Connection",
+      "type": "object",
+      "properties": {
+        "login_timeout_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600,
+          "default": 15,
+          "description": "How long to wait for the database to accept the connection"
+        },
+        "query_timeout_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3600,
+          "default": 120,
+          "description": "Timeout for one query; 0 for none. Not every driver honours it."
+        },
+        "attributes": {
+          "type": "array",
+          "description": "More driver settings, added to the connection string as NAME=value (for example TrustServerCertificate=Yes, SSLmode=require, Encrypt=yes). They come after the fields above, so one named like a field overrides it. Credentials belong in the user and password fields, which are encrypted.",
+          "items": {
+            "$ref": "#/definitions/OdbcAttribute"
+          }
+        },
+        "paging": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "limit_offset",
+            "offset_fetch",
+            "client_side"
+          ],
+          "default": "auto",
+          "description": "How rows are limited: auto follows the database the driver reports (LIMIT/OFFSET, or OFFSET/FETCH). client_side reads from the start of the table and stops, for a database that supports neither."
+        }
+      },
+      "additionalProperties": false
+    },
+    "OdbcOptionalScope": {
+      "title": "OdbcOptionalScope",
+      "label": "ODBC Scope",
+      "type": "object",
+      "properties": {
+        "include_catalogs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Only these catalogs (databases)"
+        },
+        "exclude_catalogs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Skip these catalogs"
+        },
+        "include_schemas": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Only these schemas"
+        },
+        "exclude_schemas": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Skip these schemas (system schemas are skipped already)"
+        },
+        "include_tables": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include tables"
+        },
+        "include_views": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include views"
+        },
+        "include_objects": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Only these objects (schema.table, or catalog.schema.table)"
+        },
+        "table_limit": {
+          "type": "integer",
+          "description": "Maximum number of tables to scan per run",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "OdbcOptionalExtraction": {
+      "title": "OdbcOptionalExtraction",
+      "label": "ODBC Extraction",
+      "type": "object",
+      "properties": {
+        "include_foreign_keys": {
+          "type": "boolean",
+          "default": true,
+          "description": "Ask the driver for foreign keys and link the tables they join"
+        }
+      },
+      "additionalProperties": false
+    },
+    "OdbcOptional": {
+      "title": "OdbcOptional",
+      "label": "ODBC Options",
+      "type": "object",
+      "properties": {
+        "connection": {
+          "$ref": "#/definitions/OdbcOptionalConnection"
+        },
+        "scope": {
+          "$ref": "#/definitions/OdbcOptionalScope"
+        },
+        "extraction": {
+          "$ref": "#/definitions/OdbcOptionalExtraction"
+        }
+      },
+      "additionalProperties": false
+    },
+    "OdbcInput": {
+      "title": "OdbcInput",
+      "label": "ODBC",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "ODBC"
+            },
+            "required": {
+              "$ref": "#/definitions/OdbcRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/OdbcMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/OdbcOptional"
             },
             "detectors": {
               "$ref": "#/definitions/Detectors"
