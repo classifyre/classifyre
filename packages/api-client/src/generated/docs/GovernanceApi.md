@@ -6,17 +6,28 @@ All URIs are relative to *http://localhost*
 |------------- | ------------- | -------------|
 | [**governanceControllerAssetColumns**](GovernanceApi.md#governancecontrollerassetcolumns) | **GET** /assets/{id}/columns | A table\&#39;s columns: what stewards said and what open findings classify |
 | [**governanceControllerAssetGovernance**](GovernanceApi.md#governancecontrollerassetgovernance) | **GET** /assets/{id}/governance | An asset\&#39;s owners, description, lifecycle and checklist |
+| [**governanceControllerAssetMeaning**](GovernanceApi.md#governancecontrollerassetmeaning) | **GET** /assets/{id}/governance/meaning | The glossary terms an asset is about, and suggested ones |
+| [**governanceControllerAssetQuality**](GovernanceApi.md#governancecontrollerassetquality) | **GET** /assets/{id}/quality | An asset\&#39;s quality rules, their latest results and its score |
 | [**governanceControllerAssignAssetRole**](GovernanceApi.md#governancecontrollerassignassetrole) | **POST** /assets/{id}/governance/roles | Make someone owner, steward or custodian of an asset |
 | [**governanceControllerAssignSourceRole**](GovernanceApi.md#governancecontrollerassignsourcerole) | **POST** /sources/{id}/governance/roles | Make someone owner, steward or custodian of a source |
+| [**governanceControllerCreateQualityRule**](GovernanceApi.md#governancecontrollercreatequalityrule) | **POST** /assets/{id}/quality/rules | Add a quality rule to an asset (and evaluate it at once) |
+| [**governanceControllerDismissSuggestion**](GovernanceApi.md#governancecontrollerdismisssuggestion) | **POST** /assets/{id}/governance/meaning/suggestions/{suggestionId}/dismiss | Dismiss a suggested term for an asset |
+| [**governanceControllerExportContract**](GovernanceApi.md#governancecontrollerexportcontract) | **GET** /assets/{id}/contract | The asset as an Open Data Contract Standard (v3.2) contract |
+| [**governanceControllerImportContract**](GovernanceApi.md#governancecontrollerimportcontract) | **PUT** /assets/{id}/contract | Apply an ODCS contract (YAML or JSON text) to the asset |
+| [**governanceControllerLinkTerm**](GovernanceApi.md#governancecontrollerlinkterm) | **POST** /assets/{id}/governance/meaning | Link a glossary term to an asset by hand |
 | [**governanceControllerMoveColumn**](GovernanceApi.md#governancecontrollermovecolumn) | **POST** /assets/{id}/columns/{name}/move | Move a removed column\&#39;s annotations to the column it became |
 | [**governanceControllerPrincipals**](GovernanceApi.md#governancecontrollerprincipals) | **GET** /governance/principals | People and groups of the tenant, for the owner and steward pickers |
 | [**governanceControllerRemoveAssetRole**](GovernanceApi.md#governancecontrollerremoveassetrole) | **DELETE** /assets/{id}/governance/roles/{roleId} | End a role on an asset (kept as history) |
 | [**governanceControllerRemoveColumn**](GovernanceApi.md#governancecontrollerremovecolumn) | **DELETE** /assets/{id}/columns/{name} | Forget what was said about one column |
+| [**governanceControllerRemoveQualityRule**](GovernanceApi.md#governancecontrollerremovequalityrule) | **DELETE** /quality-rules/{ruleId} | Delete a quality rule; its open finding is resolved |
 | [**governanceControllerRemoveSourceRole**](GovernanceApi.md#governancecontrollerremovesourcerole) | **DELETE** /sources/{id}/governance/roles/{roleId} | End a role on a source (kept as history) |
+| [**governanceControllerRunQuality**](GovernanceApi.md#governancecontrollerrunquality) | **POST** /assets/{id}/quality/run | Evaluate an asset\&#39;s quality rules now |
 | [**governanceControllerSourceGovernance**](GovernanceApi.md#governancecontrollersourcegovernance) | **GET** /sources/{id}/governance | A source\&#39;s owners, stewards and custodians, and its coverage |
 | [**governanceControllerSummary**](GovernanceApi.md#governancecontrollersummary) | **GET** /governance/summary | How far the workspace is governed: coverage per source, what to govern first, yours |
+| [**governanceControllerUnlinkTerm**](GovernanceApi.md#governancecontrollerunlinkterm) | **DELETE** /assets/{id}/governance/meaning/{termId} | Remove a term linked by hand |
 | [**governanceControllerUpdateAssetGovernance**](GovernanceApi.md#governancecontrollerupdateassetgovernance) | **PUT** /assets/{id}/governance | Change an asset\&#39;s description, legal basis or lifecycle |
 | [**governanceControllerUpdateColumn**](GovernanceApi.md#governancecontrollerupdatecolumn) | **PUT** /assets/{id}/columns/{name} | Describe, classify or confirm one column |
+| [**governanceControllerUpdateQualityRule**](GovernanceApi.md#governancecontrollerupdatequalityrule) | **PUT** /quality-rules/{ruleId} | Change a quality rule (and evaluate it at once) |
 | [**governanceControllerUsage**](GovernanceApi.md#governancecontrollerusage) | **GET** /assets/{id}/usage | Who read and exported a table, per day, over the last days |
 
 
@@ -132,6 +143,136 @@ example().catch(console.error);
 ### Return type
 
 [**AssetGovernanceDto**](AssetGovernanceDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## governanceControllerAssetMeaning
+
+> GovernanceMeaningDto governanceControllerAssetMeaning(id)
+
+The glossary terms an asset is about, and suggested ones
+
+### Example
+
+```ts
+import {
+  Configuration,
+  GovernanceApi,
+} from '@workspace/api-client';
+import type { GovernanceControllerAssetMeaningRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new GovernanceApi();
+
+  const body = {
+    // string
+    id: id_example,
+  } satisfies GovernanceControllerAssetMeaningRequest;
+
+  try {
+    const data = await api.governanceControllerAssetMeaning(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+[**GovernanceMeaningDto**](GovernanceMeaningDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## governanceControllerAssetQuality
+
+> AssetQualityDto governanceControllerAssetQuality(id)
+
+An asset\&#39;s quality rules, their latest results and its score
+
+### Example
+
+```ts
+import {
+  Configuration,
+  GovernanceApi,
+} from '@workspace/api-client';
+import type { GovernanceControllerAssetQualityRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new GovernanceApi();
+
+  const body = {
+    // string
+    id: id_example,
+  } satisfies GovernanceControllerAssetQualityRequest;
+
+  try {
+    const data = await api.governanceControllerAssetQuality(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+[**AssetQualityDto**](AssetQualityDto.md)
 
 ### Authorization
 
@@ -272,6 +413,354 @@ example().catch(console.error);
 ### Return type
 
 [**SourceGovernanceDto**](SourceGovernanceDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## governanceControllerCreateQualityRule
+
+> AssetQualityDto governanceControllerCreateQualityRule(id, saveQualityRuleDto)
+
+Add a quality rule to an asset (and evaluate it at once)
+
+Needs asset.govern, or the owner or steward role on the asset or its source.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  GovernanceApi,
+} from '@workspace/api-client';
+import type { GovernanceControllerCreateQualityRuleRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new GovernanceApi();
+
+  const body = {
+    // string
+    id: id_example,
+    // SaveQualityRuleDto
+    saveQualityRuleDto: ...,
+  } satisfies GovernanceControllerCreateQualityRuleRequest;
+
+  try {
+    const data = await api.governanceControllerCreateQualityRule(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+| **saveQualityRuleDto** | [SaveQualityRuleDto](SaveQualityRuleDto.md) |  | |
+
+### Return type
+
+[**AssetQualityDto**](AssetQualityDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## governanceControllerDismissSuggestion
+
+> GovernanceMeaningDto governanceControllerDismissSuggestion(id, suggestionId)
+
+Dismiss a suggested term for an asset
+
+### Example
+
+```ts
+import {
+  Configuration,
+  GovernanceApi,
+} from '@workspace/api-client';
+import type { GovernanceControllerDismissSuggestionRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new GovernanceApi();
+
+  const body = {
+    // string
+    id: id_example,
+    // string
+    suggestionId: suggestionId_example,
+  } satisfies GovernanceControllerDismissSuggestionRequest;
+
+  try {
+    const data = await api.governanceControllerDismissSuggestion(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+| **suggestionId** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+[**GovernanceMeaningDto**](GovernanceMeaningDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## governanceControllerExportContract
+
+> governanceControllerExportContract(id, format)
+
+The asset as an Open Data Contract Standard (v3.2) contract
+
+Description, team, columns with business names and classification, quality rules, SLA. YAML by default.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  GovernanceApi,
+} from '@workspace/api-client';
+import type { GovernanceControllerExportContractRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new GovernanceApi();
+
+  const body = {
+    // string
+    id: id_example,
+    // 'yaml' | 'json' (optional)
+    format: format_example,
+  } satisfies GovernanceControllerExportContractRequest;
+
+  try {
+    const data = await api.governanceControllerExportContract(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+| **format** | `yaml`, `json` |  | [Optional] [Defaults to `undefined`] [Enum: yaml, json] |
+
+### Return type
+
+`void` (Empty response body)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: Not defined
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## governanceControllerImportContract
+
+> ContractImportResultDto governanceControllerImportContract(id, importContractDto)
+
+Apply an ODCS contract (YAML or JSON text) to the asset
+
+Matches columns by name and people by e-mail or group path; reports what was skipped. Needs asset.govern, or the owner or steward role.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  GovernanceApi,
+} from '@workspace/api-client';
+import type { GovernanceControllerImportContractRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new GovernanceApi();
+
+  const body = {
+    // string
+    id: id_example,
+    // ImportContractDto
+    importContractDto: ...,
+  } satisfies GovernanceControllerImportContractRequest;
+
+  try {
+    const data = await api.governanceControllerImportContract(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+| **importContractDto** | [ImportContractDto](ImportContractDto.md) |  | |
+
+### Return type
+
+[**ContractImportResultDto**](ContractImportResultDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## governanceControllerLinkTerm
+
+> GovernanceMeaningDto governanceControllerLinkTerm(id, linkGovernanceTermDto)
+
+Link a glossary term to an asset by hand
+
+Needs asset.govern, or the owner or steward role on the asset or its source.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  GovernanceApi,
+} from '@workspace/api-client';
+import type { GovernanceControllerLinkTermRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new GovernanceApi();
+
+  const body = {
+    // string
+    id: id_example,
+    // LinkGovernanceTermDto
+    linkGovernanceTermDto: ...,
+  } satisfies GovernanceControllerLinkTermRequest;
+
+  try {
+    const data = await api.governanceControllerLinkTerm(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+| **linkGovernanceTermDto** | [LinkGovernanceTermDto](LinkGovernanceTermDto.md) |  | |
+
+### Return type
+
+[**GovernanceMeaningDto**](GovernanceMeaningDto.md)
 
 ### Authorization
 
@@ -568,6 +1057,71 @@ No authorization required
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
 
+## governanceControllerRemoveQualityRule
+
+> AssetQualityDto governanceControllerRemoveQualityRule(ruleId)
+
+Delete a quality rule; its open finding is resolved
+
+### Example
+
+```ts
+import {
+  Configuration,
+  GovernanceApi,
+} from '@workspace/api-client';
+import type { GovernanceControllerRemoveQualityRuleRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new GovernanceApi();
+
+  const body = {
+    // string
+    ruleId: ruleId_example,
+  } satisfies GovernanceControllerRemoveQualityRuleRequest;
+
+  try {
+    const data = await api.governanceControllerRemoveQualityRule(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **ruleId** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+[**AssetQualityDto**](AssetQualityDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
 ## governanceControllerRemoveSourceRole
 
 > SourceGovernanceDto governanceControllerRemoveSourceRole(id, roleId)
@@ -617,6 +1171,71 @@ example().catch(console.error);
 ### Return type
 
 [**SourceGovernanceDto**](SourceGovernanceDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## governanceControllerRunQuality
+
+> AssetQualityDto governanceControllerRunQuality(id)
+
+Evaluate an asset\&#39;s quality rules now
+
+### Example
+
+```ts
+import {
+  Configuration,
+  GovernanceApi,
+} from '@workspace/api-client';
+import type { GovernanceControllerRunQualityRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new GovernanceApi();
+
+  const body = {
+    // string
+    id: id_example,
+  } satisfies GovernanceControllerRunQualityRequest;
+
+  try {
+    const data = await api.governanceControllerRunQuality(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+[**AssetQualityDto**](AssetQualityDto.md)
 
 ### Authorization
 
@@ -766,6 +1385,74 @@ No authorization required
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
 
+## governanceControllerUnlinkTerm
+
+> GovernanceMeaningDto governanceControllerUnlinkTerm(id, termId)
+
+Remove a term linked by hand
+
+### Example
+
+```ts
+import {
+  Configuration,
+  GovernanceApi,
+} from '@workspace/api-client';
+import type { GovernanceControllerUnlinkTermRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new GovernanceApi();
+
+  const body = {
+    // string
+    id: id_example,
+    // string
+    termId: termId_example,
+  } satisfies GovernanceControllerUnlinkTermRequest;
+
+  try {
+    const data = await api.governanceControllerUnlinkTerm(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+| **termId** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+[**GovernanceMeaningDto**](GovernanceMeaningDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
 ## governanceControllerUpdateAssetGovernance
 
 > AssetGovernanceDto governanceControllerUpdateAssetGovernance(id, updateAssetGovernanceDto)
@@ -890,6 +1577,74 @@ example().catch(console.error);
 ### Return type
 
 [**AssetColumnsDto**](AssetColumnsDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## governanceControllerUpdateQualityRule
+
+> AssetQualityDto governanceControllerUpdateQualityRule(ruleId, saveQualityRuleDto)
+
+Change a quality rule (and evaluate it at once)
+
+### Example
+
+```ts
+import {
+  Configuration,
+  GovernanceApi,
+} from '@workspace/api-client';
+import type { GovernanceControllerUpdateQualityRuleRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new GovernanceApi();
+
+  const body = {
+    // string
+    ruleId: ruleId_example,
+    // SaveQualityRuleDto
+    saveQualityRuleDto: ...,
+  } satisfies GovernanceControllerUpdateQualityRuleRequest;
+
+  try {
+    const data = await api.governanceControllerUpdateQualityRule(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **ruleId** | `string` |  | [Defaults to `undefined`] |
+| **saveQualityRuleDto** | [SaveQualityRuleDto](SaveQualityRuleDto.md) |  | |
+
+### Return type
+
+[**AssetQualityDto**](AssetQualityDto.md)
 
 ### Authorization
 

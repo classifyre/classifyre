@@ -89,7 +89,8 @@ export const QuickSearchRequestDtoDetectorTypeEnum = {
     Yara: 'YARA',
     BrokenLinks: 'BROKEN_LINKS',
     CodeSecurity: 'CODE_SECURITY',
-    Custom: 'CUSTOM'
+    Custom: 'CUSTOM',
+    Quality: 'QUALITY'
 } as const;
 export type QuickSearchRequestDtoDetectorTypeEnum = typeof QuickSearchRequestDtoDetectorTypeEnum[keyof typeof QuickSearchRequestDtoDetectorTypeEnum];
 

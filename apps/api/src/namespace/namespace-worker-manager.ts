@@ -10,6 +10,7 @@ import { runsBackgroundWorkers } from '../service-role';
 import { PgBossService } from '../scheduler/pg-boss.service';
 import { WorkerLeadershipService } from '../scheduler/worker-leadership.service';
 import { PrismaClientManager } from '../prisma/prisma-client-manager';
+import { QualityWorker } from '../governance/quality.worker';
 import { NamespaceRegistryService } from '../registry/namespace-registry.service';
 import { SchedulerService } from '../scheduler/scheduler.service';
 import { RunnerCleanupService } from '../scheduler/runner-cleanup.service';
@@ -120,6 +121,7 @@ export class NamespaceWorkerManager
     private readonly prisma: PrismaService,
     // Last and optional: specs construct this class positionally.
     @Optional() private readonly caseLeads?: CaseLeadsWorker,
+    @Optional() private readonly quality?: QualityWorker,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -323,6 +325,7 @@ export class NamespaceWorkerManager
         await this.findingBulkOperations.registerForNamespace();
         await this.findingStats.registerForNamespace();
         await this.semantic.registerForNamespace();
+        await this.quality?.registerForNamespace();
         await this.caseLeads?.registerForNamespace();
         await this.mcpClient
           .refresh()

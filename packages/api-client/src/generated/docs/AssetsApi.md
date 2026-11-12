@@ -189,7 +189,7 @@ async function example() {
     assetStatus: ...,
     // Array<'JIRA' | 'CONFLUENCE' | 'CROWD' | 'BITBUCKET' | 'SERVICEDESK' | 'XRAY' | 'GOOGLE_DRIVE' | 'GOOGLE_SHEETS' | 'GOOGLE_DOCS' | 'GOOGLE_SLIDES' | 'WORDPRESS' | 'SLACK' | 'S3_COMPATIBLE_STORAGE' | 'AZURE_BLOB_STORAGE' | 'GOOGLE_CLOUD_STORAGE' | 'POSTGRESQL' | 'MYSQL' | 'MSSQL' | 'ORACLE' | 'HIVE' | 'DATABRICKS' | 'SNOWFLAKE' | 'DREMIO' | 'MONGODB' | 'NEO4J' | 'NOTION' | 'POWERBI' | 'TABLEAU' | 'EMAIL' | 'YOUTUBE' | 'REDDIT' | 'KAFKA' | 'ELASTICSEARCH' | 'OPENSEARCH' | 'MEILISEARCH' | 'LOCAL_FOLDER' | 'MICROSOFT_365' | 'GOOGLE_WORKSPACE' | 'DROPBOX' | 'HUGGING_FACE' | 'GIT' | 'SANDBOX' | 'ICEBERG_REST' | 'DUCKLAKE' | 'TRINO' | 'ODBC' | 'ATHENA' | 'BIGQUERY' | 'REDSHIFT' | 'CUSTOM'> (optional)
     assetSourceType: ...,
-    // Array<'SECRETS' | 'PII' | 'YARA' | 'BROKEN_LINKS' | 'CODE_SECURITY' | 'CUSTOM'> (optional)
+    // Array<'SECRETS' | 'PII' | 'YARA' | 'BROKEN_LINKS' | 'CODE_SECURITY' | 'CUSTOM' | 'QUALITY'> (optional)
     findingDetectorType: ...,
     // Array<'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO'> (optional)
     findingSeverity: ...,
@@ -224,7 +224,7 @@ example().catch(console.error);
 | **assetSourceId** | `string` | Single source id filter | [Optional] [Defaults to `undefined`] |
 | **assetStatus** | `NEW`, `UPDATED`, `UNCHANGED`, `DELETED` |  | [Optional] [Enum: NEW, UPDATED, UNCHANGED, DELETED] |
 | **assetSourceType** | `JIRA`, `CONFLUENCE`, `CROWD`, `BITBUCKET`, `SERVICEDESK`, `XRAY`, `GOOGLE_DRIVE`, `GOOGLE_SHEETS`, `GOOGLE_DOCS`, `GOOGLE_SLIDES`, `WORDPRESS`, `SLACK`, `S3_COMPATIBLE_STORAGE`, `AZURE_BLOB_STORAGE`, `GOOGLE_CLOUD_STORAGE`, `POSTGRESQL`, `MYSQL`, `MSSQL`, `ORACLE`, `HIVE`, `DATABRICKS`, `SNOWFLAKE`, `DREMIO`, `MONGODB`, `NEO4J`, `NOTION`, `POWERBI`, `TABLEAU`, `EMAIL`, `YOUTUBE`, `REDDIT`, `KAFKA`, `ELASTICSEARCH`, `OPENSEARCH`, `MEILISEARCH`, `LOCAL_FOLDER`, `MICROSOFT_365`, `GOOGLE_WORKSPACE`, `DROPBOX`, `HUGGING_FACE`, `GIT`, `SANDBOX`, `ICEBERG_REST`, `DUCKLAKE`, `TRINO`, `ODBC`, `ATHENA`, `BIGQUERY`, `REDSHIFT`, `CUSTOM` |  | [Optional] [Enum: JIRA, CONFLUENCE, CROWD, BITBUCKET, SERVICEDESK, XRAY, GOOGLE_DRIVE, GOOGLE_SHEETS, GOOGLE_DOCS, GOOGLE_SLIDES, WORDPRESS, SLACK, S3_COMPATIBLE_STORAGE, AZURE_BLOB_STORAGE, GOOGLE_CLOUD_STORAGE, POSTGRESQL, MYSQL, MSSQL, ORACLE, HIVE, DATABRICKS, SNOWFLAKE, DREMIO, MONGODB, NEO4J, NOTION, POWERBI, TABLEAU, EMAIL, YOUTUBE, REDDIT, KAFKA, ELASTICSEARCH, OPENSEARCH, MEILISEARCH, LOCAL_FOLDER, MICROSOFT_365, GOOGLE_WORKSPACE, DROPBOX, HUGGING_FACE, GIT, SANDBOX, ICEBERG_REST, DUCKLAKE, TRINO, ODBC, ATHENA, BIGQUERY, REDSHIFT, CUSTOM] |
-| **findingDetectorType** | `SECRETS`, `PII`, `YARA`, `BROKEN_LINKS`, `CODE_SECURITY`, `CUSTOM` |  | [Optional] [Enum: SECRETS, PII, YARA, BROKEN_LINKS, CODE_SECURITY, CUSTOM] |
+| **findingDetectorType** | `SECRETS`, `PII`, `YARA`, `BROKEN_LINKS`, `CODE_SECURITY`, `CUSTOM`, `QUALITY` |  | [Optional] [Enum: SECRETS, PII, YARA, BROKEN_LINKS, CODE_SECURITY, CUSTOM, QUALITY] |
 | **findingSeverity** | `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`, `INFO` |  | [Optional] [Enum: CRITICAL, HIGH, MEDIUM, LOW, INFO] |
 | **findingStatus** | `OPEN`, `FALSE_POSITIVE`, `RESOLVED`, `IGNORED` |  | [Optional] [Enum: OPEN, FALSE_POSITIVE, RESOLVED, IGNORED] |
 | **findingIncludeResolved** | `boolean` |  | [Optional] [Defaults to `false`] |
@@ -279,7 +279,7 @@ async function example() {
     search: search_example,
     // Array<string> (optional)
     sourceId: ...,
-    // Array<'SECRETS' | 'PII' | 'YARA' | 'BROKEN_LINKS' | 'CODE_SECURITY' | 'CUSTOM'> (optional)
+    // Array<'SECRETS' | 'PII' | 'YARA' | 'BROKEN_LINKS' | 'CODE_SECURITY' | 'CUSTOM' | 'QUALITY'> (optional)
     detectorType: ...,
     // Array<string> (optional)
     customDetectorKey: ...,
@@ -314,7 +314,7 @@ example().catch(console.error);
 |------------- | ------------- | ------------- | -------------|
 | **search** | `string` |  | [Optional] [Defaults to `undefined`] |
 | **sourceId** | `Array<string>` |  | [Optional] |
-| **detectorType** | `SECRETS`, `PII`, `YARA`, `BROKEN_LINKS`, `CODE_SECURITY`, `CUSTOM` |  | [Optional] [Enum: SECRETS, PII, YARA, BROKEN_LINKS, CODE_SECURITY, CUSTOM] |
+| **detectorType** | `SECRETS`, `PII`, `YARA`, `BROKEN_LINKS`, `CODE_SECURITY`, `CUSTOM`, `QUALITY` |  | [Optional] [Enum: SECRETS, PII, YARA, BROKEN_LINKS, CODE_SECURITY, CUSTOM, QUALITY] |
 | **customDetectorKey** | `Array<string>` |  | [Optional] |
 | **findingType** | `Array<string>` |  | [Optional] |
 | **category** | `Array<string>` |  | [Optional] |

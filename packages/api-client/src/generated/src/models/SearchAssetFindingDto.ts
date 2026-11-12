@@ -233,7 +233,8 @@ export const SearchAssetFindingDtoDetectorTypeEnum = {
     Yara: 'YARA',
     BrokenLinks: 'BROKEN_LINKS',
     CodeSecurity: 'CODE_SECURITY',
-    Custom: 'CUSTOM'
+    Custom: 'CUSTOM',
+    Quality: 'QUALITY'
 } as const;
 export type SearchAssetFindingDtoDetectorTypeEnum = typeof SearchAssetFindingDtoDetectorTypeEnum[keyof typeof SearchAssetFindingDtoDetectorTypeEnum];
 

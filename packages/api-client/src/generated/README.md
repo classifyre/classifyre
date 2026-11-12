@@ -332,17 +332,28 @@ All URIs are relative to *http://localhost*
 *GlossaryApi* | [**glossarySemanticControllerList**](docs/GlossaryApi.md#glossarysemanticcontrollerlist) | **GET** /glossary/proposals | The review queue: every proposal, one paged list
 *GovernanceApi* | [**governanceControllerAssetColumns**](docs/GovernanceApi.md#governancecontrollerassetcolumns) | **GET** /assets/{id}/columns | A table\&#39;s columns: what stewards said and what open findings classify
 *GovernanceApi* | [**governanceControllerAssetGovernance**](docs/GovernanceApi.md#governancecontrollerassetgovernance) | **GET** /assets/{id}/governance | An asset\&#39;s owners, description, lifecycle and checklist
+*GovernanceApi* | [**governanceControllerAssetMeaning**](docs/GovernanceApi.md#governancecontrollerassetmeaning) | **GET** /assets/{id}/governance/meaning | The glossary terms an asset is about, and suggested ones
+*GovernanceApi* | [**governanceControllerAssetQuality**](docs/GovernanceApi.md#governancecontrollerassetquality) | **GET** /assets/{id}/quality | An asset\&#39;s quality rules, their latest results and its score
 *GovernanceApi* | [**governanceControllerAssignAssetRole**](docs/GovernanceApi.md#governancecontrollerassignassetrole) | **POST** /assets/{id}/governance/roles | Make someone owner, steward or custodian of an asset
 *GovernanceApi* | [**governanceControllerAssignSourceRole**](docs/GovernanceApi.md#governancecontrollerassignsourcerole) | **POST** /sources/{id}/governance/roles | Make someone owner, steward or custodian of a source
+*GovernanceApi* | [**governanceControllerCreateQualityRule**](docs/GovernanceApi.md#governancecontrollercreatequalityrule) | **POST** /assets/{id}/quality/rules | Add a quality rule to an asset (and evaluate it at once)
+*GovernanceApi* | [**governanceControllerDismissSuggestion**](docs/GovernanceApi.md#governancecontrollerdismisssuggestion) | **POST** /assets/{id}/governance/meaning/suggestions/{suggestionId}/dismiss | Dismiss a suggested term for an asset
+*GovernanceApi* | [**governanceControllerExportContract**](docs/GovernanceApi.md#governancecontrollerexportcontract) | **GET** /assets/{id}/contract | The asset as an Open Data Contract Standard (v3.2) contract
+*GovernanceApi* | [**governanceControllerImportContract**](docs/GovernanceApi.md#governancecontrollerimportcontract) | **PUT** /assets/{id}/contract | Apply an ODCS contract (YAML or JSON text) to the asset
+*GovernanceApi* | [**governanceControllerLinkTerm**](docs/GovernanceApi.md#governancecontrollerlinkterm) | **POST** /assets/{id}/governance/meaning | Link a glossary term to an asset by hand
 *GovernanceApi* | [**governanceControllerMoveColumn**](docs/GovernanceApi.md#governancecontrollermovecolumn) | **POST** /assets/{id}/columns/{name}/move | Move a removed column\&#39;s annotations to the column it became
 *GovernanceApi* | [**governanceControllerPrincipals**](docs/GovernanceApi.md#governancecontrollerprincipals) | **GET** /governance/principals | People and groups of the tenant, for the owner and steward pickers
 *GovernanceApi* | [**governanceControllerRemoveAssetRole**](docs/GovernanceApi.md#governancecontrollerremoveassetrole) | **DELETE** /assets/{id}/governance/roles/{roleId} | End a role on an asset (kept as history)
 *GovernanceApi* | [**governanceControllerRemoveColumn**](docs/GovernanceApi.md#governancecontrollerremovecolumn) | **DELETE** /assets/{id}/columns/{name} | Forget what was said about one column
+*GovernanceApi* | [**governanceControllerRemoveQualityRule**](docs/GovernanceApi.md#governancecontrollerremovequalityrule) | **DELETE** /quality-rules/{ruleId} | Delete a quality rule; its open finding is resolved
 *GovernanceApi* | [**governanceControllerRemoveSourceRole**](docs/GovernanceApi.md#governancecontrollerremovesourcerole) | **DELETE** /sources/{id}/governance/roles/{roleId} | End a role on a source (kept as history)
+*GovernanceApi* | [**governanceControllerRunQuality**](docs/GovernanceApi.md#governancecontrollerrunquality) | **POST** /assets/{id}/quality/run | Evaluate an asset\&#39;s quality rules now
 *GovernanceApi* | [**governanceControllerSourceGovernance**](docs/GovernanceApi.md#governancecontrollersourcegovernance) | **GET** /sources/{id}/governance | A source\&#39;s owners, stewards and custodians, and its coverage
 *GovernanceApi* | [**governanceControllerSummary**](docs/GovernanceApi.md#governancecontrollersummary) | **GET** /governance/summary | How far the workspace is governed: coverage per source, what to govern first, yours
+*GovernanceApi* | [**governanceControllerUnlinkTerm**](docs/GovernanceApi.md#governancecontrollerunlinkterm) | **DELETE** /assets/{id}/governance/meaning/{termId} | Remove a term linked by hand
 *GovernanceApi* | [**governanceControllerUpdateAssetGovernance**](docs/GovernanceApi.md#governancecontrollerupdateassetgovernance) | **PUT** /assets/{id}/governance | Change an asset\&#39;s description, legal basis or lifecycle
 *GovernanceApi* | [**governanceControllerUpdateColumn**](docs/GovernanceApi.md#governancecontrollerupdatecolumn) | **PUT** /assets/{id}/columns/{name} | Describe, classify or confirm one column
+*GovernanceApi* | [**governanceControllerUpdateQualityRule**](docs/GovernanceApi.md#governancecontrollerupdatequalityrule) | **PUT** /quality-rules/{ruleId} | Change a quality rule (and evaluate it at once)
 *GovernanceApi* | [**governanceControllerUsage**](docs/GovernanceApi.md#governancecontrollerusage) | **GET** /assets/{id}/usage | Who read and exported a table, per day, over the last days
 *GraphApi* | [**graphControllerColumnLineage**](docs/GraphApi.md#graphcontrollercolumnlineage) | **POST** /graph/lineage/column | Trace one column back through the transformations that produced it
 *GraphApi* | [**graphControllerCreateManualEdge**](docs/GraphApi.md#graphcontrollercreatemanualedge) | **POST** /graph/edges/manual | Create a manual edge between two entities (user-defined relation type)
@@ -576,6 +587,7 @@ All URIs are relative to *http://localhost*
 - [AssetListItemDto](docs/AssetListItemDto.md)
 - [AssetListResponseDto](docs/AssetListResponseDto.md)
 - [AssetMediaChunkDto](docs/AssetMediaChunkDto.md)
+- [AssetQualityDto](docs/AssetQualityDto.md)
 - [AssetResponseDto](docs/AssetResponseDto.md)
 - [AssetSeverityCountsItemDto](docs/AssetSeverityCountsItemDto.md)
 - [AssetSeverityCountsRequestDto](docs/AssetSeverityCountsRequestDto.md)
@@ -693,6 +705,9 @@ All URIs are relative to *http://localhost*
 - [ColumnLineageStepDto](docs/ColumnLineageStepDto.md)
 - [ColumnTermDto](docs/ColumnTermDto.md)
 - [ConnectionTestStatusDto](docs/ConnectionTestStatusDto.md)
+- [ContractAppliedDto](docs/ContractAppliedDto.md)
+- [ContractImportResultDto](docs/ContractImportResultDto.md)
+- [ContractSkippedDto](docs/ContractSkippedDto.md)
 - [CorrelationConfigResponseDto](docs/CorrelationConfigResponseDto.md)
 - [CorrelationGraphResponseDto](docs/CorrelationGraphResponseDto.md)
 - [CorrelationLabelWeightDto](docs/CorrelationLabelWeightDto.md)
@@ -805,6 +820,9 @@ All URIs are relative to *http://localhost*
 - [GlossaryTermUsageDto](docs/GlossaryTermUsageDto.md)
 - [GovernFirstDto](docs/GovernFirstDto.md)
 - [GovernanceChecklistItemDto](docs/GovernanceChecklistItemDto.md)
+- [GovernanceMeaningDto](docs/GovernanceMeaningDto.md)
+- [GovernanceMeaningSuggestionDto](docs/GovernanceMeaningSuggestionDto.md)
+- [GovernanceMeaningTermDto](docs/GovernanceMeaningTermDto.md)
 - [GovernanceMineDto](docs/GovernanceMineDto.md)
 - [GovernancePrincipalDto](docs/GovernancePrincipalDto.md)
 - [GovernanceRoleDto](docs/GovernanceRoleDto.md)
@@ -819,6 +837,7 @@ All URIs are relative to *http://localhost*
 - [HarnessToolsResponseDto](docs/HarnessToolsResponseDto.md)
 - [HealthControllerGetHealth200Response](docs/HealthControllerGetHealth200Response.md)
 - [HypothesisStatus](docs/HypothesisStatus.md)
+- [ImportContractDto](docs/ImportContractDto.md)
 - [IngestEdgeDto](docs/IngestEdgeDto.md)
 - [InquiryActivityDto](docs/InquiryActivityDto.md)
 - [InquiryLinkedCaseDto](docs/InquiryLinkedCaseDto.md)
@@ -830,6 +849,7 @@ All URIs are relative to *http://localhost*
 - [InstanceSettingsResponseDto](docs/InstanceSettingsResponseDto.md)
 - [LatestRunnerSummaryDto](docs/LatestRunnerSummaryDto.md)
 - [LineageGraphDto](docs/LineageGraphDto.md)
+- [LinkGovernanceTermDto](docs/LinkGovernanceTermDto.md)
 - [LinkInquiriesDto](docs/LinkInquiriesDto.md)
 - [LinkThreadSupportDto](docs/LinkThreadSupportDto.md)
 - [ListRunnersResponseDto](docs/ListRunnersResponseDto.md)
@@ -850,6 +870,7 @@ All URIs are relative to *http://localhost*
 - [McpToolSummaryDto](docs/McpToolSummaryDto.md)
 - [MeActorDto](docs/MeActorDto.md)
 - [MeResponseDto](docs/MeResponseDto.md)
+- [MeaningTermRefDto](docs/MeaningTermRefDto.md)
 - [MoveAssetColumnDto](docs/MoveAssetColumnDto.md)
 - [NotebookCellDto](docs/NotebookCellDto.md)
 - [NotebookDto](docs/NotebookDto.md)
@@ -885,6 +906,12 @@ All URIs are relative to *http://localhost*
 - [PurgeSourceAssetsResponseDto](docs/PurgeSourceAssetsResponseDto.md)
 - [PutAssetChunksDto](docs/PutAssetChunksDto.md)
 - [PutBoardThumbnailDto](docs/PutBoardThumbnailDto.md)
+- [QualityDimensionDto](docs/QualityDimensionDto.md)
+- [QualityResultDto](docs/QualityResultDto.md)
+- [QualityRuleArgumentsDto](docs/QualityRuleArgumentsDto.md)
+- [QualityRuleArgumentsDtoMissingValuesInner](docs/QualityRuleArgumentsDtoMissingValuesInner.md)
+- [QualityRuleDto](docs/QualityRuleDto.md)
+- [QualityRuleDtoThreshold](docs/QualityRuleDtoThreshold.md)
 - [QueryCatalogDto](docs/QueryCatalogDto.md)
 - [QueryCatalogSourceDto](docs/QueryCatalogSourceDto.md)
 - [QueryCatalogTableDto](docs/QueryCatalogTableDto.md)
@@ -976,6 +1003,8 @@ All URIs are relative to *http://localhost*
 - [RunnersChartsTopSourceDto](docs/RunnersChartsTopSourceDto.md)
 - [RunnersChartsTotalsDto](docs/RunnersChartsTotalsDto.md)
 - [SaveExploreViewDto](docs/SaveExploreViewDto.md)
+- [SaveQualityRuleDto](docs/SaveQualityRuleDto.md)
+- [SaveQualityRuleDtoThreshold](docs/SaveQualityRuleDtoThreshold.md)
 - [SaveSavedQueryDto](docs/SaveSavedQueryDto.md)
 - [SaveTrainingExamplesDto](docs/SaveTrainingExamplesDto.md)
 - [SavedQueryDto](docs/SavedQueryDto.md)

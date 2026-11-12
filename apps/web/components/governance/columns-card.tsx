@@ -378,17 +378,15 @@ export function ColumnsCard({
             <TableHeader>
               <TableRow>
                 <TableHead>{t("governance.columns.column")}</TableHead>
-                <TableHead>{t("governance.columns.businessName")}</TableHead>
-                <TableHead>{t("governance.columns.term")}</TableHead>
                 <TableHead>{t("governance.columns.classification")}</TableHead>
-                <TableHead className="w-24" />
+                <TableHead className="w-20" />
               </TableRow>
             </TableHeader>
             <TableBody>
               {state.columns.map((column) => (
                 <TableRow key={column.name} data-testid="column-row">
-                  <TableCell>
-                    <div className="flex items-center gap-1.5">
+                  <TableCell className="min-w-0 max-w-[340px] whitespace-normal">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       {column.criticalDataElement && (
                         <Star
                           className="h-3.5 w-3.5 fill-current text-amber-500"
@@ -396,26 +394,31 @@ export function ColumnsCard({
                         />
                       )}
                       <span className="font-mono text-sm">{column.name}</span>
+                      {column.type && (
+                        <Badge
+                          variant="outline"
+                          className="font-mono text-[10px]"
+                        >
+                          {column.type}
+                        </Badge>
+                      )}
                     </div>
-                    {column.type && (
-                      <Badge
-                        variant="outline"
-                        className="mt-1 font-mono text-[10px]"
-                      >
-                        {column.type}
-                      </Badge>
+                    {(column.businessName || column.term) && (
+                      <div className="mt-0.5 text-sm">
+                        {column.businessName}
+                        {column.businessName && column.term && " · "}
+                        {column.term && (
+                          <span className="text-muted-foreground">
+                            {column.term.term}
+                          </span>
+                        )}
+                      </div>
                     )}
-                  </TableCell>
-                  <TableCell className="max-w-[260px]">
-                    <div className="text-sm">{column.businessName ?? "—"}</div>
                     {column.description && (
                       <div className="line-clamp-2 text-xs text-muted-foreground">
                         {column.description}
                       </div>
                     )}
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {column.term?.term ?? "—"}
                   </TableCell>
                   <TableCell>
                     <ClassificationChip column={column} />

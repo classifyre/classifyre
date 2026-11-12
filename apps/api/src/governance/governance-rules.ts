@@ -145,6 +145,7 @@ export interface ChecklistItem {
     | 'description'
     | 'meaning'
     | 'classification'
+    | 'quality'
     | 'certified';
   done: boolean;
 }
@@ -160,6 +161,8 @@ export function checklist(input: {
    * a steward. Undefined for assets without columns (no such item).
    */
   classificationReviewed?: boolean;
+  /** At least one enabled quality rule, all passing on their latest result. */
+  qualityPassing?: boolean;
 }): ChecklistItem[] {
   const has = (kind: GovernanceRoleKind) =>
     input.roles.some((role) => role.role === kind);
@@ -176,6 +179,9 @@ export function checklist(input: {
             done: input.classificationReviewed,
           },
         ]),
+    ...(input.qualityPassing === undefined
+      ? []
+      : [{ key: 'quality' as const, done: input.qualityPassing }]),
     { key: 'certified', done: input.status === 'ACTIVE' },
   ];
 }

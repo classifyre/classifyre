@@ -79,7 +79,9 @@ import { summarizeTextCoverage } from "@/lib/text-coverage";
 import { CohortSelectionCard } from "@/components/cohort-yield";
 import { fetchCatalog, type QueryCatalog } from "@/lib/data-query";
 import { useCan } from "@/hooks/use-me";
-import { SourceOwnership } from "@/components/governance/source-ownership";
+import { SourceGovernanceView } from "@/components/governance/source-ownership";
+import { SourceGovernanceSummary } from "@/components/governance/governance-summary";
+import { useSourceGovernance } from "@/lib/governance";
 
 const EMPTY_CHARTS: SearchAssetsChartsResponseDto = {
   totals: {
@@ -135,6 +137,10 @@ export default function SourceViewPage() {
   const formatDuration = useFormatDuration();
   const router = useRouter();
   const sourceId = useRouteId();
+  // Governance (docs/prd/GOV-governed-data-assets.md): a summary on the
+  // Overview, the whole of it in its own tab.
+  const sourceGovernance = useSourceGovernance(sourceId);
+  const [tab, setTab] = useState("overview");
   // How a source is set up is for the people who can change it: the API
   // sends others no configuration, and the page shows no place for it.
   const canManage = useCan("source.manage");
@@ -645,7 +651,8 @@ export default function SourceViewPage() {
         // Remounted once the Data tab is known, so ?tab=data opens it: the
         // tabs read the address when they mount.
         key={hasData ? "with-data" : "without-data"}
-        defaultValue="overview"
+        value={tab}
+        onValueChange={setTab}
         urlParam="tab"
         className="space-y-4"
       >
@@ -655,6 +662,13 @@ export default function SourceViewPage() {
           </TabsTrigger>
           <TabsTrigger value="findings" className="rounded-[3px]">
             {t("sources.detail.tabFindings")}
+          </TabsTrigger>
+          <TabsTrigger
+            value="governance"
+            className="rounded-[3px]"
+            data-testid="source-governance-tab"
+          >
+            {t("governance.tab")}
           </TabsTrigger>
           <TabsTrigger value="assets" className="rounded-[3px]">
             {t("sources.detail.tabAssets")}
@@ -699,7 +713,12 @@ export default function SourceViewPage() {
 
           <CohortSelectionCard sourceId={sourceId} />
 
-          {sourceId && <SourceOwnership sourceId={sourceId} />}
+          {sourceGovernance.data && (
+            <SourceGovernanceSummary
+              governance={sourceGovernance.data}
+              onOpen={() => setTab("governance")}
+            />
+          )}
 
           <div className="grid gap-4 lg:grid-cols-3">
             <Card className="lg:col-span-2">
@@ -1066,6 +1085,15 @@ export default function SourceViewPage() {
           </Suspense>
         </TabsContent>
 
+        <TabsContent value="governance" className="space-y-4">
+          {sourceId && sourceGovernance.data && (
+            <SourceGovernanceView
+              sourceId={sourceId}
+              governance={sourceGovernance.data}
+              onChange={sourceGovernance.setData}
+            />
+          )}
+        </TabsContent>
         <TabsContent value="assets" className="space-y-4">
           <Suspense>
             <AssetsTable scope={{ sourceId }} />

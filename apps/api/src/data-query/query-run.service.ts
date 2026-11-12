@@ -45,6 +45,8 @@ export const EXPORT_MEDIA_TYPES: Record<ExportFormat, string> = {
 };
 /** Queries one person may have waiting or running at once. */
 const MAX_ACTIVE_PER_ACTOR = 3;
+/** System queries (quality rules) running at once per workspace. */
+const MAX_ACTIVE_SYSTEM = 2;
 const RESULT_TTL_MS = 24 * 60 * 60 * 1000;
 const RESULT_MARKER = '__CLASSIFYRE_QUERY_RESULT__';
 
@@ -290,6 +292,134 @@ export class QueryRunService {
     return this.view(run);
   }
 
+  /**
+   * A query the platform runs itself, over one table, for a purpose such as
+   * measuring quality rules (docs/prd/GOV-governed-data-assets.md §5.4). No
+   * person's grants apply: the caller decided this table may be measured.
+   * The result is CSV; `onDone` gets the run once the job has ended (its
+   * result arrived, or it failed). At most `MAX_ACTIVE_SYSTEM` run at once
+   * per workspace; beyond that it is refused, and the caller retries later.
+   */
+  async createSystem(input: {
+    assetId: string;
+    sql: string;
+    purpose: 'quality';
+    actorRef: string;
+    onDone: (runId: string) => Promise<void>;
+  }): Promise<{ runId: string } | { refused: string; busy?: boolean }> {
+    const cached = await this.catalog.tables();
+    const table = cached.tables.find((t) => t.assetId === input.assetId);
+    if (!table) return { refused: 'This asset is not a table SQL can read.' };
+    if (!table.queryable || !table.location) {
+      return {
+        refused: table.reason ?? 'This table cannot be read with SQL.',
+      };
+    }
+    const source = cached.sources.find((s) => s.id === table.sourceId);
+    if (!source) return { refused: 'The table has no source.' };
+    const active = await this.prisma.queryRun.count({
+      where: {
+        purpose: input.purpose,
+        status: { in: [QueryRunStatus.PENDING, QueryRunStatus.RUNNING] },
+      },
+    });
+    if (active >= MAX_ACTIVE_SYSTEM) {
+      return {
+        refused: `${active} quality queries are already running here; this one runs next time.`,
+        busy: true,
+      };
+    }
+    const settings = await this.catalog.settings();
+    const token = randomBytes(32).toString('base64url');
+    const run = await this.prisma.queryRun.create({
+      data: {
+        sql: input.sql,
+        status: QueryRunStatus.PENDING,
+        actorRef: input.actorRef,
+        purpose: input.purpose,
+        assetIds: [table.assetId],
+        sourceIds: [source.id],
+        callbackTokenHash: tokenHash(token),
+        resultFormat: 'csv',
+        expiresAt: new Date(Date.now() + RESULT_TTL_MS),
+      },
+    });
+    const row = await this.prisma.source.findUnique({
+      where: { id: source.id },
+      select: { type: true, config: true },
+    });
+    const config = this.crypto.decryptMaskedConfig(
+      (row?.config ?? {}) as Record<string, unknown>,
+    );
+    const request = {
+      runId: run.id,
+      sql: input.sql,
+      maxRows: 10,
+      maxResultBytes: MAX_RESULT_BYTES,
+      exportFormat: 'csv',
+      timeoutSeconds: settings.timeoutSeconds,
+      callbackUrl: `${this.cliRunner.queryCallbackBaseUrl(this.actors.workspaceId())}/query-runs/${run.id}/result`,
+      callbackToken: token,
+      sources: [
+        {
+          alias: source.sqlName,
+          sourceId: source.id,
+          recipe: { ...config, type: config.type ?? row?.type },
+        },
+      ],
+      tables: [
+        {
+          source: source.sqlName,
+          schema: table.schema,
+          table: table.table,
+          assetId: table.assetId,
+          location: table.location,
+        },
+      ],
+    };
+    void this.execute(run.id, request, settings.timeoutSeconds).then(() =>
+      input
+        .onDone(run.id)
+        .catch((error: unknown) =>
+          this.logger.warn(
+            `After system query ${run.id}: ${error instanceof Error ? error.message : String(error)}`,
+          ),
+        ),
+    );
+    return { runId: run.id };
+  }
+
+  /** The SQL name of a table (`source.schema.table`), or null when SQL cannot read it. */
+  async tableName(assetId: string): Promise<string | null> {
+    const cached = await this.catalog.tables();
+    const table = cached.tables.find((t) => t.assetId === assetId);
+    return table?.queryable && table.location ? table.sqlName : null;
+  }
+
+  /** A finished system run: its status, error and CSV text. */
+  async systemResult(runId: string): Promise<{
+    status: QueryRunStatus;
+    error: string | null;
+    csv: string | null;
+  }> {
+    const run = await this.prisma.queryRun.findUnique({
+      where: { id: runId },
+      select: { status: true, error: true, result: true },
+    });
+    if (!run)
+      return {
+        status: QueryRunStatus.ERROR,
+        error: 'Run not found.',
+        csv: null,
+      };
+    const error = run.error as { message?: string } | null;
+    return {
+      status: run.status,
+      error: error?.message ?? null,
+      csv: run.result ? Buffer.from(run.result).toString('utf8') : null,
+    };
+  }
+
   private async execute(
     runId: string,
     request: Record<string, unknown>,
@@ -394,6 +524,7 @@ export class QueryRunService {
         sourceIds: true,
         actorRef: true,
         resultFormat: true,
+        purpose: true,
       },
     });
     const expected = run?.callbackTokenHash;
@@ -447,20 +578,24 @@ export class QueryRunService {
         const actor = {
           id: null,
           displayName: null,
-          kind: 'person' as const,
+          kind: run.purpose ? ('system' as const) : ('person' as const),
           via: 'none' as const,
           ref: run.actorRef,
         };
         const tables = await this.tablesFor(assetIds);
-        const isExport = Boolean(run.resultFormat);
+        // A system measurement is not a person's export: it reads as itself,
+        // and stays out of the table's usage (GOV §5.3).
+        const isExport = Boolean(run.resultFormat) && !run.purpose;
         for (const assetId of assetIds) {
           void this.audit.record({
             actor,
             channel: 'rest',
             capability: isExport ? 'data.export' : 'data.query',
-            operation: isExport
-              ? `query-runs.export-table.${run.resultFormat}`
-              : 'query-runs.read-table',
+            operation: run.purpose
+              ? `${run.purpose}.read-table`
+              : isExport
+                ? `query-runs.export-table.${run.resultFormat}`
+                : 'query-runs.read-table',
             entityType: 'asset',
             entityId: assetId,
             entityName: tables.get(assetId)?.sqlName ?? null,

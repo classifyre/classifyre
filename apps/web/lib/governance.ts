@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   api,
+  type AssetQualityDto,
+  type QualityRuleDto,
   type AssetColumnDto,
   type AssetColumnsDto,
   type AssetUsageDto,
@@ -37,6 +39,8 @@ export function principalKindsFor(
 }
 
 export type {
+  AssetQualityDto,
+  QualityRuleDto,
   AssetColumnDto,
   AssetColumnsDto,
   AssetUsageDto,
@@ -142,3 +146,36 @@ export function useGovernanceSummary() {
   );
   return useLoad<GovernanceSummaryDto>(load);
 }
+
+export function useAssetQuality(assetId: string | null | undefined) {
+  const load = useCallback(
+    () => api.governance.governanceControllerAssetQuality({ id: assetId! }),
+    [assetId],
+  );
+  return useLoad<AssetQualityDto>(assetId ? load : null);
+}
+
+export const QUALITY_DIMENSIONS = [
+  "accuracy",
+  "completeness",
+  "conformity",
+  "consistency",
+  "coverage",
+  "timeliness",
+  "uniqueness",
+] as const;
+
+export const QUALITY_OPERATORS = [
+  "mustBe",
+  "mustNotBe",
+  "mustBeGreaterThan",
+  "mustBeGreaterOrEqualTo",
+  "mustBeLessThan",
+  "mustBeLessOrEqualTo",
+  "mustBeBetween",
+  "mustNotBeBetween",
+] as const;
+export type QualityOperator = (typeof QUALITY_OPERATORS)[number];
+
+export const isBetween = (operator: string) =>
+  operator === "mustBeBetween" || operator === "mustNotBeBetween";

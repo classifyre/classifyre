@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -8,7 +9,10 @@ import {
   Post,
   Put,
   Query,
+  Res,
 } from '@nestjs/common';
+import type { FastifyReply } from 'fastify';
+import { stringify as toYaml } from 'yaml';
 import {
   ApiOkResponse,
   ApiOperation,
@@ -17,6 +21,12 @@ import {
 } from '@nestjs/swagger';
 import { Requires, SignedInOnly } from '../identity/access.decorators';
 import {
+  ContractImportResultDto,
+  ImportContractDto,
+  AssetQualityDto,
+  SaveQualityRuleDto,
+  GovernanceMeaningDto,
+  LinkGovernanceTermDto,
   AssetColumnsDto,
   AssetUsageDto,
   GovernanceSummaryDto,
@@ -46,6 +56,170 @@ export class GovernanceController {
     private readonly governance: GovernanceService,
     private readonly insights: GovernanceInsightsService,
   ) {}
+
+  @Get('assets/:id/governance/meaning')
+  @Requires('asset.view')
+  @ApiOperation({
+    summary: 'The glossary terms an asset is about, and suggested ones',
+  })
+  @ApiOkResponse({ type: GovernanceMeaningDto })
+  assetMeaning(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<GovernanceMeaningDto> {
+    return this.governance.assetMeaning(id);
+  }
+
+  @Post('assets/:id/governance/meaning')
+  @Requires('asset.view')
+  @SignedInOnly()
+  @ApiOperation({
+    summary: 'Link a glossary term to an asset by hand',
+    description:
+      'Needs asset.govern, or the owner or steward role on the asset or its source.',
+  })
+  @ApiOkResponse({ type: GovernanceMeaningDto })
+  linkTerm(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: LinkGovernanceTermDto,
+  ): Promise<GovernanceMeaningDto> {
+    return this.governance.linkTerm(id, body?.termId);
+  }
+
+  @Delete('assets/:id/governance/meaning/:termId')
+  @Requires('asset.view')
+  @SignedInOnly()
+  @ApiOperation({ summary: 'Remove a term linked by hand' })
+  @ApiOkResponse({ type: GovernanceMeaningDto })
+  unlinkTerm(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('termId', ParseUUIDPipe) termId: string,
+  ): Promise<GovernanceMeaningDto> {
+    return this.governance.unlinkTerm(id, termId);
+  }
+
+  @Post('assets/:id/governance/meaning/suggestions/:suggestionId/dismiss')
+  @Requires('asset.view')
+  @SignedInOnly()
+  @ApiOperation({ summary: 'Dismiss a suggested term for an asset' })
+  @ApiOkResponse({ type: GovernanceMeaningDto })
+  dismissSuggestion(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('suggestionId', ParseUUIDPipe) suggestionId: string,
+  ): Promise<GovernanceMeaningDto> {
+    return this.governance.dismissSuggestion(id, suggestionId);
+  }
+
+  @Get('assets/:id/contract')
+  @Requires('asset.view')
+  @ApiOperation({
+    summary: 'The asset as an Open Data Contract Standard (v3.2) contract',
+    description:
+      'Description, team, columns with business names and classification, quality rules, SLA. YAML by default.',
+  })
+  @ApiQuery({ name: 'format', required: false, enum: ['yaml', 'json'] })
+  async exportContract(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Res() reply: FastifyReply,
+    @Query('format') format?: string,
+  ): Promise<void> {
+    const kind = (format ?? 'yaml').toLowerCase();
+    if (kind !== 'yaml' && kind !== 'json') {
+      throw new BadRequestException('format is yaml or json.');
+    }
+    const { name, contract } = await this.governance.exportContract(id);
+    const file = `${name.replace(/[^A-Za-z0-9._-]+/g, '_') || 'contract'}.odcs.${kind}`;
+    await reply
+      .header(
+        'content-type',
+        kind === 'yaml'
+          ? 'application/yaml; charset=utf-8'
+          : 'application/json',
+      )
+      .header('content-disposition', `attachment; filename="${file}"`)
+      .send(
+        kind === 'yaml'
+          ? toYaml(contract, { lineWidth: 0 })
+          : JSON.stringify(contract, null, 2),
+      );
+  }
+
+  @Put('assets/:id/contract')
+  @Requires('asset.view')
+  @SignedInOnly()
+  @ApiOperation({
+    summary: 'Apply an ODCS contract (YAML or JSON text) to the asset',
+    description:
+      'Matches columns by name and people by e-mail or group path; reports what was skipped. Needs asset.govern, or the owner or steward role.',
+  })
+  @ApiOkResponse({ type: ContractImportResultDto })
+  importContract(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: ImportContractDto,
+  ): Promise<ContractImportResultDto> {
+    return this.governance.importContract(id, body?.contract);
+  }
+
+  @Get('assets/:id/quality')
+  @Requires('asset.view')
+  @ApiOperation({
+    summary: "An asset's quality rules, their latest results and its score",
+  })
+  @ApiOkResponse({ type: AssetQualityDto })
+  assetQuality(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<AssetQualityDto> {
+    return this.governance.assetQuality(id);
+  }
+
+  @Post('assets/:id/quality/rules')
+  @Requires('asset.view')
+  @SignedInOnly()
+  @ApiOperation({
+    summary: 'Add a quality rule to an asset (and evaluate it at once)',
+    description:
+      'Needs asset.govern, or the owner or steward role on the asset or its source.',
+  })
+  @ApiOkResponse({ type: AssetQualityDto })
+  createQualityRule(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: SaveQualityRuleDto,
+  ): Promise<AssetQualityDto> {
+    return this.governance.createQualityRule(id, body);
+  }
+
+  @Put('quality-rules/:ruleId')
+  @Requires('asset.view')
+  @SignedInOnly()
+  @ApiOperation({ summary: 'Change a quality rule (and evaluate it at once)' })
+  @ApiOkResponse({ type: AssetQualityDto })
+  updateQualityRule(
+    @Param('ruleId', ParseUUIDPipe) ruleId: string,
+    @Body() body: SaveQualityRuleDto,
+  ): Promise<AssetQualityDto> {
+    return this.governance.updateQualityRule(ruleId, body);
+  }
+
+  @Delete('quality-rules/:ruleId')
+  @Requires('asset.view')
+  @SignedInOnly()
+  @ApiOperation({
+    summary: 'Delete a quality rule; its open finding is resolved',
+  })
+  @ApiOkResponse({ type: AssetQualityDto })
+  removeQualityRule(
+    @Param('ruleId', ParseUUIDPipe) ruleId: string,
+  ): Promise<AssetQualityDto> {
+    return this.governance.removeQualityRule(ruleId);
+  }
+
+  @Post('assets/:id/quality/run')
+  @Requires('asset.view')
+  @SignedInOnly()
+  @ApiOperation({ summary: "Evaluate an asset's quality rules now" })
+  @ApiOkResponse({ type: AssetQualityDto })
+  runQuality(@Param('id', ParseUUIDPipe) id: string): Promise<AssetQualityDto> {
+    return this.governance.runQuality(id);
+  }
 
   @Get('assets/:id/columns')
   @Requires('asset.view')

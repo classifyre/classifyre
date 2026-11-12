@@ -7502,9 +7502,9 @@
       "CUSTODIAN": "Custodian"
     },
     "roleHint": {
-      "OWNER": "One person, accountable for the data and who may use it.",
-      "STEWARD": "Keeps its definitions and quality up to date: people or groups.",
-      "CUSTODIAN": "The technical team that runs the system it lives in."
+      "OWNER": "One person, accountable. Governs it, can query its tables (not export) and decides who else may read them.",
+      "STEWARD": "People or groups who keep its definitions and quality up to date. They govern it; reading its rows still needs a grant.",
+      "CUSTODIAN": "The technical team that runs the system it lives in: a contact, with no rights here."
     },
     "ownership": {
       "title": "Ownership",
@@ -7541,10 +7541,7 @@
     },
     "ungoverned": {
       "title": "Nobody owns this asset yet",
-      "body": "An asset becomes governed when someone is accountable for it. Assign an owner: the person who decides what it is for and who may use it.",
-      "pick": "Choose the owner",
-      "assign": "Assign owner",
-      "done": "The asset is governed now."
+      "body": "An asset becomes governed when someone is accountable for it. Assign an owner: the person who decides what it is for and who may use it."
     },
     "fields": {
       "description": "Description",
@@ -7573,18 +7570,21 @@
     "saved": "Saved.",
     "saveFailed": "Could not save.",
     "checklist": {
-      "title": "Governance",
       "progress": "{{done}} of {{total}} done",
       "owner": "An owner",
       "steward": "A steward",
       "description": "A description",
       "meaning": "An approved glossary term",
       "certified": "Certified",
-      "classification": "Column classification reviewed"
+      "classification": "Column classification reviewed",
+      "quality": "Quality rules passing"
     },
     "coverage": {
       "owned": "{{owned}} of {{assets}} assets owned",
-      "active": "{{active}} certified"
+      "active": "{{active}} certified",
+      "lead": "Assets of this source that are owned and certified. Roles set here count for every asset that names none of its own.",
+      "showUngoverned": "Show ungoverned assets",
+      "showDraft": "Show assets not yet certified"
     },
     "filter": {
       "label": "Governance",
@@ -7674,6 +7674,180 @@
         "description": "Owned and certified assets per source. Roles set on a source count for its assets."
       },
       "activity": "Recent changes"
+    },
+    "tab": "Governance",
+    "summary": {
+      "title": "Governance",
+      "open": "Open governance",
+      "start": "Start governing"
+    },
+    "steps": {
+      "label": "Governance steps",
+      "ownership": "Ownership",
+      "ownershipDesc": "Who answers for it",
+      "sourceOwnershipDesc": "Who answers for its assets",
+      "description": "Description",
+      "descriptionDesc": "What it is and is for",
+      "meaning": "Meaning",
+      "meaningDesc": "Glossary terms it is about",
+      "columns": "Columns",
+      "columnsDesc": "Names and classification",
+      "certification": "Certification",
+      "certificationDesc": "Fit for use as described",
+      "coverage": "Coverage",
+      "coverageDesc": "How much is governed",
+      "quality": "Quality",
+      "qualityDesc": "Rules and their results"
+    },
+    "meaning": {
+      "title": "Meaning",
+      "description": "The glossary terms this asset is about. Terms from bindings and the source arrive by themselves; add the rest here.",
+      "none": "No terms yet.",
+      "auto": "auto",
+      "autoHint": "Linked by {{methods}}; change it where it comes from.",
+      "remove": "Remove {{term}}",
+      "suggested": "Suggested",
+      "because": {
+        "semantic": "{{reason}}",
+        "name": "Matches the name {{reason}}",
+        "column": "Matches the column {{reason}}"
+      },
+      "add": "Add",
+      "dismiss": "Not this one",
+      "search": "Search the glossary to add a term…",
+      "already": "Added",
+      "noHits": "No term matches.",
+      "create": "Create “{{term}}” and add it",
+      "created": "Created “{{term}}” and added it.",
+      "failed": "Could not change the terms.",
+      "termStatus": {
+        "DRAFT": "draft",
+        "APPROVED": "approved",
+        "DEPRECATED": "deprecated"
+      }
+    },
+    "certify": {
+      "needsOwner": "Assign an owner first: only an owned asset can be certified."
+    },
+    "quality": {
+      "title": "Quality",
+      "empty": "No rules yet. A rule measures something after every scan and keeps a finding open while it fails.",
+      "summary": "{{rules}} rules, {{failing}} failing.",
+      "brief": "Quality {{score}} · {{failing}} failing",
+      "run": "Run now",
+      "add": "Add rule",
+      "addTitle": "Add a quality rule",
+      "editTitle": "Change the rule",
+      "kind": {
+        "detector": "From findings",
+        "metadata": "From the scan",
+        "library": "Check a column",
+        "sql": "SQL"
+      },
+      "detector": "Detector",
+      "anyFindings": "Any findings",
+      "where": "Where",
+      "wholeAsset": "Whole asset",
+      "customKey": "Custom detector key",
+      "findingType": "Finding type (optional)",
+      "measure": "Measure",
+      "metric": {
+        "rowCount": "Row count",
+        "freshness": "Hours since last scan",
+        "openFindings": "Open findings",
+        "nullValues": "Empty values (null)",
+        "missingValues": "Missing values",
+        "invalidValues": "Invalid values",
+        "duplicateValues": "Duplicate values",
+        "query": "SQL result"
+      },
+      "unit": {
+        "openFindings": "findings",
+        "rowCount": "rows",
+        "freshness": "hours",
+        "rows": "rows",
+        "percent": "% of rows",
+        "value": "",
+        "findings": "findings",
+        "hours": "hours"
+      },
+      "condition": "Condition",
+      "threshold": "Threshold",
+      "upper": "Upper bound",
+      "operator": {
+        "mustBe": "must be",
+        "mustNotBe": "must not be",
+        "mustBeGreaterThan": "must be more than",
+        "mustBeGreaterOrEqualTo": "must be at least",
+        "mustBeLessThan": "must be less than",
+        "mustBeLessOrEqualTo": "must be at most",
+        "mustBeBetween": "must be between",
+        "mustNotBeBetween": "must not be between"
+      },
+      "dimensionLabel": "Dimension",
+      "dimension": {
+        "accuracy": "Accuracy",
+        "completeness": "Completeness",
+        "conformity": "Conformity",
+        "consistency": "Consistency",
+        "coverage": "Coverage",
+        "timeliness": "Timeliness",
+        "uniqueness": "Uniqueness"
+      },
+      "severity": "Severity when failing",
+      "name": "Name",
+      "suggest": {
+        "rowCount": "Table is not empty",
+        "freshness": "Scanned recently",
+        "findings": "No {{what}} findings",
+        "findingsIn": "No {{what}} findings in {{column}}",
+        "nullValues": "No empty {{column}}",
+        "missingValues": "No missing {{column}}",
+        "invalidValues": "Only valid {{column}}",
+        "duplicateValues": "{{column}} is unique",
+        "sql": "SQL check"
+      },
+      "saveAndRun": "Save and run",
+      "saved": "Rule saved and measured.",
+      "disabled": "Disabled",
+      "never": "Not measured yet",
+      "error": "Could not be measured",
+      "passing": "Passing",
+      "failing": "Failing",
+      "measured": "Measured: {{value}}",
+      "openFinding": "Open finding",
+      "edit": "Edit {{name}}",
+      "delete": "Delete {{name}}",
+      "kindHint": {
+        "library": "Measured over the whole table, after each scan or on a schedule.",
+        "sql": "Your SELECT returns one number; {{object}} is the table, {{property}} the column.",
+        "detector": "Counts open findings: what detectors already say about this asset.",
+        "metadata": "Reads what the last scan recorded about the table."
+      },
+      "validValues": "Allowed values (comma-separated)",
+      "pattern": "Or a pattern they must match",
+      "missingValues": "Also count as missing (comma-separated)",
+      "query": "Query",
+      "queryHint": "One SELECT returning one number, e.g. SELECT COUNT(*) FROM {{object}} WHERE {{property}} < 0.",
+      "pickColumn": "Choose a column",
+      "schedule": "When",
+      "scheduleOption": {
+        "scan": "After each scan",
+        "hourly": "Hourly",
+        "daily": "Daily",
+        "weekly": "Weekly"
+      },
+      "measuring": "Measuring the table…"
+    },
+    "contract": {
+      "title": "Data contract",
+      "description": "This asset as an Open Data Contract Standard (ODCS v3.2) contract: description, team, columns and quality rules. Apply one to fill them in.",
+      "yaml": "Download YAML",
+      "json": "Download JSON",
+      "import": "Apply a contract",
+      "imported": "Contract applied.",
+      "failed": "Could not apply the contract.",
+      "applied": "Applied: {{members}} people or groups, {{columns}} columns, {{rules}} rules."
     }
   }
 }

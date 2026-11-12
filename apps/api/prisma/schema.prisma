@@ -179,6 +179,9 @@ model QueryRun {
   result            Bytes?
   /// Null for rows shown in the app; `xlsx`, `csv` or `parquet` for an export.
   resultFormat      String?        @map("result_format")
+  /// Null for a person's query; `quality` for a quality rule's measurement
+  /// (GOV §5.4), run as `system:quality` and audited as such.
+  purpose           String?
   resultBytes       Int?           @map("result_bytes")
   jobName           String?        @map("job_name")
   jobNamespace      String?        @map("job_namespace")
@@ -399,6 +402,7 @@ model Asset {
   lineageProfile            AssetLineageProfile?
   governance                AssetGovernance?
   columnAnnotations         AssetColumnAnnotation[]
+  qualityRules              QualityRule[]
 
   @@unique([sourceId, hash])
   @@index([urn])
@@ -474,6 +478,85 @@ model AssetColumnAnnotation {
   @@id([assetId, columnName])
   @@index([termId])
   @@map("asset_column_annotations")
+}
+
+/// A data quality rule on an asset or one of its columns, ODCS-shaped
+/// (GOV §5.4). `detector` rules count open findings, `metadata` rules read
+/// what the scan recorded; `library` and `sql` (G-4) measure whole tables.
+model QualityRule {
+  id             String          @id @default(uuid())
+  assetId        String          @map("asset_id")
+  columnName     String?         @map("column_name")
+  /// ODCS `id`: unique per asset, used in finding types (`quality:<key>`).
+  key            String
+  name           String
+  description    String?         @db.Text
+  /// accuracy, completeness, conformity, consistency, coverage, timeliness, uniqueness
+  dimension      String
+  /// detector, metadata (later library, sql)
+  type           String
+  /// openFindings, rowCount, freshness
+  metric         String
+  arguments      Json            @default("{}") @db.JsonB
+  /// mustBe, mustNotBe, mustBeGreaterThan, …, mustBeBetween, mustNotBeBetween
+  operator       String
+  /// A number, or [low, high] for the between operators.
+  threshold      Json            @db.JsonB
+  unit           String
+  severity       Severity        @default(MEDIUM)
+  businessImpact String?         @map("business_impact") @db.Text
+  /// Cron (UTC, at most hourly); null = after each scan and on request only.
+  schedule        String?
+  lastScheduledAt DateTime?       @map("last_scheduled_at")
+  enabled        Boolean         @default(true)
+  createdBy      String?         @map("created_by")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+  asset          Asset           @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  results        QualityResult[]
+
+  @@unique([assetId, key])
+  @@index([assetId, enabled])
+  @@map("quality_rules")
+}
+
+/// One evaluation of some rules: after a scan, or on request (GOV §5.4).
+model QualityEvaluation {
+  id         String          @id @default(uuid())
+  /// scan, manual (later schedule)
+  trigger    String
+  assetIds   String[]        @map("asset_ids")
+  runnerId   String?         @map("runner_id")
+  actorRef   String?         @map("actor_ref")
+  /// running while a whole-table query is out, then done or error.
+  status     String          @default("done")
+  /// The system query run that measured library and sql rules.
+  queryRunId String?         @map("query_run_id")
+  rules      Int             @default(0)
+  failed     Int             @default(0)
+  startedAt  DateTime        @default(now()) @map("started_at")
+  finishedAt DateTime?       @map("finished_at")
+  results    QualityResult[]
+
+  @@index([startedAt(sort: Desc)])
+  @@map("quality_evaluations")
+}
+
+/// What one rule measured once: kept, passing or not (GOV R7).
+model QualityResult {
+  id            String            @id @default(uuid())
+  ruleId        String            @map("rule_id")
+  evaluationId  String            @map("evaluation_id")
+  evaluatedAt   DateTime          @default(now()) @map("evaluated_at")
+  measuredValue Float?            @map("measured_value")
+  passed        Boolean
+  error         String?           @db.Text
+  rule          QualityRule       @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  evaluation    QualityEvaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+
+  @@index([ruleId, evaluatedAt(sort: Desc)])
+  @@index([evaluationId])
+  @@map("quality_results")
 }
 
 /// ODCS contract status, kept apart from the scan's AssetStatus.
@@ -1556,6 +1639,9 @@ enum DetectorType {
   BROKEN_LINKS
   CODE_SECURITY
   CUSTOM
+  /// A failing data quality rule (docs/prd/GOV-governed-data-assets.md §5.4),
+  /// raised and resolved by the API, never by a scan.
+  QUALITY
 }
 
 enum CustomDetectorTrainingStatus {

@@ -856,7 +856,8 @@ export const SearchAssetsControllerExportAssetsFindingDetectorTypeEnum = {
     Yara: 'YARA',
     BrokenLinks: 'BROKEN_LINKS',
     CodeSecurity: 'CODE_SECURITY',
-    Custom: 'CUSTOM'
+    Custom: 'CUSTOM',
+    Quality: 'QUALITY'
 } as const;
 export type SearchAssetsControllerExportAssetsFindingDetectorTypeEnum = typeof SearchAssetsControllerExportAssetsFindingDetectorTypeEnum[keyof typeof SearchAssetsControllerExportAssetsFindingDetectorTypeEnum];
 /**
@@ -889,7 +890,8 @@ export const SearchAssetsControllerExportFindingsDetectorTypeEnum = {
     Yara: 'YARA',
     BrokenLinks: 'BROKEN_LINKS',
     CodeSecurity: 'CODE_SECURITY',
-    Custom: 'CUSTOM'
+    Custom: 'CUSTOM',
+    Quality: 'QUALITY'
 } as const;
 export type SearchAssetsControllerExportFindingsDetectorTypeEnum = typeof SearchAssetsControllerExportFindingsDetectorTypeEnum[keyof typeof SearchAssetsControllerExportFindingsDetectorTypeEnum];
 /**

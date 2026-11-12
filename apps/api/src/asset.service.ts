@@ -2698,6 +2698,8 @@ export class AssetService {
         sourceId: source.id,
         status: FindingStatus.OPEN,
         assertedBySourceId: null,
+        // Quality findings belong to rules, not to a configured detector.
+        detectorType: { not: DetectorType.QUALITY },
         OR: orphanedDetectorWhere(configuredKeys),
       },
       _count: { _all: true },
