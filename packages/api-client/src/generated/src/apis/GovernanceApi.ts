@@ -17,11 +17,17 @@ import * as runtime from '../runtime';
 import type {
   AssetColumnsDto,
   AssetGovernanceDto,
+  AssetQualityDto,
   AssetUsageDto,
   AssignGovernanceRoleDto,
+  ContractImportResultDto,
+  GovernanceMeaningDto,
   GovernancePrincipalDto,
   GovernanceSummaryDto,
+  ImportContractDto,
+  LinkGovernanceTermDto,
   MoveAssetColumnDto,
+  SaveQualityRuleDto,
   SourceGovernanceDto,
   UpdateAssetColumnDto,
   UpdateAssetGovernanceDto,
@@ -31,16 +37,28 @@ import {
     AssetColumnsDtoToJSON,
     AssetGovernanceDtoFromJSON,
     AssetGovernanceDtoToJSON,
+    AssetQualityDtoFromJSON,
+    AssetQualityDtoToJSON,
     AssetUsageDtoFromJSON,
     AssetUsageDtoToJSON,
     AssignGovernanceRoleDtoFromJSON,
     AssignGovernanceRoleDtoToJSON,
+    ContractImportResultDtoFromJSON,
+    ContractImportResultDtoToJSON,
+    GovernanceMeaningDtoFromJSON,
+    GovernanceMeaningDtoToJSON,
     GovernancePrincipalDtoFromJSON,
     GovernancePrincipalDtoToJSON,
     GovernanceSummaryDtoFromJSON,
     GovernanceSummaryDtoToJSON,
+    ImportContractDtoFromJSON,
+    ImportContractDtoToJSON,
+    LinkGovernanceTermDtoFromJSON,
+    LinkGovernanceTermDtoToJSON,
     MoveAssetColumnDtoFromJSON,
     MoveAssetColumnDtoToJSON,
+    SaveQualityRuleDtoFromJSON,
+    SaveQualityRuleDtoToJSON,
     SourceGovernanceDtoFromJSON,
     SourceGovernanceDtoToJSON,
     UpdateAssetColumnDtoFromJSON,
@@ -57,6 +75,14 @@ export interface GovernanceControllerAssetGovernanceRequest {
     id: string;
 }
 
+export interface GovernanceControllerAssetMeaningRequest {
+    id: string;
+}
+
+export interface GovernanceControllerAssetQualityRequest {
+    id: string;
+}
+
 export interface GovernanceControllerAssignAssetRoleRequest {
     id: string;
     assignGovernanceRoleDto: AssignGovernanceRoleDto;
@@ -65,6 +91,31 @@ export interface GovernanceControllerAssignAssetRoleRequest {
 export interface GovernanceControllerAssignSourceRoleRequest {
     id: string;
     assignGovernanceRoleDto: AssignGovernanceRoleDto;
+}
+
+export interface GovernanceControllerCreateQualityRuleRequest {
+    id: string;
+    saveQualityRuleDto: SaveQualityRuleDto;
+}
+
+export interface GovernanceControllerDismissSuggestionRequest {
+    id: string;
+    suggestionId: string;
+}
+
+export interface GovernanceControllerExportContractRequest {
+    id: string;
+    format?: GovernanceControllerExportContractFormatEnum;
+}
+
+export interface GovernanceControllerImportContractRequest {
+    id: string;
+    importContractDto: ImportContractDto;
+}
+
+export interface GovernanceControllerLinkTermRequest {
+    id: string;
+    linkGovernanceTermDto: LinkGovernanceTermDto;
 }
 
 export interface GovernanceControllerMoveColumnRequest {
@@ -88,9 +139,17 @@ export interface GovernanceControllerRemoveColumnRequest {
     name: string;
 }
 
+export interface GovernanceControllerRemoveQualityRuleRequest {
+    ruleId: string;
+}
+
 export interface GovernanceControllerRemoveSourceRoleRequest {
     id: string;
     roleId: string;
+}
+
+export interface GovernanceControllerRunQualityRequest {
+    id: string;
 }
 
 export interface GovernanceControllerSourceGovernanceRequest {
@@ -99,6 +158,11 @@ export interface GovernanceControllerSourceGovernanceRequest {
 
 export interface GovernanceControllerSummaryRequest {
     days?: string;
+}
+
+export interface GovernanceControllerUnlinkTermRequest {
+    id: string;
+    termId: string;
 }
 
 export interface GovernanceControllerUpdateAssetGovernanceRequest {
@@ -110,6 +174,11 @@ export interface GovernanceControllerUpdateColumnRequest {
     id: string;
     name: string;
     updateAssetColumnDto: UpdateAssetColumnDto;
+}
+
+export interface GovernanceControllerUpdateQualityRuleRequest {
+    ruleId: string;
+    saveQualityRuleDto: SaveQualityRuleDto;
 }
 
 export interface GovernanceControllerUsageRequest {
@@ -193,6 +262,80 @@ export class GovernanceApi extends runtime.BaseAPI {
      */
     async governanceControllerAssetGovernance(requestParameters: GovernanceControllerAssetGovernanceRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AssetGovernanceDto> {
         const response = await this.governanceControllerAssetGovernanceRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * The glossary terms an asset is about, and suggested ones
+     */
+    async governanceControllerAssetMeaningRaw(requestParameters: GovernanceControllerAssetMeaningRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GovernanceMeaningDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling governanceControllerAssetMeaning().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/assets/{id}/governance/meaning`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => GovernanceMeaningDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * The glossary terms an asset is about, and suggested ones
+     */
+    async governanceControllerAssetMeaning(requestParameters: GovernanceControllerAssetMeaningRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GovernanceMeaningDto> {
+        const response = await this.governanceControllerAssetMeaningRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * An asset\'s quality rules, their latest results and its score
+     */
+    async governanceControllerAssetQualityRaw(requestParameters: GovernanceControllerAssetQualityRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AssetQualityDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling governanceControllerAssetQuality().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/assets/{id}/quality`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => AssetQualityDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * An asset\'s quality rules, their latest results and its score
+     */
+    async governanceControllerAssetQuality(requestParameters: GovernanceControllerAssetQualityRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AssetQualityDto> {
+        const response = await this.governanceControllerAssetQualityRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -291,6 +434,240 @@ export class GovernanceApi extends runtime.BaseAPI {
      */
     async governanceControllerAssignSourceRole(requestParameters: GovernanceControllerAssignSourceRoleRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<SourceGovernanceDto> {
         const response = await this.governanceControllerAssignSourceRoleRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Needs asset.govern, or the owner or steward role on the asset or its source.
+     * Add a quality rule to an asset (and evaluate it at once)
+     */
+    async governanceControllerCreateQualityRuleRaw(requestParameters: GovernanceControllerCreateQualityRuleRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AssetQualityDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling governanceControllerCreateQualityRule().'
+            );
+        }
+
+        if (requestParameters['saveQualityRuleDto'] == null) {
+            throw new runtime.RequiredError(
+                'saveQualityRuleDto',
+                'Required parameter "saveQualityRuleDto" was null or undefined when calling governanceControllerCreateQualityRule().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/assets/{id}/quality/rules`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: SaveQualityRuleDtoToJSON(requestParameters['saveQualityRuleDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => AssetQualityDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Needs asset.govern, or the owner or steward role on the asset or its source.
+     * Add a quality rule to an asset (and evaluate it at once)
+     */
+    async governanceControllerCreateQualityRule(requestParameters: GovernanceControllerCreateQualityRuleRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AssetQualityDto> {
+        const response = await this.governanceControllerCreateQualityRuleRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Dismiss a suggested term for an asset
+     */
+    async governanceControllerDismissSuggestionRaw(requestParameters: GovernanceControllerDismissSuggestionRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GovernanceMeaningDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling governanceControllerDismissSuggestion().'
+            );
+        }
+
+        if (requestParameters['suggestionId'] == null) {
+            throw new runtime.RequiredError(
+                'suggestionId',
+                'Required parameter "suggestionId" was null or undefined when calling governanceControllerDismissSuggestion().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/assets/{id}/governance/meaning/suggestions/{suggestionId}/dismiss`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+        urlPath = urlPath.replace(`{${"suggestionId"}}`, encodeURIComponent(String(requestParameters['suggestionId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => GovernanceMeaningDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Dismiss a suggested term for an asset
+     */
+    async governanceControllerDismissSuggestion(requestParameters: GovernanceControllerDismissSuggestionRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GovernanceMeaningDto> {
+        const response = await this.governanceControllerDismissSuggestionRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Description, team, columns with business names and classification, quality rules, SLA. YAML by default.
+     * The asset as an Open Data Contract Standard (v3.2) contract
+     */
+    async governanceControllerExportContractRaw(requestParameters: GovernanceControllerExportContractRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling governanceControllerExportContract().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        if (requestParameters['format'] != null) {
+            queryParameters['format'] = requestParameters['format'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/assets/{id}/contract`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Description, team, columns with business names and classification, quality rules, SLA. YAML by default.
+     * The asset as an Open Data Contract Standard (v3.2) contract
+     */
+    async governanceControllerExportContract(requestParameters: GovernanceControllerExportContractRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.governanceControllerExportContractRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Matches columns by name and people by e-mail or group path; reports what was skipped. Needs asset.govern, or the owner or steward role.
+     * Apply an ODCS contract (YAML or JSON text) to the asset
+     */
+    async governanceControllerImportContractRaw(requestParameters: GovernanceControllerImportContractRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ContractImportResultDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling governanceControllerImportContract().'
+            );
+        }
+
+        if (requestParameters['importContractDto'] == null) {
+            throw new runtime.RequiredError(
+                'importContractDto',
+                'Required parameter "importContractDto" was null or undefined when calling governanceControllerImportContract().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/assets/{id}/contract`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'PUT',
+            headers: headerParameters,
+            query: queryParameters,
+            body: ImportContractDtoToJSON(requestParameters['importContractDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => ContractImportResultDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Matches columns by name and people by e-mail or group path; reports what was skipped. Needs asset.govern, or the owner or steward role.
+     * Apply an ODCS contract (YAML or JSON text) to the asset
+     */
+    async governanceControllerImportContract(requestParameters: GovernanceControllerImportContractRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ContractImportResultDto> {
+        const response = await this.governanceControllerImportContractRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Needs asset.govern, or the owner or steward role on the asset or its source.
+     * Link a glossary term to an asset by hand
+     */
+    async governanceControllerLinkTermRaw(requestParameters: GovernanceControllerLinkTermRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GovernanceMeaningDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling governanceControllerLinkTerm().'
+            );
+        }
+
+        if (requestParameters['linkGovernanceTermDto'] == null) {
+            throw new runtime.RequiredError(
+                'linkGovernanceTermDto',
+                'Required parameter "linkGovernanceTermDto" was null or undefined when calling governanceControllerLinkTerm().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/assets/{id}/governance/meaning`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: LinkGovernanceTermDtoToJSON(requestParameters['linkGovernanceTermDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => GovernanceMeaningDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Needs asset.govern, or the owner or steward role on the asset or its source.
+     * Link a glossary term to an asset by hand
+     */
+    async governanceControllerLinkTerm(requestParameters: GovernanceControllerLinkTermRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GovernanceMeaningDto> {
+        const response = await this.governanceControllerLinkTermRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -479,6 +856,43 @@ export class GovernanceApi extends runtime.BaseAPI {
     }
 
     /**
+     * Delete a quality rule; its open finding is resolved
+     */
+    async governanceControllerRemoveQualityRuleRaw(requestParameters: GovernanceControllerRemoveQualityRuleRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AssetQualityDto>> {
+        if (requestParameters['ruleId'] == null) {
+            throw new runtime.RequiredError(
+                'ruleId',
+                'Required parameter "ruleId" was null or undefined when calling governanceControllerRemoveQualityRule().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/quality-rules/{ruleId}`;
+        urlPath = urlPath.replace(`{${"ruleId"}}`, encodeURIComponent(String(requestParameters['ruleId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => AssetQualityDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Delete a quality rule; its open finding is resolved
+     */
+    async governanceControllerRemoveQualityRule(requestParameters: GovernanceControllerRemoveQualityRuleRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AssetQualityDto> {
+        const response = await this.governanceControllerRemoveQualityRuleRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
      * End a role on a source (kept as history)
      */
     async governanceControllerRemoveSourceRoleRaw(requestParameters: GovernanceControllerRemoveSourceRoleRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<SourceGovernanceDto>> {
@@ -520,6 +934,43 @@ export class GovernanceApi extends runtime.BaseAPI {
      */
     async governanceControllerRemoveSourceRole(requestParameters: GovernanceControllerRemoveSourceRoleRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<SourceGovernanceDto> {
         const response = await this.governanceControllerRemoveSourceRoleRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Evaluate an asset\'s quality rules now
+     */
+    async governanceControllerRunQualityRaw(requestParameters: GovernanceControllerRunQualityRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AssetQualityDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling governanceControllerRunQuality().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/assets/{id}/quality/run`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => AssetQualityDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Evaluate an asset\'s quality rules now
+     */
+    async governanceControllerRunQuality(requestParameters: GovernanceControllerRunQualityRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AssetQualityDto> {
+        const response = await this.governanceControllerRunQualityRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -590,6 +1041,51 @@ export class GovernanceApi extends runtime.BaseAPI {
      */
     async governanceControllerSummary(requestParameters: GovernanceControllerSummaryRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GovernanceSummaryDto> {
         const response = await this.governanceControllerSummaryRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Remove a term linked by hand
+     */
+    async governanceControllerUnlinkTermRaw(requestParameters: GovernanceControllerUnlinkTermRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GovernanceMeaningDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling governanceControllerUnlinkTerm().'
+            );
+        }
+
+        if (requestParameters['termId'] == null) {
+            throw new runtime.RequiredError(
+                'termId',
+                'Required parameter "termId" was null or undefined when calling governanceControllerUnlinkTerm().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/assets/{id}/governance/meaning/{termId}`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+        urlPath = urlPath.replace(`{${"termId"}}`, encodeURIComponent(String(requestParameters['termId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => GovernanceMeaningDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Remove a term linked by hand
+     */
+    async governanceControllerUnlinkTerm(requestParameters: GovernanceControllerUnlinkTermRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GovernanceMeaningDto> {
+        const response = await this.governanceControllerUnlinkTermRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -700,6 +1196,53 @@ export class GovernanceApi extends runtime.BaseAPI {
     }
 
     /**
+     * Change a quality rule (and evaluate it at once)
+     */
+    async governanceControllerUpdateQualityRuleRaw(requestParameters: GovernanceControllerUpdateQualityRuleRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AssetQualityDto>> {
+        if (requestParameters['ruleId'] == null) {
+            throw new runtime.RequiredError(
+                'ruleId',
+                'Required parameter "ruleId" was null or undefined when calling governanceControllerUpdateQualityRule().'
+            );
+        }
+
+        if (requestParameters['saveQualityRuleDto'] == null) {
+            throw new runtime.RequiredError(
+                'saveQualityRuleDto',
+                'Required parameter "saveQualityRuleDto" was null or undefined when calling governanceControllerUpdateQualityRule().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/quality-rules/{ruleId}`;
+        urlPath = urlPath.replace(`{${"ruleId"}}`, encodeURIComponent(String(requestParameters['ruleId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'PUT',
+            headers: headerParameters,
+            query: queryParameters,
+            body: SaveQualityRuleDtoToJSON(requestParameters['saveQualityRuleDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => AssetQualityDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Change a quality rule (and evaluate it at once)
+     */
+    async governanceControllerUpdateQualityRule(requestParameters: GovernanceControllerUpdateQualityRuleRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AssetQualityDto> {
+        const response = await this.governanceControllerUpdateQualityRuleRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
      * Who read and exported a table, per day, over the last days
      */
     async governanceControllerUsageRaw(requestParameters: GovernanceControllerUsageRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AssetUsageDto>> {
@@ -741,3 +1284,12 @@ export class GovernanceApi extends runtime.BaseAPI {
     }
 
 }
+
+/**
+ * @export
+ */
+export const GovernanceControllerExportContractFormatEnum = {
+    Yaml: 'yaml',
+    Json: 'json'
+} as const;
+export type GovernanceControllerExportContractFormatEnum = typeof GovernanceControllerExportContractFormatEnum[keyof typeof GovernanceControllerExportContractFormatEnum];

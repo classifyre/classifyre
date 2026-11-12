@@ -8,6 +8,11 @@ export interface StepperNavItem<Id extends string = string> {
   description?: string;
   /** Steps that cannot be reached yet render dimmed and ignore clicks. */
   disabled?: boolean;
+  /**
+   * Whether the step is done on its own terms (a checklist), not by position.
+   * Undefined: steps before the active one count as done, as in a wizard.
+   */
+  complete?: boolean;
 }
 
 interface StepperNavProps<Id extends string> {
@@ -57,7 +62,7 @@ export function VerticalStepperNav<Id extends string>({
       <ol>
         {steps.map((step, index) => {
           const isActive = step.id === activeStepId;
-          const isComplete = index < activeIndex;
+          const isComplete = step.complete ?? index < activeIndex;
           const isLast = index === steps.length - 1;
           const canNavigate = !step.disabled;
           const status = isComplete ? "done" : isActive ? "active" : "upcoming";
@@ -139,7 +144,7 @@ export function HorizontalStepperNav<Id extends string>({
       <ol className="flex items-center gap-1 sm:gap-2">
         {steps.map((step, index) => {
           const isActive = step.id === activeStepId;
-          const isComplete = index < activeIndex;
+          const isComplete = step.complete ?? index < activeIndex;
           const isLast = index === steps.length - 1;
           const canNavigate = !step.disabled;
           const status = isComplete ? "done" : isActive ? "active" : "upcoming";

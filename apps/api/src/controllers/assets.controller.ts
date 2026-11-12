@@ -1,4 +1,5 @@
 import { GovernanceService } from '../governance/governance.service';
+import { QualityService } from '../governance/quality.service';
 import {
   Controller,
   Get,
@@ -326,6 +327,7 @@ export class SourceAssetsController {
     private readonly sourceService: SourceService,
     private readonly validationService: ValidationService,
     @Optional() private readonly cohortWeights?: CohortWeightsService,
+    @Optional() private readonly quality?: QualityService,
   ) {}
 
   @Get()
@@ -669,12 +671,17 @@ export class SourceAssetsController {
         .catch(() => undefined);
     }
 
-    return this.assetService.finalizeIngestRun(
+    const finalized = await this.assetService.finalizeIngestRun(
       sourceId,
       runnerId,
       seenHashes,
       isFullScan,
       scannedAssetsComplete,
     );
+    // Quality rules of the assets this run wrote (GOV §5.4): after the
+    // findings are reconciled, since detector rules count them. Never fails
+    // the run.
+    await this.quality?.afterScan(sourceId, runnerId);
+    return finalized;
   }
 }

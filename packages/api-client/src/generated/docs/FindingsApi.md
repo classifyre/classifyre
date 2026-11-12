@@ -627,7 +627,7 @@ async function example() {
   const api = new FindingsApi();
 
   const body = {
-    // 'SECRETS' | 'PII' | 'YARA' | 'BROKEN_LINKS' | 'CODE_SECURITY' | 'CUSTOM' (optional)
+    // 'SECRETS' | 'PII' | 'YARA' | 'BROKEN_LINKS' | 'CODE_SECURITY' | 'CUSTOM' | 'QUALITY' (optional)
     detectorType: detectorType_example,
     // string (optional)
     sourceId: sourceId_example,
@@ -674,7 +674,7 @@ example().catch(console.error);
 
 | Name | Type | Description  | Notes |
 |------------- | ------------- | ------------- | -------------|
-| **detectorType** | `SECRETS`, `PII`, `YARA`, `BROKEN_LINKS`, `CODE_SECURITY`, `CUSTOM` |  | [Optional] [Defaults to `undefined`] [Enum: SECRETS, PII, YARA, BROKEN_LINKS, CODE_SECURITY, CUSTOM] |
+| **detectorType** | `SECRETS`, `PII`, `YARA`, `BROKEN_LINKS`, `CODE_SECURITY`, `CUSTOM`, `QUALITY` |  | [Optional] [Defaults to `undefined`] [Enum: SECRETS, PII, YARA, BROKEN_LINKS, CODE_SECURITY, CUSTOM, QUALITY] |
 | **sourceId** | `string` |  | [Optional] [Defaults to `undefined`] |
 | **assetId** | `string` |  | [Optional] [Defaults to `undefined`] |
 | **runnerId** | `string` |  | [Optional] [Defaults to `undefined`] |

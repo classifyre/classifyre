@@ -17,7 +17,7 @@
     },
     "apps/api": {
       "name": "@classifyre/api",
-      "version": "0.7.5-SNAPSHOT",
+      "version": "0.8.1-SNAPSHOT",
       "dependencies": {
         "@ai-sdk/openai-compatible": "^3.0.11",
         "@anthropic-ai/sdk": "^0.137.0",
@@ -70,6 +70,7 @@
         "rxjs": "^7.8.2",
         "socket.io": "^4.8.3",
         "uuid": "^14.0.0",
+        "yaml": "^2.8.1",
         "zod": "4.5.4",
       },
       "devDependencies": {
@@ -107,7 +108,7 @@
     },
     "apps/blog": {
       "name": "@classifyre/blog",
-      "version": "0.7.5-SNAPSHOT",
+      "version": "0.8.1-SNAPSHOT",
       "dependencies": {
         "@workspace/schemas": "workspace:*",
         "@workspace/ui": "workspace:*",
@@ -136,11 +137,11 @@
     },
     "apps/cli": {
       "name": "@classifyre/cli",
-      "version": "0.7.5-SNAPSHOT",
+      "version": "0.8.1-SNAPSHOT",
     },
     "apps/docs": {
       "name": "@classifyre/docs",
-      "version": "0.7.5-SNAPSHOT",
+      "version": "0.8.1-SNAPSHOT",
       "dependencies": {
         "@theguild/remark-mermaid": "^0.3.0",
         "@workspace/case-board": "workspace:*",
@@ -210,7 +211,7 @@
     },
     "apps/web": {
       "name": "@classifyre/web",
-      "version": "0.7.5-SNAPSHOT",
+      "version": "0.8.1-SNAPSHOT",
       "dependencies": {
         "@hookform/resolvers": "^5.2.2",
         "@monaco-editor/react": "^4.7.0",
@@ -276,7 +277,7 @@
     },
     "packages/api-client": {
       "name": "@workspace/api-client",
-      "version": "0.7.5-SNAPSHOT",
+      "version": "0.8.1-SNAPSHOT",
       "devDependencies": {
         "@openapitools/openapi-generator-cli": "2.42.0",
         "@types/jest": "^30.0.0",
@@ -308,7 +309,7 @@
     },
     "packages/devops": {
       "name": "@workspace/devops",
-      "version": "0.7.5-SNAPSHOT",
+      "version": "0.8.1-SNAPSHOT",
     },
     "packages/eslint-config": {
       "name": "@workspace/eslint-config",
@@ -332,7 +333,7 @@
     },
     "packages/schemas": {
       "name": "@workspace/schemas",
-      "version": "0.7.5-SNAPSHOT",
+      "version": "0.8.1-SNAPSHOT",
       "dependencies": {
         "zod": "4.5.4",
       },

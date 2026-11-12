@@ -51,6 +51,7 @@ docs/AssetGovernanceDto.md
 docs/AssetListItemDto.md
 docs/AssetListResponseDto.md
 docs/AssetMediaChunkDto.md
+docs/AssetQualityDto.md
 docs/AssetResponseDto.md
 docs/AssetSeverityCountsItemDto.md
 docs/AssetSeverityCountsRequestDto.md
@@ -174,6 +175,9 @@ docs/ColumnLineageResponseDto.md
 docs/ColumnLineageStepDto.md
 docs/ColumnTermDto.md
 docs/ConnectionTestStatusDto.md
+docs/ContractAppliedDto.md
+docs/ContractImportResultDto.md
+docs/ContractSkippedDto.md
 docs/CorrelationApi.md
 docs/CorrelationConfigResponseDto.md
 docs/CorrelationGraphResponseDto.md
@@ -298,6 +302,9 @@ docs/GlossaryTermUsageDto.md
 docs/GovernFirstDto.md
 docs/GovernanceApi.md
 docs/GovernanceChecklistItemDto.md
+docs/GovernanceMeaningDto.md
+docs/GovernanceMeaningSuggestionDto.md
+docs/GovernanceMeaningTermDto.md
 docs/GovernanceMineDto.md
 docs/GovernancePrincipalDto.md
 docs/GovernanceRoleDto.md
@@ -315,6 +322,7 @@ docs/HealthApi.md
 docs/HealthControllerGetHealth200Response.md
 docs/HypothesisStatus.md
 docs/IdentityApi.md
+docs/ImportContractDto.md
 docs/IngestEdgeDto.md
 docs/InquiriesApi.md
 docs/InquiryActivityDto.md
@@ -328,6 +336,7 @@ docs/InstanceSettingsApi.md
 docs/InstanceSettingsResponseDto.md
 docs/LatestRunnerSummaryDto.md
 docs/LineageGraphDto.md
+docs/LinkGovernanceTermDto.md
 docs/LinkInquiriesDto.md
 docs/LinkThreadSupportDto.md
 docs/ListRunnersResponseDto.md
@@ -349,6 +358,7 @@ docs/McpToolParameterDto.md
 docs/McpToolSummaryDto.md
 docs/MeActorDto.md
 docs/MeResponseDto.md
+docs/MeaningTermRefDto.md
 docs/MoveAssetColumnDto.md
 docs/NamespacesApi.md
 docs/NotebookCellDto.md
@@ -388,6 +398,12 @@ docs/PurgeQueuedJobsResponseDto.md
 docs/PurgeSourceAssetsResponseDto.md
 docs/PutAssetChunksDto.md
 docs/PutBoardThumbnailDto.md
+docs/QualityDimensionDto.md
+docs/QualityResultDto.md
+docs/QualityRuleArgumentsDto.md
+docs/QualityRuleArgumentsDtoMissingValuesInner.md
+docs/QualityRuleDto.md
+docs/QualityRuleDtoThreshold.md
 docs/QueryCatalogDto.md
 docs/QueryCatalogSourceDto.md
 docs/QueryCatalogTableDto.md
@@ -480,6 +496,8 @@ docs/RunnersChartsTimelineBucketDto.md
 docs/RunnersChartsTopSourceDto.md
 docs/RunnersChartsTotalsDto.md
 docs/SaveExploreViewDto.md
+docs/SaveQualityRuleDto.md
+docs/SaveQualityRuleDtoThreshold.md
 docs/SaveSavedQueryDto.md
 docs/SaveTrainingExamplesDto.md
 docs/SavedQueryDto.md
@@ -726,6 +744,7 @@ src/models/AssetGovernanceDto.ts
 src/models/AssetListItemDto.ts
 src/models/AssetListResponseDto.ts
 src/models/AssetMediaChunkDto.ts
+src/models/AssetQualityDto.ts
 src/models/AssetResponseDto.ts
 src/models/AssetSeverityCountsItemDto.ts
 src/models/AssetSeverityCountsRequestDto.ts
@@ -843,6 +862,9 @@ src/models/ColumnLineageResponseDto.ts
 src/models/ColumnLineageStepDto.ts
 src/models/ColumnTermDto.ts
 src/models/ConnectionTestStatusDto.ts
+src/models/ContractAppliedDto.ts
+src/models/ContractImportResultDto.ts
+src/models/ContractSkippedDto.ts
 src/models/CorrelationConfigResponseDto.ts
 src/models/CorrelationGraphResponseDto.ts
 src/models/CorrelationLabelWeightDto.ts
@@ -955,6 +977,9 @@ src/models/GlossaryTermDto.ts
 src/models/GlossaryTermUsageDto.ts
 src/models/GovernFirstDto.ts
 src/models/GovernanceChecklistItemDto.ts
+src/models/GovernanceMeaningDto.ts
+src/models/GovernanceMeaningSuggestionDto.ts
+src/models/GovernanceMeaningTermDto.ts
 src/models/GovernanceMineDto.ts
 src/models/GovernancePrincipalDto.ts
 src/models/GovernanceRoleDto.ts
@@ -969,6 +994,7 @@ src/models/HarnessToolDto.ts
 src/models/HarnessToolsResponseDto.ts
 src/models/HealthControllerGetHealth200Response.ts
 src/models/HypothesisStatus.ts
+src/models/ImportContractDto.ts
 src/models/IngestEdgeDto.ts
 src/models/InquiryActivityDto.ts
 src/models/InquiryLinkedCaseDto.ts
@@ -980,6 +1006,7 @@ src/models/InquiryTimelineResponseDto.ts
 src/models/InstanceSettingsResponseDto.ts
 src/models/LatestRunnerSummaryDto.ts
 src/models/LineageGraphDto.ts
+src/models/LinkGovernanceTermDto.ts
 src/models/LinkInquiriesDto.ts
 src/models/LinkThreadSupportDto.ts
 src/models/ListRunnersResponseDto.ts
@@ -1000,6 +1027,7 @@ src/models/McpToolParameterDto.ts
 src/models/McpToolSummaryDto.ts
 src/models/MeActorDto.ts
 src/models/MeResponseDto.ts
+src/models/MeaningTermRefDto.ts
 src/models/MoveAssetColumnDto.ts
 src/models/NotebookCellDto.ts
 src/models/NotebookDto.ts
@@ -1035,6 +1063,12 @@ src/models/PurgeQueuedJobsResponseDto.ts
 src/models/PurgeSourceAssetsResponseDto.ts
 src/models/PutAssetChunksDto.ts
 src/models/PutBoardThumbnailDto.ts
+src/models/QualityDimensionDto.ts
+src/models/QualityResultDto.ts
+src/models/QualityRuleArgumentsDto.ts
+src/models/QualityRuleArgumentsDtoMissingValuesInner.ts
+src/models/QualityRuleDto.ts
+src/models/QualityRuleDtoThreshold.ts
 src/models/QueryCatalogDto.ts
 src/models/QueryCatalogSourceDto.ts
 src/models/QueryCatalogTableDto.ts
@@ -1126,6 +1160,8 @@ src/models/RunnersChartsTimelineBucketDto.ts
 src/models/RunnersChartsTopSourceDto.ts
 src/models/RunnersChartsTotalsDto.ts
 src/models/SaveExploreViewDto.ts
+src/models/SaveQualityRuleDto.ts
+src/models/SaveQualityRuleDtoThreshold.ts
 src/models/SaveSavedQueryDto.ts
 src/models/SaveTrainingExamplesDto.ts
 src/models/SavedQueryDto.ts

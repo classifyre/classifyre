@@ -65,6 +65,7 @@ export class GovernanceChecklistItemDto {
       'description',
       'meaning',
       'classification',
+      'quality',
       'certified',
     ],
   })
@@ -504,4 +505,394 @@ export class GovernanceSummaryDto {
 
   @ApiProperty({ type: GovernanceMineDto })
   mine: GovernanceMineDto;
+}
+
+// ── Meaning ─────────────────────────────────────────────────────────────────
+
+export class MeaningTermRefDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  key: string;
+
+  @ApiProperty()
+  term: string;
+
+  @ApiProperty({ enum: ['DRAFT', 'APPROVED', 'DEPRECATED'] })
+  status: string;
+
+  @ApiPropertyOptional({ nullable: true })
+  definition: string | null;
+}
+
+export class GovernanceMeaningTermDto {
+  @ApiProperty({ type: MeaningTermRefDto })
+  term: MeaningTermRefDto;
+
+  @ApiProperty({
+    type: [String],
+    description: 'MANUAL, BINDING, DECLARED, SUGGESTED, MENTION',
+  })
+  methods: string[];
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'The hand-made link; only these can be removed here.',
+  })
+  referenceId: string | null;
+
+  @ApiProperty({ description: 'Linked moments ago; still being rolled up.' })
+  pending: boolean;
+}
+
+export class GovernanceMeaningSuggestionDto {
+  @ApiProperty({ type: MeaningTermRefDto })
+  term: MeaningTermRefDto;
+
+  @ApiProperty({ enum: ['semantic', 'name', 'column'] })
+  source: string;
+
+  @ApiPropertyOptional({ nullable: true })
+  suggestionId: string | null;
+
+  @ApiProperty({
+    description: 'What it matched: a column, the name, a passage.',
+  })
+  reason: string;
+
+  @ApiProperty()
+  score: number;
+}
+
+export class GovernanceMeaningDto {
+  @ApiProperty({ type: [GovernanceMeaningTermDto] })
+  terms: GovernanceMeaningTermDto[];
+
+  @ApiProperty({ type: [GovernanceMeaningSuggestionDto] })
+  suggestions: GovernanceMeaningSuggestionDto[];
+
+  @ApiProperty()
+  canGovern: boolean;
+
+  @ApiProperty({ description: 'Whether the caller may create glossary terms.' })
+  canEditGlossary: boolean;
+}
+
+export class LinkGovernanceTermDto {
+  @ApiProperty()
+  @IsString()
+  termId: string;
+}
+
+// ── Quality (G-3) ───────────────────────────────────────────────────────────
+
+const DIMENSION_VALUES = [
+  'accuracy',
+  'completeness',
+  'conformity',
+  'consistency',
+  'coverage',
+  'timeliness',
+  'uniqueness',
+];
+const METRIC_VALUES = [
+  'openFindings',
+  'rowCount',
+  'freshness',
+  'nullValues',
+  'missingValues',
+  'invalidValues',
+  'duplicateValues',
+  'query',
+];
+const OPERATOR_VALUES = [
+  'mustBe',
+  'mustNotBe',
+  'mustBeGreaterThan',
+  'mustBeGreaterOrEqualTo',
+  'mustBeLessThan',
+  'mustBeLessOrEqualTo',
+  'mustBeBetween',
+  'mustNotBeBetween',
+];
+
+export class QualityRuleArgumentsDto {
+  @ApiPropertyOptional({
+    type: 'array',
+    items: { oneOf: [{ type: 'string' }, { type: 'number' }] },
+    description: 'library: values counted as missing besides null.',
+  })
+  missingValues?: (string | number)[];
+
+  @ApiPropertyOptional({
+    type: 'array',
+    items: { oneOf: [{ type: 'string' }, { type: 'number' }] },
+    description: 'library invalidValues: the only values allowed.',
+  })
+  validValues?: (string | number)[];
+
+  @ApiPropertyOptional({
+    description:
+      'library invalidValues: a regular expression valid values match.',
+  })
+  pattern?: string;
+
+  @ApiPropertyOptional({
+    type: [String],
+    description:
+      'library duplicateValues on the table: columns unique together.',
+  })
+  properties?: string[];
+
+  @ApiPropertyOptional({
+    description:
+      'sql: one SELECT returning one number; {object} and {property} are substituted.',
+  })
+  query?: string;
+
+  @ApiPropertyOptional({ example: 'PII' })
+  detectorType?: string;
+
+  @ApiPropertyOptional()
+  customDetectorKey?: string;
+
+  @ApiPropertyOptional({ example: 'EMAIL_ADDRESS' })
+  findingType?: string;
+
+  @ApiPropertyOptional({ example: 'QUALITY' })
+  category?: string;
+}
+
+export class QualityResultDto {
+  @ApiProperty()
+  evaluatedAt: Date;
+
+  @ApiPropertyOptional({ nullable: true })
+  measuredValue: number | null;
+
+  @ApiProperty()
+  passed: boolean;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Why it could not be measured; says nothing about the data.',
+  })
+  error: string | null;
+}
+
+export class QualityRuleDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty({ description: 'ODCS id, unique per asset.' })
+  key: string;
+
+  @ApiProperty()
+  name: string;
+
+  @ApiPropertyOptional({ nullable: true })
+  description: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  columnName: string | null;
+
+  @ApiProperty({ enum: DIMENSION_VALUES })
+  dimension: string;
+
+  @ApiProperty({ enum: ['detector', 'metadata', 'library', 'sql'] })
+  type: string;
+
+  @ApiProperty({ enum: METRIC_VALUES })
+  metric: string;
+
+  @ApiProperty({ type: QualityRuleArgumentsDto })
+  arguments: QualityRuleArgumentsDto;
+
+  @ApiProperty({ enum: OPERATOR_VALUES })
+  operator: string;
+
+  @ApiProperty({
+    description: 'A number, or [low, high] for the between operators.',
+    oneOf: [
+      { type: 'number' },
+      { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2 },
+    ],
+  })
+  threshold: number | [number, number];
+
+  @ApiProperty({ example: 'findings' })
+  unit: string;
+
+  @ApiProperty({ enum: ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'] })
+  severity: string;
+
+  @ApiPropertyOptional({ nullable: true })
+  businessImpact: string | null;
+
+  @ApiProperty()
+  enabled: boolean;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Cron in UTC; null = after each scan and on request.',
+  })
+  schedule: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  createdBy: string | null;
+
+  @ApiProperty()
+  updatedAt: Date;
+
+  @ApiPropertyOptional({ type: QualityResultDto, nullable: true })
+  latest: QualityResultDto | null;
+
+  @ApiProperty({
+    type: [QualityResultDto],
+    description: 'Oldest first, at most 20.',
+  })
+  history: QualityResultDto[];
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'The open QUALITY finding while the rule fails.',
+  })
+  findingId: string | null;
+}
+
+export class QualityDimensionDto {
+  @ApiProperty({ enum: DIMENSION_VALUES })
+  dimension: string;
+
+  @ApiPropertyOptional({ nullable: true })
+  score: number | null;
+
+  @ApiProperty()
+  rules: number;
+}
+
+export class AssetQualityDto {
+  @ApiProperty({ type: [QualityRuleDto] })
+  rules: QualityRuleDto[];
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: '0–100 weighted by severity; null until a rule has a result.',
+  })
+  score: number | null;
+
+  @ApiProperty({ type: [QualityDimensionDto] })
+  dimensions: QualityDimensionDto[];
+
+  @ApiProperty()
+  failing: number;
+
+  @ApiPropertyOptional({ nullable: true })
+  lastEvaluatedAt: Date | null;
+
+  @ApiProperty({
+    description: 'A whole-table query for its rules is still out.',
+  })
+  measuring: boolean;
+
+  @ApiProperty()
+  canGovern: boolean;
+}
+
+export class SaveQualityRuleDto {
+  @ApiPropertyOptional({ description: 'Derived from the name when absent.' })
+  key?: string;
+
+  @ApiProperty()
+  name: string;
+
+  @ApiPropertyOptional({ nullable: true })
+  description?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  columnName?: string | null;
+
+  @ApiProperty({ enum: DIMENSION_VALUES })
+  dimension: string;
+
+  @ApiProperty({ enum: ['detector', 'metadata', 'library', 'sql'] })
+  type: string;
+
+  @ApiProperty({ enum: METRIC_VALUES })
+  metric: string;
+
+  @ApiPropertyOptional({ type: QualityRuleArgumentsDto })
+  arguments?: QualityRuleArgumentsDto;
+
+  @ApiPropertyOptional({
+    enum: ['rows', 'percent'],
+    description: 'library counts: rows (default) or percent of the rows.',
+  })
+  unit?: string;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description:
+      'hourly, daily, weekly or a 5-field cron (UTC, at most hourly); null = after each scan.',
+  })
+  schedule?: string | null;
+
+  @ApiProperty({ enum: OPERATOR_VALUES })
+  operator: string;
+
+  @ApiProperty({
+    oneOf: [
+      { type: 'number' },
+      { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2 },
+    ],
+  })
+  threshold: number | [number, number];
+
+  @ApiPropertyOptional({ enum: ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'] })
+  severity?: string;
+
+  @ApiPropertyOptional({ nullable: true })
+  businessImpact?: string | null;
+
+  @ApiPropertyOptional()
+  enabled?: boolean;
+}
+
+// ── ODCS contract (G-4) ─────────────────────────────────────────────────────
+
+export class ImportContractDto {
+  @ApiProperty({ description: 'The contract as YAML or JSON text.' })
+  @IsString()
+  contract: string;
+}
+
+export class ContractAppliedDto {
+  @ApiProperty()
+  governance: boolean;
+
+  @ApiProperty()
+  members: number;
+
+  @ApiProperty()
+  columns: number;
+
+  @ApiProperty()
+  rules: number;
+}
+
+export class ContractSkippedDto {
+  @ApiProperty({ example: 'schema.properties: notes' })
+  path: string;
+
+  @ApiProperty()
+  reason: string;
+}
+
+export class ContractImportResultDto {
+  @ApiProperty({ type: ContractAppliedDto })
+  applied: ContractAppliedDto;
+
+  @ApiProperty({ type: [ContractSkippedDto] })
+  skipped: ContractSkippedDto[];
 }

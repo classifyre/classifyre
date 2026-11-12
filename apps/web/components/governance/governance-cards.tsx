@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Markdown from "react-markdown";
 import { toast } from "sonner";
-import { CheckCircle2, Circle, Pencil, UserPlus } from "lucide-react";
+import { CheckCircle2, Circle, Pencil } from "lucide-react";
 import { api } from "@workspace/api-client";
 import {
   Button,
@@ -19,26 +19,13 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Spinner,
   Textarea,
 } from "@workspace/ui/components";
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
 import { extractApiErrorMessage } from "@/lib/extract-api-error-message";
 import { ActorChip } from "@/components/actor-chip";
-import { AssetMeaningPanel } from "@/components/glossary/meaning-card";
-import type {
-  AssetColumnsDto,
-  AssetUsageDto,
-  AssetGovernanceDto,
-  GovernancePrincipalDto,
-  GovernanceRoleKind,
-  GovernanceStatus,
-} from "@/lib/governance";
-import { ColumnsCard } from "./columns-card";
-import { OwnershipCard } from "./ownership-card";
-import { UsageCard } from "./usage-card";
-import { PrincipalPicker } from "./principal-picker";
+import type { AssetGovernanceDto, GovernanceStatus } from "@/lib/governance";
 
 const LEGAL_BASES = [
   "CONSENT",
@@ -50,7 +37,7 @@ const LEGAL_BASES = [
 ] as const;
 const NO_LEGAL_BASIS = "__none__";
 
-type Patch = {
+export type GovernancePatch = {
   description?: string | null;
   usage?: string | null;
   limitations?: string | null;
@@ -59,61 +46,12 @@ type Patch = {
   status?: GovernanceStatus;
 };
 
-/** Nobody owns the asset: one way forward (GOV §5.7). */
-function UngovernedCard({
-  canGovern,
-  onAssign,
-}: {
-  canGovern: boolean;
-  onAssign: (principalRef: string) => Promise<void>;
-}) {
-  const { t } = useTranslation();
-  const [owner, setOwner] = useState<GovernancePrincipalDto | null>(null);
-  const [busy, setBusy] = useState(false);
-  return (
-    <Card className="border-dashed" data-testid="ungoverned-card">
-      <CardHeader>
-        <CardTitle>{t("governance.ungoverned.title")}</CardTitle>
-        <CardDescription>{t("governance.ungoverned.body")}</CardDescription>
-      </CardHeader>
-      {canGovern && (
-        <CardContent className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <div className="sm:w-80">
-            <PrincipalPicker
-              kinds={["user"]}
-              value={owner}
-              onChange={setOwner}
-              placeholder={t("governance.ungoverned.pick")}
-            />
-          </div>
-          <Button
-            disabled={!owner || busy}
-            data-testid="ungoverned-assign-owner"
-            onClick={async () => {
-              if (!owner) return;
-              setBusy(true);
-              try {
-                await onAssign(owner.ref);
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            <UserPlus className="h-4 w-4" aria-hidden />
-            {t("governance.ungoverned.assign")}
-          </Button>
-        </CardContent>
-      )}
-    </Card>
-  );
-}
-
-function DescriptionCard({
+export function DescriptionCard({
   governance,
   onSave,
 }: {
   governance: AssetGovernanceDto;
-  onSave: (patch: Patch) => Promise<void>;
+  onSave: (patch: GovernancePatch) => Promise<void>;
 }) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
@@ -327,12 +265,18 @@ const NEXT_STATUSES: Record<GovernanceStatus, GovernanceStatus[]> = {
   RETIRED: ["DRAFT"],
 };
 
-function ChecklistCard({
+/**
+ * Certification (GOV §4): what is still missing, each item a jump to the step
+ * that fixes it, and the lifecycle moves the owner or a steward may make.
+ */
+export function CertificationCard({
   governance,
   onStatus,
+  onJump,
 }: {
   governance: AssetGovernanceDto;
   onStatus: (status: GovernanceStatus) => Promise<void>;
+  onJump?: (key: string) => void;
 }) {
   const { t } = useTranslation();
   const done = governance.checklist.filter(
@@ -342,7 +286,7 @@ function ChecklistCard({
   return (
     <Card data-testid="governance-checklist">
       <CardHeader>
-        <CardTitle>{t("governance.checklist.title")}</CardTitle>
+        <CardTitle>{t("governance.steps.certification")}</CardTitle>
         <CardDescription>
           {t("governance.checklist.progress", {
             done,
@@ -353,22 +297,36 @@ function ChecklistCard({
       <CardContent className="space-y-4">
         <ul className="space-y-1.5">
           {governance.checklist.map((item: { key: string; done: boolean }) => (
-            <li
-              key={item.key}
-              className="flex items-center gap-2 text-sm"
-              data-done={item.done}
-            >
-              {item.done ? (
-                <CheckCircle2 className="h-4 w-4 text-accent-ink" aria-hidden />
-              ) : (
-                <Circle className="h-4 w-4 text-muted-foreground" aria-hidden />
-              )}
-              <span className={item.done ? "" : "text-muted-foreground"}>
-                {t(`governance.checklist.${item.key}` as TranslationKey)}
-              </span>
+            <li key={item.key} data-done={item.done}>
+              <button
+                type="button"
+                disabled={!onJump || item.key === "certified"}
+                onClick={() => onJump?.(item.key)}
+                className="flex w-full items-center gap-2 rounded px-1 py-0.5 text-left text-sm enabled:hover:bg-accent/10"
+              >
+                {item.done ? (
+                  <CheckCircle2
+                    className="h-4 w-4 text-accent-ink"
+                    aria-hidden
+                  />
+                ) : (
+                  <Circle
+                    className="h-4 w-4 text-muted-foreground"
+                    aria-hidden
+                  />
+                )}
+                <span className={item.done ? "" : "text-muted-foreground"}>
+                  {t(`governance.checklist.${item.key}` as TranslationKey)}
+                </span>
+              </button>
             </li>
           ))}
         </ul>
+        {!status && (
+          <p className="text-sm text-muted-foreground">
+            {t("governance.certify.needsOwner")}
+          </p>
+        )}
         {governance.canGovern && status && (
           <div className="flex flex-wrap gap-2">
             {NEXT_STATUSES[status].map((next) => (
@@ -396,147 +354,25 @@ function ChecklistCard({
   );
 }
 
-/**
- * The asset's Overview (GOV §5.7): who answers for it, what it is for, what
- * it means, and what is still missing to be fully governed; the technical
- * details follow (`children`).
- */
-export function AssetOverview({
-  governance,
-  loading,
-  onChange,
-  columns,
-  onColumnsChange,
-  usage,
-  usageLoading,
-  sourceHref,
-  children,
-}: {
-  governance: AssetGovernanceDto | null;
-  loading: boolean;
-  onChange: (next: AssetGovernanceDto) => void;
-  /** Tables only: their columns, what stewards said and findings classify. */
-  columns?: AssetColumnsDto | null;
-  onColumnsChange?: (next: AssetColumnsDto) => void;
-  /** Who reads it; absent without `activity.view`. */
-  usage?: AssetUsageDto | null;
-  usageLoading?: boolean;
-  sourceHref?: string;
-  children?: React.ReactNode;
-}) {
-  const { t } = useTranslation();
-
-  if (loading && !governance) {
-    return (
-      <div className="flex justify-center py-10">
-        <Spinner />
-      </div>
+/** Save description, legal basis or lifecycle, with the toasts every caller wants. */
+export async function saveGovernance(
+  assetId: string,
+  patch: GovernancePatch,
+  t: (key: TranslationKey) => string,
+): Promise<AssetGovernanceDto> {
+  try {
+    const next = await api.governance.governanceControllerUpdateAssetGovernance(
+      {
+        id: assetId,
+        updateAssetGovernanceDto: patch,
+      },
     );
+    toast.success(t("governance.saved"));
+    return next;
+  } catch (error) {
+    toast.error(
+      await extractApiErrorMessage(error, t("governance.saveFailed")),
+    );
+    throw error;
   }
-
-  const assetId = governance?.assetId;
-  const assign = async (role: GovernanceRoleKind, principalRef: string) => {
-    if (!assetId) return;
-    onChange(
-      await api.governance.governanceControllerAssignAssetRole({
-        id: assetId,
-        assignGovernanceRoleDto: { role, principalRef },
-      }),
-    );
-  };
-  const remove = async (roleId: string) => {
-    if (!assetId) return;
-    onChange(
-      await api.governance.governanceControllerRemoveAssetRole({
-        id: assetId,
-        roleId,
-      }),
-    );
-  };
-  const save = async (patch: Patch) => {
-    if (!assetId) return;
-    try {
-      onChange(
-        await api.governance.governanceControllerUpdateAssetGovernance({
-          id: assetId,
-          updateAssetGovernanceDto: patch,
-        }),
-      );
-      toast.success(t("governance.saved"));
-    } catch (error) {
-      toast.error(
-        await extractApiErrorMessage(error, t("governance.saveFailed")),
-      );
-      throw error;
-    }
-  };
-
-  return (
-    <div className="space-y-4" data-testid="asset-overview">
-      {governance && !governance.governed && (
-        <UngovernedCard
-          canGovern={governance.canGovern}
-          onAssign={async (ref) => {
-            try {
-              await assign("OWNER", ref);
-              toast.success(t("governance.ungoverned.done"));
-            } catch (error) {
-              toast.error(
-                await extractApiErrorMessage(
-                  error,
-                  t("governance.ownership.failed"),
-                ),
-              );
-            }
-          }}
-        />
-      )}
-      {governance && (
-        <div className="grid gap-4 lg:grid-cols-3">
-          <div className="space-y-4 lg:col-span-2">
-            <DescriptionCard governance={governance} onSave={save} />
-            <Card>
-              <CardContent className="pt-6">
-                <AssetMeaningPanel assetId={governance.assetId} />
-              </CardContent>
-            </Card>
-          </div>
-          <div className="space-y-4">
-            <OwnershipCard
-              scope="asset"
-              roles={governance.roles}
-              history={governance.history}
-              canGovern={governance.canGovern}
-              onAssign={assign}
-              onRemove={remove}
-              sourceHref={sourceHref}
-            />
-            {governance.governed && (
-              <ChecklistCard
-                governance={governance}
-                onStatus={(status) => save({ status }).catch(() => undefined)}
-              />
-            )}
-            {(usage || usageLoading) && (
-              <UsageCard
-                usage={usage ?? null}
-                loading={Boolean(usageLoading)}
-              />
-            )}
-          </div>
-        </div>
-      )}
-      {governance &&
-        columns &&
-        columns.columns.length > 0 &&
-        onColumnsChange && (
-          <ColumnsCard
-            assetId={governance.assetId}
-            state={columns}
-            onChange={onColumnsChange}
-          />
-        )}
-      {children}
-    </div>
-  );
 }

@@ -24,6 +24,19 @@ import type { IdentityService } from '../identity/identity.service';
 import { IDENTITY } from '../identity/identity.tokens';
 import type { OrgMember } from '../identity/membership.service';
 import {
+  KeyTakenError,
+  QualityService,
+  type AssetQuality,
+} from './quality.service';
+import { RuleError, validateRule, type RuleInput } from './quality-rules';
+import { fromContract, toContract, type ContractPlan } from './odcs';
+import { parse as parseYaml } from 'yaml';
+import { CLS_SLUG } from '../namespace/namespace.constants';
+import {
+  GovernanceMeaningService,
+  type GovernanceMeaning,
+} from './governance-meaning.service';
+import {
   GovernanceColumnsService,
   type AssetColumns,
 } from './governance-columns.service';
@@ -78,6 +91,8 @@ export class GovernanceService {
     private readonly directory: ActorDirectoryService,
     private readonly audit: AuditTrailService,
     private readonly columns: GovernanceColumnsService,
+    private readonly meaning: GovernanceMeaningService,
+    private readonly quality: QualityService,
     @Inject(ACCESS_POLICY) private readonly policy: AccessPolicy,
     @Inject(IDENTITY) private readonly identity: IdentityService,
   ) {}
@@ -149,15 +164,27 @@ export class GovernanceService {
   async assetGovernance(assetId: string): Promise<AssetGovernanceDto> {
     const target = await this.assetTarget(assetId);
     if (target.scopeType !== 'ASSET') throw new Error('unreachable');
-    const [record, assetRows, sourceRows, approvedTerms, columns] =
+    const [record, assetRows, sourceRows, approvedTerms, columns, quality] =
       await Promise.all([
         this.prisma.assetGovernance.findUnique({ where: { assetId } }),
         this.rows('ASSET', assetId),
         this.rows('SOURCE', target.sourceId),
-        this.prisma.assetTerm.count({
-          where: { assetId, goneAt: null, term: { status: 'APPROVED' } },
-        }),
+        // Linked terms, and links made by hand the linker has not rolled up.
+        Promise.all([
+          this.prisma.assetTerm.count({
+            where: { assetId, goneAt: null, term: { status: 'APPROVED' } },
+          }),
+          this.prisma.glossaryReference.count({
+            where: {
+              entityType: 'asset',
+              entityId: assetId,
+              role: 'ABOUT',
+              term: { status: 'APPROVED' },
+            },
+          }),
+        ]).then(([linked, byHand]) => linked + byHand),
         this.columns.state(assetId),
+        this.quality.summaries([assetId]).then((map) => map.get(assetId)),
       ]);
     const roles = effectiveRoles(assetRows, sourceRows);
     const governed = roles.some((role) => role.role === 'OWNER');
@@ -190,6 +217,9 @@ export class GovernanceService {
         approvedTerms,
         status,
         classificationReviewed: columns.classificationReviewed,
+        qualityPassing: quality
+          ? quality.failing === 0 && quality.score !== null
+          : false,
       }),
       canGovern: await this.mayGovern([...assetRows, ...sourceRows]),
     };
@@ -688,6 +718,515 @@ export class GovernanceService {
     this.record(target, `governance.role.${row.role.toLowerCase()}.remove`, [
       'role',
     ]);
+  }
+
+  // ── Meaning (glossary terms) ────────────────────────────────────────────────
+
+  async assetMeaning(
+    assetId: string,
+  ): Promise<
+    GovernanceMeaning & { canGovern: boolean; canEditGlossary: boolean }
+  > {
+    const target = await this.assetTarget(assetId);
+    if (target.scopeType !== 'ASSET') throw new Error('unreachable');
+    const [state, assetRows, sourceRows, glossary] = await Promise.all([
+      this.meaning.state(assetId),
+      this.rows('ASSET', assetId),
+      this.rows('SOURCE', target.sourceId),
+      this.policy.check(this.actors.current(), 'glossary.edit'),
+    ]);
+    return {
+      ...state,
+      canGovern: await this.mayGovern([...assetRows, ...sourceRows]),
+      canEditGlossary: glossary.allow,
+    };
+  }
+
+  async linkTerm(assetId: string, termId: unknown) {
+    const target = await this.assetTarget(assetId);
+    await this.authorize(target);
+    if (typeof termId !== 'string' || !termId) {
+      throw new BadRequestException('termId names a glossary term.');
+    }
+    await this.meaning.link(assetId, termId, this.actorName());
+    this.record(target, 'governance.meaning.link', ['termId'], 201);
+    return this.assetMeaning(assetId);
+  }
+
+  async unlinkTerm(assetId: string, termId: string) {
+    const target = await this.assetTarget(assetId);
+    await this.authorize(target);
+    await this.meaning.unlink(assetId, termId, this.actorName());
+    this.record(target, 'governance.meaning.unlink', ['termId']);
+    return this.assetMeaning(assetId);
+  }
+
+  async dismissSuggestion(assetId: string, suggestionId: string) {
+    const target = await this.assetTarget(assetId);
+    await this.authorize(target);
+    await this.meaning.dismiss(assetId, suggestionId, this.actorName());
+    this.record(target, 'governance.meaning.dismiss', ['suggestionId']);
+    return this.assetMeaning(assetId);
+  }
+
+  private actorName(): string {
+    return this.actors.current().ref ?? 'operator';
+  }
+
+  // ── Quality (G-3) ─────────────────────────────────────────────────────────
+
+  async assetQuality(
+    assetId: string,
+  ): Promise<AssetQuality & { canGovern: boolean }> {
+    const target = await this.assetTarget(assetId);
+    if (target.scopeType !== 'ASSET') throw new Error('unreachable');
+    const [quality, assetRows, sourceRows] = await Promise.all([
+      this.quality.forAsset(assetId),
+      this.rows('ASSET', assetId),
+      this.rows('SOURCE', target.sourceId),
+    ]);
+    return {
+      ...quality,
+      canGovern: await this.mayGovern([...assetRows, ...sourceRows]),
+    };
+  }
+
+  private validRule(
+    input: RuleInput,
+    current?: Parameters<typeof validateRule>[1],
+  ) {
+    try {
+      return validateRule(input ?? {}, current);
+    } catch (error) {
+      if (error instanceof RuleError) {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
+    }
+  }
+
+  async createQualityRule(assetId: string, body: RuleInput) {
+    const target = await this.assetTarget(assetId);
+    await this.authorize(target);
+    const rule = this.validRule(body);
+    if (rule.columnName) await this.assertColumn(assetId, rule.columnName);
+    let created: { id: string };
+    try {
+      created = await this.quality.create(
+        assetId,
+        rule,
+        this.actors.current().ref ?? null,
+      );
+    } catch (error) {
+      if (error instanceof KeyTakenError) {
+        throw new ConflictException(error.message);
+      }
+      throw error;
+    }
+    this.record(
+      target,
+      'governance.quality.rule.create',
+      Object.keys(body ?? {}).sort(),
+      201,
+    );
+    // A new rule says something only once it is measured.
+    await this.quality.evaluate([assetId], 'manual', {
+      actorRef: this.actors.current().ref ?? null,
+      ruleIds: [created.id],
+    });
+    return this.assetQuality(assetId);
+  }
+
+  async updateQualityRule(ruleId: string, body: RuleInput) {
+    const current = await this.quality.rule(ruleId);
+    const target = await this.assetTarget(current.assetId);
+    await this.authorize(target);
+    const rule = this.validRule(body, this.quality.toValid(current));
+    if (rule.columnName)
+      await this.assertColumn(current.assetId, rule.columnName);
+    try {
+      await this.quality.update(ruleId, rule);
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException(
+          `A rule with key ${rule.key} already exists on this asset.`,
+        );
+      }
+      throw error;
+    }
+    this.record(
+      target,
+      'governance.quality.rule.update',
+      Object.keys(body ?? {}).sort(),
+    );
+    await this.quality.evaluate([current.assetId], 'manual', {
+      actorRef: this.actors.current().ref ?? null,
+      ruleIds: [ruleId],
+    });
+    return this.assetQuality(current.assetId);
+  }
+
+  async removeQualityRule(ruleId: string) {
+    const current = await this.quality.rule(ruleId);
+    const target = await this.assetTarget(current.assetId);
+    await this.authorize(target);
+    await this.quality.remove(ruleId);
+    this.record(target, 'governance.quality.rule.remove', ['ruleId']);
+    return this.assetQuality(current.assetId);
+  }
+
+  async runQuality(assetId: string) {
+    const target = await this.assetTarget(assetId);
+    await this.authorize(target);
+    await this.quality.evaluate([assetId], 'manual', {
+      actorRef: this.actors.current().ref ?? null,
+    });
+    this.record(target, 'governance.quality.run', []);
+    return this.assetQuality(assetId);
+  }
+
+  private async assertColumn(assetId: string, columnName: string) {
+    const state = await this.columns.state(assetId);
+    if (!state.columns.some((column) => column.name === columnName)) {
+      throw new BadRequestException(`No column ${columnName} on this asset.`);
+    }
+  }
+
+  // ── ODCS contract (G-4, R10) ────────────────────────────────────────────────
+
+  /** The asset as an ODCS v3.2 contract object (GOV §5.5). */
+  async exportContract(assetId: string): Promise<{
+    name: string;
+    contract: Record<string, unknown>;
+  }> {
+    const [governance, columns, quality, asset, table, refs, changes] =
+      await Promise.all([
+        this.assetGovernance(assetId),
+        this.columns.state(assetId),
+        this.quality.forAsset(assetId),
+        this.prisma.asset.findUnique({
+          where: { id: assetId },
+          select: { name: true, urn: true, externalUrl: true },
+        }),
+        this.quality.tableName(assetId),
+        this.prisma.glossaryReference.findMany({
+          where: { entityType: 'asset', entityId: assetId, role: 'ABOUT' },
+          select: { term: { select: { key: true } } },
+        }),
+        this.prisma.auditEvent.count({
+          where: {
+            resources: { hasEvery: [`asset:${assetId}`, 'governance'] },
+          },
+        }),
+      ]);
+    if (!asset) throw new NotFoundException(`Asset ${assetId} not found`);
+    const linked = await this.prisma.assetTerm.findMany({
+      where: { assetId, goneAt: null },
+      select: { term: { select: { key: true } } },
+    });
+    const member = (role: GovernanceRoleDto) => ({
+      username:
+        role.principal.email ?? role.principal.path ?? role.principal.ref,
+      name: role.principal.displayName,
+      role: role.role.toLowerCase() as 'owner' | 'steward' | 'custodian',
+      dateIn: new Date(role.dateIn).toISOString(),
+      ...(role.dateOut
+        ? { dateOut: new Date(role.dateOut).toISOString() }
+        : {}),
+      ...(role.replacedByRef ? { replacedByUsername: role.replacedByRef } : {}),
+    });
+    const slug = this.cls.isActive()
+      ? (this.cls.get<string | undefined>(CLS_SLUG) ?? null)
+      : null;
+    const contract = toContract({
+      id: asset.urn ?? `asset:${assetId}`,
+      version: `1.${changes}.0`,
+      name: asset.name,
+      domain: slug,
+      status: governance.status?.toLowerCase() ?? null,
+      description: governance.description,
+      usage: governance.usage,
+      limitations: governance.limitations,
+      legalBasis: governance.legalBasis,
+      retention: governance.retention,
+      terms: [
+        ...new Set([
+          ...linked.map((row) => row.term.key),
+          ...refs.map((row) => row.term.key),
+        ]),
+      ],
+      members: [
+        ...governance.roles.map(member),
+        ...governance.history.map(member),
+      ],
+      table: table ?? asset.name,
+      physicalName: asset.name,
+      columns: columns.columns.map((column) => ({
+        name: column.name,
+        type: column.type,
+        businessName: column.businessName,
+        description: column.description,
+        classification: column.effectiveClassification,
+        criticalDataElement: column.criticalDataElement,
+        termKey: column.term?.key ?? null,
+      })),
+      rules: quality.rules.map((rule) => ({
+        key: rule.key,
+        name: rule.name,
+        description: rule.description,
+        columnName: rule.columnName,
+        dimension: rule.dimension,
+        type: rule.type,
+        metric: rule.metric,
+        arguments: rule.arguments as Record<string, unknown>,
+        operator: rule.operator,
+        threshold: rule.threshold,
+        unit: rule.unit,
+        severity: rule.severity,
+        businessImpact: rule.businessImpact,
+        schedule: rule.schedule,
+      })),
+      qualityScore: quality.score,
+      url: null,
+    });
+    return { name: asset.name, contract };
+  }
+
+  /**
+   * Apply an ODCS contract to the asset (GOV §5.5): description, team,
+   * column annotations and quality rules, matched by name. Returns what was
+   * applied and what was skipped, and why.
+   */
+  async importContract(assetId: string, text: unknown) {
+    const target = await this.assetTarget(assetId);
+    await this.authorize(target);
+    if (typeof text !== 'string' || !text.trim()) {
+      throw new BadRequestException('Send the contract as YAML or JSON text.');
+    }
+    if (text.length > 1_000_000) {
+      throw new BadRequestException('A contract is at most 1 MB.');
+    }
+    let plan: ContractPlan;
+    try {
+      plan = fromContract(parseYaml(text));
+    } catch (error) {
+      throw new BadRequestException(
+        `Not a readable contract: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    const skipped = [...plan.skipped];
+    const applied = { governance: false, members: 0, columns: 0, rules: 0 };
+
+    // Team first: certifying needs an owner.
+    if (plan.members.length) {
+      const orgId = this.orgId();
+      const people: OrgMember[] = await this.tenantMembers().catch(() => []);
+      const groups = orgId
+        ? await this.identity.membership.groups(orgId).catch(() => [])
+        : [];
+      const current = effectiveRoles(
+        await this.rows('ASSET', assetId),
+        target.scopeType === 'ASSET'
+          ? await this.rows('SOURCE', target.sourceId)
+          : [],
+      );
+      for (const member of plan.members) {
+        const name = member.username.toLowerCase();
+        const person = people.find(
+          (p) =>
+            p.email?.toLowerCase() === name ||
+            p.username.toLowerCase() === name,
+        );
+        const group = groups.find(
+          (g) => g.path.toLowerCase() === name || g.name.toLowerCase() === name,
+        );
+        const ref = person
+          ? `user:${person.id}`
+          : group
+            ? `group:${group.id}`
+            : null;
+        if (!ref) {
+          skipped.push({
+            path: `team: ${member.username}`,
+            reason: 'No such person or group in this tenant.',
+          });
+          continue;
+        }
+        if (
+          // Held already, here or through the source (an exported contract
+          // lists inherited roles too: re-importing it changes nothing).
+          current.some(
+            (role) => role.role === member.role && role.principalRef === ref,
+          )
+        ) {
+          continue;
+        }
+        try {
+          await this.assign(target, member.role, ref);
+          applied.members += 1;
+        } catch (error) {
+          skipped.push({
+            path: `team: ${member.username}`,
+            reason: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+    }
+
+    const status = plan.status
+      ? (
+          {
+            proposed: 'DRAFT',
+            draft: 'DRAFT',
+            active: 'ACTIVE',
+            deprecated: 'DEPRECATED',
+            retired: 'RETIRED',
+          } as Record<string, GovernanceStatus>
+        )[plan.status]
+      : undefined;
+    if (plan.status && !status) {
+      skipped.push({
+        path: 'status',
+        reason: `Unknown status ${plan.status}.`,
+      });
+    }
+    const patch: UpdateAssetGovernanceDto = {
+      ...(plan.description !== undefined
+        ? { description: plan.description }
+        : {}),
+      ...(plan.usage !== undefined ? { usage: plan.usage } : {}),
+      ...(plan.limitations !== undefined
+        ? { limitations: plan.limitations }
+        : {}),
+      ...(plan.retention !== undefined ? { retention: plan.retention } : {}),
+      ...(plan.legalBasis !== undefined &&
+      plan.legalBasis !== null &&
+      (Object.values(LegalBasis) as string[]).includes(plan.legalBasis)
+        ? { legalBasis: plan.legalBasis as LegalBasis }
+        : {}),
+      ...(status ? { status } : {}),
+    };
+    if (Object.keys(patch).length) {
+      try {
+        await this.updateAssetGovernance(assetId, patch);
+        applied.governance = true;
+      } catch (error) {
+        skipped.push({
+          path: 'description/status',
+          reason: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    const state = await this.columns.state(assetId);
+    const names = new Set(state.columns.map((column) => column.name));
+    for (const column of plan.columns) {
+      if (!names.has(column.name)) {
+        skipped.push({
+          path: `schema.properties: ${column.name}`,
+          reason: 'The table has no such column.',
+        });
+        continue;
+      }
+      const body: Record<string, unknown> = {};
+      if (column.businessName !== undefined)
+        body.businessName = column.businessName;
+      if (column.description !== undefined)
+        body.description = column.description;
+      if (column.criticalDataElement !== undefined)
+        body.criticalDataElement = column.criticalDataElement;
+      if (column.classification !== undefined) {
+        if (
+          column.classification === null ||
+          (CLASSIFICATIONS as readonly string[]).includes(column.classification)
+        ) {
+          body.classification = column.classification;
+        } else {
+          skipped.push({
+            path: `schema.properties: ${column.name}.classification`,
+            reason: `${column.classification} is not one of ${CLASSIFICATIONS.join(', ')}.`,
+          });
+        }
+      }
+      if (column.termKey !== undefined) {
+        const term = column.termKey
+          ? await this.prisma.glossaryTerm.findUnique({
+              where: { key: column.termKey },
+              select: { id: true },
+            })
+          : null;
+        if (column.termKey && !term) {
+          skipped.push({
+            path: `schema.properties: ${column.name}.authoritativeDefinitions`,
+            reason: `No glossary term ${column.termKey}.`,
+          });
+        } else {
+          body.termId = term?.id ?? null;
+        }
+      }
+      if (!Object.keys(body).length) continue;
+      try {
+        await this.updateColumn(assetId, column.name, body);
+        applied.columns += 1;
+      } catch (error) {
+        skipped.push({
+          path: `schema.properties: ${column.name}`,
+          reason: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    const existing = new Map(
+      (await this.quality.forAsset(assetId)).rules.map((rule) => [
+        rule.key,
+        rule,
+      ]),
+    );
+    const touched: string[] = [];
+    for (const input of plan.rules) {
+      try {
+        const before = existing.get(input.key);
+        const column =
+          typeof input.columnName === 'string' ? input.columnName : null;
+        if (column && !names.has(column)) {
+          throw new Error(`The table has no column ${column}.`);
+        }
+        if (before) {
+          const current = await this.quality.rule(before.id);
+          const rule = this.validRule(input, this.quality.toValid(current));
+          await this.quality.update(before.id, rule);
+          touched.push(before.id);
+        } else {
+          const rule = this.validRule(input);
+          const created = await this.quality.create(
+            assetId,
+            rule,
+            this.actors.current().ref ?? null,
+          );
+          touched.push(created.id);
+        }
+        applied.rules += 1;
+      } catch (error) {
+        skipped.push({
+          path: `quality: ${input.key}`,
+          reason:
+            error instanceof Error
+              ? error.message
+              : String((error as { message?: unknown })?.message ?? error),
+        });
+      }
+    }
+    if (touched.length) {
+      await this.quality.evaluate([assetId], 'manual', {
+        actorRef: this.actors.current().ref ?? null,
+        ruleIds: touched,
+      });
+    }
+    this.record(target, 'governance.contract.import', ['contract']);
+    return { applied, skipped };
   }
 
   // ── Columns (G-2, R6) ──────────────────────────────────────────────────────

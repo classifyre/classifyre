@@ -7502,9 +7502,9 @@
       "CUSTODIAN": "Custodian"
     },
     "roleHint": {
-      "OWNER": "Eine Person, verantwortlich für die Daten und dafür, wer sie nutzen darf.",
-      "STEWARD": "Pflegt Definitionen und Qualität: Personen oder Gruppen.",
-      "CUSTODIAN": "Das technische Team, das das System betreibt, in dem die Daten liegen."
+      "OWNER": "Eine Person, verantwortlich. Steuert es, darf seine Tabellen abfragen (nicht exportieren) und entscheidet, wer sie sonst lesen darf.",
+      "STEWARD": "Personen oder Gruppen, die Definitionen und Qualität pflegen. Sie steuern es; seine Zeilen zu lesen braucht weiterhin eine Freigabe.",
+      "CUSTODIAN": "Das technische Team, das das System betreibt, in dem es liegt: ein Kontakt, ohne Rechte hier."
     },
     "ownership": {
       "title": "Verantwortung",
@@ -7541,10 +7541,7 @@
     },
     "ungoverned": {
       "title": "Für dieses Asset ist noch niemand verantwortlich",
-      "body": "Ein Asset wird gesteuert, sobald jemand dafür verantwortlich ist. Weisen Sie einen Owner zu: die Person, die entscheidet, wofür es da ist und wer es nutzen darf.",
-      "pick": "Owner auswählen",
-      "assign": "Owner zuweisen",
-      "done": "Das Asset hat jetzt eine verantwortliche Person."
+      "body": "Ein Asset wird gesteuert, sobald jemand dafür verantwortlich ist. Weisen Sie einen Owner zu: die Person, die entscheidet, wofür es da ist und wer es nutzen darf."
     },
     "fields": {
       "description": "Beschreibung",
@@ -7573,18 +7570,21 @@
     "saved": "Gespeichert.",
     "saveFailed": "Speichern fehlgeschlagen.",
     "checklist": {
-      "title": "Governance",
       "progress": "{{done}} von {{total}} erledigt",
       "owner": "Ein Owner",
       "steward": "Ein Steward",
       "description": "Eine Beschreibung",
       "meaning": "Ein freigegebener Glossarbegriff",
       "certified": "Zertifiziert",
-      "classification": "Spaltenklassifizierung geprüft"
+      "classification": "Spaltenklassifizierung geprüft",
+      "quality": "Qualitätsregeln erfüllt"
     },
     "coverage": {
       "owned": "{{owned}} von {{assets}} Assets mit Owner",
-      "active": "{{active}} zertifiziert"
+      "active": "{{active}} zertifiziert",
+      "lead": "Assets dieser Quelle mit Owner und zertifiziert. Hier gesetzte Rollen gelten für jedes Asset, das keine eigenen nennt.",
+      "showUngoverned": "Assets ohne Verantwortliche zeigen",
+      "showDraft": "Noch nicht zertifizierte Assets zeigen"
     },
     "filter": {
       "label": "Governance",
@@ -7674,6 +7674,180 @@
         "description": "Assets mit Owner und zertifizierte Assets pro Quelle. Rollen einer Quelle zählen für ihre Assets."
       },
       "activity": "Letzte Änderungen"
+    },
+    "tab": "Governance",
+    "summary": {
+      "title": "Governance",
+      "open": "Governance öffnen",
+      "start": "Governance beginnen"
+    },
+    "steps": {
+      "label": "Governance-Schritte",
+      "ownership": "Verantwortung",
+      "ownershipDesc": "Wer dafür einsteht",
+      "sourceOwnershipDesc": "Wer für ihre Assets einsteht",
+      "description": "Beschreibung",
+      "descriptionDesc": "Was es ist und wofür",
+      "meaning": "Bedeutung",
+      "meaningDesc": "Glossarbegriffe, um die es geht",
+      "columns": "Spalten",
+      "columnsDesc": "Namen und Klassifizierung",
+      "certification": "Zertifizierung",
+      "certificationDesc": "Wie beschrieben nutzbar",
+      "coverage": "Abdeckung",
+      "coverageDesc": "Wie viel gesteuert ist",
+      "quality": "Qualität",
+      "qualityDesc": "Regeln und Ergebnisse"
+    },
+    "meaning": {
+      "title": "Bedeutung",
+      "description": "Die Glossarbegriffe, um die es in diesem Asset geht. Begriffe aus Bindungen und der Quelle kommen von selbst; den Rest hier hinzufügen.",
+      "none": "Noch keine Begriffe.",
+      "auto": "auto",
+      "autoHint": "Verknüpft über {{methods}}; dort ändern, wo es herkommt.",
+      "remove": "{{term}} entfernen",
+      "suggested": "Vorgeschlagen",
+      "because": {
+        "semantic": "{{reason}}",
+        "name": "Passt zum Namen {{reason}}",
+        "column": "Passt zur Spalte {{reason}}"
+      },
+      "add": "Hinzufügen",
+      "dismiss": "Nicht dieser",
+      "search": "Im Glossar suchen, um einen Begriff hinzuzufügen…",
+      "already": "Hinzugefügt",
+      "noHits": "Kein Begriff passt.",
+      "create": "„{{term}}“ anlegen und hinzufügen",
+      "created": "„{{term}}“ angelegt und hinzugefügt.",
+      "failed": "Die Begriffe konnten nicht geändert werden.",
+      "termStatus": {
+        "DRAFT": "Entwurf",
+        "APPROVED": "freigegeben",
+        "DEPRECATED": "veraltet"
+      }
+    },
+    "certify": {
+      "needsOwner": "Zuerst einen Owner zuweisen: nur ein Asset mit Owner kann zertifiziert werden."
+    },
+    "quality": {
+      "title": "Qualität",
+      "empty": "Noch keine Regeln. Eine Regel misst nach jedem Scan und hält einen Fund offen, solange sie verletzt ist.",
+      "summary": "{{rules}} Regeln, {{failing}} verletzt.",
+      "brief": "Qualität {{score}} · {{failing}} verletzt",
+      "run": "Jetzt prüfen",
+      "add": "Regel hinzufügen",
+      "addTitle": "Qualitätsregel hinzufügen",
+      "editTitle": "Regel ändern",
+      "kind": {
+        "detector": "Aus Funden",
+        "metadata": "Aus dem Scan",
+        "library": "Spalte prüfen",
+        "sql": "SQL"
+      },
+      "detector": "Detektor",
+      "anyFindings": "Beliebige Funde",
+      "where": "Wo",
+      "wholeAsset": "Ganzes Asset",
+      "customKey": "Schlüssel des eigenen Detektors",
+      "findingType": "Fundtyp (optional)",
+      "measure": "Messen",
+      "metric": {
+        "rowCount": "Zeilenzahl",
+        "freshness": "Stunden seit dem letzten Scan",
+        "openFindings": "Offene Funde",
+        "nullValues": "Leere Werte (null)",
+        "missingValues": "Fehlende Werte",
+        "invalidValues": "Ungültige Werte",
+        "duplicateValues": "Doppelte Werte",
+        "query": "SQL-Ergebnis"
+      },
+      "unit": {
+        "openFindings": "Funde",
+        "rowCount": "Zeilen",
+        "freshness": "Stunden",
+        "rows": "Zeilen",
+        "percent": "% der Zeilen",
+        "value": "",
+        "findings": "Funde",
+        "hours": "Stunden"
+      },
+      "condition": "Bedingung",
+      "threshold": "Schwelle",
+      "upper": "Obergrenze",
+      "operator": {
+        "mustBe": "muss gleich sein",
+        "mustNotBe": "darf nicht sein",
+        "mustBeGreaterThan": "muss größer sein als",
+        "mustBeGreaterOrEqualTo": "muss mindestens sein",
+        "mustBeLessThan": "muss kleiner sein als",
+        "mustBeLessOrEqualTo": "darf höchstens sein",
+        "mustBeBetween": "muss zwischen",
+        "mustNotBeBetween": "darf nicht zwischen"
+      },
+      "dimensionLabel": "Dimension",
+      "dimension": {
+        "accuracy": "Richtigkeit",
+        "completeness": "Vollständigkeit",
+        "conformity": "Konformität",
+        "consistency": "Konsistenz",
+        "coverage": "Abdeckung",
+        "timeliness": "Aktualität",
+        "uniqueness": "Eindeutigkeit"
+      },
+      "severity": "Schweregrad bei Verletzung",
+      "name": "Name",
+      "suggest": {
+        "rowCount": "Tabelle ist nicht leer",
+        "freshness": "Kürzlich gescannt",
+        "findings": "Keine {{what}}-Funde",
+        "findingsIn": "Keine {{what}}-Funde in {{column}}",
+        "nullValues": "Keine leeren {{column}}",
+        "missingValues": "Keine fehlenden {{column}}",
+        "invalidValues": "Nur gültige {{column}}",
+        "duplicateValues": "{{column}} ist eindeutig",
+        "sql": "SQL-Prüfung"
+      },
+      "saveAndRun": "Speichern und prüfen",
+      "saved": "Regel gespeichert und gemessen.",
+      "disabled": "Deaktiviert",
+      "never": "Noch nicht gemessen",
+      "error": "Konnte nicht gemessen werden",
+      "passing": "Erfüllt",
+      "failing": "Verletzt",
+      "measured": "Gemessen: {{value}}",
+      "openFinding": "Fund öffnen",
+      "edit": "{{name}} bearbeiten",
+      "delete": "{{name}} löschen",
+      "kindHint": {
+        "library": "Über die ganze Tabelle gemessen, nach jedem Scan oder nach Zeitplan.",
+        "sql": "Ihr SELECT liefert eine Zahl; {{object}} ist die Tabelle, {{property}} die Spalte.",
+        "detector": "Zählt offene Funde: was Detektoren schon über dieses Asset sagen.",
+        "metadata": "Liest, was der letzte Scan über die Tabelle festgehalten hat."
+      },
+      "validValues": "Erlaubte Werte (durch Komma getrennt)",
+      "pattern": "Oder ein Muster, dem sie folgen müssen",
+      "missingValues": "Ebenfalls als fehlend zählen (durch Komma getrennt)",
+      "query": "Abfrage",
+      "queryHint": "Ein SELECT, der eine Zahl liefert, z. B. SELECT COUNT(*) FROM {{object}} WHERE {{property}} < 0.",
+      "pickColumn": "Spalte wählen",
+      "schedule": "Wann",
+      "scheduleOption": {
+        "scan": "Nach jedem Scan",
+        "hourly": "Stündlich",
+        "daily": "Täglich",
+        "weekly": "Wöchentlich"
+      },
+      "measuring": "Tabelle wird gemessen…"
+    },
+    "contract": {
+      "title": "Datenvertrag",
+      "description": "Dieses Asset als Open-Data-Contract-Standard-Vertrag (ODCS v3.2): Beschreibung, Team, Spalten und Qualitätsregeln. Einen anwenden, um sie auszufüllen.",
+      "yaml": "YAML herunterladen",
+      "json": "JSON herunterladen",
+      "import": "Vertrag anwenden",
+      "imported": "Vertrag angewendet.",
+      "failed": "Der Vertrag konnte nicht angewendet werden.",
+      "applied": "Angewendet: {{members}} Personen oder Gruppen, {{columns}} Spalten, {{rules}} Regeln."
     }
   }
 }

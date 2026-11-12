@@ -85,7 +85,8 @@ export const PreviewInquiryDtoDetectorTypesEnum = {
     Yara: 'YARA',
     BrokenLinks: 'BROKEN_LINKS',
     CodeSecurity: 'CODE_SECURITY',
-    Custom: 'CUSTOM'
+    Custom: 'CUSTOM',
+    Quality: 'QUALITY'
 } as const;
 export type PreviewInquiryDtoDetectorTypesEnum = typeof PreviewInquiryDtoDetectorTypesEnum[keyof typeof PreviewInquiryDtoDetectorTypesEnum];
 

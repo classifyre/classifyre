@@ -158,3 +158,16 @@ export async function governanceAssetWhere(
 
   return clauses.length ? { AND: clauses } : null;
 }
+
+/**
+ * What an owner may query (GOV R3, decided 2026-11-12): the tables they own,
+ * and every table of a source they own. Not export (`data.export` stays a
+ * role capability). Stewards and custodians get no data access from a role.
+ */
+export async function ownerDataScope(
+  db: Db,
+  actorRef: string | null | undefined,
+): Promise<{ assetIds: string[]; sourceIds: string[] }> {
+  if (!actorRef?.startsWith('user:')) return { assetIds: [], sourceIds: [] };
+  return openScopes(db, { role: 'OWNER', principalRef: actorRef });
+}
