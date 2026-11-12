@@ -37,6 +37,10 @@ export interface NotificationAudienceView {
 }
 
 const NOTIFICATION_TYPES = Object.values(NotificationType);
+/** Kinds sent to groups chosen per workspace; governance goes to people named. */
+const AUDIENCE_TYPES = NOTIFICATION_TYPES.filter(
+  (type) => type !== NotificationType.GOVERNANCE,
+);
 /** How long a workspace's owning group is reused before it is read again. */
 const OWNER_CACHE_MS = 60_000;
 
@@ -151,9 +155,14 @@ export class NotificationsService {
     const owner = await this.ownerGroupId();
     const audiences: Prisma.NotificationWhereInput[] = [
       { audienceGroupIds: { hasSome: person.groupIds } },
+      { audiencePersonRefs: { has: person.actorRef } },
     ];
     if (owner && person.groupIds.includes(owner)) {
-      audiences.push({ audienceGroupIds: { isEmpty: true } });
+      // No audience at all: the owning group's. One named person is not that.
+      audiences.push({
+        audienceGroupIds: { isEmpty: true },
+        audiencePersonRefs: { isEmpty: true },
+      });
     }
     return {
       OR: audiences,
@@ -212,7 +221,29 @@ export class NotificationsService {
   async create(
     createDto: CreateNotificationDto,
   ): Promise<NotificationResponseDto> {
-    const audienceGroupIds = await this.audienceFor(createDto.type);
+    return this.persist(createDto, await this.audienceFor(createDto.type), []);
+  }
+
+  /**
+   * A notification for people and groups named, instead of the groups
+   * chosen for its type (governance, GOV G-5): people by `user:<sub>`,
+   * groups by id. Nobody named: nothing is sent, null.
+   */
+  async createFor(
+    createDto: CreateNotificationDto,
+    to: { personRefs?: string[]; groupIds?: string[] },
+  ): Promise<NotificationResponseDto | null> {
+    const personRefs = [...new Set(to.personRefs ?? [])];
+    const groupIds = [...new Set(to.groupIds ?? [])];
+    if (!personRefs.length && !groupIds.length) return null;
+    return this.persist(createDto, groupIds, personRefs);
+  }
+
+  private async persist(
+    createDto: CreateNotificationDto,
+    audienceGroupIds: string[],
+    personRefs: string[],
+  ): Promise<NotificationResponseDto> {
     const notification = await this.prisma.notification.create({
       data: {
         type: this.toPrismaType(createDto.type),
@@ -227,6 +258,7 @@ export class NotificationsService {
         triggeredBy: createDto.triggeredBy,
         isImportant: createDto.isImportant ?? false,
         audienceGroupIds,
+        audiencePersonRefs: personRefs,
         metadata: createDto.metadata as Prisma.JsonObject | undefined,
       },
       include: {
@@ -235,13 +267,20 @@ export class NotificationsService {
     });
 
     const response = this.toResponse(notification);
-    const owner = audienceGroupIds.length ? null : await this.ownerGroupId();
+    const owner =
+      audienceGroupIds.length || personRefs.length
+        ? null
+        : await this.ownerGroupId();
     const groups = audienceGroupIds.length
       ? audienceGroupIds
       : owner
         ? [owner]
         : [];
-    this.notificationEventsGateway?.emitNotificationCreated(response, groups);
+    this.notificationEventsGateway?.emitNotificationCreated(
+      response,
+      groups,
+      personRefs,
+    );
     return response;
   }
 
@@ -410,7 +449,7 @@ export class NotificationsService {
 
   async audiences(): Promise<NotificationAudienceView[]> {
     const rows = await this.prisma.notificationAudience.findMany();
-    return NOTIFICATION_TYPES.map((type) => {
+    return AUDIENCE_TYPES.map((type) => {
       const row = rows.find((r) => r.type === this.toPrismaType(type));
       return {
         type,

@@ -3,6 +3,7 @@ import { FindingStatus, Prisma, type QualityRule } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { QueryRunService } from '../data-query/query-run.service';
 import { columnsOf } from './governance-columns.service';
+import { GovernanceNotifier } from './governance-notifier';
 import { compileQuality, readCsvRow, ROWS_ALIAS } from './quality-sql';
 import { HistoryEventType } from '../types/finding-history.types';
 import {
@@ -87,6 +88,7 @@ export class QualityService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly queries: QueryRunService,
+    private readonly notifier: GovernanceNotifier,
   ) {}
 
   // ── Reads ─────────────────────────────────────────────────────────────────
@@ -668,8 +670,24 @@ export class QualityService {
       where: { detectionIdentity: identity },
       select: { id: true, status: true, history: true },
     });
+    const announce = async (findingId: string) => {
+      const named = await this.prisma.asset.findUnique({
+        where: { id: asset.id },
+        select: { name: true },
+      });
+      void this.notifier.qualityFailing({
+        assetId: asset.id,
+        assetName: named?.name ?? 'an asset',
+        sourceId: asset.sourceId,
+        ruleKey: rule.key,
+        ruleName: rule.name,
+        severity: rule.severity,
+        text: content,
+        findingId,
+      });
+    };
     if (!existing) {
-      await this.prisma.finding.create({
+      const created = await this.prisma.finding.create({
         data: {
           detectionIdentity: identity,
           assetId: asset.id,
@@ -701,7 +719,10 @@ export class QualityService {
             },
           ],
         },
+        select: { id: true },
       });
+      // A rule starting to fail is news; failing again tomorrow is not.
+      await announce(created.id);
       return;
     }
     // Reopen what the system resolved; a person's decision (false positive,
@@ -736,6 +757,7 @@ export class QualityService {
           : {}),
       },
     });
+    if (reopen) await announce(existing.id);
   }
 
   private async resolveFinding(ruleId: string, reason: string): Promise<void> {

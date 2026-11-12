@@ -64,6 +64,12 @@ export interface SourceGovernanceDto {
      * @memberof SourceGovernanceDto
      */
     canGovern: boolean;
+    /**
+     * 
+     * @type {boolean}
+     * @memberof SourceGovernanceDto
+     */
+    canAssignRoles: boolean;
 }
 
 /**
@@ -75,6 +81,7 @@ export function instanceOfSourceGovernanceDto(value: object): value is SourceGov
     if (!('history' in value) || value['history'] === undefined) return false;
     if (!('coverage' in value) || value['coverage'] === undefined) return false;
     if (!('canGovern' in value) || value['canGovern'] === undefined) return false;
+    if (!('canAssignRoles' in value) || value['canAssignRoles'] === undefined) return false;
     return true;
 }
 
@@ -93,6 +100,7 @@ export function SourceGovernanceDtoFromJSONTyped(json: any, ignoreDiscriminator:
         'history': ((json['history'] as Array<any>).map(GovernanceRoleDtoFromJSON)),
         'coverage': SourceGovernanceCoverageDtoFromJSON(json['coverage']),
         'canGovern': json['canGovern'],
+        'canAssignRoles': json['canAssignRoles'],
     };
 }
 
@@ -112,6 +120,7 @@ export function SourceGovernanceDtoToJSONTyped(value?: SourceGovernanceDto | nul
         'history': ((value['history'] as Array<any>).map(GovernanceRoleDtoToJSON)),
         'coverage': SourceGovernanceCoverageDtoToJSON(value['coverage']),
         'canGovern': value['canGovern'],
+        'canAssignRoles': value['canAssignRoles'],
     };
 }
 

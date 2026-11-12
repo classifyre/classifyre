@@ -1272,6 +1272,9 @@ model Notification {
   /// Who gets it: identity-server group ids, fixed when it is made (from
   /// NotificationAudience). Empty: the workspace's owning group.
   audienceGroupIds String[]         @default([]) @map("audience_group_ids")
+  /// People it is for by name (`user:<sub>`), besides the groups: an asset's
+  /// owner hears about their asset (GOV G-5). Both empty: the owning group.
+  audiencePersonRefs String[]       @default([]) @map("audience_person_refs")
   metadata         Json?            @db.JsonB
   createdAt        DateTime         @default(now()) @map("created_at")
   updatedAt        DateTime         @updatedAt @map("updated_at")
@@ -1289,6 +1292,7 @@ model Notification {
   @@index([findingId])
   @@index([isImportant])
   @@index([createdAt])
+  @@index([audiencePersonRefs], type: Gin)
   @@map("notifications")
 }
 
@@ -1618,6 +1622,8 @@ enum NotificationType {
   FINDING
   SOURCE
   SYSTEM
+  /// To people who answer for data (docs/prd/GOV-governed-data-assets.md G-5).
+  GOVERNANCE
 }
 
 enum InstanceLanguage {

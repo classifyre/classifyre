@@ -4,6 +4,7 @@ import { DataQueryModule } from '../data-query/data-query.module';
 import { GovernanceMeaningService } from './governance-meaning.service';
 import { QualityService } from './quality.service';
 import { QualityWorker } from './quality.worker';
+import { GovernanceNotifier } from './governance-notifier';
 import { PrismaService } from '../prisma.service';
 import { GovernanceController } from './governance.controller';
 import { GovernanceColumnsService } from './governance-columns.service';
@@ -22,6 +23,7 @@ import { GovernanceService } from './governance.service';
     GovernanceMeaningService,
     QualityService,
     QualityWorker,
+    GovernanceNotifier,
   ],
   exports: [
     GovernanceService,

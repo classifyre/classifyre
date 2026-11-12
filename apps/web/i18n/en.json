@@ -2757,7 +2757,8 @@
       "SCAN": "Scan",
       "FINDING": "Finding",
       "SOURCE": "Source",
-      "SYSTEM": "System"
+      "SYSTEM": "System",
+      "GOVERNANCE": "Governance"
     }
   },
   "triggerTypes": {

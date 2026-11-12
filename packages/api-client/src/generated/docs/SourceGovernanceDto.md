@@ -11,6 +11,7 @@ Name | Type
 `history` | [Array&lt;GovernanceRoleDto&gt;](GovernanceRoleDto.md)
 `coverage` | [SourceGovernanceCoverageDto](SourceGovernanceCoverageDto.md)
 `canGovern` | boolean
+`canAssignRoles` | boolean
 
 ## Example
 
@@ -24,6 +25,7 @@ const example = {
   "history": null,
   "coverage": null,
   "canGovern": null,
+  "canAssignRoles": null,
 } satisfies SourceGovernanceDto
 
 console.log(example)

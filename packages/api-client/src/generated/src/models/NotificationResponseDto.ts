@@ -137,7 +137,8 @@ export const NotificationResponseDtoTypeEnum = {
     Scan: 'SCAN',
     Finding: 'FINDING',
     Source: 'SOURCE',
-    System: 'SYSTEM'
+    System: 'SYSTEM',
+    Governance: 'GOVERNANCE'
 } as const;
 export type NotificationResponseDtoTypeEnum = typeof NotificationResponseDtoTypeEnum[keyof typeof NotificationResponseDtoTypeEnum];
 

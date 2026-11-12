@@ -23,6 +23,7 @@ Name | Type
 `history` | [Array&lt;GovernanceRoleDto&gt;](GovernanceRoleDto.md)
 `checklist` | [Array&lt;GovernanceChecklistItemDto&gt;](GovernanceChecklistItemDto.md)
 `canGovern` | boolean
+`canAssignRoles` | boolean
 
 ## Example
 
@@ -48,6 +49,7 @@ const example = {
   "history": null,
   "checklist": null,
   "canGovern": null,
+  "canAssignRoles": null,
 } satisfies AssetGovernanceDto
 
 console.log(example)

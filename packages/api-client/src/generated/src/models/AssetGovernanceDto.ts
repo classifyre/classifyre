@@ -136,6 +136,12 @@ export interface AssetGovernanceDto {
      * @memberof AssetGovernanceDto
      */
     canGovern: boolean;
+    /**
+     * Whether the caller may name owners, stewards and custodians: asset.govern only.
+     * @type {boolean}
+     * @memberof AssetGovernanceDto
+     */
+    canAssignRoles: boolean;
 }
 
 
@@ -175,6 +181,7 @@ export function instanceOfAssetGovernanceDto(value: object): value is AssetGover
     if (!('history' in value) || value['history'] === undefined) return false;
     if (!('checklist' in value) || value['checklist'] === undefined) return false;
     if (!('canGovern' in value) || value['canGovern'] === undefined) return false;
+    if (!('canAssignRoles' in value) || value['canAssignRoles'] === undefined) return false;
     return true;
 }
 
@@ -205,6 +212,7 @@ export function AssetGovernanceDtoFromJSONTyped(json: any, ignoreDiscriminator: 
         'history': ((json['history'] as Array<any>).map(GovernanceRoleDtoFromJSON)),
         'checklist': ((json['checklist'] as Array<any>).map(GovernanceChecklistItemDtoFromJSON)),
         'canGovern': json['canGovern'],
+        'canAssignRoles': json['canAssignRoles'],
     };
 }
 
@@ -236,6 +244,7 @@ export function AssetGovernanceDtoToJSONTyped(value?: AssetGovernanceDto | null,
         'history': ((value['history'] as Array<any>).map(GovernanceRoleDtoToJSON)),
         'checklist': ((value['checklist'] as Array<any>).map(GovernanceChecklistItemDtoToJSON)),
         'canGovern': value['canGovern'],
+        'canAssignRoles': value['canAssignRoles'],
     };
 }
 

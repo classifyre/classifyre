@@ -87,11 +87,15 @@ export class NotificationEventsGateway
   emitNotificationCreated(
     notification: NotificationResponseDto,
     groupIds: string[],
+    personRefs: string[] = [],
   ) {
-    if (!groupIds.length) return;
+    if (!groupIds.length && !personRefs.length) return;
     const schema = this.currentSchema();
     this.server
-      .to(groupIds.map((groupId) => this.groupRoom(schema, groupId)))
+      .to([
+        ...groupIds.map((groupId) => this.groupRoom(schema, groupId)),
+        ...personRefs.map((ref) => this.personRoom(schema, ref)),
+      ])
       .emit('notification:created', notification);
   }
 
