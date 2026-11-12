@@ -22,6 +22,7 @@ const ROUTE_TITLE_KEYS: Record<string, string> = {
   "/investigations/inquiries/new": "investigations.page.newInquiry",
   "/duplicates": "nav.fingerprints",
   "/glossary": "glossary.title",
+  "/governance": "nav.governance",
   "/harness": "nav.harness",
 };
 

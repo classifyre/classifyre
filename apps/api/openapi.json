@@ -11970,6 +11970,245 @@
         ]
       }
     },
+    "/assets/{id}/columns": {
+      "get": {
+        "operationId": "GovernanceController_assetColumns",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetColumnsDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "A table's columns: what stewards said and what open findings classify",
+        "tags": [
+          "Governance"
+        ]
+      }
+    },
+    "/assets/{id}/columns/{name}": {
+      "put": {
+        "description": "Needs asset.govern, or the owner or steward role on the asset or its source.",
+        "operationId": "GovernanceController_updateColumn",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAssetColumnDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetColumnsDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Describe, classify or confirm one column",
+        "tags": [
+          "Governance"
+        ]
+      },
+      "delete": {
+        "operationId": "GovernanceController_removeColumn",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetColumnsDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Forget what was said about one column",
+        "tags": [
+          "Governance"
+        ]
+      }
+    },
+    "/assets/{id}/columns/{name}/move": {
+      "post": {
+        "operationId": "GovernanceController_moveColumn",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveAssetColumnDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetColumnsDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Move a removed column's annotations to the column it became",
+        "tags": [
+          "Governance"
+        ]
+      }
+    },
+    "/assets/{id}/usage": {
+      "get": {
+        "operationId": "GovernanceController_usage",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "days",
+            "required": false,
+            "in": "query",
+            "description": "1–365, default 30",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetUsageDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Who read and exported a table, per day, over the last days",
+        "tags": [
+          "Governance"
+        ]
+      }
+    },
+    "/governance/summary": {
+      "get": {
+        "operationId": "GovernanceController_summary",
+        "parameters": [
+          {
+            "name": "days",
+            "required": false,
+            "in": "query",
+            "description": "1–365, default 30",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GovernanceSummaryDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "How far the workspace is governed: coverage per source, what to govern first, yours",
+        "tags": [
+          "Governance"
+        ]
+      }
+    },
     "/assets/{id}/governance": {
       "get": {
         "operationId": "GovernanceController_assetGovernance",
@@ -35783,6 +36022,475 @@
           "createdAt"
         ]
       },
+      "ColumnTermDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "term": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "term",
+          "status"
+        ]
+      },
+      "ColumnFindingGroupDto": {
+        "type": "object",
+        "properties": {
+          "detectorType": {
+            "type": "string",
+            "example": "PII"
+          },
+          "findingType": {
+            "type": "string",
+            "example": "EMAIL_ADDRESS"
+          },
+          "count": {
+            "type": "number"
+          },
+          "maxSeverity": {
+            "type": "string",
+            "enum": [
+              "INFO",
+              "LOW",
+              "MEDIUM",
+              "HIGH",
+              "CRITICAL"
+            ]
+          }
+        },
+        "required": [
+          "detectorType",
+          "findingType",
+          "count",
+          "maxSeverity"
+        ]
+      },
+      "AssetColumnDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "description": "As the scan recorded it; empty when unknown."
+          },
+          "businessName": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "term": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ColumnTermDto"
+              }
+            ]
+          },
+          "criticalDataElement": {
+            "type": "boolean",
+            "description": "ODCS criticalDataElement."
+          },
+          "classification": {
+            "type": "string",
+            "enum": [
+              "public",
+              "internal",
+              "confidential",
+              "personal",
+              "sensitive",
+              "secret"
+            ],
+            "nullable": true,
+            "description": "A steward's classification; null when derived."
+          },
+          "derivedClassification": {
+            "type": "string",
+            "enum": [
+              "public",
+              "internal",
+              "confidential",
+              "personal",
+              "sensitive",
+              "secret"
+            ],
+            "nullable": true,
+            "description": "What open findings in this column say."
+          },
+          "effectiveClassification": {
+            "type": "string",
+            "enum": [
+              "public",
+              "internal",
+              "confidential",
+              "personal",
+              "sensitive",
+              "secret"
+            ],
+            "nullable": true
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ColumnFindingGroupDto"
+            }
+          },
+          "reviewedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "reviewedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "updatedBy": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "name",
+          "type",
+          "criticalDataElement",
+          "findings"
+        ]
+      },
+      "AssetColumnsDto": {
+        "type": "object",
+        "properties": {
+          "columns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssetColumnDto"
+            }
+          },
+          "removed": {
+            "description": "Annotations of columns the last scan no longer has.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssetColumnDto"
+            }
+          },
+          "findingsWithoutColumn": {
+            "type": "number",
+            "description": "Open findings of a table that name no column."
+          },
+          "classificationReviewed": {
+            "type": "boolean",
+            "description": "Whether every column findings classify was reviewed; absent without columns."
+          },
+          "canGovern": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "columns",
+          "removed",
+          "findingsWithoutColumn",
+          "canGovern"
+        ]
+      },
+      "UpdateAssetColumnDto": {
+        "type": "object",
+        "properties": {
+          "businessName": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "termId": {
+            "type": "string",
+            "nullable": true,
+            "description": "A glossary term id."
+          },
+          "criticalDataElement": {
+            "type": "boolean"
+          },
+          "classification": {
+            "type": "string",
+            "enum": [
+              "public",
+              "internal",
+              "confidential",
+              "personal",
+              "sensitive",
+              "secret"
+            ],
+            "nullable": true,
+            "description": "Null returns to the derived classification."
+          },
+          "reviewClassification": {
+            "type": "boolean",
+            "description": "Confirm the classification as it stands."
+          }
+        }
+      },
+      "MoveAssetColumnDto": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string",
+            "description": "The column it became."
+          }
+        },
+        "required": [
+          "to"
+        ]
+      },
+      "UsageDayDto": {
+        "type": "object",
+        "properties": {
+          "day": {
+            "type": "string",
+            "example": "2026-11-12"
+          },
+          "reads": {
+            "type": "number"
+          },
+          "exports": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "day",
+          "reads",
+          "exports"
+        ]
+      },
+      "UsageReaderDto": {
+        "type": "object",
+        "properties": {
+          "actorRef": {
+            "type": "string"
+          },
+          "reads": {
+            "type": "number"
+          },
+          "exports": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "actorRef",
+          "reads",
+          "exports"
+        ]
+      },
+      "UsageFormatDto": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "example": "xlsx"
+          },
+          "count": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "format",
+          "count"
+        ]
+      },
+      "AssetUsageDto": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "number"
+          },
+          "reads": {
+            "type": "number"
+          },
+          "exports": {
+            "type": "number"
+          },
+          "readers": {
+            "type": "number",
+            "description": "Distinct people and tokens."
+          },
+          "perDay": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UsageDayDto"
+            }
+          },
+          "topReaders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UsageReaderDto"
+            }
+          },
+          "exportsByFormat": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UsageFormatDto"
+            }
+          }
+        },
+        "required": [
+          "days",
+          "reads",
+          "exports",
+          "readers",
+          "perDay",
+          "topReaders",
+          "exportsByFormat"
+        ]
+      },
+      "GovernanceTotalsDto": {
+        "type": "object",
+        "properties": {
+          "assets": {
+            "type": "number"
+          },
+          "owned": {
+            "type": "number"
+          },
+          "active": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "assets",
+          "owned",
+          "active"
+        ]
+      },
+      "SourceCoverageDto": {
+        "type": "object",
+        "properties": {
+          "assets": {
+            "type": "number"
+          },
+          "owned": {
+            "type": "number"
+          },
+          "active": {
+            "type": "number"
+          },
+          "sourceId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "assets",
+          "owned",
+          "active",
+          "sourceId",
+          "name"
+        ]
+      },
+      "GovernFirstDto": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sourceId": {
+            "type": "string"
+          },
+          "sourceName": {
+            "type": "string"
+          },
+          "reads": {
+            "type": "number"
+          },
+          "readers": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "assetId",
+          "name",
+          "sourceId",
+          "sourceName",
+          "reads",
+          "readers"
+        ]
+      },
+      "GovernanceMineDto": {
+        "type": "object",
+        "properties": {
+          "owned": {
+            "type": "number",
+            "description": "Sources and assets you own."
+          },
+          "stewarded": {
+            "type": "number",
+            "description": "Sources and assets you or your groups steward."
+          }
+        },
+        "required": [
+          "owned",
+          "stewarded"
+        ]
+      },
+      "GovernanceSummaryDto": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "number"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/GovernanceTotalsDto"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceCoverageDto"
+            }
+          },
+          "governFirst": {
+            "description": "Ungoverned tables read most in the period: govern these first.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GovernFirstDto"
+            }
+          },
+          "mine": {
+            "$ref": "#/components/schemas/GovernanceMineDto"
+          }
+        },
+        "required": [
+          "days",
+          "totals",
+          "sources",
+          "governFirst",
+          "mine"
+        ]
+      },
       "GovernancePrincipalDto": {
         "type": "object",
         "properties": {
@@ -35875,6 +36583,7 @@
               "steward",
               "description",
               "meaning",
+              "classification",
               "certified"
             ]
           },

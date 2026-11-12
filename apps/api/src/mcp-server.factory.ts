@@ -1,3 +1,4 @@
+import { GovernanceService } from './governance/governance.service';
 import {
   BadRequestException,
   Injectable,
@@ -455,6 +456,7 @@ export class McpServerFactoryService {
     // Last and optional: specs construct this class positionally.
     @Optional() private readonly exploreService?: ExploreService,
     @Optional() private readonly auditTrail?: AuditTrailService,
+    @Optional() private readonly governance?: GovernanceService,
   ) {}
 
   /**
@@ -3642,6 +3644,48 @@ export class McpServerFactoryService {
           throw new NotFoundException(`Asset with ID ${id} not found`);
         }
         return jsonResult(asset);
+      },
+    );
+
+    server.registerTool(
+      'get_asset_governance',
+      {
+        title: 'Get Asset Governance',
+        description:
+          'Who answers for an asset (owner, stewards, custodian; its own or its source’s), its description, lifecycle (DRAFT, ACTIVE = certified, DEPRECATED, RETIRED; null = nobody owns it), what is missing to be fully governed, and its columns with their business names and classification (from findings or set by a steward).',
+        inputSchema: z.strictObject({ assetId: z.string().uuid() }),
+        annotations: { readOnlyHint: true, idempotentHint: true },
+      },
+      async ({ assetId }) => {
+        if (!this.governance) throw new NotFoundException('Governance is off');
+        const [governance, columns] = await Promise.all([
+          this.governance.assetGovernance(assetId),
+          this.governance.assetColumns(assetId),
+        ]);
+        return jsonResult({ ...governance, columns });
+      },
+    );
+
+    server.registerTool(
+      'set_asset_owner',
+      {
+        title: 'Set Asset Owner',
+        description:
+          'Make one person (user:<id>) the owner of an asset; the current owner is replaced and kept as history. The asset becomes governed. Look the person up with get_asset_governance on an asset they own, or ask for their user reference.',
+        inputSchema: z.strictObject({
+          assetId: z.string().uuid(),
+          principalRef: z
+            .string()
+            .regex(/^user:[A-Za-z0-9._:-]+$/)
+            .describe('user:<id> of a person in this tenant'),
+        }),
+        annotations: { readOnlyHint: false, destructiveHint: false },
+      },
+      async ({ assetId, principalRef }) => {
+        if (!this.governance) throw new NotFoundException('Governance is off');
+        return jsonResult(
+          await this.governance.assignAssetRole(assetId, 'OWNER', principalRef),
+        );
       },
     );
 

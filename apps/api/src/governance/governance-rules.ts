@@ -139,7 +139,13 @@ export function effectiveStatus(
 }
 
 export interface ChecklistItem {
-  key: 'owner' | 'steward' | 'description' | 'meaning' | 'certified';
+  key:
+    | 'owner'
+    | 'steward'
+    | 'description'
+    | 'meaning'
+    | 'classification'
+    | 'certified';
   done: boolean;
 }
 
@@ -149,6 +155,11 @@ export function checklist(input: {
   description: string | null | undefined;
   approvedTerms: number;
   status: GovernanceStatusKind | null;
+  /**
+   * For tables: whether every column findings classify has been reviewed by
+   * a steward. Undefined for assets without columns (no such item).
+   */
+  classificationReviewed?: boolean;
 }): ChecklistItem[] {
   const has = (kind: GovernanceRoleKind) =>
     input.roles.some((role) => role.role === kind);
@@ -157,6 +168,90 @@ export function checklist(input: {
     { key: 'steward', done: has('STEWARD') },
     { key: 'description', done: Boolean(input.description?.trim()) },
     { key: 'meaning', done: input.approvedTerms > 0 },
+    ...(input.classificationReviewed === undefined
+      ? []
+      : [
+          {
+            key: 'classification' as const,
+            done: input.classificationReviewed,
+          },
+        ]),
     { key: 'certified', done: input.status === 'ACTIVE' },
   ];
+}
+
+// ── Column classification (GOV §5.1, R6) ────────────────────────────────────
+
+/**
+ * What a column holds, from least to most guarded. Stewards pick from all of
+ * them; findings derive only the last three. ODCS `classification` is free
+ * text; these are the values Classifyre writes.
+ */
+export const CLASSIFICATIONS = [
+  'public',
+  'internal',
+  'confidential',
+  'personal',
+  'sensitive',
+  'secret',
+] as const;
+export type Classification = (typeof CLASSIFICATIONS)[number];
+
+/** PII types that identify a person or reach their money or their state. */
+const SENSITIVE_PII = new Set([
+  'CREDIT_CARD',
+  'IBAN_CODE',
+  'US_SSN',
+  'US_PASSPORT',
+  'US_BANK_NUMBER',
+  'US_DRIVER_LICENSE',
+  'US_ITIN',
+  'UK_NHS',
+  'MEDICAL_LICENSE',
+  'CRYPTO',
+]);
+
+export interface ColumnFindingGroup {
+  detectorType: string;
+  findingType: string;
+  count: number;
+  maxSeverity: string;
+}
+
+/**
+ * The classification open findings give a column: a secret makes it
+ * `secret`; a national id, card or account number `sensitive`; any other
+ * personal data `personal`; nothing else classifies.
+ */
+export function deriveClassification(
+  groups: readonly ColumnFindingGroup[],
+): Classification | null {
+  let best: Classification | null = null;
+  const rank = (value: Classification | null) =>
+    value ? CLASSIFICATIONS.indexOf(value) : -1;
+  for (const group of groups) {
+    const label: Classification | null =
+      group.detectorType === 'SECRETS'
+        ? 'secret'
+        : group.detectorType === 'PII'
+          ? SENSITIVE_PII.has(group.findingType.toUpperCase())
+            ? 'sensitive'
+            : 'personal'
+          : null;
+    if (rank(label) > rank(best)) best = label;
+  }
+  return best;
+}
+
+/**
+ * Whether a steward has reviewed every column the findings classify (the
+ * checklist item): a confirmed or overridden classification on each.
+ */
+export function classificationReviewed(
+  columns: readonly {
+    derived: Classification | null;
+    reviewedAt: Date | null;
+  }[],
+): boolean {
+  return columns.every((column) => !column.derived || column.reviewedAt);
 }

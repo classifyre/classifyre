@@ -24,8 +24,13 @@ import type { IdentityService } from '../identity/identity.service';
 import { IDENTITY } from '../identity/identity.tokens';
 import type { OrgMember } from '../identity/membership.service';
 import {
+  GovernanceColumnsService,
+  type AssetColumns,
+} from './governance-columns.service';
+import {
   canGovern,
   checklist,
+  CLASSIFICATIONS,
   effectiveRoles,
   effectiveStatus,
   GOVERNANCE_ROLES,
@@ -72,6 +77,7 @@ export class GovernanceService {
     private readonly actors: ActorContextService,
     private readonly directory: ActorDirectoryService,
     private readonly audit: AuditTrailService,
+    private readonly columns: GovernanceColumnsService,
     @Inject(ACCESS_POLICY) private readonly policy: AccessPolicy,
     @Inject(IDENTITY) private readonly identity: IdentityService,
   ) {}
@@ -143,14 +149,16 @@ export class GovernanceService {
   async assetGovernance(assetId: string): Promise<AssetGovernanceDto> {
     const target = await this.assetTarget(assetId);
     if (target.scopeType !== 'ASSET') throw new Error('unreachable');
-    const [record, assetRows, sourceRows, approvedTerms] = await Promise.all([
-      this.prisma.assetGovernance.findUnique({ where: { assetId } }),
-      this.rows('ASSET', assetId),
-      this.rows('SOURCE', target.sourceId),
-      this.prisma.assetTerm.count({
-        where: { assetId, goneAt: null, term: { status: 'APPROVED' } },
-      }),
-    ]);
+    const [record, assetRows, sourceRows, approvedTerms, columns] =
+      await Promise.all([
+        this.prisma.assetGovernance.findUnique({ where: { assetId } }),
+        this.rows('ASSET', assetId),
+        this.rows('SOURCE', target.sourceId),
+        this.prisma.assetTerm.count({
+          where: { assetId, goneAt: null, term: { status: 'APPROVED' } },
+        }),
+        this.columns.state(assetId),
+      ]);
     const roles = effectiveRoles(assetRows, sourceRows);
     const governed = roles.some((role) => role.role === 'OWNER');
     const status = effectiveStatus(record, governed);
@@ -181,6 +189,7 @@ export class GovernanceService {
         description: record?.description,
         approvedTerms,
         status,
+        classificationReviewed: columns.classificationReviewed,
       }),
       canGovern: await this.mayGovern([...assetRows, ...sourceRows]),
     };
@@ -679,6 +688,184 @@ export class GovernanceService {
     this.record(target, `governance.role.${row.role.toLowerCase()}.remove`, [
       'role',
     ]);
+  }
+
+  // ── Columns (G-2, R6) ──────────────────────────────────────────────────────
+
+  async assetColumns(
+    assetId: string,
+  ): Promise<AssetColumns & { canGovern: boolean }> {
+    const target = await this.assetTarget(assetId);
+    if (target.scopeType !== 'ASSET') throw new Error('unreachable');
+    const [state, assetRows, sourceRows] = await Promise.all([
+      this.columns.state(assetId),
+      this.rows('ASSET', assetId),
+      this.rows('SOURCE', target.sourceId),
+    ]);
+    return {
+      ...state,
+      canGovern: await this.mayGovern([...assetRows, ...sourceRows]),
+    };
+  }
+
+  /**
+   * What a steward says about one column. `reviewClassification` confirms
+   * the classification as it stands (derived or set); setting one confirms
+   * it too. A column the scan no longer has can still be edited or removed.
+   */
+  async updateColumn(
+    assetId: string,
+    columnName: string,
+    body: {
+      businessName?: unknown;
+      description?: unknown;
+      termId?: unknown;
+      criticalDataElement?: unknown;
+      classification?: unknown;
+      reviewClassification?: unknown;
+    },
+  ): Promise<AssetColumns & { canGovern: boolean }> {
+    const target = await this.assetTarget(assetId);
+    await this.authorize(target);
+    const name = columnName.trim();
+    const state = await this.columns.state(assetId);
+    const known =
+      state.columns.some((column) => column.name === name) ||
+      state.removed.some((column) => column.name === name);
+    if (!name || !known) {
+      throw new NotFoundException(`No column ${columnName} on this asset.`);
+    }
+    const actorRef = this.actors.current().ref ?? null;
+    const data: Prisma.AssetColumnAnnotationUncheckedUpdateInput = {
+      updatedBy: actorRef,
+    };
+    const fields: string[] = [];
+    const text = (key: 'businessName' | 'description', max: number) => {
+      if (!(key in body)) return;
+      const value = body[key];
+      if (value !== null && typeof value !== 'string') {
+        throw new BadRequestException(`${key} is text.`);
+      }
+      if (typeof value === 'string' && value.length > max) {
+        throw new BadRequestException(`${key} is at most ${max} characters.`);
+      }
+      data[key] =
+        typeof value === 'string' && value.trim() ? value.trim() : null;
+      fields.push(key);
+    };
+    text('businessName', 200);
+    text('description', 5_000);
+    if ('termId' in body) {
+      const termId = body.termId;
+      if (termId !== null && typeof termId !== 'string') {
+        throw new BadRequestException('termId names a glossary term.');
+      }
+      if (termId) {
+        const term = await this.prisma.glossaryTerm.findUnique({
+          where: { id: termId },
+          select: { id: true },
+        });
+        if (!term) throw new BadRequestException('No such glossary term.');
+      }
+      data.termId = termId || null;
+      fields.push('termId');
+    }
+    if ('criticalDataElement' in body) {
+      if (typeof body.criticalDataElement !== 'boolean') {
+        throw new BadRequestException('criticalDataElement is true or false.');
+      }
+      data.criticalDataElement = body.criticalDataElement;
+      fields.push('criticalDataElement');
+    }
+    let reviewed = body.reviewClassification === true;
+    if ('classification' in body) {
+      const value = body.classification;
+      if (
+        value !== null &&
+        (typeof value !== 'string' ||
+          !(CLASSIFICATIONS as readonly string[]).includes(value))
+      ) {
+        throw new BadRequestException(
+          `classification is one of ${CLASSIFICATIONS.join(', ')}, or null for the derived one.`,
+        );
+      }
+      data.classification = value;
+      fields.push('classification');
+      reviewed = reviewed || value !== null;
+    }
+    if (reviewed) {
+      data.classificationReviewedAt = new Date();
+      data.classificationReviewedBy = actorRef;
+      fields.push('reviewClassification');
+    }
+    if (!fields.length) return this.assetColumns(assetId);
+    await this.prisma.assetColumnAnnotation.upsert({
+      where: { assetId_columnName: { assetId, columnName: name } },
+      create: {
+        ...(data as Prisma.AssetColumnAnnotationUncheckedCreateInput),
+        assetId,
+        columnName: name,
+      },
+      update: data,
+    });
+    this.record(target, 'governance.column.update', fields.sort());
+    return this.assetColumns(assetId);
+  }
+
+  /**
+   * Move what was said about a column the scan no longer has to the column it
+   * became (a rename at the source). The target must carry nothing yet.
+   */
+  async moveColumn(
+    assetId: string,
+    columnName: string,
+    to: unknown,
+  ): Promise<AssetColumns & { canGovern: boolean }> {
+    const target = await this.assetTarget(assetId);
+    await this.authorize(target);
+    if (typeof to !== 'string' || !to.trim()) {
+      throw new BadRequestException('to names the column it became.');
+    }
+    const state = await this.columns.state(assetId);
+    const from = state.removed.find((column) => column.name === columnName);
+    if (!from) {
+      throw new NotFoundException(
+        `${columnName} is not a removed column of this asset.`,
+      );
+    }
+    const dest = state.columns.find((column) => column.name === to.trim());
+    if (!dest) throw new BadRequestException(`No column ${to} on this asset.`);
+    const taken = await this.prisma.assetColumnAnnotation.count({
+      where: { assetId, columnName: dest.name },
+    });
+    if (taken) {
+      throw new ConflictException(
+        `${dest.name} already has a description or classification.`,
+      );
+    }
+    await this.prisma.assetColumnAnnotation.update({
+      where: { assetId_columnName: { assetId, columnName } },
+      data: {
+        columnName: dest.name,
+        updatedBy: this.actors.current().ref ?? null,
+      },
+    });
+    this.record(target, 'governance.column.move', ['columnName', 'to']);
+    return this.assetColumns(assetId);
+  }
+
+  /** Forget what was said about a column (a removed one, usually). */
+  async removeColumn(
+    assetId: string,
+    columnName: string,
+  ): Promise<AssetColumns & { canGovern: boolean }> {
+    const target = await this.assetTarget(assetId);
+    await this.authorize(target);
+    const { count } = await this.prisma.assetColumnAnnotation.deleteMany({
+      where: { assetId, columnName },
+    });
+    if (count) this.record(target, 'governance.column.remove', ['columnName']);
+    return this.assetColumns(assetId);
   }
 
   // ── Assets lists ──────────────────────────────────────────────────────────

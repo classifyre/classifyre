@@ -42,6 +42,7 @@ export const GovernanceChecklistItemDtoKeyEnum = {
     Steward: 'steward',
     Description: 'description',
     Meaning: 'meaning',
+    Classification: 'classification',
     Certified: 'certified'
 } as const;
 export type GovernanceChecklistItemDtoKeyEnum = typeof GovernanceChecklistItemDtoKeyEnum[keyof typeof GovernanceChecklistItemDtoKeyEnum];

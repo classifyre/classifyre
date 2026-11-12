@@ -15,24 +15,43 @@
 
 import * as runtime from '../runtime';
 import type {
+  AssetColumnsDto,
   AssetGovernanceDto,
+  AssetUsageDto,
   AssignGovernanceRoleDto,
   GovernancePrincipalDto,
+  GovernanceSummaryDto,
+  MoveAssetColumnDto,
   SourceGovernanceDto,
+  UpdateAssetColumnDto,
   UpdateAssetGovernanceDto,
 } from '../models/index';
 import {
+    AssetColumnsDtoFromJSON,
+    AssetColumnsDtoToJSON,
     AssetGovernanceDtoFromJSON,
     AssetGovernanceDtoToJSON,
+    AssetUsageDtoFromJSON,
+    AssetUsageDtoToJSON,
     AssignGovernanceRoleDtoFromJSON,
     AssignGovernanceRoleDtoToJSON,
     GovernancePrincipalDtoFromJSON,
     GovernancePrincipalDtoToJSON,
+    GovernanceSummaryDtoFromJSON,
+    GovernanceSummaryDtoToJSON,
+    MoveAssetColumnDtoFromJSON,
+    MoveAssetColumnDtoToJSON,
     SourceGovernanceDtoFromJSON,
     SourceGovernanceDtoToJSON,
+    UpdateAssetColumnDtoFromJSON,
+    UpdateAssetColumnDtoToJSON,
     UpdateAssetGovernanceDtoFromJSON,
     UpdateAssetGovernanceDtoToJSON,
 } from '../models/index';
+
+export interface GovernanceControllerAssetColumnsRequest {
+    id: string;
+}
 
 export interface GovernanceControllerAssetGovernanceRequest {
     id: string;
@@ -48,6 +67,12 @@ export interface GovernanceControllerAssignSourceRoleRequest {
     assignGovernanceRoleDto: AssignGovernanceRoleDto;
 }
 
+export interface GovernanceControllerMoveColumnRequest {
+    id: string;
+    name: string;
+    moveAssetColumnDto: MoveAssetColumnDto;
+}
+
 export interface GovernanceControllerPrincipalsRequest {
     q?: string;
     kinds?: string;
@@ -56,6 +81,11 @@ export interface GovernanceControllerPrincipalsRequest {
 export interface GovernanceControllerRemoveAssetRoleRequest {
     id: string;
     roleId: string;
+}
+
+export interface GovernanceControllerRemoveColumnRequest {
+    id: string;
+    name: string;
 }
 
 export interface GovernanceControllerRemoveSourceRoleRequest {
@@ -67,15 +97,67 @@ export interface GovernanceControllerSourceGovernanceRequest {
     id: string;
 }
 
+export interface GovernanceControllerSummaryRequest {
+    days?: string;
+}
+
 export interface GovernanceControllerUpdateAssetGovernanceRequest {
     id: string;
     updateAssetGovernanceDto: UpdateAssetGovernanceDto;
+}
+
+export interface GovernanceControllerUpdateColumnRequest {
+    id: string;
+    name: string;
+    updateAssetColumnDto: UpdateAssetColumnDto;
+}
+
+export interface GovernanceControllerUsageRequest {
+    id: string;
+    days?: string;
 }
 
 /**
  * 
  */
 export class GovernanceApi extends runtime.BaseAPI {
+
+    /**
+     * A table\'s columns: what stewards said and what open findings classify
+     */
+    async governanceControllerAssetColumnsRaw(requestParameters: GovernanceControllerAssetColumnsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AssetColumnsDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling governanceControllerAssetColumns().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/assets/{id}/columns`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => AssetColumnsDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * A table\'s columns: what stewards said and what open findings classify
+     */
+    async governanceControllerAssetColumns(requestParameters: GovernanceControllerAssetColumnsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AssetColumnsDto> {
+        const response = await this.governanceControllerAssetColumnsRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
 
     /**
      * An asset\'s owners, description, lifecycle and checklist
@@ -213,6 +295,61 @@ export class GovernanceApi extends runtime.BaseAPI {
     }
 
     /**
+     * Move a removed column\'s annotations to the column it became
+     */
+    async governanceControllerMoveColumnRaw(requestParameters: GovernanceControllerMoveColumnRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AssetColumnsDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling governanceControllerMoveColumn().'
+            );
+        }
+
+        if (requestParameters['name'] == null) {
+            throw new runtime.RequiredError(
+                'name',
+                'Required parameter "name" was null or undefined when calling governanceControllerMoveColumn().'
+            );
+        }
+
+        if (requestParameters['moveAssetColumnDto'] == null) {
+            throw new runtime.RequiredError(
+                'moveAssetColumnDto',
+                'Required parameter "moveAssetColumnDto" was null or undefined when calling governanceControllerMoveColumn().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/assets/{id}/columns/{name}/move`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+        urlPath = urlPath.replace(`{${"name"}}`, encodeURIComponent(String(requestParameters['name'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: MoveAssetColumnDtoToJSON(requestParameters['moveAssetColumnDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => AssetColumnsDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Move a removed column\'s annotations to the column it became
+     */
+    async governanceControllerMoveColumn(requestParameters: GovernanceControllerMoveColumnRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AssetColumnsDto> {
+        const response = await this.governanceControllerMoveColumnRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
      * Needs asset.govern or access.view, or an owner or steward role somewhere in the workspace. At most 20.
      * People and groups of the tenant, for the owner and steward pickers
      */
@@ -293,6 +430,51 @@ export class GovernanceApi extends runtime.BaseAPI {
      */
     async governanceControllerRemoveAssetRole(requestParameters: GovernanceControllerRemoveAssetRoleRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AssetGovernanceDto> {
         const response = await this.governanceControllerRemoveAssetRoleRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Forget what was said about one column
+     */
+    async governanceControllerRemoveColumnRaw(requestParameters: GovernanceControllerRemoveColumnRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AssetColumnsDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling governanceControllerRemoveColumn().'
+            );
+        }
+
+        if (requestParameters['name'] == null) {
+            throw new runtime.RequiredError(
+                'name',
+                'Required parameter "name" was null or undefined when calling governanceControllerRemoveColumn().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/assets/{id}/columns/{name}`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+        urlPath = urlPath.replace(`{${"name"}}`, encodeURIComponent(String(requestParameters['name'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => AssetColumnsDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Forget what was said about one column
+     */
+    async governanceControllerRemoveColumn(requestParameters: GovernanceControllerRemoveColumnRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AssetColumnsDto> {
+        const response = await this.governanceControllerRemoveColumnRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -379,6 +561,39 @@ export class GovernanceApi extends runtime.BaseAPI {
     }
 
     /**
+     * How far the workspace is governed: coverage per source, what to govern first, yours
+     */
+    async governanceControllerSummaryRaw(requestParameters: GovernanceControllerSummaryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GovernanceSummaryDto>> {
+        const queryParameters: any = {};
+
+        if (requestParameters['days'] != null) {
+            queryParameters['days'] = requestParameters['days'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/governance/summary`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => GovernanceSummaryDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * How far the workspace is governed: coverage per source, what to govern first, yours
+     */
+    async governanceControllerSummary(requestParameters: GovernanceControllerSummaryRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GovernanceSummaryDto> {
+        const response = await this.governanceControllerSummaryRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
      * Needs asset.govern, or the owner or steward role on the asset or its source. ACTIVE certifies the asset and needs an owner.
      * Change an asset\'s description, legal basis or lifecycle
      */
@@ -424,6 +639,104 @@ export class GovernanceApi extends runtime.BaseAPI {
      */
     async governanceControllerUpdateAssetGovernance(requestParameters: GovernanceControllerUpdateAssetGovernanceRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AssetGovernanceDto> {
         const response = await this.governanceControllerUpdateAssetGovernanceRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Needs asset.govern, or the owner or steward role on the asset or its source.
+     * Describe, classify or confirm one column
+     */
+    async governanceControllerUpdateColumnRaw(requestParameters: GovernanceControllerUpdateColumnRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AssetColumnsDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling governanceControllerUpdateColumn().'
+            );
+        }
+
+        if (requestParameters['name'] == null) {
+            throw new runtime.RequiredError(
+                'name',
+                'Required parameter "name" was null or undefined when calling governanceControllerUpdateColumn().'
+            );
+        }
+
+        if (requestParameters['updateAssetColumnDto'] == null) {
+            throw new runtime.RequiredError(
+                'updateAssetColumnDto',
+                'Required parameter "updateAssetColumnDto" was null or undefined when calling governanceControllerUpdateColumn().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/assets/{id}/columns/{name}`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+        urlPath = urlPath.replace(`{${"name"}}`, encodeURIComponent(String(requestParameters['name'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'PUT',
+            headers: headerParameters,
+            query: queryParameters,
+            body: UpdateAssetColumnDtoToJSON(requestParameters['updateAssetColumnDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => AssetColumnsDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Needs asset.govern, or the owner or steward role on the asset or its source.
+     * Describe, classify or confirm one column
+     */
+    async governanceControllerUpdateColumn(requestParameters: GovernanceControllerUpdateColumnRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AssetColumnsDto> {
+        const response = await this.governanceControllerUpdateColumnRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Who read and exported a table, per day, over the last days
+     */
+    async governanceControllerUsageRaw(requestParameters: GovernanceControllerUsageRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AssetUsageDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling governanceControllerUsage().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        if (requestParameters['days'] != null) {
+            queryParameters['days'] = requestParameters['days'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/assets/{id}/usage`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => AssetUsageDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Who read and exported a table, per day, over the last days
+     */
+    async governanceControllerUsage(requestParameters: GovernanceControllerUsageRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AssetUsageDto> {
+        const response = await this.governanceControllerUsageRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

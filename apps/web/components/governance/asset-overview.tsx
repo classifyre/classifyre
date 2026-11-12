@@ -28,12 +28,16 @@ import { extractApiErrorMessage } from "@/lib/extract-api-error-message";
 import { ActorChip } from "@/components/actor-chip";
 import { AssetMeaningPanel } from "@/components/glossary/meaning-card";
 import type {
+  AssetColumnsDto,
+  AssetUsageDto,
   AssetGovernanceDto,
   GovernancePrincipalDto,
   GovernanceRoleKind,
   GovernanceStatus,
 } from "@/lib/governance";
+import { ColumnsCard } from "./columns-card";
 import { OwnershipCard } from "./ownership-card";
+import { UsageCard } from "./usage-card";
 import { PrincipalPicker } from "./principal-picker";
 
 const LEGAL_BASES = [
@@ -401,12 +405,22 @@ export function AssetOverview({
   governance,
   loading,
   onChange,
+  columns,
+  onColumnsChange,
+  usage,
+  usageLoading,
   sourceHref,
   children,
 }: {
   governance: AssetGovernanceDto | null;
   loading: boolean;
   onChange: (next: AssetGovernanceDto) => void;
+  /** Tables only: their columns, what stewards said and findings classify. */
+  columns?: AssetColumnsDto | null;
+  onColumnsChange?: (next: AssetColumnsDto) => void;
+  /** Who reads it; absent without `activity.view`. */
+  usage?: AssetUsageDto | null;
+  usageLoading?: boolean;
   sourceHref?: string;
   children?: React.ReactNode;
 }) {
@@ -503,9 +517,25 @@ export function AssetOverview({
                 onStatus={(status) => save({ status }).catch(() => undefined)}
               />
             )}
+            {(usage || usageLoading) && (
+              <UsageCard
+                usage={usage ?? null}
+                loading={Boolean(usageLoading)}
+              />
+            )}
           </div>
         </div>
       )}
+      {governance &&
+        columns &&
+        columns.columns.length > 0 &&
+        onColumnsChange && (
+          <ColumnsCard
+            assetId={governance.assetId}
+            state={columns}
+            onChange={onColumnsChange}
+          />
+        )}
       {children}
     </div>
   );

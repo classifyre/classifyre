@@ -46,6 +46,9 @@ export const MCP_TOOL_CAPABILITY_OVERRIDES: Record<string, Capability> = {
   decide_glossary_proposal: 'glossary.approve',
   approve_binding: 'glossary.approve',
   disable_binding: 'glossary.approve',
+  // REST lets an asset's owner and stewards govern it without the role; a
+  // token's tools are filtered by role capabilities alone, so it needs it.
+  set_asset_owner: 'asset.govern',
 };
 
 const GROUP_OF_TOOL = new Map<string, string>(

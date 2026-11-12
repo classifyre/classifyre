@@ -3,6 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   api,
+  type AssetColumnDto,
+  type AssetColumnsDto,
+  type AssetUsageDto,
+  type GovernanceSummaryDto,
   type AssetGovernanceDto,
   type GovernancePrincipalDto,
   type GovernanceRoleDto,
@@ -33,6 +37,10 @@ export function principalKindsFor(
 }
 
 export type {
+  AssetColumnDto,
+  AssetColumnsDto,
+  AssetUsageDto,
+  GovernanceSummaryDto,
   AssetGovernanceDto,
   GovernancePrincipalDto,
   GovernanceRoleDto,
@@ -94,4 +102,43 @@ export function rolesOf(
   kind: GovernanceRoleKind,
 ): GovernanceRoleDto[] {
   return roles.filter((role) => role.role === kind);
+}
+
+/** What a column holds, least to most guarded (GOV R6). */
+export const CLASSIFICATIONS = [
+  "public",
+  "internal",
+  "confidential",
+  "personal",
+  "sensitive",
+  "secret",
+] as const;
+export type Classification = (typeof CLASSIFICATIONS)[number];
+
+export function useAssetColumns(assetId: string | null | undefined) {
+  const load = useCallback(
+    () => api.governance.governanceControllerAssetColumns({ id: assetId! }),
+    [assetId],
+  );
+  return useLoad<AssetColumnsDto>(assetId ? load : null);
+}
+
+export function useAssetUsage(
+  assetId: string | null | undefined,
+  enabled: boolean,
+) {
+  const load = useCallback(
+    () =>
+      api.governance.governanceControllerUsage({ id: assetId!, days: "30" }),
+    [assetId],
+  );
+  return useLoad<AssetUsageDto>(assetId && enabled ? load : null);
+}
+
+export function useGovernanceSummary() {
+  const load = useCallback(
+    () => api.governance.governanceControllerSummary({ days: "30" }),
+    [],
+  );
+  return useLoad<GovernanceSummaryDto>(load);
 }

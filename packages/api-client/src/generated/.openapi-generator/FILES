@@ -39,6 +39,8 @@ docs/AppliedBoardOpDto.md
 docs/ApplyBoardOpsDto.md
 docs/ApplyBoardOpsResponseDto.md
 docs/AssetChunkDto.md
+docs/AssetColumnDto.md
+docs/AssetColumnsDto.md
 docs/AssetFindingDetectorCountDto.md
 docs/AssetFindingSeverityCountDto.md
 docs/AssetFindingStatusCountDto.md
@@ -54,6 +56,7 @@ docs/AssetSeverityCountsItemDto.md
 docs/AssetSeverityCountsRequestDto.md
 docs/AssetSeverityCountsResponseDto.md
 docs/AssetSimilarityDto.md
+docs/AssetUsageDto.md
 docs/AssetsApi.md
 docs/AssignGovernanceRoleDto.md
 docs/AssistantApi.md
@@ -165,9 +168,11 @@ docs/CloseCaseDto.md
 docs/CloseCaseResponseDto.md
 docs/CohortRunYieldDto.md
 docs/CohortWeightsPreviewDto.md
+docs/ColumnFindingGroupDto.md
 docs/ColumnLineageDto.md
 docs/ColumnLineageResponseDto.md
 docs/ColumnLineageStepDto.md
+docs/ColumnTermDto.md
 docs/ConnectionTestStatusDto.md
 docs/CorrelationApi.md
 docs/CorrelationConfigResponseDto.md
@@ -290,10 +295,14 @@ docs/GlossarySchemeDto.md
 docs/GlossarySchemeRefDto.md
 docs/GlossaryTermDto.md
 docs/GlossaryTermUsageDto.md
+docs/GovernFirstDto.md
 docs/GovernanceApi.md
 docs/GovernanceChecklistItemDto.md
+docs/GovernanceMineDto.md
 docs/GovernancePrincipalDto.md
 docs/GovernanceRoleDto.md
+docs/GovernanceSummaryDto.md
+docs/GovernanceTotalsDto.md
 docs/GrantDto.md
 docs/GraphApi.md
 docs/GraphEdgeDto.md
@@ -340,6 +349,7 @@ docs/McpToolParameterDto.md
 docs/McpToolSummaryDto.md
 docs/MeActorDto.md
 docs/MeResponseDto.md
+docs/MoveAssetColumnDto.md
 docs/NamespacesApi.md
 docs/NotebookCellDto.md
 docs/NotebookDto.md
@@ -534,6 +544,7 @@ docs/SitemapEntryDto.md
 docs/SitemapIndexDto.md
 docs/SitemapSectionDto.md
 docs/SourceAssetsControllerBulkIngest201Response.md
+docs/SourceCoverageDto.md
 docs/SourceGovernanceCoverageDto.md
 docs/SourceGovernanceDto.md
 docs/SourceInfoDto.md
@@ -581,6 +592,7 @@ docs/UndoLogResponseDto.md
 docs/UpdateAgentConfigDto.md
 docs/UpdateAgentMemoryDto.md
 docs/UpdateAiProviderConfigDto.md
+docs/UpdateAssetColumnDto.md
 docs/UpdateAssetGovernanceDto.md
 docs/UpdateCapabilitiesDto.md
 docs/UpdateCaseDto.md
@@ -616,6 +628,9 @@ docs/UploadedSourceFileDto.md
 docs/UpsertGlossarySchemeDto.md
 docs/UpsertGlossaryTermDto.md
 docs/UpsertGlossaryTermResponseDto.md
+docs/UsageDayDto.md
+docs/UsageFormatDto.md
+docs/UsageReaderDto.md
 docs/ValueOccurrenceAssetDto.md
 docs/ValueOccurrencesResponseDto.md
 docs/WakeSupervisorDto.md
@@ -699,6 +714,8 @@ src/models/AppliedBoardOpDto.ts
 src/models/ApplyBoardOpsDto.ts
 src/models/ApplyBoardOpsResponseDto.ts
 src/models/AssetChunkDto.ts
+src/models/AssetColumnDto.ts
+src/models/AssetColumnsDto.ts
 src/models/AssetFindingDetectorCountDto.ts
 src/models/AssetFindingSeverityCountDto.ts
 src/models/AssetFindingStatusCountDto.ts
@@ -714,6 +731,7 @@ src/models/AssetSeverityCountsItemDto.ts
 src/models/AssetSeverityCountsRequestDto.ts
 src/models/AssetSeverityCountsResponseDto.ts
 src/models/AssetSimilarityDto.ts
+src/models/AssetUsageDto.ts
 src/models/AssignGovernanceRoleDto.ts
 src/models/AssistantCapabilityReportDto.ts
 src/models/AssistantControllerRespond200Response.ts
@@ -819,9 +837,11 @@ src/models/CloseCaseDto.ts
 src/models/CloseCaseResponseDto.ts
 src/models/CohortRunYieldDto.ts
 src/models/CohortWeightsPreviewDto.ts
+src/models/ColumnFindingGroupDto.ts
 src/models/ColumnLineageDto.ts
 src/models/ColumnLineageResponseDto.ts
 src/models/ColumnLineageStepDto.ts
+src/models/ColumnTermDto.ts
 src/models/ConnectionTestStatusDto.ts
 src/models/CorrelationConfigResponseDto.ts
 src/models/CorrelationGraphResponseDto.ts
@@ -933,9 +953,13 @@ src/models/GlossarySchemeDto.ts
 src/models/GlossarySchemeRefDto.ts
 src/models/GlossaryTermDto.ts
 src/models/GlossaryTermUsageDto.ts
+src/models/GovernFirstDto.ts
 src/models/GovernanceChecklistItemDto.ts
+src/models/GovernanceMineDto.ts
 src/models/GovernancePrincipalDto.ts
 src/models/GovernanceRoleDto.ts
+src/models/GovernanceSummaryDto.ts
+src/models/GovernanceTotalsDto.ts
 src/models/GrantDto.ts
 src/models/GraphEdgeDto.ts
 src/models/GraphNodeDto.ts
@@ -976,6 +1000,7 @@ src/models/McpToolParameterDto.ts
 src/models/McpToolSummaryDto.ts
 src/models/MeActorDto.ts
 src/models/MeResponseDto.ts
+src/models/MoveAssetColumnDto.ts
 src/models/NotebookCellDto.ts
 src/models/NotebookDto.ts
 src/models/NotebookExecutionDto.ts
@@ -1162,6 +1187,7 @@ src/models/SitemapEntryDto.ts
 src/models/SitemapIndexDto.ts
 src/models/SitemapSectionDto.ts
 src/models/SourceAssetsControllerBulkIngest201Response.ts
+src/models/SourceCoverageDto.ts
 src/models/SourceGovernanceCoverageDto.ts
 src/models/SourceGovernanceDto.ts
 src/models/SourceInfoDto.ts
@@ -1207,6 +1233,7 @@ src/models/UndoLogResponseDto.ts
 src/models/UpdateAgentConfigDto.ts
 src/models/UpdateAgentMemoryDto.ts
 src/models/UpdateAiProviderConfigDto.ts
+src/models/UpdateAssetColumnDto.ts
 src/models/UpdateAssetGovernanceDto.ts
 src/models/UpdateCapabilitiesDto.ts
 src/models/UpdateCaseDto.ts
@@ -1242,6 +1269,9 @@ src/models/UploadedSourceFileDto.ts
 src/models/UpsertGlossarySchemeDto.ts
 src/models/UpsertGlossaryTermDto.ts
 src/models/UpsertGlossaryTermResponseDto.ts
+src/models/UsageDayDto.ts
+src/models/UsageFormatDto.ts
+src/models/UsageReaderDto.ts
 src/models/ValueOccurrenceAssetDto.ts
 src/models/ValueOccurrencesResponseDto.ts
 src/models/WakeSupervisorDto.ts

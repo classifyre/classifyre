@@ -398,6 +398,7 @@ model Asset {
   labelProfiles             AssetLabelProfile[]
   lineageProfile            AssetLineageProfile?
   governance                AssetGovernance?
+  columnAnnotations         AssetColumnAnnotation[]
 
   @@unique([sourceId, hash])
   @@index([urn])
@@ -445,6 +446,34 @@ model AssetGovernance {
 
   @@index([status])
   @@map("asset_governance")
+}
+
+/// What a steward says about one column of a table (GOV §5.1, R6): business
+/// name, description, glossary term, critical data element, and the
+/// classification they set or confirmed. Keyed by column name, because columns
+/// stay in `assets.metadata.columns`; a renamed column leaves its row behind,
+/// listed as removed so it can be moved.
+model AssetColumnAnnotation {
+  assetId                  String        @map("asset_id")
+  columnName               String        @map("column_name")
+  businessName             String?       @map("business_name")
+  description              String?       @db.Text
+  termId                   String?       @map("term_id")
+  criticalDataElement      Boolean       @default(false) @map("critical_data_element")
+  /// A steward's classification; null = the one derived from findings.
+  classification           String?
+  /// When someone confirmed the classification (derived or set): the
+  /// checklist's "classification reviewed".
+  classificationReviewedAt DateTime?     @map("classification_reviewed_at")
+  classificationReviewedBy String?       @map("classification_reviewed_by")
+  updatedAt                DateTime      @updatedAt @map("updated_at")
+  updatedBy                String?       @map("updated_by")
+  asset                    Asset         @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  term                     GlossaryTerm? @relation(fields: [termId], references: [id], onDelete: SetNull)
+
+  @@id([assetId, columnName])
+  @@index([termId])
+  @@map("asset_column_annotations")
 }
 
 /// ODCS contract status, kept apart from the scan's AssetStatus.
@@ -3517,6 +3546,7 @@ model GlossaryTerm {
   // Content hash of "term + aliases + codes + definition + notes" in the
   // shared embedding store (hidden aliases excluded, SL1 R7).
   embedContentHash String?            @map("embed_content_hash")
+  columnAnnotations AssetColumnAnnotation[]
   createdAt        DateTime           @default(now()) @map("created_at")
   updatedAt        DateTime           @updatedAt @map("updated_at")
 
