@@ -68,7 +68,11 @@ export interface ActorDisplay {
 /** What to show for an actor reference; null for no reference. */
 export function useActor(ref: string | null | undefined): ActorDisplay | null {
   const { t } = useTranslation();
-  useSyncExternalStore(subscribe, () => version, () => 0);
+  useSyncExternalStore(
+    subscribe,
+    () => version,
+    () => 0,
+  );
 
   useEffect(() => {
     if (ref) request(ref);
@@ -93,6 +97,7 @@ export function useActor(ref: string | null | undefined): ActorDisplay | null {
   }
   if (kind === "system") return { kind, name: t("actors.system") };
   if (kind === "mcp") return { kind, name: t("actors.mcpToken") };
+  if (kind === "group") return { kind, name: t("actors.group") };
   return { kind, name: t("actors.person") };
 }
 

@@ -11970,6 +11970,314 @@
         ]
       }
     },
+    "/assets/{id}/governance": {
+      "get": {
+        "operationId": "GovernanceController_assetGovernance",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetGovernanceDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "An asset's owners, description, lifecycle and checklist",
+        "tags": [
+          "Governance"
+        ]
+      },
+      "put": {
+        "description": "Needs asset.govern, or the owner or steward role on the asset or its source. ACTIVE certifies the asset and needs an owner.",
+        "operationId": "GovernanceController_updateAssetGovernance",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAssetGovernanceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetGovernanceDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Change an asset's description, legal basis or lifecycle",
+        "tags": [
+          "Governance"
+        ]
+      }
+    },
+    "/assets/{id}/governance/roles": {
+      "post": {
+        "description": "A new owner replaces the current one; the old row is kept as history.",
+        "operationId": "GovernanceController_assignAssetRole",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignGovernanceRoleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetGovernanceDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Make someone owner, steward or custodian of an asset",
+        "tags": [
+          "Governance"
+        ]
+      }
+    },
+    "/assets/{id}/governance/roles/{roleId}": {
+      "delete": {
+        "operationId": "GovernanceController_removeAssetRole",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "roleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetGovernanceDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "End a role on an asset (kept as history)",
+        "tags": [
+          "Governance"
+        ]
+      }
+    },
+    "/sources/{id}/governance": {
+      "get": {
+        "operationId": "GovernanceController_sourceGovernance",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceGovernanceDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "A source's owners, stewards and custodians, and its coverage",
+        "tags": [
+          "Governance"
+        ]
+      }
+    },
+    "/sources/{id}/governance/roles": {
+      "post": {
+        "description": "Roles on a source apply to its assets that set none of their own.",
+        "operationId": "GovernanceController_assignSourceRole",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignGovernanceRoleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceGovernanceDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Make someone owner, steward or custodian of a source",
+        "tags": [
+          "Governance"
+        ]
+      }
+    },
+    "/sources/{id}/governance/roles/{roleId}": {
+      "delete": {
+        "operationId": "GovernanceController_removeSourceRole",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "roleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceGovernanceDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "End a role on a source (kept as history)",
+        "tags": [
+          "Governance"
+        ]
+      }
+    },
+    "/governance/principals": {
+      "get": {
+        "description": "Needs asset.govern or access.view, or an owner or steward role somewhere in the workspace. At most 20.",
+        "operationId": "GovernanceController_principals",
+        "parameters": [
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kinds",
+            "required": false,
+            "in": "query",
+            "description": "Comma-separated: user, group. Default both.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/GovernancePrincipalDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "People and groups of the tenant, for the owner and steward pickers",
+        "tags": [
+          "Governance"
+        ]
+      }
+    },
     "/runner-limits": {
       "get": {
         "operationId": "DeploymentSettingsController_get",
@@ -14520,6 +14828,7 @@
             "name": "steward",
             "required": false,
             "in": "query",
+            "description": "Terms of one steward: `user:<id>` or `group:<id>`.",
             "schema": {
               "type": "string"
             }
@@ -18893,6 +19202,26 @@
                 "MENTION"
               ]
             }
+          },
+          "governance": {
+            "type": "string",
+            "enum": [
+              "ungoverned",
+              "governed",
+              "draft",
+              "active",
+              "deprecated",
+              "retired"
+            ],
+            "description": "Governance (docs/prd/GOV-governed-data-assets.md): owned or not, or a lifecycle of owned assets."
+          },
+          "ownerRef": {
+            "type": "string",
+            "description": "Assets this person owns (their own or their source’s owner): `user:<id>`, or `me`."
+          },
+          "stewardRef": {
+            "type": "string",
+            "description": "Assets this person or group stewards, on the asset or its source: `user:<id>`, `group:<id>`, or `me` (you and your groups)."
           }
         }
       },
@@ -19414,6 +19743,27 @@
           "via"
         ]
       },
+      "SearchAssetGovernanceDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "ACTIVE",
+              "DEPRECATED",
+              "RETIRED"
+            ],
+            "nullable": true,
+            "description": "Lifecycle; null while nobody owns the asset."
+          },
+          "ownerRef": {
+            "type": "string",
+            "nullable": true,
+            "description": "The owner, its own or its source’s (`user:<id>`)."
+          }
+        }
+      },
       "SearchAssetItemDto": {
         "type": "object",
         "properties": {
@@ -19433,6 +19783,9 @@
                 "$ref": "#/components/schemas/SearchAssetMatchDto"
               }
             ]
+          },
+          "governance": {
+            "$ref": "#/components/schemas/SearchAssetGovernanceDto"
           }
         },
         "required": [
@@ -30461,6 +30814,7 @@
                 "finding.triage",
                 "asset.view",
                 "asset.tag",
+                "asset.govern",
                 "detector.view",
                 "detector.manage",
                 "detector.train",
@@ -30610,6 +30964,7 @@
             "type": "string",
             "enum": [
               "user",
+              "group",
               "mcp",
               "agent",
               "system",
@@ -30623,6 +30978,11 @@
           "viaDisplayName": {
             "type": "string",
             "description": "For an action delegated through an MCP token: the token."
+          },
+          "path": {
+            "type": "string",
+            "description": "For a group: its path in the tenant.",
+            "example": "/finance/controlling"
           }
         },
         "required": [
@@ -30679,6 +31039,7 @@
                 "finding.triage",
                 "asset.view",
                 "asset.tag",
+                "asset.govern",
                 "detector.view",
                 "detector.manage",
                 "detector.train",
@@ -30903,6 +31264,7 @@
                 "finding.triage",
                 "asset.view",
                 "asset.tag",
+                "asset.govern",
                 "detector.view",
                 "detector.manage",
                 "detector.train",
@@ -35419,6 +35781,335 @@
           "assetIds",
           "truncated",
           "createdAt"
+        ]
+      },
+      "GovernancePrincipalDto": {
+        "type": "object",
+        "properties": {
+          "ref": {
+            "type": "string",
+            "example": "user:5c1f…"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "user",
+              "group"
+            ]
+          },
+          "displayName": {
+            "type": "string",
+            "example": "Jordan Reyes"
+          },
+          "email": {
+            "type": "string",
+            "example": "jordan@example.org"
+          },
+          "path": {
+            "type": "string",
+            "description": "For a group: its path in the tenant.",
+            "example": "/finance/controlling"
+          }
+        },
+        "required": [
+          "ref",
+          "kind",
+          "displayName"
+        ]
+      },
+      "GovernanceRoleDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "OWNER",
+              "STEWARD",
+              "CUSTODIAN"
+            ]
+          },
+          "principal": {
+            "$ref": "#/components/schemas/GovernancePrincipalDto"
+          },
+          "inherited": {
+            "type": "boolean",
+            "description": "Set on the asset's source, not on the asset itself."
+          },
+          "dateIn": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "dateOut": {
+            "format": "date-time",
+            "type": "string",
+            "description": "When the role ended; absent while open."
+          },
+          "replacedByRef": {
+            "type": "string"
+          },
+          "assignedBy": {
+            "type": "string"
+          },
+          "removedBy": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "role",
+          "principal",
+          "inherited",
+          "dateIn"
+        ]
+      },
+      "GovernanceChecklistItemDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "steward",
+              "description",
+              "meaning",
+              "certified"
+            ]
+          },
+          "done": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "done"
+        ]
+      },
+      "AssetGovernanceDto": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string"
+          },
+          "sourceId": {
+            "type": "string"
+          },
+          "governed": {
+            "type": "boolean",
+            "description": "Whether someone owns the asset, itself or through its source."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "ACTIVE",
+              "DEPRECATED",
+              "RETIRED"
+            ],
+            "nullable": true,
+            "description": "Lifecycle; null while the asset is not governed."
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "usage": {
+            "type": "string",
+            "nullable": true
+          },
+          "limitations": {
+            "type": "string",
+            "nullable": true
+          },
+          "legalBasis": {
+            "type": "string",
+            "enum": [
+              "CONSENT",
+              "CONTRACT",
+              "LEGAL_OBLIGATION",
+              "VITAL_INTERESTS",
+              "PUBLIC_TASK",
+              "LEGITIMATE_INTERESTS"
+            ],
+            "nullable": true
+          },
+          "retention": {
+            "type": "string",
+            "nullable": true
+          },
+          "certifiedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "certifiedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "updatedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "roles": {
+            "description": "Open roles that apply: its own, else its source’s.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GovernanceRoleDto"
+            }
+          },
+          "history": {
+            "description": "Ended roles of the asset, newest first.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GovernanceRoleDto"
+            }
+          },
+          "checklist": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GovernanceChecklistItemDto"
+            }
+          },
+          "canGovern": {
+            "type": "boolean",
+            "description": "Whether the caller may change it: asset.govern, or owner or steward of the asset or its source."
+          }
+        },
+        "required": [
+          "assetId",
+          "sourceId",
+          "governed",
+          "roles",
+          "history",
+          "checklist",
+          "canGovern"
+        ]
+      },
+      "UpdateAssetGovernanceDto": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "description": "Markdown."
+          },
+          "usage": {
+            "type": "string",
+            "nullable": true
+          },
+          "limitations": {
+            "type": "string",
+            "nullable": true
+          },
+          "legalBasis": {
+            "type": "string",
+            "enum": [
+              "CONSENT",
+              "CONTRACT",
+              "LEGAL_OBLIGATION",
+              "VITAL_INTERESTS",
+              "PUBLIC_TASK",
+              "LEGITIMATE_INTERESTS"
+            ],
+            "nullable": true
+          },
+          "retention": {
+            "type": "string",
+            "nullable": true,
+            "example": "10 y"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "ACTIVE",
+              "DEPRECATED",
+              "RETIRED"
+            ],
+            "description": "ACTIVE certifies the asset; it needs an owner."
+          }
+        }
+      },
+      "AssignGovernanceRoleDto": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "OWNER",
+              "STEWARD",
+              "CUSTODIAN"
+            ]
+          },
+          "principalRef": {
+            "type": "string",
+            "description": "`user:<id>` (owner, steward) or `group:<id>` (steward, custodian)."
+          }
+        },
+        "required": [
+          "role",
+          "principalRef"
+        ]
+      },
+      "SourceGovernanceCoverageDto": {
+        "type": "object",
+        "properties": {
+          "assets": {
+            "type": "number"
+          },
+          "owned": {
+            "type": "number",
+            "description": "Assets with an owner, own or inherited."
+          },
+          "active": {
+            "type": "number",
+            "description": "Owned assets whose lifecycle is ACTIVE."
+          }
+        },
+        "required": [
+          "assets",
+          "owned",
+          "active"
+        ]
+      },
+      "SourceGovernanceDto": {
+        "type": "object",
+        "properties": {
+          "sourceId": {
+            "type": "string"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GovernanceRoleDto"
+            }
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GovernanceRoleDto"
+            }
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/SourceGovernanceCoverageDto"
+          },
+          "canGovern": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "sourceId",
+          "roles",
+          "history",
+          "coverage",
+          "canGovern"
         ]
       },
       "RunnerLimitDto": {
@@ -40077,7 +40768,8 @@
           },
           "steward": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "description": "A person (`user:<id>`) or group (`group:<id>`) of the tenant who maintains the term."
           },
           "status": {
             "type": "string",

@@ -118,6 +118,14 @@ export const CAPABILITIES = [
     scope: 'workspace',
     description: 'Tag assets, add or remove connections, save explore views.',
   },
+  {
+    // Also held on one asset or source by its owner and stewards, without a
+    // role (docs/prd/GOV-governed-data-assets.md §5.2).
+    id: 'asset.govern',
+    scope: 'workspace',
+    description:
+      'Govern assets: owners, stewards, custodians, descriptions and lifecycle.',
+  },
   // Detectors
   {
     id: 'detector.view',

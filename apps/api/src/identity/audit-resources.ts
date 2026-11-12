@@ -8,12 +8,16 @@
  *   or on one of its tables. The source's Data tab filters on it.
  * - `asset:<id>`: reads of that table, access given on it. The table's Data
  *   tab filters on it.
+ * - `governance`: owners, stewards, descriptions and lifecycle of assets and
+ *   sources (docs/prd/GOV-governed-data-assets.md R4). The Governance page
+ *   filters on it.
  *
  * One vocabulary for both writers (the per-table reads in query-run.service
  * and the grant changes in audit.interceptor) and the one reader (the
  * `resource` filter of GET /audit-events).
  */
 export const DATA_RESOURCE = 'data';
+export const GOVERNANCE_RESOURCE = 'governance';
 
 export function sourceResource(sourceId: string): string {
   return `source:${sourceId}`;
@@ -62,4 +66,16 @@ export function grantResources(grant: {
     }
   }
   return out;
+}
+
+/** A governance change on an asset (with its source) or on a source. */
+export function governanceResources(target: {
+  assetId?: string | null;
+  sourceId?: string | null;
+}): string[] {
+  return [
+    GOVERNANCE_RESOURCE,
+    ...(target.assetId ? [assetResource(target.assetId)] : []),
+    ...(target.sourceId ? [sourceResource(target.sourceId)] : []),
+  ];
 }

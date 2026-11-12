@@ -4,6 +4,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { stewardFromImport } from './steward';
 import { randomUUID } from 'node:crypto';
 import {
   GlossaryOrigin,
@@ -518,8 +519,7 @@ export class GlossaryImportExportService {
           hiddenAliases,
         }),
         definition: item.definition ?? null,
-        notes: item.notes ?? null,
-        steward: item.steward ?? null,
+        ...stewardFromImport(item.steward, item.notes),
         entityType: this.entityType(item),
         schemeId: item.schemeKey
           ? (schemeIdByKey.get(item.schemeKey) ?? null)
@@ -591,8 +591,12 @@ export class GlossaryImportExportService {
           ...(merge
             ? {}
             : {
-                notes: item.notes ?? existing.notes,
-                steward: item.steward ?? existing.steward,
+                ...(item.steward
+                  ? stewardFromImport(
+                      item.steward,
+                      item.notes ?? existing.notes,
+                    )
+                  : { notes: item.notes ?? existing.notes }),
               }),
           ...(item.schemeKey && !merge
             ? {

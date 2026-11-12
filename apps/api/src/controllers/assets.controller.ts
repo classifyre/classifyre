@@ -1,3 +1,4 @@
+import { GovernanceService } from '../governance/governance.service';
 import {
   Controller,
   Get,
@@ -137,6 +138,7 @@ export class SearchAssetsController {
     private readonly pgStreamService: PgStreamService,
     private readonly exportQueryService: ExportQueryService,
     private readonly quickSearchService: QuickSearchService,
+    private readonly governance: GovernanceService,
   ) {}
 
   @Post('quick')
@@ -218,7 +220,21 @@ export class SearchAssetsController {
   async searchAssets(
     @Body() request: SearchAssetsRequestDto,
   ): Promise<SearchAssetsResponseDto> {
-    return this.assetService.searchAssets(request);
+    const result = await this.assetService.searchAssets(request);
+    // Owner and lifecycle per row (GOV §5.7), one lookup for the page.
+    const governance = await this.governance.summaries(
+      result.items.map((item) => item.asset),
+    );
+    return {
+      ...result,
+      items: result.items.map((item) => ({
+        ...item,
+        governance: governance.get(item.asset.id) ?? {
+          status: null,
+          ownerRef: null,
+        },
+      })),
+    };
   }
 
   @Post('assets/charts')

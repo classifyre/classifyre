@@ -489,7 +489,6 @@
         "entity": "Mentions"
       },
       "noDefinition": "No definition yet.",
-      "steward": "Steward: {{steward}}",
       "aliases": "Aliases",
       "codes": "Codes",
       "hiddenAliases": "Hidden aliases",
@@ -499,7 +498,8 @@
       "generatedDetectors": "Detectors made from this term",
       "noActivity": "No activity yet.",
       "showOnMap": "Show on map",
-      "connections": "Where it is connected"
+      "connections": "Where it is connected",
+      "stewardLabel": "Steward"
     },
     "relations": {
       "out": {
@@ -7110,8 +7110,10 @@
       "name": "Person",
       "mcp": "MCP token",
       "agent": "Agent",
-      "system": "System"
-    }
+      "system": "System",
+      "group": "Group"
+    },
+    "group": "A group"
   },
   "audit": {
     "createdBy": "Created by",
@@ -7469,5 +7471,130 @@
     "cappedByInstallation": "The installation-wide limit is lower, so {{value}} applies.",
     "save": "Save scan limits",
     "saved": "Saved"
+  },
+  "governance": {
+    "overviewTab": "Overview",
+    "column": "Governance",
+    "status": {
+      "UNGOVERNED": "Ungoverned",
+      "DRAFT": "Draft",
+      "ACTIVE": "Certified",
+      "DEPRECATED": "Deprecated",
+      "RETIRED": "Retired"
+    },
+    "statusHint": {
+      "UNGOVERNED": "Nobody owns this asset yet.",
+      "DRAFT": "Owned, not yet certified.",
+      "ACTIVE": "Certified by its owner or steward: fit for use as described.",
+      "DEPRECATED": "Still here; do not build new work on it.",
+      "RETIRED": "Out of use."
+    },
+    "statusAction": {
+      "ACTIVE": "Certify",
+      "DRAFT": "Back to draft",
+      "DEPRECATED": "Deprecate",
+      "RETIRED": "Retire"
+    },
+    "role": {
+      "OWNER": "Owner",
+      "STEWARD": "Steward",
+      "CUSTODIAN": "Custodian"
+    },
+    "roleHint": {
+      "OWNER": "One person, accountable for the data and who may use it.",
+      "STEWARD": "Keeps its definitions and quality up to date: people or groups.",
+      "CUSTODIAN": "The technical team that runs the system it lives in."
+    },
+    "ownership": {
+      "title": "Ownership",
+      "description": {
+        "asset": "Who answers for this asset. Roles set on its source apply until the asset names its own.",
+        "source": "Who answers for this source. Its assets inherit these roles unless they name their own."
+      },
+      "assign": "Assign",
+      "change": "Change",
+      "nobody": "Nobody yet.",
+      "inherited": "From source",
+      "end": "End the role of {{name}}",
+      "history": "History ({{count}})",
+      "endedBy": "ended by",
+      "dialogTitle": "Assign {{role}}",
+      "replaces": "The current owner is replaced and kept in the history.",
+      "confirm": "Assign",
+      "assigned": "{{name}} is now {{role}}.",
+      "removed": "{{name}} is no longer {{role}}.",
+      "failed": "Could not change the role."
+    },
+    "picker": {
+      "placeholder": "Choose…",
+      "search": "Search people and groups",
+      "none": "Nobody found.",
+      "people": "People",
+      "groups": "Groups",
+      "failed": "Could not look up people and groups.",
+      "person": "Person",
+      "group": "Group",
+      "personOrGroup": "Person or group",
+      "nobody": "Nobody",
+      "clear": "Clear"
+    },
+    "ungoverned": {
+      "title": "Nobody owns this asset yet",
+      "body": "An asset becomes governed when someone is accountable for it. Assign an owner: the person who decides what it is for and who may use it.",
+      "pick": "Choose the owner",
+      "assign": "Assign owner",
+      "done": "The asset is governed now."
+    },
+    "fields": {
+      "description": "Description",
+      "usage": "Usage",
+      "limitations": "Limitations",
+      "legalBasis": "Legal basis",
+      "retention": "Retention"
+    },
+    "descriptionHint": "What this asset is, what it is for, and what to watch out for.",
+    "noDescription": "No description yet.",
+    "placeholders": {
+      "description": "What is in it, where it comes from, what it is for (Markdown).",
+      "retention": "e.g. 10 y"
+    },
+    "legalBasis": {
+      "none": "Not set",
+      "CONSENT": "Consent (Art. 6(1)(a))",
+      "CONTRACT": "Contract (Art. 6(1)(b))",
+      "LEGAL_OBLIGATION": "Legal obligation (Art. 6(1)(c))",
+      "VITAL_INTERESTS": "Vital interests (Art. 6(1)(d))",
+      "PUBLIC_TASK": "Public task (Art. 6(1)(e))",
+      "LEGITIMATE_INTERESTS": "Legitimate interests (Art. 6(1)(f))"
+    },
+    "lastChanged": "Last changed by",
+    "certifiedBy": "Certified by",
+    "saved": "Saved.",
+    "saveFailed": "Could not save.",
+    "checklist": {
+      "title": "Governance",
+      "progress": "{{done}} of {{total}} done",
+      "owner": "An owner",
+      "steward": "A steward",
+      "description": "A description",
+      "meaning": "An approved glossary term",
+      "certified": "Certified"
+    },
+    "coverage": {
+      "owned": "{{owned}} of {{assets}} assets owned",
+      "active": "{{active}} certified"
+    },
+    "filter": {
+      "label": "Governance",
+      "all": "Any governance",
+      "ungoverned": "Ungoverned",
+      "governed": "Governed",
+      "draft": "Draft",
+      "active": "Certified",
+      "deprecated": "Deprecated",
+      "retired": "Retired",
+      "mine": "Owned by me",
+      "stewarding": "Stewarded by me"
+    }
   }
 }

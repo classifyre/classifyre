@@ -79,6 +79,7 @@ import { summarizeTextCoverage } from "@/lib/text-coverage";
 import { CohortSelectionCard } from "@/components/cohort-yield";
 import { fetchCatalog, type QueryCatalog } from "@/lib/data-query";
 import { useCan } from "@/hooks/use-me";
+import { SourceOwnership } from "@/components/governance/source-ownership";
 
 const EMPTY_CHARTS: SearchAssetsChartsResponseDto = {
   totals: {
@@ -697,6 +698,8 @@ export default function SourceViewPage() {
           </div>
 
           <CohortSelectionCard sourceId={sourceId} />
+
+          {sourceId && <SourceOwnership sourceId={sourceId} />}
 
           <div className="grid gap-4 lg:grid-cols-3">
             <Card className="lg:col-span-2">

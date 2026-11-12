@@ -34,6 +34,9 @@ export const ASSET_FILTER_KEYS = [
   'term',
   'includeNarrower',
   'meaningMethod',
+  'governance',
+  'ownerRef',
+  'stewardRef',
 ] as const;
 
 const KNOWN_SECTIONS = new Set<string>(ASSET_SEARCH_SECTIONS);

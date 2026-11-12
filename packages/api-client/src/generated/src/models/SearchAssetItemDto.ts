@@ -27,6 +27,13 @@ import {
     SearchAssetMatchDtoToJSON,
     SearchAssetMatchDtoToJSONTyped,
 } from './SearchAssetMatchDto';
+import type { SearchAssetGovernanceDto } from './SearchAssetGovernanceDto';
+import {
+    SearchAssetGovernanceDtoFromJSON,
+    SearchAssetGovernanceDtoFromJSONTyped,
+    SearchAssetGovernanceDtoToJSON,
+    SearchAssetGovernanceDtoToJSONTyped,
+} from './SearchAssetGovernanceDto';
 import type { AssetListItemDto } from './AssetListItemDto';
 import {
     AssetListItemDtoFromJSON,
@@ -59,6 +66,12 @@ export interface SearchAssetItemDto {
      * @memberof SearchAssetItemDto
      */
     match?: SearchAssetMatchDto;
+    /**
+     * 
+     * @type {SearchAssetGovernanceDto}
+     * @memberof SearchAssetItemDto
+     */
+    governance?: SearchAssetGovernanceDto;
 }
 
 /**
@@ -83,6 +96,7 @@ export function SearchAssetItemDtoFromJSONTyped(json: any, ignoreDiscriminator: 
         'asset': AssetListItemDtoFromJSON(json['asset']),
         'findings': ((json['findings'] as Array<any>).map(SearchAssetFindingDtoFromJSON)),
         'match': json['match'] == null ? undefined : SearchAssetMatchDtoFromJSON(json['match']),
+        'governance': json['governance'] == null ? undefined : SearchAssetGovernanceDtoFromJSON(json['governance']),
     };
 }
 
@@ -100,6 +114,7 @@ export function SearchAssetItemDtoToJSONTyped(value?: SearchAssetItemDto | null,
         'asset': AssetListItemDtoToJSON(value['asset']),
         'findings': ((value['findings'] as Array<any>).map(SearchAssetFindingDtoToJSON)),
         'match': SearchAssetMatchDtoToJSON(value['match']),
+        'governance': SearchAssetGovernanceDtoToJSON(value['governance']),
     };
 }
 

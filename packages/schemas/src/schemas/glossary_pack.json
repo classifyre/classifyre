@@ -115,9 +115,6 @@
           "entityType": {
             "type": "string"
           },
-          "steward": {
-            "type": "string"
-          },
           "notes": {
             "type": "string"
           }

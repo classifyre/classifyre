@@ -66,6 +66,7 @@ import { SocketAccessService } from './socket-access.service';
   exports: [
     SocketAccessService,
     ActorContextService,
+    ActorDirectoryService,
     AuditTrailService,
     SourceConfigAccess,
     TenancyService,

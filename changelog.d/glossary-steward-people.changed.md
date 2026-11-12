@@ -1,0 +1,1 @@
+A glossary term's steward is now a person or group from your organization rather than free text. On upgrade, a steward name that matches exactly one person who has signed in is linked to that person. Any other steward text is moved into the term's notes.

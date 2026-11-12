@@ -73,6 +73,7 @@ export const BUILT_IN_ROLES = [
       'glossary.approve',
       'entity.manage',
       'correlation.review',
+      'asset.govern',
     ],
   },
   {

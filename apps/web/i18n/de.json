@@ -489,7 +489,6 @@
         "entity": "Erwähnungen"
       },
       "noDefinition": "Noch keine Definition.",
-      "steward": "Verantwortlich: {{steward}}",
       "aliases": "Synonyme",
       "codes": "Codes",
       "hiddenAliases": "Versteckte Synonyme",
@@ -499,7 +498,8 @@
       "generatedDetectors": "Aus diesem Begriff erzeugte Detektoren",
       "noActivity": "Noch kein Verlauf.",
       "showOnMap": "Auf der Karte zeigen",
-      "connections": "Womit er verbunden ist"
+      "connections": "Womit er verbunden ist",
+      "stewardLabel": "Steward"
     },
     "relations": {
       "out": {
@@ -7110,8 +7110,10 @@
       "name": "Person",
       "mcp": "MCP-Token",
       "agent": "Agent",
-      "system": "System"
-    }
+      "system": "System",
+      "group": "Gruppe"
+    },
+    "group": "Eine Gruppe"
   },
   "audit": {
     "createdBy": "Erstellt von",
@@ -7469,5 +7471,130 @@
     "cappedByInstallation": "Das Limit der gesamten Installation ist niedriger, daher gilt {{value}}.",
     "save": "Scan-Limits speichern",
     "saved": "Gespeichert"
+  },
+  "governance": {
+    "overviewTab": "Überblick",
+    "column": "Governance",
+    "status": {
+      "UNGOVERNED": "Ohne Verantwortliche",
+      "DRAFT": "Entwurf",
+      "ACTIVE": "Zertifiziert",
+      "DEPRECATED": "Veraltet",
+      "RETIRED": "Stillgelegt"
+    },
+    "statusHint": {
+      "UNGOVERNED": "Für dieses Asset ist noch niemand verantwortlich.",
+      "DRAFT": "Hat eine verantwortliche Person, ist aber noch nicht zertifiziert.",
+      "ACTIVE": "Vom Owner oder Steward zertifiziert: wie beschrieben nutzbar.",
+      "DEPRECATED": "Noch vorhanden; keine neue Arbeit darauf aufbauen.",
+      "RETIRED": "Nicht mehr in Gebrauch."
+    },
+    "statusAction": {
+      "ACTIVE": "Zertifizieren",
+      "DRAFT": "Zurück zum Entwurf",
+      "DEPRECATED": "Als veraltet markieren",
+      "RETIRED": "Stilllegen"
+    },
+    "role": {
+      "OWNER": "Owner",
+      "STEWARD": "Steward",
+      "CUSTODIAN": "Custodian"
+    },
+    "roleHint": {
+      "OWNER": "Eine Person, verantwortlich für die Daten und dafür, wer sie nutzen darf.",
+      "STEWARD": "Pflegt Definitionen und Qualität: Personen oder Gruppen.",
+      "CUSTODIAN": "Das technische Team, das das System betreibt, in dem die Daten liegen."
+    },
+    "ownership": {
+      "title": "Verantwortung",
+      "description": {
+        "asset": "Wer für dieses Asset verantwortlich ist. Rollen der Quelle gelten, bis das Asset eigene nennt.",
+        "source": "Wer für diese Quelle verantwortlich ist. Ihre Assets übernehmen diese Rollen, solange sie keine eigenen nennen."
+      },
+      "assign": "Zuweisen",
+      "change": "Ändern",
+      "nobody": "Noch niemand.",
+      "inherited": "Von der Quelle",
+      "end": "Rolle von {{name}} beenden",
+      "history": "Verlauf ({{count}})",
+      "endedBy": "beendet von",
+      "dialogTitle": "{{role}} zuweisen",
+      "replaces": "Der bisherige Owner wird ersetzt und bleibt im Verlauf.",
+      "confirm": "Zuweisen",
+      "assigned": "{{name}} ist jetzt {{role}}.",
+      "removed": "{{name}} ist nicht mehr {{role}}.",
+      "failed": "Die Rolle konnte nicht geändert werden."
+    },
+    "picker": {
+      "placeholder": "Auswählen…",
+      "search": "Personen und Gruppen suchen",
+      "none": "Niemand gefunden.",
+      "people": "Personen",
+      "groups": "Gruppen",
+      "failed": "Personen und Gruppen konnten nicht geladen werden.",
+      "person": "Person",
+      "group": "Gruppe",
+      "personOrGroup": "Person oder Gruppe",
+      "nobody": "Niemand",
+      "clear": "Leeren"
+    },
+    "ungoverned": {
+      "title": "Für dieses Asset ist noch niemand verantwortlich",
+      "body": "Ein Asset wird gesteuert, sobald jemand dafür verantwortlich ist. Weisen Sie einen Owner zu: die Person, die entscheidet, wofür es da ist und wer es nutzen darf.",
+      "pick": "Owner auswählen",
+      "assign": "Owner zuweisen",
+      "done": "Das Asset hat jetzt eine verantwortliche Person."
+    },
+    "fields": {
+      "description": "Beschreibung",
+      "usage": "Verwendung",
+      "limitations": "Einschränkungen",
+      "legalBasis": "Rechtsgrundlage",
+      "retention": "Aufbewahrung"
+    },
+    "descriptionHint": "Was dieses Asset ist, wofür es da ist und worauf zu achten ist.",
+    "noDescription": "Noch keine Beschreibung.",
+    "placeholders": {
+      "description": "Was enthalten ist, woher es kommt, wofür es da ist (Markdown).",
+      "retention": "z. B. 10 J."
+    },
+    "legalBasis": {
+      "none": "Nicht angegeben",
+      "CONSENT": "Einwilligung (Art. 6 Abs. 1 lit. a)",
+      "CONTRACT": "Vertrag (Art. 6 Abs. 1 lit. b)",
+      "LEGAL_OBLIGATION": "Rechtliche Verpflichtung (Art. 6 Abs. 1 lit. c)",
+      "VITAL_INTERESTS": "Lebenswichtige Interessen (Art. 6 Abs. 1 lit. d)",
+      "PUBLIC_TASK": "Öffentliche Aufgabe (Art. 6 Abs. 1 lit. e)",
+      "LEGITIMATE_INTERESTS": "Berechtigte Interessen (Art. 6 Abs. 1 lit. f)"
+    },
+    "lastChanged": "Zuletzt geändert von",
+    "certifiedBy": "Zertifiziert von",
+    "saved": "Gespeichert.",
+    "saveFailed": "Speichern fehlgeschlagen.",
+    "checklist": {
+      "title": "Governance",
+      "progress": "{{done}} von {{total}} erledigt",
+      "owner": "Ein Owner",
+      "steward": "Ein Steward",
+      "description": "Eine Beschreibung",
+      "meaning": "Ein freigegebener Glossarbegriff",
+      "certified": "Zertifiziert"
+    },
+    "coverage": {
+      "owned": "{{owned}} von {{assets}} Assets mit Owner",
+      "active": "{{active}} zertifiziert"
+    },
+    "filter": {
+      "label": "Governance",
+      "all": "Jede Governance",
+      "ungoverned": "Ohne Verantwortliche",
+      "governed": "Mit Owner",
+      "draft": "Entwurf",
+      "active": "Zertifiziert",
+      "deprecated": "Veraltet",
+      "retired": "Stillgelegt",
+      "mine": "Meine (Owner)",
+      "stewarding": "Meine (Steward)"
+    }
   }
 }

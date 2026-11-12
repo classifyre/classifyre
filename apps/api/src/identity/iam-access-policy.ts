@@ -21,6 +21,9 @@ export const CLS_RESOURCE_GRANTS = 'classifyre:resourceGrants';
  */
 export const CLS_PERSON = 'classifyre:person';
 
+/** The Keycloak organization of the request's tenant (set by the namespace hook), to name groups. */
+export const CLS_ORG_ID = 'classifyre:orgId';
+
 export interface ClsPerson {
   actorRef: string;
   groupIds: string[];

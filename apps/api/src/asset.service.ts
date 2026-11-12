@@ -8,6 +8,8 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
+import { governanceAssetWhere } from './governance/governance-filter';
+import { clsPerson } from './governance/cls-person';
 import {
   Asset,
   Prisma,
@@ -1420,6 +1422,23 @@ export class AssetService {
             : {}),
         },
       };
+    }
+
+    // Governance (GOV §5.6): owned or not, lifecycle, owner, steward.
+    const governanceWhere = await governanceAssetWhere(
+      this.prisma,
+      assetFilters,
+      clsPerson(),
+    );
+    if (governanceWhere) {
+      where.AND = [
+        ...(Array.isArray(where.AND)
+          ? where.AND
+          : where.AND
+            ? [where.AND]
+            : []),
+        governanceWhere,
+      ];
     }
 
     const findingWhere = excludeFindings

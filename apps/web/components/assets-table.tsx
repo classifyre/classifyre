@@ -19,6 +19,7 @@ import {
   api,
   AssetListItemDtoStatusEnum,
   SearchAssetsFiltersDtoStatusEnum,
+  type SearchAssetsFiltersDtoGovernanceEnum,
   SearchAssetFindingDtoDetectorTypeEnum,
   SearchAssetFindingDtoStatusEnum,
   SearchFindingsFiltersDtoDetectorTypeEnum,
@@ -79,6 +80,8 @@ import { useTranslation } from "../hooks/use-translation";
 import type { TranslationKey } from "../i18n";
 import { FeatureOffNotice } from "@/components/feature-off-notice";
 import { AssetFilterBar } from "@/components/asset-filter-bar";
+import { GovernanceBadge } from "@/components/governance/governance-badge";
+import { ActorChip } from "@/components/actor-chip";
 
 type AssetsTableScope = {
   sourceId?: string;
@@ -104,7 +107,21 @@ type FilterDraft = {
   findingSeverities: Array<
     (typeof SearchFindingsFiltersDtoSeverityEnum)[keyof typeof SearchFindingsFiltersDtoSeverityEnum]
   >;
+  /** GOV §5.7: a lifecycle, owned or not, or mine. */
+  governance: string;
 };
+
+/** Governance filter values; `mine` and `stewarding` are the signed-in person's. */
+const GOVERNANCE_FILTER_VALUES = [
+  "ungoverned",
+  "governed",
+  "draft",
+  "active",
+  "deprecated",
+  "retired",
+  "mine",
+  "stewarding",
+] as const;
 
 type SortDraft = {
   by: SearchAssetsSortBy;
@@ -191,6 +208,7 @@ const DEFAULT_DRAFT: FilterDraft = {
   sourceId: ALL,
   detectorTypes: [],
   findingSeverities: [],
+  governance: ALL,
 };
 
 function formatEnumLabel(value: string) {
@@ -249,6 +267,16 @@ function buildRequest({
       scope?.sourceId || (draft.sourceId !== ALL ? draft.sourceId : undefined),
     runnerId: scope?.runnerId,
     status: assetStatuses.length > 0 ? assetStatuses : undefined,
+    ...(draft.governance === "mine"
+      ? { ownerRef: "me" }
+      : draft.governance === "stewarding"
+        ? { stewardRef: "me" }
+        : draft.governance !== ALL
+          ? {
+              governance:
+                draft.governance as SearchAssetsFiltersDtoGovernanceEnum,
+            }
+          : {}),
   };
 
   const findingsFilters: NonNullable<SearchAssetsRequestInputDto["findings"]> =
@@ -468,6 +496,11 @@ export function AssetsTable({
     findingSeverities: searchParams.getAll(
       "findingSeverity",
     ) as FilterDraft["findingSeverities"],
+    governance: (GOVERNANCE_FILTER_VALUES as readonly string[]).includes(
+      searchParams.get("governance") ?? "",
+    )
+      ? (searchParams.get("governance") as string)
+      : ALL,
   }));
   const [sort, setSort] = useState<SortDraft>(() => {
     const by = searchParams.get("sortBy") as SearchAssetsSortBy | null;
@@ -546,6 +579,7 @@ export function AssetsTable({
       detector: draft.detectorTypes.length > 0 ? draft.detectorTypes : null,
       findingSeverity:
         draft.findingSeverities.length > 0 ? draft.findingSeverities : null,
+      governance: draft.governance !== ALL ? draft.governance : null,
       sortBy: sort.by !== DEFAULT_SORT.by ? sort.by : null,
       sortOrder: sort.order !== DEFAULT_SORT.order ? sort.order : null,
     });
@@ -801,6 +835,28 @@ export function AssetsTable({
           </MultiSelectContent>
         </MultiSelect>
 
+        <Select
+          value={draft.governance}
+          onValueChange={(value) =>
+            setDraft((current) => ({ ...current, governance: value }))
+          }
+        >
+          <SelectTrigger
+            className="h-9 w-[190px] border-2 border-border rounded-[4px]"
+            data-testid="governance-filter"
+          >
+            <SelectValue placeholder={t("governance.filter.label")} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL}>{t("governance.filter.all")}</SelectItem>
+            {GOVERNANCE_FILTER_VALUES.map((value) => (
+              <SelectItem key={value} value={value}>
+                {t(`governance.filter.${value}` as TranslationKey)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
         <div className="ml-auto flex items-center gap-2">
           {isFilterLoading ? (
             <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -905,6 +961,9 @@ export function AssetsTable({
                       t("common.status"),
                       SearchAssetsSortByEnum.Status,
                     )}
+                  </TableHead>
+                  <TableHead className="bg-white/95 dark:bg-card/95">
+                    {t("governance.column")}
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
                     <Tooltip>
@@ -1095,6 +1154,17 @@ export function AssetsTable({
                         </TableCell>
 
                         <TableCell>
+                          <div className="flex flex-col items-start gap-1">
+                            <GovernanceBadge
+                              status={item.governance?.status ?? null}
+                            />
+                            {item.governance?.ownerRef && (
+                              <ActorChip actorRef={item.governance.ownerRef} />
+                            )}
+                          </div>
+                        </TableCell>
+
+                        <TableCell>
                           <DetectorSummaryBadges
                             items={topDetectors.map((entry) => ({
                               detector: String(entry.detector),
@@ -1199,7 +1269,7 @@ export function AssetsTable({
 
                       {isExpanded && canExpand && (
                         <TableRow>
-                          <TableCell colSpan={13} className="p-0 bg-muted/15">
+                          <TableCell colSpan={14} className="p-0 bg-muted/15">
                             <FindingsSubTable
                               findings={item.findings}
                               onFindingClick={(findingId) =>

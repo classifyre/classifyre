@@ -2,7 +2,7 @@
 
 |                  |                                                                                                                                                                  |
 | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Status**       | Phases 0–2 built 2026-11-09, plus export (from phase 3) and the phase-1 hardening (§9 "As built"). Rest of phase 3 and phases 4–6 proposed.                     |
+| **Status**       | Phases 0–2 built 2026-11-09, plus export (from phase 3) and the phase-1 hardening (§9 "As built"). Rest of phase 3 and phases 4–6 proposed. Owners, business metadata and data quality moved to [GOV](GOV-governed-data-assets.md) (2026-11-12). |
 | **Size**         | L (7 phases, each its own PR or set of PRs)                                                                                                                      |
 | **Depends on**   | [IAM](IAM-access-management.md) (grants, roles, capabilities), the CLI's DuckDB readers (`apps/cli/src/utils/duckdb_engine.py`, `lakehouse_tables.py`)          |
 | **Starts from**  | The payload-access proof of concept `fedsql` (outside this repository: `onedata/poc-payload`, reviewed 2026-11-05)                                               |
@@ -15,6 +15,8 @@ Classifyre knows every table of a workspace (assets of kind `table`, and table f
 The engine is the one the CLI already has, DuckDB, run the way every other piece of CLI work runs: an **ephemeral job** per query (a Kubernetes Job, or a local process in the all-in-one image). The API decides what a query may read; the job enforces it on the SQL itself.
 
 Later phases add column masking (driven by the PII findings Classifyre already has), access requests, more source types, JDBC/BI access, and **Delta data products**: a multi-table query published as a governed Delta table that can be granted without its base tables.
+
+What makes a table a *governed data asset* — an accountable owner, stewards and a custodian from IAM, a description and column-level business metadata, and ODCS-shaped quality rules with kept results — is its own PRD, [GOV](GOV-governed-data-assets.md). This PRD's phase 3 builds on it: access requests go to the table's owner, and default masks come from GOV's column classification. GOV's whole-table quality rules run on this PRD's engine (job mode `quality`).
 
 ## 2. What the proof of concept showed
 
@@ -135,16 +137,16 @@ A table is `<source>.<schema>.<table>`, every part a plain lower-case identifier
 | 0 | This PRD; POC gate ported with its bypass list; job latency measured | Built 2026-11-09 |
 | 1 | CLI engine and bindings, job mode `query`, API runs and catalog, `data.query` / `data-reader`, source and table grants, workspace setting, audit | Built 2026-11-09 |
 | 2 | SQL page, asset Data tab, grant panel, settings card; redesigned 2026-11-10 into an IDE-style runner (Monaco-centric toolbar, cursor-aware explorer, per-user history and saved queries in `saved_queries`); source Data tab and per-scope Access/Activity 2026-11-11 | Built; redesign built 2026-11-10; source tab 2026-11-11 |
-| 3 | Governance: column hide/mask per group; **PII columns masked by default** from open findings unless `data.unmask`; access requests that end in an expiring group grant; MCP tool `query_data`. Export to Excel/CSV/Parquet (`data.export`) and saved queries built 2026-11-09/10 | Export + saved queries built; rest proposed |
+| 3 | **Access governance** (after [GOV](GOV-governed-data-assets.md) G-1/G-2): column hide/mask per group; **classified columns masked by default** — GOV's column classification (derived from open findings, or a steward's override) — unless `data.unmask`; **access requests routed to the table's owner** (then a steward, then the workspace's owning group), approval ending in an expiring Data reader grant to a group (one the requester names, or a requester group made on approval); MCP tool `query_data`; grants and governance rows cleaned up with the asset purge. Export to Excel/CSV/Parquet (`data.export`) and saved queries built 2026-11-09/10 | Export + saved queries built; rest proposed |
 | 4 | More sources: Snowflake, BigQuery, MSSQL, Databricks, Trino, Redshift, Athena, Oracle, Hive through DuckDB extensions where reliable, otherwise a driver binding with projection/filter/LIMIT pushdown and a row cap that refuses rather than silently answers on part of a table; file tables in SharePoint/Drive by materialising them | Proposed |
-| 5 | JDBC/ODBC: a PostgreSQL wire endpoint (from the POC's `pgwire.py`: TLS, SCRAM, an isolated metadata catalog answered from the API catalog), personal data access tokens like MCP tokens, each query a phase-1 job. The one place a long-lived listener is unavoidable: decide jobs-only vs a warm pool with the phase-1 latency numbers | Proposed |
+| 5 | JDBC/ODBC: a PostgreSQL wire endpoint (from the POC's `pgwire.py`: TLS, SCRAM, an isolated metadata catalog answered from the API catalog), personal data access tokens like MCP tokens, each query a phase-1 job, audited like the SQL page (the token's person as actor, `data` / `asset:` / `source:` tags) so BI tools show in a table's Activity and in GOV's Usage card. The one place a long-lived listener is unavoidable: decide jobs-only vs a warm pool with the phase-1 latency numbers | Proposed |
 | 6 | **Delta data products**: a saved multi-table query + a target (a bucket source with a write key and a prefix) + a schedule; job mode `publish` runs it with the owning group's grants (re-checked every refresh) and writes Delta (`deltalake`; on B2 write locally then upload); the product is an asset of its own, grantable without its base tables, with lineage edges from them; Delta versions are its history; masks applied at publish time | Proposed |
 
 ## 7. Risks and open questions
 
 - **Job start-up is the latency floor.** A query is as fast as a pod is to start. Mitigations in place: the quick profile, no internal-key/HF token work, the `query` command skips connector imports, optional interactive priority class. Not yet: extensions baked into the CLI image (they come from the uv-cache volume after first use). Measure before phase 5.
-- **Grants on single resources are new to IAM.** They are evaluated per request from the principal's grants (no extra lookups) and listed among the workspace's grants. Removing a source or asset leaves its grants behind, harmless but untidy: clean up with the asset purge in phase 3.
-- **Masking is display protection, not anonymisation** (as the POC noted): someone who can query a column can infer from it. Phase 3 hides by default what detectors flagged.
+- **Grants on single resources are new to IAM.** They are evaluated per request from the principal's grants (no extra lookups) and listed among the workspace's grants. Removing a source or asset leaves its grants behind, harmless but untidy: clean up with the asset purge in phase 3, together with the asset's GOV rows (owners, annotations, quality rules).
+- **Masking is display protection, not anonymisation** (as the POC noted): someone who can query a column can infer from it. Phase 3 hides by default what GOV classifies (detectors' findings, or a steward's override).
 - **Two S3 sources on the same bucket with different keys** in one query: secrets are scoped by bucket, so the longest scope wins. Rare; documented.
 - **Delta writes to B2** fail through delta-rs (no `If-None-Match`): phase 6 writes locally and uploads.
 

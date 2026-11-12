@@ -6,9 +6,17 @@
  * - `mcp:<tokenId>`  an MCP token; `user:<sub>@mcp:<tokenId>` when it acts for its owner
  * - `agent:<kind>`   an agent, e.g. `agent:autopilot`
  * - `system:<job>`   the platform itself, e.g. `system:scheduler`
+ * - `group:<id>`     a Keycloak group of the tenant; never an actor, only a
+ *                    principal something is given to (an asset's steward)
  * - anything else    a self-declared name (IAM off), stored as typed
  */
-export type ActorRefKind = 'user' | 'mcp' | 'agent' | 'system' | 'name';
+export type ActorRefKind =
+  | 'user'
+  | 'group'
+  | 'mcp'
+  | 'agent'
+  | 'system'
+  | 'name';
 
 export interface ParsedActorRef {
   kind: ActorRefKind;
@@ -19,7 +27,7 @@ export interface ParsedActorRef {
 }
 
 const TYPED_REF =
-  /^(user|mcp|agent|system):([A-Za-z0-9._:-]+?)(?:@mcp:([A-Za-z0-9-]+))?$/;
+  /^(user|group|mcp|agent|system):([A-Za-z0-9._:-]+?)(?:@mcp:([A-Za-z0-9-]+))?$/;
 
 export const AUTOPILOT_ACTOR_REF = 'agent:autopilot';
 
@@ -41,3 +49,5 @@ export function parseActorRef(value: string): ParsedActorRef {
 export const mcpTokenRef = (tokenId: string) => `mcp:${tokenId}`;
 export const systemRef = (job: string) => `system:${job}`;
 export const agentRef = (kind: string) => `agent:${kind}`;
+export const userRef = (sub: string) => `user:${sub}`;
+export const groupRef = (groupId: string) => `group:${groupId}`;

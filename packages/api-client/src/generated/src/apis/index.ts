@@ -20,6 +20,7 @@ export { EntitiesApi } from './EntitiesApi';
 export { ExploreApi } from './ExploreApi';
 export { FindingsApi } from './FindingsApi';
 export { GlossaryApi } from './GlossaryApi';
+export { GovernanceApi } from './GovernanceApi';
 export { GraphApi } from './GraphApi';
 export { HealthApi } from './HealthApi';
 export { IdentityApi } from './IdentityApi';

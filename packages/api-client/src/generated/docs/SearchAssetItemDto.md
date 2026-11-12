@@ -9,6 +9,7 @@ Name | Type
 `asset` | [AssetListItemDto](AssetListItemDto.md)
 `findings` | [Array&lt;SearchAssetFindingDto&gt;](SearchAssetFindingDto.md)
 `match` | [SearchAssetMatchDto](SearchAssetMatchDto.md)
+`governance` | [SearchAssetGovernanceDto](SearchAssetGovernanceDto.md)
 
 ## Example
 
@@ -20,6 +21,7 @@ const example = {
   "asset": null,
   "findings": null,
   "match": null,
+  "governance": null,
 } satisfies SearchAssetItemDto
 
 console.log(example)

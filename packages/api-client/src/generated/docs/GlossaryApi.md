@@ -932,7 +932,7 @@ async function example() {
     schemeKey: schemeKey_example,
     // string | Comma-separated statuses (DRAFT, APPROVED, DEPRECATED). (optional)
     status: status_example,
-    // string (optional)
+    // string | Terms of one steward: `user:<id>` or `group:<id>`. (optional)
     steward: steward_example,
     // number (optional)
     take: 8.14,
@@ -963,7 +963,7 @@ example().catch(console.error);
 | **schemeId** | `string` | Scheme id, or \&quot;none\&quot; for terms without a scheme. | [Optional] [Defaults to `undefined`] |
 | **schemeKey** | `string` |  | [Optional] [Defaults to `undefined`] |
 | **status** | `string` | Comma-separated statuses (DRAFT, APPROVED, DEPRECATED). | [Optional] [Defaults to `undefined`] |
-| **steward** | `string` |  | [Optional] [Defaults to `undefined`] |
+| **steward** | `string` | Terms of one steward: &#x60;user:&lt;id&gt;&#x60; or &#x60;group:&lt;id&gt;&#x60;. | [Optional] [Defaults to `undefined`] |
 | **take** | `number` |  | [Optional] [Defaults to `25`] |
 | **skip** | `number` |  | [Optional] [Defaults to `0`] |
 

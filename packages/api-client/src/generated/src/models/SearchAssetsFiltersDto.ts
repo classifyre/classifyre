@@ -73,6 +73,24 @@ export interface SearchAssetsFiltersDto {
      * @memberof SearchAssetsFiltersDto
      */
     meaningMethod?: Array<SearchAssetsFiltersDtoMeaningMethodEnum>;
+    /**
+     * Governance (docs/prd/GOV-governed-data-assets.md): owned or not, or a lifecycle of owned assets.
+     * @type {string}
+     * @memberof SearchAssetsFiltersDto
+     */
+    governance?: SearchAssetsFiltersDtoGovernanceEnum;
+    /**
+     * Assets this person owns (their own or their source’s owner): `user:<id>`, or `me`.
+     * @type {string}
+     * @memberof SearchAssetsFiltersDto
+     */
+    ownerRef?: string;
+    /**
+     * Assets this person or group stewards, on the asset or its source: `user:<id>`, `group:<id>`, or `me` (you and your groups).
+     * @type {string}
+     * @memberof SearchAssetsFiltersDto
+     */
+    stewardRef?: string;
 }
 
 
@@ -156,6 +174,19 @@ export const SearchAssetsFiltersDtoMeaningMethodEnum = {
 } as const;
 export type SearchAssetsFiltersDtoMeaningMethodEnum = typeof SearchAssetsFiltersDtoMeaningMethodEnum[keyof typeof SearchAssetsFiltersDtoMeaningMethodEnum];
 
+/**
+ * @export
+ */
+export const SearchAssetsFiltersDtoGovernanceEnum = {
+    Ungoverned: 'ungoverned',
+    Governed: 'governed',
+    Draft: 'draft',
+    Active: 'active',
+    Deprecated: 'deprecated',
+    Retired: 'retired'
+} as const;
+export type SearchAssetsFiltersDtoGovernanceEnum = typeof SearchAssetsFiltersDtoGovernanceEnum[keyof typeof SearchAssetsFiltersDtoGovernanceEnum];
+
 
 /**
  * Check if a given object implements the SearchAssetsFiltersDto interface.
@@ -183,6 +214,9 @@ export function SearchAssetsFiltersDtoFromJSONTyped(json: any, ignoreDiscriminat
         'term': json['term'] == null ? undefined : json['term'],
         'includeNarrower': json['includeNarrower'] == null ? undefined : json['includeNarrower'],
         'meaningMethod': json['meaningMethod'] == null ? undefined : json['meaningMethod'],
+        'governance': json['governance'] == null ? undefined : json['governance'],
+        'ownerRef': json['ownerRef'] == null ? undefined : json['ownerRef'],
+        'stewardRef': json['stewardRef'] == null ? undefined : json['stewardRef'],
     };
 }
 
@@ -206,6 +240,9 @@ export function SearchAssetsFiltersDtoToJSONTyped(value?: SearchAssetsFiltersDto
         'term': value['term'],
         'includeNarrower': value['includeNarrower'],
         'meaningMethod': value['meaningMethod'],
+        'governance': value['governance'],
+        'ownerRef': value['ownerRef'],
+        'stewardRef': value['stewardRef'],
     };
 }
 

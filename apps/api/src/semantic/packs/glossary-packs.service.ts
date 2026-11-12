@@ -47,7 +47,6 @@ export interface GlossaryPack {
     codes?: string[];
     hiddenAliases?: string[];
     entityType?: string;
-    steward?: string;
     notes?: string;
   }>;
   relations?: Array<{ from: string; to: string; type: string; label?: string }>;
@@ -160,7 +159,7 @@ export class GlossaryPacksService {
       codes: term.codes ?? [],
       hiddenAliases: term.hiddenAliases ?? [],
       entityType: term.entityType,
-      steward: term.steward,
+      // Stewards are people of one tenant; a pack travels to others.
       notes: term.notes,
       broader: relations
         .filter((r) => r.from === term.key && r.type === 'BROADER')

@@ -45,6 +45,7 @@ docs/AssetFindingStatusCountDto.md
 docs/AssetFindingSummaryDto.md
 docs/AssetFindingSummaryListResponseDto.md
 docs/AssetFindingTypeCountDto.md
+docs/AssetGovernanceDto.md
 docs/AssetListItemDto.md
 docs/AssetListResponseDto.md
 docs/AssetMediaChunkDto.md
@@ -54,6 +55,7 @@ docs/AssetSeverityCountsRequestDto.md
 docs/AssetSeverityCountsResponseDto.md
 docs/AssetSimilarityDto.md
 docs/AssetsApi.md
+docs/AssignGovernanceRoleDto.md
 docs/AssistantApi.md
 docs/AssistantCapabilityReportDto.md
 docs/AssistantControllerRespond200Response.md
@@ -288,6 +290,10 @@ docs/GlossarySchemeDto.md
 docs/GlossarySchemeRefDto.md
 docs/GlossaryTermDto.md
 docs/GlossaryTermUsageDto.md
+docs/GovernanceApi.md
+docs/GovernanceChecklistItemDto.md
+docs/GovernancePrincipalDto.md
+docs/GovernanceRoleDto.md
 docs/GrantDto.md
 docs/GraphApi.md
 docs/GraphEdgeDto.md
@@ -469,6 +475,7 @@ docs/SaveTrainingExamplesDto.md
 docs/SavedQueryDto.md
 docs/ScanCacheEntryDto.md
 docs/SearchAssetFindingDto.md
+docs/SearchAssetGovernanceDto.md
 docs/SearchAssetItemDto.md
 docs/SearchAssetMatchDto.md
 docs/SearchAssetsChartsOptionsDto.md
@@ -527,6 +534,8 @@ docs/SitemapEntryDto.md
 docs/SitemapIndexDto.md
 docs/SitemapSectionDto.md
 docs/SourceAssetsControllerBulkIngest201Response.md
+docs/SourceGovernanceCoverageDto.md
+docs/SourceGovernanceDto.md
 docs/SourceInfoDto.md
 docs/SourceResponseDto.md
 docs/SourcesApi.md
@@ -572,6 +581,7 @@ docs/UndoLogResponseDto.md
 docs/UpdateAgentConfigDto.md
 docs/UpdateAgentMemoryDto.md
 docs/UpdateAiProviderConfigDto.md
+docs/UpdateAssetGovernanceDto.md
 docs/UpdateCapabilitiesDto.md
 docs/UpdateCaseDto.md
 docs/UpdateCaseEventDto.md
@@ -634,6 +644,7 @@ src/apis/EntitiesApi.ts
 src/apis/ExploreApi.ts
 src/apis/FindingsApi.ts
 src/apis/GlossaryApi.ts
+src/apis/GovernanceApi.ts
 src/apis/GraphApi.ts
 src/apis/HealthApi.ts
 src/apis/IdentityApi.ts
@@ -694,6 +705,7 @@ src/models/AssetFindingStatusCountDto.ts
 src/models/AssetFindingSummaryDto.ts
 src/models/AssetFindingSummaryListResponseDto.ts
 src/models/AssetFindingTypeCountDto.ts
+src/models/AssetGovernanceDto.ts
 src/models/AssetListItemDto.ts
 src/models/AssetListResponseDto.ts
 src/models/AssetMediaChunkDto.ts
@@ -702,6 +714,7 @@ src/models/AssetSeverityCountsItemDto.ts
 src/models/AssetSeverityCountsRequestDto.ts
 src/models/AssetSeverityCountsResponseDto.ts
 src/models/AssetSimilarityDto.ts
+src/models/AssignGovernanceRoleDto.ts
 src/models/AssistantCapabilityReportDto.ts
 src/models/AssistantControllerRespond200Response.ts
 src/models/AssistantControllerRespondRequest.ts
@@ -920,6 +933,9 @@ src/models/GlossarySchemeDto.ts
 src/models/GlossarySchemeRefDto.ts
 src/models/GlossaryTermDto.ts
 src/models/GlossaryTermUsageDto.ts
+src/models/GovernanceChecklistItemDto.ts
+src/models/GovernancePrincipalDto.ts
+src/models/GovernanceRoleDto.ts
 src/models/GrantDto.ts
 src/models/GraphEdgeDto.ts
 src/models/GraphNodeDto.ts
@@ -1090,6 +1106,7 @@ src/models/SaveTrainingExamplesDto.ts
 src/models/SavedQueryDto.ts
 src/models/ScanCacheEntryDto.ts
 src/models/SearchAssetFindingDto.ts
+src/models/SearchAssetGovernanceDto.ts
 src/models/SearchAssetItemDto.ts
 src/models/SearchAssetMatchDto.ts
 src/models/SearchAssetsChartsOptionsDto.ts
@@ -1145,6 +1162,8 @@ src/models/SitemapEntryDto.ts
 src/models/SitemapIndexDto.ts
 src/models/SitemapSectionDto.ts
 src/models/SourceAssetsControllerBulkIngest201Response.ts
+src/models/SourceGovernanceCoverageDto.ts
+src/models/SourceGovernanceDto.ts
 src/models/SourceInfoDto.ts
 src/models/SourceResponseDto.ts
 src/models/SourcesControllerGetSchedule200Response.ts
@@ -1188,6 +1207,7 @@ src/models/UndoLogResponseDto.ts
 src/models/UpdateAgentConfigDto.ts
 src/models/UpdateAgentMemoryDto.ts
 src/models/UpdateAiProviderConfigDto.ts
+src/models/UpdateAssetGovernanceDto.ts
 src/models/UpdateCapabilitiesDto.ts
 src/models/UpdateCaseDto.ts
 src/models/UpdateCaseEventDto.ts

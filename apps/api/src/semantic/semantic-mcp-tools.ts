@@ -157,7 +157,10 @@ const schemas = {
     kind: kindEnum.optional(),
     schemeKey: z.string().optional(),
     status: z.array(statusEnum).optional(),
-    steward: z.string().optional(),
+    steward: z
+      .string()
+      .optional()
+      .describe('A person (user:<id>) or group (group:<id>): their terms.'),
     take: z.number().int().min(1).max(200).optional(),
     skip: z.number().int().min(0).optional(),
   }),
@@ -181,7 +184,12 @@ const schemas = {
     definition: z.string().max(4000).optional(),
     schemeKey: z.string().optional(),
     entityType: entityTypeEnum.optional(),
-    steward: z.string().optional(),
+    steward: z
+      .string()
+      .optional()
+      .describe(
+        'A person (user:<id>) or group (group:<id>) of the tenant; never a plain name.',
+      ),
     notes: z.string().optional(),
     createNew: z.boolean().optional(),
   }),
