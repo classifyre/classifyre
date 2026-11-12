@@ -407,7 +407,8 @@ export const NotificationsControllerListNotificationsTypeEnum = {
     Scan: 'SCAN',
     Finding: 'FINDING',
     Source: 'SOURCE',
-    System: 'SYSTEM'
+    System: 'SYSTEM',
+    Governance: 'GOVERNANCE'
 } as const;
 export type NotificationsControllerListNotificationsTypeEnum = typeof NotificationsControllerListNotificationsTypeEnum[keyof typeof NotificationsControllerListNotificationsTypeEnum];
 /**
@@ -428,6 +429,7 @@ export const NotificationsControllerSetAudienceTypeEnum = {
     Scan: 'SCAN',
     Finding: 'FINDING',
     Source: 'SOURCE',
-    System: 'SYSTEM'
+    System: 'SYSTEM',
+    Governance: 'GOVERNANCE'
 } as const;
 export type NotificationsControllerSetAudienceTypeEnum = typeof NotificationsControllerSetAudienceTypeEnum[keyof typeof NotificationsControllerSetAudienceTypeEnum];

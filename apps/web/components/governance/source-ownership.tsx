@@ -51,7 +51,7 @@ export function SourceGovernanceView({
               scope="source"
               roles={governance.roles}
               history={governance.history}
-              canGovern={governance.canGovern}
+              canGovern={governance.canAssignRoles}
               onAssign={async (role, principalRef) =>
                 onChange(
                   await api.governance.governanceControllerAssignSourceRole({

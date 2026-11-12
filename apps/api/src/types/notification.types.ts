@@ -3,6 +3,7 @@ export enum NotificationType {
   FINDING = 'FINDING',
   SOURCE = 'SOURCE',
   SYSTEM = 'SYSTEM',
+  GOVERNANCE = 'GOVERNANCE',
 }
 
 export enum NotificationEvent {
@@ -27,4 +28,9 @@ export enum NotificationEvent {
   // The adaptive scheduler's cadence for a source changed materially (e.g. a
   // sweep finished, or an agent pinned a different interval).
   SOURCE_SCHEDULE_CHANGED = 'source.schedule_changed',
+  // Governance (GOV G-5): to the person or group named, or to an asset's
+  // owner and stewards.
+  GOVERNANCE_ROLE_ASSIGNED = 'governance.role_assigned',
+  GOVERNANCE_QUALITY_FAILING = 'governance.quality_failing',
+  GOVERNANCE_STATUS_CHANGED = 'governance.status_changed',
 }

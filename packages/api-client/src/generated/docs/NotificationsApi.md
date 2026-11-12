@@ -162,7 +162,7 @@ async function example() {
   const api = new NotificationsApi();
 
   const body = {
-    // 'SCAN' | 'FINDING' | 'SOURCE' | 'SYSTEM' (optional)
+    // 'SCAN' | 'FINDING' | 'SOURCE' | 'SYSTEM' | 'GOVERNANCE' (optional)
     type: type_example,
     // string (optional)
     event: event_example,
@@ -201,7 +201,7 @@ example().catch(console.error);
 
 | Name | Type | Description  | Notes |
 |------------- | ------------- | ------------- | -------------|
-| **type** | `SCAN`, `FINDING`, `SOURCE`, `SYSTEM` |  | [Optional] [Defaults to `undefined`] [Enum: SCAN, FINDING, SOURCE, SYSTEM] |
+| **type** | `SCAN`, `FINDING`, `SOURCE`, `SYSTEM`, `GOVERNANCE` |  | [Optional] [Defaults to `undefined`] [Enum: SCAN, FINDING, SOURCE, SYSTEM, GOVERNANCE] |
 | **event** | `string` |  | [Optional] [Defaults to `undefined`] |
 | **severity** | `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`, `INFO` |  | [Optional] [Defaults to `undefined`] [Enum: CRITICAL, HIGH, MEDIUM, LOW, INFO] |
 | **sourceId** | `string` |  | [Optional] [Defaults to `undefined`] |
@@ -388,7 +388,7 @@ async function example() {
   const api = new NotificationsApi();
 
   const body = {
-    // 'SCAN' | 'FINDING' | 'SOURCE' | 'SYSTEM'
+    // 'SCAN' | 'FINDING' | 'SOURCE' | 'SYSTEM' | 'GOVERNANCE'
     type: type_example,
     // UpdateNotificationAudienceDto
     updateNotificationAudienceDto: ...,
@@ -411,7 +411,7 @@ example().catch(console.error);
 
 | Name | Type | Description  | Notes |
 |------------- | ------------- | ------------- | -------------|
-| **type** | `SCAN`, `FINDING`, `SOURCE`, `SYSTEM` |  | [Defaults to `undefined`] [Enum: SCAN, FINDING, SOURCE, SYSTEM] |
+| **type** | `SCAN`, `FINDING`, `SOURCE`, `SYSTEM`, `GOVERNANCE` |  | [Defaults to `undefined`] [Enum: SCAN, FINDING, SOURCE, SYSTEM, GOVERNANCE] |
 | **updateNotificationAudienceDto** | [UpdateNotificationAudienceDto](UpdateNotificationAudienceDto.md) |  | |
 
 ### Return type

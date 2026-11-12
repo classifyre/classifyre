@@ -3790,7 +3790,8 @@
                 "SCAN",
                 "FINDING",
                 "SOURCE",
-                "SYSTEM"
+                "SYSTEM",
+                "GOVERNANCE"
               ],
               "type": "string"
             }
@@ -3839,7 +3840,8 @@
                 "SCAN",
                 "FINDING",
                 "SOURCE",
-                "SYSTEM"
+                "SYSTEM",
+                "GOVERNANCE"
               ]
             }
           },
@@ -23085,7 +23087,8 @@
               "SCAN",
               "FINDING",
               "SOURCE",
-              "SYSTEM"
+              "SYSTEM",
+              "GOVERNANCE"
             ]
           },
           "groupIds": {
@@ -23137,7 +23140,8 @@
               "SCAN",
               "FINDING",
               "SOURCE",
-              "SYSTEM"
+              "SYSTEM",
+              "GOVERNANCE"
             ]
           },
           "event": {
@@ -23250,7 +23254,8 @@
               "SCAN",
               "FINDING",
               "SOURCE",
-              "SYSTEM"
+              "SYSTEM",
+              "GOVERNANCE"
             ]
           },
           "event": {
@@ -37752,6 +37757,10 @@
           "canGovern": {
             "type": "boolean",
             "description": "Whether the caller may change it: asset.govern, or owner or steward of the asset or its source."
+          },
+          "canAssignRoles": {
+            "type": "boolean",
+            "description": "Whether the caller may name owners, stewards and custodians: asset.govern only."
           }
         },
         "required": [
@@ -37761,7 +37770,8 @@
           "roles",
           "history",
           "checklist",
-          "canGovern"
+          "canGovern",
+          "canAssignRoles"
         ]
       },
       "UpdateAssetGovernanceDto": {
@@ -37874,6 +37884,9 @@
           },
           "canGovern": {
             "type": "boolean"
+          },
+          "canAssignRoles": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -37881,7 +37894,8 @@
           "roles",
           "history",
           "coverage",
-          "canGovern"
+          "canGovern",
+          "canAssignRoles"
         ]
       },
       "GlossarySchemeRefDto": {

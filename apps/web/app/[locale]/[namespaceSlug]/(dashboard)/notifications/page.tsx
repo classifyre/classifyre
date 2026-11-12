@@ -87,6 +87,7 @@ const TYPE_LABELS: Record<NotificationResponseDto["type"], string> = {
   FINDING: "Finding",
   SOURCE: "Source",
   SYSTEM: "System",
+  GOVERNANCE: "Governance",
 };
 
 function formatEnumLabel(value: string) {

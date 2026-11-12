@@ -29,6 +29,7 @@ import {
   type AssetQuality,
 } from './quality.service';
 import { RuleError, validateRule, type RuleInput } from './quality-rules';
+import { GovernanceNotifier } from './governance-notifier';
 import { fromContract, toContract, type ContractPlan } from './odcs';
 import { parse as parseYaml } from 'yaml';
 import { CLS_SLUG } from '../namespace/namespace.constants';
@@ -93,6 +94,7 @@ export class GovernanceService {
     private readonly columns: GovernanceColumnsService,
     private readonly meaning: GovernanceMeaningService,
     private readonly quality: QualityService,
+    private readonly notifier: GovernanceNotifier,
     @Inject(ACCESS_POLICY) private readonly policy: AccessPolicy,
     @Inject(IDENTITY) private readonly identity: IdentityService,
   ) {}
@@ -222,6 +224,7 @@ export class GovernanceService {
           : false,
       }),
       canGovern: await this.mayGovern([...assetRows, ...sourceRows]),
+      canAssignRoles: await this.hasCapability(),
     };
   }
 
@@ -246,6 +249,7 @@ export class GovernanceService {
         open.some((row) => row.role === 'OWNER'),
       ),
       canGovern: await this.mayGovern(rows),
+      canAssignRoles: await this.hasCapability(),
     };
   }
 
@@ -456,6 +460,24 @@ export class GovernanceService {
     }
   }
 
+  /**
+   * Who answers for an asset is decided by people with `asset.govern` (an
+   * admin, a curator), never by the owner or steward themselves: naming an
+   * owner hands out rights (R3), and only a role may do that.
+   */
+  private async authorizeRoles(): Promise<void> {
+    if (!(await this.hasCapability())) {
+      throw new ForbiddenException({
+        statusCode: 403,
+        error: 'Forbidden',
+        code: 'CAPABILITY_REQUIRED',
+        capability: 'asset.govern',
+        message:
+          'Naming owners, stewards and custodians needs asset.govern (an admin or curator role).',
+      });
+    }
+  }
+
   private record(
     target: Target,
     operation: string,
@@ -527,6 +549,14 @@ export class GovernanceService {
         : 'governance.update',
       fields,
     );
+    if (patch.status && patch.status !== (current?.status ?? 'DRAFT')) {
+      void this.notifier.statusChanged({
+        assetId,
+        assetName: target.name,
+        status: patch.status,
+        actorRef,
+      });
+    }
     return this.assetGovernance(assetId);
   }
 
@@ -641,7 +671,7 @@ export class GovernanceService {
     const ref = principalRef.trim();
     const problem = principalError(kind, ref);
     if (problem) throw new BadRequestException(problem);
-    await this.authorize(target);
+    await this.authorizeRoles();
     await this.assertPrincipalExists(ref);
 
     const scopeType = target.scopeType;
@@ -697,10 +727,18 @@ export class GovernanceService {
       ['principalRef', 'role'],
       201,
     );
+    void this.notifier.roleAssigned({
+      scope: target.scopeType === 'ASSET' ? 'asset' : 'source',
+      id: target.scopeType === 'ASSET' ? target.assetId : target.sourceId,
+      name: target.name,
+      role: kind,
+      principalRef: ref,
+      actorRef,
+    });
   }
 
   private async remove(target: Target, roleId: string): Promise<void> {
-    await this.authorize(target);
+    await this.authorizeRoles();
     const scopeId =
       target.scopeType === 'ASSET' ? target.assetId : target.sourceId;
     const row = await this.prisma.governanceRole.findFirst({

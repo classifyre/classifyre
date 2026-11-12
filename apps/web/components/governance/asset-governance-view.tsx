@@ -110,7 +110,7 @@ export function AssetGovernanceView({
           scope="asset"
           roles={governance.roles}
           history={governance.history}
-          canGovern={governance.canGovern}
+          canGovern={governance.canAssignRoles}
           onAssign={assign}
           onRemove={remove}
           sourceHref={sourceHref}

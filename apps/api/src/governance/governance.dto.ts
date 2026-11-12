@@ -142,6 +142,12 @@ export class AssetGovernanceDto {
       'Whether the caller may change it: asset.govern, or owner or steward of the asset or its source.',
   })
   canGovern: boolean;
+
+  @ApiProperty({
+    description:
+      'Whether the caller may name owners, stewards and custodians: asset.govern only.',
+  })
+  canAssignRoles: boolean;
 }
 
 export class SourceGovernanceCoverageDto {
@@ -170,6 +176,9 @@ export class SourceGovernanceDto {
 
   @ApiProperty()
   canGovern: boolean;
+
+  @ApiProperty()
+  canAssignRoles: boolean;
 }
 
 export class UpdateAssetGovernanceDto {
