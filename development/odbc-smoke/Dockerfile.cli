@@ -1,0 +1,21 @@
+# The CLI image plus what the ODBC source needs, for the local k3d stack, until
+# the published `classifyre/cli:latest` carries it (the root Dockerfile does).
+#
+#   ./development/odbc-smoke/build-cli-image.sh
+#
+# It starts from the image the dev stack already runs, so everything else is
+# identical; the scan pods keep mounting apps/cli/src from the working copy.
+ARG BASE=classifyre/cli:latest
+FROM ${BASE}
+USER root
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends unixodbc odbc-postgresql \
+    && rm -rf /var/lib/apt/lists/*
+# pyodbc goes straight into the venv: the base image's lock predates the `odbc`
+# group, and it only has to import for the scan (a missing group is a warning,
+# never a failure). The real image gets it from the lock (root Dockerfile).
+WORKDIR /app/apps/cli
+RUN uv pip install --python .venv/bin/python "pyodbc>=5.2.0,<6.0.0" \
+    && .venv/bin/python -c "import duckdb; c = duckdb.connect(); c.execute(\"SET extension_directory = '/opt/duckdb-extensions'\"); c.execute('INSTALL odbc FROM core_nightly')" \
+    && chown -R 10001:10001 /app /opt/duckdb-extensions
+USER 10001

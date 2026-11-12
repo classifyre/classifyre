@@ -103,6 +103,13 @@ COMMUNITY_EXTENSIONS = frozenset({"paimon", "hudi"})
 COMMUNITY_REPOSITORY_ENV = "CLASSIFYRE_DUCKDB_COMMUNITY_REPOSITORY"
 
 
+#: Extensions DuckDB publishes only from its nightly repository, under the name
+#: INSTALL takes (``odbc``) when LOAD takes another (``odbc_scanner``). The ODBC
+#: scanner's binary is built on the stable C API and runs on any DuckDB >= 1.2.
+NIGHTLY_EXTENSIONS = {"odbc_scanner": "odbc"}
+NIGHTLY_REPOSITORY_ENV = "CLASSIFYRE_DUCKDB_NIGHTLY_REPOSITORY"
+
+
 #: Extensions whose file is named differently from what LOAD takes.
 _EXTENSION_FILES = {
     "postgres": "postgres_scanner",
@@ -138,7 +145,9 @@ def load_extension(conn: Any, name: str) -> None:
     The image's own copy comes first (no download, no shared volume needed),
     then the extension directory, then an INSTALL. Community extensions install
     from DuckDB's community repository, or from
-    ``CLASSIFYRE_DUCKDB_COMMUNITY_REPOSITORY`` where a mirror stands in for it.
+    ``CLASSIFYRE_DUCKDB_COMMUNITY_REPOSITORY`` where a mirror stands in for it;
+    the nightly ones (``odbc_scanner``) from ``core_nightly`` or
+    ``CLASSIFYRE_DUCKDB_NIGHTLY_REPOSITORY``.
     """
     try:
         conn.execute(f"LOAD {name}")
@@ -155,7 +164,11 @@ def load_extension(conn: Any, name: str) -> None:
     with _install_lock:
         try:
             if name not in _installed:
-                if name in COMMUNITY_EXTENSIONS:
+                if name in NIGHTLY_EXTENSIONS:
+                    mirror = os.environ.get(NIGHTLY_REPOSITORY_ENV, "").strip()
+                    repository = sql_literal(mirror) if mirror else "core_nightly"
+                    conn.execute(f"INSTALL {NIGHTLY_EXTENSIONS[name]} FROM {repository}")
+                elif name in COMMUNITY_EXTENSIONS:
                     mirror = os.environ.get(COMMUNITY_REPOSITORY_ENV, "").strip()
                     repository = sql_literal(mirror) if mirror else "community"
                     conn.execute(f"INSTALL {name} FROM {repository}")

@@ -42,6 +42,7 @@ const sourcePages = [
   "snowflake",
   "tableau",
   "trino",
+  "odbc",
   "wordpress",
   "youtube",
 ];

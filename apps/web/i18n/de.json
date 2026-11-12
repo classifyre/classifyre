@@ -5998,6 +5998,7 @@
     "SNOWFLAKE": "Snowflake",
     "TABLEAU": "Tableau",
     "TRINO": "Trino / Starburst",
+    "ODBC": "ODBC",
     "WORDPRESS": "WordPress",
     "YOUTUBE": "YouTube"
   },

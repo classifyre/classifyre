@@ -2098,6 +2098,12 @@ function SchemaField({
     fieldPath,
     normalizedSchema,
   );
+  const suggestions = Array.isArray(normalizedSchema.examples)
+    ? normalizedSchema.examples.filter(
+        (example): example is string => typeof example === "string",
+      )
+    : [];
+  const suggestionsId = `${fieldName.toLowerCase().replace(/[^a-z0-9]/g, "-")}-suggestions`;
 
   return (
     <FormField
@@ -2144,6 +2150,27 @@ function SchemaField({
                 placeholder={formatPlaceholder(name, normalizedSchema, t)}
                 disabled={disabled}
               />
+            ) : suggestions.length > 0 ? (
+              <>
+                {/* `examples` are suggestions, not a closed list: any value
+                    still goes (an ODBC driver name is whatever the host
+                    registered), which an enum would forbid. */}
+                <Input
+                  type="text"
+                  list={suggestionsId}
+                  placeholder={formatPlaceholder(name, normalizedSchema, t)}
+                  {...field}
+                  value={field.value ?? ""}
+                  autoComplete="off"
+                  disabled={disabled}
+                  data-testid={`input-${fieldName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`}
+                />
+                <datalist id={suggestionsId}>
+                  {suggestions.map((suggestion) => (
+                    <option key={suggestion} value={suggestion} />
+                  ))}
+                </datalist>
+              </>
             ) : (
               <Input
                 type={isUrl ? "url" : "text"}
@@ -2496,6 +2523,7 @@ export const JsonSchemaForm = React.forwardRef<
     ICEBERG_REST: true,
     DUCKLAKE: true,
     TRINO: true,
+    ODBC: true,
     ATHENA: true,
     BIGQUERY: true,
     REDSHIFT: true,

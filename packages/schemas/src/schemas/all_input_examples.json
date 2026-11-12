@@ -4224,6 +4224,85 @@
       }
     }
   ],
+  "ODBC": [
+    {
+      "name": "SQL Server through its ODBC driver",
+      "description": "Name the driver and the server; the connection string is built from them",
+      "config": {
+        "type": "ODBC",
+        "required": {
+          "driver": "ODBC Driver 18 for SQL Server",
+          "host": "sql.internal",
+          "port": 1433,
+          "database": "sales"
+        },
+        "masked": {
+          "username": "reader",
+          "password": "your-password"
+        },
+        "optional": {
+          "connection": {
+            "attributes": [
+              {
+                "name": "TrustServerCertificate",
+                "value": "Yes"
+              }
+            ]
+          }
+        },
+        "sampling": {
+          "strategy": "AUTOMATIC",
+          "rows_per_page": 100
+        }
+      }
+    },
+    {
+      "name": "Data source configured on the host",
+      "description": "Use a DSN from the scanning host's odbc.ini and scan two schemas",
+      "config": {
+        "type": "ODBC",
+        "required": {
+          "dsn": "finance_dw"
+        },
+        "masked": {},
+        "optional": {
+          "connection": {
+            "paging": "offset_fetch",
+            "query_timeout_seconds": 300
+          },
+          "scope": {
+            "include_schemas": [
+              "dbo",
+              "reporting"
+            ],
+            "include_views": false
+          }
+        },
+        "sampling": {
+          "strategy": "RANDOM",
+          "rows_per_page": 50
+        }
+      }
+    },
+    {
+      "name": "Hand-written connection string",
+      "description": "For a driver the server fields cannot describe",
+      "config": {
+        "type": "ODBC",
+        "required": {
+          "connection_string": "Driver={PostgreSQL Unicode};Server=warehouse.internal;Port=5432;Database=analytics"
+        },
+        "masked": {
+          "username": "reader",
+          "password": "your-password"
+        },
+        "sampling": {
+          "strategy": "ALL",
+          "rows_per_page": 100
+        }
+      }
+    }
+  ],
   "ATHENA": [
     {
       "name": "Athena over the Glue catalog",

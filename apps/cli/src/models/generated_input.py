@@ -61,6 +61,7 @@ class AssetType(StrEnum):
     BIGQUERY = 'BIGQUERY'
     ATHENA = 'ATHENA'
     TRINO = 'TRINO'
+    ODBC = 'ODBC'
     DUCKLAKE = 'DUCKLAKE'
     ICEBERG_REST = 'ICEBERG_REST'
     GIT = 'GIT'
@@ -398,6 +399,7 @@ class Type(StrEnum):
     BIGQUERY = 'BIGQUERY'
     ATHENA = 'ATHENA'
     TRINO = 'TRINO'
+    ODBC = 'ODBC'
     DUCKLAKE = 'DUCKLAKE'
     ICEBERG_REST = 'ICEBERG_REST'
     GIT = 'GIT'
@@ -3216,6 +3218,7 @@ class Type23(StrEnum):
     BIGQUERY = 'BIGQUERY'
     ATHENA = 'ATHENA'
     TRINO = 'TRINO'
+    ODBC = 'ODBC'
     DUCKLAKE = 'DUCKLAKE'
     ICEBERG_REST = 'ICEBERG_REST'
     GIT = 'GIT'
@@ -5100,6 +5103,206 @@ class DuckLakeOptional(BaseModel):
     scope: DuckLakeOptionalScope | None = None
 
 
+class OdbcRequiredServer(BaseModel):
+    """
+    Name the ODBC driver and the server; the connection string is built from them. Add any further driver setting under Optional > Connection > Attributes.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    driver: str = Field(
+        ...,
+        description='Name of the ODBC driver as it is registered on the scanning host (odbcinst -q -d). Pick a common one or type your own.',
+        examples=[
+            'PostgreSQL Unicode',
+            'PostgreSQL ANSI',
+            'ODBC Driver 18 for SQL Server',
+            'ODBC Driver 17 for SQL Server',
+            'ODBC Driver 13 for SQL Server',
+            'SQL Server Native Client 11.0',
+            'FreeTDS',
+            'MySQL ODBC 9.0 Unicode Driver',
+            'MySQL ODBC 8.0 Unicode Driver',
+            'MariaDB ODBC 3.1 Driver',
+            'MariaDB',
+            'Oracle in instantclient_23_0',
+            'Oracle in instantclient_21_1',
+            'Oracle in OraClient19Home1',
+            'IBM DB2 ODBC DRIVER',
+            'IBM INFORMIX ODBC DRIVER',
+            'Teradata Database ODBC Driver 20.00',
+            'Teradata',
+            'SnowflakeDSIIDriver',
+            'Simba Spark ODBC Driver',
+            'Cloudera ODBC Driver for Apache Hive',
+            'Cloudera ODBC Driver for Impala',
+            'Simba Apache Drill ODBC Driver',
+            'Databricks',
+            'Simba Amazon Redshift ODBC Driver',
+            'Amazon Redshift (x64)',
+            'Simba Athena ODBC Driver',
+            'Simba ODBC Driver for Google BigQuery',
+            'ClickHouse ODBC Driver (Unicode)',
+            'ClickHouse ODBC Driver (ANSI)',
+            'Vertica',
+            'Firebird ODBC Driver',
+            'HDBODBC',
+            'Sybase ASE ODBC Driver',
+            'Sybase IQ',
+            'Dremio Flight SQL ODBC Driver',
+            'Dremio ODBC Driver 64-bit',
+            'Starburst ODBC Driver',
+            'SingleStore ODBC Unicode Driver',
+            'Exasol Driver',
+            'MonetDB ODBC Driver',
+            'Netezza',
+            'InterSystems IRIS ODBC35',
+            'Progress OpenEdge Wire Protocol',
+            'SQLite3',
+            'SQLite3 ODBC Driver',
+            'DuckDB',
+        ],
+    )
+    host: str = Field(
+        ...,
+        description='Server name or address (for Oracle: the listener; for Teradata: the DBC name)',
+    )
+    port: int | None = Field(
+        None,
+        description="Server port; leave empty for the driver's default",
+        ge=1,
+        le=65535,
+    )
+    database: str | None = Field(
+        None,
+        description="Database to connect to (for Oracle: the service name); leave empty for the user's default",
+    )
+
+
+class OdbcRequiredDsn(BaseModel):
+    """
+    A data source defined on the scanning host in odbc.ini; the driver, server and database come from it.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    dsn: str = Field(..., description='Name of the data source')
+
+
+class OdbcRequiredConnectionString(BaseModel):
+    """
+    Write the whole ODBC connection string yourself, for a driver the other two cannot describe.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    connection_string: str = Field(
+        ...,
+        description='ODBC connection string without the user name and password, e.g. Driver={ODBC Driver 18 for SQL Server};Server=tcp:db.internal,1433;Database=sales',
+    )
+
+
+class OdbcMasked(BaseModel):
+    """
+    Appended to the connection string as UID and PWD. Leave empty when the data source signs in by itself.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    username: str | None = Field(None, description='User to sign in as (UID)')
+    password: str | None = Field(None, description='Password (PWD)')
+
+
+class OdbcAttribute(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    name: str = Field(..., description='Setting name, e.g. SSLmode')
+    value: str = Field(..., description='Its value')
+
+
+class Paging(StrEnum):
+    """
+    How rows are limited: auto follows the database the driver reports (LIMIT/OFFSET, or OFFSET/FETCH). client_side reads from the start of the table and stops, for a database that supports neither.
+    """
+
+    auto = 'auto'
+    limit_offset = 'limit_offset'
+    offset_fetch = 'offset_fetch'
+    client_side = 'client_side'
+
+
+class OdbcOptionalConnection(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    login_timeout_seconds: int | None = Field(
+        15,
+        description='How long to wait for the database to accept the connection',
+        ge=1,
+        le=600,
+    )
+    query_timeout_seconds: int | None = Field(
+        120,
+        description='Timeout for one query; 0 for none. Not every driver honours it.',
+        ge=0,
+        le=3600,
+    )
+    attributes: list[OdbcAttribute] | None = Field(
+        None,
+        description='More driver settings, added to the connection string as NAME=value (for example TrustServerCertificate=Yes, SSLmode=require, Encrypt=yes). They come after the fields above, so one named like a field overrides it. Credentials belong in the user and password fields, which are encrypted.',
+    )
+    paging: Paging | None = Field(
+        'auto',
+        description='How rows are limited: auto follows the database the driver reports (LIMIT/OFFSET, or OFFSET/FETCH). client_side reads from the start of the table and stops, for a database that supports neither.',
+    )
+
+
+class OdbcOptionalScope(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    include_catalogs: list[str] | None = Field(
+        None, description='Only these catalogs (databases)'
+    )
+    exclude_catalogs: list[str] | None = Field(None, description='Skip these catalogs')
+    include_schemas: list[str] | None = Field(None, description='Only these schemas')
+    exclude_schemas: list[str] | None = Field(
+        None, description='Skip these schemas (system schemas are skipped already)'
+    )
+    include_tables: bool | None = Field(True, description='Include tables')
+    include_views: bool | None = Field(True, description='Include views')
+    include_objects: list[str] | None = Field(
+        None, description='Only these objects (schema.table, or catalog.schema.table)'
+    )
+    table_limit: int | None = Field(
+        None, description='Maximum number of tables to scan per run', ge=1
+    )
+
+
+class OdbcOptionalExtraction(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    include_foreign_keys: bool | None = Field(
+        True,
+        description='Ask the driver for foreign keys and link the tables they join',
+    )
+
+
+class OdbcOptional(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    connection: OdbcOptionalConnection | None = None
+    scope: OdbcOptionalScope | None = None
+    extraction: OdbcOptionalExtraction | None = None
+
+
 class TrinoRequired(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -6444,6 +6647,33 @@ class DuckLakeInput(CoreInput):
     augmentation: AugmentationConfig | None = None
 
 
+class OdbcInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    type: Literal['ODBC'] = Field(..., description='Type of the asset or source')
+    required: OdbcRequiredServer | OdbcRequiredDsn | OdbcRequiredConnectionString = (
+        Field(..., title='OdbcRequired')
+    )
+    masked: OdbcMasked
+    optional: OdbcOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
+
+
 class TrinoInput(CoreInput):
     model_config = ConfigDict(
         extra='forbid',
@@ -6691,6 +6921,7 @@ class SourceInput(
         | IcebergRestInput
         | DuckLakeInput
         | TrinoInput
+        | OdbcInput
         | AthenaInput
         | BigQueryInput
         | RedshiftInput
@@ -6736,6 +6967,7 @@ class SourceInput(
         | IcebergRestInput
         | DuckLakeInput
         | TrinoInput
+        | OdbcInput
         | AthenaInput
         | BigQueryInput
         | RedshiftInput

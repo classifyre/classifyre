@@ -506,3 +506,63 @@ def test_databricks_endpoint_is_named_like_the_scan_does() -> None:
         "src-1",
     )
     assert binding.label() == "databricks://dbc-1.cloud.databricks.com/"
+
+
+def _attach_odbc(monkeypatch: pytest.MonkeyPatch, qualified: str = '"sales"."orders"') -> Any:
+    from src.query import bindings
+    from src.query.bindings import SourceBinding, TableLocation
+
+    loaded: list[str] = []
+    monkeypatch.setattr(bindings, "load_extension", lambda _conn, name: loaded.append(name))
+    recipe = {
+        "type": "ODBC",
+        "required": {"connection_string": "Driver={PostgreSQL Unicode};Server=db.test;Port=5432"},
+        "masked": {"username": "admin", "password": "p'w;d"},
+    }
+    binding = SourceBinding("warehouse", 0, recipe, "src-1")
+    conn = _RecordingConn()
+    location = TableLocation(
+        kind="catalog", schema="sales", table="orders", qualified_name=qualified
+    )
+    relation = binding.relation(conn, location)
+    again = binding.relation(conn, location)
+    return binding, relation, again, conn.statements, loaded
+
+
+def test_odbc_reads_through_the_scanner_with_the_credentials_in_a_variable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    binding, relation, again, statements, loaded = _attach_odbc(monkeypatch)
+    assert loaded == ["odbc_scanner"]
+    # The connection string is stored once, as a variable, escaped as a literal.
+    assert len(statements) == 1
+    assert statements[0].startswith('SET VARIABLE "__src_0_odbc" = ')
+    assert "PWD={p'w;d}" not in statements[0]  # the quote is doubled for SQL
+    assert "PWD={p''w;d};" in statements[0]
+    # The relation names the variable and the remote table, never the password.
+    assert relation == again
+    assert relation == (
+        "odbc_query(odbc_connect(getvariable('__src_0_odbc')), 'SELECT * FROM \"sales\".\"orders\"')"
+    )
+    assert "admin" not in relation and "p'w" not in relation
+    assert binding.label() == "odbc://db.test:5432/"
+
+
+def test_odbc_without_a_recorded_name_asks_for_a_rescan(monkeypatch: pytest.MonkeyPatch) -> None:
+    from src.query import bindings
+    from src.query.bindings import BindingError, SourceBinding, TableLocation
+
+    monkeypatch.setattr(bindings, "load_extension", lambda *_a: None)
+    binding = SourceBinding("warehouse", 0, {"type": "ODBC"}, "src-1")
+    with pytest.raises(BindingError, match="run a scan of the source again"):
+        binding.relation(_RecordingConn(), TableLocation(kind="catalog", table="orders"))
+
+
+def test_odbc_missing_driver_is_explained() -> None:
+    from src.query.bindings import SourceBinding
+
+    binding = SourceBinding("warehouse", 0, {"type": "ODBC"}, "src-1")
+    reason = binding.explain(
+        RuntimeError("[unixODBC][Driver Manager]Can't open lib 'X' : not found")
+    )
+    assert reason is not None and "driver" in reason
