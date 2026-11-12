@@ -88,8 +88,9 @@ export const CIRCUIT_BREAK_FAILURES = 8;
  * opportunistic one and yields to the rest — a source sweeping itself faster is
  * never worth delaying a schedule someone chose.
  *
- * Distinct from `MAX_CONCURRENT_RUNNERS`, which is the hard instance-wide cap
- * enforced in CliRunnerService (unset by default) and queues rather than
+ * Distinct from `MAX_CONCURRENT_RUNNERS`, which is the hard instance-wide ceiling
+ * enforced in CliRunnerService (a workspace may hold itself lower in Settings)
+ * and queues rather than
  * refuses. This one decides whether to ask at all.
  */
 export const DEFAULT_MAX_CONCURRENT_AUTO_SCANS = 2;

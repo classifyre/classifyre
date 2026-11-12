@@ -556,6 +556,10 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
    *
    * Ties inside a namespace are still oldest-first, so no run can be starved
    * by a newer one from its own workspace.
+   *
+   * A namespace whose workspace is at its own scans-at-once cap (Settings) is
+   * left out of the round: its queued run cannot start, and offering it would
+   * stall every namespace behind it while slots sit free.
    */
   async findNextPendingRunner(): Promise<{
     namespace: Namespace;
@@ -593,6 +597,21 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
                       AS last_served_at
                FROM "${schema}"."runners" r
               WHERE r.status = 'PENDING' AND r.started_at IS NULL
+                -- A workspace already at the scans-at-once cap it set in
+                -- Settings cannot start this run, so it must not be offered:
+                -- it would keep winning the round robin (its last_served_at
+                -- never advances) and the claim would be refused every time,
+                -- stalling the queue of every other namespace behind it.
+                AND (
+                  COALESCE((SELECT s.max_concurrent_runners
+                              FROM "${schema}"."instance_settings" s
+                             WHERE s.id = 1), 0) = 0
+                  OR (SELECT count(*) FROM "${schema}"."runners" x
+                       WHERE x.status = 'RUNNING')
+                     < (SELECT s.max_concurrent_runners
+                          FROM "${schema}"."instance_settings" s
+                         WHERE s.id = 1)
+                )
               ORDER BY lane ASC, r.triggered_at ASC
               LIMIT 1`,
           );

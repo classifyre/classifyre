@@ -154,4 +154,96 @@ describe('scan concurrency', () => {
       expect(countAcross).not.toHaveBeenCalled();
     });
   });
+
+  describe('workspace limit (Settings)', () => {
+    let override: jest.Mock;
+
+    beforeEach(() => {
+      build(true);
+      process.env.MAX_CONCURRENT_RUNNERS = '4';
+      override = jest.fn().mockResolvedValue(null);
+      Object.assign(service, { deploymentSettings: { override } });
+    });
+
+    it('holds a workspace at its own cap even though the machine has room', async () => {
+      override.mockResolvedValue(1);
+      count.mockResolvedValue(1);
+      countAcross.mockResolvedValue(1);
+
+      await expect(canStart()).resolves.toBe(false);
+      // Decided from the workspace's own rows; the machine-wide count is moot.
+      expect(countAcross).not.toHaveBeenCalled();
+    });
+
+    it('still enforces the installation-wide ceiling under a roomy workspace cap', async () => {
+      override.mockResolvedValue(10);
+      count.mockResolvedValue(0);
+      countAcross.mockResolvedValue(4);
+
+      await expect(canStart()).resolves.toBe(false);
+    });
+
+    it('admits when both the workspace cap and the ceiling have room', async () => {
+      override.mockResolvedValue(2);
+      count.mockResolvedValue(1);
+      countAcross.mockResolvedValue(3);
+
+      await expect(canStart()).resolves.toBe(true);
+    });
+
+    it('treats an empty or 0 workspace cap as no workspace cap', async () => {
+      for (const value of [null, 0]) {
+        override.mockResolvedValue(value);
+        countAcross.mockResolvedValue(1);
+        await expect(canStart()).resolves.toBe(true);
+      }
+      expect(count).not.toHaveBeenCalled();
+    });
+
+    it("does not let the caller's own cap stop the cross-namespace dequeue", async () => {
+      // The caller's workspace is full, but the next run belongs elsewhere:
+      // only the instance-wide ceiling is the caller's to decide.
+      override.mockResolvedValue(1);
+      count.mockResolvedValue(1);
+      countAcross.mockResolvedValue(1);
+      const findNextPendingRunner = jest.fn().mockResolvedValue(null);
+      Object.assign(service, {
+        cls: { get: jest.fn(), run: jest.fn() },
+        namespaceRegistry: {
+          countRowsAcrossNamespaces: countAcross,
+          findNextPendingRunner,
+        },
+      });
+
+      await (
+        service as unknown as {
+          dequeueNextPendingRunner: () => Promise<boolean>;
+        }
+      ).dequeueNextPendingRunner();
+
+      expect(findNextPendingRunner).toHaveBeenCalledTimes(1);
+      expect(count).not.toHaveBeenCalled();
+    });
+
+    it('does not dequeue at all once the ceiling is reached', async () => {
+      countAcross.mockResolvedValue(4);
+      const findNextPendingRunner = jest.fn();
+      Object.assign(service, {
+        cls: { get: jest.fn(), run: jest.fn() },
+        namespaceRegistry: {
+          countRowsAcrossNamespaces: countAcross,
+          findNextPendingRunner,
+        },
+      });
+
+      await expect(
+        (
+          service as unknown as {
+            dequeueNextPendingRunner: () => Promise<boolean>;
+          }
+        ).dequeueNextPendingRunner(),
+      ).resolves.toBe(false);
+      expect(findNextPendingRunner).not.toHaveBeenCalled();
+    });
+  });
 });

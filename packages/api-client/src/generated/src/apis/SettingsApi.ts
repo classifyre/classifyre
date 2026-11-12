@@ -35,7 +35,7 @@ export interface DeploymentSettingsControllerUpdateRequest {
 export class SettingsApi extends runtime.BaseAPI {
 
     /**
-     * Scan limits of this deployment: what is saved in Settings and what the chart or image sets
+     * Scan limits of this workspace: what is saved in Settings and what the chart or image sets
      */
     async deploymentSettingsControllerGetRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<RunnerLimitsDto>> {
         const queryParameters: any = {};
@@ -56,7 +56,7 @@ export class SettingsApi extends runtime.BaseAPI {
     }
 
     /**
-     * Scan limits of this deployment: what is saved in Settings and what the chart or image sets
+     * Scan limits of this workspace: what is saved in Settings and what the chart or image sets
      */
     async deploymentSettingsControllerGet(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<RunnerLimitsDto> {
         const response = await this.deploymentSettingsControllerGetRaw(initOverrides);
@@ -64,7 +64,7 @@ export class SettingsApi extends runtime.BaseAPI {
     }
 
     /**
-     * Set scan limits for the whole deployment; null hands a limit back to the chart or image
+     * Set scan limits for this workspace; null hands a limit back to the chart or image. Scans at once can only be held below the installation-wide ceiling
      */
     async deploymentSettingsControllerUpdateRaw(requestParameters: DeploymentSettingsControllerUpdateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<RunnerLimitsDto>> {
         if (requestParameters['updateRunnerLimitsDto'] == null) {
@@ -95,7 +95,7 @@ export class SettingsApi extends runtime.BaseAPI {
     }
 
     /**
-     * Set scan limits for the whole deployment; null hands a limit back to the chart or image
+     * Set scan limits for this workspace; null hands a limit back to the chart or image. Scans at once can only be held below the installation-wide ceiling
      */
     async deploymentSettingsControllerUpdate(requestParameters: DeploymentSettingsControllerUpdateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<RunnerLimitsDto> {
         const response = await this.deploymentSettingsControllerUpdateRaw(requestParameters, initOverrides);
