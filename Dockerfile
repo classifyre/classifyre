@@ -134,7 +134,7 @@ ENV UV_LINK_MODE=copy \
 # the CLI loads from before it tries the shared extension cache or INSTALL.
 RUN uv venv --python /usr/local/bin/python3 .venv \
     && uv sync --locked --no-dev --group file-processing --group lineage \
-    && .venv/bin/python -c "import duckdb; c = duckdb.connect(); c.execute(\"SET extension_directory = '/opt/duckdb-extensions'\"); [c.execute('INSTALL ' + e) for e in ('httpfs', 'postgres', 'mysql', 'sqlite', 'delta', 'iceberg', 'ducklake', 'azure', 'avro', 'excel')]"
+    && .venv/bin/python -c "import duckdb; c = duckdb.connect(); c.execute(\"SET extension_directory = '/opt/duckdb-extensions'\"); [c.execute('INSTALL ' + e) for e in ('httpfs', 'postgres', 'mysql', 'sqlite', 'delta', 'iceberg', 'ducklake', 'azure', 'avro', 'excel', 'unity_catalog', 'spatial')]"
 
 # ── web-final: standalone Next.js server ──────────────────────────────────────
 FROM node:${NODE_VERSION}-bookworm-slim AS web-final

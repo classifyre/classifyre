@@ -1,0 +1,1 @@
+SQL can now query Databricks (Unity Catalog Delta tables, with the source's own credentials), and JSON and geospatial files (GeoJSON, FlatGeobuf, shapefile tables) in buckets and folders. The SQL docs now list every queryable source and file format, and why the others are not.

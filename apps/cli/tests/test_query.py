@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -296,16 +297,212 @@ def test_binding_labels_name_the_endpoint_like_the_scan() -> None:
     assert files.label() == "shop_db"
 
 
-@pytest.mark.parametrize("mode", ["VERIFY_CA", "verify_identity"])
-def test_mysql_certificate_checks_are_refused_not_dropped(mode: str) -> None:
-    from src.query.bindings import BindingError, TableLocation
+class _RecordingConn:
+    """Stands in for a DuckDB connection: remembers the SQL, runs nothing."""
 
-    binding = _binding(
-        "MYSQL",
-        {"host": "db.example.test", "port": 3306},
-        connection={"ssl_mode": mode},
+    def __init__(self) -> None:
+        self.statements: list[str] = []
+
+    def execute(self, sql: str) -> None:
+        self.statements.append(sql)
+
+
+def _attach_mysql(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    ssl_mode: str | None,
+    ca: str | None = None,
+    password: str = "s3cret",
+) -> tuple[Any, list[str]]:
+    from src.query import bindings
+    from src.query.bindings import SourceBinding, TableLocation
+
+    monkeypatch.setattr(bindings, "load_extension", lambda *_args: None)
+    recipe: dict[str, Any] = {
+        "type": "MYSQL",
+        "required": {"host": "db.example.test", "port": 3306},
+        "masked": {"username": "reader", "password": password, **({"ssl_ca": ca} if ca else {})},
+        "optional": {"connection": {"ssl_mode": ssl_mode} if ssl_mode else {}},
+    }
+    binding = SourceBinding("shop_db", 0, recipe, "src-1")
+    conn = _RecordingConn()
+    binding.relation(conn, TableLocation(kind="catalog", database="shop", table="orders"))
+    return binding, conn.statements
+
+
+_PEM = "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----"
+
+
+@pytest.mark.parametrize("mode", ["VERIFY_CA", "VERIFY_IDENTITY"])
+def test_mysql_verify_modes_hand_duckdb_the_sources_ca_as_a_file(
+    monkeypatch: pytest.MonkeyPatch, mode: str
+) -> None:
+    binding, statements = _attach_mysql(monkeypatch, ssl_mode=mode, ca=_PEM)
+    secret = next(s for s in statements if s.startswith("CREATE OR REPLACE SECRET"))
+    assert f"SSL_MODE '{mode.lower()}'" in secret
+    match = re.search(r"SSL_CA '([^']+)'", secret)
+    assert match is not None
+    ca_file = Path(match.group(1))
+    # The escaped newlines of a pasted PEM are real ones in the file.
+    assert ca_file.read_text() == "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n"
+    assert ca_file.stat().st_mode & 0o077 == 0  # private to this process's user
+    assert statements[-1].startswith("ATTACH '' AS ") and "TYPE mysql, SECRET" in statements[-1]
+    binding.close()
+    assert not ca_file.exists()
+
+
+def test_mysql_verify_without_a_ca_checks_against_the_system_roots(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, statements = _attach_mysql(monkeypatch, ssl_mode="VERIFY_CA")
+    secret = statements[0]
+    assert "SSL_MODE 'verify_ca'" in secret and "SSL_CA" not in secret
+
+
+@pytest.mark.parametrize(
+    ("mode", "ca", "expected", "absent"),
+    [
+        (None, None, [], ["SSL_MODE", "SSL_CA"]),
+        ("PREFERRED", _PEM, [], ["SSL_MODE", "SSL_CA"]),  # the scan does not verify either
+        ("REQUIRED", None, [], ["SSL_MODE", "SSL_CA"]),  # DuckDB's own 'required' is stricter
+        ("REQUIRED", _PEM, ["SSL_MODE 'required'", "SSL_CA"], []),
+        ("DISABLED", _PEM, ["SSL_MODE 'disabled'"], ["SSL_CA"]),
+    ],
+)
+def test_mysql_other_ssl_modes_never_claim_a_check_the_scan_does_not_make(
+    monkeypatch: pytest.MonkeyPatch,
+    mode: str | None,
+    ca: str | None,
+    expected: list[str],
+    absent: list[str],
+) -> None:
+    binding, statements = _attach_mysql(monkeypatch, ssl_mode=mode, ca=ca)
+    secret = statements[0]
+    assert all(part in secret for part in expected)
+    assert not any(part in secret for part in absent)
+    binding.close()
+
+
+def test_mysql_credentials_are_escaped_literals_not_connection_string_text(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, statements = _attach_mysql(monkeypatch, ssl_mode=None, password="it's a 'pass' \\ word")
+    secret = statements[0]
+    assert "PASSWORD 'it''s a ''pass'' \\ word'" in secret
+    assert "HOST 'db.example.test', PORT 3306, DATABASE 'shop'" in secret
+    # The password never travels in the ATTACH string.
+    assert "pass" not in statements[-1]
+
+
+# ── more file formats, Databricks ────────────────────────────────────────
+
+
+def _run_file_table(folder: Path, fmt: str, key: str, sql: str) -> dict[str, Any]:
+    request = _request(folder, sql)
+    request["tables"] = [
+        {
+            "source": "files",
+            "schema": "local",
+            "table": "t",
+            "location": {"kind": "file", "format": fmt, "objectKey": key},
+        }
+    ]
+    payload, _ = run_query(request)
+    return payload
+
+
+def test_json_array_files_are_tables(folder: Path) -> None:
+    (folder / "rows.json").write_text(json.dumps([{"id": 1, "n": "a"}, {"id": 2, "n": "b"}]))
+    payload = _run_file_table(
+        folder, "json", "rows.json", "SELECT n FROM files.local.t ORDER BY id"
     )
-    conn = duckdb.connect()
-    location = TableLocation(kind="catalog", database="shop", table="orders")
-    with pytest.raises(BindingError, match="verifies the server's certificate"):
-        binding.relation(conn, location)
+    assert payload["status"] == "success" and payload["rowCount"] == 2
+
+
+def test_geojson_geometry_reads_as_text(folder: Path) -> None:
+    feature = {
+        "type": "Feature",
+        "properties": {"name": "hq"},
+        "geometry": {"type": "Point", "coordinates": [1, 2]},
+    }
+    (folder / "sites.geojson").write_text(
+        json.dumps({"type": "FeatureCollection", "features": [feature]})
+    )
+    payload = _run_file_table(
+        folder, "geojson", "sites.geojson", "SELECT name, geom FROM files.local.t"
+    )
+    if payload["status"] != "success":
+        pytest.skip(f"spatial extension unavailable here: {payload.get('error')}")
+    types = {c["name"]: c["type"] for c in payload["columns"]}
+    assert types["geom"] == "string"  # WKT, not a binary geometry
+
+
+def _attach_databricks(
+    monkeypatch: pytest.MonkeyPatch, workspace_url: str
+) -> tuple[Any, list[str], list[str]]:
+    from src.query import bindings
+    from src.query.bindings import SourceBinding, TableLocation
+
+    loaded: list[str] = []
+    monkeypatch.setattr(bindings, "load_extension", lambda _conn, name: loaded.append(name))
+    recipe = {
+        "type": "DATABRICKS",
+        "required": {"workspace_url": workspace_url, "warehouse_id": "w"},
+    }
+    binding = SourceBinding("lake", 0, recipe, "src-1")
+
+    class _Source:
+        @staticmethod
+        def _access_token_value() -> str:
+            return "dapi-it's-a-token"
+
+    binding._source = _Source()
+    conn = _RecordingConn()
+    relation = binding.relation(
+        conn, TableLocation(kind="catalog", database="sales", schema="raw", table="orders")
+    )
+    return relation, conn.statements, loaded
+
+
+def test_databricks_attaches_unity_catalog_with_the_scans_token(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    relation, statements, loaded = _attach_databricks(
+        monkeypatch, "https://dbc-1.cloud.databricks.com/"
+    )
+    assert relation == '"__src_0_0"."raw"."orders"'
+    assert loaded == ["unity_catalog", "delta", "httpfs"]
+    secret, attach = statements
+    assert "TYPE unity_catalog" in secret
+    assert "TOKEN 'dapi-it''s-a-token'" in secret
+    assert "ENDPOINT 'https://dbc-1.cloud.databricks.com'" in secret
+    assert attach.startswith("ATTACH 'sales' AS ") and "READ_ONLY" in attach
+    assert "dapi" not in attach
+
+
+def test_databricks_on_azure_loads_the_azure_filesystem(monkeypatch: pytest.MonkeyPatch) -> None:
+    _, _, loaded = _attach_databricks(monkeypatch, "https://adb-1.2.azuredatabricks.net")
+    assert loaded == ["unity_catalog", "delta", "azure"]
+
+
+def test_databricks_credential_refusal_is_explained() -> None:
+    from src.query.bindings import SourceBinding
+
+    binding = SourceBinding("lake", 0, {"type": "DATABRICKS"}, "src-1")
+    reason = binding.explain(
+        RuntimeError("Request to '.../api/2.1/unity-catalog/temporary-table-credentials' failed")
+    )
+    assert reason is not None and "External data access" in reason
+    assert binding.explain(RuntimeError("something else")) is None
+
+
+def test_databricks_endpoint_is_named_like_the_scan_does() -> None:
+    from src.query.bindings import SourceBinding
+
+    binding = SourceBinding(
+        "lake",
+        0,
+        {"type": "DATABRICKS", "required": {"workspace_url": "https://dbc-1.cloud.databricks.com"}},
+        "src-1",
+    )
+    assert binding.label() == "databricks://dbc-1.cloud.databricks.com/"

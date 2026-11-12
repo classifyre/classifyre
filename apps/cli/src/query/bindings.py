@@ -15,13 +15,21 @@ What is reused rather than rewritten:
 * PostgreSQL and MySQL are attached with DuckDB's own scanners, read-only, from
   the same recipe fields their connectors read. Their Python drivers are not
   needed, so a query never installs them.
+* Databricks is attached through the ``unity_catalog`` extension with the token
+  the scan authenticates with (a personal access token, or the OAuth token of
+  its service principal). The extension asks Unity Catalog for short-lived
+  storage credentials itself, so no storage keys are involved.
 """
 
 from __future__ import annotations
 
 import logging
+import os
+import tempfile
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from ..utils.duckdb_engine import load_extension, quote_identifier, sql_literal
 
@@ -30,18 +38,21 @@ logger = logging.getLogger(__name__)
 #: Formats DuckDB reads natively, by the ``format`` of a location.
 #: Keep in sync with ``LAKEHOUSE_FORMATS`` in apps/api/src/data-query/sql-names.ts.
 LAKEHOUSE_FORMATS = frozenset({"delta", "iceberg"})
+#: Geospatial files, read with the ``spatial`` extension (``ST_Read``); geometries
+#: come out as WKT text, so no spatial function has to be allowed in SQL.
+SPATIAL_FORMATS = frozenset({"geojson", "fgb", "dbf"})
 #: Keep in sync with ``FILE_FORMATS`` in apps/api/src/data-query/sql-names.ts
 #: (``json`` here is read via ``read_json_auto``).
-FILE_FORMATS = frozenset({"parquet", "csv", "tsv", "jsonl", "json", "avro"})
+FILE_FORMATS = frozenset({"parquet", "csv", "tsv", "jsonl", "json", "avro", *SPATIAL_FORMATS})
 
 OBJECT_STORAGE_TYPES = frozenset(
     {"S3_COMPATIBLE_STORAGE", "AZURE_BLOB_STORAGE", "GOOGLE_CLOUD_STORAGE", "LOCAL_FOLDER"}
 )
 ATTACHED_CATALOG_TYPES = frozenset({"ICEBERG_REST", "DUCKLAKE"})
 #: Keep in sync with ``QUERYABLE_SOURCE_TYPES`` in
-#: apps/api/src/data-query/sql-names.ts (same eight values).
+#: apps/api/src/data-query/sql-names.ts (same nine values).
 QUERYABLE_SOURCE_TYPES = (
-    OBJECT_STORAGE_TYPES | ATTACHED_CATALOG_TYPES | frozenset({"POSTGRESQL", "MYSQL"})
+    OBJECT_STORAGE_TYPES | ATTACHED_CATALOG_TYPES | frozenset({"POSTGRESQL", "MYSQL", "DATABRICKS"})
 )
 
 
@@ -83,15 +94,11 @@ _ENDPOINT_SCHEMES = {"MYSQL": "mysql", "POSTGRESQL": "postgresql"}
 
 
 def _conninfo(values: dict[str, Any]) -> str:
-    """A libpq-style ``key=value`` string for DuckDB's scanners.
+    """A libpq-style ``key=value`` string for PostgreSQL's scanner.
 
-    Numbers stay bare (`port=3306`) — the MySQL scanner runs ``port``
-    through ``stoi`` and a quoted value fails the whole ATTACH with just
-    "stoi" — and so do hostnames (`host=mysql-…`): quoting them makes the
-    scanner look up a host *with the quotes in it* ("Unknown server host
-    ''mysql-…''"). Anything with whitespace, quotes or backslashes stays
-    quoted (usernames, passwords, paths); a value that is only safe bare
-    when the scanner says so is left to the caller to coerce.
+    (MySQL's scanner does not read quoted values — see ``_mysql``, which
+    connects through a secret instead.) Numbers and plain hostnames stay
+    bare; anything with whitespace, quotes or backslashes is quoted.
     """
     parts = []
     for key, value in values.items():
@@ -124,6 +131,7 @@ class SourceBinding:
         self._attached: dict[str, str] = {}
         self._source: Any = None
         self._storage: Any = None
+        self._ca_path: str | None = None
 
     # ── recipe access ──────────────────────────────────────────────────
 
@@ -139,6 +147,10 @@ class SourceBinding:
         required = self._section("required")
         host = str(required.get("host") or "").strip()
         port = str(required.get("port") or "").strip()
+        if self.source_type == "DATABRICKS":
+            workspace = str(required.get("workspace_url") or "").strip()
+            netloc = urlparse(workspace).netloc or workspace.removeprefix("https://").strip("/")
+            return f"databricks://{netloc}/" if netloc else self.alias
         scheme = _ENDPOINT_SCHEMES.get(self.source_type)
         if host and scheme:
             return f"{scheme}://{host}:{port}/" if port else f"{scheme}://{host}/"
@@ -167,6 +179,8 @@ class SourceBinding:
             return self._postgres(conn, location)
         if self.source_type == "MYSQL":
             return self._mysql(conn, location)
+        if self.source_type == "DATABRICKS":
+            return self._databricks(conn, location)
         if self.source_type in ATTACHED_CATALOG_TYPES:
             return self._attached_catalog(conn, location)
         if self.source_type in OBJECT_STORAGE_TYPES:
@@ -222,40 +236,108 @@ class SourceBinding:
                 raise BindingError(
                     "The MySQL source has no usable port: check its configuration."
                 ) from None
-            values: dict[str, Any] = {
-                "host": required.get("host"),
-                # The scanner parses `port` as a bare integer (`stoi`); a
-                # quoted value fails the whole ATTACH with just "stoi".
-                "port": port,
-                "database": database,
-                "user": masked.get("username"),
-                "password": masked.get("password"),
-            }
-            # Verified against the DuckDB docs (docs/stable mysql page): the
-            # ATTACH connection string spells it `ssl_mode` with underscores
-            # (`verify_ca`), same as the source model's lower-cased value.
-            # This build rejects *every* ssl_mode string through the DSN
-            # parser (each spelling answered "got '<that spelling>'") — the
-            # mode key itself is what it chokes on, not the value. So the
-            # mode is dropped entirely: the scanner then negotiates TLS on
-            # its own (the server requires it), like the docs' bare
-            # `ATTACH 'host=… database=…'` example. That cannot verify the
-            # server's certificate, so a source set to verify it is refused
-            # rather than silently queried without the check it asked for.
-            ssl_mode = str(self._connection_option("ssl_mode") or "").upper()
-            if ssl_mode in ("VERIFY_CA", "VERIFY_IDENTITY"):
-                raise BindingError(
-                    f"Could not open {self.label()}: the source verifies the server's "
-                    "certificate, which SQL queries cannot do yet. Scans still verify it."
-                )
             alias = f"{self._hidden}_{len(self._attached)}"
+            # Connect through a DuckDB *secret*, not a connection string. The
+            # scanner's DSN parser takes values literally, quotes included
+            # (`ssl_mode='verify_ca'` answers "got ''verify_ca''", a quoted
+            # password is refused as wrong), so nothing with a space, a quote
+            # or a backslash in it (a password, a path) can be passed safely.
+            # Secret fields are SQL literals, escaped like any other.
+            fields = [
+                "TYPE mysql",
+                f"HOST {sql_literal(str(required.get('host') or ''))}",
+                f"PORT {port}",
+                f"DATABASE {sql_literal(database)}",
+                f"USER {sql_literal(str(masked.get('username') or ''))}",
+                f"PASSWORD {sql_literal(str(masked.get('password') or ''))}",
+                *self._mysql_tls_fields(),
+            ]
+            secret = quote_identifier(f"{alias}_secret")
+            conn.execute(f"CREATE OR REPLACE SECRET {secret} ({', '.join(fields)})")
             conn.execute(
-                f"ATTACH {sql_literal(_conninfo(values))} AS {quote_identifier(alias)} "
-                "(TYPE mysql, READ_ONLY)"
+                f"ATTACH '' AS {quote_identifier(alias)} (TYPE mysql, SECRET {secret}, READ_ONLY)"
             )
             self._attached[database] = alias
         # The scanner names its schemas after the server's databases.
         return ".".join(quote_identifier(part) for part in (alias, database, table))
+
+    def _mysql_tls_fields(self) -> list[str]:
+        """The secret's TLS fields, matching what the scan does with the source.
+
+        The scan (``MySQLSource._build_ssl_kwargs``) verifies the certificate
+        only for *Verify CA* / *Verify identity*, against the source's CA when
+        it has one and the system roots otherwise; every other mode just
+        encrypts. DuckDB's own ``required`` is stricter than that (it demands
+        a trusted chain), so it is only used when the source supplies the CA
+        to check against; without one the scanner's default (``preferred``:
+        TLS whenever the server offers it) is what the scan effectively does.
+        The CA is a *file* to DuckDB, so the PEM is written to a private temp
+        file kept until :meth:`close` — parallel scan threads reconnect.
+        """
+        mode = str(self._connection_option("ssl_mode") or "").upper()
+        if mode == "DISABLED":
+            return ["SSL_MODE 'disabled'"]
+        verifies = mode in ("VERIFY_CA", "VERIFY_IDENTITY")
+        ca_path = self._ca_file() if verifies or mode == "REQUIRED" else None
+        fields: list[str] = []
+        if verifies:
+            fields.append(f"SSL_MODE '{mode.lower()}'")
+        elif mode == "REQUIRED" and ca_path:
+            fields.append("SSL_MODE 'required'")
+        if ca_path and (verifies or mode == "REQUIRED"):
+            fields.append(f"SSL_CA {sql_literal(ca_path)}")
+        return fields
+
+    def _ca_file(self) -> str | None:
+        """The source's CA certificate as a file path, or None without one."""
+        pem = str(self._section("masked").get("ssl_ca") or "")
+        if not pem.strip():
+            return None
+        if self._ca_path is None:
+            # Same normalisation as the scan: escaped newlines and CRLF.
+            text = pem.replace("\\n", "\n").replace("\r\n", "\n").strip() + "\n"
+            fd, path = tempfile.mkstemp(prefix="classifyre-mysql-ca-", suffix=".pem")
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                handle.write(text)
+            self._ca_path = path
+        return self._ca_path
+
+    def _databricks(self, conn: Any, location: TableLocation) -> str:
+        catalog, schema, table = self._require_location_fields(
+            location, "database", "schema", "table"
+        )
+        alias = self._attached.get(catalog)
+        if alias is None:
+            source = self._instance()
+            endpoint = str(self._section("required").get("workspace_url") or "").rstrip("/")
+            # Delta files sit in S3 on AWS (httpfs) and in ADLS on Azure (azure).
+            storage = "azure" if "azuredatabricks.net" in endpoint else "httpfs"
+            for extension in ("unity_catalog", "delta", storage):
+                load_extension(conn, extension)
+            alias = f"{self._hidden}_{len(self._attached)}"
+            secret = quote_identifier(f"{alias}_secret")
+            conn.execute(
+                f"CREATE OR REPLACE SECRET {secret} (TYPE unity_catalog, "
+                f"TOKEN {sql_literal(source._access_token_value())}, "
+                f"ENDPOINT {sql_literal(endpoint)})"
+            )
+            conn.execute(
+                f"ATTACH {sql_literal(catalog)} AS {quote_identifier(alias)} "
+                f"(TYPE unity_catalog, SECRET {secret}, READ_ONLY)"
+            )
+            self._attached[catalog] = alias
+        return ".".join(quote_identifier(part) for part in (alias, schema, table))
+
+    def explain(self, exc: Exception) -> str | None:
+        """What a failed read of this source's table means, when it is known."""
+        message = str(exc)
+        if self.source_type == "DATABRICKS" and "temporary-table-credentials" in message:
+            return (
+                "Databricks would not hand out storage credentials for the table. "
+                "An admin has to turn on External data access for the metastore, and the "
+                "source's principal needs the EXTERNAL USE SCHEMA privilege on the schema."
+            )
+        return None
 
     def _attached_catalog(self, conn: Any, location: TableLocation) -> str:
         schema, table = self._require_location_fields(location, "schema", "table")
@@ -312,10 +394,38 @@ class SourceBinding:
             if fmt == "avro":
                 load_extension(conn, "avro")
                 return f"read_avro({uri})"
+            if fmt in SPATIAL_FORMATS:
+                return self._spatial(conn, uri)
             raise BindingError(f"{fmt or 'These'} files cannot be queried with SQL yet.")
         raise BindingError(f"Unknown table location kind '{location.kind}'.")
 
+    def _spatial(self, conn: Any, uri: str) -> str:
+        """``ST_Read`` with every geometry column turned into WKT text.
+
+        The raw column is a binary geometry only spatial functions can read;
+        as text it shows in a result and compares like any string.
+        """
+        load_extension(conn, "spatial")
+        source = f"ST_Read({uri})"
+        columns = conn.execute(f"DESCRIBE SELECT * FROM {source}").fetchall()
+        geometries = [
+            name for name, kind, *_ in columns if str(kind).upper().startswith("GEOMETRY")
+        ]
+        if not geometries:
+            return source
+        replaced = ", ".join(
+            f"ST_AsText({quote_identifier(name)}) AS {quote_identifier(name)}"
+            for name in geometries
+        )
+        return f"(SELECT * REPLACE ({replaced}) FROM {source})"
+
     def close(self) -> None:
+        if self._ca_path is not None:
+            try:
+                Path(self._ca_path).unlink()
+            except OSError:  # pragma: no cover - best effort
+                pass
+            self._ca_path = None
         if self._source is not None:
             try:
                 self._source.cleanup()

@@ -90,6 +90,9 @@ See [Lineage & Relationships](/sources/lineage/).
 
 - **Sampling runs on your SQL warehouse**, so scan cost is warehouse cost. A
   serverless warehouse with a short auto-stop is the cheapest setup.
+- **Its tables can be queried with SQL**, joined with your other sources. That
+  needs External data access on the metastore and the `EXTERNAL USE SCHEMA`
+  privilege on the schemas; see [SQL](/data-query/#databricks).
 - **Column lineage on wide tables is slow.** Leave it off for a first scan and
   turn it on once you know which catalogs matter.
 

@@ -112,6 +112,78 @@ describe('SQL names for data query', () => {
     });
   });
 
+  it('reads JSON and geo files from a bucket', () => {
+    const cases: Array<[string, string, string]> = [
+      ['files/data.json', 'application/json', 'json'],
+      ['geo/boundaries.geojson', 'application/geo+json', 'geojson'],
+      ['geo/sites.fgb', 'application/vnd.flatgeobuf', 'fgb'],
+      ['geo/parcels.dbf', 'application/vnd.dbf', 'dbf'],
+    ];
+    for (const [key, mime, format] of cases) {
+      const address = tableAddress('S3_COMPATIBLE_STORAGE', 'file', key, {
+        object_key: key,
+        mime_type: mime,
+      });
+      expect(address.location).toEqual({
+        kind: 'file',
+        format,
+        objectKey: key,
+      });
+      // The extension alone is enough when the scan left no mime type.
+      expect(
+        tableAddress('S3_COMPATIBLE_STORAGE', 'file', key, { object_key: key })
+          .location,
+      ).toMatchObject({ format });
+    }
+    // Formats DuckDB cannot read stay out.
+    for (const key of [
+      'people.orc',
+      'people.arrow',
+      'app.sqlite',
+      'w.duckdb',
+      'staff.xlsx',
+      'places.gpkg',
+      'people.vortex',
+    ]) {
+      expect(
+        tableAddress('S3_COMPATIBLE_STORAGE', 'file', key, { object_key: key })
+          .location,
+      ).toBeNull();
+    }
+  });
+
+  it('addresses Databricks tables by catalog, schema and table', () => {
+    const meta = {
+      catalog: 'sales',
+      database: 'sales',
+      schema: 'raw',
+      table_name: 'orders',
+      object_type: 'TABLE',
+    };
+    expect(tableAddress('DATABRICKS', 'table', 'x', meta)).toEqual({
+      schema: 'raw',
+      table: 'orders',
+      location: {
+        kind: 'catalog',
+        database: 'sales',
+        schema: 'raw',
+        table: 'orders',
+      },
+      reason: undefined,
+    });
+    // Several catalogs: the catalog joins the schema so names stay apart.
+    expect(tableAddress('DATABRICKS', 'table', 'x', meta, true).schema).toBe(
+      'sales_raw',
+    );
+    // A view has no files of its own.
+    const view = tableAddress('DATABRICKS', 'table', 'v', {
+      ...meta,
+      object_type: 'VIEW',
+    });
+    expect(view.location).toBeNull();
+    expect(view.reason).toMatch(/views/i);
+  });
+
   it('gives colliding tables stable suffixes by asset id', () => {
     const names = assignTableNames([
       { id: 'b', schema: 'Shop', table: 'Orders' },

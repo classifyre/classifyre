@@ -282,6 +282,12 @@ It's opened read-only and every table in it is scanned. Views and macros inside
 the file are never run, so a crafted database can't make the scan read anything
 else.
 
+**Can I query these files with SQL?**
+The table files DuckDB can read straight from a bucket — Parquet, CSV, TSV,
+JSON, JSON Lines, Avro and the geospatial formats — can, joined with your
+databases. Spreadsheets, SQLite and DuckDB files and ORC are scanned but not
+yet queryable; the full list is under [SQL](/data-query/#what-you-can-query).
+
 **My bucket holds Delta or Iceberg tables. Why weren't their Parquet files scanned one by one?**
 Because a table's files include rows the table has deleted. The scan reads each
 table as one asset instead, as it is now — see
