@@ -13,16 +13,10 @@ import underPressure from '@fastify/under-pressure';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { McpServerFactoryService } from './mcp-server.factory';
 import { McpTokenService } from './mcp-token.service';
-import { ActorContextService } from './identity/actor-context.service';
 import { assertIamAllowed } from './identity/iam-config';
 import type { IdentityService } from './identity/identity.service';
 import { IDENTITY } from './identity/identity.tokens';
-import {
-  CLS_CAPABILITIES,
-  CLS_ORG_ID,
-  CLS_PERSON,
-  type ClsPerson,
-} from './identity/iam-access-policy';
+import { applyPrincipalContext } from './identity/principal-context';
 import { InstanceSettingsService } from './instance-settings.service';
 import { PrismaExceptionFilter } from './filters/prisma-exception.filter';
 import { DbRetryInterceptor } from './interceptors/db-retry.interceptor';
@@ -282,7 +276,6 @@ async function bootstrap() {
   const namespaceRegistry = app.get(NamespaceRegistryService);
   const prismaClientManager = app.get(PrismaClientManager);
   const internalApiKey = app.get(InternalApiKeyService);
-  const actors = app.get(ActorContextService);
 
   // Resolve the leading `/<slug>` into a tenant context (404 on unknown slug)
   // before any route runs. `/<slug>/mcp` was already rewritten to `/mcp`.
@@ -353,10 +346,10 @@ async function bootstrap() {
       }
 
       // A token acts for its owner, as they are right now.
-      const owner = await identity.principalForOwner(
+      const owner = await identity.principalFor(
         authorizedToken.ownerSub,
-        authorizedToken.id,
         ns.namespaceId,
+        { kind: 'mcp', id: authorizedToken.id },
       );
       if (!owner) {
         reply.code(401).send({
@@ -367,15 +360,16 @@ async function bootstrap() {
         });
         return;
       }
-      const actor = owner.principal.actor;
       const capabilities = owner.capabilities;
-      cls.set(CLS_CAPABILITIES, capabilities);
-      if (owner.principal.orgId) cls.set(CLS_ORG_ID, owner.principal.orgId);
-      cls.set<ClsPerson>(CLS_PERSON, {
-        actorRef: `user:${authorizedToken.ownerSub}`,
-        groupIds: await identity.groupLineage(owner.principal),
-      });
-      actors.set(actor);
+      // The same context a signed-in request gets, grants on single sources
+      // and tables included (they were missing here before).
+      await applyPrincipalContext(
+        cls,
+        identity,
+        owner.principal,
+        capabilities,
+        ns.namespaceId,
+      );
 
       reply.hijack();
 

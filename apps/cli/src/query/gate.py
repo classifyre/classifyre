@@ -114,15 +114,63 @@ def _cte_names(tree: exp.Expression) -> set[str]:
     return {cte.alias_or_name.lower() for cte in tree.find_all(exp.CTE) if cte.alias_or_name}
 
 
-def validate(sql: str, allowed: Iterable[TableName], dialect: str = "duckdb") -> Validated:
+def _postgres_name(
+    table: exp.Table, database: str | None, search_path: list[str], allowed: set[TableName]
+) -> TableName | None:
+    """A table as a PostgreSQL client names it, mapped to ``source.schema.table``.
+
+    SQL connections (docs/prd/DQ-data-query.md §5.7) show each source schema
+    as one PostgreSQL schema ``"<source>.<schema>"`` in a database named after
+    the workspace, so clients write ``"src.sch".tbl`` or
+    ``workspace."src.sch".tbl``, or a bare ``tbl`` found on the session's
+    search path. Three plain parts (``src.sch.tbl``) still work as on the SQL
+    page. Returns None when the name cannot be one of ours.
+    """
+    catalog = str(table.catalog or "")
+    db = str(table.db or "")
+    name = str(table.name)
+    if db and "." in db:
+        if catalog and (database is None or catalog.lower() != database.lower()):
+            return None
+        source, _, schema = db.partition(".")
+        return TableName.of(source, schema, name)
+    if catalog and db:
+        if database is not None and catalog.lower() == database.lower():
+            return None
+        return TableName.of(catalog, db, name)
+    if not catalog and not db:
+        for entry in search_path:
+            source, dot, schema = entry.partition(".")
+            if not dot:
+                continue
+            candidate = TableName.of(source, schema, name)
+            if candidate in allowed:
+                return candidate
+    return None
+
+
+def validate(
+    sql: str,
+    allowed: Iterable[TableName],
+    dialect: str = "duckdb",
+    *,
+    database: str | None = None,
+    search_path: Iterable[str] = (),
+) -> Validated:
     """Check ``sql`` against the allowlist and return it rewritten for DuckDB.
+
+    ``dialect="postgres"`` is SQL from a PostgreSQL client (a SQL connection):
+    it is parsed as PostgreSQL, names resolve as :func:`_postgres_name` says,
+    and the result is DuckDB SQL like any other.
 
     Raises :class:`QueryRefusedError` with a stable ``code`` the UI can show:
     ``invalid_sql``, ``select_only``, ``function_not_allowed``,
     ``table_name_required`` or ``table_not_available``.
     """
+    postgres = dialect == "postgres"
+    path = [p.lower() for p in search_path]
     allowed_set = set(allowed)
-    text = (sql or "").strip()
+    text = (sql or "").strip().rstrip(";").strip() if postgres else (sql or "").strip()
     if not text:
         raise QueryRefusedError("Write a SELECT statement.", "invalid_sql")
     try:
@@ -165,6 +213,19 @@ def validate(sql: str, allowed: Iterable[TableName], dialect: str = "duckdb") ->
             )
         name = str(table.name)
         if not table.catalog and not table.db and name.lower() in ctes:
+            continue
+        if postgres:
+            mapped = _postgres_name(table, database, path, allowed_set)
+            if mapped is None or mapped not in allowed_set:
+                shown = mapped or table.sql(dialect="postgres")
+                raise QueryRefusedError(
+                    f"The table {shown} does not exist or you cannot query it.",
+                    "table_not_available",
+                )
+            referenced.add(mapped)
+            table.set("catalog", exp.to_identifier(mapped.source, quoted=True))
+            table.set("db", exp.to_identifier(mapped.schema, quoted=True))
+            table.set("this", exp.to_identifier(mapped.table, quoted=True))
             continue
         if not (table.catalog and table.db):
             raise QueryRefusedError(

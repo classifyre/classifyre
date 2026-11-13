@@ -452,6 +452,17 @@ All URIs are relative to *http://localhost*
 *RunnersApi* | [**searchRunnersControllerSearchRunnerAssets**](docs/RunnersApi.md#searchrunnerscontrollersearchrunnerassets) | **POST** /search/runner-assets | Search runner assets
 *RunnersApi* | [**searchRunnersControllerSearchRunners**](docs/RunnersApi.md#searchrunnerscontrollersearchrunners) | **POST** /search/runners | Search runners
 *RunnersApi* | [**searchRunnersControllerSearchRunnersCharts**](docs/RunnersApi.md#searchrunnerscontrollersearchrunnerscharts) | **POST** /search/runners/charts | Runners charts overview
+*SQLConnectionsApi* | [**dataConnectionControllerAll**](docs/SQLConnectionsApi.md#dataconnectioncontrollerall) | **GET** /data-connections/all | Everyone’s SQL connections (data.connection.manage)
+*SQLConnectionsApi* | [**dataConnectionControllerBlock**](docs/SQLConnectionsApi.md#dataconnectioncontrollerblock) | **POST** /data-connections/{id}/blocks | Close a table or source you govern to this connection
+*SQLConnectionsApi* | [**dataConnectionControllerCreate**](docs/SQLConnectionsApi.md#dataconnectioncontrollercreate) | **POST** /data-connections | Create a SQL connection of your own; the password is shown once
+*SQLConnectionsApi* | [**dataConnectionControllerEndpoint**](docs/SQLConnectionsApi.md#dataconnectioncontrollerendpoint) | **GET** /data-connections/endpoint | Where tools connect: host, port, database, TLS
+*SQLConnectionsApi* | [**dataConnectionControllerForAsset**](docs/SQLConnectionsApi.md#dataconnectioncontrollerforasset) | **GET** /assets/{id}/data-connections | SQL connections that read, name or are blocked on a table
+*SQLConnectionsApi* | [**dataConnectionControllerForSource**](docs/SQLConnectionsApi.md#dataconnectioncontrollerforsource) | **GET** /sources/{id}/data-connections | SQL connections that read, name or are blocked on a source
+*SQLConnectionsApi* | [**dataConnectionControllerIssue**](docs/SQLConnectionsApi.md#dataconnectioncontrollerissue) | **POST** /data-connections/issue | Give someone a SQL connection; they reveal its password themselves
+*SQLConnectionsApi* | [**dataConnectionControllerMine**](docs/SQLConnectionsApi.md#dataconnectioncontrollermine) | **GET** /data-connections | Your SQL connections
+*SQLConnectionsApi* | [**dataConnectionControllerPassword**](docs/SQLConnectionsApi.md#dataconnectioncontrollerpassword) | **POST** /data-connections/{id}/password | Reveal (first time) or replace the password of your own connection
+*SQLConnectionsApi* | [**dataConnectionControllerRevoke**](docs/SQLConnectionsApi.md#dataconnectioncontrollerrevoke) | **POST** /data-connections/{id}/revoke | Revoke a SQL connection (its person or a manager)
+*SQLConnectionsApi* | [**dataConnectionControllerUnblock**](docs/SQLConnectionsApi.md#dataconnectioncontrollerunblock) | **DELETE** /data-connections/{id}/blocks/{blockId} | Lift a block
 *SemanticApi* | [**semanticControllerApproveBinding**](docs/SemanticApi.md#semanticcontrollerapprovebinding) | **POST** /semantic/bindings/{id}/approve | 
 *SemanticApi* | [**semanticControllerAssetMeaning**](docs/SemanticApi.md#semanticcontrollerassetmeaning) | **GET** /semantic/assets/{assetId}/meaning | An asset\&#39;s current links, grouped by term; GONE links with history&#x3D;true
 *SemanticApi* | [**semanticControllerAssetTermEvidence**](docs/SemanticApi.md#semanticcontrollerassettermevidence) | **GET** /semantic/assets/{assetId}/terms/{termId}/evidence | Why this asset is about this term
@@ -600,6 +611,7 @@ All URIs are relative to *http://localhost*
 - [AuditEventDto](docs/AuditEventDto.md)
 - [AuditEventsResponseDto](docs/AuditEventsResponseDto.md)
 - [AutopilotStatsDto](docs/AutopilotStatsDto.md)
+- [BlockDataConnectionDto](docs/BlockDataConnectionDto.md)
 - [BoardEndpointDto](docs/BoardEndpointDto.md)
 - [BoardItemDto](docs/BoardItemDto.md)
 - [BoardLinkCertainty](docs/BoardLinkCertainty.md)
@@ -706,6 +718,7 @@ All URIs are relative to *http://localhost*
 - [CreateCaseDto](docs/CreateCaseDto.md)
 - [CreateCaseEventDto](docs/CreateCaseEventDto.md)
 - [CreateCustomDetectorDto](docs/CreateCustomDetectorDto.md)
+- [CreateDataConnectionDto](docs/CreateDataConnectionDto.md)
 - [CreateDetectorNotebookExecutionDto](docs/CreateDetectorNotebookExecutionDto.md)
 - [CreateExternalRunnerDto](docs/CreateExternalRunnerDto.md)
 - [CreateFindingDto](docs/CreateFindingDto.md)
@@ -725,6 +738,13 @@ All URIs are relative to *http://localhost*
 - [CustomDetectorResponseDto](docs/CustomDetectorResponseDto.md)
 - [CustomDetectorResponseDtoSourcesUsingInner](docs/CustomDetectorResponseDtoSourcesUsingInner.md)
 - [CustomDetectorTrainingRunDto](docs/CustomDetectorTrainingRunDto.md)
+- [DataConnectionBlockDto](docs/DataConnectionBlockDto.md)
+- [DataConnectionDto](docs/DataConnectionDto.md)
+- [DataConnectionEndpointDto](docs/DataConnectionEndpointDto.md)
+- [DataConnectionListDto](docs/DataConnectionListDto.md)
+- [DataConnectionReadsDto](docs/DataConnectionReadsDto.md)
+- [DataConnectionScopeItemDto](docs/DataConnectionScopeItemDto.md)
+- [DataConnectionSecretDto](docs/DataConnectionSecretDto.md)
 - [DataQuerySettingsDto](docs/DataQuerySettingsDto.md)
 - [DecisionsToCaseDto](docs/DecisionsToCaseDto.md)
 - [DecisionsToCaseResponseDto](docs/DecisionsToCaseResponseDto.md)
@@ -835,6 +855,7 @@ All URIs are relative to *http://localhost*
 - [InquiryResponseDto](docs/InquiryResponseDto.md)
 - [InquiryTimelineResponseDto](docs/InquiryTimelineResponseDto.md)
 - [InstanceSettingsResponseDto](docs/InstanceSettingsResponseDto.md)
+- [IssueDataConnectionDto](docs/IssueDataConnectionDto.md)
 - [LatestRunnerSummaryDto](docs/LatestRunnerSummaryDto.md)
 - [LineageGraphDto](docs/LineageGraphDto.md)
 - [LinkGovernanceTermDto](docs/LinkGovernanceTermDto.md)
@@ -962,6 +983,7 @@ All URIs are relative to *http://localhost*
 - [ReviewSourceNodeDto](docs/ReviewSourceNodeDto.md)
 - [ReviewWaterfallDto](docs/ReviewWaterfallDto.md)
 - [ReviewWaterfallRowDto](docs/ReviewWaterfallRowDto.md)
+- [RevokeDataConnectionDto](docs/RevokeDataConnectionDto.md)
 - [RoleDto](docs/RoleDto.md)
 - [RunnerAssetFindingSummaryDto](docs/RunnerAssetFindingSummaryDto.md)
 - [RunnerAssetItemDto](docs/RunnerAssetItemDto.md)
@@ -1140,6 +1162,7 @@ All URIs are relative to *http://localhost*
 - [UpsertGlossarySchemeDto](docs/UpsertGlossarySchemeDto.md)
 - [UpsertGlossaryTermDto](docs/UpsertGlossaryTermDto.md)
 - [UpsertGlossaryTermResponseDto](docs/UpsertGlossaryTermResponseDto.md)
+- [UsageChannelDto](docs/UsageChannelDto.md)
 - [UsageDayDto](docs/UsageDayDto.md)
 - [UsageFormatDto](docs/UsageFormatDto.md)
 - [UsageReaderDto](docs/UsageReaderDto.md)

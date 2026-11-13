@@ -17,16 +17,7 @@ import { PrismaClientManager } from '../prisma/prisma-client-manager';
 import { transientDbErrorCode } from '../db/transient-db-error';
 import { InternalApiKeyService } from '../internal-api-key.service';
 import type { IdentityService } from '../identity/identity.service';
-import { CLS_ACTOR } from '../identity/actor-context.service';
-import {
-  CLS_CAPABILITIES,
-  CLS_ORG_ID,
-  CLS_PERSON,
-  CLS_RESOURCE_GRANTS,
-  type ClsPerson,
-} from '../identity/iam-access-policy';
-import { RESOURCE_GRANTABLE_CAPABILITIES } from '../identity/access-policy';
-import { resourceGrantsInWorkspace } from '../identity/grant-evaluation';
+import { applyPrincipalContext } from '../identity/principal-context';
 import {
   assertSameOrigin,
   authenticateOr,
@@ -275,23 +266,12 @@ export async function authorizeWorkspaceRequest(
       .send({ error: 'Not Found', message: `Unknown namespace '${ns.slug}'` });
     return false;
   }
-  cls.set(CLS_ACTOR, principal.actor);
-  cls.set(CLS_CAPABILITIES, capabilities);
-  if (principal.orgId) cls.set(CLS_ORG_ID, principal.orgId);
-  if (principal.actor.id?.startsWith('user:')) {
-    cls.set<ClsPerson>(CLS_PERSON, {
-      actorRef: principal.actor.id,
-      groupIds: await identity.groupLineage(principal),
-    });
-  }
-  cls.set(
-    CLS_RESOURCE_GRANTS,
-    Object.fromEntries(
-      RESOURCE_GRANTABLE_CAPABILITIES.map((capability) => [
-        capability,
-        resourceGrantsInWorkspace(principal.grants, ns.namespaceId, capability),
-      ]),
-    ),
+  await applyPrincipalContext(
+    cls,
+    identity,
+    principal,
+    capabilities,
+    ns.namespaceId,
   );
   return true;
 }

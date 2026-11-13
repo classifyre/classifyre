@@ -20,6 +20,13 @@ import {
     UsageDayDtoToJSON,
     UsageDayDtoToJSONTyped,
 } from './UsageDayDto';
+import type { UsageChannelDto } from './UsageChannelDto';
+import {
+    UsageChannelDtoFromJSON,
+    UsageChannelDtoFromJSONTyped,
+    UsageChannelDtoToJSON,
+    UsageChannelDtoToJSONTyped,
+} from './UsageChannelDto';
 import type { UsageFormatDto } from './UsageFormatDto';
 import {
     UsageFormatDtoFromJSON,
@@ -60,7 +67,7 @@ export interface AssetUsageDto {
      */
     exports: number;
     /**
-     * Distinct people and tokens.
+     * Distinct people, however they read.
      * @type {number}
      * @memberof AssetUsageDto
      */
@@ -83,6 +90,12 @@ export interface AssetUsageDto {
      * @memberof AssetUsageDto
      */
     exportsByFormat: Array<UsageFormatDto>;
+    /**
+     * By how the reads came: `rest` (the app), `mcp`, `sql` (SQL connections).
+     * @type {Array<UsageChannelDto>}
+     * @memberof AssetUsageDto
+     */
+    byChannel: Array<UsageChannelDto>;
 }
 
 /**
@@ -96,6 +109,7 @@ export function instanceOfAssetUsageDto(value: object): value is AssetUsageDto {
     if (!('perDay' in value) || value['perDay'] === undefined) return false;
     if (!('topReaders' in value) || value['topReaders'] === undefined) return false;
     if (!('exportsByFormat' in value) || value['exportsByFormat'] === undefined) return false;
+    if (!('byChannel' in value) || value['byChannel'] === undefined) return false;
     return true;
 }
 
@@ -116,6 +130,7 @@ export function AssetUsageDtoFromJSONTyped(json: any, ignoreDiscriminator: boole
         'perDay': ((json['perDay'] as Array<any>).map(UsageDayDtoFromJSON)),
         'topReaders': ((json['topReaders'] as Array<any>).map(UsageReaderDtoFromJSON)),
         'exportsByFormat': ((json['exportsByFormat'] as Array<any>).map(UsageFormatDtoFromJSON)),
+        'byChannel': ((json['byChannel'] as Array<any>).map(UsageChannelDtoFromJSON)),
     };
 }
 
@@ -137,6 +152,7 @@ export function AssetUsageDtoToJSONTyped(value?: AssetUsageDto | null, ignoreDis
         'perDay': ((value['perDay'] as Array<any>).map(UsageDayDtoToJSON)),
         'topReaders': ((value['topReaders'] as Array<any>).map(UsageReaderDtoToJSON)),
         'exportsByFormat': ((value['exportsByFormat'] as Array<any>).map(UsageFormatDtoToJSON)),
+        'byChannel': ((value['byChannel'] as Array<any>).map(UsageChannelDtoToJSON)),
     };
 }
 

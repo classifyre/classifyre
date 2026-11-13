@@ -165,6 +165,53 @@ export class GovernanceNotifier {
     });
   }
 
+  /**
+   * A SQL connection of someone's changed by someone else (DQ §5.7): given to
+   * them, revoked, or blocked on a table or source. Only its person hears.
+   */
+  async connectionChanged(input: {
+    kind: 'issued' | 'revoked' | 'blocked' | 'unblocked';
+    connectionId: string;
+    connectionName: string;
+    personRef: string;
+    actorRef: string | null;
+    scopeName?: string;
+    reason?: string | null;
+  }): Promise<void> {
+    if (input.personRef === input.actorRef) return;
+    const text = {
+      issued: {
+        event: NotificationEvent.GOVERNANCE_CONNECTION_ISSUED,
+        title: `You were given the SQL connection ${input.connectionName}`,
+        message:
+          'Open it to get its password, once. It reads what you may query, nothing more.',
+      },
+      revoked: {
+        event: NotificationEvent.GOVERNANCE_CONNECTION_REVOKED,
+        title: `Your SQL connection ${input.connectionName} was revoked`,
+        message: input.reason ?? 'Tools using it can no longer sign in.',
+      },
+      blocked: {
+        event: NotificationEvent.GOVERNANCE_CONNECTION_BLOCKED,
+        title: `${input.scopeName ?? 'A table'} is closed to your SQL connection ${input.connectionName}`,
+        message:
+          input.reason ??
+          'Its owner closed it to this connection; the rest of the connection still works.',
+      },
+      unblocked: {
+        event: NotificationEvent.GOVERNANCE_CONNECTION_BLOCKED,
+        title: `${input.scopeName ?? 'A table'} is open again to your SQL connection ${input.connectionName}`,
+        message: 'Its owner lifted the block.',
+      },
+    }[input.kind];
+    await this.send(audienceOf([input.personRef]), {
+      ...text,
+      actionUrl: `/settings?tab=sql-connections&connection=${input.connectionId}`,
+      triggeredBy: input.actorRef,
+      metadata: { connectionId: input.connectionId, kind: input.kind },
+    });
+  }
+
   /** Someone changed the lifecycle: the others who answer for it hear of it. */
   async statusChanged(input: {
     assetId: string;

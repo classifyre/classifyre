@@ -222,7 +222,7 @@ The **Usage** card on the asset reads `audit_events` where `resources @> {asset:
 - the top 5 readers (`ActorChip`);
 - exports by format.
 
-It is a read-only aggregate, so no new storage is needed. DQ phase 5 (JDBC/ODBC) writes the same events, so BI tools show here too. On the workspace Governance page, *ungoverned tables by reads* uses the same query grouped by asset.
+It is a read-only aggregate, so no new storage is needed. SQL connections (DQ phase 4, §5.7, built 2026-11-13) write the same events with `channel = sql` and `connection:<id>`, so BI tools show here too: readers are counted as people however they read, and reads are split by channel. The asset and source Governance tabs gain *Access*: the connections that read the table, name it or are closed on it, where owners and stewards give a connection or close the table to one. On the workspace Governance page, *ungoverned tables by reads* uses the same query grouped by asset.
 
 ### 5.4 Data quality
 

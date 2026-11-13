@@ -5,6 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ClsService } from 'nestjs-cls';
 import type { Capability } from './capabilities';
 import { grantApplies, roleCapabilities } from './grant-evaluation';
 import type { IdentityService, Principal } from './identity.service';
@@ -17,7 +18,14 @@ import {
   type GrantScopeType,
   type Tenant,
 } from './tenancy.service';
+import {
+  CLS_DATABASE_LANE,
+  CLS_NAMESPACE_ID,
+  CLS_SCHEMA,
+  CLS_SLUG,
+} from '../namespace/namespace.constants';
 import { PrismaService } from '../prisma.service';
+import { NamespaceRegistryService } from '../registry/namespace-registry.service';
 
 export interface GrantInput extends GrantScope {
   /** Always a group: people get access by being in one. */
@@ -81,6 +89,8 @@ export class AccessManagementService {
     private readonly tenancy: TenancyService,
     @Inject(IDENTITY) readonly identity: IdentityService,
     private readonly prisma: PrismaService,
+    private readonly cls: ClsService,
+    private readonly registry: NamespaceRegistryService,
   ) {}
 
   roles() {
@@ -378,42 +388,83 @@ export class AccessManagementService {
 
   /**
    * Single-source/table grant scopes (`source/<id>`, `asset/<id>`) → the
-   * source or table name, and a table's source, batched in two reads of the
-   * current workspace. Deleted resources (or ones of another workspace in a
-   * tenant-wide list) stay absent, and the generic labels apply.
+   * source or table name, and a table's source, batched in two reads per
+   * workspace. A tenant-wide list has no current workspace, so each grant is
+   * read in the workspace its scope id names. Deleted resources and
+   * workspaces that cannot be read stay absent, and the generic labels apply.
    */
   private async resources(
     grants: Grant[],
   ): Promise<Map<string, { name: string; sourceId?: string }>> {
-    const sourceIds = new Set<string>();
-    const assetIds = new Set<string>();
+    const byWorkspace = new Map<
+      string,
+      { sourceIds: Set<string>; assetIds: Set<string> }
+    >();
     for (const grant of grants) {
-      if (grant.scopeType === 'source')
-        sourceIds.add(resourceIdOf(grant.scopeId));
-      if (grant.scopeType === 'asset')
-        assetIds.add(resourceIdOf(grant.scopeId));
+      if (!isResourceScope(grant.scopeType)) continue;
+      const workspaceId = resourceWorkspace(grant.scopeId);
+      let ids = byWorkspace.get(workspaceId);
+      if (!ids) {
+        ids = { sourceIds: new Set(), assetIds: new Set() };
+        byWorkspace.set(workspaceId, ids);
+      }
+      (grant.scopeType === 'source' ? ids.sourceIds : ids.assetIds).add(
+        resourceIdOf(grant.scopeId),
+      );
     }
     const out = new Map<string, { name: string; sourceId?: string }>();
-    if (sourceIds.size) {
-      const rows = await this.prisma.source
-        .findMany({
-          where: { id: { in: [...sourceIds] } },
-          select: { id: true, name: true },
-        })
-        .catch(() => []);
-      for (const row of rows) out.set(`source/${row.id}`, { name: row.name });
-    }
-    if (assetIds.size) {
-      const rows = await this.prisma.asset
-        .findMany({
-          where: { id: { in: [...assetIds] } },
-          select: { id: true, name: true, sourceId: true },
-        })
-        .catch(() => []);
-      for (const row of rows) {
-        out.set(`asset/${row.id}`, { name: row.name, sourceId: row.sourceId });
+    for (const [workspaceId, { sourceIds, assetIds }] of byWorkspace) {
+      try {
+        await this.inWorkspace(workspaceId, async () => {
+          if (sourceIds.size) {
+            const rows = await this.prisma.source.findMany({
+              where: { id: { in: [...sourceIds] } },
+              select: { id: true, name: true },
+            });
+            for (const row of rows) {
+              out.set(`source/${row.id}`, { name: row.name });
+            }
+          }
+          if (assetIds.size) {
+            const rows = await this.prisma.asset.findMany({
+              where: { id: { in: [...assetIds] } },
+              select: { id: true, name: true, sourceId: true },
+            });
+            for (const row of rows) {
+              out.set(`asset/${row.id}`, {
+                name: row.name,
+                sourceId: row.sourceId,
+              });
+            }
+          }
+        });
+      } catch {
+        // A removed workspace or an unreadable one: its rows keep the
+        // generic labels, the list still answers.
       }
     }
     return out;
+  }
+
+  /** Runs `read` with `workspaceId` as the current workspace. */
+  private async inWorkspace<T>(
+    workspaceId: string,
+    read: () => Promise<T>,
+  ): Promise<T> {
+    if (
+      this.cls.isActive() &&
+      this.cls.get<string>(CLS_SCHEMA) &&
+      this.cls.get<string>(CLS_NAMESPACE_ID) === workspaceId
+    ) {
+      return read();
+    }
+    const workspace = await this.registry.get(workspaceId);
+    return this.cls.run(async () => {
+      this.cls.set(CLS_SCHEMA, workspace.schemaName);
+      this.cls.set(CLS_NAMESPACE_ID, workspace.id);
+      this.cls.set(CLS_SLUG, workspace.slug);
+      this.cls.set(CLS_DATABASE_LANE, 'interactive');
+      return read();
+    });
   }
 }

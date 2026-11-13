@@ -1,0 +1,39 @@
+{{- if and .Values.sqlGateway.enabled .Values.sqlGateway.traefik.enabled }}
+{{- $mode := .Values.sqlGateway.traefik.tls }}
+{{- if and (ne $mode "none") (not .Values.sqlGateway.publicHost) }}
+{{- fail "sqlGateway.traefik.tls passthrough/terminate route by name (SNI): set sqlGateway.publicHost" }}
+{{- end }}
+{{- /*
+Traefik v3 in front of the SQL gateway. `none`: raw TCP on a dedicated
+entrypoint, TLS negotiated end to end with the gateway (every client works).
+`passthrough`: SNI routing on a shared entrypoint; Traefik answers PostgreSQL's
+SSLRequest and passes TLS through (the gateway accepts it as direct TLS).
+`terminate`: Traefik ends TLS and sends plaintext with a PROXY header.
+*/ -}}
+apiVersion: traefik.io/v1alpha1
+kind: IngressRouteTCP
+metadata:
+  name: {{ include "classifyre.sqlGateway.fullname" . }}
+  labels:
+    {{- include "classifyre.commonLabels" . | nindent 4 }}
+    app.kubernetes.io/component: sql-gateway
+spec:
+  entryPoints:
+    {{- toYaml .Values.sqlGateway.traefik.entryPoints | nindent 4 }}
+  routes:
+    - match: {{ if eq $mode "none" }}HostSNI(`*`){{ else }}HostSNI(`{{ .Values.sqlGateway.publicHost }}`){{ end }}
+      services:
+        - name: {{ include "classifyre.sqlGateway.fullname" . }}
+          port: {{ .Values.sqlGateway.port }}
+          {{- if or .Values.sqlGateway.proxyProtocol (eq $mode "terminate") }}
+          proxyProtocol:
+            version: 2
+          {{- end }}
+  {{- if eq $mode "passthrough" }}
+  tls:
+    passthrough: true
+  {{- else if eq $mode "terminate" }}
+  tls:
+    secretName: {{ .Values.sqlGateway.traefik.secretName | default (include "classifyre.sqlGateway.tlsSecret" .) }}
+  {{- end }}
+{{- end }}

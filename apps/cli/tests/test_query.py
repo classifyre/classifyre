@@ -108,6 +108,43 @@ def test_gate_reports_only_tables_read() -> None:
     assert checked.tables == {TableName.of("lake", "shop", "orders")}
 
 
+@pytest.mark.parametrize(
+    ("sql", "expected"),
+    [
+        ('SELECT * FROM "crm.public".customers', "crm.public.customers"),
+        ('SELECT * FROM lab."crm.public"."customers"', "crm.public.customers"),
+        ("SELECT * FROM customers WHERE id = 1", "crm.public.customers"),
+        ("SELECT * FROM crm.public.customers", "crm.public.customers"),
+        ('SELECT o.amount::numeric FROM "lake.shop".orders AS o', "lake.shop.orders"),
+    ],
+)
+def test_gate_reads_postgres_client_names(sql: str, expected: str) -> None:
+    checked = validate(
+        sql, ALLOWED, "postgres", database="lab", search_path=["crm.public", "public"]
+    )
+    assert {str(t) for t in checked.tables} == {expected}
+    assert '"crm"' in checked.sql or '"lake"' in checked.sql
+
+
+@pytest.mark.parametrize(
+    "sql",
+    [
+        'SELECT * FROM other_db."crm.public".customers',
+        'SELECT * FROM "crm.public".not_granted',
+        "SELECT * FROM orders",
+        "SELECT * FROM lab.public.customers",
+        "SELECT * FROM pg_catalog.pg_class",
+        "SELECT * FROM information_schema.tables",
+        "SELECT pg_read_file('/etc/passwd')",
+        'DELETE FROM "crm.public".customers',
+        'SELECT * FROM "crm.public".customers; SELECT 1',
+    ],
+)
+def test_gate_refuses_postgres_bypasses(sql: str) -> None:
+    with pytest.raises(QueryRefusedError):
+        validate(sql, ALLOWED, "postgres", database="lab", search_path=["crm.public"])
+
+
 # ── session over local files ─────────────────────────────────────────────
 
 
@@ -176,6 +213,25 @@ def test_join_across_files(folder: Path) -> None:
         {"country": "AT", "n": 100},
         {"country": "DE", "n": 100},
         {"country": "FR", "n": 100},
+    ]
+    assert payload["tables"] == ["files.local.customers", "files.local.orders"]
+
+
+def test_postgres_client_sql_runs_on_duckdb(folder: Path) -> None:
+    payload, result = run_query(
+        _request(
+            folder,
+            'SELECT c.country, count(*)::int8 AS n FROM "files.local".customers c '
+            "JOIN orders o ON o.customer_id = c.id WHERE c.country = ANY(ARRAY['AT','DE']) "
+            "GROUP BY c.country ORDER BY 1;",
+            dialect="postgres",
+            database="lab",
+            searchPath=["files.local"],
+        )
+    )
+    assert _rows(payload, result) == [
+        {"country": "AT", "n": 100},
+        {"country": "DE", "n": 100},
     ]
     assert payload["tables"] == ["files.local.customers", "files.local.orders"]
 

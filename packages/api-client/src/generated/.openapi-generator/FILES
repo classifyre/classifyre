@@ -72,6 +72,7 @@ docs/AuditEventDto.md
 docs/AuditEventsResponseDto.md
 docs/AutopilotApi.md
 docs/AutopilotStatsDto.md
+docs/BlockDataConnectionDto.md
 docs/BoardEndpointDto.md
 docs/BoardItemDto.md
 docs/BoardLinkCertainty.md
@@ -182,6 +183,7 @@ docs/CreateAiProviderConfigDto.md
 docs/CreateCaseDto.md
 docs/CreateCaseEventDto.md
 docs/CreateCustomDetectorDto.md
+docs/CreateDataConnectionDto.md
 docs/CreateDetectorNotebookExecutionDto.md
 docs/CreateExternalRunnerDto.md
 docs/CreateFindingDto.md
@@ -204,6 +206,13 @@ docs/CustomDetectorResponseDtoSourcesUsingInner.md
 docs/CustomDetectorTestsApi.md
 docs/CustomDetectorTrainingRunDto.md
 docs/CustomDetectorsApi.md
+docs/DataConnectionBlockDto.md
+docs/DataConnectionDto.md
+docs/DataConnectionEndpointDto.md
+docs/DataConnectionListDto.md
+docs/DataConnectionReadsDto.md
+docs/DataConnectionScopeItemDto.md
+docs/DataConnectionSecretDto.md
 docs/DataQueryApi.md
 docs/DataQuerySettingsDto.md
 docs/DecisionsToCaseDto.md
@@ -326,6 +335,7 @@ docs/InquiryResponseDto.md
 docs/InquiryTimelineResponseDto.md
 docs/InstanceSettingsApi.md
 docs/InstanceSettingsResponseDto.md
+docs/IssueDataConnectionDto.md
 docs/LatestRunnerSummaryDto.md
 docs/LineageGraphDto.md
 docs/LinkGovernanceTermDto.md
@@ -458,6 +468,7 @@ docs/ReviewSourceGraphDto.md
 docs/ReviewSourceNodeDto.md
 docs/ReviewWaterfallDto.md
 docs/ReviewWaterfallRowDto.md
+docs/RevokeDataConnectionDto.md
 docs/RoleDto.md
 docs/RunnerAssetFindingSummaryDto.md
 docs/RunnerAssetItemDto.md
@@ -491,6 +502,7 @@ docs/RunnersApi.md
 docs/RunnersChartsTimelineBucketDto.md
 docs/RunnersChartsTopSourceDto.md
 docs/RunnersChartsTotalsDto.md
+docs/SQLConnectionsApi.md
 docs/SaveExploreViewDto.md
 docs/SaveQualityRuleDto.md
 docs/SaveQualityRuleDtoThreshold.md
@@ -642,6 +654,7 @@ docs/UploadedSourceFileDto.md
 docs/UpsertGlossarySchemeDto.md
 docs/UpsertGlossaryTermDto.md
 docs/UpsertGlossaryTermResponseDto.md
+docs/UsageChannelDto.md
 docs/UsageDayDto.md
 docs/UsageFormatDto.md
 docs/UsageReaderDto.md
@@ -684,6 +697,7 @@ src/apis/NotebooksApi.ts
 src/apis/NotificationsApi.ts
 src/apis/PlatformApi.ts
 src/apis/RunnersApi.ts
+src/apis/SQLConnectionsApi.ts
 src/apis/SemanticApi.ts
 src/apis/SettingsApi.ts
 src/apis/SitemapApi.ts
@@ -757,6 +771,7 @@ src/models/AuditChangeDto.ts
 src/models/AuditEventDto.ts
 src/models/AuditEventsResponseDto.ts
 src/models/AutopilotStatsDto.ts
+src/models/BlockDataConnectionDto.ts
 src/models/BoardEndpointDto.ts
 src/models/BoardItemDto.ts
 src/models/BoardLinkCertainty.ts
@@ -863,6 +878,7 @@ src/models/CreateAiProviderConfigDto.ts
 src/models/CreateCaseDto.ts
 src/models/CreateCaseEventDto.ts
 src/models/CreateCustomDetectorDto.ts
+src/models/CreateDataConnectionDto.ts
 src/models/CreateDetectorNotebookExecutionDto.ts
 src/models/CreateExternalRunnerDto.ts
 src/models/CreateFindingDto.ts
@@ -882,6 +898,13 @@ src/models/CustomDetectorFileDto.ts
 src/models/CustomDetectorResponseDto.ts
 src/models/CustomDetectorResponseDtoSourcesUsingInner.ts
 src/models/CustomDetectorTrainingRunDto.ts
+src/models/DataConnectionBlockDto.ts
+src/models/DataConnectionDto.ts
+src/models/DataConnectionEndpointDto.ts
+src/models/DataConnectionListDto.ts
+src/models/DataConnectionReadsDto.ts
+src/models/DataConnectionScopeItemDto.ts
+src/models/DataConnectionSecretDto.ts
 src/models/DataQuerySettingsDto.ts
 src/models/DecisionsToCaseDto.ts
 src/models/DecisionsToCaseResponseDto.ts
@@ -992,6 +1015,7 @@ src/models/InquiryMatchListResponseDto.ts
 src/models/InquiryResponseDto.ts
 src/models/InquiryTimelineResponseDto.ts
 src/models/InstanceSettingsResponseDto.ts
+src/models/IssueDataConnectionDto.ts
 src/models/LatestRunnerSummaryDto.ts
 src/models/LineageGraphDto.ts
 src/models/LinkGovernanceTermDto.ts
@@ -1119,6 +1143,7 @@ src/models/ReviewSourceGraphDto.ts
 src/models/ReviewSourceNodeDto.ts
 src/models/ReviewWaterfallDto.ts
 src/models/ReviewWaterfallRowDto.ts
+src/models/RevokeDataConnectionDto.ts
 src/models/RoleDto.ts
 src/models/RunnerAssetFindingSummaryDto.ts
 src/models/RunnerAssetItemDto.ts
@@ -1297,6 +1322,7 @@ src/models/UploadedSourceFileDto.ts
 src/models/UpsertGlossarySchemeDto.ts
 src/models/UpsertGlossaryTermDto.ts
 src/models/UpsertGlossaryTermResponseDto.ts
+src/models/UsageChannelDto.ts
 src/models/UsageDayDto.ts
 src/models/UsageFormatDto.ts
 src/models/UsageReaderDto.ts

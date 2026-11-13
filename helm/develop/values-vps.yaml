@@ -90,6 +90,13 @@ frontend:
   sitemap:
     enabled: true
 
+  # Single node: one web pod is enough for the showcase. A second replica
+  # (+384Mi) eats into the extract-job headroom (see the budget above), same
+  # reasoning as api.autoscaling.
+  autoscaling:
+    minReplicas: 1
+    maxReplicas: 1
+
   service:
     type: NodePort
     port: 3100

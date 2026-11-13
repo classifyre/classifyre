@@ -31,6 +31,7 @@ export { NotebooksApi } from './NotebooksApi';
 export { NotificationsApi } from './NotificationsApi';
 export { PlatformApi } from './PlatformApi';
 export { RunnersApi } from './RunnersApi';
+export { SQLConnectionsApi } from './SQLConnectionsApi';
 export { SemanticApi } from './SemanticApi';
 export { SettingsApi } from './SettingsApi';
 export { SitemapApi } from './SitemapApi';

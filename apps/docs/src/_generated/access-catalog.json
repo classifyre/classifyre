@@ -201,6 +201,16 @@
       "description": "Query the rows of tables with SQL: every table here, or only the sources and tables a grant names."
     },
     {
+      "id": "data.connect",
+      "scope": "workspace",
+      "description": "Create your own SQL connections for BI tools and drivers (PostgreSQL protocol)."
+    },
+    {
+      "id": "data.connection.manage",
+      "scope": "workspace",
+      "description": "See, give and revoke the SQL connections of everyone in the workspace."
+    },
+    {
       "id": "mcp.token.own",
       "scope": "workspace",
       "description": "Create and revoke your own MCP tokens."
@@ -378,6 +388,8 @@
         "agent.use",
         "data.export",
         "data.query",
+        "data.connect",
+        "data.connection.manage",
         "mcp.token.own",
         "mcp.token.admin"
       ]
@@ -388,6 +400,7 @@
       "scope": "workspace",
       "capabilities": [
         "data.query",
+        "data.connect",
         "notification.view"
       ]
     },
@@ -445,6 +458,8 @@
         "agent.use",
         "data.export",
         "data.query",
+        "data.connect",
+        "data.connection.manage",
         "mcp.token.own",
         "mcp.token.admin"
       ]
@@ -506,6 +521,8 @@
         "agent.use",
         "data.export",
         "data.query",
+        "data.connect",
+        "data.connection.manage",
         "mcp.token.own",
         "mcp.token.admin",
         "tenant.workspace.create",

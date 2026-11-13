@@ -33,4 +33,8 @@ export enum NotificationEvent {
   GOVERNANCE_ROLE_ASSIGNED = 'governance.role_assigned',
   GOVERNANCE_QUALITY_FAILING = 'governance.quality_failing',
   GOVERNANCE_STATUS_CHANGED = 'governance.status_changed',
+  // SQL connections (docs/prd/DQ-data-query.md §5.7): to the connection's person.
+  GOVERNANCE_CONNECTION_ISSUED = 'governance.connection_issued',
+  GOVERNANCE_CONNECTION_REVOKED = 'governance.connection_revoked',
+  GOVERNANCE_CONNECTION_BLOCKED = 'governance.connection_blocked',
 }

@@ -38,11 +38,17 @@ export interface ResolvedActorDto {
      */
     displayName: string;
     /**
-     * For an action delegated through an MCP token: the token.
+     * For an action delegated through an MCP token or a SQL connection: its name.
      * @type {string}
      * @memberof ResolvedActorDto
      */
     viaDisplayName?: string;
+    /**
+     * What `viaDisplayName` names: an MCP token or a SQL connection.
+     * @type {string}
+     * @memberof ResolvedActorDto
+     */
+    viaKind?: ResolvedActorDtoViaKindEnum;
     /**
      * For a group: its path in the tenant.
      * @type {string}
@@ -64,6 +70,15 @@ export const ResolvedActorDtoKindEnum = {
     Name: 'name'
 } as const;
 export type ResolvedActorDtoKindEnum = typeof ResolvedActorDtoKindEnum[keyof typeof ResolvedActorDtoKindEnum];
+
+/**
+ * @export
+ */
+export const ResolvedActorDtoViaKindEnum = {
+    Mcp: 'mcp',
+    Sql: 'sql'
+} as const;
+export type ResolvedActorDtoViaKindEnum = typeof ResolvedActorDtoViaKindEnum[keyof typeof ResolvedActorDtoViaKindEnum];
 
 
 /**
@@ -90,6 +105,7 @@ export function ResolvedActorDtoFromJSONTyped(json: any, ignoreDiscriminator: bo
         'kind': json['kind'],
         'displayName': json['displayName'],
         'viaDisplayName': json['viaDisplayName'] == null ? undefined : json['viaDisplayName'],
+        'viaKind': json['viaKind'] == null ? undefined : json['viaKind'],
         'path': json['path'] == null ? undefined : json['path'],
     };
 }
@@ -109,6 +125,7 @@ export function ResolvedActorDtoToJSONTyped(value?: ResolvedActorDto | null, ign
         'kind': value['kind'],
         'displayName': value['displayName'],
         'viaDisplayName': value['viaDisplayName'],
+        'viaKind': value['viaKind'],
         'path': value['path'],
     };
 }

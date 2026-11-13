@@ -109,7 +109,7 @@ export const BUILT_IN_ROLES = [
     key: 'data-reader',
     title: 'Data reader',
     scope: 'workspace',
-    capabilities: ['data.query', 'notification.view'],
+    capabilities: ['data.query', 'data.connect', 'notification.view'],
   },
   {
     // Add-on: combined with another role, never granted alone in practice.

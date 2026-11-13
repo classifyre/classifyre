@@ -19,10 +19,23 @@ export class MeActorDto {
   kind: ActorKind;
 
   @ApiProperty({
-    enum: ['oidc', 'mcp-token', 'internal-key', 'autopilot', 'none'],
+    enum: [
+      'oidc',
+      'mcp-token',
+      'sql-connection',
+      'internal-key',
+      'autopilot',
+      'none',
+    ],
     description: 'How the actor was identified.',
   })
-  via: 'oidc' | 'mcp-token' | 'internal-key' | 'autopilot' | 'none';
+  via:
+    | 'oidc'
+    | 'mcp-token'
+    | 'sql-connection'
+    | 'internal-key'
+    | 'autopilot'
+    | 'none';
 }
 
 export class MeResponseDto {

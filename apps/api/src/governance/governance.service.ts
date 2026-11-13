@@ -136,6 +136,42 @@ export class GovernanceService {
 
   // ── Reads ─────────────────────────────────────────────────────────────────
 
+  /**
+   * Whether the caller governs an asset or source: `asset.govern`, or owner
+   * or steward of it (or of the asset's source). Used by SQL connections,
+   * where an owner gives and blocks access to their own data (DQ §5.7).
+   */
+  async mayGovernScope(scope: {
+    scopeType: 'ASSET' | 'SOURCE';
+    scopeId: string;
+  }): Promise<{ allowed: boolean; name: string; sourceId: string }> {
+    const target =
+      scope.scopeType === 'ASSET'
+        ? await this.assetTarget(scope.scopeId)
+        : await this.sourceTarget(scope.scopeId);
+    const rows = [
+      ...(target.scopeType === 'ASSET'
+        ? await this.rows('ASSET', target.assetId)
+        : []),
+      ...(await this.rows('SOURCE', target.sourceId)),
+    ];
+    return {
+      allowed: await this.mayGovern(rows),
+      name: target.name,
+      sourceId: target.sourceId,
+    };
+  }
+
+  /** A current member of the tenant by `user:` ref, or null. */
+  async tenantMember(ref: string): Promise<OrgMember | null> {
+    const parsed = parseActorRef(ref);
+    if (parsed.kind !== 'user') return null;
+    return (
+      (await this.tenantMembers()).find((member) => member.id === parsed.id) ??
+      null
+    );
+  }
+
   private async assetTarget(assetId: string): Promise<Target> {
     const asset = await this.prisma.asset.findUnique({
       where: { id: assetId },

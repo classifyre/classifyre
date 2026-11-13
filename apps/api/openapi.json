@@ -15399,6 +15399,348 @@
         ]
       }
     },
+    "/data-connections": {
+      "get": {
+        "operationId": "DataConnectionController_mine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataConnectionListDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Your SQL connections",
+        "tags": [
+          "SQL connections"
+        ]
+      },
+      "post": {
+        "operationId": "DataConnectionController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDataConnectionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataConnectionSecretDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create a SQL connection of your own; the password is shown once",
+        "tags": [
+          "SQL connections"
+        ]
+      }
+    },
+    "/data-connections/all": {
+      "get": {
+        "operationId": "DataConnectionController_all",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataConnectionListDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Everyone’s SQL connections (data.connection.manage)",
+        "tags": [
+          "SQL connections"
+        ]
+      }
+    },
+    "/data-connections/endpoint": {
+      "get": {
+        "operationId": "DataConnectionController_endpoint",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataConnectionEndpointDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Where tools connect: host, port, database, TLS",
+        "tags": [
+          "SQL connections"
+        ]
+      }
+    },
+    "/assets/{id}/data-connections": {
+      "get": {
+        "operationId": "DataConnectionController_forAsset",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataConnectionListDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "SQL connections that read, name or are blocked on a table",
+        "tags": [
+          "SQL connections"
+        ]
+      }
+    },
+    "/sources/{id}/data-connections": {
+      "get": {
+        "operationId": "DataConnectionController_forSource",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataConnectionListDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "SQL connections that read, name or are blocked on a source",
+        "tags": [
+          "SQL connections"
+        ]
+      }
+    },
+    "/data-connections/issue": {
+      "post": {
+        "operationId": "DataConnectionController_issue",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IssueDataConnectionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataConnectionDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Give someone a SQL connection; they reveal its password themselves",
+        "tags": [
+          "SQL connections"
+        ]
+      }
+    },
+    "/data-connections/{id}/password": {
+      "post": {
+        "operationId": "DataConnectionController_password",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataConnectionSecretDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Reveal (first time) or replace the password of your own connection",
+        "tags": [
+          "SQL connections"
+        ]
+      }
+    },
+    "/data-connections/{id}/revoke": {
+      "post": {
+        "operationId": "DataConnectionController_revoke",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevokeDataConnectionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataConnectionDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Revoke a SQL connection (its person or a manager)",
+        "tags": [
+          "SQL connections"
+        ]
+      }
+    },
+    "/data-connections/{id}/blocks": {
+      "post": {
+        "operationId": "DataConnectionController_block",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BlockDataConnectionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataConnectionDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Close a table or source you govern to this connection",
+        "tags": [
+          "SQL connections"
+        ]
+      }
+    },
+    "/data-connections/{id}/blocks/{blockId}": {
+      "delete": {
+        "operationId": "DataConnectionController_unblock",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "blockId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataConnectionDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lift a block",
+        "tags": [
+          "SQL connections"
+        ]
+      }
+    },
     "/runner-limits": {
       "get": {
         "operationId": "DeploymentSettingsController_get",
@@ -30950,6 +31292,7 @@
             "enum": [
               "oidc",
               "mcp-token",
+              "sql-connection",
               "internal-key",
               "autopilot",
               "none"
@@ -31016,6 +31359,8 @@
                 "agent.use",
                 "data.export",
                 "data.query",
+                "data.connect",
+                "data.connection.manage",
                 "mcp.token.own",
                 "mcp.token.admin",
                 "tenant.workspace.create",
@@ -31076,7 +31421,8 @@
             "type": "string",
             "enum": [
               "rest",
-              "mcp"
+              "mcp",
+              "sql"
             ]
           },
           "capability": {
@@ -31185,7 +31531,15 @@
           },
           "viaDisplayName": {
             "type": "string",
-            "description": "For an action delegated through an MCP token: the token."
+            "description": "For an action delegated through an MCP token or a SQL connection: its name."
+          },
+          "viaKind": {
+            "type": "string",
+            "enum": [
+              "mcp",
+              "sql"
+            ],
+            "description": "What `viaDisplayName` names: an MCP token or a SQL connection."
           },
           "path": {
             "type": "string",
@@ -31269,6 +31623,8 @@
                 "agent.use",
                 "data.export",
                 "data.query",
+                "data.connect",
+                "data.connection.manage",
                 "mcp.token.own",
                 "mcp.token.admin",
                 "tenant.workspace.create",
@@ -31494,6 +31850,8 @@
                 "agent.use",
                 "data.export",
                 "data.query",
+                "data.connect",
+                "data.connection.manage",
                 "mcp.token.own",
                 "mcp.token.admin",
                 "tenant.workspace.create",
@@ -37070,6 +37428,30 @@
           "count"
         ]
       },
+      "UsageChannelDto": {
+        "type": "object",
+        "properties": {
+          "channel": {
+            "type": "string",
+            "enum": [
+              "rest",
+              "mcp",
+              "sql"
+            ]
+          },
+          "reads": {
+            "type": "number"
+          },
+          "exports": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "channel",
+          "reads",
+          "exports"
+        ]
+      },
       "AssetUsageDto": {
         "type": "object",
         "properties": {
@@ -37084,7 +37466,7 @@
           },
           "readers": {
             "type": "number",
-            "description": "Distinct people and tokens."
+            "description": "Distinct people, however they read."
           },
           "perDay": {
             "type": "array",
@@ -37103,6 +37485,13 @@
             "items": {
               "$ref": "#/components/schemas/UsageFormatDto"
             }
+          },
+          "byChannel": {
+            "description": "By how the reads came: `rest` (the app), `mcp`, `sql` (SQL connections).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UsageChannelDto"
+            }
           }
         },
         "required": [
@@ -37112,7 +37501,8 @@
           "readers",
           "perDay",
           "topReaders",
-          "exportsByFormat"
+          "exportsByFormat",
+          "byChannel"
         ]
       },
       "GovernanceTotalsDto": {
@@ -38843,6 +39233,378 @@
         },
         "required": [
           "deleted",
+          "id"
+        ]
+      },
+      "DataConnectionScopeItemDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "source",
+              "asset"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "description": "The source or table name, as the app shows it."
+          },
+          "sqlName": {
+            "type": "string",
+            "description": "For a table: its SQL name (`source.schema.table`)."
+          }
+        },
+        "required": [
+          "type",
+          "id",
+          "name"
+        ]
+      },
+      "DataConnectionBlockDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "source",
+              "asset"
+            ]
+          },
+          "scopeId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "blockedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "scopeId",
+          "name",
+          "blockedBy",
+          "reason",
+          "createdAt"
+        ]
+      },
+      "DataConnectionReadsDto": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "number",
+            "description": "Table reads through the connection, last 90 days."
+          },
+          "lastAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "count",
+          "lastAt"
+        ]
+      },
+      "DataConnectionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "personRef": {
+            "type": "string",
+            "description": "The person it belongs to (`user:<sub>`)."
+          },
+          "username": {
+            "type": "string",
+            "description": "What the tool signs in as."
+          },
+          "secretPreview": {
+            "type": "string",
+            "nullable": true,
+            "description": "Last characters of the password."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "pending",
+              "expired",
+              "revoked"
+            ]
+          },
+          "scope": {
+            "description": "Empty: everything its person may query.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DataConnectionScopeItemDto"
+            }
+          },
+          "blocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DataConnectionBlockDto"
+            }
+          },
+          "issuedBy": {
+            "type": "string",
+            "nullable": true,
+            "description": "Who gave it, when not its person."
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastUsedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastUsedIp": {
+            "type": "string",
+            "nullable": true
+          },
+          "revokedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "revokedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "revokeReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "canRevoke": {
+            "type": "boolean",
+            "description": "The caller may revoke it (its person, or a manager)."
+          },
+          "reads": {
+            "description": "On an asset or source listing: its reads there.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DataConnectionReadsDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "personRef",
+          "username",
+          "secretPreview",
+          "status",
+          "scope",
+          "blocks",
+          "issuedBy",
+          "expiresAt",
+          "lastUsedAt",
+          "lastUsedIp",
+          "revokedAt",
+          "revokedBy",
+          "revokeReason",
+          "createdAt",
+          "canRevoke"
+        ]
+      },
+      "DataConnectionListDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DataConnectionDto"
+            }
+          },
+          "canCreate": {
+            "type": "boolean",
+            "description": "The caller may create connections of their own."
+          },
+          "canManage": {
+            "type": "boolean",
+            "description": "The caller sees and manages everyone’s."
+          },
+          "canGovern": {
+            "type": "boolean",
+            "description": "On an asset or source listing: the caller may issue and block here."
+          }
+        },
+        "required": [
+          "items",
+          "canCreate",
+          "canManage"
+        ]
+      },
+      "DataConnectionEndpointDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "The SQL gateway runs in this deployment."
+          },
+          "host": {
+            "type": "string",
+            "nullable": true
+          },
+          "port": {
+            "type": "number"
+          },
+          "database": {
+            "type": "string",
+            "description": "The PostgreSQL database: this workspace."
+          },
+          "sslMode": {
+            "type": "string",
+            "enum": [
+              "verify-full",
+              "verify-ca",
+              "require"
+            ]
+          },
+          "caCertificate": {
+            "type": "string",
+            "nullable": true,
+            "description": "PEM of the CA that signed the gateway certificate, when it is not a public one."
+          }
+        },
+        "required": [
+          "enabled",
+          "host",
+          "port",
+          "database",
+          "sslMode",
+          "caCertificate"
+        ]
+      },
+      "CreateDataConnectionDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Power BI"
+          },
+          "expiresInDays": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 365,
+            "default": 90
+          },
+          "scope": {
+            "description": "`source:<id>` / `asset:<id>` to narrow it to; empty = everything you may query.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "DataConnectionSecretDto": {
+        "type": "object",
+        "properties": {
+          "connection": {
+            "$ref": "#/components/schemas/DataConnectionDto"
+          },
+          "password": {
+            "type": "string",
+            "description": "Shown once; only a verifier is kept."
+          }
+        },
+        "required": [
+          "connection",
+          "password"
+        ]
+      },
+      "IssueDataConnectionDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Power BI"
+          },
+          "expiresInDays": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 365,
+            "default": 90
+          },
+          "scope": {
+            "description": "`source:<id>` / `asset:<id>` to narrow it to; empty = everything you may query.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "personRef": {
+            "type": "string",
+            "description": "The person to give it to (`user:<sub>`)."
+          }
+        },
+        "required": [
+          "name",
+          "personRef"
+        ]
+      },
+      "RevokeDataConnectionDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 300
+          }
+        }
+      },
+      "BlockDataConnectionDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "source",
+              "asset"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "type",
           "id"
         ]
       },

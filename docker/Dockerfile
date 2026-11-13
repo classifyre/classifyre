@@ -279,7 +279,8 @@ ENV PORT_HTTP=3000 \
     CLASSIFYRE_ALLINONE=1 \
     IAM_PORT=8180
 
-EXPOSE 3000
+# 5433: SQL connections (PostgreSQL protocol), published as e.g. -p 5432:5433.
+EXPOSE 3000 5433
 
 # start-period is generous on purpose: a first boot initialises the database
 # cluster, applies every migration, and provisions the bootstrap workspace's

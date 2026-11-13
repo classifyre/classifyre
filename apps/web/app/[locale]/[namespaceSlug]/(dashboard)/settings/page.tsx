@@ -30,10 +30,12 @@ import {
   SlidersHorizontal,
   History,
   ShieldCheck,
+  PlugZap,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useInstanceSettings } from "@/components/instance-settings-provider";
 import { McpSettingsCard } from "@/components/mcp-settings-card";
+import { SqlConnectionsCard } from "@/components/sql-connections/sql-connections-card";
 import { HuggingFaceSettingsCard } from "@/components/huggingface-settings-card";
 import { VersionSettingsSection } from "@/components/version-update-notifier";
 import { RunnerLimitsCard } from "@/components/maintenance/runner-limits-card";
@@ -260,6 +262,10 @@ function WorkspaceSettings() {
             <Server className="h-3.5 w-3.5" />
             {t("settings.tabs.mcp")}
           </TabsTrigger>
+          <TabsTrigger value="sql-connections" className={TAB_TRIGGER_CLASS}>
+            <PlugZap className="h-3.5 w-3.5" />
+            {t("settings.tabs.sqlConnections")}
+          </TabsTrigger>
           <TabsTrigger value="workers" className={TAB_TRIGGER_CLASS}>
             <Cpu className="h-3.5 w-3.5" />
             {t("settings.tabs.workers")}
@@ -438,6 +444,13 @@ function WorkspaceSettings() {
           className="duration-300 animate-in fade-in-50 slide-in-from-bottom-1"
         >
           <McpSettingsCard />
+        </TabsContent>
+
+        <TabsContent
+          value="sql-connections"
+          className="duration-300 animate-in fade-in-50 slide-in-from-bottom-1"
+        >
+          <SqlConnectionsCard />
         </TabsContent>
 
         <TabsContent

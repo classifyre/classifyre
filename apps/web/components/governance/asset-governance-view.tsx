@@ -22,6 +22,7 @@ import { MeaningStep } from "./meaning-step";
 import { OwnershipCard } from "./ownership-card";
 import { QualityStep } from "./quality-step";
 import { ContractCard } from "./contract-card";
+import { AccessCard } from "./access-card";
 import { GovernanceBadge } from "./governance-badge";
 import { QualityChip } from "./quality-chip";
 import { RoleIcon } from "./role-style";
@@ -190,6 +191,25 @@ export function AssetGovernanceView({
         />
       ),
     },
+    ...(isTable && governance.canGovern
+      ? [
+          {
+            id: "access",
+            title: t("governance.steps.access"),
+            description: t("governance.steps.accessDesc"),
+            complete: true,
+            content: (
+              <AccessCard
+                target={{
+                  type: "asset",
+                  id: assetId,
+                  name: t("sqlConnections.thisTable"),
+                }}
+              />
+            ),
+          },
+        ]
+      : []),
     {
       id: "certification",
       title: t("governance.steps.certification"),

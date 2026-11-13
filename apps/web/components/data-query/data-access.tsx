@@ -1,24 +1,15 @@
 "use client";
 
 import * as React from "react";
-import { Trash2, UserPlus } from "lucide-react";
+import { UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@workspace/api-client";
 import type { GrantDto, RoleDto, TenantGroupDto } from "@workspace/api-client";
-import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 
 
 
 
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@workspace/ui/components/table";
 import {
   Tabs,
   TabsContent,
@@ -29,16 +20,11 @@ import {
   GiveAccessDialog,
   type GrantTarget,
 } from "@/components/access/give-access-dialog";
+import { GrantsByGroup } from "@/components/access/grants-by-group";
 import { AuditEventList } from "@/components/audit-history";
 import { useNamespace } from "@/components/namespace-provider";
-import {
-  SortableHead,
-  sortRows,
-  useTableSort,
-} from "@/components/sortable-table-head";
 import { useCan } from "@/hooks/use-me";
 import { useTranslation } from "@/hooks/use-translation";
-import { formatDate } from "@/lib/date";
 import { extractApiErrorMessage } from "@/lib/extract-api-error-message";
 
 /**
@@ -70,7 +56,10 @@ function reaches(scope: DataScope, workspaceId: string, grant: GrantDto) {
 }
 
 export interface DataAccessGrants {
+  /** The Data reader grants that reach the scope. */
   grants: GrantDto[] | null;
+  /** Every grant of the workspace: what decides whether a group can open it. */
+  all: GrantDto[];
   groups: TenantGroupDto[];
   roles: RoleDto[];
   reload: () => Promise<void>;
@@ -87,6 +76,7 @@ export function useDataAccessGrants(scope: DataScope): DataAccessGrants {
   const canView = useCan("access.view");
   const workspaceId = namespace?.id ?? "";
   const [grants, setGrants] = React.useState<GrantDto[] | null>(null);
+  const [allGrants, setAllGrants] = React.useState<GrantDto[]>([]);
   const [groups, setGroups] = React.useState<TenantGroupDto[]>([]);
   const [roles, setRoles] = React.useState<RoleDto[]>([]);
   const scopeKey = JSON.stringify(scope);
@@ -102,6 +92,7 @@ export function useDataAccessGrants(scope: DataScope): DataAccessGrants {
       ]);
       setGroups(tenantGroups);
       setRoles(workspaceRoles);
+      setAllGrants(all);
       setGrants(all.filter((grant) => reaches(current, workspaceId, grant)));
     } catch (error) {
       toast.error(await extractApiErrorMessage(error, t("access.loadFailed")));
@@ -113,7 +104,7 @@ export function useDataAccessGrants(scope: DataScope): DataAccessGrants {
     void reload();
   }, [reload]);
 
-  return { grants, groups, roles, reload };
+  return { grants, all: allGrants, groups, roles, reload };
 }
 
 /** A grant this screen may take away: given here, and only data access. */
@@ -125,9 +116,12 @@ function removable(grant: GrantDto): boolean {
   );
 }
 
-type GrantsSortCol = "group" | "scope" | "until";
-
-/** Who can read a scope's rows, as a sortable table like settings → Access. */
+/**
+ * Who can read a scope's rows: the same grouped access table as Settings →
+ * Access, limited to the Data reader grants that reach this source or table.
+ * Each row says where it applies (the table, its source, the workspace), so a
+ * group with several grants shows them together.
+ */
 function DataAccessOverview({
   scope,
   access,
@@ -138,22 +132,6 @@ function DataAccessOverview({
   canManage: boolean;
 }) {
   const { t } = useTranslation();
-  const sort = useTableSort<GrantsSortCol>("group");
-  const { sortCol, sortDir } = sort;
-  const rows = React.useMemo(
-    () =>
-      sortRows(
-        access.grants ?? [],
-        (grant) =>
-          sortCol === "scope"
-            ? grant.scopeLabel
-            : sortCol === "until"
-              ? grant.expiresAt
-              : grant.subjectLabel,
-        sortDir,
-      ),
-    [access.grants, sortCol, sortDir],
-  );
 
   const remove = async (grant: GrantDto) => {
     try {
@@ -170,7 +148,7 @@ function DataAccessOverview({
       <p className="mb-3 text-xs text-muted-foreground">
         {t(`dataQuery.access.description.${scope.kind}`)}
       </p>
-      {access.grants !== null && rows.length === 0 ? (
+      {access.grants !== null && access.grants.length === 0 ? (
         <p
           className="rounded-[4px] border border-dashed p-4 text-sm text-muted-foreground"
           data-testid="data-access-none"
@@ -178,74 +156,17 @@ function DataAccessOverview({
           {t("dataQuery.access.none")}
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-[4px] border border-border">
-          <Table data-testid="data-access-table">
-            <TableHeader>
-              <TableRow>
-                <SortableHead
-                  label={t("access.grantsTable.group")}
-                  column="group"
-                  sort={sort}
-                />
-                <SortableHead
-                  label={t("access.grantsTable.scope")}
-                  column="scope"
-                  sort={sort}
-                />
-                <SortableHead
-                  label={t("access.grantsTable.until")}
-                  column="until"
-                  sort={sort}
-                />
-                <TableHead>
-                  <span className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                    {t("access.grantsTable.origin")}
-                  </span>
-                </TableHead>
-                <TableHead className="text-right">
-                  <span className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                    {t("access.grantsTable.actions")}
-                  </span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((grant) => (
-                <TableRow key={grant.id}>
-                  <TableCell className="font-medium">
-                    {grant.subjectLabel}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {grant.scopeLabel}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {grant.expiresAt ? formatDate(grant.expiresAt) : "—"}
-                  </TableCell>
-                  <TableCell>
-                    {grant.inherited ? (
-                      <Badge variant="outline">{t("access.inherited")}</Badge>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">
-                        {t("access.grantsTable.here")}
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {canManage && removable(grant) && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        aria-label={t("dataQuery.access.remove")}
-                        onClick={() => void remove(grant)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+        <div data-testid="data-access-table">
+          <GrantsByGroup
+            grants={access.grants ?? []}
+            contextGrants={access.all}
+            roles={access.roles}
+            groupLabel={(grant) => grant.subjectLabel}
+            scopeLabel={(grant) => grant.scopeLabel}
+            showOrigin
+            canRemove={(grant) => canManage && removable(grant)}
+            onRemove={remove}
+          />
         </div>
       )}
       <p className="mt-2 text-[11px] text-muted-foreground">

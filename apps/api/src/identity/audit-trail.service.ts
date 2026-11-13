@@ -5,9 +5,12 @@ import { PrismaService } from '../prisma.service';
 import type { Actor } from './actor';
 import type { Capability } from './capabilities';
 
+export type AuditChannel = 'rest' | 'mcp' | 'sql';
+
 export interface AuditEventInput {
   actor: Actor;
-  channel: 'rest' | 'mcp';
+  /** `sql`: a SQL connection (a BI tool or driver, docs/prd/DQ §5.7). */
+  channel: AuditChannel;
   capability: Capability;
   operation: string;
   entityType: string | null;

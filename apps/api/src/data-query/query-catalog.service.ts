@@ -13,6 +13,11 @@ import {
   uniqueSourceSqlName,
   type TableLocation,
 } from './sql-names';
+import {
+  CLS_CONNECTION_SCOPE,
+  connectionAllows,
+  type ConnectionScope,
+} from './connection-scope';
 
 export interface CatalogColumn {
   name: string;
@@ -165,7 +170,10 @@ export class QueryCatalogService {
     // An owner reads the tables they own (GOV R3), without a grant.
     const owned = all
       ? { sourceIds: [], assetIds: [] }
-      : await ownerDataScope(this.prisma, actor.ref);
+      : await ownerDataScope(
+          this.prisma,
+          actor.id?.startsWith('user:') ? actor.id : actor.ref,
+        );
     return {
       all,
       sourceIds: new Set([...grants.sourceIds, ...owned.sourceIds]),
@@ -184,12 +192,18 @@ export class QueryCatalogService {
     for (const source of cached.sources) {
       sources.set(source.id, { ...source, tables: [] });
     }
+    const connection = this.cls.isActive()
+      ? this.cls.get<ConnectionScope | undefined>(CLS_CONNECTION_SCOPE)
+      : undefined;
     for (const table of cached.tables) {
+      // Through a SQL connection only what it opens shows at all: a BI tool
+      // has no use for locked tables, and blocked ones are not its business.
+      if (connection && !connectionAllows(connection, table)) continue;
       const granted =
         scope.all ||
         scope.sourceIds.has(table.sourceId) ||
         scope.assetIds.has(table.assetId);
-      if (!granted && !scope.seeLocked) continue;
+      if (!granted && (connection || !scope.seeLocked)) continue;
       // R4: say why a visible table cannot be queried — unreadable by the
       // engine, or locked for lack of a grant.
       const reason = table.queryable

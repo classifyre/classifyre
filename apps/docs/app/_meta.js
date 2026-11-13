@@ -11,6 +11,7 @@ export default {
   duplicates: "Duplicate Review",
   notifications: "Notifications",
   "data-query": "SQL",
+  "sql-connections": "SQL Connections",
   "data-export": "Data Export",
   access: "Access & Sign-in",
   settings: "Settings",

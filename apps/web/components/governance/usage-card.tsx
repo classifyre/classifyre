@@ -109,6 +109,18 @@ export function UsageCard({
                 </ul>
               </div>
             )}
+            {usage.byChannel.length > 0 && (
+              <p className="text-xs text-muted-foreground" data-testid="usage-channels">
+                {t("governance.usage.channels", {
+                  list: usage.byChannel
+                    .map(
+                      (item) =>
+                        `${t(`governance.usage.channel.${item.channel === "sql" || item.channel === "mcp" ? item.channel : "rest"}`)} ${item.reads + item.exports}`,
+                    )
+                    .join(" · "),
+                })}
+              </p>
+            )}
             {usage.exportsByFormat.length > 0 && (
               <p className="text-xs text-muted-foreground">
                 {t("governance.usage.formats", {

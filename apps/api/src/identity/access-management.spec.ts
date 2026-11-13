@@ -7,6 +7,7 @@ import { AccessManagementService } from './access-management.service';
 import type { Capability } from './capabilities';
 import type { IdentityService, Principal } from './identity.service';
 import { BUILT_IN_ROLES } from './roles';
+import { CLS_SCHEMA } from '../namespace/namespace.constants';
 import type { Grant, TenancyService } from './tenancy.service';
 
 const roleCaps = (key: string): Set<Capability> =>
@@ -82,17 +83,56 @@ describe('AccessManagementService', () => {
     ownerLineage: () => Promise.resolve(['finance']),
   } as unknown as IdentityService;
 
-  const service = new AccessManagementService(tenancy, identity, {
-    source: {
-      findMany: () => Promise.resolve([{ id: 's-shop', name: 'Shop lake' }]),
+  // Like the real ones: tenant data can only be read inside a workspace.
+  let store: Record<string, string> | null = null;
+  const cls = {
+    isActive: () => store !== null,
+    get: (key: string) => store?.[key],
+    set: (key: string, value: string) => {
+      if (store) store[key] = value;
     },
-    asset: {
-      findMany: () =>
-        Promise.resolve([
-          { id: 'a-orders', name: 'orders', sourceId: 's-shop' },
-        ]),
+    run: async <T>(fn: () => Promise<T>): Promise<T> => {
+      const outer = store;
+      store = { ...outer };
+      try {
+        return await fn();
+      } finally {
+        store = outer;
+      }
     },
-  } as never);
+  };
+  const inWorkspace = <T>(rows: Record<string, T>): Promise<T> => {
+    const schema = store?.[CLS_SCHEMA];
+    if (!schema) throw new Error('PrismaService accessed outside a workspace');
+    return Promise.resolve(rows[schema] ?? ([] as unknown as T));
+  };
+  const registry = {
+    get: (id: string) =>
+      id === 'ws-gone'
+        ? Promise.reject(new NotFoundException('Unknown namespace'))
+        : Promise.resolve({ id, slug: id, schemaName: `ns_${id}` }),
+  };
+
+  const service = new AccessManagementService(
+    tenancy,
+    identity,
+    {
+      source: {
+        findMany: () =>
+          inWorkspace({ 'ns_ws-q3': [{ id: 's-shop', name: 'Shop lake' }] }),
+      },
+      asset: {
+        findMany: () =>
+          inWorkspace({
+            'ns_ws-q3': [
+              { id: 'a-orders', name: 'orders', sourceId: 's-shop' },
+            ],
+          }),
+      },
+    } as never,
+    cls as never,
+    registry as never,
+  );
   const base = {
     subjectType: 'group' as const,
     subjectId: 'legal',
@@ -246,5 +286,33 @@ describe('AccessManagementService', () => {
     const source = await service.removeGrant(principal, 'g-src');
     expect(source).toMatchObject({ scopeLabel: 'Shop lake' });
     expect(source).not.toHaveProperty('sourceId');
+  });
+
+  it('names single-source grants in a tenant-wide list, with no current workspace', async () => {
+    stored = [
+      {
+        ...base,
+        id: 'g-src',
+        tenantId: 't1',
+        roleKey: 'data-reader',
+        scopeType: 'source',
+        scopeId: 'ws-q3/s-shop',
+        expiresAt: null,
+      },
+      {
+        ...base,
+        id: 'g-gone',
+        tenantId: 't1',
+        roleKey: 'data-reader',
+        scopeType: 'source',
+        scopeId: 'ws-gone/s-old',
+        expiresAt: null,
+      },
+    ] as Grant[];
+    const list = await service.tenantGrants(principal);
+    expect(list.map((grant) => grant.scopeLabel)).toEqual([
+      'Shop lake',
+      'One source',
+    ]);
   });
 });

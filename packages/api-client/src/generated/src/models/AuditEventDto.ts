@@ -113,7 +113,8 @@ export interface AuditEventDto {
  */
 export const AuditEventDtoChannelEnum = {
     Rest: 'rest',
-    Mcp: 'mcp'
+    Mcp: 'mcp',
+    Sql: 'sql'
 } as const;
 export type AuditEventDtoChannelEnum = typeof AuditEventDtoChannelEnum[keyof typeof AuditEventDtoChannelEnum];
 

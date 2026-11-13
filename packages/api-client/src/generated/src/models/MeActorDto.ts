@@ -64,6 +64,7 @@ export type MeActorDtoKindEnum = typeof MeActorDtoKindEnum[keyof typeof MeActorD
 export const MeActorDtoViaEnum = {
     Oidc: 'oidc',
     McpToken: 'mcp-token',
+    SqlConnection: 'sql-connection',
     InternalKey: 'internal-key',
     Autopilot: 'autopilot',
     None: 'none'

@@ -403,15 +403,16 @@ export class IdentityService {
   }
 
   /**
-   * The principal an MCP token acts as: its owner, as they are now (docs/prd
-   * §8.3). Rebuilt on every call, so a viewer's agent stays read-only, a
-   * mover's agent follows the move and a leaver's agent stops. Null when the
-   * owner can no longer see the workspace.
+   * The principal a delegated credential acts as: its person, as they are now
+   * (docs/prd §8.3) — an MCP token (`via: mcp`) or a SQL connection (`via:
+   * sql`, docs/prd/DQ-data-query.md §5.7). Rebuilt on every use, so a
+   * viewer's agent stays read-only, a mover's agent follows the move and a
+   * leaver's tools stop. Null when the person can no longer see the workspace.
    */
-  async principalForOwner(
+  async principalFor(
     sub: string,
-    tokenId: string,
     namespaceId: string,
+    via: { kind: 'mcp' | 'sql'; id: string },
   ): Promise<{ principal: Principal; capabilities: Set<Capability> } | null> {
     const tenancy = await this.tenancy.workspaceTenancy(namespaceId);
     const tenant = tenancy
@@ -432,8 +433,8 @@ export class IdentityService {
         id: `user:${sub}`,
         displayName: member.displayName,
         kind: 'person',
-        via: 'mcp-token',
-        ref: `user:${sub}@mcp:${tokenId}`,
+        via: via.kind === 'mcp' ? 'mcp-token' : 'sql-connection',
+        ref: `user:${sub}@${via.kind}:${via.id}`,
       },
       tenant,
       orgId: tenant.orgId,
