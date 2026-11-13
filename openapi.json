@@ -12344,6 +12344,79 @@
         ]
       }
     },
+    "/assets/{id}/quality/options": {
+      "get": {
+        "operationId": "GovernanceController_qualityOptions",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QualityOptionsDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "What a quality rule on this asset can use: columns, SQL name, open findings by kind",
+        "tags": [
+          "Governance"
+        ]
+      }
+    },
+    "/assets/{id}/quality/test": {
+      "post": {
+        "description": "Nothing is stored and no finding changes. Whole-table rules run their query and wait up to a minute. Needs the right to govern the asset.",
+        "operationId": "GovernanceController_testQualityRule",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveQualityRuleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QualityTestResultDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Measure a quality rule now without saving it",
+        "tags": [
+          "Governance"
+        ]
+      }
+    },
     "/assets/{id}/quality/run": {
       "post": {
         "operationId": "GovernanceController_runQuality",
@@ -19857,9 +19930,10 @@
               "draft",
               "active",
               "deprecated",
-              "retired"
+              "retired",
+              "failing"
             ],
-            "description": "Governance (docs/prd/GOV-governed-data-assets.md): owned or not, or a lifecycle of owned assets."
+            "description": "Governance (docs/prd/GOV-governed-data-assets.md): owned or not, a lifecycle of owned assets, or `failing` quality checks."
           },
           "ownerRef": {
             "type": "string",
@@ -20391,6 +20465,28 @@
           "via"
         ]
       },
+      "SearchAssetQualityDto": {
+        "type": "object",
+        "properties": {
+          "rules": {
+            "type": "number",
+            "description": "Enabled quality rules."
+          },
+          "failing": {
+            "type": "number",
+            "description": "Rules whose latest result fails."
+          },
+          "score": {
+            "type": "number",
+            "nullable": true,
+            "description": "0–100 weighted by severity; null until measured."
+          }
+        },
+        "required": [
+          "rules",
+          "failing"
+        ]
+      },
       "SearchAssetGovernanceDto": {
         "type": "object",
         "properties": {
@@ -20409,6 +20505,16 @@
             "type": "string",
             "nullable": true,
             "description": "The owner, its own or its source’s (`user:<id>`)."
+          },
+          "quality": {
+            "nullable": true,
+            "description": "Quality rules and their latest results; null without rules.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SearchAssetQualityDto"
+              }
+            ]
           }
         }
       },
@@ -31511,6 +31617,26 @@
           "capabilities"
         ]
       },
+      "AuditChangeDto": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string",
+            "example": "Owner"
+          },
+          "from": {
+            "type": "string",
+            "nullable": true
+          },
+          "to": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "field"
+        ]
+      },
       "AuditEventDto": {
         "type": "object",
         "properties": {
@@ -31565,6 +31691,14 @@
             "type": "array",
             "items": {
               "type": "string"
+            }
+          },
+          "changes": {
+            "nullable": true,
+            "description": "What changed, for changes whose values are not secret (governance).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditChangeDto"
             }
           },
           "status": {
@@ -37089,6 +37223,142 @@
           "threshold"
         ]
       },
+      "QualityOptionColumnDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "QualityOptionCountDto": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "count": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "value",
+          "count"
+        ]
+      },
+      "QualityOptionsDto": {
+        "type": "object",
+        "properties": {
+          "table": {
+            "type": "string",
+            "nullable": true,
+            "description": "SQL name of the table; null when SQL cannot read it."
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QualityOptionColumnDto"
+            }
+          },
+          "rowCount": {
+            "type": "number",
+            "nullable": true
+          },
+          "lastScannedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "openFindings": {
+            "type": "number"
+          },
+          "detectorTypes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QualityOptionCountDto"
+            }
+          },
+          "customDetectors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QualityOptionCountDto"
+            }
+          },
+          "findingTypes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QualityOptionCountDto"
+            }
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QualityOptionCountDto"
+            }
+          },
+          "columnsWithFindings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QualityOptionCountDto"
+            }
+          }
+        },
+        "required": [
+          "columns",
+          "openFindings",
+          "detectorTypes",
+          "customDetectors",
+          "findingTypes",
+          "categories",
+          "columnsWithFindings"
+        ]
+      },
+      "QualityTestResultDto": {
+        "type": "object",
+        "properties": {
+          "measuredValue": {
+            "type": "number",
+            "nullable": true
+          },
+          "passed": {
+            "type": "boolean",
+            "nullable": true,
+            "description": "null when it could not be measured."
+          },
+          "error": {
+            "type": "string",
+            "nullable": true
+          },
+          "rowsChecked": {
+            "type": "number",
+            "nullable": true,
+            "description": "Rows the whole-table query read."
+          },
+          "sql": {
+            "type": "string",
+            "nullable": true,
+            "description": "The query that measured it (table rules)."
+          },
+          "tookMs": {
+            "type": "number"
+          },
+          "failure": {
+            "type": "string",
+            "nullable": true,
+            "description": "What the finding would say when it fails."
+          }
+        },
+        "required": [
+          "tookMs"
+        ]
+      },
       "ColumnTermDto": {
         "type": "object",
         "properties": {
@@ -37853,12 +38123,22 @@
           "active": {
             "type": "number",
             "description": "Owned assets whose lifecycle is ACTIVE."
+          },
+          "checked": {
+            "type": "number",
+            "description": "Assets with at least one quality check."
+          },
+          "failing": {
+            "type": "number",
+            "description": "Assets with a failing quality check."
           }
         },
         "required": [
           "assets",
           "owned",
-          "active"
+          "active",
+          "checked",
+          "failing"
         ]
       },
       "SourceGovernanceDto": {

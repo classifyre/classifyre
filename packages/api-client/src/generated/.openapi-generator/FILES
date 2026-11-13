@@ -67,6 +67,7 @@ docs/AssistantControllerRespondRequest.md
 docs/AssistantControllerRespondRequestMessagesInner.md
 docs/AttachFindingsDto.md
 docs/AttachFindingsResponseDto.md
+docs/AuditChangeDto.md
 docs/AuditEventDto.md
 docs/AuditEventsResponseDto.md
 docs/AutopilotApi.md
@@ -399,11 +400,15 @@ docs/PurgeSourceAssetsResponseDto.md
 docs/PutAssetChunksDto.md
 docs/PutBoardThumbnailDto.md
 docs/QualityDimensionDto.md
+docs/QualityOptionColumnDto.md
+docs/QualityOptionCountDto.md
+docs/QualityOptionsDto.md
 docs/QualityResultDto.md
 docs/QualityRuleArgumentsDto.md
 docs/QualityRuleArgumentsDtoMissingValuesInner.md
 docs/QualityRuleDto.md
 docs/QualityRuleDtoThreshold.md
+docs/QualityTestResultDto.md
 docs/QueryCatalogDto.md
 docs/QueryCatalogSourceDto.md
 docs/QueryCatalogTableDto.md
@@ -506,6 +511,7 @@ docs/SearchAssetFindingDto.md
 docs/SearchAssetGovernanceDto.md
 docs/SearchAssetItemDto.md
 docs/SearchAssetMatchDto.md
+docs/SearchAssetQualityDto.md
 docs/SearchAssetsChartsOptionsDto.md
 docs/SearchAssetsChartsRequestDto.md
 docs/SearchAssetsChartsResponseDto.md
@@ -758,6 +764,7 @@ src/models/AssistantControllerRespondRequest.ts
 src/models/AssistantControllerRespondRequestMessagesInner.ts
 src/models/AttachFindingsDto.ts
 src/models/AttachFindingsResponseDto.ts
+src/models/AuditChangeDto.ts
 src/models/AuditEventDto.ts
 src/models/AuditEventsResponseDto.ts
 src/models/AutopilotStatsDto.ts
@@ -1064,11 +1071,15 @@ src/models/PurgeSourceAssetsResponseDto.ts
 src/models/PutAssetChunksDto.ts
 src/models/PutBoardThumbnailDto.ts
 src/models/QualityDimensionDto.ts
+src/models/QualityOptionColumnDto.ts
+src/models/QualityOptionCountDto.ts
+src/models/QualityOptionsDto.ts
 src/models/QualityResultDto.ts
 src/models/QualityRuleArgumentsDto.ts
 src/models/QualityRuleArgumentsDtoMissingValuesInner.ts
 src/models/QualityRuleDto.ts
 src/models/QualityRuleDtoThreshold.ts
+src/models/QualityTestResultDto.ts
 src/models/QueryCatalogDto.ts
 src/models/QueryCatalogSourceDto.ts
 src/models/QueryCatalogTableDto.ts
@@ -1170,6 +1181,7 @@ src/models/SearchAssetFindingDto.ts
 src/models/SearchAssetGovernanceDto.ts
 src/models/SearchAssetItemDto.ts
 src/models/SearchAssetMatchDto.ts
+src/models/SearchAssetQualityDto.ts
 src/models/SearchAssetsChartsOptionsDto.ts
 src/models/SearchAssetsChartsRequestDto.ts
 src/models/SearchAssetsChartsResponseDto.ts

@@ -40,6 +40,20 @@ export class SearchAssetMatchDto {
   via: 'meaning' | 'words';
 }
 
+export class SearchAssetQualityDto {
+  @ApiProperty({ description: 'Enabled quality rules.' })
+  rules: number;
+
+  @ApiProperty({ description: 'Rules whose latest result fails.' })
+  failing: number;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: '0–100 weighted by severity; null until measured.',
+  })
+  score: number | null;
+}
+
 export class SearchAssetGovernanceDto {
   @ApiPropertyOptional({
     enum: ['DRAFT', 'ACTIVE', 'DEPRECATED', 'RETIRED'],
@@ -53,6 +67,13 @@ export class SearchAssetGovernanceDto {
     description: 'The owner, its own or its source’s (`user:<id>`).',
   })
   ownerRef: string | null;
+
+  @ApiPropertyOptional({
+    type: SearchAssetQualityDto,
+    nullable: true,
+    description: 'Quality rules and their latest results; null without rules.',
+  })
+  quality?: SearchAssetQualityDto | null;
 }
 
 export class SearchAssetItemDto {

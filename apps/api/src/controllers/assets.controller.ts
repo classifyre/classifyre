@@ -233,6 +233,7 @@ export class SearchAssetsController {
         governance: governance.get(item.asset.id) ?? {
           status: null,
           ownerRef: null,
+          quality: null,
         },
       })),
     };

@@ -50,6 +50,7 @@ import { AssetGovernanceView } from "@/components/governance/asset-governance-vi
 import { AssetGovernanceSummary } from "@/components/governance/governance-summary";
 import { UsageCard } from "@/components/governance/usage-card";
 import { GovernanceBadge } from "@/components/governance/governance-badge";
+import { QualityChip } from "@/components/governance/quality-chip";
 import { ActorChip } from "@/components/actor-chip";
 
 // Monaco and the results grid: client-only, loaded when the Data tab opens.
@@ -265,6 +266,23 @@ export default function AssetDetailPage() {
               <Badge variant="outline">{assetDetails.sourceType}</Badge>
               {governance.data && (
                 <GovernanceBadge status={governance.data.status} />
+              )}
+              {quality.data && quality.data.rules.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setTab("governance")}
+                  className="rounded-[4px]"
+                  data-testid="asset-quality-chip"
+                >
+                  <QualityChip
+                    quality={{
+                      rules: quality.data.rules.filter((rule) => rule.enabled)
+                        .length,
+                      failing: quality.data.failing,
+                      score: quality.data.score ?? null,
+                    }}
+                  />
+                </button>
               )}
               {owner && (
                 <span

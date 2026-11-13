@@ -7122,7 +7122,7 @@
     "lastChangedBy": "Zuletzt geändert von",
     "history": "Verlauf",
     "historyTitle": "Verlauf",
-    "historyDescription": "Jede Änderung an diesem Element, neueste zuerst. Gespeichert werden nur Feldnamen, nie ihre Werte.",
+    "historyDescription": "Jede Änderung an diesem Element, neueste zuerst. Meist werden nur Feldnamen gespeichert; Governance-Änderungen halten auch fest, was ein Wert war und wurde.",
     "mcpTool": "MCP · {{tool}}",
     "fields": "Felder: {{fields}}",
     "empty": "Noch keine Änderungen erfasst.",
@@ -7145,7 +7145,55 @@
       "mcp": "MCP",
       "empty": "Keine Änderungen für diese Filter.",
       "rangeOf": "von {{total}}",
-      "thisWorkspace": "Dieser Arbeitsbereich"
+      "thisWorkspace": "Dieser Arbeitsbereich",
+      "changes": "Änderungen",
+      "emptyValue": "(leer)"
+    },
+    "ops": {
+      "governance": {
+        "update": "Governance-Angaben bearbeitet",
+        "status": {
+          "draft": "Auf Entwurf gesetzt",
+          "active": "Zertifiziert (aktiv)",
+          "deprecated": "Als veraltet markiert",
+          "retired": "Außer Betrieb genommen"
+        },
+        "role": {
+          "owner": {
+            "assign": "Eigentümer benannt",
+            "remove": "Eigentümer entfernt"
+          },
+          "steward": {
+            "assign": "Steward hinzugefügt",
+            "remove": "Steward entfernt"
+          },
+          "custodian": {
+            "assign": "Verwalter hinzugefügt",
+            "remove": "Verwalter entfernt"
+          }
+        },
+        "meaning": {
+          "link": "Begriff verknüpft",
+          "unlink": "Begriffsverknüpfung gelöst",
+          "dismiss": "Begriffsvorschlag verworfen"
+        },
+        "quality": {
+          "run": "Qualitätsprüfungen ausgeführt",
+          "rule": {
+            "create": "Qualitätsprüfung hinzugefügt",
+            "update": "Qualitätsprüfung geändert",
+            "remove": "Qualitätsprüfung entfernt"
+          }
+        },
+        "contract": {
+          "import": "Datenvertrag importiert"
+        },
+        "column": {
+          "update": "Spalte beschrieben",
+          "move": "Spaltenangaben verschoben",
+          "remove": "Spaltenangaben entfernt"
+        }
+      }
     }
   },
   "account": {
@@ -7518,10 +7566,8 @@
       "nobody": "Noch niemand.",
       "inherited": "Von der Quelle",
       "end": "Rolle von {{name}} beenden",
-      "history": "Verlauf ({{count}})",
-      "endedBy": "beendet von",
       "dialogTitle": "{{role}} zuweisen",
-      "replaces": "Der bisherige Owner wird ersetzt und bleibt im Verlauf.",
+      "replaces": "Der aktuelle Eigentümer wird ersetzt; die Aktivität hält fest, wer es war.",
       "confirm": "Zuweisen",
       "assigned": "{{name}} ist jetzt {{role}}.",
       "removed": "{{name}} ist nicht mehr {{role}}.",
@@ -7585,7 +7631,12 @@
       "active": "{{active}} zertifiziert",
       "lead": "Assets dieser Quelle mit Owner und zertifiziert. Hier gesetzte Rollen gelten für jedes Asset, das keine eigenen nennt.",
       "showUngoverned": "Assets ohne Verantwortliche zeigen",
-      "showDraft": "Noch nicht zertifizierte Assets zeigen"
+      "showDraft": "Noch nicht zertifizierte Assets zeigen",
+      "assets": "Assets",
+      "checked": "von {{count}} mit Qualitätsprüfungen",
+      "failing": "Qualität fehlerhaft",
+      "noSourceOwner": "Diese Quelle hat keinen Eigentümer: Nur Assets, die selbst einen Eigentümer benennen, sind governed.",
+      "withChecks": "Mit Qualitätsprüfungen"
     },
     "filter": {
       "label": "Governance",
@@ -7597,7 +7648,8 @@
       "deprecated": "Veraltet",
       "retired": "Stillgelegt",
       "mine": "Meine (Owner)",
-      "stewarding": "Meine (Steward)"
+      "stewarding": "Meine (Steward)",
+      "failing": "Qualität fehlerhaft"
     },
     "classification": {
       "public": "Öffentlich",
@@ -7728,7 +7780,9 @@
       }
     },
     "certify": {
-      "needsOwner": "Zuerst einen Owner zuweisen: nur ein Asset mit Owner kann zertifiziert werden."
+      "needsOwner": "Zuerst einen Owner zuweisen: nur ein Asset mit Owner kann zertifiziert werden.",
+      "lead": "Was vorhanden ist und wo es im Lebenszyklus steht. Ein fehlender Punkt führt dorthin, wo er behoben wird.",
+      "lifecycle": "Lebenszyklus"
     },
     "quality": {
       "title": "Qualität",
@@ -7849,6 +7903,210 @@
       "imported": "Vertrag angewendet.",
       "failed": "Der Vertrag konnte nicht angewendet werden.",
       "applied": "Angewendet: {{members}} Personen oder Gruppen, {{columns}} Spalten, {{rules}} Regeln."
+    },
+    "overview": {
+      "status": "Status",
+      "checklist": "Checkliste",
+      "noChecks": "Noch keine Prüfungen",
+      "measured": "Gemessen {{when}}"
+    },
+    "qualityColumn": "Qualität",
+    "qualityChip": {
+      "hint": "{{rules}} Qualitätsprüfungen, {{failing}} schlagen gerade fehl",
+      "score": "Qualität {{score}}",
+      "unmeasured": "Nicht gemessen",
+      "failing": "{{count}} fehlerhaft"
+    },
+    "qualityLifecycle": {
+      "title": "So arbeitet eine Qualitätsprüfung",
+      "define": {
+        "title": "Festlegen und testen",
+        "body": "Wählen Sie, was gemessen wird und was es sein muss. Ein Testlauf misst auf den aktuellen Daten und speichert nichts."
+      },
+      "measure": {
+        "title": "Gemessen",
+        "body": "Funde und Scan-Fakten nach jedem Scan. Spalten- und SQL-Prüfungen nach jedem Scan oder nach Zeitplan, als eine Abfrage über die ganze Tabelle. Und bei „Jetzt ausführen“."
+      },
+      "record": {
+        "title": "Jedes Ergebnis bleibt",
+        "body": "Jede Messung wird mit Wert und Ergebnis gespeichert; die Balken zeigen die letzten 20."
+      },
+      "fail": {
+        "title": "Fehlschlag: ein Fund",
+        "body": "Eine fehlschlagende Prüfung öffnet einen QUALITY-Fund mit ihrer Schwere und benachrichtigt Eigentümer und Stewards. Was nicht gemessen werden konnte, ändert nichts."
+      },
+      "recover": {
+        "title": "Bestanden: erledigt",
+        "body": "Besteht sie wieder, wird ihr Fund von selbst erledigt. Die Bewertung ist der Anteil bestandener Prüfungen, nach Schwere gewichtet."
+      }
+    },
+    "qualityBuilder": {
+      "steps": {
+        "kind": "Was",
+        "template": "Vorlage",
+        "form": "Details & Test"
+      },
+      "back": "Zurück",
+      "backToChecks": "Zurück zu den Prüfungen",
+      "newOf": "Neue Prüfung: {{kind}}",
+      "kind": {
+        "library": {
+          "title": "Spaltenwerte",
+          "tagline": "Ganze Tabelle · eine Abfrage",
+          "body": "Zählt leere, fehlende, ungültige oder doppelte Werte einer Spalte oder die Zeilen der Tabelle, über alle Zeilen."
+        },
+        "sql": {
+          "title": "SQL-Abfrage",
+          "tagline": "Ganze Tabelle · Ihr SELECT",
+          "body": "Ein SELECT, das eine Zahl liefert, etwa die Zeilen, die eine Geschäftsregel verletzen, und was sie sein muss."
+        },
+        "detector": {
+          "title": "Funde",
+          "tagline": "Was Scans gefunden haben",
+          "body": "Zählt die offenen Funde der Detektoren auf diesem Asset, etwa personenbezogene Daten in einer Spalte, die keine haben darf."
+        },
+        "metadata": {
+          "title": "Scan-Fakten",
+          "tagline": "Was der letzte Scan festhielt",
+          "body": "Nutzt, was der Scan schon weiß: die erfasste Zeilenzahl und wie lange er her ist."
+        }
+      },
+      "notTable": "Braucht eine Tabelle, die SQL lesen kann; dieses Asset ist keine.",
+      "columnsCount": "{{count}} Spalten",
+      "templatesTitle": "Mit einer Vorlage beginnen",
+      "blank": "Alle Felder selbst ausfüllen.",
+      "nowRows": "jetzt {{count}} Zeilen",
+      "nowHours": "jetzt {{hours}} h",
+      "nowFindings": "jetzt {{count}} offen",
+      "template": {
+        "notNull": {
+          "title": "Keine leeren Werte",
+          "body": "Jede Zeile hat einen Wert in der Spalte."
+        },
+        "fewNull": {
+          "title": "Höchstens 5 % leer",
+          "body": "Einige Lücken sind in Ordnung, zu viele nicht."
+        },
+        "placeholders": {
+          "title": "Keine Platzhalter",
+          "body": "Kein N/A, Strich oder „unknown“ anstelle eines Werts."
+        },
+        "allowed": {
+          "title": "Nur erlaubte Werte",
+          "body": "Jeder Wert stammt aus einer Liste, die Sie angeben, etwa ein Status."
+        },
+        "pattern": {
+          "title": "Passt zu einem Muster",
+          "body": "Jeder Wert passt zu einem regulären Ausdruck, etwa einem ID-Format."
+        },
+        "unique": {
+          "title": "Eindeutige Werte",
+          "body": "Kein Wert kommt in der Spalte zweimal vor."
+        },
+        "uniqueTogether": {
+          "title": "Gemeinsam eindeutig",
+          "body": "Keine zwei Zeilen haben dieselben Werte in den gewählten Spalten."
+        },
+        "rows": {
+          "title": "Tabelle hat Zeilen",
+          "body": "Zählt jetzt jede Zeile der Tabelle, nicht die Schätzung des Scans."
+        },
+        "condition": {
+          "title": "Zeilen, die eine Regel verletzen",
+          "body": "Zählt Zeilen, für die eine Bedingung gilt, die nie gelten darf, etwa negative Beträge."
+        },
+        "range": {
+          "title": "Werte außerhalb des Bereichs",
+          "body": "Zählt Werte außerhalb des Bereichs, in dem sie bleiben müssen."
+        },
+        "future": {
+          "title": "Daten in der Zukunft",
+          "body": "Zählt Daten nach heute, wo das nicht sein kann."
+        },
+        "total": {
+          "title": "Summe im Rahmen",
+          "body": "Summiert eine Spalte und prüft, dass die Summe in Grenzen bleibt."
+        },
+        "distinct": {
+          "title": "Genug verschiedene Werte",
+          "body": "Zählt verschiedene Werte, um eine auf einem Wert festsitzende Spalte zu erkennen."
+        },
+        "notEmpty": {
+          "title": "Nicht leer",
+          "body": "Der letzte Scan hat mindestens eine Zeile erfasst."
+        },
+        "rowRange": {
+          "title": "Stabile Zeilenzahl",
+          "body": "Die Zeilen bleiben zwischen der Hälfte und dem Anderthalbfachen der heutigen Zahl."
+        },
+        "daily": {
+          "title": "Täglich gescannt",
+          "body": "Der letzte Scan ist höchstens 24 Stunden alt."
+        },
+        "weekly": {
+          "title": "Wöchentlich gescannt",
+          "body": "Der letzte Scan ist höchstens eine Woche alt."
+        },
+        "noFindings": {
+          "title": "Keine offenen Funde",
+          "body": "Nichts, was ein Detektor gefunden hat, ist offen."
+        },
+        "detector": {
+          "title": "Keine {{detector}}-Funde",
+          "body": "Keine offenen Funde des Detektors {{detector}}."
+        },
+        "column": {
+          "title": "Saubere Spalte {{column}}",
+          "body": "Keine offenen Funde in der Spalte {{column}}."
+        },
+        "type": {
+          "title": "Kein {{type}}",
+          "body": "Keine offenen Funde vom Typ {{type}}."
+        }
+      },
+      "section": {
+        "what": "Was gemessen wird",
+        "fails": "Wann sie fehlschlägt",
+        "failsBody": "Die gemessene Zahl wird hiermit verglichen; gilt die Bedingung nicht, schlägt die Prüfung fehl.",
+        "about": "Name und Zeitpunkt"
+      },
+      "metricHint": {
+        "nullValues": "Zeilen, in denen die Spalte keinen Wert hat (NULL).",
+        "missingValues": "Zeilen ohne Wert, mit leerem Text oder einem der Platzhalter unten.",
+        "invalidValues": "Zeilen, deren Wert nicht in der erlaubten Liste steht oder nicht zum Muster passt.",
+        "duplicateValues": "Zeilen, die einen schon gesehenen Wert wiederholen, in einer Spalte oder mehreren.",
+        "rowCount": "Die Zeilen der ganzen Tabelle, jetzt gezählt."
+      },
+      "column": "Spalte",
+      "uniqueTogether": "Gemeinsam eindeutige Spalten (unten wählen)",
+      "searchColumns": "Spalte suchen",
+      "sqlHint": "Die Abfrage muss genau eine Zahl liefern; die Prüfung vergleicht sie mit der Bedingung unten. Sie läuft nur lesend über die ganze Tabelle.",
+      "noColumn": "keine Spalte gewählt",
+      "propertyColumn": "Spalte für {{property}} (optional)",
+      "resolved": "Was auf dieser Tabelle läuft",
+      "anyType": "Beliebig",
+      "scanRows": "Der letzte Scan hat {{count}} Zeilen erfasst.",
+      "scanNoRows": "Der Scan hat für dieses Asset noch keine Zeilenzahl erfasst.",
+      "scanWhen": "Zuletzt gescannt {{when}}.",
+      "scanNever": "Dieses Asset wurde noch nicht gescannt.",
+      "in": "in",
+      "preview": "Vor dem Speichern testen",
+      "previewBody": "Misst die Prüfung auf den aktuellen Daten. Nichts wird gespeichert, kein Fund ändert sich.",
+      "test": "Testlauf",
+      "testing": "Wird gemessen…",
+      "testFailed": "Der Test konnte nicht laufen.",
+      "measuredNow": "Jetzt gemessen",
+      "wouldSay": "Ihr Fund würde lauten:",
+      "rowsChecked": "Geprüfte Zeilen",
+      "took": "Dauer",
+      "queryRan": "Ausgeführte Abfrage",
+      "stale": "Die Prüfung hat sich seit diesem Test geändert; bitte erneut testen.",
+      "runs": {
+        "library": "Gespeichert wird sie sofort gemessen, dann nach jedem Scan der Quelle oder nach dem gewählten Zeitplan.",
+        "sql": "Gespeichert wird sie sofort gemessen, dann nach jedem Scan der Quelle oder nach dem gewählten Zeitplan.",
+        "detector": "Gespeichert wird sie sofort gemessen und nach jedem Scan erneut, wenn Funde sich öffnen und schließen.",
+        "metadata": "Gespeichert wird sie sofort gemessen und nach jedem Scan der Quelle erneut."
+      }
     }
   }
 }

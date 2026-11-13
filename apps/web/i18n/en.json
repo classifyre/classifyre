@@ -7122,7 +7122,7 @@
     "lastChangedBy": "Last changed by",
     "history": "History",
     "historyTitle": "History",
-    "historyDescription": "Every change to this item, newest first. Only field names are kept, never their values.",
+    "historyDescription": "Every change to this item, newest first. Most changes keep only field names; governance changes also keep what a value was and became.",
     "mcpTool": "MCP · {{tool}}",
     "fields": "Fields: {{fields}}",
     "empty": "No changes recorded yet.",
@@ -7145,7 +7145,55 @@
       "mcp": "MCP",
       "empty": "No changes match these filters.",
       "rangeOf": "of {{total}}",
-      "thisWorkspace": "This workspace"
+      "thisWorkspace": "This workspace",
+      "changes": "Changes",
+      "emptyValue": "(empty)"
+    },
+    "ops": {
+      "governance": {
+        "update": "Governance details edited",
+        "status": {
+          "draft": "Set to draft",
+          "active": "Certified (active)",
+          "deprecated": "Deprecated",
+          "retired": "Retired"
+        },
+        "role": {
+          "owner": {
+            "assign": "Owner named",
+            "remove": "Owner removed"
+          },
+          "steward": {
+            "assign": "Steward added",
+            "remove": "Steward removed"
+          },
+          "custodian": {
+            "assign": "Custodian added",
+            "remove": "Custodian removed"
+          }
+        },
+        "meaning": {
+          "link": "Term linked",
+          "unlink": "Term unlinked",
+          "dismiss": "Suggested term dismissed"
+        },
+        "quality": {
+          "run": "Quality checks run",
+          "rule": {
+            "create": "Quality check added",
+            "update": "Quality check changed",
+            "remove": "Quality check removed"
+          }
+        },
+        "contract": {
+          "import": "Data contract imported"
+        },
+        "column": {
+          "update": "Column described",
+          "move": "Column notes moved",
+          "remove": "Column notes removed"
+        }
+      }
     }
   },
   "account": {
@@ -7518,10 +7566,8 @@
       "nobody": "Nobody yet.",
       "inherited": "From source",
       "end": "End the role of {{name}}",
-      "history": "History ({{count}})",
-      "endedBy": "ended by",
       "dialogTitle": "Assign {{role}}",
-      "replaces": "The current owner is replaced and kept in the history.",
+      "replaces": "The current owner is replaced; Activity keeps who it was.",
       "confirm": "Assign",
       "assigned": "{{name}} is now {{role}}.",
       "removed": "{{name}} is no longer {{role}}.",
@@ -7585,7 +7631,12 @@
       "active": "{{active}} certified",
       "lead": "Assets of this source that are owned and certified. Roles set here count for every asset that names none of its own.",
       "showUngoverned": "Show ungoverned assets",
-      "showDraft": "Show assets not yet certified"
+      "showDraft": "Show assets not yet certified",
+      "assets": "Assets",
+      "checked": "of {{count}} with quality checks",
+      "failing": "Failing quality",
+      "noSourceOwner": "Nobody owns this source: only its assets that name an owner of their own are governed.",
+      "withChecks": "With quality checks"
     },
     "filter": {
       "label": "Governance",
@@ -7597,7 +7648,8 @@
       "deprecated": "Deprecated",
       "retired": "Retired",
       "mine": "Owned by me",
-      "stewarding": "Stewarded by me"
+      "stewarding": "Stewarded by me",
+      "failing": "Failing quality"
     },
     "classification": {
       "public": "Public",
@@ -7728,7 +7780,9 @@
       }
     },
     "certify": {
-      "needsOwner": "Assign an owner first: only an owned asset can be certified."
+      "needsOwner": "Assign an owner first: only an owned asset can be certified.",
+      "lead": "What is in place, and where it stands in its lifecycle. A missing item takes you to where it is fixed.",
+      "lifecycle": "Lifecycle"
     },
     "quality": {
       "title": "Quality",
@@ -7849,6 +7903,210 @@
       "imported": "Contract applied.",
       "failed": "Could not apply the contract.",
       "applied": "Applied: {{members}} people or groups, {{columns}} columns, {{rules}} rules."
+    },
+    "overview": {
+      "status": "Status",
+      "checklist": "Checklist",
+      "noChecks": "No checks yet",
+      "measured": "Measured {{when}}"
+    },
+    "qualityColumn": "Quality",
+    "qualityChip": {
+      "hint": "{{rules}} quality checks, {{failing}} failing now",
+      "score": "Quality {{score}}",
+      "unmeasured": "Not measured",
+      "failing": "{{count}} failing"
+    },
+    "qualityLifecycle": {
+      "title": "How a quality check works",
+      "define": {
+        "title": "Define and test",
+        "body": "Choose what to measure and what it must be. A test run measures it on the data as it is now, saving nothing."
+      },
+      "measure": {
+        "title": "Measured",
+        "body": "Findings and scan facts after every scan. Column and SQL checks after each scan or on their schedule, as one query over the whole table. And on Run now."
+      },
+      "record": {
+        "title": "Every result kept",
+        "body": "Each measurement is stored with its value and whether it passed; the bars show the last 20."
+      },
+      "fail": {
+        "title": "Fails: a finding",
+        "body": "A failing check opens one QUALITY finding at its severity and tells the owner and stewards. A check that could not be measured changes nothing."
+      },
+      "recover": {
+        "title": "Passes: resolved",
+        "body": "When it passes again its finding resolves by itself. The score is the checks passing, weighted by severity."
+      }
+    },
+    "qualityBuilder": {
+      "steps": {
+        "kind": "What",
+        "template": "Template",
+        "form": "Details & test"
+      },
+      "back": "Back",
+      "backToChecks": "Back to checks",
+      "newOf": "New check: {{kind}}",
+      "kind": {
+        "library": {
+          "title": "Column values",
+          "tagline": "Whole table · one query",
+          "body": "Count empty, missing, invalid or duplicate values in a column, or the rows of the table, over every row."
+        },
+        "sql": {
+          "title": "SQL query",
+          "tagline": "Whole table · your SELECT",
+          "body": "Write one SELECT that returns one number, such as the rows breaking a business rule, and say what it must be."
+        },
+        "detector": {
+          "title": "Findings",
+          "tagline": "What scans found",
+          "body": "Count the open findings detectors left on this asset, for example personal data in a column that must have none."
+        },
+        "metadata": {
+          "title": "Scan facts",
+          "tagline": "What the last scan recorded",
+          "body": "Use what the scan already knows: the row count it recorded and how long ago it ran."
+        }
+      },
+      "notTable": "Needs a table SQL can read; this asset is not one.",
+      "columnsCount": "{{count}} columns",
+      "templatesTitle": "Start from a template",
+      "blank": "Set every field yourself.",
+      "nowRows": "now {{count}} rows",
+      "nowHours": "now {{hours}} h",
+      "nowFindings": "now {{count}} open",
+      "template": {
+        "notNull": {
+          "title": "No empty values",
+          "body": "Every row has a value in the column."
+        },
+        "fewNull": {
+          "title": "At most 5% empty",
+          "body": "Some gaps are fine, too many are not."
+        },
+        "placeholders": {
+          "title": "No placeholders",
+          "body": "No N/A, dashes or 'unknown' standing in for a value."
+        },
+        "allowed": {
+          "title": "Only allowed values",
+          "body": "Every value is one of a list you give, such as a status."
+        },
+        "pattern": {
+          "title": "Matches a pattern",
+          "body": "Every value matches a regular expression, such as an ID format."
+        },
+        "unique": {
+          "title": "Unique values",
+          "body": "No value appears twice in the column."
+        },
+        "uniqueTogether": {
+          "title": "Unique together",
+          "body": "No two rows share the same values in the columns you pick."
+        },
+        "rows": {
+          "title": "Table has rows",
+          "body": "Counts every row of the table now, not the scan's estimate."
+        },
+        "condition": {
+          "title": "Rows breaking a rule",
+          "body": "Count rows where a condition holds that never should, such as negative amounts."
+        },
+        "range": {
+          "title": "Values out of range",
+          "body": "Count values outside the range they must stay in."
+        },
+        "future": {
+          "title": "Dates in the future",
+          "body": "Count dates later than today where that cannot be."
+        },
+        "total": {
+          "title": "Total stays in range",
+          "body": "Sum a column and check the total stays within bounds."
+        },
+        "distinct": {
+          "title": "Enough distinct values",
+          "body": "Count distinct values, to catch a column stuck on one value."
+        },
+        "notEmpty": {
+          "title": "Not empty",
+          "body": "The last scan recorded at least one row."
+        },
+        "rowRange": {
+          "title": "Row count steady",
+          "body": "Rows stay between half and one and a half times today's count."
+        },
+        "daily": {
+          "title": "Scanned daily",
+          "body": "The last scan is at most 24 hours old."
+        },
+        "weekly": {
+          "title": "Scanned weekly",
+          "body": "The last scan is at most a week old."
+        },
+        "noFindings": {
+          "title": "No open findings",
+          "body": "Nothing any detector found is left open."
+        },
+        "detector": {
+          "title": "No {{detector}} findings",
+          "body": "No open findings from the {{detector}} detector."
+        },
+        "column": {
+          "title": "Clean column {{column}}",
+          "body": "No open findings in column {{column}}."
+        },
+        "type": {
+          "title": "No {{type}}",
+          "body": "No open findings of type {{type}}."
+        }
+      },
+      "section": {
+        "what": "What is measured",
+        "fails": "When it fails",
+        "failsBody": "The measured number is compared with this; when the condition does not hold the check fails.",
+        "about": "Name and timing"
+      },
+      "metricHint": {
+        "nullValues": "Rows where the column has no value (NULL).",
+        "missingValues": "Rows with no value, an empty text, or one of the placeholders below.",
+        "invalidValues": "Rows whose value is not in the allowed list or does not match the pattern.",
+        "duplicateValues": "Rows repeating a value already seen, in one column or a set of columns.",
+        "rowCount": "The rows of the whole table, counted now."
+      },
+      "column": "Column",
+      "uniqueTogether": "Columns unique together (pick below)",
+      "searchColumns": "Find a column",
+      "sqlHint": "The query must return a single number; the check compares it with the condition below. It runs read-only over the whole table.",
+      "noColumn": "no column chosen",
+      "propertyColumn": "Column for {{property}} (optional)",
+      "resolved": "What runs on this table",
+      "anyType": "Any",
+      "scanRows": "The last scan recorded {{count}} rows.",
+      "scanNoRows": "The scan recorded no row count for this asset yet.",
+      "scanWhen": "Last scanned {{when}}.",
+      "scanNever": "This asset has not been scanned yet.",
+      "in": "in",
+      "preview": "Test before you save",
+      "previewBody": "Measure the check on the data as it is now. Nothing is saved and no finding changes.",
+      "test": "Test run",
+      "testing": "Measuring…",
+      "testFailed": "Could not run the test.",
+      "measuredNow": "Measured now",
+      "wouldSay": "Its finding would say:",
+      "rowsChecked": "Rows checked",
+      "took": "Took",
+      "queryRan": "Query that ran",
+      "stale": "The check changed since this test; run it again.",
+      "runs": {
+        "library": "Saved, it is measured at once, then after each scan of the source or on the schedule you chose.",
+        "sql": "Saved, it is measured at once, then after each scan of the source or on the schedule you chose.",
+        "detector": "Saved, it is measured at once and again after every scan, as findings open and close.",
+        "metadata": "Saved, it is measured at once and again after every scan of the source."
+      }
     }
   }
 }

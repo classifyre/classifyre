@@ -19,6 +19,7 @@ import {
   type SourceGovernanceDto,
 } from "@/lib/governance";
 import { GovernanceBadge } from "./governance-badge";
+import { RoleIcon } from "./role-style";
 
 function RoleLines({ roles }: { roles: GovernanceRoleDto[] }) {
   const { t } = useTranslation();
@@ -28,7 +29,8 @@ function RoleLines({ roles }: { roles: GovernanceRoleDto[] }) {
         const held = rolesOf(roles, kind);
         return (
           <div key={kind} className="contents">
-            <dt className="text-xs text-muted-foreground">
+            <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <RoleIcon role={kind} size="sm" />
               {t(`governance.role.${kind}`)}
             </dt>
             <dd className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -159,6 +161,13 @@ export function SourceGovernanceSummary({
         <p className="text-xs text-muted-foreground">
           {t("governance.coverage.owned", { owned, assets })} ·{" "}
           {t("governance.coverage.active", { active })}
+          {governance.coverage.failing > 0 && (
+            <span className="text-destructive">
+              {" "}
+              · {governance.coverage.failing}{" "}
+              {t("governance.coverage.failing")}
+            </span>
+          )}
         </p>
       </CardContent>
     </Card>

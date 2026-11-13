@@ -13,6 +13,14 @@
  */
 
 import { mapValues } from '../runtime';
+import type { AuditChangeDto } from './AuditChangeDto';
+import {
+    AuditChangeDtoFromJSON,
+    AuditChangeDtoFromJSONTyped,
+    AuditChangeDtoToJSON,
+    AuditChangeDtoToJSONTyped,
+} from './AuditChangeDto';
+
 /**
  * 
  * @export
@@ -86,6 +94,12 @@ export interface AuditEventDto {
      */
     fields: Array<string>;
     /**
+     * What changed, for changes whose values are not secret (governance).
+     * @type {Array<AuditChangeDto>}
+     * @memberof AuditEventDto
+     */
+    changes?: Array<AuditChangeDto> | null;
+    /**
      * 
      * @type {number}
      * @memberof AuditEventDto
@@ -144,6 +158,7 @@ export function AuditEventDtoFromJSONTyped(json: any, ignoreDiscriminator: boole
         'entityId': json['entityId'],
         'entityName': json['entityName'],
         'fields': json['fields'],
+        'changes': json['changes'] == null ? undefined : ((json['changes'] as Array<any>).map(AuditChangeDtoFromJSON)),
         'status': json['status'],
     };
 }
@@ -170,6 +185,7 @@ export function AuditEventDtoToJSONTyped(value?: AuditEventDto | null, ignoreDis
         'entityId': value['entityId'],
         'entityName': value['entityName'],
         'fields': value['fields'],
+        'changes': value['changes'] == null ? undefined : ((value['changes'] as Array<any>).map(AuditChangeDtoToJSON)),
         'status': value['status'],
     };
 }

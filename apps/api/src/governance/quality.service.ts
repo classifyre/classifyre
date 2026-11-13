@@ -67,6 +67,41 @@ export interface AssetQuality {
   measuring: boolean;
 }
 
+/** How long a test run waits for a whole-table query. */
+const TEST_WAIT_MS = 60_000;
+
+export interface QualityTestResult {
+  measuredValue: number | null;
+  /** null when it could not be measured. */
+  passed: boolean | null;
+  error: string | null;
+  rowsChecked: number | null;
+  /** The query that measured it (table rules). */
+  sql: string | null;
+  tookMs: number;
+  /** What the finding would say, when it fails. */
+  failure: string | null;
+}
+
+export interface QualityOptionCount {
+  value: string;
+  count: number;
+}
+
+export interface QualityOptions {
+  /** SQL name; null when SQL cannot read the asset. */
+  table: string | null;
+  columns: { name: string; type: string | null }[];
+  rowCount: number | null;
+  lastScannedAt: Date | null;
+  openFindings: number;
+  detectorTypes: QualityOptionCount[];
+  customDetectors: QualityOptionCount[];
+  findingTypes: QualityOptionCount[];
+  categories: QualityOptionCount[];
+  columnsWithFindings: QualityOptionCount[];
+}
+
 interface Measured {
   value: number | null;
   error: string | null;
@@ -206,6 +241,213 @@ export class QualityService {
       });
     }
     return out;
+  }
+
+  /**
+   * What a rule would measure right now, without saving it or touching
+   * findings: the rule editor's test run. Table rules run their query as a
+   * system query and wait for it (at most `TEST_WAIT_MS`).
+   */
+  async test(assetId: string, rule: ValidRule): Promise<QualityTestResult> {
+    const asset = await this.prisma.asset.findUnique({
+      where: { id: assetId },
+      select: { id: true, metadata: true, lastScannedAt: true },
+    });
+    if (!asset) throw new NotFoundException(`Asset ${assetId} not found.`);
+    const started = Date.now();
+    const done = (
+      measured: Measured,
+      extra: { rowsChecked?: number | null; sql?: string | null } = {},
+    ): QualityTestResult => ({
+      measuredValue: measured.value,
+      passed:
+        measured.error === null && measured.value !== null
+          ? meets(rule.operator, measured.value, rule.threshold)
+          : null,
+      error: measured.error,
+      rowsChecked: extra.rowsChecked ?? null,
+      sql: extra.sql ?? null,
+      tookMs: Date.now() - started,
+      failure:
+        measured.error === null &&
+        measured.value !== null &&
+        !meets(rule.operator, measured.value, rule.threshold)
+          ? failureText(rule, measured.value)
+          : null,
+    });
+
+    if (!TABLE_RULE_TYPES.includes(rule.type)) {
+      const measured = await this.measure({
+        ...(this.data(rule) as unknown as QualityRule),
+        id: 'test',
+        assetId,
+        asset,
+      }).catch(
+        (error: unknown): Measured => ({ value: null, error: String(error) }),
+      );
+      return done(measured);
+    }
+
+    const table = await this.queries.tableName(assetId);
+    if (!table) {
+      return done({
+        value: null,
+        error: 'This asset is not a table SQL can read.',
+      });
+    }
+    const compiled = compileQuality(
+      table,
+      columnsOf(asset.metadata).map((c) => c.name),
+      [
+        {
+          id: 'test',
+          type: rule.type,
+          metric: rule.metric,
+          columnName: rule.columnName,
+          arguments: rule.arguments,
+        },
+      ],
+    );
+    const compileError = compiled.errors.get('test');
+    if (compileError) return done({ value: null, error: compileError });
+
+    let settle: (runId: string | null) => void = () => undefined;
+    const finished = new Promise<string | null>((resolve) => {
+      settle = resolve;
+    });
+    const timer = setTimeout(() => settle(null), TEST_WAIT_MS);
+    const startedRun = await this.queries.createSystem({
+      assetId,
+      sql: compiled.sql,
+      purpose: 'quality',
+      actorRef: SYSTEM,
+      onDone: (runId) => {
+        settle(runId);
+        return Promise.resolve();
+      },
+    });
+    if ('refused' in startedRun) {
+      clearTimeout(timer);
+      return done(
+        {
+          value: null,
+          error: startedRun.busy
+            ? 'Other quality queries are running here; try again in a minute.'
+            : startedRun.refused,
+        },
+        { sql: compiled.sql },
+      );
+    }
+    const runId = await finished;
+    clearTimeout(timer);
+    if (!runId) {
+      return done(
+        {
+          value: null,
+          error:
+            'The query is still running; a table this size is better measured on save.',
+        },
+        { sql: compiled.sql },
+      );
+    }
+    const result = await this.queries.systemResult(runId);
+    if (result.status !== 'SUCCESS' || result.csv === null) {
+      return done(
+        { value: null, error: result.error ?? 'The quality query failed.' },
+        { sql: compiled.sql },
+      );
+    }
+    const row = readCsvRow(result.csv);
+    const rows = row.get(ROWS_ALIAS) ?? null;
+    const raw = row.get(compiled.aliases.get('test') ?? '');
+    if (raw === undefined || raw === null) {
+      return done(
+        { value: null, error: 'The query returned no number.' },
+        { sql: compiled.sql, rowsChecked: rows },
+      );
+    }
+    const value =
+      rule.unit === 'percent'
+        ? rows
+          ? Math.round((raw / rows) * 10_000) / 100
+          : 0
+        : raw;
+    return done(
+      { value, error: null },
+      { sql: compiled.sql, rowsChecked: rows },
+    );
+  }
+
+  /**
+   * What the rule editor offers on this asset: its columns, whether SQL can
+   * read it, and its open findings grouped the ways a detector rule counts
+   * them, with how many there are now.
+   */
+  async options(assetId: string): Promise<QualityOptions> {
+    const asset = await this.prisma.asset.findUnique({
+      where: { id: assetId },
+      select: { metadata: true, lastScannedAt: true },
+    });
+    if (!asset) throw new NotFoundException(`Asset ${assetId} not found.`);
+    const [table, findings] = await Promise.all([
+      this.queries.tableName(assetId),
+      this.prisma.finding.findMany({
+        where: {
+          assetId,
+          status: FindingStatus.OPEN,
+          detectorType: { not: 'QUALITY' as never },
+        },
+        select: {
+          detectorType: true,
+          customDetectorKey: true,
+          findingType: true,
+          category: true,
+          metadata: true,
+        },
+        take: 20_000,
+      }),
+    ]);
+    const tally = (values: (string | null | undefined)[]) => {
+      const counts = new Map<string, number>();
+      for (const value of values) {
+        if (!value) continue;
+        counts.set(value, (counts.get(value) ?? 0) + 1);
+      }
+      return [...counts]
+        .map(([value, count]) => ({ value, count }))
+        .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
+    };
+    const rawRows = (asset.metadata as { row_count?: unknown } | null)
+      ?.row_count;
+    const rowCount =
+      typeof rawRows === 'number'
+        ? rawRows
+        : rawRows !== undefined &&
+            rawRows !== null &&
+            Number.isFinite(Number(rawRows))
+          ? Number(rawRows)
+          : null;
+    return {
+      table,
+      columns: columnsOf(asset.metadata).map((column) => ({
+        name: column.name,
+        type: column.type ?? null,
+      })),
+      rowCount,
+      lastScannedAt: asset.lastScannedAt,
+      openFindings: findings.length,
+      detectorTypes: tally(findings.map((f) => String(f.detectorType))),
+      customDetectors: tally(findings.map((f) => f.customDetectorKey)),
+      findingTypes: tally(findings.map((f) => f.findingType)),
+      categories: tally(findings.map((f) => f.category)),
+      columnsWithFindings: tally(
+        findings.map((f) => {
+          const name = (f.metadata as { tabular_column_name?: unknown } | null)
+            ?.tabular_column_name;
+          return typeof name === 'string' ? name : null;
+        }),
+      ),
+    };
   }
 
   /** The table's SQL name, or null when SQL cannot read it. */

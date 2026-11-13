@@ -17,8 +17,8 @@ export interface GovernanceStep {
 }
 
 /**
- * The governance view of an asset or a source (GOV §5.7): one centred column
- * of sections, with the same stepper as the source editor beside it. A step
+ * The governance view of an asset (GOV §5.7): the page's full width of
+ * sections, with the same stepper as the source editor beside it. A step
  * shows ✓ when its checklist item is done, so the stepper doubles as the
  * progress of governing this thing; clicking one scrolls to it.
  */
@@ -30,7 +30,7 @@ export function GovernanceSteps({
 }: {
   steps: GovernanceStep[];
   label: string;
-  /** Shown above the steps, e.g. "nobody owns this yet". */
+  /** Shown above the steps: the overview, "nobody owns this yet". */
   banner?: ReactNode;
   /** A step id to scroll to (set from elsewhere, e.g. the checklist). */
   jumpTo?: { id: string; at: number } | null;
@@ -77,7 +77,7 @@ export function GovernanceSteps({
   }));
 
   return (
-    <div className="mx-auto w-full max-w-5xl" data-testid="governance-steps">
+    <div className="w-full" data-testid="governance-steps">
       <div className="sticky top-0 z-20 -mx-4 mb-4 border-b-2 border-border bg-background/95 px-4 py-2 backdrop-blur-sm md:hidden">
         <HorizontalStepperNav
           steps={nav}
@@ -88,7 +88,7 @@ export function GovernanceSteps({
       </div>
       {banner}
       <div className="flex gap-8 lg:gap-12">
-        <div className="min-w-0 flex-1 space-y-10 pb-24">
+        <div className="min-w-0 flex-1 space-y-8 pb-24">
           {steps.map((step) => (
             <section
               key={step.id}

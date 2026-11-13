@@ -8,6 +8,7 @@ Name | Type
 ------------ | -------------
 `status` | string
 `ownerRef` | string
+`quality` | [SearchAssetQualityDto](SearchAssetQualityDto.md)
 
 ## Example
 
@@ -18,6 +19,7 @@ import type { SearchAssetGovernanceDto } from '@workspace/api-client'
 const example = {
   "status": null,
   "ownerRef": null,
+  "quality": null,
 } satisfies SearchAssetGovernanceDto
 
 console.log(example)

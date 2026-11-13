@@ -61,9 +61,17 @@ export class SearchAssetsFiltersDto extends OmitType(QueryAssetsDto, [
   meaningMethod?: string[];
 
   @ApiPropertyOptional({
-    enum: ['ungoverned', 'governed', 'draft', 'active', 'deprecated', 'retired'],
+    enum: [
+      'ungoverned',
+      'governed',
+      'draft',
+      'active',
+      'deprecated',
+      'retired',
+      'failing',
+    ],
     description:
-      'Governance (docs/prd/GOV-governed-data-assets.md): owned or not, or a lifecycle of owned assets.',
+      'Governance (docs/prd/GOV-governed-data-assets.md): owned or not, a lifecycle of owned assets, or `failing` quality checks.',
   })
   @IsOptional()
   @IsString()

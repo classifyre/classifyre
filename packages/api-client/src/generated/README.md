@@ -343,6 +343,7 @@ All URIs are relative to *http://localhost*
 *GovernanceApi* | [**governanceControllerLinkTerm**](docs/GovernanceApi.md#governancecontrollerlinkterm) | **POST** /assets/{id}/governance/meaning | Link a glossary term to an asset by hand
 *GovernanceApi* | [**governanceControllerMoveColumn**](docs/GovernanceApi.md#governancecontrollermovecolumn) | **POST** /assets/{id}/columns/{name}/move | Move a removed column\&#39;s annotations to the column it became
 *GovernanceApi* | [**governanceControllerPrincipals**](docs/GovernanceApi.md#governancecontrollerprincipals) | **GET** /governance/principals | People and groups of the tenant, for the owner and steward pickers
+*GovernanceApi* | [**governanceControllerQualityOptions**](docs/GovernanceApi.md#governancecontrollerqualityoptions) | **GET** /assets/{id}/quality/options | What a quality rule on this asset can use: columns, SQL name, open findings by kind
 *GovernanceApi* | [**governanceControllerRemoveAssetRole**](docs/GovernanceApi.md#governancecontrollerremoveassetrole) | **DELETE** /assets/{id}/governance/roles/{roleId} | End a role on an asset (kept as history)
 *GovernanceApi* | [**governanceControllerRemoveColumn**](docs/GovernanceApi.md#governancecontrollerremovecolumn) | **DELETE** /assets/{id}/columns/{name} | Forget what was said about one column
 *GovernanceApi* | [**governanceControllerRemoveQualityRule**](docs/GovernanceApi.md#governancecontrollerremovequalityrule) | **DELETE** /quality-rules/{ruleId} | Delete a quality rule; its open finding is resolved
@@ -350,6 +351,7 @@ All URIs are relative to *http://localhost*
 *GovernanceApi* | [**governanceControllerRunQuality**](docs/GovernanceApi.md#governancecontrollerrunquality) | **POST** /assets/{id}/quality/run | Evaluate an asset\&#39;s quality rules now
 *GovernanceApi* | [**governanceControllerSourceGovernance**](docs/GovernanceApi.md#governancecontrollersourcegovernance) | **GET** /sources/{id}/governance | A source\&#39;s owners, stewards and custodians, and its coverage
 *GovernanceApi* | [**governanceControllerSummary**](docs/GovernanceApi.md#governancecontrollersummary) | **GET** /governance/summary | How far the workspace is governed: coverage per source, what to govern first, yours
+*GovernanceApi* | [**governanceControllerTestQualityRule**](docs/GovernanceApi.md#governancecontrollertestqualityrule) | **POST** /assets/{id}/quality/test | Measure a quality rule now without saving it
 *GovernanceApi* | [**governanceControllerUnlinkTerm**](docs/GovernanceApi.md#governancecontrollerunlinkterm) | **DELETE** /assets/{id}/governance/meaning/{termId} | Remove a term linked by hand
 *GovernanceApi* | [**governanceControllerUpdateAssetGovernance**](docs/GovernanceApi.md#governancecontrollerupdateassetgovernance) | **PUT** /assets/{id}/governance | Change an asset\&#39;s description, legal basis or lifecycle
 *GovernanceApi* | [**governanceControllerUpdateColumn**](docs/GovernanceApi.md#governancecontrollerupdatecolumn) | **PUT** /assets/{id}/columns/{name} | Describe, classify or confirm one column
@@ -601,6 +603,7 @@ All URIs are relative to *http://localhost*
 - [AssistantControllerRespondRequestMessagesInner](docs/AssistantControllerRespondRequestMessagesInner.md)
 - [AttachFindingsDto](docs/AttachFindingsDto.md)
 - [AttachFindingsResponseDto](docs/AttachFindingsResponseDto.md)
+- [AuditChangeDto](docs/AuditChangeDto.md)
 - [AuditEventDto](docs/AuditEventDto.md)
 - [AuditEventsResponseDto](docs/AuditEventsResponseDto.md)
 - [AutopilotStatsDto](docs/AutopilotStatsDto.md)
@@ -907,11 +910,15 @@ All URIs are relative to *http://localhost*
 - [PutAssetChunksDto](docs/PutAssetChunksDto.md)
 - [PutBoardThumbnailDto](docs/PutBoardThumbnailDto.md)
 - [QualityDimensionDto](docs/QualityDimensionDto.md)
+- [QualityOptionColumnDto](docs/QualityOptionColumnDto.md)
+- [QualityOptionCountDto](docs/QualityOptionCountDto.md)
+- [QualityOptionsDto](docs/QualityOptionsDto.md)
 - [QualityResultDto](docs/QualityResultDto.md)
 - [QualityRuleArgumentsDto](docs/QualityRuleArgumentsDto.md)
 - [QualityRuleArgumentsDtoMissingValuesInner](docs/QualityRuleArgumentsDtoMissingValuesInner.md)
 - [QualityRuleDto](docs/QualityRuleDto.md)
 - [QualityRuleDtoThreshold](docs/QualityRuleDtoThreshold.md)
+- [QualityTestResultDto](docs/QualityTestResultDto.md)
 - [QueryCatalogDto](docs/QueryCatalogDto.md)
 - [QueryCatalogSourceDto](docs/QueryCatalogSourceDto.md)
 - [QueryCatalogTableDto](docs/QueryCatalogTableDto.md)
@@ -1013,6 +1020,7 @@ All URIs are relative to *http://localhost*
 - [SearchAssetGovernanceDto](docs/SearchAssetGovernanceDto.md)
 - [SearchAssetItemDto](docs/SearchAssetItemDto.md)
 - [SearchAssetMatchDto](docs/SearchAssetMatchDto.md)
+- [SearchAssetQualityDto](docs/SearchAssetQualityDto.md)
 - [SearchAssetsChartsOptionsDto](docs/SearchAssetsChartsOptionsDto.md)
 - [SearchAssetsChartsRequestDto](docs/SearchAssetsChartsRequestDto.md)
 - [SearchAssetsChartsResponseDto](docs/SearchAssetsChartsResponseDto.md)

@@ -20,6 +20,7 @@ export const GOVERNANCE_FILTERS = [
   'active',
   'deprecated',
   'retired',
+  'failing',
 ] as const;
 export type GovernanceFilter = (typeof GOVERNANCE_FILTERS)[number];
 
@@ -93,8 +94,14 @@ export async function governanceAssetWhere(
         `governance is one of ${GOVERNANCE_FILTERS.join(', ')}; got ${governance}`,
       );
     }
-    const owned = await openScopes(db, { role: 'OWNER' });
-    if (governance === 'ungoverned') {
+    // A failing quality rule keeps one open QUALITY finding (GOV R9).
+    const owned =
+      governance === 'failing' ? null : await openScopes(db, { role: 'OWNER' });
+    if (!owned) {
+      clauses.push({
+        findings: { some: { detectorType: 'QUALITY', status: 'OPEN' } },
+      });
+    } else if (governance === 'ungoverned') {
       clauses.push({
         AND: [
           { id: { notIn: owned.assetIds } },

@@ -9,6 +9,8 @@ Name | Type
 `assets` | number
 `owned` | number
 `active` | number
+`checked` | number
+`failing` | number
 
 ## Example
 
@@ -20,6 +22,8 @@ const example = {
   "assets": null,
   "owned": null,
   "active": null,
+  "checked": null,
+  "failing": null,
 } satisfies SourceGovernanceCoverageDto
 
 console.log(example)

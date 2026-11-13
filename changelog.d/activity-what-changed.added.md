@@ -1,0 +1,1 @@
+Activity now shows what a governance change changed, from the old value to the new one: who was named owner or steward and who held the role before, the status before and after certification, edited descriptions, columns, glossary terms and quality checks. Governance changes have readable names in the list. The ownership card no longer keeps its own history; Activity holds it.

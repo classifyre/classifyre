@@ -13,6 +13,14 @@
  */
 
 import { mapValues } from '../runtime';
+import type { SearchAssetQualityDto } from './SearchAssetQualityDto';
+import {
+    SearchAssetQualityDtoFromJSON,
+    SearchAssetQualityDtoFromJSONTyped,
+    SearchAssetQualityDtoToJSON,
+    SearchAssetQualityDtoToJSONTyped,
+} from './SearchAssetQualityDto';
+
 /**
  * 
  * @export
@@ -31,6 +39,12 @@ export interface SearchAssetGovernanceDto {
      * @memberof SearchAssetGovernanceDto
      */
     ownerRef?: string | null;
+    /**
+     * Quality rules and their latest results; null without rules.
+     * @type {SearchAssetQualityDto}
+     * @memberof SearchAssetGovernanceDto
+     */
+    quality?: SearchAssetQualityDto | null;
 }
 
 
@@ -65,6 +79,7 @@ export function SearchAssetGovernanceDtoFromJSONTyped(json: any, ignoreDiscrimin
         
         'status': json['status'] == null ? undefined : json['status'],
         'ownerRef': json['ownerRef'] == null ? undefined : json['ownerRef'],
+        'quality': json['quality'] == null ? undefined : SearchAssetQualityDtoFromJSON(json['quality']),
     };
 }
 
@@ -81,6 +96,7 @@ export function SearchAssetGovernanceDtoToJSONTyped(value?: SearchAssetGovernanc
         
         'status': value['status'],
         'ownerRef': value['ownerRef'],
+        'quality': SearchAssetQualityDtoToJSON(value['quality']),
     };
 }
 

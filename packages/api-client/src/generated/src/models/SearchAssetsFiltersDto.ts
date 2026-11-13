@@ -74,7 +74,7 @@ export interface SearchAssetsFiltersDto {
      */
     meaningMethod?: Array<SearchAssetsFiltersDtoMeaningMethodEnum>;
     /**
-     * Governance (docs/prd/GOV-governed-data-assets.md): owned or not, or a lifecycle of owned assets.
+     * Governance (docs/prd/GOV-governed-data-assets.md): owned or not, a lifecycle of owned assets, or `failing` quality checks.
      * @type {string}
      * @memberof SearchAssetsFiltersDto
      */
@@ -183,7 +183,8 @@ export const SearchAssetsFiltersDtoGovernanceEnum = {
     Draft: 'draft',
     Active: 'active',
     Deprecated: 'deprecated',
-    Retired: 'retired'
+    Retired: 'retired',
+    Failing: 'failing'
 } as const;
 export type SearchAssetsFiltersDtoGovernanceEnum = typeof SearchAssetsFiltersDtoGovernanceEnum[keyof typeof SearchAssetsFiltersDtoGovernanceEnum];
 

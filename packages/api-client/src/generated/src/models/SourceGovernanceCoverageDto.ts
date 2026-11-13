@@ -37,6 +37,18 @@ export interface SourceGovernanceCoverageDto {
      * @memberof SourceGovernanceCoverageDto
      */
     active: number;
+    /**
+     * Assets with at least one quality check.
+     * @type {number}
+     * @memberof SourceGovernanceCoverageDto
+     */
+    checked: number;
+    /**
+     * Assets with a failing quality check.
+     * @type {number}
+     * @memberof SourceGovernanceCoverageDto
+     */
+    failing: number;
 }
 
 /**
@@ -46,6 +58,8 @@ export function instanceOfSourceGovernanceCoverageDto(value: object): value is S
     if (!('assets' in value) || value['assets'] === undefined) return false;
     if (!('owned' in value) || value['owned'] === undefined) return false;
     if (!('active' in value) || value['active'] === undefined) return false;
+    if (!('checked' in value) || value['checked'] === undefined) return false;
+    if (!('failing' in value) || value['failing'] === undefined) return false;
     return true;
 }
 
@@ -62,6 +76,8 @@ export function SourceGovernanceCoverageDtoFromJSONTyped(json: any, ignoreDiscri
         'assets': json['assets'],
         'owned': json['owned'],
         'active': json['active'],
+        'checked': json['checked'],
+        'failing': json['failing'],
     };
 }
 
@@ -79,6 +95,8 @@ export function SourceGovernanceCoverageDtoToJSONTyped(value?: SourceGovernanceC
         'assets': value['assets'],
         'owned': value['owned'],
         'active': value['active'],
+        'checked': value['checked'],
+        'failing': value['failing'],
     };
 }
 
