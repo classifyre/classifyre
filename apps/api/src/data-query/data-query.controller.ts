@@ -113,8 +113,17 @@ export class DataQueryController {
       'The tables you can query with SQL, and those you could with access',
   })
   @ApiOkResponse({ type: QueryCatalogDto })
-  getCatalog(): Promise<QueryCatalogDto> {
-    return this.catalog.catalog();
+  async getCatalog(): Promise<QueryCatalogDto> {
+    const catalog = await this.catalog.catalog();
+    // The job's mask list stays on the server: the columns already say
+    // what is masked, and hidden ones are counted, not named.
+    return {
+      ...catalog,
+      sources: catalog.sources.map((source) => ({
+        ...source,
+        tables: source.tables.map(({ masks: _masks, ...table }) => table),
+      })),
+    };
   }
 
   @Get('data-query/settings')

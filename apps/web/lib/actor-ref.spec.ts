@@ -1,4 +1,3 @@
-import { describe, expect, it } from "bun:test";
 import { actorKind, needsResolving } from "./actor-ref";
 
 /**
@@ -17,7 +16,7 @@ describe("actor references", () => {
     ["system:quality", "system"],
     ["Jordan Reyes", "name"],
     ["user:9f2c@other:1", "name"],
-  ])("%s is a %s", (ref, kind) => {
+  ])("%s is a %s", (ref: string, kind: string) => {
     expect(actorKind(ref)).toBe(kind as ReturnType<typeof actorKind>);
   });
 

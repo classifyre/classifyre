@@ -201,6 +201,11 @@
       "description": "Query the rows of tables with SQL: every table here, or only the sources and tables a grant names."
     },
     {
+      "id": "data.unmask",
+      "scope": "workspace",
+      "description": "Read the columns governance masks or hides (personal, sensitive, secret) in clear."
+    },
+    {
       "id": "data.connect",
       "scope": "workspace",
       "description": "Create your own SQL connections for BI tools and drivers (PostgreSQL protocol)."
@@ -405,6 +410,17 @@
       ]
     },
     {
+      "key": "data-reader-unmasked",
+      "title": "Data reader, unmasked",
+      "scope": "workspace",
+      "capabilities": [
+        "data.query",
+        "data.connect",
+        "data.unmask",
+        "notification.view"
+      ]
+    },
+    {
       "key": "code-author",
       "title": "Code author",
       "scope": "workspace",
@@ -521,6 +537,7 @@
         "agent.use",
         "data.export",
         "data.query",
+        "data.unmask",
         "data.connect",
         "data.connection.manage",
         "mcp.token.own",

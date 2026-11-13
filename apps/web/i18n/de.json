@@ -7224,7 +7224,8 @@
       "pickTable": "Tabelle",
       "choose": "Auswählen…",
       "none": "Nichts zur Auswahl: scannen Sie zuerst eine Datenbank, ein Lakehouse oder einen Bucket."
-    }
+    },
+    "unmaskedHint": "Liest auch die Spalten im Klartext, die Governance maskiert oder verbirgt (personenbezogen, sensibel, geheim). Nur Gruppen geben, die die echten Werte brauchen."
   },
   "platform": {
     "title": "Plattform",
@@ -7618,7 +7619,12 @@
       "removedHint": "Was zu diesen Spalten gesagt wurde, bleibt, bis es auf die neue Spalte verschoben oder verworfen wird.",
       "moveTo": "Verschieben nach…",
       "move": "Verschieben",
-      "forget": "Verwerfen"
+      "forget": "Verwerfen",
+      "access": "Zugriff",
+      "accessDefault": "Der Klassifizierung folgen ({{value}})",
+      "accessHint": "Was Personen sehen, die diese Tabelle abfragen dürfen. Eigentümer, Stewards und Personen mit „Datenleser, unmaskiert“ lesen sie im Klartext.",
+      "maskKind": "Angezeigt als",
+      "maskKindDefault": "Standard (geschwärzt)"
     },
     "usage": {
       "title": "Nutzung",
@@ -8146,5 +8152,22 @@
     "openListTitle": "Für SQL-Verbindungen geöffnet",
     "openListLead": "Was BI-Werkzeuge überhaupt erreichen dürfen. Jede Verbindung erreicht nur, was sie nennt, und nur, was ihre Person abfragen darf.",
     "openListNone": "Nichts ist für SQL-Verbindungen geöffnet. Öffnen Sie eine Quelle oder Tabelle auf ihrem Governance-Tab."
+  },
+  "columnAccess": {
+    "clear": "Klartext",
+    "mask": "Maskiert",
+    "hide": "Verborgen",
+    "kind": {
+      "redact": "geschwärzt (****)",
+      "partial": "letzte vier sichtbar",
+      "hash": "gehasht, verknüpfbar",
+      "null": "leer (NULL)"
+    },
+    "fromClassification": "folgt der Klassifizierung",
+    "bySteward": "von einem Steward gesetzt",
+    "inClear": "für andere maskiert oder verborgen; Sie lesen sie im Klartext",
+    "hiddenCount": "{{count}} verborgene Spalte(n)",
+    "runMasked": "Für Sie maskiert: {{list}}. Personen mit „Datenleser, unmaskiert“ sowie Eigentümer und Stewards der Tabelle lesen sie im Klartext.",
+    "runHidden": "Für Sie verborgen: {{list}}."
   }
 }

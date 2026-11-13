@@ -31,7 +31,47 @@ export interface QueryColumnDto {
      * @memberof QueryColumnDto
      */
     type: string;
+    /**
+     * Governance masks or hides this column (DQ §5.8). Hidden columns are left out unless you read them in clear.
+     * @type {string}
+     * @memberof QueryColumnDto
+     */
+    access?: QueryColumnDtoAccessEnum;
+    /**
+     * 
+     * @type {string}
+     * @memberof QueryColumnDto
+     */
+    mask?: QueryColumnDtoMaskEnum;
+    /**
+     * Masked or hidden for others; you read it in clear (data.unmask, or you own or steward the table).
+     * @type {boolean}
+     * @memberof QueryColumnDto
+     */
+    inClear?: boolean;
 }
+
+
+/**
+ * @export
+ */
+export const QueryColumnDtoAccessEnum = {
+    Mask: 'mask',
+    Hide: 'hide'
+} as const;
+export type QueryColumnDtoAccessEnum = typeof QueryColumnDtoAccessEnum[keyof typeof QueryColumnDtoAccessEnum];
+
+/**
+ * @export
+ */
+export const QueryColumnDtoMaskEnum = {
+    Redact: 'redact',
+    Partial: 'partial',
+    Hash: 'hash',
+    Null: 'null'
+} as const;
+export type QueryColumnDtoMaskEnum = typeof QueryColumnDtoMaskEnum[keyof typeof QueryColumnDtoMaskEnum];
+
 
 /**
  * Check if a given object implements the QueryColumnDto interface.
@@ -54,6 +94,9 @@ export function QueryColumnDtoFromJSONTyped(json: any, ignoreDiscriminator: bool
         
         'name': json['name'],
         'type': json['type'],
+        'access': json['access'] == null ? undefined : json['access'],
+        'mask': json['mask'] == null ? undefined : json['mask'],
+        'inClear': json['inClear'] == null ? undefined : json['inClear'],
     };
 }
 
@@ -70,6 +113,9 @@ export function QueryColumnDtoToJSONTyped(value?: QueryColumnDto | null, ignoreD
         
         'name': value['name'],
         'type': value['type'],
+        'access': value['access'],
+        'mask': value['mask'],
+        'inClear': value['inClear'],
     };
 }
 

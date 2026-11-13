@@ -178,3 +178,24 @@ export async function ownerDataScope(
   if (!actorRef?.startsWith('user:')) return { assetIds: [], sourceIds: [] };
   return openScopes(db, { role: 'OWNER', principalRef: actorRef });
 }
+
+/**
+ * What a person reads in clear because they answer for it (DQ §5.8): the
+ * tables and sources they, or a group of theirs, own or steward. Columns
+ * governance masks are theirs to judge; custodians run the system and get
+ * nothing from this.
+ */
+export async function governedDataScope(
+  db: Db,
+  person: GovernancePerson | null,
+): Promise<{ assetIds: string[]; sourceIds: string[] }> {
+  if (!person?.actorRef.startsWith('user:')) {
+    return { assetIds: [], sourceIds: [] };
+  }
+  return openScopes(db, {
+    role: { in: ['OWNER', 'STEWARD'] },
+    principalRef: {
+      in: [person.actorRef, ...person.groupIds.map((id) => `group:${id}`)],
+    },
+  });
+}

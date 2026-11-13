@@ -36,6 +36,7 @@ import {
   TooltipTrigger,
 } from "@workspace/ui/components/tooltip";
 import { cn } from "@workspace/ui/lib/utils";
+import { ColumnAccessChip } from "@/components/governance/column-access-chip";
 import { useTranslation } from "@/hooks/use-translation";
 import { useNamespace } from "@/components/namespace-provider";
 import { formatDate, formatRelative } from "@/lib/date";
@@ -140,9 +141,9 @@ export function QueryExplorer({
   const [filter, setFilter] = React.useState("");
   const [onlyQueryable, setOnlyQueryable] = React.useState(false);
   const [starred, setStarred] = React.useState<Record<string, boolean>>({});
-  const [openSources, setOpenSources] = React.useState<
-    Record<string, boolean>
-  >({});
+  const [openSources, setOpenSources] = React.useState<Record<string, boolean>>(
+    {},
+  );
   const [openTables, setOpenTables] = React.useState<Record<string, boolean>>(
     {},
   );
@@ -333,7 +334,10 @@ export function QueryExplorer({
                             <Copy className="h-3 w-3" />
                           </button>
                         </TooltipTrigger>
-                        <TooltipContent side="left" className="font-mono text-xs">
+                        <TooltipContent
+                          side="left"
+                          className="font-mono text-xs"
+                        >
                           {t("dataQuery.explorer.copySourceHint", {
                             name: source.sqlName,
                           })}
@@ -448,7 +452,10 @@ export function QueryExplorer({
                                           <Play className="h-3 w-3" />
                                         </button>
                                       </TooltipTrigger>
-                                      <TooltipContent side="left" className="text-xs">
+                                      <TooltipContent
+                                        side="left"
+                                        className="text-xs"
+                                      >
                                         {t("dataQuery.explorer.runTableHint", {
                                           name: table.sqlName,
                                         })}
@@ -466,7 +473,10 @@ export function QueryExplorer({
                                           <Copy className="h-3 w-3" />
                                         </button>
                                       </TooltipTrigger>
-                                      <TooltipContent side="left" className="font-mono text-xs">
+                                      <TooltipContent
+                                        side="left"
+                                        className="font-mono text-xs"
+                                      >
                                         {t("dataQuery.explorer.copyNameHint", {
                                           name: table.sqlName,
                                         })}
@@ -504,6 +514,14 @@ export function QueryExplorer({
                                           <span className="truncate">
                                             {column.name}
                                           </span>
+                                          {column.access && (
+                                            <ColumnAccessChip
+                                              action={column.access}
+                                              mask={column.mask}
+                                              inClear={column.inClear}
+                                              compact
+                                            />
+                                          )}
                                           <span className="ml-auto shrink-0 truncate text-muted-foreground">
                                             {column.type}
                                           </span>
@@ -519,6 +537,17 @@ export function QueryExplorer({
                                       </TooltipContent>
                                     </Tooltip>
                                   ))}
+                                  {(table.hiddenColumns ?? 0) > 0 && (
+                                    <p
+                                      className="flex items-center gap-1 px-1 text-[11px] text-muted-foreground"
+                                      data-testid="explorer-hidden-columns"
+                                    >
+                                      <ColumnAccessChip action="hide" compact />
+                                      {t("columnAccess.hiddenCount", {
+                                        count: table.hiddenColumns ?? 0,
+                                      })}
+                                    </p>
+                                  )}
                                   {table.columns.length === 0 &&
                                     table.canQuery && (
                                       <p className="px-1 text-[11px] text-muted-foreground">

@@ -82,7 +82,12 @@ export function catalogDdl(
       for (const column of table.columns) {
         if (!seen.has(column.name.toLowerCase())) continue;
         const note = columnNotes?.get(column.name);
-        const text = [note?.businessName, note?.description]
+        // A masked column says so: BI tools show comments next to columns.
+        const masked =
+          column.access === 'mask' && !column.inClear
+            ? `Masked (${column.mask ?? 'redact'})`
+            : null;
+        const text = [note?.businessName, note?.description, masked]
           .filter(Boolean)
           .join(' — ');
         if (text) {

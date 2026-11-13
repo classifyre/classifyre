@@ -194,6 +194,9 @@ model QueryRun {
   channel           String         @default("rest")
   /// The SQL connection the run came through, for `sql`.
   connectionId      String?        @map("connection_id")
+  /// `[{ table, column, action, mask }]`: the masked and hidden columns of
+  /// the tables the SQL names, as they were when it ran (DQ §5.8).
+  masks             Json?
   startedAt         DateTime?      @map("started_at")
   finishedAt        DateTime?      @map("finished_at")
   createdAt         DateTime       @default(now()) @map("created_at")
@@ -551,6 +554,12 @@ model AssetColumnAnnotation {
   /// checklist's "classification reviewed".
   classificationReviewedAt DateTime?     @map("classification_reviewed_at")
   classificationReviewedBy String?       @map("classification_reviewed_by")
+  /// What people without `data.unmask` see (DQ §5.8): `clear`, `mask` or
+  /// `hide`; null follows the classification (personal, sensitive → mask;
+  /// secret → hide).
+  access                   String?
+  /// For `mask` (or a default mask): `redact`, `partial`, `hash` or `null`.
+  maskKind                 String?       @map("mask_kind")
   updatedAt                DateTime      @updatedAt @map("updated_at")
   updatedBy                String?       @map("updated_by")
   asset                    Asset         @relation(fields: [assetId], references: [id], onDelete: Cascade)

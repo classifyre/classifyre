@@ -62,6 +62,12 @@ import {
   type GovernanceRoleKind,
   type RoleRow,
 } from './governance-rules';
+import {
+  COLUMN_ACTIONS,
+  MASK_KINDS,
+  isColumnAction,
+  isMaskKind,
+} from '../data-query/column-masks';
 import type {
   AssetGovernanceDto,
   GovernancePrincipalDto,
@@ -1481,6 +1487,8 @@ export class GovernanceService {
       criticalDataElement?: unknown;
       classification?: unknown;
       reviewClassification?: unknown;
+      access?: unknown;
+      maskKind?: unknown;
     },
   ): Promise<AssetColumns & { canGovern: boolean }> {
     const target = await this.assetTarget(assetId);
@@ -1551,6 +1559,27 @@ export class GovernanceService {
       fields.push('classification');
       reviewed = reviewed || value !== null;
     }
+    // DQ §5.8: what people who may not unmask see of this column.
+    if ('access' in body) {
+      const value = body.access;
+      if (value !== null && !isColumnAction(value)) {
+        throw new BadRequestException(
+          `access is one of ${COLUMN_ACTIONS.join(', ')}, or null to follow the classification.`,
+        );
+      }
+      data.access = value;
+      fields.push('access');
+    }
+    if ('maskKind' in body) {
+      const value = body.maskKind;
+      if (value !== null && !isMaskKind(value)) {
+        throw new BadRequestException(
+          `maskKind is one of ${MASK_KINDS.join(', ')}, or null for the default.`,
+        );
+      }
+      data.maskKind = value;
+      fields.push('maskKind');
+    }
     if (reviewed) {
       data.classificationReviewedAt = new Date();
       data.classificationReviewedBy = actorRef;
@@ -1586,7 +1615,9 @@ export class GovernanceService {
         | 'description'
         | 'termId'
         | 'criticalDataElement'
-        | 'classification';
+        | 'classification'
+        | 'access'
+        | 'maskKind';
       let from: unknown = previous?.[key] ?? null;
       let to: unknown = (data as Record<string, unknown>)[key] ?? null;
       if (from === to) continue;

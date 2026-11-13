@@ -1,9 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, VenetianMask } from "lucide-react";
+import type { QueryRunMaskDto } from "@workspace/api-client";
 import { toast } from "sonner";
 import { useTranslation } from "@/hooks/use-translation";
+import type { TranslationKey } from "@/i18n";
 import {
   apiErrorMessage,
   cancelQuery,
@@ -113,7 +115,11 @@ export function QueryWorkbench({
       try {
         const created = await startQuery(statement);
         setRun(created);
-        const finished = await waitForRun(created.id, setRun, controller.signal);
+        const finished = await waitForRun(
+          created.id,
+          setRun,
+          controller.signal,
+        );
         if (finished.status === "SUCCESS") {
           setRows(await fetchRows(finished));
         } else {
@@ -247,6 +253,7 @@ export function QueryWorkbench({
 
       {rows && (
         <div className="space-y-2">
+          <RunMasksNote masks={run?.masks} />
           {run?.truncated && (
             <p className="text-xs text-amber-600 dark:text-amber-400">
               {run.truncatedReason === "bytes"
@@ -283,5 +290,43 @@ export function QueryWorkbench({
         onSave={(name) => void save(name)}
       />
     </div>
+  );
+}
+
+/**
+ * Which columns of the tables a query names were masked or hidden for the
+ * person when it ran (docs/prd/DQ-data-query.md §5.8), so a column of
+ * `****` never reads as the data itself.
+ */
+function RunMasksNote({ masks }: { masks?: QueryRunMaskDto[] }) {
+  const { t } = useTranslation();
+  if (!masks?.length) return null;
+  const name = (mask: QueryRunMaskDto) =>
+    `${mask.table.split(".").pop()}.${mask.column}`;
+  const masked = masks.filter((mask) => mask.action === "mask");
+  const hidden = masks.filter((mask) => mask.action === "hide");
+  return (
+    <p
+      className="flex items-start gap-1.5 text-xs text-muted-foreground"
+      data-testid="run-masks"
+    >
+      <VenetianMask className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+      <span>
+        {masked.length > 0 &&
+          t("columnAccess.runMasked", {
+            list: masked
+              .map(
+                (mask) =>
+                  `${name(mask)} (${t(`columnAccess.kind.${mask.mask ?? "redact"}` as TranslationKey)})`,
+              )
+              .join(", "),
+          })}
+        {masked.length > 0 && hidden.length > 0 && " "}
+        {hidden.length > 0 &&
+          t("columnAccess.runHidden", {
+            list: hidden.map(name).join(", "),
+          })}
+      </span>
+    </p>
   );
 }

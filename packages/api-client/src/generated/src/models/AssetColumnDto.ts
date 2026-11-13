@@ -20,6 +20,13 @@ import {
     ColumnFindingGroupDtoToJSON,
     ColumnFindingGroupDtoToJSONTyped,
 } from './ColumnFindingGroupDto';
+import type { ColumnAccessDto } from './ColumnAccessDto';
+import {
+    ColumnAccessDtoFromJSON,
+    ColumnAccessDtoFromJSONTyped,
+    ColumnAccessDtoToJSON,
+    ColumnAccessDtoToJSONTyped,
+} from './ColumnAccessDto';
 import type { ColumnTermDto } from './ColumnTermDto';
 import {
     ColumnTermDtoFromJSON,
@@ -95,6 +102,24 @@ export interface AssetColumnDto {
      */
     findings: Array<ColumnFindingGroupDto>;
     /**
+     * A steward's access; null when it follows the classification.
+     * @type {string}
+     * @memberof AssetColumnDto
+     */
+    access: AssetColumnDtoAccessEnum | null;
+    /**
+     * 
+     * @type {string}
+     * @memberof AssetColumnDto
+     */
+    maskKind: AssetColumnDtoMaskKindEnum | null;
+    /**
+     * 
+     * @type {ColumnAccessDto}
+     * @memberof AssetColumnDto
+     */
+    effectiveAccess: ColumnAccessDto;
+    /**
      * 
      * @type {Date}
      * @memberof AssetColumnDto
@@ -160,6 +185,27 @@ export const AssetColumnDtoEffectiveClassificationEnum = {
 } as const;
 export type AssetColumnDtoEffectiveClassificationEnum = typeof AssetColumnDtoEffectiveClassificationEnum[keyof typeof AssetColumnDtoEffectiveClassificationEnum];
 
+/**
+ * @export
+ */
+export const AssetColumnDtoAccessEnum = {
+    Clear: 'clear',
+    Mask: 'mask',
+    Hide: 'hide'
+} as const;
+export type AssetColumnDtoAccessEnum = typeof AssetColumnDtoAccessEnum[keyof typeof AssetColumnDtoAccessEnum];
+
+/**
+ * @export
+ */
+export const AssetColumnDtoMaskKindEnum = {
+    Redact: 'redact',
+    Partial: 'partial',
+    Hash: 'hash',
+    Null: 'null'
+} as const;
+export type AssetColumnDtoMaskKindEnum = typeof AssetColumnDtoMaskKindEnum[keyof typeof AssetColumnDtoMaskKindEnum];
+
 
 /**
  * Check if a given object implements the AssetColumnDto interface.
@@ -169,6 +215,9 @@ export function instanceOfAssetColumnDto(value: object): value is AssetColumnDto
     if (!('type' in value) || value['type'] === undefined) return false;
     if (!('criticalDataElement' in value) || value['criticalDataElement'] === undefined) return false;
     if (!('findings' in value) || value['findings'] === undefined) return false;
+    if (!('access' in value) || value['access'] === undefined) return false;
+    if (!('maskKind' in value) || value['maskKind'] === undefined) return false;
+    if (!('effectiveAccess' in value) || value['effectiveAccess'] === undefined) return false;
     return true;
 }
 
@@ -192,6 +241,9 @@ export function AssetColumnDtoFromJSONTyped(json: any, ignoreDiscriminator: bool
         'derivedClassification': json['derivedClassification'] == null ? undefined : json['derivedClassification'],
         'effectiveClassification': json['effectiveClassification'] == null ? undefined : json['effectiveClassification'],
         'findings': ((json['findings'] as Array<any>).map(ColumnFindingGroupDtoFromJSON)),
+        'access': json['access'],
+        'maskKind': json['maskKind'],
+        'effectiveAccess': ColumnAccessDtoFromJSON(json['effectiveAccess']),
         'reviewedAt': json['reviewedAt'] == null ? undefined : (new Date(json['reviewedAt'])),
         'reviewedBy': json['reviewedBy'] == null ? undefined : json['reviewedBy'],
         'updatedAt': json['updatedAt'] == null ? undefined : (new Date(json['updatedAt'])),
@@ -220,6 +272,9 @@ export function AssetColumnDtoToJSONTyped(value?: AssetColumnDto | null, ignoreD
         'derivedClassification': value['derivedClassification'],
         'effectiveClassification': value['effectiveClassification'],
         'findings': ((value['findings'] as Array<any>).map(ColumnFindingGroupDtoToJSON)),
+        'access': value['access'],
+        'maskKind': value['maskKind'],
+        'effectiveAccess': ColumnAccessDtoToJSON(value['effectiveAccess']),
         'reviewedAt': value['reviewedAt'] == null ? value['reviewedAt'] : value['reviewedAt'].toISOString(),
         'reviewedBy': value['reviewedBy'],
         'updatedAt': value['updatedAt'] == null ? value['updatedAt'] : value['updatedAt'].toISOString(),

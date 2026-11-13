@@ -243,6 +243,15 @@ export const CAPABILITIES = [
       'Query the rows of tables with SQL: every table here, or only the sources and tables a grant names.',
   },
   {
+    // Masked and hidden columns in clear (docs/prd/DQ-data-query.md §5.8).
+    // Like data.query, given on a workspace by a role or on one source or
+    // table by a grant; owners and stewards read what they govern in clear.
+    id: 'data.unmask',
+    scope: 'workspace',
+    description:
+      'Read the columns governance masks or hides (personal, sensitive, secret) in clear.',
+  },
+  {
     // A channel for data.query, never more (docs/prd/DQ-data-query.md §5.7):
     // a BI tool or driver reads, over PostgreSQL, what its person may query.
     id: 'data.connect',

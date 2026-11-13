@@ -7224,7 +7224,8 @@
       "pickTable": "Table",
       "choose": "Choose…",
       "none": "Nothing to choose: scan a database, lakehouse or bucket first."
-    }
+    },
+    "unmaskedHint": "Also reads the columns governance masks or hides (personal, sensitive, secret) in clear. Give it only to groups that need the real values."
   },
   "platform": {
     "title": "Platform",
@@ -7618,7 +7619,12 @@
       "removedHint": "What was said about these columns stays until it is moved to the column they became, or forgotten.",
       "moveTo": "Move to…",
       "move": "Move",
-      "forget": "Forget"
+      "forget": "Forget",
+      "access": "Access",
+      "accessDefault": "Follow the classification ({{value}})",
+      "accessHint": "What people who may query this table see. Its owner and stewards, and people with Data reader, unmasked, read it in clear.",
+      "maskKind": "Shown as",
+      "maskKindDefault": "Default (redacted)"
     },
     "usage": {
       "title": "Usage",
@@ -8146,5 +8152,22 @@
     "openListTitle": "Open to SQL connections",
     "openListLead": "What BI tools may reach at all. Each connection reaches only what it names, and only what its person may query.",
     "openListNone": "Nothing is open to SQL connections. Open a source or table on its Governance tab."
+  },
+  "columnAccess": {
+    "clear": "Clear",
+    "mask": "Masked",
+    "hide": "Hidden",
+    "kind": {
+      "redact": "redacted (****)",
+      "partial": "last four shown",
+      "hash": "hashed, joinable",
+      "null": "empty (NULL)"
+    },
+    "fromClassification": "follows its classification",
+    "bySteward": "set by a steward",
+    "inClear": "masked or hidden for others; you read it in clear",
+    "hiddenCount": "{{count}} hidden column(s)",
+    "runMasked": "Masked for you: {{list}}. People with Data reader, unmasked, and the table's owner and stewards read them in clear.",
+    "runHidden": "Hidden from you: {{list}}."
   }
 }

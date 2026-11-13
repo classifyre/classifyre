@@ -16,6 +16,9 @@ Name | Type
 `derivedClassification` | string
 `effectiveClassification` | string
 `findings` | [Array&lt;ColumnFindingGroupDto&gt;](ColumnFindingGroupDto.md)
+`access` | string
+`maskKind` | string
+`effectiveAccess` | [ColumnAccessDto](ColumnAccessDto.md)
 `reviewedAt` | Date
 `reviewedBy` | string
 `updatedAt` | Date
@@ -38,6 +41,9 @@ const example = {
   "derivedClassification": null,
   "effectiveClassification": null,
   "findings": null,
+  "access": null,
+  "maskKind": null,
+  "effectiveAccess": null,
   "reviewedAt": null,
   "reviewedBy": null,
   "updatedAt": null,

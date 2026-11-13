@@ -55,6 +55,18 @@ export interface UpdateAssetColumnDto {
      * @memberof UpdateAssetColumnDto
      */
     reviewClassification?: boolean;
+    /**
+     * What people who may query the table but not unmask see (DQ §5.8). Null follows the classification.
+     * @type {string}
+     * @memberof UpdateAssetColumnDto
+     */
+    access?: UpdateAssetColumnDtoAccessEnum | null;
+    /**
+     * How a masked column shows. Null is the default (`redact`).
+     * @type {string}
+     * @memberof UpdateAssetColumnDto
+     */
+    maskKind?: UpdateAssetColumnDtoMaskKindEnum | null;
 }
 
 
@@ -70,6 +82,27 @@ export const UpdateAssetColumnDtoClassificationEnum = {
     Secret: 'secret'
 } as const;
 export type UpdateAssetColumnDtoClassificationEnum = typeof UpdateAssetColumnDtoClassificationEnum[keyof typeof UpdateAssetColumnDtoClassificationEnum];
+
+/**
+ * @export
+ */
+export const UpdateAssetColumnDtoAccessEnum = {
+    Clear: 'clear',
+    Mask: 'mask',
+    Hide: 'hide'
+} as const;
+export type UpdateAssetColumnDtoAccessEnum = typeof UpdateAssetColumnDtoAccessEnum[keyof typeof UpdateAssetColumnDtoAccessEnum];
+
+/**
+ * @export
+ */
+export const UpdateAssetColumnDtoMaskKindEnum = {
+    Redact: 'redact',
+    Partial: 'partial',
+    Hash: 'hash',
+    Null: 'null'
+} as const;
+export type UpdateAssetColumnDtoMaskKindEnum = typeof UpdateAssetColumnDtoMaskKindEnum[keyof typeof UpdateAssetColumnDtoMaskKindEnum];
 
 
 /**
@@ -95,6 +128,8 @@ export function UpdateAssetColumnDtoFromJSONTyped(json: any, ignoreDiscriminator
         'criticalDataElement': json['criticalDataElement'] == null ? undefined : json['criticalDataElement'],
         'classification': json['classification'] == null ? undefined : json['classification'],
         'reviewClassification': json['reviewClassification'] == null ? undefined : json['reviewClassification'],
+        'access': json['access'] == null ? undefined : json['access'],
+        'maskKind': json['maskKind'] == null ? undefined : json['maskKind'],
     };
 }
 
@@ -115,6 +150,8 @@ export function UpdateAssetColumnDtoToJSONTyped(value?: UpdateAssetColumnDto | n
         'criticalDataElement': value['criticalDataElement'],
         'classification': value['classification'],
         'reviewClassification': value['reviewClassification'],
+        'access': value['access'],
+        'maskKind': value['maskKind'],
     };
 }
 

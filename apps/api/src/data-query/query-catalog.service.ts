@@ -1,4 +1,20 @@
-import { ownerDataScope } from '../governance/governance-filter';
+import {
+  governedDataScope,
+  ownerDataScope,
+} from '../governance/governance-filter';
+import {
+  deriveClassification,
+  type Classification,
+  type ColumnFindingGroup,
+} from '../governance/governance-rules';
+import { CLS_PERSON, type ClsPerson } from '../identity/iam-access-policy';
+import {
+  columnsAsSeen,
+  effectiveColumnPolicy,
+  toColumnMask,
+  type ColumnMask,
+  type MaskedColumn,
+} from './column-masks';
 import { personOf } from '../identity/actor-ref';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ClsService } from 'nestjs-cls';
@@ -20,10 +36,8 @@ import {
   type ConnectionScope,
 } from './connection-scope';
 
-export interface CatalogColumn {
-  name: string;
-  type: string;
-}
+/** A column as the person sees it (masked ones marked, hidden ones gone). */
+export type CatalogColumn = MaskedColumn;
 
 export interface CatalogTable {
   assetId: string;
@@ -41,6 +55,13 @@ export interface CatalogTable {
   canQuery: boolean;
   reason?: string;
   location: TableLocation | null;
+  /** Columns governance hides from this person (DQ §5.8), by count. */
+  hiddenColumns?: number;
+  /**
+   * The masked and hidden columns the query job applies for this person;
+   * absent when they read the table in clear. Never sent to the browser.
+   */
+  masks?: ColumnMask[];
 }
 
 export interface CatalogSource {
@@ -76,6 +97,19 @@ interface CachedTables {
 /** How long the table list of one workspace is reused (it changes with scans). */
 const CACHE_MS = 30_000;
 
+interface CachedClassifications {
+  at: number;
+  /** asset id → column → what its open findings classify it as. */
+  byAsset: Map<string, Map<string, Classification>>;
+}
+
+/** Who reads masked columns in clear (DQ §5.8). */
+export interface ClearScope {
+  all: boolean;
+  sourceIds: ReadonlySet<string>;
+  assetIds: ReadonlySet<string>;
+}
+
 /**
  * What a person can query in the current workspace (docs/prd/DQ-data-query.md §4).
  *
@@ -88,6 +122,7 @@ const CACHE_MS = 30_000;
 export class QueryCatalogService {
   private readonly logger = new Logger(QueryCatalogService.name);
   private readonly cache = new Map<string, CachedTables>();
+  private readonly classified = new Map<string, CachedClassifications>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -147,7 +182,10 @@ export class QueryCatalogService {
   /** Forget the cached table list, e.g. after a source was renamed. */
   invalidate(): void {
     const schema = this.schema();
-    if (schema) this.cache.delete(schema);
+    if (schema) {
+      this.cache.delete(schema);
+      this.classified.delete(schema);
+    }
   }
 
   private schema(): string | undefined {
@@ -180,11 +218,150 @@ export class QueryCatalogService {
     };
   }
 
+  /**
+   * Who reads masked and hidden columns in clear (DQ §5.8): `data.unmask` on
+   * the workspace (a role), on a source or table (an unmasked Data reader
+   * grant), and the owners and stewards of what they govern.
+   */
+  async clearScope(): Promise<ClearScope> {
+    const actor = this.actors.current();
+    const capabilities = await this.policy.capabilities(actor);
+    if (capabilities.has('data.unmask')) {
+      return { all: true, sourceIds: new Set(), assetIds: new Set() };
+    }
+    const grants = this.policy.resourceGrants?.('data.unmask') ?? {
+      sourceIds: [],
+      assetIds: [],
+    };
+    const person = this.cls.isActive()
+      ? this.cls.get<ClsPerson | undefined>(CLS_PERSON)
+      : undefined;
+    const governed = await governedDataScope(this.prisma, person ?? null);
+    return {
+      all: false,
+      sourceIds: new Set([...grants.sourceIds, ...governed.sourceIds]),
+      assetIds: new Set([...grants.assetIds, ...governed.assetIds]),
+    };
+  }
+
+  /**
+   * asset id → its masked and hidden columns, for people who do not read it
+   * in clear. Stewards' settings are read every time (a column they hide is
+   * hidden at once); what findings classify is reused like the table list.
+   */
+  async columnMasks(): Promise<Map<string, ColumnMask[]>> {
+    const [derived, notes] = await Promise.all([
+      this.derivedClassifications(),
+      this.prisma.assetColumnAnnotation.findMany({
+        where: {
+          OR: [
+            { access: { not: null } },
+            { maskKind: { not: null } },
+            { classification: { not: null } },
+          ],
+        },
+        select: {
+          assetId: true,
+          columnName: true,
+          access: true,
+          maskKind: true,
+          classification: true,
+        },
+      }),
+    ]);
+    const out = new Map<string, ColumnMask[]>();
+    const add = (assetId: string, mask: ColumnMask | null) => {
+      if (!mask) return;
+      const list = out.get(assetId) ?? [];
+      list.push(mask);
+      out.set(assetId, list);
+    };
+    const noted = new Set<string>();
+    for (const note of notes) {
+      noted.add(`${note.assetId}\u0000${note.columnName}`);
+      const policy = effectiveColumnPolicy({
+        access: note.access,
+        maskKind: note.maskKind,
+        classification:
+          note.classification ??
+          derived.get(note.assetId)?.get(note.columnName) ??
+          null,
+      });
+      add(note.assetId, toColumnMask(note.columnName, policy));
+    }
+    for (const [assetId, columns] of derived) {
+      for (const [column, classification] of columns) {
+        if (noted.has(`${assetId}\u0000${column}`)) continue;
+        const policy = effectiveColumnPolicy({
+          access: null,
+          maskKind: null,
+          classification,
+        });
+        add(assetId, toColumnMask(column, policy));
+      }
+    }
+    return out;
+  }
+
+  /** What open PII and secret findings classify, per table column (GOV §5.1). */
+  private async derivedClassifications(): Promise<
+    Map<string, Map<string, Classification>>
+  > {
+    const key = this.schema() ?? '';
+    const hit = this.classified.get(key);
+    if (hit && Date.now() - hit.at < CACHE_MS) return hit.byAsset;
+    const rows = await this.prisma.$queryRaw<
+      {
+        asset_id: string;
+        column: string;
+        detector_type: string;
+        finding_type: string;
+      }[]
+    >`
+      SELECT asset_id,
+             metadata->>'tabular_column_name' AS column,
+             detector_type::text AS detector_type,
+             finding_type
+        FROM findings
+       WHERE status = 'OPEN'
+         AND detector_type::text IN ('PII', 'SECRETS')
+         AND metadata ? 'tabular_column_name'
+       GROUP BY 1, 2, 3, 4`;
+    const groups = new Map<string, Map<string, ColumnFindingGroup[]>>();
+    for (const row of rows) {
+      if (!row.column) continue;
+      const columns = groups.get(row.asset_id) ?? new Map();
+      const list = columns.get(row.column) ?? [];
+      list.push({
+        detectorType: row.detector_type,
+        findingType: row.finding_type,
+        count: 1,
+        maxSeverity: 'INFO',
+      });
+      columns.set(row.column, list);
+      groups.set(row.asset_id, columns);
+    }
+    const byAsset = new Map<string, Map<string, Classification>>();
+    for (const [assetId, columns] of groups) {
+      for (const [column, list] of columns) {
+        const classification = deriveClassification(list);
+        if (!classification) continue;
+        const map = byAsset.get(assetId) ?? new Map();
+        map.set(column, classification);
+        byAsset.set(assetId, map);
+      }
+    }
+    this.classified.set(key, { at: Date.now(), byAsset });
+    return byAsset;
+  }
+
   async catalog(): Promise<QueryCatalog> {
-    const [settings, scope, cached] = await Promise.all([
+    const [settings, scope, cached, clear, masks] = await Promise.all([
       this.settings(),
       this.scope(),
       this.tables(),
+      this.clearScope(),
+      this.columnMasks(),
     ]);
     const sources = new Map<string, CatalogSource>();
     for (const source of cached.sources) {
@@ -209,10 +386,21 @@ export class QueryCatalogService {
           ? undefined
           : 'You need the Data reader role on this table or its source to query it.'
         : table.reason;
+      // DQ §5.8: hidden columns leave the list, masked ones say so; the
+      // job gets the same masks, so what the list shows is what runs.
+      const tableMasks = masks.get(table.assetId) ?? [];
+      const inClear =
+        clear.all ||
+        clear.sourceIds.has(table.sourceId) ||
+        clear.assetIds.has(table.assetId);
+      const seen = columnsAsSeen(table.columns, tableMasks, inClear);
       sources.get(table.sourceId)?.tables.push({
         ...table,
+        columns: seen.columns,
         canQuery: table.queryable && granted,
         ...(reason ? { reason } : {}),
+        ...(seen.hidden ? { hiddenColumns: seen.hidden } : {}),
+        ...(!inClear && tableMasks.length ? { masks: tableMasks } : {}),
       });
     }
     return {

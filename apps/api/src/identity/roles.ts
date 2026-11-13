@@ -35,9 +35,20 @@ const NOT_FOR_VISITORS: ReadonlySet<Capability> = new Set<Capability>([
   'activity.view',
 ]);
 
+// Writing code that runs, and reading columns governance masks, are trust
+// decisions of their own: given by a role made for them, never with admin.
 const WORKSPACE_ADMIN: readonly Capability[] = WORKSPACE_CAPABILITIES.filter(
-  (id) => id !== 'code.author',
+  (id) => id !== 'code.author' && id !== 'data.unmask',
 );
+
+/**
+ * Roles that open table rows, and so the ones given on a single source or
+ * table (docs/prd/DQ-data-query.md §4) and shown on a Data tab's access.
+ */
+export const DATA_ROLE_KEYS: readonly string[] = [
+  'data-reader',
+  'data-reader-unmasked',
+];
 
 export const BUILT_IN_ROLES = [
   {
@@ -110,6 +121,19 @@ export const BUILT_IN_ROLES = [
     title: 'Data reader',
     scope: 'workspace',
     capabilities: ['data.query', 'data.connect', 'notification.view'],
+  },
+  {
+    // Data reader who also reads the columns governance masks or hides
+    // (docs/prd/DQ-data-query.md §5.8), on the same scopes.
+    key: 'data-reader-unmasked',
+    title: 'Data reader, unmasked',
+    scope: 'workspace',
+    capabilities: [
+      'data.query',
+      'data.connect',
+      'data.unmask',
+      'notification.view',
+    ],
   },
   {
     // Add-on: combined with another role, never granted alone in practice.

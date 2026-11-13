@@ -28,6 +28,8 @@ import {
   type CatalogTable,
 } from './query-catalog.service';
 import { mentionedSourceNames } from './sql-names';
+import { maskSalt, type ColumnMask } from './column-masks';
+import { resolveApplicationSecretKey } from '../secret-key.util';
 import {
   extractThreePartNames,
   precheckSql,
@@ -75,6 +77,8 @@ export interface QueryRunView {
   truncated: boolean;
   truncatedReason: string | null;
   columns: { name: string; type: string }[] | null;
+  /** Masked and hidden columns of the tables it names (DQ §5.8). */
+  masks: RunMask[];
   timings: Record<string, number> | null;
   error: { code: string; message: string } | null;
   resultBytes: number | null;
@@ -83,6 +87,18 @@ export interface QueryRunView {
   createdAt: Date;
   startedAt: Date | null;
   finishedAt: Date | null;
+}
+
+/** A masked or hidden column of a table a run names, as it ran. */
+export interface RunMask extends ColumnMask {
+  table: string;
+}
+
+/** The masks of the tables a run names: what its result shows them as. */
+export function runMasks(tables: readonly CatalogTable[]): RunMask[] {
+  return tables.flatMap((table) =>
+    (table.masks ?? []).map((mask) => ({ table: table.sqlName, ...mask })),
+  );
 }
 
 export interface QueryCallbackMeta {
@@ -474,6 +490,11 @@ export class QueryRunService {
         connectionId: input.origin.connectionId,
         assetIds: input.namedAssetIds,
         sourceIds: input.used.map((source) => source.id),
+        masks: runMasks(
+          input.tables
+            .map(({ table }) => table)
+            .filter((table) => input.namedAssetIds.includes(table.assetId)),
+        ) as unknown as Prisma.InputJsonValue,
         callbackTokenHash: tokenHash(token),
         resultFormat: input.exportFormat ?? null,
         expiresAt: new Date(Date.now() + RESULT_TTL_MS),
@@ -513,7 +534,17 @@ export class QueryRunService {
         table: table.table,
         assetId: table.assetId,
         location: table.location,
+        // DQ §5.8: the job's view of this table hides and masks these.
+        ...(table.masks?.length ? { columns: table.masks } : {}),
       })),
+      ...(input.tables.some(({ table }) => table.masks?.length)
+        ? {
+            maskSalt: maskSalt(
+              resolveApplicationSecretKey(),
+              this.actors.workspaceId() ?? '',
+            ),
+          }
+        : {}),
     };
 
     // Settles once the job has ended: its result arrived, or it failed.
@@ -903,6 +934,7 @@ export class QueryRunService {
         truncated: true,
         truncatedReason: true,
         columns: true,
+        masks: true,
         timings: true,
         error: true,
         resultBytes: true,
@@ -957,6 +989,7 @@ export class QueryRunService {
     truncated: boolean;
     truncatedReason: string | null;
     columns: Prisma.JsonValue;
+    masks: Prisma.JsonValue;
     timings: Prisma.JsonValue;
     error: Prisma.JsonValue;
     resultBytes: number | null;
@@ -975,6 +1008,9 @@ export class QueryRunService {
       truncated: run.truncated,
       truncatedReason: run.truncatedReason,
       columns: (run.columns as QueryRunView['columns']) ?? null,
+      masks: Array.isArray(run.masks)
+        ? (run.masks as unknown as RunMask[])
+        : [],
       timings: (run.timings as QueryRunView['timings']) ?? null,
       error: (run.error as QueryRunView['error']) ?? null,
       resultBytes: run.resultBytes,

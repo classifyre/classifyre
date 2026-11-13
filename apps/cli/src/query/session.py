@@ -28,6 +28,7 @@ from typing import Any
 from ..utils.duckdb_engine import connect, load_extension, quote_identifier, require_duckdb
 from .bindings import BindingError, SourceBinding, TableLocation
 from .gate import QueryRefusedError, TableName, validate
+from .masks import ColumnMask, ColumnsHiddenError, masked_projection
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +92,8 @@ class QueryRequest:
     database: str | None = None
     #: The client's search path as ``source.schema`` entries, postgres only.
     search_path: list[str] = field(default_factory=list)
+    #: Key of the ``hash`` masks: one per workspace (§5.8).
+    mask_salt: str = ""
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> QueryRequest:
@@ -119,6 +122,7 @@ class QueryRequest:
             dialect="postgres" if data.get("dialect") == "postgres" else "duckdb",
             database=str(data["database"]) if data.get("database") else None,
             search_path=[str(p) for p in data.get("searchPath") or [] if isinstance(p, str)],
+            mask_salt=str(data.get("maskSalt") or ""),
         )
 
 
@@ -141,6 +145,8 @@ class _Table:
     name: TableName
     source_alias: str
     location: TableLocation
+    #: Columns masked or hidden for the person (docs/prd/DQ-data-query.md §5.8).
+    masks: list[ColumnMask] = field(default_factory=list)
 
 
 class QuerySession:
@@ -168,7 +174,12 @@ class QuerySession:
             )
             location = entry.get("location")
             if name.source in self._bindings and isinstance(location, dict):
-                self._tables[name] = _Table(name, name.source, TableLocation.from_dict(location))
+                self._tables[name] = _Table(
+                    name,
+                    name.source,
+                    TableLocation.from_dict(location),
+                    ColumnMask.parse(entry.get("columns")),
+                )
 
     def __enter__(self) -> QuerySession:
         return self
@@ -236,7 +247,28 @@ class QuerySession:
                 created_schemas.add((name.source, name.schema))
             target = ".".join(quote_identifier(p) for p in (name.source, name.schema, name.table))
             try:
-                conn.execute(f"CREATE VIEW {target} AS SELECT * FROM {relation}")
+                projection = "*"
+                if entry.masks:
+                    # The view is the only way to the table: masked here, the
+                    # query filters and joins on masked values; hidden, the
+                    # column does not exist for it.
+                    described = conn.execute(f"DESCRIBE SELECT * FROM {relation}").fetchall()
+                    try:
+                        projection = (
+                            masked_projection(
+                                [(str(row[0]), str(row[1])) for row in described],
+                                entry.masks,
+                                self.request.mask_salt,
+                            )
+                            or "*"
+                        )
+                    except ColumnsHiddenError:
+                        raise QueryRefusedError(
+                            f"Every column of {name} is hidden from you.", "columns_hidden"
+                        ) from None
+                conn.execute(f"CREATE VIEW {target} AS SELECT {projection} FROM {relation}")
+            except QueryRefusedError:
+                raise
             except Exception as exc:
                 raise BindingError(
                     f"Failed to read {binding.label()}: {binding.explain(exc) or _first_line(exc)}"

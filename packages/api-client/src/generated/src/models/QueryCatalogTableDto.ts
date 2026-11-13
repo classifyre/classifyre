@@ -87,6 +87,12 @@ export interface QueryCatalogTableDto {
      * @memberof QueryCatalogTableDto
      */
     reason?: string;
+    /**
+     * How many columns governance hides from you (DQ §5.8).
+     * @type {number}
+     * @memberof QueryCatalogTableDto
+     */
+    hiddenColumns?: number;
 }
 
 /**
@@ -125,6 +131,7 @@ export function QueryCatalogTableDtoFromJSONTyped(json: any, ignoreDiscriminator
         'queryable': json['queryable'],
         'canQuery': json['canQuery'],
         'reason': json['reason'] == null ? undefined : json['reason'],
+        'hiddenColumns': json['hiddenColumns'] == null ? undefined : json['hiddenColumns'],
     };
 }
 
@@ -149,6 +156,7 @@ export function QueryCatalogTableDtoToJSONTyped(value?: QueryCatalogTableDto | n
         'queryable': value['queryable'],
         'canQuery': value['canQuery'],
         'reason': value['reason'],
+        'hiddenColumns': value['hiddenColumns'],
     };
 }
 

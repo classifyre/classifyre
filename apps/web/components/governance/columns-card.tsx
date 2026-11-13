@@ -5,7 +5,9 @@ import { toast } from "sonner";
 import { CheckCircle2, Pencil, ShieldAlert, Star } from "lucide-react";
 import {
   api,
+  type UpdateAssetColumnDtoAccessEnum,
   type UpdateAssetColumnDtoClassificationEnum,
+  type UpdateAssetColumnDtoMaskKindEnum,
 } from "@workspace/api-client";
 import {
   Badge,
@@ -52,6 +54,12 @@ import {
   type AssetColumnDto,
   type AssetColumnsDto,
 } from "@/lib/governance";
+import {
+  COLUMN_ACTIONS,
+  MASK_KINDS,
+  columnAccessFor,
+} from "@/lib/column-access";
+import { ColumnAccessChip } from "./column-access-chip";
 
 const CLASSIFICATION_TONE: Record<string, StatusTone> = {
   public: "neutral",
@@ -62,6 +70,8 @@ const CLASSIFICATION_TONE: Record<string, StatusTone> = {
   secret: "error",
 };
 const DERIVED = "__derived__";
+/** Access and mask kind left to the classification's default. */
+const DEFAULT = "__default__";
 
 /** A column's classification: who said it, and whether a steward confirmed it. */
 export function ClassificationChip({ column }: { column: AssetColumnDto }) {
@@ -138,7 +148,23 @@ function ColumnDialog({
   const [classification, setClassification] = useState<string>(
     column.classification ?? DERIVED,
   );
+  const [access, setAccess] = useState<string>(column.access ?? DEFAULT);
+  const [maskKind, setMaskKind] = useState<string>(column.maskKind ?? DEFAULT);
   const [busy, setBusy] = useState(false);
+  // What the column will show to people who do not read it in clear, with
+  // the classification as it stands in this dialog (DQ §5.8).
+  const classificationNow =
+    classification === DERIVED ? column.derivedClassification : classification;
+  const byClassification = columnAccessFor({
+    access: null,
+    maskKind: null,
+    classification: classificationNow ?? null,
+  });
+  const preview = columnAccessFor({
+    access: access === DEFAULT ? null : access,
+    maskKind: maskKind === DEFAULT ? null : maskKind,
+    classification: classificationNow ?? null,
+  });
 
   const save = async (reviewClassification: boolean) => {
     setBusy(true);
@@ -157,6 +183,14 @@ function ColumnDialog({
                 ? null
                 : (classification as UpdateAssetColumnDtoClassificationEnum),
             ...(reviewClassification ? { reviewClassification: true } : {}),
+            access:
+              access === DEFAULT
+                ? null
+                : (access as UpdateAssetColumnDtoAccessEnum),
+            maskKind:
+              maskKind === DEFAULT || preview.action !== "mask"
+                ? null
+                : (maskKind as UpdateAssetColumnDtoMaskKindEnum),
           },
         }),
       );
@@ -249,6 +283,55 @@ function ColumnDialog({
                 })}
               </p>
             )}
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="col-access">{t("governance.columns.access")}</Label>
+            <Select value={access} onValueChange={setAccess}>
+              <SelectTrigger id="col-access" data-testid="column-access">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={DEFAULT}>
+                  {t("governance.columns.accessDefault", {
+                    value: t(
+                      `columnAccess.${byClassification.action}` as TranslationKey,
+                    ),
+                  })}
+                </SelectItem>
+                {COLUMN_ACTIONS.map((value) => (
+                  <SelectItem
+                    key={value}
+                    value={value}
+                    data-testid={`column-access-option-${value}`}
+                  >
+                    {t(`columnAccess.${value}` as TranslationKey)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {preview.action === "mask" && (
+              <Select value={maskKind} onValueChange={setMaskKind}>
+                <SelectTrigger
+                  aria-label={t("governance.columns.maskKind")}
+                  data-testid="column-mask-kind"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={DEFAULT}>
+                    {t("governance.columns.maskKindDefault")}
+                  </SelectItem>
+                  {MASK_KINDS.map((value) => (
+                    <SelectItem key={value} value={value}>
+                      {t(`columnAccess.kind.${value}` as TranslationKey)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <p className="text-xs text-muted-foreground">
+              {t("governance.columns.accessHint")}
+            </p>
           </div>
         </div>
         <DialogFooter className="gap-2">
@@ -355,7 +438,9 @@ export function ColumnsCard({
       !column.term &&
       !column.classification &&
       !column.reviewedAt &&
-      !column.criticalDataElement,
+      !column.criticalDataElement &&
+      !column.access &&
+      !column.maskKind,
   );
 
   return (
@@ -379,6 +464,7 @@ export function ColumnsCard({
               <TableRow>
                 <TableHead>{t("governance.columns.column")}</TableHead>
                 <TableHead>{t("governance.columns.classification")}</TableHead>
+                <TableHead>{t("governance.columns.access")}</TableHead>
                 <TableHead className="w-20" />
               </TableRow>
             </TableHeader>
@@ -422,6 +508,15 @@ export function ColumnsCard({
                   </TableCell>
                   <TableCell>
                     <ClassificationChip column={column} />
+                  </TableCell>
+                  <TableCell>
+                    <ColumnAccessChip
+                      action={column.effectiveAccess.action}
+                      mask={column.effectiveAccess.mask}
+                      fromClassification={
+                        column.effectiveAccess.fromClassification
+                      }
+                    />
                   </TableCell>
                   <TableCell className="text-right">
                     {state.canGovern && (

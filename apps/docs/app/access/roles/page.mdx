@@ -33,9 +33,10 @@ In plain words:
 | **Investigator**      | A Viewer who also triages findings, tags assets, works on cases and inquiries, reviews leads and asks the assistant. |
 | **Curator**           | A Viewer who also writes and approves glossary terms, manages entities and decides duplicates.                    |
 | **Source manager**    | Connecting sources, running scans and managing detectors. Sees findings and assets, **not** cases or inquiries.    |
-| **Workspace admin**   | Everything in a workspace, settings and access included, except writing code.                                     |
+| **Workspace admin**   | Everything in a workspace, settings and access included, except writing code and reading masked columns in clear. |
 | **Code author**       | An add-on, next to another role: custom source notebooks and code detectors run code on your infrastructure.      |
-| **Data reader**       | An add-on, next to Viewer: reading the rows of tables with [SQL](/data-query/). The one role that can also be given on a single source or a single table. |
+| **Data reader**       | An add-on, next to Viewer: reading the rows of tables with [SQL](/data-query/). Can also be given on a single source or a single table. |
+| **Data reader, unmasked** | Data reader who also reads the columns governance masks or hides (personal, sensitive, secret data) in clear — see [Masked and hidden columns](/data-query/#masked-and-hidden-columns). Given on the same places. |
 | **Workspace manager** | Creating workspaces for a group they belong to, and being Workspace admin on every workspace that group owns.     |
 | **Auditor**           | The tenant's audit trail and who has access, without seeing findings or content.                                  |
 | **Tenant admin**      | Everything in the tenant: every workspace, every grant, the tenant's activity.                                    |
@@ -79,7 +80,8 @@ stays listed until someone removes it.
 
 - **Access only adds up.** No grant takes anything away.
 - **Nobody gives more than they have.** A workspace admin cannot make anyone a
-  Code author, because writing code is not theirs to give.
+  Code author, because writing code is not theirs to give — nor give Data
+  reader, unmasked, unless a tenant admin gave them that role on the workspace.
 - **Creating a workspace needs membership.** A Workspace manager creates
   workspaces only for a group they are in (or under). Only tenant admins may
   create one for any group of the tenant.

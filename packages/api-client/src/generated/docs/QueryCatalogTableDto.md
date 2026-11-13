@@ -16,6 +16,7 @@ Name | Type
 `queryable` | boolean
 `canQuery` | boolean
 `reason` | string
+`hiddenColumns` | number
 
 ## Example
 
@@ -34,6 +35,7 @@ const example = {
   "queryable": null,
   "canQuery": null,
   "reason": null,
+  "hiddenColumns": null,
 } satisfies QueryCatalogTableDto
 
 console.log(example)

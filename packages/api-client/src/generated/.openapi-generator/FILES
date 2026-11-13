@@ -163,6 +163,7 @@ docs/CloseCaseDto.md
 docs/CloseCaseResponseDto.md
 docs/CohortRunYieldDto.md
 docs/CohortWeightsPreviewDto.md
+docs/ColumnAccessDto.md
 docs/ColumnFindingGroupDto.md
 docs/ColumnLineageDto.md
 docs/ColumnLineageResponseDto.md
@@ -421,6 +422,7 @@ docs/QueryColumnDto.md
 docs/QueryLimitsDto.md
 docs/QueryRunDto.md
 docs/QueryRunErrorDto.md
+docs/QueryRunMaskDto.md
 docs/QuickSearchAssetDto.md
 docs/QuickSearchFindingDto.md
 docs/QuickSearchRequestDto.md
@@ -865,6 +867,7 @@ src/models/CloseCaseDto.ts
 src/models/CloseCaseResponseDto.ts
 src/models/CohortRunYieldDto.ts
 src/models/CohortWeightsPreviewDto.ts
+src/models/ColumnAccessDto.ts
 src/models/ColumnFindingGroupDto.ts
 src/models/ColumnLineageDto.ts
 src/models/ColumnLineageResponseDto.ts
@@ -1101,6 +1104,7 @@ src/models/QueryColumnDto.ts
 src/models/QueryLimitsDto.ts
 src/models/QueryRunDto.ts
 src/models/QueryRunErrorDto.ts
+src/models/QueryRunMaskDto.ts
 src/models/QuickSearchAssetDto.ts
 src/models/QuickSearchFindingDto.ts
 src/models/QuickSearchRequestDto.ts

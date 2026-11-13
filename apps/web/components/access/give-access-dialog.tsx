@@ -35,6 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@workspace/ui/components/select";
+import { DATA_READER_UNMASKED } from "@/lib/column-access";
 import { useTranslation } from "@/hooks/use-translation";
 import { fetchCatalog, type QueryCatalog } from "@/lib/data-query";
 import { lacksOpeningRole } from "@/lib/access-grants";
@@ -89,7 +90,8 @@ const START: Record<GiveAccessWhere["kind"], TargetKind> = {
  *   not left with access nobody can reach.
  * - From a Data tab the role and target are predefined (`fixed`): shown but
  *   not editable, so the dialog reads the same and only the group and date
- *   are left to choose.
+ *   are left to choose — or, with `roleChoices`, one of a few roles (Data
+ *   reader, or Data reader, unmasked: masked columns in clear).
  */
 export function GiveAccessDialog({
   open,
@@ -106,8 +108,11 @@ export function GiveAccessDialog({
   /** Roles that can be given here. */
   roles: RoleDto[];
   where?: GiveAccessWhere;
-  /** A Data tab's role and target, predefined and not to be changed here. */
-  fixed?: { roleKey: string; target: GrantTarget };
+  /**
+   * A Data tab's role and target, predefined and not to be changed here;
+   * `roleChoices` lets one of those roles be picked instead.
+   */
+  fixed?: { roleKey: string; roleChoices?: string[]; target: GrantTarget };
   onAdded: () => Promise<void> | void;
 }) {
   const { t } = useTranslation();
@@ -314,7 +319,31 @@ export function GiveAccessDialog({
 
           <div className="grid gap-1">
             <Label htmlFor="give-access-role">{t("access.roles")}</Label>
-            {fixed ? (
+            {fixed?.roleChoices?.length ? (
+              <Select
+                value={roleKeys[0] ?? fixed.roleKey}
+                onValueChange={(key) => setRoleKeys([key])}
+              >
+                <SelectTrigger
+                  id="give-access-role"
+                  data-testid="give-access-role"
+                  className="w-full"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {fixed.roleChoices.map((key) => (
+                    <SelectItem
+                      key={key}
+                      value={key}
+                      data-testid={`give-access-role-${key}`}
+                    >
+                      {roleTitle(key)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : fixed ? (
               <Input
                 id="give-access-role"
                 data-testid="give-access-role"
@@ -350,6 +379,14 @@ export function GiveAccessDialog({
                   ))}
                 </MultiSelectContent>
               </MultiSelect>
+            )}
+            {roleKeys.includes(DATA_READER_UNMASKED) && (
+              <p
+                className="text-xs text-muted-foreground"
+                data-testid="give-access-unmasked-hint"
+              >
+                {t("access.unmaskedHint")}
+              </p>
             )}
             {opensNothing && (
               <p
@@ -468,9 +505,7 @@ export function GiveAccessDialog({
             </Button>
             <Button
               type="submit"
-              disabled={
-                !groupId || !target || roleKeys.length === 0 || saving
-              }
+              disabled={!groupId || !target || roleKeys.length === 0 || saving}
               data-testid="give-access-submit"
             >
               <Plus className="h-4 w-4" />

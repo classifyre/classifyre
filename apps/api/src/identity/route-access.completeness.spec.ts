@@ -133,13 +133,14 @@ describe('route access completeness', () => {
 });
 
 describe('built-in roles', () => {
-  it('give Workspace admin every workspace capability except writing code', () => {
+  it('give Workspace admin every workspace capability except writing code and unmasking', () => {
     const admin = BUILT_IN_ROLES.find((role) => role.key === 'workspace-admin');
     const workspaceCapabilities = CAPABILITY_IDS.filter(
       (id) =>
         !id.startsWith('tenant.') &&
         !id.startsWith('platform.') &&
-        id !== 'code.author',
+        id !== 'code.author' &&
+        id !== 'data.unmask',
     );
     expect([...(admin?.capabilities ?? [])].sort()).toEqual(
       [...workspaceCapabilities].sort(),

@@ -167,6 +167,7 @@ Reading rows is its own right, separate from seeing findings:
 
 - **Workspace admins** (and tenant admins and workspace managers) can query every table of their workspaces.
 - The **Data reader** role gives the right to others. Give it to a group on a whole workspace, on a group's workspaces — or on **one source** or **one table**. Members also need a role that opens the workspace, such as Viewer.
+- **Data reader, unmasked** is the same, and also reads the columns governance masks or hides in clear (see [Masked and hidden columns](#masked-and-hidden-columns)).
 
 People see tables they cannot query with a lock, so they know what exists and whom to ask.
 
@@ -177,8 +178,8 @@ The **Data reader** role is what opens SQL: whoever holds it on a table, a sourc
 | Where you press **Give access** | Role | Applies to |
 | --- | --- | --- |
 | **Settings → Access** | any role; Data reader can also be given on one source or one table | the whole workspace, or — for Data reader — a source or a table you pick |
-| A source's **Data** tab | Data reader (fixed) | the whole source: every table in it (fixed) |
-| A table's **Data** tab | Data reader (fixed) | this table (fixed) |
+| A source's **Data** tab | Data reader, or Data reader, unmasked | the whole source: every table in it (fixed) |
+| A table's **Data** tab | Data reader, or Data reader, unmasked | this table (fixed) |
 
 Below the result, people who can see who has access (**access.view**) see **Access**: the Data reader grants that reach the source or table — on it, on its tables or source, and wider ones — with their end dates. Grants made here can be removed with the bin button; inherited ones (from the tenant or an owning group) are changed in **Settings → Access**.
 
@@ -189,7 +190,31 @@ A table's tab also has **Activity**: reads and exports of that table, and access
 ![A table's Activity: who read and exported it, and the access given on it](./images/table-activity.png)
 
 <Callout type="warning">
-Reading rows shows everything in them, including what detectors flagged as personal data. Give the Data reader role as narrowly as the work needs: one table or one source rather than a whole workspace.
+Give the Data reader role as narrowly as the work needs: one table or one source rather than a whole workspace. Columns that hold personal data are masked for Data readers (below); give **Data reader, unmasked** only to groups that need the real values.
+</Callout>
+
+## Masked and hidden columns
+
+A column of a table shows one of three ways to people who may query the table:
+
+| Access | What they get |
+| --- | --- |
+| **Clear** | the values as they are |
+| **Masked** | the column is there, its values replaced: *redacted* (`****`), *last four shown* (`•••••1234`), *hashed* (16 hex characters, the same for equal values in the workspace, so masked columns still join and count distinct) or *empty* (`NULL`). Numbers and dates masked any way but *hashed* become `NULL`. |
+| **Hidden** | the column is not there: `SELECT *` leaves it out, naming it is an unknown column |
+
+**By default it follows the column's classification** on the table's **Governance** tab (Columns): *personal* and *sensitive* data are masked, *secret* is hidden, the rest is clear. Classifications come from open findings (an email address found in the column makes it personal data) or from a steward. The table's owner or a steward can set a column's access and how it is masked in the same dialog — *Follow the classification*, *Clear*, *Masked* or *Hidden* — and it applies to the next query.
+
+**Who reads it in clear:**
+
+- people with **Data reader, unmasked** on the table, its source or the workspace;
+- the table's (or its source's) **owner and stewards**;
+- tenant admins. Workspace admins do not, unless given Data reader, unmasked: like writing code, reading masked data is a decision of its own.
+
+Masks apply wherever the table is read — the SQL page, a Data tab, exports, [SQL connections](/sql-connections) — and to the whole query: a `WHERE`, `JOIN` or `GROUP BY` sees the masked values too, so a filter cannot reveal what the result hides. The SQL page marks masked columns in the table list, counts hidden ones, and says above a result which columns were masked for you.
+
+<Callout type="info">
+Masking protects what people see; it is not anonymisation. Someone who can read the other columns of a row may still work out who it is about.
 </Callout>
 
 ## Settings
@@ -204,7 +229,6 @@ Reading rows shows everything in them, including what detectors flagged as perso
 
 ## Coming next
 
-- Columns hidden or masked per group, with personal data masked by default where detectors found it.
 - Asking for access from a locked table.
 - Connecting BI tools over JDBC/ODBC.
 - Publishing a query that joins several tables as a Delta table of its own, which can be shared without sharing the tables it reads.

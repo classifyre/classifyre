@@ -8,6 +8,9 @@ Name | Type
 ------------ | -------------
 `name` | string
 `type` | string
+`access` | string
+`mask` | string
+`inClear` | boolean
 
 ## Example
 
@@ -18,6 +21,9 @@ import type { QueryColumnDto } from '@workspace/api-client'
 const example = {
   "name": null,
   "type": null,
+  "access": null,
+  "mask": null,
+  "inClear": null,
 } satisfies QueryColumnDto
 
 console.log(example)

@@ -7,6 +7,36 @@ export class QueryColumnDto {
 
   @ApiProperty({ description: 'Type as the source or Arrow names it.' })
   type: string;
+
+  @ApiPropertyOptional({
+    enum: ['mask', 'hide'],
+    description:
+      'Governance masks or hides this column (DQ §5.8). Hidden columns are left out unless you read them in clear.',
+  })
+  access?: 'mask' | 'hide';
+
+  @ApiPropertyOptional({ enum: ['redact', 'partial', 'hash', 'null'] })
+  mask?: 'redact' | 'partial' | 'hash' | 'null';
+
+  @ApiPropertyOptional({
+    description:
+      'Masked or hidden for others; you read it in clear (data.unmask, or you own or steward the table).',
+  })
+  inClear?: boolean;
+}
+
+export class QueryRunMaskDto {
+  @ApiProperty({ example: 'shop_lake.shop.customers' })
+  table: string;
+
+  @ApiProperty()
+  column: string;
+
+  @ApiProperty({ enum: ['mask', 'hide'] })
+  action: 'mask' | 'hide';
+
+  @ApiPropertyOptional({ enum: ['redact', 'partial', 'hash', 'null'] })
+  mask?: 'redact' | 'partial' | 'hash' | 'null';
 }
 
 export class QueryCatalogTableDto {
@@ -49,6 +79,11 @@ export class QueryCatalogTableDto {
     description: 'Why it cannot be queried, when it cannot.',
   })
   reason?: string;
+
+  @ApiPropertyOptional({
+    description: 'How many columns governance hides from you (DQ §5.8).',
+  })
+  hiddenColumns?: number;
 }
 
 export class QueryCatalogSourceDto {
@@ -221,6 +256,13 @@ export class QueryRunDto {
 
   @ApiPropertyOptional({ nullable: true, type: [QueryColumnDto] })
   columns: QueryColumnDto[] | null;
+
+  @ApiProperty({
+    type: [QueryRunMaskDto],
+    description:
+      'Columns of the tables it names that were masked or hidden for you when it ran.',
+  })
+  masks: QueryRunMaskDto[];
 
   @ApiPropertyOptional({
     nullable: true,

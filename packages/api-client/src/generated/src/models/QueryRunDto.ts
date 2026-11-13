@@ -27,6 +27,13 @@ import {
     QueryColumnDtoToJSON,
     QueryColumnDtoToJSONTyped,
 } from './QueryColumnDto';
+import type { QueryRunMaskDto } from './QueryRunMaskDto';
+import {
+    QueryRunMaskDtoFromJSON,
+    QueryRunMaskDtoFromJSONTyped,
+    QueryRunMaskDtoToJSON,
+    QueryRunMaskDtoToJSONTyped,
+} from './QueryRunMaskDto';
 
 /**
  * 
@@ -88,6 +95,12 @@ export interface QueryRunDto {
      * @memberof QueryRunDto
      */
     columns?: Array<QueryColumnDto> | null;
+    /**
+     * Columns of the tables it names that were masked or hidden for you when it ran.
+     * @type {Array<QueryRunMaskDto>}
+     * @memberof QueryRunDto
+     */
+    masks: Array<QueryRunMaskDto>;
     /**
      * setupMs, executeMs, totalMs (inside the job).
      * @type {{ [key: string]: number; }}
@@ -156,6 +169,7 @@ export function instanceOfQueryRunDto(value: object): value is QueryRunDto {
     if (!('status' in value) || value['status'] === undefined) return false;
     if (!('assetIds' in value) || value['assetIds'] === undefined) return false;
     if (!('truncated' in value) || value['truncated'] === undefined) return false;
+    if (!('masks' in value) || value['masks'] === undefined) return false;
     if (!('createdAt' in value) || value['createdAt'] === undefined) return false;
     return true;
 }
@@ -179,6 +193,7 @@ export function QueryRunDtoFromJSONTyped(json: any, ignoreDiscriminator: boolean
         'truncated': json['truncated'],
         'truncatedReason': json['truncatedReason'] == null ? undefined : json['truncatedReason'],
         'columns': json['columns'] == null ? undefined : ((json['columns'] as Array<any>).map(QueryColumnDtoFromJSON)),
+        'masks': ((json['masks'] as Array<any>).map(QueryRunMaskDtoFromJSON)),
         'timings': json['timings'] == null ? undefined : json['timings'],
         'error': json['error'] == null ? undefined : QueryRunErrorDtoFromJSON(json['error']),
         'resultBytes': json['resultBytes'] == null ? undefined : json['resultBytes'],
@@ -209,6 +224,7 @@ export function QueryRunDtoToJSONTyped(value?: QueryRunDto | null, ignoreDiscrim
         'truncated': value['truncated'],
         'truncatedReason': value['truncatedReason'],
         'columns': value['columns'] == null ? undefined : ((value['columns'] as Array<any>).map(QueryColumnDtoToJSON)),
+        'masks': ((value['masks'] as Array<any>).map(QueryRunMaskDtoToJSON)),
         'timings': value['timings'],
         'error': QueryRunErrorDtoToJSON(value['error']),
         'resultBytes': value['resultBytes'],

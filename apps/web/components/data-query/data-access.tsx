@@ -7,9 +7,6 @@ import { api } from "@workspace/api-client";
 import type { GrantDto, RoleDto, TenantGroupDto } from "@workspace/api-client";
 import { Button } from "@workspace/ui/components/button";
 
-
-
-
 import {
   Tabs,
   TabsContent,
@@ -24,6 +21,11 @@ import { GrantsByGroup } from "@/components/access/grants-by-group";
 import { AuditEventList } from "@/components/audit-history";
 import { useNamespace } from "@/components/namespace-provider";
 import { useCan } from "@/hooks/use-me";
+import {
+  DATA_READER,
+  DATA_READER_UNMASKED,
+  DATA_ROLE_KEYS,
+} from "@/lib/column-access";
 import { useTranslation } from "@/hooks/use-translation";
 import { extractApiErrorMessage } from "@/lib/extract-api-error-message";
 
@@ -36,15 +38,13 @@ export type DataScope =
   | { kind: "source"; sourceId: string; name: string }
   | { kind: "asset"; assetId: string; sourceId: string; name: string };
 
-const DATA_READER = "data-reader";
-
 /**
  * Whether a grant opens this scope's rows:
  * - a table: Data reader on the table, on its source, or anything wider;
  * - a source: Data reader on the source, on one of its tables, or wider.
  */
 function reaches(scope: DataScope, workspaceId: string, grant: GrantDto) {
-  if (grant.roleKey !== DATA_READER) return false;
+  if (!DATA_ROLE_KEYS.includes(grant.roleKey)) return false;
   const onResource = (id: string) => grant.scopeId === `${workspaceId}/${id}`;
   if (grant.scopeType === "asset") {
     return scope.kind === "asset"
@@ -111,7 +111,7 @@ export function useDataAccessGrants(scope: DataScope): DataAccessGrants {
 function removable(grant: GrantDto): boolean {
   return (
     !grant.inherited &&
-    grant.roleKey === DATA_READER &&
+    DATA_ROLE_KEYS.includes(grant.roleKey) &&
     (grant.scopeType === "asset" || grant.scopeType === "source")
   );
 }
@@ -139,7 +139,9 @@ function DataAccessOverview({
       toast.success(t("access.removed", { subject: grant.subjectLabel }));
       await access.reload();
     } catch (error) {
-      toast.error(await extractApiErrorMessage(error, t("access.removeFailed")));
+      toast.error(
+        await extractApiErrorMessage(error, t("access.removeFailed")),
+      );
     }
   };
 
@@ -209,7 +211,12 @@ export function GiveDataAccessButton({
         onOpenChange={setOpen}
         groups={access.groups}
         roles={access.roles}
-        fixed={{ roleKey: DATA_READER, target }}
+        fixed={{
+          roleKey: DATA_READER,
+          // Or the same with masked columns in clear (DQ §5.8).
+          roleChoices: [DATA_READER, DATA_READER_UNMASKED],
+          target,
+        }}
         onAdded={access.reload}
       />
     </>

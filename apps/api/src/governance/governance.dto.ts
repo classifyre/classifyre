@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { GovernanceStatus, LegalBasis } from '@prisma/client';
 import { IsEnum, IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 import { GOVERNANCE_ROLES } from './governance-rules';
+import { COLUMN_ACTIONS, MASK_KINDS } from '../data-query/column-masks';
 
 /** A person or group as the governance screens show it. */
 export class GovernancePrincipalDto {
@@ -279,6 +280,19 @@ export class ColumnTermDto {
   status: string;
 }
 
+export class ColumnAccessDto {
+  @ApiProperty({ enum: COLUMN_ACTIONS })
+  action: string;
+
+  @ApiPropertyOptional({ enum: MASK_KINDS })
+  mask?: string;
+
+  @ApiProperty({
+    description: 'It follows the classification, not a steward.',
+  })
+  fromClassification: boolean;
+}
+
 export class AssetColumnDto {
   @ApiProperty()
   name: string;
@@ -317,6 +331,20 @@ export class AssetColumnDto {
 
   @ApiProperty({ type: [ColumnFindingGroupDto] })
   findings: ColumnFindingGroupDto[];
+
+  @ApiProperty({
+    enum: COLUMN_ACTIONS,
+    nullable: true,
+    type: String,
+    description: "A steward's access; null when it follows the classification.",
+  })
+  access: string | null;
+
+  @ApiProperty({ enum: MASK_KINDS, nullable: true, type: String })
+  maskKind: string | null;
+
+  @ApiProperty({ type: () => ColumnAccessDto })
+  effectiveAccess: ColumnAccessDto;
 
   @ApiPropertyOptional({ nullable: true })
   reviewedAt: Date | null;
@@ -389,6 +417,23 @@ export class UpdateAssetColumnDto {
   })
   @IsOptional()
   reviewClassification?: boolean;
+
+  @ApiPropertyOptional({
+    enum: COLUMN_ACTIONS,
+    nullable: true,
+    description:
+      'What people who may query the table but not unmask see (DQ §5.8). Null follows the classification.',
+  })
+  @IsOptional()
+  access?: string | null;
+
+  @ApiPropertyOptional({
+    enum: MASK_KINDS,
+    nullable: true,
+    description: 'How a masked column shows. Null is the default (`redact`).',
+  })
+  @IsOptional()
+  maskKind?: string | null;
 }
 
 export class MoveAssetColumnDto {
@@ -464,7 +509,8 @@ export class AssetUsageDto {
 
   @ApiProperty({
     type: [UsageChannelDto],
-    description: 'By how the reads came: `rest` (the app), `mcp`, `sql` (SQL connections).',
+    description:
+      'By how the reads came: `rest` (the app), `mcp`, `sql` (SQL connections).',
   })
   byChannel: UsageChannelDto[];
 }

@@ -15,6 +15,7 @@ Name | Type
 `truncated` | boolean
 `truncatedReason` | string
 `columns` | [Array&lt;QueryColumnDto&gt;](QueryColumnDto.md)
+`masks` | [Array&lt;QueryRunMaskDto&gt;](QueryRunMaskDto.md)
 `timings` | { [key: string]: number; }
 `error` | [QueryRunErrorDto](QueryRunErrorDto.md)
 `resultBytes` | number
@@ -39,6 +40,7 @@ const example = {
   "truncated": null,
   "truncatedReason": null,
   "columns": null,
+  "masks": null,
   "timings": null,
   "error": null,
   "resultBytes": null,

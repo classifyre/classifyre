@@ -59,4 +59,6 @@ export const RESOURCE_GRANTABLE_CAPABILITIES: readonly Capability[] = [
   'data.query',
   // A Data reader of one table may connect a tool to that table.
   'data.connect',
+  // An unmasked Data reader of one table reads its masked columns in clear.
+  'data.unmask',
 ];

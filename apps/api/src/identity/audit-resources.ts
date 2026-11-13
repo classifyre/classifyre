@@ -1,3 +1,5 @@
+import { DATA_ROLE_KEYS } from './roles';
+
 /**
  * What an audit event touched beyond its one entity, as plain strings the
  * trail can be filtered on (`audit_events.resources`, GIN-indexed):
@@ -59,7 +61,11 @@ export function grantResources(grant: {
   sourceId?: unknown;
 }): string[] {
   const out: string[] = [];
-  if (grant.roleKey === 'data-reader') out.push(DATA_RESOURCE);
+  if (
+    typeof grant.roleKey === 'string' &&
+    DATA_ROLE_KEYS.includes(grant.roleKey)
+  )
+    out.push(DATA_RESOURCE);
   const resourceId =
     typeof grant.scopeId === 'string'
       ? grant.scopeId.split('/').slice(1).join('/')

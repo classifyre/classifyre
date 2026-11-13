@@ -31491,6 +31491,7 @@
                 "agent.use",
                 "data.export",
                 "data.query",
+                "data.unmask",
                 "data.connect",
                 "data.connection.manage",
                 "mcp.token.own",
@@ -31755,6 +31756,7 @@
                 "agent.use",
                 "data.export",
                 "data.query",
+                "data.unmask",
                 "data.connect",
                 "data.connection.manage",
                 "mcp.token.own",
@@ -31982,6 +31984,7 @@
                 "agent.use",
                 "data.export",
                 "data.query",
+                "data.unmask",
                 "data.connect",
                 "data.connection.manage",
                 "mcp.token.own",
@@ -36174,6 +36177,27 @@
           "type": {
             "type": "string",
             "description": "Type as the source or Arrow names it."
+          },
+          "access": {
+            "type": "string",
+            "enum": [
+              "mask",
+              "hide"
+            ],
+            "description": "Governance masks or hides this column (DQ §5.8). Hidden columns are left out unless you read them in clear."
+          },
+          "mask": {
+            "type": "string",
+            "enum": [
+              "redact",
+              "partial",
+              "hash",
+              "null"
+            ]
+          },
+          "inClear": {
+            "type": "boolean",
+            "description": "Masked or hidden for others; you read it in clear (data.unmask, or you own or steward the table)."
           }
         },
         "required": [
@@ -36222,6 +36246,10 @@
           "reason": {
             "type": "string",
             "description": "Why it cannot be queried, when it cannot."
+          },
+          "hiddenColumns": {
+            "type": "number",
+            "description": "How many columns governance hides from you (DQ §5.8)."
           }
         },
         "required": [
@@ -36364,6 +36392,39 @@
           "sql"
         ]
       },
+      "QueryRunMaskDto": {
+        "type": "object",
+        "properties": {
+          "table": {
+            "type": "string",
+            "example": "shop_lake.shop.customers"
+          },
+          "column": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "mask",
+              "hide"
+            ]
+          },
+          "mask": {
+            "type": "string",
+            "enum": [
+              "redact",
+              "partial",
+              "hash",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "table",
+          "column",
+          "action"
+        ]
+      },
       "QueryRunErrorDto": {
         "type": "object",
         "properties": {
@@ -36431,6 +36492,13 @@
               "$ref": "#/components/schemas/QueryColumnDto"
             }
           },
+          "masks": {
+            "description": "Columns of the tables it names that were masked or hidden for you when it ran.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QueryRunMaskDto"
+            }
+          },
           "timings": {
             "type": "object",
             "nullable": true,
@@ -36478,6 +36546,7 @@
           "status",
           "assetIds",
           "truncated",
+          "masks",
           "createdAt"
         ]
       },
@@ -37319,6 +37388,36 @@
           "maxSeverity"
         ]
       },
+      "ColumnAccessDto": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "clear",
+              "mask",
+              "hide"
+            ]
+          },
+          "mask": {
+            "type": "string",
+            "enum": [
+              "redact",
+              "partial",
+              "hash",
+              "null"
+            ]
+          },
+          "fromClassification": {
+            "type": "boolean",
+            "description": "It follows the classification, not a steward."
+          }
+        },
+        "required": [
+          "action",
+          "fromClassification"
+        ]
+      },
       "AssetColumnDto": {
         "type": "object",
         "properties": {
@@ -37394,6 +37493,29 @@
               "$ref": "#/components/schemas/ColumnFindingGroupDto"
             }
           },
+          "access": {
+            "type": "string",
+            "enum": [
+              "clear",
+              "mask",
+              "hide"
+            ],
+            "nullable": true,
+            "description": "A steward's access; null when it follows the classification."
+          },
+          "maskKind": {
+            "type": "string",
+            "enum": [
+              "redact",
+              "partial",
+              "hash",
+              "null"
+            ],
+            "nullable": true
+          },
+          "effectiveAccess": {
+            "$ref": "#/components/schemas/ColumnAccessDto"
+          },
           "reviewedAt": {
             "format": "date-time",
             "type": "string",
@@ -37417,7 +37539,10 @@
           "name",
           "type",
           "criticalDataElement",
-          "findings"
+          "findings",
+          "access",
+          "maskKind",
+          "effectiveAccess"
         ]
       },
       "AssetColumnsDto": {
@@ -37490,6 +37615,27 @@
           "reviewClassification": {
             "type": "boolean",
             "description": "Confirm the classification as it stands."
+          },
+          "access": {
+            "type": "string",
+            "enum": [
+              "clear",
+              "mask",
+              "hide"
+            ],
+            "nullable": true,
+            "description": "What people who may query the table but not unmask see (DQ §5.8). Null follows the classification."
+          },
+          "maskKind": {
+            "type": "string",
+            "enum": [
+              "redact",
+              "partial",
+              "hash",
+              "null"
+            ],
+            "nullable": true,
+            "description": "How a masked column shows. Null is the default (`redact`)."
           }
         }
       },

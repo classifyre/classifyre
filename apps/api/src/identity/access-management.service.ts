@@ -10,7 +10,7 @@ import type { Capability } from './capabilities';
 import { grantApplies, roleCapabilities } from './grant-evaluation';
 import type { IdentityService, Principal } from './identity.service';
 import { IDENTITY } from './identity.tokens';
-import { BUILT_IN_ROLES } from './roles';
+import { BUILT_IN_ROLES, DATA_ROLE_KEYS } from './roles';
 import {
   TenancyService,
   type Grant,
@@ -53,7 +53,7 @@ const ROLE_SCOPES: Record<string, GrantScopeType[]> = Object.fromEntries(
     role.key,
     role.key === 'workspace-manager'
       ? ['group', 'tenant']
-      : role.key === 'data-reader'
+      : DATA_ROLE_KEYS.includes(role.key)
         ? // Data access is the one thing given on a single source or table.
           ['workspace', 'group', 'tenant', 'source', 'asset']
         : role.scope === 'workspace'

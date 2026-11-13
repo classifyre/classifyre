@@ -409,7 +409,7 @@ All strings are in `i18n/en.json` and `de.json`.
 | G-4 | **Quality over whole tables**: `library` and `sql` rules, job mode `quality` and the system run path, per-rule schedules, ODCS contract export and import | Built 2026-11-12 (system runs of the existing `query` job, CSV result — no new job mode) |
 | G-5 | **Telling people**: per-person notifications (owner or steward assigned, rule failing, access request waiting; the last one with DQ phase 3) | Built 2026-11-12 (access requests wait for DQ phase 3) |
 
-[DQ](DQ-data-query.md) phase 3 (masking, access requests) can start after G-2. It needs the owner to route requests to, and the column classification for default masks.
+[DQ](DQ-data-query.md) phase 3 (masking, access requests) can start after G-2. It needs the owner to route requests to, and the column classification for default masks. *Masking built 2026-11-13 (DQ §5.8): each column's access (clear, masked, hidden) sits on its annotation, follows the classification by default, and is set in the Columns step; owners and stewards read their tables in clear.*
 
 ## 7. Risks and open questions
 

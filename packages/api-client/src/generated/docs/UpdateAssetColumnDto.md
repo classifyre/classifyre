@@ -12,6 +12,8 @@ Name | Type
 `criticalDataElement` | boolean
 `classification` | string
 `reviewClassification` | boolean
+`access` | string
+`maskKind` | string
 
 ## Example
 
@@ -26,6 +28,8 @@ const example = {
   "criticalDataElement": null,
   "classification": null,
   "reviewClassification": null,
+  "access": null,
+  "maskKind": null,
 } satisfies UpdateAssetColumnDto
 
 console.log(example)

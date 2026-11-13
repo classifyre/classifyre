@@ -26,6 +26,7 @@ except Exception as exc:  # auto-install off and the groups absent
     pytest.skip(f"query dependencies unavailable: {exc}", allow_module_level=True)
 
 from src.query.gate import QueryRefusedError, TableName, validate
+from src.query.masks import mask_expression
 
 duckdb = pytest.importorskip("duckdb")
 pa = pytest.importorskip("pyarrow")
@@ -234,6 +235,96 @@ def test_postgres_client_sql_runs_on_duckdb(folder: Path) -> None:
         {"country": "DE", "n": 100},
     ]
     assert payload["tables"] == ["files.local.customers", "files.local.orders"]
+
+
+def _masked(folder: Path, sql: str, masks: list[dict[str, Any]], **extra: Any) -> Any:
+    request = _request(folder, sql, maskSalt="salt-1", **extra)
+    request["tables"][0]["columns"] = masks
+    return request
+
+
+def test_masked_column_shows_masked_values_and_filters_on_them(folder: Path) -> None:
+    masks = [{"column": "country", "action": "mask", "mask": "redact"}]
+    payload, result = run_query(
+        _masked(folder, "SELECT id, country FROM files.local.customers ORDER BY id LIMIT 2", masks)
+    )
+    assert _rows(payload, result) == [
+        {"id": 0, "country": "****"},
+        {"id": 1, "country": "****"},
+    ]
+    # WHERE sees the masked value too: nothing to infer from a filter.
+    payload, result = run_query(
+        _masked(
+            folder, "SELECT count(*) AS n FROM files.local.customers WHERE country = 'AT'", masks
+        )
+    )
+    assert _rows(payload, result) == [{"n": 0}]
+
+
+@pytest.mark.parametrize(("mask", "expected"), [("partial", "••"), ("null", None)])
+def test_mask_kinds(folder: Path, mask: str, expected: str | None) -> None:
+    masks = [{"column": "country", "action": "mask", "mask": mask}]
+    payload, result = run_query(
+        _masked(folder, "SELECT country FROM files.local.customers WHERE id = 1", masks)
+    )
+    assert _rows(payload, result) == [{"country": expected}]
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [("DE", "••"), ("AT-1234", "•••1234"), (None, None)],
+)
+def test_partial_mask_keeps_the_last_four(value: str | None, expected: str | None) -> None:
+    conn = duckdb.connect()
+    conn.execute("CREATE TABLE t AS SELECT CAST(? AS VARCHAR) AS v", [value])
+    expr = mask_expression("v", "VARCHAR", "partial", "")
+    assert conn.execute(f"SELECT {expr} FROM t").fetchone() == (expected,)
+
+
+def test_masks_on_other_types_are_null() -> None:
+    conn = duckdb.connect()
+    expr = mask_expression("v", "DATE", "redact", "")
+    assert conn.execute(f"SELECT {expr} FROM (SELECT DATE '2026-01-01' AS v)").fetchone() == (None,)
+
+
+def test_hash_mask_is_stable_and_joinable(folder: Path) -> None:
+    masks = [{"column": "id", "action": "mask", "mask": "hash"}]
+    sql = "SELECT count(DISTINCT id) AS ids, min(length(id)) AS len FROM files.local.customers"
+    payload, result = run_query(_masked(folder, sql, masks))
+    assert _rows(payload, result) == [{"ids": 30, "len": 16}]
+
+
+def test_hidden_column_does_not_exist(folder: Path) -> None:
+    masks = [{"column": "COUNTRY", "action": "hide"}]
+    payload, result = run_query(_masked(folder, "SELECT * FROM files.local.customers", masks))
+    rows = _rows(payload, result)
+    assert set(rows[0]) == {"id"}
+    payload, _ = run_query(_masked(folder, "SELECT country FROM files.local.customers", masks))
+    assert payload["status"] == "error"
+    assert "country" in payload["error"]["message"].lower()
+
+
+def test_every_column_hidden_is_refused(folder: Path) -> None:
+    masks = [{"column": "id", "action": "hide"}, {"column": "country", "action": "hide"}]
+    payload, _ = run_query(_masked(folder, "SELECT 1 FROM files.local.customers", masks))
+    assert payload["error"]["code"] == "columns_hidden"
+
+
+def test_export_is_masked_too(folder: Path) -> None:
+    masks = [{"column": "country", "action": "mask", "mask": "redact"}]
+    payload, result = run_query(
+        _masked(
+            folder,
+            "SELECT country FROM files.local.customers",
+            masks,
+            exportFormat="csv",
+            maxRows=1000,
+        )
+    )
+    assert payload["status"] == "success", payload
+    lines = result.arrow.decode().splitlines()
+    assert lines[0] == "country"
+    assert set(lines[1:]) == {"****"}
 
 
 def test_row_cap_truncates_exactly(folder: Path) -> None:
