@@ -47,14 +47,14 @@ ARG S6_OVERLAY_VERSION=3.2.3.2
 ARG PG_MAJOR=18
 
 # ── Sources of binaries (Dependabot keeps these current) ──────────────────────
-FROM ghcr.io/astral-sh/uv:0.13.6 AS uv-bin
-FROM caddy:2.11.7 AS caddy-bin
+FROM ghcr.io/astral-sh/uv:0.13.7 AS uv-bin
+FROM caddy:2.11.9 AS caddy-bin
 FROM node:24.22.2-bookworm-slim AS node-bin
 # The identity server: the stock distribution, the same version as the Helm
 # chart's iam.image.tag (scripts/check-keycloak-version.sh keeps them equal),
 # run on a Java 21 runtime. Temurin builds against an old glibc, so its JRE
 # runs on this bookworm base unchanged.
-FROM quay.io/keycloak/keycloak:26.8.1 AS keycloak-bin
+FROM quay.io/keycloak/keycloak:26.8.2-1 AS keycloak-bin
 FROM eclipse-temurin:21.0.13_9-jre AS jre-bin
 
 # ── The application, already built ────────────────────────────────────────────
