@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   ArrayMaxSize,
   IsArray,
+  IsBoolean,
   IsIn,
   IsInt,
   IsOptional,
@@ -145,6 +146,64 @@ export class DataConnectionDto {
   reads?: DataConnectionReadsDto;
 }
 
+export class DataConnectionExposureDto {
+  @ApiProperty({ description: 'Reachable through SQL connections (opt-in).' })
+  open: boolean;
+
+  @ApiProperty({ description: 'Open because its source is.' })
+  inheritedFromSource: boolean;
+
+  @ApiProperty({ type: String, nullable: true })
+  openedBy: string | null;
+
+  @ApiProperty({ type: String, format: 'date-time', nullable: true })
+  openedAt: Date | null;
+}
+
+export class DataConnectionExposureItemDto extends DataConnectionScopeItemDto {
+  @ApiProperty({ type: String, nullable: true })
+  openedBy: string | null;
+
+  @ApiProperty({ type: String, format: 'date-time' })
+  openedAt: Date;
+}
+
+export class DataConnectionReachableTableDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  name: string;
+
+  @ApiProperty()
+  sqlName: string;
+}
+
+export class DataConnectionReachableSourceDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  name: string;
+
+  @ApiProperty()
+  sqlName: string;
+
+  @ApiProperty({
+    description: 'The whole source is open (else only some tables).',
+  })
+  open: boolean;
+
+  @ApiProperty({ type: [DataConnectionReachableTableDto] })
+  tables: DataConnectionReachableTableDto[];
+}
+
+export class SetDataConnectionExposureDto {
+  @ApiProperty()
+  @IsBoolean()
+  open: boolean;
+}
+
 export class DataConnectionListDto {
   @ApiProperty({ type: [DataConnectionDto] })
   items: DataConnectionDto[];
@@ -162,6 +221,18 @@ export class DataConnectionListDto {
       'On an asset or source listing: the caller may issue and block here.',
   })
   canGovern?: boolean;
+
+  @ApiProperty({
+    description:
+      'The caller may make or give a connection to everything (admins, owners, stewards, custodians).',
+  })
+  canConnectAll: boolean;
+
+  @ApiPropertyOptional({
+    type: DataConnectionExposureDto,
+    description: 'On an asset or source listing: open to SQL connections?',
+  })
+  exposure?: DataConnectionExposureDto;
 }
 
 export class DataConnectionSecretDto {

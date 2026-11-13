@@ -15,6 +15,7 @@ import { useTranslation } from "@/hooks/use-translation";
 import { useDataConnections } from "@/lib/sql-connections";
 import { ConnectIcon } from "./connect-details";
 import { ConnectionsPanel } from "./connections-panel";
+import { OpenToConnectionsList } from "./open-list";
 
 /** Settings → SQL connections: your own, and everyone's for managers. */
 export function SqlConnectionsCard() {
@@ -40,6 +41,7 @@ export function SqlConnectionsCard() {
           </Tabs>
         )}
         <ConnectionsPanel key={view} scope={{ kind: view }} />
+        <OpenToConnectionsList />
       </CardContent>
     </Card>
   );

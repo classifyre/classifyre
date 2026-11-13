@@ -10,6 +10,8 @@ Name | Type
 `canCreate` | boolean
 `canManage` | boolean
 `canGovern` | boolean
+`canConnectAll` | boolean
+`exposure` | [DataConnectionExposureDto](DataConnectionExposureDto.md)
 
 ## Example
 
@@ -22,6 +24,8 @@ const example = {
   "canCreate": null,
   "canManage": null,
   "canGovern": null,
+  "canConnectAll": null,
+  "exposure": null,
 } satisfies DataConnectionListDto
 
 console.log(example)

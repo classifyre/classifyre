@@ -7062,7 +7062,8 @@
       "rangeOf": "von {{total}}",
       "thisWorkspace": "Dieser Arbeitsbereich",
       "changes": "Änderungen",
-      "emptyValue": "(leer)"
+      "emptyValue": "(leer)",
+      "sql": "SQL-Verbindung"
     },
     "ops": {
       "governance": {
@@ -7118,7 +7119,9 @@
         "block": "Für eine SQL-Verbindung gesperrt",
         "unblock": "Für eine SQL-Verbindung wieder geöffnet",
         "sign-in": "Über eine SQL-Verbindung angemeldet",
-        "sign-in-refused": "Anmeldung einer SQL-Verbindung abgelehnt"
+        "sign-in-refused": "Anmeldung einer SQL-Verbindung abgelehnt",
+        "open": "Für SQL-Verbindungen geöffnet",
+        "close": "Für SQL-Verbindungen geschlossen"
       },
       "query-runs": {
         "read-table": "Tabelle gelesen"
@@ -8116,6 +8119,32 @@
     "governanceTitle": "Zugriff über SQL-Verbindungen",
     "governanceLead": "Wer dies aus BI-Werkzeugen und Treibern liest, wann und wie oft. Eigentümer und Verwalter können dafür eine Verbindung vergeben oder es für eine sperren.",
     "reads": "{{count}} Lesezugriffe hier",
-    "days": "{{count}} Tagen"
+    "days": "{{count}} Tagen",
+    "nothingOpen": "Noch ist nichts, was Sie abfragen dürfen, für SQL-Verbindungen geöffnet. Eigentümer, Verwalter oder Admins öffnen eine Quelle oder Tabelle auf ihrem Governance-Tab.",
+    "scope": "Für",
+    "scopePlaceholder": "Quellen oder Tabellen wählen…",
+    "scopeSearch": "Quellen und Tabellen suchen",
+    "scopeEmpty": "Nichts Geöffnetes passt.",
+    "wholeSource": "Ganz {{name}}",
+    "wholeSourceShort": "ganze Quelle",
+    "oneTable": "Tabelle",
+    "scopeEverything": "Alles, was ich abfragen darf und für SQL-Verbindungen geöffnet ist",
+    "scopeHint": "Wählbar sind nur Quellen und Tabellen, die für SQL-Verbindungen geöffnet sind und die Sie abfragen dürfen.",
+    "exposureTable": "Für SQL-Verbindungen geöffnet",
+    "exposureSource": "Für SQL-Verbindungen geöffnet (alle Tabellen)",
+    "openHint": "BI-Werkzeuge und Treiber können sie über Verbindungen lesen, die sie nennen — weiterhin nur für Personen, die sie abfragen dürfen.",
+    "openViaSource": "Geöffnet, weil ihre Quelle es ist. Schließen Sie die Quelle oder sperren Sie diese Tabelle unten für einzelne Verbindungen.",
+    "closedHint": "BI-Werkzeuge erreichen sie nicht. Öffnen gibt niemandem Zugriff: Personen brauchen weiterhin das Recht, sie abzufragen.",
+    "openedAt": "Geöffnet am {{when}}",
+    "opened": "Für SQL-Verbindungen geöffnet",
+    "closed": "Für SQL-Verbindungen geschlossen",
+    "connectToolFor": "Werkzeug mit {{name}} verbinden",
+    "notOpenHere": "Dies ist nicht für SQL-Verbindungen geöffnet.",
+    "openOnGovernance": "Auf dem Governance-Tab öffnen",
+    "noConnectionHere": "Noch keine Ihrer Verbindungen erreicht dies.",
+    "createFor": "Neue Verbindung für {{name}}",
+    "openListTitle": "Für SQL-Verbindungen geöffnet",
+    "openListLead": "Was BI-Werkzeuge überhaupt erreichen dürfen. Jede Verbindung erreicht nur, was sie nennt, und nur, was ihre Person abfragen darf.",
+    "openListNone": "Nichts ist für SQL-Verbindungen geöffnet. Öffnen Sie eine Quelle oder Tabelle auf ihrem Governance-Tab."
   }
 }

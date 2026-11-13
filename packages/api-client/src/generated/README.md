@@ -456,11 +456,15 @@ All URIs are relative to *http://localhost*
 *SQLConnectionsApi* | [**dataConnectionControllerBlock**](docs/SQLConnectionsApi.md#dataconnectioncontrollerblock) | **POST** /data-connections/{id}/blocks | Close a table or source you govern to this connection
 *SQLConnectionsApi* | [**dataConnectionControllerCreate**](docs/SQLConnectionsApi.md#dataconnectioncontrollercreate) | **POST** /data-connections | Create a SQL connection of your own; the password is shown once
 *SQLConnectionsApi* | [**dataConnectionControllerEndpoint**](docs/SQLConnectionsApi.md#dataconnectioncontrollerendpoint) | **GET** /data-connections/endpoint | Where tools connect: host, port, database, TLS
+*SQLConnectionsApi* | [**dataConnectionControllerExposeAsset**](docs/SQLConnectionsApi.md#dataconnectioncontrollerexposeasset) | **PUT** /assets/{id}/data-connections/exposure | Open or close a table to SQL connections
+*SQLConnectionsApi* | [**dataConnectionControllerExposeSource**](docs/SQLConnectionsApi.md#dataconnectioncontrollerexposesource) | **PUT** /sources/{id}/data-connections/exposure | Open or close a source to SQL connections
+*SQLConnectionsApi* | [**dataConnectionControllerExposures**](docs/SQLConnectionsApi.md#dataconnectioncontrollerexposures) | **GET** /data-connections/exposures | Sources and tables open to SQL connections
 *SQLConnectionsApi* | [**dataConnectionControllerForAsset**](docs/SQLConnectionsApi.md#dataconnectioncontrollerforasset) | **GET** /assets/{id}/data-connections | SQL connections that read, name or are blocked on a table
 *SQLConnectionsApi* | [**dataConnectionControllerForSource**](docs/SQLConnectionsApi.md#dataconnectioncontrollerforsource) | **GET** /sources/{id}/data-connections | SQL connections that read, name or are blocked on a source
 *SQLConnectionsApi* | [**dataConnectionControllerIssue**](docs/SQLConnectionsApi.md#dataconnectioncontrollerissue) | **POST** /data-connections/issue | Give someone a SQL connection; they reveal its password themselves
 *SQLConnectionsApi* | [**dataConnectionControllerMine**](docs/SQLConnectionsApi.md#dataconnectioncontrollermine) | **GET** /data-connections | Your SQL connections
 *SQLConnectionsApi* | [**dataConnectionControllerPassword**](docs/SQLConnectionsApi.md#dataconnectioncontrollerpassword) | **POST** /data-connections/{id}/password | Reveal (first time) or replace the password of your own connection
+*SQLConnectionsApi* | [**dataConnectionControllerReachable**](docs/SQLConnectionsApi.md#dataconnectioncontrollerreachable) | **GET** /data-connections/reachable | Sources and tables you may put in a connection: readable by you and open to SQL connections
 *SQLConnectionsApi* | [**dataConnectionControllerRevoke**](docs/SQLConnectionsApi.md#dataconnectioncontrollerrevoke) | **POST** /data-connections/{id}/revoke | Revoke a SQL connection (its person or a manager)
 *SQLConnectionsApi* | [**dataConnectionControllerUnblock**](docs/SQLConnectionsApi.md#dataconnectioncontrollerunblock) | **DELETE** /data-connections/{id}/blocks/{blockId} | Lift a block
 *SemanticApi* | [**semanticControllerApproveBinding**](docs/SemanticApi.md#semanticcontrollerapprovebinding) | **POST** /semantic/bindings/{id}/approve | 
@@ -741,7 +745,11 @@ All URIs are relative to *http://localhost*
 - [DataConnectionBlockDto](docs/DataConnectionBlockDto.md)
 - [DataConnectionDto](docs/DataConnectionDto.md)
 - [DataConnectionEndpointDto](docs/DataConnectionEndpointDto.md)
+- [DataConnectionExposureDto](docs/DataConnectionExposureDto.md)
+- [DataConnectionExposureItemDto](docs/DataConnectionExposureItemDto.md)
 - [DataConnectionListDto](docs/DataConnectionListDto.md)
+- [DataConnectionReachableSourceDto](docs/DataConnectionReachableSourceDto.md)
+- [DataConnectionReachableTableDto](docs/DataConnectionReachableTableDto.md)
 - [DataConnectionReadsDto](docs/DataConnectionReadsDto.md)
 - [DataConnectionScopeItemDto](docs/DataConnectionScopeItemDto.md)
 - [DataConnectionSecretDto](docs/DataConnectionSecretDto.md)
@@ -1069,6 +1077,7 @@ All URIs are relative to *http://localhost*
 - [SearchSourcesResponseDto](docs/SearchSourcesResponseDto.md)
 - [SearchSourcesTotalsDto](docs/SearchSourcesTotalsDto.md)
 - [SemanticFindingsSearchDto](docs/SemanticFindingsSearchDto.md)
+- [SetDataConnectionExposureDto](docs/SetDataConnectionExposureDto.md)
 - [SetInquiryAutoPullDto](docs/SetInquiryAutoPullDto.md)
 - [SetWorkerQueuePausedDto](docs/SetWorkerQueuePausedDto.md)
 - [SimilarFindingAssetDto](docs/SimilarFindingAssetDto.md)

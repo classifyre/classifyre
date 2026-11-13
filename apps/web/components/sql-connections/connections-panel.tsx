@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Ban,
   CircleSlash,
@@ -17,6 +17,7 @@ import {
   AlertDescription,
   Badge,
   Button,
+  Checkbox,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -45,12 +46,15 @@ import {
   revokeConnection,
   unblockConnection,
   useDataConnections,
+  useReachable,
   useSqlEndpoint,
   type ConnectionsScope,
   type DataConnectionDto,
   type DataConnectionSecretDto,
 } from "@/lib/sql-connections";
 import { ConnectDetails } from "./connect-details";
+import { ExposureSwitch } from "./exposure-switch";
+import { ScopePicker } from "./scope-picker";
 
 const EXPIRY_DAYS = [30, 90, 180, 365] as const;
 
@@ -82,7 +86,6 @@ export function ConnectionsPanel({
 }) {
   const { t } = useTranslation();
   const { data, loading, error, reload } = useDataConnections(scope);
-  const endpoint = useSqlEndpoint();
   const [secret, setSecret] = useState<DataConnectionSecretDto | null>(null);
   const [creating, setCreating] = useState(false);
   const [issuing, setIssuing] = useState(false);
@@ -119,10 +122,23 @@ export function ConnectionsPanel({
     );
   }
   const items = data?.items ?? [];
-  const canIssue = Boolean(target && (data?.canGovern || data?.canManage));
+  // Giving or making one for this table needs it open to SQL connections.
+  const closedHere = Boolean(target && data?.exposure && !data.exposure.open);
+  const canIssue = Boolean(
+    target && (data?.canGovern || data?.canManage) && !closedHere,
+  );
 
+  const exposure = data?.exposure;
   return (
     <div className="space-y-3" data-testid="sql-connections-panel">
+      {target && exposure && (
+        <ExposureSwitch
+          target={target}
+          exposure={exposure}
+          canChange={Boolean(data?.canGovern || data?.canManage)}
+          onChange={() => void reload()}
+        />
+      )}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-muted-foreground">
           {target
@@ -132,7 +148,7 @@ export function ConnectionsPanel({
               : t("sqlConnections.allIntro")}
         </p>
         <div className="flex gap-2">
-          {isMine && data?.canCreate && (
+          {(isMine || (target && !closedHere)) && data?.canCreate && (
             <Button size="sm" onClick={() => setCreating(true)}>
               <Plus className="mr-1.5 h-4 w-4" />
               {t("sqlConnections.create")}
@@ -210,9 +226,11 @@ export function ConnectionsPanel({
         </ul>
       )}
 
-      <CreateDialog
+      <CreateConnectionDialog
         open={creating}
         onOpenChange={setCreating}
+        canConnectAll={Boolean(data?.canConnectAll)}
+        initialScope={target ? [`${target.type}:${target.id}`] : []}
         onCreated={(created) => {
           setSecret(created);
           void reload();
@@ -226,39 +244,7 @@ export function ConnectionsPanel({
           onIssued={() => void reload()}
         />
       )}
-      <Dialog open={Boolean(secret)} onOpenChange={(open) => !open && setSecret(null)}>
-        <DialogContent className="max-w-2xl" data-testid="sql-connection-secret">
-          <DialogHeader>
-            <DialogTitle>
-              {t("sqlConnections.secretTitle", {
-                name: secret?.connection.name ?? "",
-              })}
-            </DialogTitle>
-            <DialogDescription>{t("sqlConnections.secretOnce")}</DialogDescription>
-          </DialogHeader>
-          {secret && (
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <Label>{t("sqlConnections.password")}</Label>
-                <code
-                  className="block break-all rounded-[4px] border bg-muted/40 px-2 py-1.5 font-mono text-sm"
-                  data-testid="sql-connection-password"
-                >
-                  {secret.password}
-                </code>
-              </div>
-              <ConnectDetails
-                endpoint={endpoint}
-                username={secret.connection.username}
-                password={secret.password}
-              />
-            </div>
-          )}
-          <DialogFooter>
-            <Button onClick={() => setSecret(null)}>{t("sqlConnections.done")}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConnectionSecretDialog secret={secret} onClose={() => setSecret(null)} />
     </div>
   );
 }
@@ -423,24 +409,49 @@ function ExpirySelect({
   );
 }
 
-function CreateDialog({
+/**
+ * A connection of one's own (DQ §5.7). What it is for is picked like *Give
+ * access*: sources or tables you may query that are open to SQL connections,
+ * preset to where it was opened from; "everything" only for admins, owners,
+ * stewards and custodians.
+ */
+export function CreateConnectionDialog({
   open,
   onOpenChange,
   onCreated,
+  canConnectAll,
+  initialScope = [],
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated: (created: DataConnectionSecretDto) => void;
+  canConnectAll: boolean;
+  initialScope?: string[];
 }) {
   const { t } = useTranslation();
   const [name, setName] = useState("");
   const [days, setDays] = useState(90);
+  const [scope, setScope] = useState<string[]>(initialScope);
+  const [everything, setEverything] = useState(false);
   const [saving, setSaving] = useState(false);
+  const reachable = useReachable(open);
+  const initialKey = initialScope.join(",");
+  useEffect(() => {
+    if (open) {
+      setScope(initialKey ? initialKey.split(",") : []);
+      setEverything(false);
+    }
+  }, [open, initialKey]);
+  const ready = Boolean(name.trim()) && (everything || scope.length > 0);
   const submit = async () => {
-    if (!name.trim()) return;
+    if (!ready) return;
     setSaving(true);
     try {
-      const created = await createConnection({ name: name.trim(), expiresInDays: days });
+      const created = await createConnection({
+        name: name.trim(),
+        expiresInDays: days,
+        scope: everything ? [] : scope,
+      });
       onOpenChange(false);
       setName("");
       onCreated(created);
@@ -452,7 +463,7 @@ function CreateDialog({
   };
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent data-testid="sql-connection-create">
         <DialogHeader>
           <DialogTitle>{t("sqlConnections.createTitle")}</DialogTitle>
           <DialogDescription>{t("sqlConnections.createIntro")}</DialogDescription>
@@ -466,8 +477,23 @@ function CreateDialog({
               placeholder="Power BI"
               maxLength={80}
               onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && void submit()}
             />
+          </div>
+          <div className="space-y-1">
+            <Label>{t("sqlConnections.scope")}</Label>
+            {!everything && (
+              <ScopePicker sources={reachable} value={scope} onChange={setScope} />
+            )}
+            {canConnectAll && (
+              <label className="flex items-center gap-2 pt-1 text-xs text-muted-foreground">
+                <Checkbox
+                  checked={everything}
+                  onCheckedChange={(checked) => setEverything(checked === true)}
+                />
+                {t("sqlConnections.scopeEverything")}
+              </label>
+            )}
+            <p className="text-xs text-muted-foreground">{t("sqlConnections.scopeHint")}</p>
           </div>
           <div className="space-y-1">
             <Label>{t("sqlConnections.expiresIn")}</Label>
@@ -478,7 +504,7 @@ function CreateDialog({
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             {t("sqlConnections.cancel")}
           </Button>
-          <Button disabled={!name.trim() || saving} onClick={() => void submit()}>
+          <Button disabled={!ready || saving} onClick={() => void submit()}>
             {saving && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
             {t("sqlConnections.create")}
           </Button>
@@ -563,5 +589,52 @@ function IssueDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** A connection's password, shown once, with how tools connect (DQ §5.7). */
+export function ConnectionSecretDialog({
+  secret,
+  onClose,
+}: {
+  secret: DataConnectionSecretDto | null;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const endpoint = useSqlEndpoint();
+  return (
+  <Dialog open={Boolean(secret)} onOpenChange={(open) => !open && onClose()}>
+    <DialogContent className="max-w-2xl" data-testid="sql-connection-secret">
+      <DialogHeader>
+        <DialogTitle>
+          {t("sqlConnections.secretTitle", {
+            name: secret?.connection.name ?? "",
+          })}
+        </DialogTitle>
+        <DialogDescription>{t("sqlConnections.secretOnce")}</DialogDescription>
+      </DialogHeader>
+      {secret && (
+        <div className="space-y-4">
+          <div className="space-y-1">
+            <Label>{t("sqlConnections.password")}</Label>
+            <code
+              className="block break-all rounded-[4px] border bg-muted/40 px-2 py-1.5 font-mono text-sm"
+              data-testid="sql-connection-password"
+            >
+              {secret.password}
+            </code>
+          </div>
+          <ConnectDetails
+            endpoint={endpoint}
+            username={secret.connection.username}
+            password={secret.password}
+          />
+        </div>
+      )}
+      <DialogFooter>
+        <Button onClick={onClose}>{t("sqlConnections.done")}</Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
   );
 }

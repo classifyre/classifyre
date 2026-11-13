@@ -10,6 +10,8 @@ import { Callout, Steps, Tabs } from "nextra/components"
 
 The [SQL](/data-query) page and the Data tabs run queries in the app. A **SQL connection** lets the tools you already use do the same: Power BI, Excel, Tableau, DBeaver, Metabase, `psql`, and anything with a PostgreSQL JDBC or ODBC driver. Classifyre answers as a PostgreSQL database: the workspace is the database, each source schema is a schema, each table you may query is a table.
 
+- **Nothing is reachable until it is opened.** A source or table is reachable through SQL connections only after its owner, a steward or an admin opens it on its **Governance** tab (opening a source opens all its tables). Opening gives nobody access: people still need the right to query it.
+- **It names what it is for.** Like *Give access*, a connection is for a whole source or for single tables — chosen from what is open and what you may query. Only admins and people who answer for data (owners, stewards, custodians) may make or give one for everything open.
 - **It is yours.** A connection belongs to one person and reads exactly what that person may query right now — their roles, their Data reader grants, the tables they own. It never gives access of its own: when a grant is removed, the connection stops reading that table at once.
 - **Everything is recorded.** Every table read through a connection is in the table's **Activity** and **Usage**, with the person and the connection's name.
 - **It can be taken back.** Its person or an admin can revoke it; a table's owner can close their table to one connection; it expires.
@@ -20,7 +22,7 @@ The [SQL](/data-query) page and the Data tabs run queries in the app. A **SQL co
 <Steps>
 ### Open Settings → SQL connections
 
-Choose **New connection**, name it after the tool (`Power BI`, `DBeaver`) and pick when it expires.
+Choose **New connection**, name it after the tool (`Power BI`, `DBeaver`), choose the sources or tables it is for, and pick when it expires. From a table's or source's **Data** tab, **Connect a tool → New connection for …** starts with that table or source already chosen.
 
 ### Copy the password
 
@@ -94,6 +96,10 @@ Catalog queries — the schemas, tables and columns tools read to show you what 
 
 Each query starts a short-lived job, which takes seconds before the query itself runs. Tools that import data (Power BI import mode, Excel, extracts in Tableau) work well; tools that send a query for every click feel slow.
 
+## Opening a source or table
+
+On a table's or source's **Governance** tab, the **Access** step starts with **Open to SQL connections**. Its owner, a steward or an admin switches it on; a table is open when it or its source is. **Settings → SQL connections** lists everything open, by whom and since when. Closing it again stops every connection from reaching it at once.
+
 ## Governance and activity
 
 On a table's or source's **Governance** tab, **Access** lists the SQL connections that read it in the last 90 days, how often and when, whose they are, and those its scope names or that are closed on it. Its owner and stewards can:
@@ -108,7 +114,8 @@ The table's **Activity** shows each read with the connection's name (*via SQL co
 
 | | Its person | Owner or steward of a table/source | Admin (`data.connection.manage`) |
 | --- | --- | --- | --- |
-| Make one for themselves | ✓ (with `data.connect` or tables to read) | | ✓ |
+| Open a table or source to SQL connections | | for what they govern | ✓ |
+| Make one for themselves | ✓ for open sources/tables they may query (`data.connect`, a Data reader grant, or tables they own) | ✓, also for everything | ✓, also for everything |
 | See its password | ✓, once per password | never | never |
 | Give one to someone | | for what they govern | for anything |
 | Close a table or source to one | | for what they govern | ✓ |

@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   api,
+  type DataConnectionExposureDto,
+  type DataConnectionExposureItemDto,
+  type DataConnectionReachableSourceDto,
   type DataConnectionDto,
   type DataConnectionEndpointDto,
   type DataConnectionListDto,
@@ -8,6 +11,9 @@ import {
 } from "@workspace/api-client";
 
 export type {
+  DataConnectionExposureDto,
+  DataConnectionExposureItemDto,
+  DataConnectionReachableSourceDto,
   DataConnectionDto,
   DataConnectionEndpointDto,
   DataConnectionListDto,
@@ -138,3 +144,49 @@ export function connectionStrings(
     npgsql: `Host=${host};Port=${port};Database=${database};Username=${username};Password=${password};SSL Mode=VerifyFull${withCa ? `;Root Certificate=${caPath}` : ""}`,
   };
 }
+
+/** What the caller may put in a connection: readable by them and open to SQL connections. */
+export function useReachable(enabled = true) {
+  const [sources, setSources] = useState<DataConnectionReachableSourceDto[] | null>(null);
+  useEffect(() => {
+    if (!enabled) return;
+    let alive = true;
+    void api.sqlConnections
+      .dataConnectionControllerReachable()
+      .then((value) => alive && setSources(value))
+      .catch(() => alive && setSources([]));
+    return () => {
+      alive = false;
+    };
+  }, [enabled]);
+  return sources;
+}
+
+export function useExposures() {
+  const [items, setItems] = useState<DataConnectionExposureItemDto[] | null>(null);
+  const reload = useCallback(async () => {
+    try {
+      setItems(await api.sqlConnections.dataConnectionControllerExposures());
+    } catch {
+      setItems([]);
+    }
+  }, []);
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+  return { items, reload };
+}
+
+export const setExposure = (
+  target: { type: "asset" | "source"; id: string },
+  open: boolean,
+) =>
+  target.type === "asset"
+    ? api.sqlConnections.dataConnectionControllerExposeAsset({
+        id: target.id,
+        setDataConnectionExposureDto: { open },
+      })
+    : api.sqlConnections.dataConnectionControllerExposeSource({
+        id: target.id,
+        setDataConnectionExposureDto: { open },
+      });

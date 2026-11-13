@@ -6,6 +6,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Put,
 } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Requires, SignedInOnly } from '../identity/access.decorators';
@@ -15,10 +16,14 @@ import {
   CreateDataConnectionDto,
   DataConnectionDto,
   DataConnectionEndpointDto,
+  DataConnectionExposureDto,
+  DataConnectionExposureItemDto,
   DataConnectionListDto,
+  DataConnectionReachableSourceDto,
   DataConnectionSecretDto,
   IssueDataConnectionDto,
   RevokeDataConnectionDto,
+  SetDataConnectionExposureDto,
 } from './data-connection.dto';
 
 /**
@@ -57,6 +62,47 @@ export class DataConnectionController {
   @ApiOkResponse({ type: DataConnectionEndpointDto })
   endpoint(): DataConnectionEndpointDto {
     return this.connections.endpoint();
+  }
+
+  @Get('data-connections/reachable')
+  @Requires('workspace.view')
+  @ApiOperation({
+    summary:
+      'Sources and tables you may put in a connection: readable by you and open to SQL connections',
+  })
+  @ApiOkResponse({ type: [DataConnectionReachableSourceDto] })
+  reachable(): Promise<DataConnectionReachableSourceDto[]> {
+    return this.connections.reachable();
+  }
+
+  @Get('data-connections/exposures')
+  @Requires('workspace.view')
+  @ApiOperation({ summary: 'Sources and tables open to SQL connections' })
+  @ApiOkResponse({ type: [DataConnectionExposureItemDto] })
+  exposures(): Promise<DataConnectionExposureItemDto[]> {
+    return this.connections.listExposures();
+  }
+
+  @Put('assets/:id/data-connections/exposure')
+  @Requires('workspace.view')
+  @ApiOperation({ summary: 'Open or close a table to SQL connections' })
+  @ApiOkResponse({ type: DataConnectionExposureDto })
+  exposeAsset(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: SetDataConnectionExposureDto,
+  ): Promise<DataConnectionExposureDto> {
+    return this.connections.setExposure('asset', id, body.open);
+  }
+
+  @Put('sources/:id/data-connections/exposure')
+  @Requires('workspace.view')
+  @ApiOperation({ summary: 'Open or close a source to SQL connections' })
+  @ApiOkResponse({ type: DataConnectionExposureDto })
+  exposeSource(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: SetDataConnectionExposureDto,
+  ): Promise<DataConnectionExposureDto> {
+    return this.connections.setExposure('source', id, body.open);
   }
 
   @Get('assets/:id/data-connections')

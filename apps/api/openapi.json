@@ -15495,6 +15495,138 @@
         ]
       }
     },
+    "/data-connections/reachable": {
+      "get": {
+        "operationId": "DataConnectionController_reachable",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DataConnectionReachableSourceDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Sources and tables you may put in a connection: readable by you and open to SQL connections",
+        "tags": [
+          "SQL connections"
+        ]
+      }
+    },
+    "/data-connections/exposures": {
+      "get": {
+        "operationId": "DataConnectionController_exposures",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DataConnectionExposureItemDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Sources and tables open to SQL connections",
+        "tags": [
+          "SQL connections"
+        ]
+      }
+    },
+    "/assets/{id}/data-connections/exposure": {
+      "put": {
+        "operationId": "DataConnectionController_exposeAsset",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetDataConnectionExposureDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataConnectionExposureDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Open or close a table to SQL connections",
+        "tags": [
+          "SQL connections"
+        ]
+      }
+    },
+    "/sources/{id}/data-connections/exposure": {
+      "put": {
+        "operationId": "DataConnectionController_exposeSource",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetDataConnectionExposureDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataConnectionExposureDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Open or close a source to SQL connections",
+        "tags": [
+          "SQL connections"
+        ]
+      }
+    },
     "/assets/{id}/data-connections": {
       "get": {
         "operationId": "DataConnectionController_forAsset",
@@ -39436,6 +39568,34 @@
           "canRevoke"
         ]
       },
+      "DataConnectionExposureDto": {
+        "type": "object",
+        "properties": {
+          "open": {
+            "type": "boolean",
+            "description": "Reachable through SQL connections (opt-in)."
+          },
+          "inheritedFromSource": {
+            "type": "boolean",
+            "description": "Open because its source is."
+          },
+          "openedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "openedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "open",
+          "inheritedFromSource",
+          "openedBy",
+          "openedAt"
+        ]
+      },
       "DataConnectionListDto": {
         "type": "object",
         "properties": {
@@ -39456,12 +39616,25 @@
           "canGovern": {
             "type": "boolean",
             "description": "On an asset or source listing: the caller may issue and block here."
+          },
+          "canConnectAll": {
+            "type": "boolean",
+            "description": "The caller may make or give a connection to everything (admins, owners, stewards, custodians)."
+          },
+          "exposure": {
+            "description": "On an asset or source listing: open to SQL connections?",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DataConnectionExposureDto"
+              }
+            ]
           }
         },
         "required": [
           "items",
           "canCreate",
-          "canManage"
+          "canManage",
+          "canConnectAll"
         ]
       },
       "DataConnectionEndpointDto": {
@@ -39503,6 +39676,105 @@
           "database",
           "sslMode",
           "caCertificate"
+        ]
+      },
+      "DataConnectionReachableTableDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sqlName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "sqlName"
+        ]
+      },
+      "DataConnectionReachableSourceDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sqlName": {
+            "type": "string"
+          },
+          "open": {
+            "type": "boolean",
+            "description": "The whole source is open (else only some tables)."
+          },
+          "tables": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DataConnectionReachableTableDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "sqlName",
+          "open",
+          "tables"
+        ]
+      },
+      "DataConnectionExposureItemDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "source",
+              "asset"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "description": "The source or table name, as the app shows it."
+          },
+          "sqlName": {
+            "type": "string",
+            "description": "For a table: its SQL name (`source.schema.table`)."
+          },
+          "openedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "openedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "type",
+          "id",
+          "name",
+          "openedBy",
+          "openedAt"
+        ]
+      },
+      "SetDataConnectionExposureDto": {
+        "type": "object",
+        "properties": {
+          "open": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "open"
         ]
       },
       "CreateDataConnectionDto": {

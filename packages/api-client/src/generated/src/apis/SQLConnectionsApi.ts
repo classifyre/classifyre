@@ -19,10 +19,14 @@ import type {
   CreateDataConnectionDto,
   DataConnectionDto,
   DataConnectionEndpointDto,
+  DataConnectionExposureDto,
+  DataConnectionExposureItemDto,
   DataConnectionListDto,
+  DataConnectionReachableSourceDto,
   DataConnectionSecretDto,
   IssueDataConnectionDto,
   RevokeDataConnectionDto,
+  SetDataConnectionExposureDto,
 } from '../models/index';
 import {
     BlockDataConnectionDtoFromJSON,
@@ -33,14 +37,22 @@ import {
     DataConnectionDtoToJSON,
     DataConnectionEndpointDtoFromJSON,
     DataConnectionEndpointDtoToJSON,
+    DataConnectionExposureDtoFromJSON,
+    DataConnectionExposureDtoToJSON,
+    DataConnectionExposureItemDtoFromJSON,
+    DataConnectionExposureItemDtoToJSON,
     DataConnectionListDtoFromJSON,
     DataConnectionListDtoToJSON,
+    DataConnectionReachableSourceDtoFromJSON,
+    DataConnectionReachableSourceDtoToJSON,
     DataConnectionSecretDtoFromJSON,
     DataConnectionSecretDtoToJSON,
     IssueDataConnectionDtoFromJSON,
     IssueDataConnectionDtoToJSON,
     RevokeDataConnectionDtoFromJSON,
     RevokeDataConnectionDtoToJSON,
+    SetDataConnectionExposureDtoFromJSON,
+    SetDataConnectionExposureDtoToJSON,
 } from '../models/index';
 
 export interface DataConnectionControllerBlockRequest {
@@ -50,6 +62,16 @@ export interface DataConnectionControllerBlockRequest {
 
 export interface DataConnectionControllerCreateRequest {
     createDataConnectionDto: CreateDataConnectionDto;
+}
+
+export interface DataConnectionControllerExposeAssetRequest {
+    id: string;
+    setDataConnectionExposureDto: SetDataConnectionExposureDto;
+}
+
+export interface DataConnectionControllerExposeSourceRequest {
+    id: string;
+    setDataConnectionExposureDto: SetDataConnectionExposureDto;
 }
 
 export interface DataConnectionControllerForAssetRequest {
@@ -224,6 +246,129 @@ export class SQLConnectionsApi extends runtime.BaseAPI {
      */
     async dataConnectionControllerEndpoint(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<DataConnectionEndpointDto> {
         const response = await this.dataConnectionControllerEndpointRaw(initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Open or close a table to SQL connections
+     */
+    async dataConnectionControllerExposeAssetRaw(requestParameters: DataConnectionControllerExposeAssetRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<DataConnectionExposureDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling dataConnectionControllerExposeAsset().'
+            );
+        }
+
+        if (requestParameters['setDataConnectionExposureDto'] == null) {
+            throw new runtime.RequiredError(
+                'setDataConnectionExposureDto',
+                'Required parameter "setDataConnectionExposureDto" was null or undefined when calling dataConnectionControllerExposeAsset().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/assets/{id}/data-connections/exposure`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'PUT',
+            headers: headerParameters,
+            query: queryParameters,
+            body: SetDataConnectionExposureDtoToJSON(requestParameters['setDataConnectionExposureDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => DataConnectionExposureDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Open or close a table to SQL connections
+     */
+    async dataConnectionControllerExposeAsset(requestParameters: DataConnectionControllerExposeAssetRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<DataConnectionExposureDto> {
+        const response = await this.dataConnectionControllerExposeAssetRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Open or close a source to SQL connections
+     */
+    async dataConnectionControllerExposeSourceRaw(requestParameters: DataConnectionControllerExposeSourceRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<DataConnectionExposureDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling dataConnectionControllerExposeSource().'
+            );
+        }
+
+        if (requestParameters['setDataConnectionExposureDto'] == null) {
+            throw new runtime.RequiredError(
+                'setDataConnectionExposureDto',
+                'Required parameter "setDataConnectionExposureDto" was null or undefined when calling dataConnectionControllerExposeSource().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/sources/{id}/data-connections/exposure`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'PUT',
+            headers: headerParameters,
+            query: queryParameters,
+            body: SetDataConnectionExposureDtoToJSON(requestParameters['setDataConnectionExposureDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => DataConnectionExposureDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Open or close a source to SQL connections
+     */
+    async dataConnectionControllerExposeSource(requestParameters: DataConnectionControllerExposeSourceRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<DataConnectionExposureDto> {
+        const response = await this.dataConnectionControllerExposeSourceRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Sources and tables open to SQL connections
+     */
+    async dataConnectionControllerExposuresRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<DataConnectionExposureItemDto>>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/data-connections/exposures`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(DataConnectionExposureItemDtoFromJSON));
+    }
+
+    /**
+     * Sources and tables open to SQL connections
+     */
+    async dataConnectionControllerExposures(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<DataConnectionExposureItemDto>> {
+        const response = await this.dataConnectionControllerExposuresRaw(initOverrides);
         return await response.value();
     }
 
@@ -403,6 +548,35 @@ export class SQLConnectionsApi extends runtime.BaseAPI {
      */
     async dataConnectionControllerPassword(requestParameters: DataConnectionControllerPasswordRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<DataConnectionSecretDto> {
         const response = await this.dataConnectionControllerPasswordRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Sources and tables you may put in a connection: readable by you and open to SQL connections
+     */
+    async dataConnectionControllerReachableRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<DataConnectionReachableSourceDto>>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/data-connections/reachable`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(DataConnectionReachableSourceDtoFromJSON));
+    }
+
+    /**
+     * Sources and tables you may put in a connection: readable by you and open to SQL connections
+     */
+    async dataConnectionControllerReachable(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<DataConnectionReachableSourceDto>> {
+        const response = await this.dataConnectionControllerReachableRaw(initOverrides);
         return await response.value();
     }
 

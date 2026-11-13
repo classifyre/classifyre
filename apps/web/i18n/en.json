@@ -7062,7 +7062,8 @@
       "rangeOf": "of {{total}}",
       "thisWorkspace": "This workspace",
       "changes": "Changes",
-      "emptyValue": "(empty)"
+      "emptyValue": "(empty)",
+      "sql": "SQL connection"
     },
     "ops": {
       "governance": {
@@ -7118,7 +7119,9 @@
         "block": "Closed to a SQL connection",
         "unblock": "Opened again to a SQL connection",
         "sign-in": "Signed in through a SQL connection",
-        "sign-in-refused": "SQL connection sign-in refused"
+        "sign-in-refused": "SQL connection sign-in refused",
+        "open": "Opened to SQL connections",
+        "close": "Closed to SQL connections"
       },
       "query-runs": {
         "read-table": "Table read"
@@ -8116,6 +8119,32 @@
     "governanceTitle": "Access through SQL connections",
     "governanceLead": "Who reads this from BI tools and drivers, when and how often. Owners and stewards can give a connection for it, or close it to one.",
     "reads": "{{count}} reads here",
-    "days": "{{count}} days"
+    "days": "{{count}} days",
+    "nothingOpen": "Nothing you may query is open to SQL connections yet. An owner, a steward or an admin opens a source or table on its Governance tab.",
+    "scope": "For",
+    "scopePlaceholder": "Choose sources or tables…",
+    "scopeSearch": "Search sources and tables",
+    "scopeEmpty": "Nothing open matches.",
+    "wholeSource": "All of {{name}}",
+    "wholeSourceShort": "whole source",
+    "oneTable": "table",
+    "scopeEverything": "Everything I may query that is open to SQL connections",
+    "scopeHint": "Only sources and tables open to SQL connections, and only what you may query, can be chosen.",
+    "exposureTable": "Open to SQL connections",
+    "exposureSource": "Open to SQL connections (all its tables)",
+    "openHint": "BI tools and drivers can read it through connections that name it — still only for people who may query it.",
+    "openViaSource": "Open because its source is. Close the source, or close this table to single connections below.",
+    "closedHint": "BI tools cannot reach it. Opening it does not give anyone access: people still need the right to query it.",
+    "openedAt": "Opened {{when}}",
+    "opened": "Open to SQL connections",
+    "closed": "Closed to SQL connections",
+    "connectToolFor": "Connect a tool to {{name}}",
+    "notOpenHere": "This is not open to SQL connections.",
+    "openOnGovernance": "Open it on its Governance tab",
+    "noConnectionHere": "None of your connections reaches this yet.",
+    "createFor": "New connection for {{name}}",
+    "openListTitle": "Open to SQL connections",
+    "openListLead": "What BI tools may reach at all. Each connection reaches only what it names, and only what its person may query.",
+    "openListNone": "Nothing is open to SQL connections. Open a source or table on its Governance tab."
   }
 }

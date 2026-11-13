@@ -20,6 +20,13 @@ import {
     DataConnectionDtoToJSON,
     DataConnectionDtoToJSONTyped,
 } from './DataConnectionDto';
+import type { DataConnectionExposureDto } from './DataConnectionExposureDto';
+import {
+    DataConnectionExposureDtoFromJSON,
+    DataConnectionExposureDtoFromJSONTyped,
+    DataConnectionExposureDtoToJSON,
+    DataConnectionExposureDtoToJSONTyped,
+} from './DataConnectionExposureDto';
 
 /**
  * 
@@ -51,6 +58,18 @@ export interface DataConnectionListDto {
      * @memberof DataConnectionListDto
      */
     canGovern?: boolean;
+    /**
+     * The caller may make or give a connection to everything (admins, owners, stewards, custodians).
+     * @type {boolean}
+     * @memberof DataConnectionListDto
+     */
+    canConnectAll: boolean;
+    /**
+     * On an asset or source listing: open to SQL connections?
+     * @type {DataConnectionExposureDto}
+     * @memberof DataConnectionListDto
+     */
+    exposure?: DataConnectionExposureDto;
 }
 
 /**
@@ -60,6 +79,7 @@ export function instanceOfDataConnectionListDto(value: object): value is DataCon
     if (!('items' in value) || value['items'] === undefined) return false;
     if (!('canCreate' in value) || value['canCreate'] === undefined) return false;
     if (!('canManage' in value) || value['canManage'] === undefined) return false;
+    if (!('canConnectAll' in value) || value['canConnectAll'] === undefined) return false;
     return true;
 }
 
@@ -77,6 +97,8 @@ export function DataConnectionListDtoFromJSONTyped(json: any, ignoreDiscriminato
         'canCreate': json['canCreate'],
         'canManage': json['canManage'],
         'canGovern': json['canGovern'] == null ? undefined : json['canGovern'],
+        'canConnectAll': json['canConnectAll'],
+        'exposure': json['exposure'] == null ? undefined : DataConnectionExposureDtoFromJSON(json['exposure']),
     };
 }
 
@@ -95,6 +117,8 @@ export function DataConnectionListDtoToJSONTyped(value?: DataConnectionListDto |
         'canCreate': value['canCreate'],
         'canManage': value['canManage'],
         'canGovern': value['canGovern'],
+        'canConnectAll': value['canConnectAll'],
+        'exposure': DataConnectionExposureDtoToJSON(value['exposure']),
     };
 }
 

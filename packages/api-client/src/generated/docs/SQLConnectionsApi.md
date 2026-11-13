@@ -8,11 +8,15 @@ All URIs are relative to *http://localhost*
 | [**dataConnectionControllerBlock**](SQLConnectionsApi.md#dataconnectioncontrollerblock) | **POST** /data-connections/{id}/blocks | Close a table or source you govern to this connection |
 | [**dataConnectionControllerCreate**](SQLConnectionsApi.md#dataconnectioncontrollercreate) | **POST** /data-connections | Create a SQL connection of your own; the password is shown once |
 | [**dataConnectionControllerEndpoint**](SQLConnectionsApi.md#dataconnectioncontrollerendpoint) | **GET** /data-connections/endpoint | Where tools connect: host, port, database, TLS |
+| [**dataConnectionControllerExposeAsset**](SQLConnectionsApi.md#dataconnectioncontrollerexposeasset) | **PUT** /assets/{id}/data-connections/exposure | Open or close a table to SQL connections |
+| [**dataConnectionControllerExposeSource**](SQLConnectionsApi.md#dataconnectioncontrollerexposesource) | **PUT** /sources/{id}/data-connections/exposure | Open or close a source to SQL connections |
+| [**dataConnectionControllerExposures**](SQLConnectionsApi.md#dataconnectioncontrollerexposures) | **GET** /data-connections/exposures | Sources and tables open to SQL connections |
 | [**dataConnectionControllerForAsset**](SQLConnectionsApi.md#dataconnectioncontrollerforasset) | **GET** /assets/{id}/data-connections | SQL connections that read, name or are blocked on a table |
 | [**dataConnectionControllerForSource**](SQLConnectionsApi.md#dataconnectioncontrollerforsource) | **GET** /sources/{id}/data-connections | SQL connections that read, name or are blocked on a source |
 | [**dataConnectionControllerIssue**](SQLConnectionsApi.md#dataconnectioncontrollerissue) | **POST** /data-connections/issue | Give someone a SQL connection; they reveal its password themselves |
 | [**dataConnectionControllerMine**](SQLConnectionsApi.md#dataconnectioncontrollermine) | **GET** /data-connections | Your SQL connections |
 | [**dataConnectionControllerPassword**](SQLConnectionsApi.md#dataconnectioncontrollerpassword) | **POST** /data-connections/{id}/password | Reveal (first time) or replace the password of your own connection |
+| [**dataConnectionControllerReachable**](SQLConnectionsApi.md#dataconnectioncontrollerreachable) | **GET** /data-connections/reachable | Sources and tables you may put in a connection: readable by you and open to SQL connections |
 | [**dataConnectionControllerRevoke**](SQLConnectionsApi.md#dataconnectioncontrollerrevoke) | **POST** /data-connections/{id}/revoke | Revoke a SQL connection (its person or a manager) |
 | [**dataConnectionControllerUnblock**](SQLConnectionsApi.md#dataconnectioncontrollerunblock) | **DELETE** /data-connections/{id}/blocks/{blockId} | Lift a block |
 
@@ -246,6 +250,199 @@ This endpoint does not need any parameter.
 ### Return type
 
 [**DataConnectionEndpointDto**](DataConnectionEndpointDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## dataConnectionControllerExposeAsset
+
+> DataConnectionExposureDto dataConnectionControllerExposeAsset(id, setDataConnectionExposureDto)
+
+Open or close a table to SQL connections
+
+### Example
+
+```ts
+import {
+  Configuration,
+  SQLConnectionsApi,
+} from '@workspace/api-client';
+import type { DataConnectionControllerExposeAssetRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new SQLConnectionsApi();
+
+  const body = {
+    // string
+    id: id_example,
+    // SetDataConnectionExposureDto
+    setDataConnectionExposureDto: ...,
+  } satisfies DataConnectionControllerExposeAssetRequest;
+
+  try {
+    const data = await api.dataConnectionControllerExposeAsset(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+| **setDataConnectionExposureDto** | [SetDataConnectionExposureDto](SetDataConnectionExposureDto.md) |  | |
+
+### Return type
+
+[**DataConnectionExposureDto**](DataConnectionExposureDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## dataConnectionControllerExposeSource
+
+> DataConnectionExposureDto dataConnectionControllerExposeSource(id, setDataConnectionExposureDto)
+
+Open or close a source to SQL connections
+
+### Example
+
+```ts
+import {
+  Configuration,
+  SQLConnectionsApi,
+} from '@workspace/api-client';
+import type { DataConnectionControllerExposeSourceRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new SQLConnectionsApi();
+
+  const body = {
+    // string
+    id: id_example,
+    // SetDataConnectionExposureDto
+    setDataConnectionExposureDto: ...,
+  } satisfies DataConnectionControllerExposeSourceRequest;
+
+  try {
+    const data = await api.dataConnectionControllerExposeSource(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+| **setDataConnectionExposureDto** | [SetDataConnectionExposureDto](SetDataConnectionExposureDto.md) |  | |
+
+### Return type
+
+[**DataConnectionExposureDto**](DataConnectionExposureDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## dataConnectionControllerExposures
+
+> Array&lt;DataConnectionExposureItemDto&gt; dataConnectionControllerExposures()
+
+Sources and tables open to SQL connections
+
+### Example
+
+```ts
+import {
+  Configuration,
+  SQLConnectionsApi,
+} from '@workspace/api-client';
+import type { DataConnectionControllerExposuresRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new SQLConnectionsApi();
+
+  try {
+    const data = await api.dataConnectionControllerExposures();
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+This endpoint does not need any parameter.
+
+### Return type
+
+[**Array&lt;DataConnectionExposureItemDto&gt;**](DataConnectionExposureItemDto.md)
 
 ### Authorization
 
@@ -563,6 +760,63 @@ example().catch(console.error);
 ### Return type
 
 [**DataConnectionSecretDto**](DataConnectionSecretDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## dataConnectionControllerReachable
+
+> Array&lt;DataConnectionReachableSourceDto&gt; dataConnectionControllerReachable()
+
+Sources and tables you may put in a connection: readable by you and open to SQL connections
+
+### Example
+
+```ts
+import {
+  Configuration,
+  SQLConnectionsApi,
+} from '@workspace/api-client';
+import type { DataConnectionControllerReachableRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new SQLConnectionsApi();
+
+  try {
+    const data = await api.dataConnectionControllerReachable();
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+This endpoint does not need any parameter.
+
+### Return type
+
+[**Array&lt;DataConnectionReachableSourceDto&gt;**](DataConnectionReachableSourceDto.md)
 
 ### Authorization
 

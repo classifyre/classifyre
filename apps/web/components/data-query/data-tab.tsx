@@ -73,7 +73,7 @@ export function DataTab({
         )}
         <div className="ml-auto flex flex-wrap items-center gap-1">
           {canManage && <GiveDataAccessButton scope={scope} access={access} />}
-          <ConnectToolButton />
+          <ConnectToolButton scope={scope} />
           <Button asChild size="sm" variant="ghost">
             <Link
               href={`${nsHref("/query")}?sql=${encodeURIComponent(sql)}`}

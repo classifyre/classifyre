@@ -632,6 +632,11 @@ export type {
   DataConnectionScopeItemDto,
   DataConnectionBlockDto,
   DataConnectionReadsDto,
+  DataConnectionExposureDto,
+  DataConnectionExposureItemDto,
+  DataConnectionReachableSourceDto,
+  DataConnectionReachableTableDto,
+  SetDataConnectionExposureDto,
   CreateDataConnectionDto,
   IssueDataConnectionDto,
   RevokeDataConnectionDto,
@@ -803,6 +808,7 @@ export type TenantAccessControllerEventsSortOrderEnum =
 export const AuditEventDtoChannelEnum = {
   Rest: "rest",
   Mcp: "mcp",
+  Sql: "sql",
 } as const;
 export type AuditEventDtoChannelEnum =
   (typeof AuditEventDtoChannelEnum)[keyof typeof AuditEventDtoChannelEnum];

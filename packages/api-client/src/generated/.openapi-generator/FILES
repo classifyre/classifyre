@@ -209,7 +209,11 @@ docs/CustomDetectorsApi.md
 docs/DataConnectionBlockDto.md
 docs/DataConnectionDto.md
 docs/DataConnectionEndpointDto.md
+docs/DataConnectionExposureDto.md
+docs/DataConnectionExposureItemDto.md
 docs/DataConnectionListDto.md
+docs/DataConnectionReachableSourceDto.md
+docs/DataConnectionReachableTableDto.md
 docs/DataConnectionReadsDto.md
 docs/DataConnectionScopeItemDto.md
 docs/DataConnectionSecretDto.md
@@ -557,6 +561,7 @@ docs/SearchSourcesResponseDto.md
 docs/SearchSourcesTotalsDto.md
 docs/SemanticApi.md
 docs/SemanticFindingsSearchDto.md
+docs/SetDataConnectionExposureDto.md
 docs/SetInquiryAutoPullDto.md
 docs/SetWorkerQueuePausedDto.md
 docs/SettingsApi.md
@@ -901,7 +906,11 @@ src/models/CustomDetectorTrainingRunDto.ts
 src/models/DataConnectionBlockDto.ts
 src/models/DataConnectionDto.ts
 src/models/DataConnectionEndpointDto.ts
+src/models/DataConnectionExposureDto.ts
+src/models/DataConnectionExposureItemDto.ts
 src/models/DataConnectionListDto.ts
+src/models/DataConnectionReachableSourceDto.ts
+src/models/DataConnectionReachableTableDto.ts
 src/models/DataConnectionReadsDto.ts
 src/models/DataConnectionScopeItemDto.ts
 src/models/DataConnectionSecretDto.ts
@@ -1229,6 +1238,7 @@ src/models/SearchSourcesRequestDto.ts
 src/models/SearchSourcesResponseDto.ts
 src/models/SearchSourcesTotalsDto.ts
 src/models/SemanticFindingsSearchDto.ts
+src/models/SetDataConnectionExposureDto.ts
 src/models/SetInquiryAutoPullDto.ts
 src/models/SetWorkerQueuePausedDto.ts
 src/models/SimilarFindingAssetDto.ts

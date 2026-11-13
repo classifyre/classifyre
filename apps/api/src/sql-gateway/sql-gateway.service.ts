@@ -28,7 +28,10 @@ import type { Capability } from '../identity/capabilities';
 import { applyPrincipalContext } from '../identity/principal-context';
 import { QueryCatalogService } from '../data-query/query-catalog.service';
 import { QueryRunService } from '../data-query/query-run.service';
-import { CLS_CONNECTION_SCOPE } from '../data-query/connection-scope';
+import {
+  CLS_CONNECTION_SCOPE,
+  type ConnectionScope,
+} from '../data-query/connection-scope';
 import { DataConnectionService } from '../sql-connections/data-connection.service';
 import {
   ScramError,
@@ -569,7 +572,9 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
     socket.write(authenticationOk());
 
     // The catalog: what the person may read through this connection right now.
-    const scope = DataConnectionService.scopeOf(row);
+    const scope = await this.inWorkspace(ns, () =>
+      this.connections.scopeFor(row),
+    );
     const { ddl, notes } = await this.within(
       ns,
       principalState,
@@ -751,7 +756,7 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
           truncated: result.truncated,
         };
       },
-      DataConnectionService.scopeOf(row),
+      await this.inWorkspace(entry.ns, () => this.connections.scopeFor(row)),
     );
   }
 
@@ -843,7 +848,7 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
     principal: Live['principal'],
     _connectionId: string,
     fn: () => Promise<T>,
-    scope: ReturnType<typeof DataConnectionService.scopeOf>,
+    scope: ConnectionScope,
   ): Promise<T> {
     return this.inWorkspace(ns, async () => {
       await applyPrincipalContext(

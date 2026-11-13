@@ -247,6 +247,20 @@ model DataConnection {
   @@map("data_connections")
 }
 
+/// A source or table opened to SQL connections (docs/prd/DQ §5.7). Opt-in:
+/// BI tools reach nothing until an admin, owner or steward opens it here; a
+/// table is open when it or its source is.
+model DataConnectionExposure {
+  id        String          @id @default(uuid())
+  scopeType GovernanceScope @map("scope_type")
+  scopeId   String          @map("scope_id")
+  openedBy  String?         @map("opened_by")
+  openedAt  DateTime        @default(now()) @map("opened_at")
+
+  @@unique([scopeType, scopeId])
+  @@map("data_connection_exposures")
+}
+
 /// An owner's or steward's "not through this connection" on their asset or
 /// source (docs/prd/DQ §5.7): the rest of the connection keeps working.
 model DataConnectionBlock {
