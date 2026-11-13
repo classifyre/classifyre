@@ -553,7 +553,7 @@ async function example() {
   const api = new AutopilotApi();
 
   const body = {
-    // 'INQUIRY' | 'CASE' | 'DREAM' | 'DUPLICATES' | 'CONFIG' | 'DETECTOR_AUTHOR' | 'ESCALATION' | 'CHAT' | 'SUPERVISOR' (optional)
+    // 'INQUIRY' | 'CASE' | 'DREAM' | 'DUPLICATES' | 'CONFIG' | 'DETECTOR_AUTHOR' | 'ESCALATION' | 'SUPERVISOR' (optional)
     agentKind: agentKind_example,
     // string | ISO lower bound for run creation (default: 30 days ago) (optional)
     since: since_example,
@@ -578,7 +578,7 @@ example().catch(console.error);
 
 | Name | Type | Description  | Notes |
 |------------- | ------------- | ------------- | -------------|
-| **agentKind** | `INQUIRY`, `CASE`, `DREAM`, `DUPLICATES`, `CONFIG`, `DETECTOR_AUTHOR`, `ESCALATION`, `CHAT`, `SUPERVISOR` |  | [Optional] [Defaults to `undefined`] [Enum: INQUIRY, CASE, DREAM, DUPLICATES, CONFIG, DETECTOR_AUTHOR, ESCALATION, CHAT, SUPERVISOR] |
+| **agentKind** | `INQUIRY`, `CASE`, `DREAM`, `DUPLICATES`, `CONFIG`, `DETECTOR_AUTHOR`, `ESCALATION`, `SUPERVISOR` |  | [Optional] [Defaults to `undefined`] [Enum: INQUIRY, CASE, DREAM, DUPLICATES, CONFIG, DETECTOR_AUTHOR, ESCALATION, SUPERVISOR] |
 | **since** | `string` | ISO lower bound for run creation (default: 30 days ago) | [Optional] [Defaults to `undefined`] |
 | **until** | `string` | ISO upper bound for run creation | [Optional] [Defaults to `undefined`] |
 
@@ -624,7 +624,7 @@ async function example() {
   const api = new AutopilotApi();
 
   const body = {
-    // 'INQUIRY' | 'CASE' | 'DREAM' | 'DUPLICATES' | 'CONFIG' | 'DETECTOR_AUTHOR' | 'ESCALATION' | 'CHAT' | 'SUPERVISOR' (optional)
+    // 'INQUIRY' | 'CASE' | 'DREAM' | 'DUPLICATES' | 'CONFIG' | 'DETECTOR_AUTHOR' | 'ESCALATION' | 'SUPERVISOR' (optional)
     agentKind: agentKind_example,
     // 'CREATE_INQUIRY' | 'UPDATE_INQUIRY' | 'ENRICH_INQUIRY_MATCHERS' | 'SIGNAL_CASE_READY' | 'CREATE_CASE' | 'UPDATE_CASE' | 'ADD_HYPOTHESIS' | 'UPDATE_HYPOTHESIS' | 'ADD_EVIDENCE' | 'ATTACH_FINDINGS' | 'ADD_NOTE' | 'ADD_THREAD_ENTRY' | 'CREATE_EDGE' | 'REMOVE_EDGE' | 'LINK_SUPPORT' | 'CHANGE_STATUS' | 'LINK_INQUIRY' | 'CONSOLIDATE_MEMORY' | 'LINK_DUPLICATE' | 'UPDATE_CLUSTER' | 'TOOL_CALL' | 'TUNE_SOURCE' | 'CREATE_DETECTOR' | 'TRAIN_DETECTOR' | 'UPDATE_DETECTOR' | 'DELETE_DETECTOR' | 'TRIGGER_SCAN' | 'UPDATE_SYSTEM_BRIEF' | 'RECOMPUTE_CORRELATION' | 'TUNE_CORRELATION' | 'NOTIFY_OPERATOR' | 'SET_GOAL' | 'COMMAND_AGENT' | 'CONFIGURE_AGENT' | 'PURGE_FINDINGS' | 'PURGE_ASSETS' | 'SCHEDULE_WAKE' | 'WRITE_JOURNAL' | 'REVERT_ACTION' | 'NO_ACTION' | 'APPROVE_RELATION' | 'APPROVE_BINDING' (optional)
     action: action_example,
@@ -661,7 +661,7 @@ example().catch(console.error);
 
 | Name | Type | Description  | Notes |
 |------------- | ------------- | ------------- | -------------|
-| **agentKind** | `INQUIRY`, `CASE`, `DREAM`, `DUPLICATES`, `CONFIG`, `DETECTOR_AUTHOR`, `ESCALATION`, `CHAT`, `SUPERVISOR` |  | [Optional] [Defaults to `undefined`] [Enum: INQUIRY, CASE, DREAM, DUPLICATES, CONFIG, DETECTOR_AUTHOR, ESCALATION, CHAT, SUPERVISOR] |
+| **agentKind** | `INQUIRY`, `CASE`, `DREAM`, `DUPLICATES`, `CONFIG`, `DETECTOR_AUTHOR`, `ESCALATION`, `SUPERVISOR` |  | [Optional] [Defaults to `undefined`] [Enum: INQUIRY, CASE, DREAM, DUPLICATES, CONFIG, DETECTOR_AUTHOR, ESCALATION, SUPERVISOR] |
 | **action** | `CREATE_INQUIRY`, `UPDATE_INQUIRY`, `ENRICH_INQUIRY_MATCHERS`, `SIGNAL_CASE_READY`, `CREATE_CASE`, `UPDATE_CASE`, `ADD_HYPOTHESIS`, `UPDATE_HYPOTHESIS`, `ADD_EVIDENCE`, `ATTACH_FINDINGS`, `ADD_NOTE`, `ADD_THREAD_ENTRY`, `CREATE_EDGE`, `REMOVE_EDGE`, `LINK_SUPPORT`, `CHANGE_STATUS`, `LINK_INQUIRY`, `CONSOLIDATE_MEMORY`, `LINK_DUPLICATE`, `UPDATE_CLUSTER`, `TOOL_CALL`, `TUNE_SOURCE`, `CREATE_DETECTOR`, `TRAIN_DETECTOR`, `UPDATE_DETECTOR`, `DELETE_DETECTOR`, `TRIGGER_SCAN`, `UPDATE_SYSTEM_BRIEF`, `RECOMPUTE_CORRELATION`, `TUNE_CORRELATION`, `NOTIFY_OPERATOR`, `SET_GOAL`, `COMMAND_AGENT`, `CONFIGURE_AGENT`, `PURGE_FINDINGS`, `PURGE_ASSETS`, `SCHEDULE_WAKE`, `WRITE_JOURNAL`, `REVERT_ACTION`, `NO_ACTION`, `APPROVE_RELATION`, `APPROVE_BINDING` |  | [Optional] [Defaults to `undefined`] [Enum: CREATE_INQUIRY, UPDATE_INQUIRY, ENRICH_INQUIRY_MATCHERS, SIGNAL_CASE_READY, CREATE_CASE, UPDATE_CASE, ADD_HYPOTHESIS, UPDATE_HYPOTHESIS, ADD_EVIDENCE, ATTACH_FINDINGS, ADD_NOTE, ADD_THREAD_ENTRY, CREATE_EDGE, REMOVE_EDGE, LINK_SUPPORT, CHANGE_STATUS, LINK_INQUIRY, CONSOLIDATE_MEMORY, LINK_DUPLICATE, UPDATE_CLUSTER, TOOL_CALL, TUNE_SOURCE, CREATE_DETECTOR, TRAIN_DETECTOR, UPDATE_DETECTOR, DELETE_DETECTOR, TRIGGER_SCAN, UPDATE_SYSTEM_BRIEF, RECOMPUTE_CORRELATION, TUNE_CORRELATION, NOTIFY_OPERATOR, SET_GOAL, COMMAND_AGENT, CONFIGURE_AGENT, PURGE_FINDINGS, PURGE_ASSETS, SCHEDULE_WAKE, WRITE_JOURNAL, REVERT_ACTION, NO_ACTION, APPROVE_RELATION, APPROVE_BINDING] |
 | **outcome** | `APPLIED`, `SKIPPED_OBSERVE_ONLY`, `FAILED` |  | [Optional] [Defaults to `undefined`] [Enum: APPLIED, SKIPPED_OBSERVE_ONLY, FAILED] |
 | **entityType** | `string` | inquiry | case | source | detector | memory | system | asset | [Optional] [Defaults to `undefined`] |
@@ -861,7 +861,7 @@ async function example() {
   const api = new AutopilotApi();
 
   const body = {
-    // 'INQUIRY' | 'CASE' | 'DREAM' | 'DUPLICATES' | 'CONFIG' | 'DETECTOR_AUTHOR' | 'ESCALATION' | 'CHAT' | 'SUPERVISOR' (optional)
+    // 'INQUIRY' | 'CASE' | 'DREAM' | 'DUPLICATES' | 'CONFIG' | 'DETECTOR_AUTHOR' | 'ESCALATION' | 'SUPERVISOR' (optional)
     agentKind: agentKind_example,
     // string | Only runs focused on this case (optional)
     caseId: caseId_example,
@@ -900,7 +900,7 @@ example().catch(console.error);
 
 | Name | Type | Description  | Notes |
 |------------- | ------------- | ------------- | -------------|
-| **agentKind** | `INQUIRY`, `CASE`, `DREAM`, `DUPLICATES`, `CONFIG`, `DETECTOR_AUTHOR`, `ESCALATION`, `CHAT`, `SUPERVISOR` |  | [Optional] [Defaults to `undefined`] [Enum: INQUIRY, CASE, DREAM, DUPLICATES, CONFIG, DETECTOR_AUTHOR, ESCALATION, CHAT, SUPERVISOR] |
+| **agentKind** | `INQUIRY`, `CASE`, `DREAM`, `DUPLICATES`, `CONFIG`, `DETECTOR_AUTHOR`, `ESCALATION`, `SUPERVISOR` |  | [Optional] [Defaults to `undefined`] [Enum: INQUIRY, CASE, DREAM, DUPLICATES, CONFIG, DETECTOR_AUTHOR, ESCALATION, SUPERVISOR] |
 | **caseId** | `string` | Only runs focused on this case | [Optional] [Defaults to `undefined`] |
 | **sourceId** | `string` | Only runs for this source | [Optional] [Defaults to `undefined`] |
 | **status** | `PENDING`, `RUNNING`, `COMPLETED`, `FAILED`, `SKIPPED`, `CANCELLED` |  | [Optional] [Defaults to `undefined`] [Enum: PENDING, RUNNING, COMPLETED, FAILED, SKIPPED, CANCELLED] |
@@ -1140,7 +1140,7 @@ async function example() {
   const api = new AutopilotApi();
 
   const body = {
-    // 'INQUIRY' | 'CASE' | 'DREAM' | 'DUPLICATES' | 'CONFIG' | 'DETECTOR_AUTHOR' | 'ESCALATION' | 'CHAT' | 'SUPERVISOR'
+    // 'INQUIRY' | 'CASE' | 'DREAM' | 'DUPLICATES' | 'CONFIG' | 'DETECTOR_AUTHOR' | 'ESCALATION' | 'SUPERVISOR'
     kind: kind_example,
     // UpdateAgentConfigDto
     updateAgentConfigDto: ...,
@@ -1163,7 +1163,7 @@ example().catch(console.error);
 
 | Name | Type | Description  | Notes |
 |------------- | ------------- | ------------- | -------------|
-| **kind** | `INQUIRY`, `CASE`, `DREAM`, `DUPLICATES`, `CONFIG`, `DETECTOR_AUTHOR`, `ESCALATION`, `CHAT`, `SUPERVISOR` |  | [Defaults to `undefined`] [Enum: INQUIRY, CASE, DREAM, DUPLICATES, CONFIG, DETECTOR_AUTHOR, ESCALATION, CHAT, SUPERVISOR] |
+| **kind** | `INQUIRY`, `CASE`, `DREAM`, `DUPLICATES`, `CONFIG`, `DETECTOR_AUTHOR`, `ESCALATION`, `SUPERVISOR` |  | [Defaults to `undefined`] [Enum: INQUIRY, CASE, DREAM, DUPLICATES, CONFIG, DETECTOR_AUTHOR, ESCALATION, SUPERVISOR] |
 | **updateAgentConfigDto** | [UpdateAgentConfigDto](UpdateAgentConfigDto.md) |  | |
 
 ### Return type

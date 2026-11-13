@@ -46,7 +46,6 @@ describe('NamespaceWorkerManager teardown isolation', () => {
     embedding: { registerForNamespace: asyncNoop, stopForSchema: asyncNoop },
     embeddingService: { clearForSchema: noop },
     embeddingCapability: { clearForSchema: noop },
-    chat: { refresh: asyncNoop, stopForSchema: asyncNoop },
     cliRunner: {
       activateForSchema: noop,
       stopForSchema: asyncNoop,
@@ -59,10 +58,6 @@ describe('NamespaceWorkerManager teardown isolation', () => {
     runnerEvents: { stopForSchema: noop },
     notificationEvents: { stopForSchema: noop },
     prisma: {},
-    // Never the leader in these tests, so start() takes the branch that skips
-    // chat connectors — the teardown paths under test are unaffected either
-    // way, and a double that claimed leadership would start pollers here.
-    leadership: { start: noop, isLeader: () => false },
     ...over,
   });
 
@@ -83,7 +78,6 @@ describe('NamespaceWorkerManager teardown isolation', () => {
       d.embedding as never,
       d.embeddingService as never,
       d.embeddingCapability as never,
-      d.chat as never,
       d.cliRunner as never,
       d.mcpClient as never,
       d.pgStream as never,
@@ -92,7 +86,6 @@ describe('NamespaceWorkerManager teardown isolation', () => {
       d.semantic as never,
       d.runnerEvents as never,
       d.notificationEvents as never,
-      d.leadership as never,
       d.prisma as never,
     );
     return { manager, deps: d };

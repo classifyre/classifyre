@@ -69,12 +69,7 @@ import { GraphService } from './graph.service';
 import { ExploreController } from './explore/explore.controller';
 import { ExploreService } from './explore/explore.service';
 import { ExploreViewsService } from './explore/explore-views.service';
-import { BuiltinMcpToolsService } from './chat-gateway/builtin-mcp-tools.service';
-import { ChatAgentService } from './chat-gateway/chat-agent.service';
-import { ChatBotsService } from './chat-gateway/chat-bots.service';
-import { ChatGatewayService } from './chat-gateway/chat-gateway.service';
-import { ChatHarnessToolset } from './chat-gateway/chat-harness.toolset';
-import { ChatSessionService } from './chat-gateway/chat-session.service';
+import { BuiltinMcpToolsService } from './autopilot/tools/builtin-mcp-tools.service';
 import { EmbeddingModule } from './embedding/embedding.module';
 import { FindingStatsModule } from './stats/finding-stats.module';
 import { GlossaryModule } from './glossary/glossary.module';
@@ -118,7 +113,6 @@ import {
   CaseThreadsController,
   CaseTimelineController,
   GraphController,
-  ChatBotsController,
   WorkerQueuesController,
 } from './controllers';
 
@@ -175,7 +169,6 @@ import {
     CaseThreadsController,
     GraphController,
     ExploreController,
-    ChatBotsController,
     CaseLeadsController,
     CaseEventsController,
     NamespacesController,
@@ -242,14 +235,9 @@ import {
     ExploreService,
     ExploreViewsService,
     AgentMemoryService,
-    // Chat gateway (Telegram/Slack bots → chat agent over the harness tools).
-    // Registry/dispatcher/audit instances come from AutopilotModule's exports.
+    // Bridges the built-in MCP server into the harness tool registry for the
+    // supervisor. The registry comes from AutopilotModule's exports.
     BuiltinMcpToolsService,
-    ChatHarnessToolset,
-    ChatSessionService,
-    ChatAgentService,
-    ChatGatewayService,
-    ChatBotsService,
     CaseLeadsService,
     // Keeps each case's leads current: asked for by CaseActivityService (so it
     // is provided wherever that is), run by the worker below.

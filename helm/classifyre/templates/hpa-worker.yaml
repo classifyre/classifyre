@@ -10,8 +10,7 @@ pg-boss pools and RAISES total memory instead of relieving it.
 Correctness with more than one replica rests on two things that are already
 true: pg-boss hands each job to exactly one consumer, and the job-slot
 semaphore is a Postgres advisory lock shared across replicas, so the configured
-concurrency still holds in aggregate. The one piece that must not run twice —
-the chat connectors — is gated on WorkerLeadershipService.
+concurrency still holds in aggregate.
 */}}
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler

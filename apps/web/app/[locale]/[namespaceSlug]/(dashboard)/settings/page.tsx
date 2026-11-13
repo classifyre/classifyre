@@ -25,7 +25,6 @@ import {
   Globe,
   Languages,
   Loader2,
-  MessageSquare,
   Server,
   Settings,
   SlidersHorizontal,
@@ -35,7 +34,6 @@ import {
 import { toast } from "sonner";
 import { useInstanceSettings } from "@/components/instance-settings-provider";
 import { McpSettingsCard } from "@/components/mcp-settings-card";
-import { ChatBotsCard } from "@/components/chat-bots-card";
 import { HuggingFaceSettingsCard } from "@/components/huggingface-settings-card";
 import { VersionSettingsSection } from "@/components/version-update-notifier";
 import { RunnerLimitsCard } from "@/components/maintenance/runner-limits-card";
@@ -262,10 +260,6 @@ function WorkspaceSettings() {
             <Server className="h-3.5 w-3.5" />
             {t("settings.tabs.mcp")}
           </TabsTrigger>
-          <TabsTrigger value="chat" className={TAB_TRIGGER_CLASS}>
-            <MessageSquare className="h-3.5 w-3.5" />
-            {t("settings.tabs.chat")}
-          </TabsTrigger>
           <TabsTrigger value="workers" className={TAB_TRIGGER_CLASS}>
             <Cpu className="h-3.5 w-3.5" />
             {t("settings.tabs.workers")}
@@ -444,13 +438,6 @@ function WorkspaceSettings() {
           className="duration-300 animate-in fade-in-50 slide-in-from-bottom-1"
         >
           <McpSettingsCard />
-        </TabsContent>
-
-        <TabsContent
-          value="chat"
-          className="duration-300 animate-in fade-in-50 slide-in-from-bottom-1"
-        >
-          <ChatBotsCard />
         </TabsContent>
 
         <TabsContent

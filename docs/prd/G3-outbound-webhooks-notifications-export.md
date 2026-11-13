@@ -14,13 +14,13 @@ Three outbound capabilities on one backbone:
 
 - **Domain events (F1).** An append-only table of meaningful things that happened in a workspace, written in the same transaction as the change.
 - **Webhooks.** Signed, retried HTTP deliveries of chosen events to any endpoint (n8n, Zapier, Jira automation, SOAR, a custom service).
-- **Push notifications.** Chosen events delivered to Slack, Telegram, email and Microsoft Teams, reusing the existing chat-bot connectors.
+- **Push notifications.** Chosen events delivered to Slack, Telegram, email and Microsoft Teams. The Telegram/Slack chat-bot connectors this once planned to reuse were removed on 2026-11-13, so these channels are built here from scratch.
 
 Plus **case export**: a whole investigation as Markdown or JSON, with evidence, lineage, chronology, hypotheses and provenance.
 
 ## 2. Why
 
-- **Decisions never leave Classifyre.** There is no webhook, no email and no push. The Telegram and Slack bots (`apps/api/src/chat-gateway/`) answer questions but never speak first. Notifications are in-app only (`Notification` model, `notification-events.gateway.ts`). The research behind the [gap analysis](../../palantir-use-case-gap-analysis.md) is clear on adoption: successful deployments put the decision where people already work, rather than adding another dashboard.
+- **Decisions never leave Classifyre.** There is no webhook, no email and no push. Notifications are in-app only (`Notification` model, `notification-events.gateway.ts`). The research behind the [gap analysis](../../palantir-use-case-gap-analysis.md) is clear on adoption: successful deployments put the decision where people already work, rather than adding another dashboard.
 - **A case can't leave either.** An investigation's result must reach a regulator, a board, a court or a data-protection officer. Phase 8 of `docs/architecture/INVESTIGATION_ROADMAP.md` lists "export a case … as a report", and it was never built.
 - **Open-source adopters expect webhooks.** They are the cheapest integration: instead of building N write-back connectors (Jira, ServiceNow, TheHive, …), the customer's own automation acts on a signed event.
 - **Without a shared event backbone, every feature grows its own notifier.** Today 13 call sites create notifications with an `event` string (`types/notification.types.ts`), triage, entities and metrics are coming, and the enterprise edition needs an audit trail. One outbox serves all of them.
@@ -68,7 +68,7 @@ Plus **case export**: a whole investigation as Markdown or JSON, with evidence, 
 
 | # | Requirement | Priority |
 |---|---|---|
-| N1 | Channel kinds: **Slack** (an existing `ChatBot` of platform SLACK plus a channel id; needs `chat:write`), **Telegram** (an existing bot plus a chat id), **Email** (SMTP), **Microsoft Teams** (an incoming-webhook URL, encrypted) | MUST (Teams SHOULD) |
+| N1 | Channel kinds: **Slack** (an encrypted bot token plus a channel id; needs `chat:write`), **Telegram** (an encrypted bot token plus a chat id), **Email** (SMTP), **Microsoft Teams** (an incoming-webhook URL, encrypted) | MUST (Teams SHOULD) |
 | N2 | Same subscription model as webhooks (W1), plus `language` (EN/DE, default: instance language) and `mode` = `immediate` \| `hourly digest` \| `daily digest` | MUST (digests SHOULD) |
 | N3 | Message templates per event type in EN and DE: one line of what happened, severity, and an absolute link into the namespaced UI (`/<namespace>/…`, per the namespace URL contract) | MUST |
 | N4 | SMTP settings in instance settings (host, port, TLS, user, password encrypted, from), with a "send test email" button. Uses `nodemailer` | MUST |
@@ -159,7 +159,7 @@ model WebhookDelivery {
 }
 ```
 
-`NotificationChannel` mirrors `WebhookEndpoint`, with `kind`, `chatBotId?`, `targetEnc`, `language`, `mode`. Its deliveries share the delivery table shape (`channel_deliveries`).
+`NotificationChannel` mirrors `WebhookEndpoint`, with `kind`, `targetEnc`, `language`, `mode`. Its deliveries share the delivery table shape (`channel_deliveries`).
 
 **Why a `dispatchedAt` column instead of a sequence cursor.** Sequence values commit out of order, so "everything after seq N" can skip an event committed late. Marking rows dispatched is robust, and `@@unique([endpointId, eventId])` makes fan-out idempotent.
 

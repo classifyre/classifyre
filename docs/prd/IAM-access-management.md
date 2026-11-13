@@ -157,7 +157,7 @@ Every REST route declares one with `@Requires('<capability>')`. Every MCP tool d
 | Code                | `code.author` (custom source code, Python detectors, notebooks that run code). Kept apart because it runs code inside the cluster |
 | Investigations      | `case.view`, `case.edit`, `case.manage` (close, delete, cleanup), `inquiry.view`, `inquiry.edit`, `lead.review`                   |
 | Meaning             | `glossary.view`, `glossary.edit`, `glossary.approve`, `entity.view`, `entity.manage`, `correlation.review`                        |
-| Agents              | `agent.view`, `agent.configure` (harness, autopilot, AI providers, chat bots), `agent.use` (assistant, AI completion)             |
+| Agents              | `agent.view`, `agent.configure` (harness, autopilot, AI providers), `agent.use` (assistant, AI completion)             |
 | Data out            | `data.export` (CSV, case export, live queries), `data.query` (rows of tables with SQL, [DQ](DQ-data-query.md))                     |
 | Tokens              | `mcp.token.own` (create and revoke your own), `mcp.token.admin` (see and revoke everyone's in the workspace)                      |
 | Tenant              | `tenant.workspace.create` (scoped to an owning group), `tenant.access.manage`, `tenant.categories.manage`, `tenant.audit.view` |
@@ -436,7 +436,7 @@ One component set in `@workspace/ui`, built from today's `ai-actor-badge.tsx`:
 | Notebooks                                      | Executions "run by"                                                                                                                                                           |
 | Explore                                        | Saved views "created by"                                                                                                                                                      |
 | Settings: MCP tokens                           | Owner column, last used, "acting as"; admins see every token in the workspace and can revoke                                                                                  |
-| Settings: AI providers, MCP servers, chat bots | `ChangedBy` on each                                                                                                                                                           |
+| Settings: AI providers, MCP servers | `ChangedBy` on each                                                                                                                                                           |
 | Notifications                                  | Who caused the event                                                                                                                                                          |
 
 Without IAM the same components show the self-declared name with a small "unverified" mark, so H1 and H6 hold together.
@@ -915,8 +915,7 @@ The autopilot keeps `agent:autopilot` attribution and the `OBSERVE_ONLY` modes. 
 
 1. **Harness settings gain a role picker** (`AgentConfigDto.roleKey`, default `investigator`): offered roles are the workspace-scoped built-ins, read from `GET /<ws>/access/roles`. Needs `agent.configure` to change, like every other harness setting.
 2. **Each cycle rebuilds the owner's principal the way MCP does** (`IdentityService.principalForOwner` with a synthetic owner — the role from settings, the workspace as scope), caps the tool set by `roleCapabilities(roleKey)`, and records `agent:<workspace>:autopilot` (migration rewrites `agent:autopilot` per workspace, or resolves it with the workspace in context).
-3. **Chat bots keep `chatMutationsAllowed`** (read-only with sign-in) until they get the same picker; a bot's role would be picked when the bot is configured (`agent.configure`).
-4. **Tests:** a persona check that an autopilot limited to Viewer runs reads but is refused writes; a check that changing the role takes effect on the next cycle without restarting anything. Estimated 2-3 days (picker + `principalForOwner` reuse + specs + persona checks).
+3. **Tests:** a persona check that an autopilot limited to Viewer runs reads but is refused writes; a check that changing the role takes effect on the next cycle without restarting anything. Estimated 2-3 days (picker + `principalForOwner` reuse + specs + persona checks).
 
 #### Step 9b · Platform operator console (U15, built as TEN phase 2)
 

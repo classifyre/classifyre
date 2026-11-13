@@ -1,34 +1,9 @@
 import { AiManagementMode } from '@prisma/client';
-import type { Tool, ToolContext } from '../autopilot/tools/tool.types';
-import { bridgeMutationsAllowed } from '../autopilot/tools/mcp-bridge-gate';
+import type { Tool, ToolContext } from './tool.types';
+import { bridgeMutationsAllowed } from './mcp-bridge-gate';
 
 /** Namespace of the bridged built-in Classifyre MCP tools in the registry. */
 export const BUILTIN_MCP_PREFIX = 'mcp.builtin.';
-
-/** AgentContext.state key carrying the chat bot's effective permissions. */
-export const CHAT_BOT_STATE_KEY = 'chat:bot';
-
-/**
- * Per-turn bot settings stashed in AgentContext.state by the chat agent. A
- * chat message has no signed-in person behind it, so a bot only ever reads.
- */
-export interface ChatBotState {
-  id: string;
-  agentKinds: string[];
-}
-
-export function chatBotState(tc: ToolContext): ChatBotState | null {
-  const value = tc.ctx.state[CHAT_BOT_STATE_KEY];
-  if (!value || typeof value !== 'object') return null;
-  const v = value as Partial<ChatBotState>;
-  if (typeof v.id !== 'string') return null;
-  return {
-    id: v.id,
-    agentKinds: Array.isArray(v.agentKinds)
-      ? v.agentKinds.filter((k): k is string => typeof k === 'string')
-      : [],
-  };
-}
 
 /** Tool shape as listed by the MCP client from the built-in server. */
 export interface BuiltinRemoteTool {
@@ -42,9 +17,9 @@ export interface BuiltinRemoteTool {
  * Adapt one built-in Classifyre MCP tool into a harness Tool, namespaced as
  * `mcp.builtin.<name>`. Read tools (readOnlyHint) run ungated; everything else
  * is treated as mutating (fail-closed) and only runs for a run that set the
- * bridge flag (see {@link bridgeMutationsAllowed}). For any other caller,
- * chat bots included, the gate resolves OBSERVE_ONLY, so the dispatcher
- * records the call without executing it.
+ * bridge flag (see {@link bridgeMutationsAllowed}). For any other caller the
+ * gate resolves OBSERVE_ONLY, so the dispatcher records the call without
+ * executing it.
  */
 export function adaptBuiltinMcpTool(opts: {
   remote: BuiltinRemoteTool;

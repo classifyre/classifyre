@@ -1791,7 +1791,6 @@ export const AutopilotControllerGetUsageAgentKindEnum = {
     Config: 'CONFIG',
     DetectorAuthor: 'DETECTOR_AUTHOR',
     Escalation: 'ESCALATION',
-    Chat: 'CHAT',
     Supervisor: 'SUPERVISOR'
 } as const;
 export type AutopilotControllerGetUsageAgentKindEnum = typeof AutopilotControllerGetUsageAgentKindEnum[keyof typeof AutopilotControllerGetUsageAgentKindEnum];
@@ -1806,7 +1805,6 @@ export const AutopilotControllerListActivityAgentKindEnum = {
     Config: 'CONFIG',
     DetectorAuthor: 'DETECTOR_AUTHOR',
     Escalation: 'ESCALATION',
-    Chat: 'CHAT',
     Supervisor: 'SUPERVISOR'
 } as const;
 export type AutopilotControllerListActivityAgentKindEnum = typeof AutopilotControllerListActivityAgentKindEnum[keyof typeof AutopilotControllerListActivityAgentKindEnum];
@@ -1907,7 +1905,6 @@ export const AutopilotControllerListRunsAgentKindEnum = {
     Config: 'CONFIG',
     DetectorAuthor: 'DETECTOR_AUTHOR',
     Escalation: 'ESCALATION',
-    Chat: 'CHAT',
     Supervisor: 'SUPERVISOR'
 } as const;
 export type AutopilotControllerListRunsAgentKindEnum = typeof AutopilotControllerListRunsAgentKindEnum[keyof typeof AutopilotControllerListRunsAgentKindEnum];
@@ -1934,7 +1931,6 @@ export const AutopilotControllerUpdateAgentKindEnum = {
     Config: 'CONFIG',
     DetectorAuthor: 'DETECTOR_AUTHOR',
     Escalation: 'ESCALATION',
-    Chat: 'CHAT',
     Supervisor: 'SUPERVISOR'
 } as const;
 export type AutopilotControllerUpdateAgentKindEnum = typeof AutopilotControllerUpdateAgentKindEnum[keyof typeof AutopilotControllerUpdateAgentKindEnum];

@@ -8,7 +8,6 @@ export { AssistantApi } from './AssistantApi';
 export { AutopilotApi } from './AutopilotApi';
 export { CaseBoardApi } from './CaseBoardApi';
 export { CasesApi } from './CasesApi';
-export { ChatBotsApi } from './ChatBotsApi';
 export { CorrelationApi } from './CorrelationApi';
 export { CorrelationReviewApi } from './CorrelationReviewApi';
 export { CustomDetectorExtractionsApi } from './CustomDetectorExtractionsApi';

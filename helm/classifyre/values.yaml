@@ -735,14 +735,12 @@ worker:
     # flip without looking at your node pool first.
     #
     # More replicas add throughput safely — pg-boss gives each job to one
-    # consumer, the job-slot semaphore is a Postgres advisory lock shared
-    # across replicas, and the chat connectors (the only single-instance
-    # piece) run on an elected leader. What more replicas do NOT add is
-    # capacity: on a single-node cluster a second 3Gi worker competes with the
-    # first for the same RAM, and the usual result is eviction rather than
-    # throughput. Scale out only when there is somewhere for the pod to go,
-    # and soak two replicas manually — a scan plus a chat bot for a few
-    # minutes — before turning this on.
+    # consumer, and the job-slot semaphore is a Postgres advisory lock shared
+    # across replicas. What more replicas do NOT add is capacity: on a
+    # single-node cluster a second 3Gi worker competes with the first for the
+    # same RAM, and the usual result is eviction rather than throughput. Scale
+    # out only when there is somewhere for the pod to go, and soak two
+    # replicas manually — a scan for a few minutes — before turning this on.
     enabled: false
     # -- Minimum worker replicas under HPA.
     minReplicas: 1
