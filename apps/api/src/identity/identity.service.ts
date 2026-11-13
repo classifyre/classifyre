@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import type { DelegationKind } from './actor-ref';
 import type { Actor } from './actor';
 import type { Capability } from './capabilities';
 import {
@@ -412,7 +413,7 @@ export class IdentityService {
   async principalFor(
     sub: string,
     namespaceId: string,
-    via: { kind: 'mcp' | 'sql'; id: string },
+    via: { kind: DelegationKind; id: string },
   ): Promise<{ principal: Principal; capabilities: Set<Capability> } | null> {
     const tenancy = await this.tenancy.workspaceTenancy(namespaceId);
     const tenant = tenancy

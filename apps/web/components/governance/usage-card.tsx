@@ -10,6 +10,7 @@ import {
 } from "@workspace/ui/components";
 import { useTranslation } from "@/hooks/use-translation";
 import { ActorChip } from "@/components/actor-chip";
+import { asAuditChannel } from "@/lib/audit-channel";
 import type { AssetUsageDto } from "@/lib/governance";
 
 /**
@@ -115,7 +116,7 @@ export function UsageCard({
                   list: usage.byChannel
                     .map(
                       (item) =>
-                        `${t(`governance.usage.channel.${item.channel === "sql" || item.channel === "mcp" ? item.channel : "rest"}`)} ${item.reads + item.exports}`,
+                        `${t(`governance.usage.channel.${asAuditChannel(item.channel)}`)} ${item.reads + item.exports}`,
                     )
                     .join(" · "),
                 })}

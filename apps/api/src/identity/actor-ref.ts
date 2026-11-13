@@ -20,12 +20,15 @@ export type ActorRefKind =
   | 'system'
   | 'name';
 
+/** What a person acts through: an MCP token or a SQL connection. */
+export type DelegationKind = 'mcp' | 'sql';
+
 export interface ParsedActorRef {
   kind: ActorRefKind;
   /** The id after the prefix; the name itself for a self-declared name. */
   id: string;
   /** The channel a delegated action came through (`@mcp:<tokenId>`, `@sql:<connectionId>`). */
-  via?: { kind: 'mcp' | 'sql'; id: string };
+  via?: { kind: DelegationKind; id: string };
 }
 
 const TYPED_REF =
@@ -45,7 +48,7 @@ export function parseActorRef(value: string): ParsedActorRef {
     kind: kind as ActorRefKind,
     id,
     ...(viaKind && viaId
-      ? { via: { kind: viaKind as 'mcp' | 'sql', id: viaId } }
+      ? { via: { kind: viaKind as DelegationKind, id: viaId } }
       : {}),
   };
 }

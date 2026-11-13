@@ -117,7 +117,7 @@ The table's **Activity** shows each read with the connection's name (*via SQL co
 | Open a table or source to SQL connections | | for what they govern | ✓ |
 | Make one for themselves | ✓ for open sources/tables they may query (`data.connect`, a Data reader grant, or tables they own) | ✓, also for everything | ✓, also for everything |
 | See its password | ✓, once per password | never | never |
-| Give one to someone | | for what they govern | for anything |
+| Give one to someone | | for open sources and tables they govern | for anything open; for everything only to an admin, owner, steward or custodian |
 | Close a table or source to one | | for what they govern | ✓ |
 | Revoke | ✓ | | ✓ |
 | See them | their own | those that concern their table | all |
@@ -160,7 +160,9 @@ sqlGateway:
   proxyProtocol: true  # optional: real client addresses for lockouts and allowedCidrs
 ```
 
-`tls: passthrough` routes by host name (SNI) on a shared entrypoint: Traefik answers PostgreSQL's SSL request and passes the encrypted stream to the gateway, which still holds the certificate. `tls: terminate` lets Traefik hold the certificate (`traefik.secretName`) and forward plain TCP with a PROXY header; the gateway then accepts plain text only through the proxy.
+`tls: passthrough` routes by host name (SNI) on a shared entrypoint: Traefik answers PostgreSQL's SSL request and passes the encrypted stream to the gateway, which still holds the certificate. TLS always ends at the gateway (TLS 1.3); Traefik never sees the plain protocol.
+
+With `proxyProtocol: true`, also set `trustedProxies` to Traefik's pod or node networks: the gateway then accepts a PROXY header only from there, so nobody reaching the pod directly can claim another client address.
 </Tabs.Tab>
 <Tabs.Tab>
 ingress-nginx forwards TCP ports through its `tcp-services` ConfigMap (no host names on TCP):
@@ -187,4 +189,4 @@ It makes a certificate authority and a certificate under `/var/lib/classifyre/sq
 </Tabs.Tab>
 </Tabs>
 
-Other settings: `maxSessions` per gateway pod (each session holds a catalog of about 150 MB), `maxSessionsPerConnection`, `idleMinutes`. Ten failed sign-ins within 15 minutes lock a user name, and an address, out for 15 minutes.
+Connections use TLS 1.3 only. Other settings: `maxSessions` per gateway pod (each session holds a catalog of about 150 MB), `maxSessionsPerConnection`, `idleMinutes`. Ten failed sign-ins within 15 minutes lock a user name, and an address, out for 15 minutes.

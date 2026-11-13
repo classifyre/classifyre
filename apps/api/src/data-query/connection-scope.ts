@@ -5,6 +5,12 @@
  */
 export const CLS_CONNECTION_SCOPE = 'classifyre:connectionScope';
 
+/** Sources and tables, by id: what a scope, a block list or an opening names. */
+export interface ScopeIds {
+  sourceIds: string[];
+  assetIds: string[];
+}
+
 export interface ConnectionScope {
   /** Empty both = everything the person may read (that is open). */
   sourceIds: string[];

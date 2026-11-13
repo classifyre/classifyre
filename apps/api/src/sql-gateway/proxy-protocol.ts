@@ -21,21 +21,16 @@ export async function readProxyHeader(
 ): Promise<string | null> {
   const start = await reader.peek(5);
   if (start.toString('latin1') === 'PROXY') {
-    let length = 16;
-    for (;;) {
-      const head = await reader.peek(Math.min(length, 107));
-      const end = head.indexOf('\r\n');
-      if (end >= 0) {
-        const line = reader
-          .take(end + 2)
-          .toString('latin1')
-          .trim();
-        const parts = line.split(' ');
+    // One byte more at a time: never ask for bytes past the header line, or
+    // a short first packet after it (an 8-byte SSLRequest) would wait forever.
+    for (let length = 8; length <= 107; length++) {
+      const head = await reader.peek(length);
+      if (head[length - 2] === 0x0d && head[length - 1] === 0x0a) {
+        const parts = reader.take(length).toString('latin1').trim().split(' ');
         return parts[1] === 'UNKNOWN' ? null : (parts[2] ?? null);
       }
-      if (length >= 107) throw new Error('PROXY v1 header too long.');
-      length = Math.min(length * 2, 107);
     }
+    throw new Error('PROXY v1 header too long.');
   }
   const head = await reader.peek(16);
   if (!head.subarray(0, 12).equals(V2_SIGNATURE)) {

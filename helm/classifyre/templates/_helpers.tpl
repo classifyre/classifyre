@@ -55,10 +55,6 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- .Values.sqlGateway.tls.existingSecret | default (printf "%s-sql-tls" (include "classifyre.fullname" .)) -}}
 {{- end -}}
 
-{{- /* TLS ends at the gateway unless Traefik terminates it. */ -}}
-{{- define "classifyre.sqlGateway.terminatesTls" -}}
-{{- if not (and .Values.sqlGateway.traefik.enabled (eq .Values.sqlGateway.traefik.tls "terminate")) }}true{{ end -}}
-{{- end -}}
 
 {{- define "classifyre.postgres.fullname" -}}
 {{- printf "%s-postgres" (include "classifyre.fullname" .) | trunc 63 | trimSuffix "-" -}}

@@ -39,6 +39,7 @@ import {
   TableRow,
 } from "@workspace/ui/components/table";
 import { ActorChip } from "@/components/actor-chip";
+import { asAuditChannel } from "@/lib/audit-channel";
 import { useCan } from "@/hooks/use-me";
 import {
   SortableHead,
@@ -346,11 +347,7 @@ export function AuditEventTable({
                   />
                 </TableCell>
                 <TableCell className="text-[11px] text-muted-foreground">
-                  {event.channel === "mcp"
-                    ? t("audit.table.mcp")
-                    : event.channel === "sql"
-                      ? t("audit.table.sql")
-                      : t("audit.table.rest")}
+                  {t(`audit.table.${asAuditChannel(event.channel)}`)}
                 </TableCell>
               </TableRow>
             ))}

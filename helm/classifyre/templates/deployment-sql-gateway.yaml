@@ -104,17 +104,16 @@ spec:
               value: "true"
             - name: SQL_GATEWAY_PORT
               value: {{ .Values.sqlGateway.port | quote }}
-            {{- if include "classifyre.sqlGateway.terminatesTls" . }}
             - name: SQL_GATEWAY_TLS_CERT_FILE
               value: /etc/classifyre/sql-tls/tls.crt
             - name: SQL_GATEWAY_TLS_KEY_FILE
               value: /etc/classifyre/sql-tls/tls.key
-            {{- end }}
-            {{- $terminate := and .Values.sqlGateway.traefik.enabled (eq .Values.sqlGateway.traefik.tls "terminate") }}
             - name: SQL_GATEWAY_ALLOW_PLAINTEXT
-              value: {{ or .Values.sqlGateway.tls.allowPlaintext $terminate | quote }}
+              value: {{ .Values.sqlGateway.tls.allowPlaintext | quote }}
             - name: SQL_GATEWAY_PROXY_PROTOCOL
-              value: {{ or .Values.sqlGateway.proxyProtocol $terminate | quote }}
+              value: {{ .Values.sqlGateway.proxyProtocol | quote }}
+            - name: SQL_GATEWAY_TRUSTED_PROXIES
+              value: {{ join "," .Values.sqlGateway.trustedProxies | quote }}
             - name: SQL_GATEWAY_ALLOWED_CIDRS
               value: {{ join "," .Values.sqlGateway.allowedCidrs | quote }}
             - name: SQL_GATEWAY_MAX_SESSIONS

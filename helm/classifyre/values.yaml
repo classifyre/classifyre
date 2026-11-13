@@ -733,6 +733,13 @@ sqlGateway:
   # -- every connection comes through such a proxy.
   proxyProtocol: false
 
+  # -- With `proxyProtocol`: the networks of the proxies themselves (pod or
+  # -- node CIDRs of Traefik, a load balancer). A PROXY header from anywhere
+  # -- else is refused, so a client reaching the pod directly cannot claim
+  # -- another address. Empty: any peer may send one (only safe when nothing
+  # -- but the proxy can reach the gateway, e.g. a NetworkPolicy).
+  trustedProxies: []
+
   # -- V8 heap cap (MB) of the gateway process. The catalogs live outside the
   # -- JS heap (WebAssembly), so this stays small.
   maxOldSpaceSizeMb: 1024
@@ -785,11 +792,8 @@ sqlGateway:
     # -- (`HostSNI(*)`) and TLS is negotiated with the gateway, end to end —
     # -- works with every client. `passthrough`: route by `publicHost` (SNI) on
     # -- a shared entrypoint; Traefik answers PostgreSQL's SSLRequest and passes
-    # -- the TLS stream through, so TLS still ends at the gateway. `terminate`:
-    # -- Traefik ends TLS with `traefik.secretName` and forwards plaintext with a
-    # -- PROXY header (the gateway then accepts plaintext from proxies only).
+    # -- the TLS stream through. TLS always ends at the gateway (TLS 1.3).
     tls: none
-    secretName: ""
 
 worker:
   # -- Number of worker replicas. The worker runs the same image as the API

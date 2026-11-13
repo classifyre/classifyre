@@ -4,7 +4,11 @@ import { PrismaService } from '../prisma.service';
 import { CLS_ORG_ID } from './iam-access-policy';
 import type { IdentityService } from './identity.service';
 import { IDENTITY } from './identity.tokens';
-import { parseActorRef, type ActorRefKind } from './actor-ref';
+import {
+  parseActorRef,
+  type ActorRefKind,
+  type DelegationKind,
+} from './actor-ref';
 import { TenancyService } from './tenancy.service';
 
 export interface ResolvedActor {
@@ -14,7 +18,7 @@ export interface ResolvedActor {
   /** For a delegated action: the token it came through. */
   viaDisplayName?: string;
   /** `mcp` (an MCP token) or `sql` (a SQL connection). */
-  viaKind?: 'mcp' | 'sql';
+  viaKind?: DelegationKind;
   /** For a group: its path in the tenant (`/finance/controlling`). */
   path?: string;
 }
@@ -63,10 +67,13 @@ export class ActorDirectoryService {
     }
   }
 
-  /** `withTokens: false` outside a workspace, where there is no token table to read. */
+  /**
+   * `inWorkspace: false` outside a workspace: there are no MCP tokens or SQL
+   * connections to name there, so delegated names are not looked up.
+   */
   async resolve(
     refs: string[],
-    options: { withTokens?: boolean } = {},
+    options: { inWorkspace?: boolean } = {},
   ): Promise<ResolvedActor[]> {
     const unique = [...new Set(refs.filter(Boolean))].slice(0, MAX_REFS);
     const parsed = unique.map((ref) => ({ ref, ...parseActorRef(ref) }));
@@ -86,15 +93,15 @@ export class ActorDirectoryService {
         ),
       ),
     ];
-    const withTokens = options.withTokens !== false;
+    const inWorkspace = options.inWorkspace !== false;
     const named: Promise<{ id: string; name: string }[]>[] = [
-      tokenIds.length && withTokens
+      tokenIds.length && inWorkspace
         ? this.prisma.mcpAccessToken.findMany({
             where: { id: { in: tokenIds } },
             select: { id: true, name: true },
           })
         : Promise.resolve([]),
-      connectionIds.length && withTokens
+      connectionIds.length && inWorkspace
         ? this.prisma.dataConnection.findMany({
             where: { id: { in: connectionIds } },
             select: { id: true, name: true },

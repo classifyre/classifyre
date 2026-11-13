@@ -16,9 +16,12 @@ import { ActorContextService } from '../identity/actor-context.service';
 import {
   AuditTrailService,
   type AuditChannel,
+  asAuditChannel,
+  channelOfRef,
+  viaOfChannel,
 } from '../identity/audit-trail.service';
 import type { Actor } from '../identity/actor';
-import { parseActorRef } from '../identity/actor-ref';
+import { parseActorRef, personOf } from '../identity/actor-ref';
 import { tableReadResources } from '../identity/audit-resources';
 import {
   QueryCatalogService,
@@ -103,18 +106,12 @@ interface RunOrigin {
 }
 
 export function runOrigin(actor: Actor): RunOrigin {
-  const parsed = actor.ref ? parseActorRef(actor.ref) : null;
+  const via = actor.ref ? parseActorRef(actor.ref).via : undefined;
   return {
     actorRef: actor.ref ?? null,
-    personRef:
-      parsed?.kind === 'user' ? `user:${parsed.id}` : (actor.ref ?? null),
-    channel:
-      parsed?.via?.kind === 'sql'
-        ? 'sql'
-        : parsed?.via?.kind === 'mcp'
-          ? 'mcp'
-          : 'rest',
-    connectionId: parsed?.via?.kind === 'sql' ? parsed.via.id : null,
+    personRef: personOf(actor.ref),
+    channel: channelOfRef(actor.ref),
+    connectionId: via?.kind === 'sql' ? via.id : null,
   };
 }
 
@@ -253,7 +250,7 @@ export class QueryRunService {
     const tablesNamedInCode = tablesWithSource.filter(({ table }) =>
       namesInCode.has(table.sqlName),
     );
-    const run = await this.launch({
+    const { run } = await this.launch({
       actor,
       origin,
       sql: text,
@@ -274,7 +271,7 @@ export class QueryRunService {
    * Runs in the context the gateway set up for the connection's person, so
    * the catalog already says what they may read through this connection;
    * a table outside it is refused here, and the job's gate refuses it again.
-   * `onDone` gets the run once the job has ended.
+   * `done` settles once the job has ended (its result arrived, or it failed).
    */
   async createForConnection(input: {
     sql: string;
@@ -282,20 +279,19 @@ export class QueryRunService {
     database: string;
     searchPath: string[];
     maxRows: number;
-    onDone: (runId: string) => void;
   }): Promise<
-    | { runId: string }
+    | { runId: string; done: Promise<void> }
     | { refused: { code: string; message: string; sqlState: string } }
   > {
     const actor = this.actors.current();
     const origin = runOrigin(actor);
-    const active = await this.activeRuns(origin);
-    if (active >= MAX_ACTIVE_PER_ACTOR) {
+    const atCap = await this.capRefusal(origin);
+    if (atCap) {
       return {
         refused: {
           code: 'too_many_queries',
           sqlState: '53000',
-          message: `${active} of your queries are running; wait for one to finish.`,
+          message: atCap,
         },
       };
     }
@@ -340,7 +336,7 @@ export class QueryRunService {
         table,
       })),
     );
-    const run = await this.launch({
+    const { run, done } = await this.launch({
       actor,
       origin,
       sql: input.sql,
@@ -355,9 +351,8 @@ export class QueryRunService {
         database: input.database,
         searchPath: input.searchPath,
       },
-      onDone: input.onDone,
     });
-    return { runId: run.id };
+    return { runId: run.id, done };
   }
 
   /**
@@ -426,15 +421,25 @@ export class QueryRunService {
     });
   }
 
-  /** One person's queries at once, whichever way they came (app, MCP, SQL connection). */
-  private async assertBelowCap(origin: RunOrigin): Promise<void> {
+  /**
+   * One person's queries at once, whichever way they came (app, MCP, SQL
+   * connection): the refusal text when the person is at the cap, else null.
+   */
+  private async capRefusal(origin: RunOrigin): Promise<string | null> {
     const active = await this.activeRuns(origin);
-    if (active >= MAX_ACTIVE_PER_ACTOR) {
+    return active >= MAX_ACTIVE_PER_ACTOR
+      ? `You have ${active} queries running. Wait for one to finish or cancel it.`
+      : null;
+  }
+
+  private async assertBelowCap(origin: RunOrigin): Promise<void> {
+    const refusal = await this.capRefusal(origin);
+    if (refusal) {
       throw new ConflictException({
         statusCode: 409,
         error: 'Conflict',
         code: 'TOO_MANY_QUERIES',
-        message: `You have ${active} queries running. Wait for one to finish or cancel it.`,
+        message: refusal,
       });
     }
   }
@@ -452,7 +457,6 @@ export class QueryRunService {
     exportFormat?: ExportFormat;
     timeoutSeconds: number;
     extra?: Record<string, unknown>;
-    onDone?: (runId: string) => void;
   }) {
     void this.purgeExpired().catch(() => undefined);
     const token = randomBytes(32).toString('base64url');
@@ -512,10 +516,9 @@ export class QueryRunService {
       })),
     };
 
-    void this.execute(run.id, request, input.timeoutSeconds).then(() =>
-      input.onDone?.(run.id),
-    );
-    return run;
+    // Settles once the job has ended: its result arrived, or it failed.
+    const done = this.execute(run.id, request, input.timeoutSeconds);
+    return { run, done };
   }
 
   /**
@@ -803,20 +806,12 @@ export class QueryRunService {
       // reads without resolving asset ids — and the per-table tab filters
       // on names, not just ids.
       if (assetIds?.length && run.actorRef) {
-        const channel = (
-          ['rest', 'mcp', 'sql'].includes(run.channel) ? run.channel : 'rest'
-        ) as AuditChannel;
+        const channel = asAuditChannel(run.channel);
         const actor: Actor = {
           id: null,
           displayName: null,
           kind: run.purpose ? 'system' : 'person',
-          via: run.purpose
-            ? 'none'
-            : channel === 'sql'
-              ? 'sql-connection'
-              : channel === 'mcp'
-                ? 'mcp-token'
-                : 'oidc',
+          via: run.purpose ? 'none' : viaOfChannel(channel),
           ref: run.actorRef,
         };
         const tables = await this.tablesFor(assetIds);

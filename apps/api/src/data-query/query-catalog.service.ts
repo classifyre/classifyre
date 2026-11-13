@@ -1,4 +1,5 @@
 import { ownerDataScope } from '../governance/governance-filter';
+import { personOf } from '../identity/actor-ref';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ClsService } from 'nestjs-cls';
 import { PrismaService } from '../prisma.service';
@@ -170,10 +171,7 @@ export class QueryCatalogService {
     // An owner reads the tables they own (GOV R3), without a grant.
     const owned = all
       ? { sourceIds: [], assetIds: [] }
-      : await ownerDataScope(
-          this.prisma,
-          actor.id?.startsWith('user:') ? actor.id : actor.ref,
-        );
+      : await ownerDataScope(this.prisma, personOf(actor.ref));
     return {
       all,
       sourceIds: new Set([...grants.sourceIds, ...owned.sourceIds]),

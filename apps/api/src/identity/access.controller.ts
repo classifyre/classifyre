@@ -283,7 +283,7 @@ export class TenantAccessController {
   ): Promise<ResolvedActorDto[]> {
     await this.principal(request);
     return this.actors.resolve(Array.isArray(refs) ? refs : [refs], {
-      withTokens: false,
+      inWorkspace: false,
     });
   }
 

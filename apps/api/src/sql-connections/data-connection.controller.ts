@@ -11,6 +11,7 @@ import {
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Requires, SignedInOnly } from '../identity/access.decorators';
 import { DataConnectionService } from './data-connection.service';
+import { ConnectionExposureService } from './connection-exposure.service';
 import {
   BlockDataConnectionDto,
   CreateDataConnectionDto,
@@ -36,7 +37,10 @@ import {
 @SignedInOnly()
 @Controller()
 export class DataConnectionController {
-  constructor(private readonly connections: DataConnectionService) {}
+  constructor(
+    private readonly connections: DataConnectionService,
+    private readonly opening: ConnectionExposureService,
+  ) {}
 
   @Get('data-connections')
   @Requires('workspace.view')
@@ -72,7 +76,7 @@ export class DataConnectionController {
   })
   @ApiOkResponse({ type: [DataConnectionReachableSourceDto] })
   reachable(): Promise<DataConnectionReachableSourceDto[]> {
-    return this.connections.reachable();
+    return this.opening.reachable();
   }
 
   @Get('data-connections/exposures')
@@ -80,7 +84,7 @@ export class DataConnectionController {
   @ApiOperation({ summary: 'Sources and tables open to SQL connections' })
   @ApiOkResponse({ type: [DataConnectionExposureItemDto] })
   exposures(): Promise<DataConnectionExposureItemDto[]> {
-    return this.connections.listExposures();
+    return this.opening.listExposures();
   }
 
   @Put('assets/:id/data-connections/exposure')
@@ -91,7 +95,7 @@ export class DataConnectionController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: SetDataConnectionExposureDto,
   ): Promise<DataConnectionExposureDto> {
-    return this.connections.setExposure('asset', id, body.open);
+    return this.opening.setExposure('asset', id, body.open);
   }
 
   @Put('sources/:id/data-connections/exposure')
@@ -102,7 +106,7 @@ export class DataConnectionController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: SetDataConnectionExposureDto,
   ): Promise<DataConnectionExposureDto> {
-    return this.connections.setExposure('source', id, body.open);
+    return this.opening.setExposure('source', id, body.open);
   }
 
   @Get('assets/:id/data-connections')

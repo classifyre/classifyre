@@ -6,7 +6,7 @@ import {
   type OnModuleInit,
 } from '@nestjs/common';
 import { ClsService } from 'nestjs-cls';
-import { randomBytes, randomInt } from 'node:crypto';
+import { randomInt } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { type Server, type Socket, createServer } from 'node:net';
 import { type SecureContext, TLSSocket, createSecureContext } from 'node:tls';
@@ -32,12 +32,8 @@ import {
   CLS_CONNECTION_SCOPE,
   type ConnectionScope,
 } from '../data-query/connection-scope';
-import { DataConnectionService } from '../sql-connections/data-connection.service';
-import {
-  ScramError,
-  ScramExchange,
-  scramVerifier,
-} from '../sql-connections/scram';
+import { ConnectionSignInService } from '../sql-connections/connection-sign-in.service';
+import { ScramError, ScramExchange } from '../sql-connections/scram';
 import { runsSqlGateway } from '../service-role';
 import {
   CANCEL_REQUEST,
@@ -66,6 +62,15 @@ import {
 } from './pg-session';
 import { plainValue } from './pg-types';
 import { readProxyHeader } from './proxy-protocol';
+import {
+  SignInLockout,
+  type SignInCandidate,
+  challengeVerifier,
+  decoyVerifier,
+  refusalMessage,
+  refusalReason,
+} from './sign-in';
+import { resolveApplicationSecretKey } from '../secret-key.util';
 
 /** A connection's session settings a client may bring in its startup packet. */
 const STARTUP_SETTINGS = new Set([
@@ -78,9 +83,6 @@ const STARTUP_SETTINGS = new Set([
 ]);
 
 const SWEEP_MS = 30_000;
-const PRINCIPAL_TTL_MS = 5 * 60_000;
-const LOCKOUT_WINDOW_MS = 15 * 60_000;
-const LOCKOUT_FAILURES = 10;
 
 /** Error codes of query runs, as the SQLSTATE a PostgreSQL client expects. */
 const SQLSTATE: Record<string, string> = {
@@ -101,6 +103,8 @@ interface Config {
   tls: SecureContext | null;
   allowPlaintext: boolean;
   proxyProtocol: boolean;
+  /** Networks a PROXY header is accepted from (the proxies' own addresses). */
+  trustedProxies: string[];
   allowedCidrs: string[];
   maxSessions: number;
   maxPerConnection: number;
@@ -127,7 +131,7 @@ function readConfig(): Config | null {
       ? createSecureContext({
           cert: readFileSync(cert),
           key: readFileSync(key),
-          minVersion: 'TLSv1.2',
+          minVersion: 'TLSv1.3',
         })
       : null;
   return {
@@ -140,6 +144,10 @@ function readConfig(): Config | null {
     proxyProtocol: /^(1|true|yes|on)$/i.test(
       process.env.SQL_GATEWAY_PROXY_PROTOCOL ?? '',
     ),
+    trustedProxies: (process.env.SQL_GATEWAY_TRUSTED_PROXIES ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
     allowedCidrs: (process.env.SQL_GATEWAY_ALLOWED_CIDRS ?? '')
       .split(',')
       .map((s) => s.trim())
@@ -274,7 +282,8 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
   private config: Config | null = null;
   private readonly host = new PgliteHost();
   private readonly live = new Map<number, Live>();
-  private readonly failures = new Map<string, number[]>();
+  private readonly lockout = new SignInLockout();
+  private secretKey: Buffer | null = null;
   private sweeper: NodeJS.Timeout | null = null;
 
   constructor(
@@ -284,7 +293,7 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
     private readonly prisma: PrismaService,
     private readonly catalog: QueryCatalogService,
     private readonly queryRuns: QueryRunService,
-    private readonly connections: DataConnectionService,
+    private readonly connections: ConnectionSignInService,
     @Inject(IDENTITY) private readonly identity: IdentityService,
   ) {}
 
@@ -322,6 +331,12 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
     );
   }
 
+  /** The application secret: the decoy verifiers are derived from it. */
+  private secret(): Buffer {
+    this.secretKey ??= resolveApplicationSecretKey();
+    return this.secretKey;
+  }
+
   // ── Accepting ─────────────────────────────────────────────────────────
 
   private async accept(raw: Socket): Promise<void> {
@@ -334,6 +349,16 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
     let client = raw.remoteAddress ?? null;
     try {
       if (config.proxyProtocol) {
+        // A PROXY header names the client; only a proxy may say so, or any
+        // client reaching the pod could claim an address (and pass
+        // allowedCidrs and the lockout).
+        const peer = raw.remoteAddress ?? '';
+        if (
+          config.trustedProxies.length &&
+          !config.trustedProxies.some((cidr) => inCidr(peer, cidr))
+        ) {
+          throw new Refusal('28000', 'Connect through the proxy.');
+        }
         const proxied = await readProxyHeader(incoming);
         if (proxied) client = proxied;
       }
@@ -444,19 +469,6 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
 
   // ── Signing in ────────────────────────────────────────────────────────
 
-  private lockedOut(key: string): boolean {
-    const now = Date.now();
-    const recent = (this.failures.get(key) ?? []).filter(
-      (t) => now - t < LOCKOUT_WINDOW_MS,
-    );
-    this.failures.set(key, recent);
-    return recent.length >= LOCKOUT_FAILURES;
-  }
-
-  private failed(key: string): void {
-    this.failures.set(key, [...(this.failures.get(key) ?? []), Date.now()]);
-  }
-
   private async signIn(
     socket: Socket,
     incoming: Incoming,
@@ -472,7 +484,18 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
     if (!ns)
       throw new Refusal('3D000', `database "${database}" does not exist`);
     const keys = [`u:${ns.namespaceId}:${username}`, `ip:${client ?? '-'}`];
-    if (keys.some((key) => this.lockedOut(key))) {
+    const locked = keys.find((key) => this.lockout.isLocked(key));
+    if (locked) {
+      if (this.lockout.shouldReport(locked)) {
+        await this.inWorkspace(ns, () =>
+          this.connections.recordSignInFailure(
+            null,
+            username,
+            client,
+            'locked out',
+          ),
+        );
+      }
       throw new Refusal(
         '28000',
         'Too many failed sign-ins; try again in 15 minutes.',
@@ -481,21 +504,32 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
     const found = await this.inWorkspace(ns, () =>
       this.connections.forSignIn(username),
     );
-    const verifier =
-      found?.row.scramStoredKey &&
-      found.row.scramSalt &&
-      found.row.scramServerKey
-        ? {
-            salt: found.row.scramSalt,
-            iterations: found.row.scramIterations ?? 4096,
-            storedKey: found.row.scramStoredKey,
-            serverKey: found.row.scramServerKey,
-          }
-        : // An unknown name goes through the same exchange, so a client cannot
-          // tell a wrong name from a wrong password.
-          scramVerifier(randomBytes(24).toString('base64url'));
-    const exchange = new ScramExchange(verifier);
+    const candidate: SignInCandidate | null = found
+      ? {
+          status: found.status,
+          verifier:
+            found.row.scramStoredKey &&
+            found.row.scramSalt &&
+            found.row.scramServerKey
+              ? {
+                  salt: found.row.scramSalt,
+                  iterations: found.row.scramIterations ?? 4096,
+                  storedKey: found.row.scramStoredKey,
+                  serverKey: found.row.scramServerKey,
+                }
+              : null,
+        }
+      : null;
+    // An unknown name, or one whose password was never revealed, goes
+    // through the same exchange with a stable decoy: same salt every time,
+    // same cost as a real verifier, no password matches.
+    const exchange = new ScramExchange(
+      challengeVerifier(candidate, () =>
+        decoyVerifier(this.secret(), ns.namespaceId, username),
+      ),
+    );
     socket.write(authenticationSasl(['SCRAM-SHA-256']));
+    let proofOk = false;
     try {
       const initial = await incoming.message();
       if (initial.type !== 'p')
@@ -508,36 +542,24 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
       const response = await incoming.message();
       if (response.type !== 'p') throw new ScramError('Expected SASLResponse.');
       const final = exchange.finish(response.body.toString('utf8'));
+      proofOk = true;
       if (!found || found.status !== 'active') {
-        throw new ScramError(
-          found ? `connection ${found.status}` : 'unknown user',
-        );
+        throw new ScramError(`connection ${found?.status ?? 'unknown'}`);
       }
       socket.write(authenticationSaslFinal(final));
     } catch (error) {
       if (!(error instanceof ScramError)) throw error;
-      keys.forEach((key) => this.failed(key));
-      const why =
-        found && found.status !== 'active'
-          ? found.status === 'pending'
-            ? 'pending: its person has not revealed the password yet'
-            : found.status
-          : error.message;
+      keys.forEach((key) => this.lockout.fail(key));
+      const status = found?.status ?? null;
       await this.inWorkspace(ns, () =>
         this.connections.recordSignInFailure(
           found?.row ?? null,
           username,
           client,
-          why,
+          refusalReason(proofOk, status, error.message),
         ),
       );
-      const message =
-        found && found.status === 'revoked'
-          ? 'This SQL connection was revoked.'
-          : found && found.status === 'expired'
-            ? 'This SQL connection has expired.'
-            : `password authentication failed for user "${username}"`;
-      throw new Refusal('28P01', message);
+      throw new Refusal('28P01', refusalMessage(username, proofOk, status));
     }
     const row = found.row;
     const live = [...this.live.values()];
@@ -694,7 +716,7 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
     );
     if (!row)
       throw new DataError('28000', 'This SQL connection is no longer active.');
-    await this.refreshPrincipal(entry);
+    await this.refreshPrincipal(entry, row);
     return this.within(
       entry.ns,
       entry.principal,
@@ -705,15 +727,12 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
           ? settings.exportMaxRows
           : settings.maxRows;
         setMaxRows(maxRows);
-        let resolve!: (runId: string) => void;
-        const done = new Promise<string>((r) => (resolve = r));
         const created = await this.queryRuns.createForConnection({
           sql: input.sql,
           tables: input.tables,
           database: entry.ns.slug,
           searchPath: input.searchPath,
           maxRows,
-          onDone: (runId) => resolve(runId),
         });
         if ('refused' in created) {
           throw new DataError(
@@ -731,7 +750,7 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
         // A cancel that came while the run was being created.
         if (signal.aborted) onAbort();
         try {
-          await done;
+          await created.done;
         } finally {
           signal.removeEventListener('abort', onAbort);
         }
@@ -760,18 +779,19 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
     );
   }
 
-  private async refreshPrincipal(entry: Live): Promise<void> {
-    if (Date.now() - entry.principal.at < PRINCIPAL_TTL_MS) return;
-    const row = await this.inWorkspace(entry.ns, () =>
-      this.connections.current(entry.connectionId),
-    );
-    const sub = row?.personRef.replace(/^user:/, '');
-    const next = sub
-      ? await this.identity.principalFor(sub, entry.ns.namespaceId, {
-          kind: 'sql',
-          id: entry.connectionId,
-        })
-      : null;
+  /**
+   * The person's rights as they are now: rebuilt before every data statement
+   * (PRD §5.7), so a removed grant or a leaver stops reading at once.
+   */
+  private async refreshPrincipal(
+    entry: Live,
+    row: { personRef: string },
+  ): Promise<void> {
+    const sub = row.personRef.replace(/^user:/, '');
+    const next = await this.identity.principalFor(sub, entry.ns.namespaceId, {
+      kind: 'sql',
+      id: entry.connectionId,
+    });
     if (!next)
       throw new DataError(
         '28000',

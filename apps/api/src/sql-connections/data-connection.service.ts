@@ -1,18 +1,15 @@
 import {
   BadRequestException,
   ForbiddenException,
-  Inject,
   Injectable,
   NotFoundException,
-  UnauthorizedException,
 } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { ClsService } from 'nestjs-cls';
-import type { DataConnection, DataConnectionBlock } from '@prisma/client';
+import type { DataConnection } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { ActorContextService } from '../identity/actor-context.service';
-import { ACCESS_POLICY, type AccessPolicy } from '../identity/access-policy';
 import {
   AuditTrailService,
   type AuditChange,
@@ -24,24 +21,26 @@ import {
   sourceResource,
 } from '../identity/audit-resources';
 import type { Capability } from '../identity/capabilities';
-import { CLS_PERSON, type ClsPerson } from '../identity/iam-access-policy';
 import { CLS_SLUG } from '../namespace/namespace.constants';
 import { GovernanceService } from '../governance/governance.service';
 import { GovernanceNotifier } from '../governance/governance-notifier';
-import { ownerDataScope } from '../governance/governance-filter';
-import { QueryCatalogService } from '../data-query/query-catalog.service';
-import type { ConnectionScope } from '../data-query/connection-scope';
+import type { ScopeIds } from '../data-query/connection-scope';
 import { scramVerifier } from './scram';
+import { ConnectionRightsService } from './connection-rights.service';
+import { ConnectionExposureService } from './connection-exposure.service';
+import {
+  type ConnectionRow,
+  connectionStatus,
+  isEverything,
+  parseScope,
+  splitScoped,
+  usernamePart,
+} from './connection-scope-rules';
 import type {
-  ConnectionStatus,
   CreateDataConnectionDto,
   DataConnectionDto,
   DataConnectionEndpointDto,
-  DataConnectionExposureDto,
-  DataConnectionExposureItemDto,
   DataConnectionListDto,
-  DataConnectionReachableSourceDto,
-  DataConnectionScopeItemDto,
   DataConnectionSecretDto,
   IssueDataConnectionDto,
 } from './data-connection.dto';
@@ -49,51 +48,17 @@ import type {
 export const DEFAULT_EXPIRY_DAYS = 90;
 const READS_WINDOW_DAYS = 90;
 
-type ConnectionRow = DataConnection & { blocks: DataConnectionBlock[] };
-
-/** Lower-case letters, digits and `_`: a name every tool takes unquoted. */
-export function usernamePart(text: string): string {
-  return text
-    .normalize('NFKD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .slice(0, 24);
-}
-
-export function connectionStatus(
-  row: Pick<DataConnection, 'revokedAt' | 'expiresAt' | 'scramStoredKey'>,
-  now = new Date(),
-): ConnectionStatus {
-  if (row.revokedAt) return 'revoked';
-  if (row.expiresAt <= now) return 'expired';
-  if (!row.scramStoredKey) return 'pending';
-  return 'active';
-}
-
-function parseScope(items: readonly string[] | undefined) {
-  const sourceIds: string[] = [];
-  const assetIds: string[] = [];
-  for (const item of items ?? []) {
-    const [type, id] = item.split(':');
-    if (type === 'source') sourceIds.push(id.toLowerCase());
-    if (type === 'asset') assetIds.push(id.toLowerCase());
-  }
-  return {
-    sourceIds: [...new Set(sourceIds)],
-    assetIds: [...new Set(assetIds)],
-  };
-}
-
 /**
  * SQL connections (docs/prd/DQ-data-query.md §5.7): the credentials BI tools
  * and drivers sign in with over the PostgreSQL protocol. Each belongs to one
  * person and reads only what that person may query right now, narrowed by its
- * scope and minus what owners blocked. Its person makes one (`data.connect`),
- * or a manager or an owner gives one; only its person ever sees the password,
- * and only a SCRAM verifier is kept. Every change is audited with the
- * connection, and its reads carry the connection too.
+ * scope, to what is open, minus what owners blocked. Its person makes one, or
+ * a manager or an owner gives one; only its person ever sees the password, and
+ * only a SCRAM verifier is kept. Every change is audited with the connection.
+ *
+ * Rights live in {@link ConnectionRightsService}, opening and reachability in
+ * {@link ConnectionExposureService}, what the gateway needs in
+ * `ConnectionSignInService`; this is the connections' own lifecycle.
  */
 @Injectable()
 export class DataConnectionService {
@@ -104,80 +69,43 @@ export class DataConnectionService {
     private readonly audit: AuditTrailService,
     private readonly governance: GovernanceService,
     private readonly notifier: GovernanceNotifier,
-    private readonly catalog: QueryCatalogService,
-    @Inject(ACCESS_POLICY) private readonly policy: AccessPolicy,
+    private readonly rights: ConnectionRightsService,
+    private readonly exposures: ConnectionExposureService,
   ) {}
-
-  // ── Who is asking ─────────────────────────────────────────────────────
-
-  private me(): string {
-    const person = this.cls.isActive()
-      ? this.cls.get<ClsPerson | undefined>(CLS_PERSON)
-      : undefined;
-    if (!person?.actorRef) {
-      throw new UnauthorizedException({
-        statusCode: 401,
-        error: 'Unauthorized',
-        code: 'SIGN_IN_REQUIRED',
-        message: 'SQL connections belong to people: sign in.',
-      });
-    }
-    return person.actorRef;
-  }
-
-  private async allows(capability: Capability): Promise<boolean> {
-    return (await this.policy.check(this.actors.current(), capability)).allow;
-  }
-
-  async canManage(): Promise<boolean> {
-    return this.allows('data.connection.manage');
-  }
-
-  /**
-   * Whether the caller may have a connection at all: `data.connect` on the
-   * workspace, a Data reader grant on a source or table, or tables they own
-   * (GOV R3: owners query their tables).
-   */
-  async canConnect(): Promise<boolean> {
-    if (await this.allows('data.connect')) return true;
-    const grants = this.policy.resourceGrants?.('data.connect');
-    if (grants && (grants.sourceIds.length || grants.assetIds.length)) {
-      return true;
-    }
-    const owned = await ownerDataScope(this.prisma, this.me());
-    return owned.sourceIds.length > 0 || owned.assetIds.length > 0;
-  }
 
   // ── Reads ─────────────────────────────────────────────────────────────
 
   async listMine(): Promise<DataConnectionListDto> {
-    const me = this.me();
-    const [rows, canCreate, canManage] = await Promise.all([
+    const me = this.rights.me();
+    const [rows, canCreate, canManage, canConnectAll] = await Promise.all([
       this.prisma.dataConnection.findMany({
         where: { personRef: me },
         include: { blocks: true },
         orderBy: { createdAt: 'desc' },
       }),
-      this.canConnect(),
-      this.canManage(),
+      this.rights.canConnect(),
+      this.rights.canManage(),
+      this.rights.canConnectAll(),
     ]);
     return {
       items: await this.views(rows),
       canCreate,
       canManage,
-      canConnectAll: await this.canConnectAll(),
+      canConnectAll,
     };
   }
 
   async listAll(): Promise<DataConnectionListDto> {
-    if (!(await this.canManage())) this.refuse('data.connection.manage');
+    if (!(await this.rights.canManage())) {
+      this.rights.refuse('data.connection.manage');
+    }
     const rows = await this.prisma.dataConnection.findMany({
       include: { blocks: true },
       orderBy: { createdAt: 'desc' },
     });
     return {
       items: await this.views(rows),
-      canCreate: await this.canConnect(),
+      canCreate: await this.rights.canConnect(),
       canManage: true,
       canConnectAll: true,
     };
@@ -197,8 +125,8 @@ export class DataConnectionService {
       scopeType,
       scopeId: scope.id,
     });
-    const canManage = await this.canManage();
-    if (!governed.allowed && !canManage) this.refuse('asset.govern');
+    const canManage = await this.rights.canManage();
+    if (!governed.allowed && !canManage) this.rights.refuse('asset.govern');
     const tag =
       scope.type === 'asset'
         ? assetResource(scope.id)
@@ -242,11 +170,15 @@ export class DataConnectionService {
         ...view,
         reads: readBy.get(view.id) ?? { count: 0, lastAt: null },
       })),
-      canCreate: await this.canConnect(),
+      canCreate: await this.rights.canConnect(),
       canManage,
       canGovern: governed.allowed,
-      canConnectAll: await this.canConnectAll(),
-      exposure: await this.exposureOf(scope.type, scope.id, governed.sourceId),
+      canConnectAll: await this.rights.canConnectAll(),
+      exposure: await this.exposures.exposureOf(
+        scope.type,
+        scope.id,
+        governed.sourceId,
+      ),
     };
   }
 
@@ -278,12 +210,16 @@ export class DataConnectionService {
 
   // ── Changes ───────────────────────────────────────────────────────────
 
-  /** A connection of one's own; the password is in the answer, once. */
+  /**
+   * A connection of one's own; the password is in the answer, once. It names
+   * open sources or tables its person may query, or — for admins and people
+   * who answer for data — nothing, meaning everything open.
+   */
   async create(
     body: CreateDataConnectionDto,
   ): Promise<DataConnectionSecretDto> {
-    const me = this.me();
-    if (!(await this.canConnect())) {
+    const me = this.rights.me();
+    if (!(await this.rights.canConnect())) {
       throw new ForbiddenException({
         statusCode: 403,
         error: 'Forbidden',
@@ -294,19 +230,22 @@ export class DataConnectionService {
       });
     }
     const scope = parseScope(body.scope);
-    await this.assertScopeExists(scope);
-    await this.assertScopeAllowed(scope, { mustQuery: true });
-    const password = this.newPassword();
+    if (isEverything(scope)) {
+      if (!(await this.rights.canConnectAll())) throw scopeRequired();
+    } else {
+      await this.exposures.assertNamedScope(scope, { mustQuery: true });
+    }
+    const password = newPassword();
     const row = await this.prisma.dataConnection.create({
       data: {
         name: body.name.trim(),
         personRef: me,
         username: await this.newUsername(me, body.name),
-        ...this.verifierFields(password),
+        ...verifierFields(password),
         scopeSourceIds: scope.sourceIds,
         scopeAssetIds: scope.assetIds,
         revealedAt: new Date(),
-        expiresAt: this.expiry(body.expiresInDays),
+        expiresAt: expiry(body.expiresInDays),
       },
       include: { blocks: true },
     });
@@ -318,42 +257,40 @@ export class DataConnectionService {
   }
 
   /**
-   * A connection given to someone (DQ §5.7): by a manager, on anything; by an
-   * owner or steward, on the tables and sources they govern. It waits until
-   * its person reveals the password. It is a channel: the person still needs
-   * the right to read what it names.
+   * A connection given to someone (DQ §5.7). An owner or steward gives one
+   * for open tables and sources they govern; a manager for any open ones. A
+   * connection for everything is given only by a manager, and only to a
+   * person who may have one themselves (a manager, or an owner, steward or
+   * custodian). It waits until its person reveals the password, and it is a
+   * channel: the person still needs the right to read what it names.
    */
   async issue(body: IssueDataConnectionDto): Promise<DataConnectionDto> {
-    const me = this.me();
+    const me = this.rights.me();
     const scope = parseScope(body.scope);
-    await this.assertScopeExists(scope);
-    const canManage = await this.canManage();
-    if (!canManage) {
-      if (!scope.sourceIds.length && !scope.assetIds.length) {
-        await this.assertScopeAllowed(scope, { mustQuery: false });
+    const canManage = await this.rights.canManage();
+    if (isEverything(scope)) {
+      if (!canManage) {
+        throw new BadRequestException({
+          statusCode: 400,
+          error: 'Bad Request',
+          code: 'SCOPE_REQUIRED',
+          message:
+            'Name the tables or sources you govern that this connection is for; only admins give a connection for everything.',
+        });
       }
-      for (const [scopeType, ids] of [
-        ['SOURCE', scope.sourceIds],
-        ['ASSET', scope.assetIds],
-      ] as const) {
-        for (const scopeId of ids) {
-          const governed = await this.governance.mayGovernScope({
-            scopeType,
-            scopeId,
-          });
-          if (!governed.allowed) {
-            throw new ForbiddenException({
-              statusCode: 403,
-              error: 'Forbidden',
-              code: 'CAPABILITY_REQUIRED',
-              capability: 'asset.govern',
-              message: `You can give connections only to what you own or steward; ${governed.name} is not.`,
-            });
-          }
-        }
+      if (!(await this.rights.personMayConnectAll(body.personRef))) {
+        throw new BadRequestException({
+          statusCode: 400,
+          error: 'Bad Request',
+          code: 'SCOPE_REQUIRED',
+          message:
+            'This person may not have a connection for everything (only admins, owners, stewards and custodians may): name sources or tables.',
+        });
       }
+    } else {
+      if (!canManage) await this.assertGoverns(scope);
+      await this.exposures.assertNamedScope(scope, { mustQuery: false });
     }
-    await this.assertScopeAllowed(scope, { mustQuery: false });
     const member = await this.governance.tenantMember(body.personRef);
     if (!member)
       throw new BadRequestException('No such person in this tenant.');
@@ -369,7 +306,7 @@ export class DataConnectionService {
         scopeSourceIds: scope.sourceIds,
         scopeAssetIds: scope.assetIds,
         issuedBy: this.actors.current().ref ?? me,
-        expiresAt: this.expiry(body.expiresInDays),
+        expiresAt: expiry(body.expiresInDays),
       },
       include: { blocks: true },
     });
@@ -386,7 +323,10 @@ export class DataConnectionService {
         { field: 'person', from: null, to: member.email ?? member.username },
         ...(await this.scopeChange(scope)),
       ],
-      this.scopeResources(scope),
+      [
+        ...scope.sourceIds.map(sourceResource),
+        ...scope.assetIds.map(assetResource),
+      ],
     );
     void this.notifier.connectionChanged({
       kind: 'issued',
@@ -404,7 +344,7 @@ export class DataConnectionService {
    * next sign-in.
    */
   async newPasswordFor(id: string): Promise<DataConnectionSecretDto> {
-    const me = this.me();
+    const me = this.rights.me();
     const row = await this.find(id);
     if (row.personRef !== me) {
       throw new ForbiddenException(
@@ -415,10 +355,10 @@ export class DataConnectionService {
     if (status === 'revoked' || status === 'expired') {
       throw new BadRequestException(`This connection is ${status}.`);
     }
-    const password = this.newPassword();
+    const password = newPassword();
     const updated = await this.prisma.dataConnection.update({
       where: { id },
-      data: { ...this.verifierFields(password), revealedAt: new Date() },
+      data: { ...verifierFields(password), revealedAt: new Date() },
       include: { blocks: true },
     });
     this.record(
@@ -439,11 +379,10 @@ export class DataConnectionService {
   }
 
   async revoke(id: string, reason?: string): Promise<DataConnectionDto> {
-    const me = this.me();
+    const me = this.rights.me();
     const row = await this.find(id);
-    const canManage = await this.canManage();
-    if (row.personRef !== me && !canManage) {
-      this.refuse('data.connection.manage');
+    if (row.personRef !== me && !(await this.rights.canManage())) {
+      this.rights.refuse('data.connection.manage');
     }
     if (row.revokedAt) return (await this.views([row]))[0];
     const updated = await this.prisma.dataConnection.update({
@@ -480,15 +419,15 @@ export class DataConnectionService {
     id: string,
     body: { type: 'source' | 'asset'; id: string; reason?: string },
   ): Promise<DataConnectionDto> {
-    const me = this.me();
+    const me = this.rights.me();
     const row = await this.find(id);
     const scopeType = body.type === 'asset' ? 'ASSET' : 'SOURCE';
     const governed = await this.governance.mayGovernScope({
       scopeType,
       scopeId: body.id,
     });
-    if (!governed.allowed && !(await this.canManage())) {
-      this.refuse('asset.govern');
+    if (!governed.allowed && !(await this.rights.canManage())) {
+      this.rights.refuse('asset.govern');
     }
     await this.prisma.dataConnectionBlock.upsert({
       where: {
@@ -530,7 +469,7 @@ export class DataConnectionService {
   }
 
   async unblock(id: string, blockId: string): Promise<DataConnectionDto> {
-    const me = this.me();
+    const me = this.rights.me();
     const row = await this.find(id);
     const block = row.blocks.find((b) => b.id === blockId);
     if (!block) throw new NotFoundException('No such block.');
@@ -538,8 +477,8 @@ export class DataConnectionService {
       scopeType: block.scopeType,
       scopeId: block.scopeId,
     });
-    if (!governed.allowed && !(await this.canManage())) {
-      this.refuse('asset.govern');
+    if (!governed.allowed && !(await this.rights.canManage())) {
+      this.rights.refuse('asset.govern');
     }
     await this.prisma.dataConnectionBlock.delete({ where: { id: blockId } });
     const updated = await this.find(id);
@@ -563,382 +502,30 @@ export class DataConnectionService {
     return (await this.views([updated]))[0];
   }
 
-  // ── Opening sources and tables to SQL connections ───────────────────
-
-  /**
-   * Whether the caller may have or give a connection to everything its person
-   * may query (no sources or tables named): admins (`data.connection.manage`)
-   * and people who answer for data here — owners, stewards, custodians, or a
-   * group of theirs (decided 2026-11-13). Everyone else names what it is for.
-   */
-  async canConnectAll(): Promise<boolean> {
-    if (await this.canManage()) return true;
-    const person = this.cls.isActive()
-      ? this.cls.get<ClsPerson | undefined>(CLS_PERSON)
-      : undefined;
-    if (!person?.actorRef) return false;
-    const refs = [
-      person.actorRef,
-      ...person.groupIds.map((id) => `group:${id}`),
-    ];
-    const held = await this.prisma.governanceRole.count({
-      where: { principalRef: { in: refs }, dateOut: null },
-    });
-    return held > 0;
-  }
-
-  /** Is a table or source open to connections, and by whom (itself or its source)? */
-  async exposureOf(
-    type: 'asset' | 'source',
-    id: string,
-    sourceId: string,
-  ): Promise<DataConnectionExposureDto> {
-    const rows = await this.prisma.dataConnectionExposure.findMany({
-      where: {
-        OR: [
-          ...(type === 'asset'
-            ? [{ scopeType: 'ASSET' as const, scopeId: id }]
-            : []),
-          { scopeType: 'SOURCE' as const, scopeId: sourceId },
-        ],
-      },
-    });
-    const own = rows.find(
-      (r) =>
-        r.scopeType === (type === 'asset' ? 'ASSET' : 'SOURCE') &&
-        r.scopeId === id,
-    );
-    const viaSource =
-      type === 'asset'
-        ? rows.find((r) => r.scopeType === 'SOURCE' && r.scopeId === sourceId)
-        : undefined;
-    const effective = own ?? viaSource;
-    return {
-      open: Boolean(effective),
-      inheritedFromSource: !own && Boolean(viaSource),
-      openedBy: effective?.openedBy ?? null,
-      openedAt: effective?.openedAt ?? null,
-    };
-  }
-
-  /**
-   * Opens or closes a table or source to SQL connections (opt-in). Who
-   * governs it decides: `asset.govern`, its owner or steward, or a manager.
-   * Closing a table its source opened is refused: close the source.
-   */
-  async setExposure(
-    type: 'asset' | 'source',
-    id: string,
-    open: boolean,
-  ): Promise<DataConnectionExposureDto> {
-    const scopeType = type === 'asset' ? 'ASSET' : 'SOURCE';
-    const governed = await this.governance.mayGovernScope({
-      scopeType,
-      scopeId: id,
-    });
-    if (!governed.allowed && !(await this.canManage()))
-      this.refuse('asset.govern');
-    const before = await this.exposureOf(type, id, governed.sourceId);
-    if (open) {
-      await this.prisma.dataConnectionExposure.upsert({
-        where: { scopeType_scopeId: { scopeType, scopeId: id } },
-        create: {
-          scopeType,
-          scopeId: id,
-          openedBy: this.actors.current().ref ?? null,
-        },
-        update: {},
-      });
-    } else {
-      if (before.inheritedFromSource) {
-        throw new BadRequestException(
-          'Its source is open to SQL connections: close the source, or block this table for single connections.',
-        );
-      }
-      await this.prisma.dataConnectionExposure.deleteMany({
-        where: { scopeType, scopeId: id },
-      });
-    }
-    const after = await this.exposureOf(type, id, governed.sourceId);
-    if (before.open !== after.open) {
-      void this.audit.record({
-        actor: this.actors.current(),
-        channel: 'rest',
-        capability: 'asset.govern',
-        operation: open ? 'data-connections.open' : 'data-connections.close',
-        entityType: type,
-        entityId: id,
-        entityName: governed.name,
-        resources: [
-          DATA_RESOURCE,
-          ...(type === 'asset'
-            ? [assetResource(id), sourceResource(governed.sourceId)]
-            : [sourceResource(id)]),
-        ],
-        fields: ['sqlConnections'],
-        changes: [
-          {
-            field: 'SQL connections',
-            from: before.open ? 'open' : 'closed',
-            to: after.open ? 'open' : 'closed',
-          },
-        ],
-      });
-    }
-    return after;
-  }
-
-  /** Everything open to SQL connections, for Settings. */
-  async listExposures(): Promise<DataConnectionExposureItemDto[]> {
-    const rows = await this.prisma.dataConnectionExposure.findMany({
-      orderBy: { openedAt: 'desc' },
-    });
-    const names = await this.scopeNames({
-      sourceIds: rows
-        .filter((r) => r.scopeType === 'SOURCE')
-        .map((r) => r.scopeId),
-      assetIds: rows
-        .filter((r) => r.scopeType === 'ASSET')
-        .map((r) => r.scopeId),
-    });
-    return rows.flatMap((r) => {
-      const type = r.scopeType === 'ASSET' ? 'asset' : 'source';
-      const item = names.get(`${type}:${r.scopeId}`);
-      return item
-        ? [{ ...item, openedBy: r.openedBy, openedAt: r.openedAt }]
-        : [];
-    });
-  }
-
-  /**
-   * What the caller may put in a connection's scope: the sources and tables
-   * they may query that are open to SQL connections.
-   */
-  async reachable(): Promise<DataConnectionReachableSourceDto[]> {
-    const [catalog, open] = await Promise.all([
-      this.catalog.catalog(),
-      this.prisma.dataConnectionExposure.findMany(),
-    ]);
-    const openSources = new Set(
-      open.filter((e) => e.scopeType === 'SOURCE').map((e) => e.scopeId),
-    );
-    const openAssets = new Set(
-      open.filter((e) => e.scopeType === 'ASSET').map((e) => e.scopeId),
-    );
-    return catalog.sources
-      .map((source) => ({
-        id: source.id,
-        name: source.name,
-        sqlName: source.sqlName,
-        open: openSources.has(source.id),
-        tables: source.tables
-          .filter(
-            (t) =>
-              t.canQuery &&
-              (openSources.has(source.id) || openAssets.has(t.assetId)),
-          )
-          .map((t) => ({ id: t.assetId, name: t.name, sqlName: t.sqlName })),
-      }))
-      .filter((source) => source.tables.length > 0);
-  }
-
-  /**
-   * A connection's scope: named sources and tables must be open to SQL
-   * connections (and, for one's own, readable by its person); naming none
-   * means everything, which only `canConnectAll` people may have or give.
-   */
-  private async assertScopeAllowed(
-    scope: { sourceIds: string[]; assetIds: string[] },
-    options: { mustQuery: boolean },
-  ): Promise<void> {
-    if (!scope.sourceIds.length && !scope.assetIds.length) {
-      if (!(await this.canConnectAll())) {
-        throw new BadRequestException({
-          statusCode: 400,
-          error: 'Bad Request',
-          code: 'SCOPE_REQUIRED',
-          message:
-            'Choose the sources or tables this connection is for. Only admins, owners, stewards and custodians may make one for everything.',
-        });
-      }
-      return;
-    }
-    const open = await this.prisma.dataConnectionExposure.findMany();
-    const openSources = new Set(
-      open.filter((e) => e.scopeType === 'SOURCE').map((e) => e.scopeId),
-    );
-    const openAssets = new Set(
-      open.filter((e) => e.scopeType === 'ASSET').map((e) => e.scopeId),
-    );
-    const assets = await this.prisma.asset.findMany({
-      where: { id: { in: scope.assetIds } },
-      select: { id: true, sourceId: true, name: true },
-    });
-    const sources = await this.prisma.source.findMany({
-      where: { id: { in: scope.sourceIds } },
-      select: { id: true, name: true },
-    });
-    const closed = [
-      ...sources.filter((s) => !openSources.has(s.id)).map((s) => s.name),
-      ...assets
-        .filter((a) => !openAssets.has(a.id) && !openSources.has(a.sourceId))
-        .map((a) => a.name),
-    ];
-    const reachable = options.mustQuery
-      ? new Set(
-          (await this.reachable()).flatMap((s) => [
-            `source:${s.id}`,
-            ...s.tables.map((t) => `asset:${t.id}`),
-          ]),
-        )
-      : null;
-    const unreadable = reachable
-      ? [
-          ...sources
-            .filter((s) => !reachable.has(`source:${s.id}`))
-            .map((s) => s.name),
-          ...assets
-            .filter((a) => !reachable.has(`asset:${a.id}`))
-            .map((a) => a.name),
-        ]
-      : [];
-    if (closed.length || unreadable.length) {
-      throw new BadRequestException({
-        statusCode: 400,
-        error: 'Bad Request',
-        code: 'SCOPE_NOT_OPEN',
-        message: closed.length
-          ? `Not open to SQL connections: ${closed.join(', ')}. Its owner, a steward or an admin opens it on its Governance tab.`
-          : `You cannot query ${[...new Set(unreadable)].join(', ')}.`,
-      });
-    }
-  }
-
-  // ── For the SQL gateway ───────────────────────────────────────────────
-
-  /** What signing in needs: the verifier and whether it may sign in at all. */
-  async forSignIn(username: string) {
-    const row = await this.prisma.dataConnection.findUnique({
-      where: { username: username.toLowerCase() },
-      include: { blocks: true },
-    });
-    if (!row) return null;
-    return { row, status: connectionStatus(row) };
-  }
-
-  /** Still good: not revoked, not expired, with its current blocks. */
-  async current(id: string) {
-    const row = await this.prisma.dataConnection.findUnique({
-      where: { id },
-      include: { blocks: true },
-    });
-    if (!row || connectionStatus(row) !== 'active') return null;
-    return row;
-  }
-
-  /** The connection's scope, with what the workspace opened to connections. */
-  async scopeFor(row: ConnectionRow): Promise<ConnectionScope> {
-    const open = await this.prisma.dataConnectionExposure.findMany();
-    return {
-      sourceIds: row.scopeSourceIds,
-      assetIds: row.scopeAssetIds,
-      blockedSourceIds: row.blocks
-        .filter((b) => b.scopeType === 'SOURCE')
-        .map((b) => b.scopeId),
-      blockedAssetIds: row.blocks
-        .filter((b) => b.scopeType === 'ASSET')
-        .map((b) => b.scopeId),
-      openSourceIds: open
-        .filter((e) => e.scopeType === 'SOURCE')
-        .map((e) => e.scopeId),
-      openAssetIds: open
-        .filter((e) => e.scopeType === 'ASSET')
-        .map((e) => e.scopeId),
-    };
-  }
-
-  /**
-   * A sign-in that worked: last used, from where; on the trail at most once
-   * an hour per connection (BI tools sign in often).
-   */
-  async markUsed(
-    id: string,
-    ip: string | null,
-    previous: Date | null,
-  ): Promise<void> {
-    const row = await this.prisma.dataConnection
-      .update({
-        where: { id },
-        data: { lastUsedAt: new Date(), lastUsedIp: ip },
-      })
-      .catch(() => null);
-    if (!row || (previous && Date.now() - previous.getTime() < 3_600_000)) {
-      return;
-    }
-    void this.audit.record({
-      actor: {
-        id: row.personRef,
-        displayName: null,
-        kind: 'person',
-        via: 'sql-connection',
-        ref: `${row.personRef}@sql:${row.id}`,
-      },
-      channel: 'sql',
-      capability: 'data.connect',
-      operation: 'data-connections.sign-in',
-      entityType: 'data-connection',
-      entityId: row.id,
-      entityName: row.name,
-      resources: [DATA_RESOURCE, connectionResource(row.id)],
-      fields: [],
-      ...(ip ? { changes: [{ field: 'client', from: null, to: ip }] } : {}),
-    });
-  }
-
-  /** A sign-in that failed, for the trail (never the password). */
-  recordSignInFailure(
-    row: DataConnection | null,
-    username: string,
-    ip: string | null,
-    why: string,
-  ): void {
-    void this.audit.record({
-      actor: {
-        id: null,
-        displayName: null,
-        kind: 'person',
-        via: 'sql-connection',
-        ref: row ? `${row.personRef}@sql:${row.id}` : undefined,
-      },
-      channel: 'sql',
-      capability: 'data.connect',
-      operation: 'data-connections.sign-in-refused',
-      entityType: 'data-connection',
-      entityId: row?.id ?? null,
-      entityName: row?.name ?? username.slice(0, 80),
-      resources: [DATA_RESOURCE, ...(row ? [connectionResource(row.id)] : [])],
-      fields: [],
-      changes: [
-        { field: 'reason', from: null, to: why },
-        ...(ip ? [{ field: 'client', from: null, to: ip }] : []),
-      ],
-      status: 401,
-    });
-  }
-
   // ── Helpers ───────────────────────────────────────────────────────────
 
-  private refuse(capability: Capability): never {
-    throw new ForbiddenException({
-      statusCode: 403,
-      error: 'Forbidden',
-      code: 'CAPABILITY_REQUIRED',
-      capability,
-      message:
-        capability === 'asset.govern'
-          ? 'This needs asset.govern, or the owner or steward role on this table or its source.'
-          : 'This needs the right to manage everyone’s SQL connections (data.connection.manage).',
-    });
+  /** Every named source and table must be one the caller owns or stewards. */
+  private async assertGoverns(scope: ScopeIds): Promise<void> {
+    for (const [scopeType, ids] of [
+      ['SOURCE', scope.sourceIds],
+      ['ASSET', scope.assetIds],
+    ] as const) {
+      for (const scopeId of ids) {
+        const governed = await this.governance.mayGovernScope({
+          scopeType,
+          scopeId,
+        });
+        if (!governed.allowed) {
+          throw new ForbiddenException({
+            statusCode: 403,
+            error: 'Forbidden',
+            code: 'CAPABILITY_REQUIRED',
+            capability: 'asset.govern',
+            message: `You can give connections only to what you own or steward; ${governed.name} is not.`,
+          });
+        }
+      }
+    }
   }
 
   private async find(id: string): Promise<ConnectionRow> {
@@ -948,26 +535,6 @@ export class DataConnectionService {
     });
     if (!row) throw new NotFoundException('No such SQL connection.');
     return row;
-  }
-
-  private newPassword(): string {
-    return randomBytes(24).toString('base64url');
-  }
-
-  private verifierFields(password: string) {
-    const verifier = scramVerifier(password);
-    return {
-      scramSalt: verifier.salt,
-      scramIterations: verifier.iterations,
-      scramStoredKey: verifier.storedKey,
-      scramServerKey: verifier.serverKey,
-      secretPreview: password.slice(-4),
-    };
-  }
-
-  private expiry(days?: number): Date {
-    const span = Math.min(Math.max(days ?? DEFAULT_EXPIRY_DAYS, 1), 365);
-    return new Date(Date.now() + span * 86_400_000);
   }
 
   /** `<person>_<name>`, unique in the workspace: what the tool signs in as. */
@@ -994,45 +561,13 @@ export class DataConnectionService {
     return `${base}_${randomBytes(3).toString('hex')}`;
   }
 
-  private async assertScopeExists(scope: {
-    sourceIds: string[];
-    assetIds: string[];
-  }): Promise<void> {
-    const [sources, assets] = await Promise.all([
-      scope.sourceIds.length
-        ? this.prisma.source.count({ where: { id: { in: scope.sourceIds } } })
-        : 0,
-      scope.assetIds.length
-        ? this.prisma.asset.count({ where: { id: { in: scope.assetIds } } })
-        : 0,
-    ]);
-    if (
-      sources !== scope.sourceIds.length ||
-      assets !== scope.assetIds.length
-    ) {
-      throw new BadRequestException(
-        'A source or table in the scope does not exist.',
-      );
-    }
-  }
-
-  private scopeResources(scope: { sourceIds: string[]; assetIds: string[] }) {
-    return [
-      ...scope.sourceIds.map(sourceResource),
-      ...scope.assetIds.map(assetResource),
-    ];
-  }
-
-  private async scopeChange(scope: {
-    sourceIds: string[];
-    assetIds: string[];
-  }): Promise<AuditChange[]> {
-    if (!scope.sourceIds.length && !scope.assetIds.length) {
+  private async scopeChange(scope: ScopeIds): Promise<AuditChange[]> {
+    if (isEverything(scope)) {
       return [
         { field: 'scope', from: null, to: 'everything its person may query' },
       ];
     }
-    const names = await this.scopeNames(scope);
+    const names = await this.exposures.names(scope);
     return [
       {
         field: 'scope',
@@ -1042,75 +577,16 @@ export class DataConnectionService {
     ];
   }
 
-  private async scopeNames(scope: {
-    sourceIds: string[];
-    assetIds: string[];
-  }): Promise<Map<string, DataConnectionScopeItemDto>> {
-    const [sources, assets, tables] = await Promise.all([
-      scope.sourceIds.length
-        ? this.prisma.source.findMany({
-            where: { id: { in: scope.sourceIds } },
-            select: { id: true, name: true },
-          })
-        : [],
-      scope.assetIds.length
-        ? this.prisma.asset.findMany({
-            where: { id: { in: scope.assetIds } },
-            select: { id: true, name: true },
-          })
-        : [],
-      scope.assetIds.length
-        ? this.catalog.tables().then((cached) => cached.tables)
-        : Promise.resolve([] as { assetId: string; sqlName: string }[]),
-    ]);
-    const sqlNames = new Map<string, string>(
-      tables.map((t) => [t.assetId, t.sqlName]),
-    );
-    const out = new Map<string, DataConnectionScopeItemDto>();
-    for (const source of sources) {
-      out.set(`source:${source.id}`, {
-        type: 'source',
-        id: source.id,
-        name: source.name,
-      });
-    }
-    for (const asset of assets) {
-      out.set(`asset:${asset.id}`, {
-        type: 'asset',
-        id: asset.id,
-        name: asset.name,
-        ...(sqlNames.get(asset.id) ? { sqlName: sqlNames.get(asset.id) } : {}),
-      });
-    }
-    return out;
-  }
-
   private async views(rows: ConnectionRow[]): Promise<DataConnectionDto[]> {
-    const me = this.cls.isActive()
-      ? this.cls.get<ClsPerson | undefined>(CLS_PERSON)?.actorRef
-      : undefined;
-    const canManage = await this.canManage();
-    const names = await this.scopeNames({
-      sourceIds: [
-        ...new Set(
-          rows.flatMap((row) => [
-            ...row.scopeSourceIds,
-            ...row.blocks
-              .filter((b) => b.scopeType === 'SOURCE')
-              .map((b) => b.scopeId),
-          ]),
-        ),
-      ],
-      assetIds: [
-        ...new Set(
-          rows.flatMap((row) => [
-            ...row.scopeAssetIds,
-            ...row.blocks
-              .filter((b) => b.scopeType === 'ASSET')
-              .map((b) => b.scopeId),
-          ]),
-        ),
-      ],
+    const me = this.rights.person()?.actorRef;
+    const canManage = await this.rights.canManage();
+    const named = rows.map((row) => ({
+      sourceIds: [...row.scopeSourceIds, ...splitScoped(row.blocks).sourceIds],
+      assetIds: [...row.scopeAssetIds, ...splitScoped(row.blocks).assetIds],
+    }));
+    const names = await this.exposures.names({
+      sourceIds: [...new Set(named.flatMap((n) => n.sourceIds))],
+      assetIds: [...new Set(named.flatMap((n) => n.assetIds))],
     });
     return rows.map((row) => ({
       id: row.id,
@@ -1170,4 +646,34 @@ export class DataConnectionService {
       changes,
     });
   }
+}
+
+function scopeRequired(): BadRequestException {
+  return new BadRequestException({
+    statusCode: 400,
+    error: 'Bad Request',
+    code: 'SCOPE_REQUIRED',
+    message:
+      'Choose the sources or tables this connection is for. Only admins, owners, stewards and custodians may make one for everything.',
+  });
+}
+
+function newPassword(): string {
+  return randomBytes(24).toString('base64url');
+}
+
+function verifierFields(password: string) {
+  const verifier = scramVerifier(password);
+  return {
+    scramSalt: verifier.salt,
+    scramIterations: verifier.iterations,
+    scramStoredKey: verifier.storedKey,
+    scramServerKey: verifier.serverKey,
+    secretPreview: password.slice(-4),
+  };
+}
+
+function expiry(days?: number): Date {
+  const span = Math.min(Math.max(days ?? DEFAULT_EXPIRY_DAYS, 1), 365);
+  return new Date(Date.now() + span * 86_400_000);
 }

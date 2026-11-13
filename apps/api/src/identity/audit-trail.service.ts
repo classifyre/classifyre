@@ -2,10 +2,32 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ClsService } from 'nestjs-cls';
 import { CLS_NAMESPACE_ID, CLS_SCHEMA } from '../namespace/namespace.constants';
 import { PrismaService } from '../prisma.service';
-import type { Actor } from './actor';
+import type { Actor, ActorVia } from './actor';
+import { parseActorRef } from './actor-ref';
 import type { Capability } from './capabilities';
 
-export type AuditChannel = 'rest' | 'mcp' | 'sql';
+/** How an audited action came: the app or API, an MCP token, a SQL connection. */
+export const AUDIT_CHANNELS = ['rest', 'mcp', 'sql'] as const;
+export type AuditChannel = (typeof AUDIT_CHANNELS)[number];
+
+/** A stored channel value as a known channel (`rest` for anything else). */
+export function asAuditChannel(value: string | null | undefined): AuditChannel {
+  return AUDIT_CHANNELS.find((channel) => channel === value) ?? 'rest';
+}
+
+/** The channel an actor reference acted through (`user:x@sql:c` → `sql`). */
+export function channelOfRef(ref: string | null | undefined): AuditChannel {
+  return ref ? (parseActorRef(ref).via?.kind ?? 'rest') : 'rest';
+}
+
+/** How a person's action arrived, for the actor of a channel. */
+export function viaOfChannel(channel: AuditChannel): ActorVia {
+  return channel === 'sql'
+    ? 'sql-connection'
+    : channel === 'mcp'
+      ? 'mcp-token'
+      : 'oidc';
+}
 
 export interface AuditEventInput {
   actor: Actor;

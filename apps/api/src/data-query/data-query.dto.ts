@@ -159,7 +159,9 @@ export class SavedQueryDto {
   @ApiProperty({ maxLength: 120 })
   name!: string;
 
-  @ApiProperty({ description: 'One SELECT over tables named `<source>.<schema>.<table>`.' })
+  @ApiProperty({
+    description: 'One SELECT over tables named `<source>.<schema>.<table>`.',
+  })
   sql!: string;
 
   @ApiProperty({ type: String, format: 'date-time' })
@@ -175,7 +177,9 @@ export class SaveSavedQueryDto {
   @MaxLength(120)
   name!: string;
 
-  @ApiProperty({ description: 'One SELECT over tables named `<source>.<schema>.<table>`.' })
+  @ApiProperty({
+    description: 'One SELECT over tables named `<source>.<schema>.<table>`.',
+  })
   @IsString()
   @MaxLength(100_000)
   sql!: string;
