@@ -2,6 +2,17 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
+export class AuditChangeDto {
+  @ApiProperty({ example: 'Owner' })
+  field: string;
+
+  @ApiPropertyOptional({ type: String, nullable: true })
+  from?: string | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true })
+  to?: string | null;
+}
+
 export class AuditEventDto {
   @ApiProperty()
   id: string;
@@ -48,6 +59,14 @@ export class AuditEventDto {
     description: 'Top-level input keys of the change, never their values.',
   })
   fields: string[];
+
+  @ApiPropertyOptional({
+    type: [AuditChangeDto],
+    nullable: true,
+    description:
+      'What changed, for changes whose values are not secret (governance).',
+  })
+  changes?: AuditChangeDto[] | null;
 
   @ApiProperty({ type: Number, nullable: true })
   status: number | null;

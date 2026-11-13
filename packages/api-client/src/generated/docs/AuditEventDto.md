@@ -17,6 +17,7 @@ Name | Type
 `entityId` | string
 `entityName` | string
 `fields` | Array&lt;string&gt;
+`changes` | [Array&lt;AuditChangeDto&gt;](AuditChangeDto.md)
 `status` | number
 
 ## Example
@@ -37,6 +38,7 @@ const example = {
   "entityId": null,
   "entityName": null,
   "fields": null,
+  "changes": null,
   "status": null,
 } satisfies AuditEventDto
 

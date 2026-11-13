@@ -27,6 +27,8 @@ import type {
   ImportContractDto,
   LinkGovernanceTermDto,
   MoveAssetColumnDto,
+  QualityOptionsDto,
+  QualityTestResultDto,
   SaveQualityRuleDto,
   SourceGovernanceDto,
   UpdateAssetColumnDto,
@@ -57,6 +59,10 @@ import {
     LinkGovernanceTermDtoToJSON,
     MoveAssetColumnDtoFromJSON,
     MoveAssetColumnDtoToJSON,
+    QualityOptionsDtoFromJSON,
+    QualityOptionsDtoToJSON,
+    QualityTestResultDtoFromJSON,
+    QualityTestResultDtoToJSON,
     SaveQualityRuleDtoFromJSON,
     SaveQualityRuleDtoToJSON,
     SourceGovernanceDtoFromJSON,
@@ -129,6 +135,10 @@ export interface GovernanceControllerPrincipalsRequest {
     kinds?: string;
 }
 
+export interface GovernanceControllerQualityOptionsRequest {
+    id: string;
+}
+
 export interface GovernanceControllerRemoveAssetRoleRequest {
     id: string;
     roleId: string;
@@ -158,6 +168,11 @@ export interface GovernanceControllerSourceGovernanceRequest {
 
 export interface GovernanceControllerSummaryRequest {
     days?: string;
+}
+
+export interface GovernanceControllerTestQualityRuleRequest {
+    id: string;
+    saveQualityRuleDto: SaveQualityRuleDto;
 }
 
 export interface GovernanceControllerUnlinkTermRequest {
@@ -766,6 +781,43 @@ export class GovernanceApi extends runtime.BaseAPI {
     }
 
     /**
+     * What a quality rule on this asset can use: columns, SQL name, open findings by kind
+     */
+    async governanceControllerQualityOptionsRaw(requestParameters: GovernanceControllerQualityOptionsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<QualityOptionsDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling governanceControllerQualityOptions().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/assets/{id}/quality/options`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => QualityOptionsDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * What a quality rule on this asset can use: columns, SQL name, open findings by kind
+     */
+    async governanceControllerQualityOptions(requestParameters: GovernanceControllerQualityOptionsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<QualityOptionsDto> {
+        const response = await this.governanceControllerQualityOptionsRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
      * End a role on an asset (kept as history)
      */
     async governanceControllerRemoveAssetRoleRaw(requestParameters: GovernanceControllerRemoveAssetRoleRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AssetGovernanceDto>> {
@@ -1041,6 +1093,55 @@ export class GovernanceApi extends runtime.BaseAPI {
      */
     async governanceControllerSummary(requestParameters: GovernanceControllerSummaryRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GovernanceSummaryDto> {
         const response = await this.governanceControllerSummaryRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Nothing is stored and no finding changes. Whole-table rules run their query and wait up to a minute. Needs the right to govern the asset.
+     * Measure a quality rule now without saving it
+     */
+    async governanceControllerTestQualityRuleRaw(requestParameters: GovernanceControllerTestQualityRuleRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<QualityTestResultDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling governanceControllerTestQualityRule().'
+            );
+        }
+
+        if (requestParameters['saveQualityRuleDto'] == null) {
+            throw new runtime.RequiredError(
+                'saveQualityRuleDto',
+                'Required parameter "saveQualityRuleDto" was null or undefined when calling governanceControllerTestQualityRule().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/assets/{id}/quality/test`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: SaveQualityRuleDtoToJSON(requestParameters['saveQualityRuleDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => QualityTestResultDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Nothing is stored and no finding changes. Whole-table rules run their query and wait up to a minute. Needs the right to govern the asset.
+     * Measure a quality rule now without saving it
+     */
+    async governanceControllerTestQualityRule(requestParameters: GovernanceControllerTestQualityRuleRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<QualityTestResultDto> {
+        const response = await this.governanceControllerTestQualityRuleRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

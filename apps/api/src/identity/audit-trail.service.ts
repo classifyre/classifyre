@@ -17,8 +17,27 @@ export interface AuditEventInput {
   /** What it touched beyond the entity (identity/audit-resources.ts). */
   resources?: string[];
   fields: string[];
+  /**
+   * What changed, for changes whose values are not secret (governance):
+   * `{field, from, to}`, each value cut to 200 characters.
+   */
+  changes?: AuditChange[];
   status?: number;
 }
+
+export interface AuditChange {
+  field: string;
+  from?: string | null;
+  to?: string | null;
+}
+
+const CHANGE_VALUE_MAX = 200;
+const cut = (value: string | null | undefined) =>
+  value === null || value === undefined
+    ? null
+    : value.length > CHANGE_VALUE_MAX
+      ? `${value.slice(0, CHANGE_VALUE_MAX - 1)}…`
+      : value;
 
 export interface AuditEventQuery {
   entityType?: string;
@@ -93,6 +112,15 @@ export class AuditTrailService {
           entityName: event.entityName ?? null,
           resources: event.resources ?? [],
           fields: event.fields,
+          ...(event.changes?.length
+            ? {
+                changes: event.changes.map((change) => ({
+                  field: change.field,
+                  from: cut(change.from),
+                  to: cut(change.to),
+                })),
+              }
+            : {}),
           status: event.status ?? null,
         },
       });

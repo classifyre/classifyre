@@ -1,3 +1,4 @@
+import { AuditChangeDto } from './audit.dto';
 import { Controller, Get, Query } from '@nestjs/common';
 import {
   ApiOkResponse,
@@ -112,7 +113,17 @@ export class AuditController {
       sortBy: dto.page?.sortBy,
       sortOrder: dto.page?.sortOrder,
     });
-    return { items, total, skip: usedSkip, limit: usedLimit };
+    return {
+      items: items.map((item) => ({
+        ...item,
+        changes: Array.isArray(item.changes)
+          ? (item.changes as unknown as AuditChangeDto[])
+          : null,
+      })),
+      total,
+      skip: usedSkip,
+      limit: usedLimit,
+    };
   }
 
   @Get('actors/resolve')

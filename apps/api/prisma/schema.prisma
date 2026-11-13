@@ -4487,6 +4487,9 @@ model AuditEvent {
   resources  String[] @default([])
   /// Top-level input keys of the change.
   fields     String[] @default([])
+  /// What changed, where the values are not secret (governance: owner Ann →
+  /// Ben, status DRAFT → ACTIVE): `[{field, from, to}]`, texts cut short.
+  changes    Json?      @db.JsonB
   /// HTTP status of the response (REST only).
   status     Int?
 

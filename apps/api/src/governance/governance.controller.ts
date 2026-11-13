@@ -25,6 +25,8 @@ import {
   ImportContractDto,
   AssetQualityDto,
   SaveQualityRuleDto,
+  QualityOptionsDto,
+  QualityTestResultDto,
   GovernanceMeaningDto,
   LinkGovernanceTermDto,
   AssetColumnsDto,
@@ -210,6 +212,35 @@ export class GovernanceController {
     @Param('ruleId', ParseUUIDPipe) ruleId: string,
   ): Promise<AssetQualityDto> {
     return this.governance.removeQualityRule(ruleId);
+  }
+
+  @Get('assets/:id/quality/options')
+  @Requires('asset.view')
+  @ApiOperation({
+    summary:
+      'What a quality rule on this asset can use: columns, SQL name, open findings by kind',
+  })
+  @ApiOkResponse({ type: QualityOptionsDto })
+  qualityOptions(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<QualityOptionsDto> {
+    return this.governance.qualityOptions(id);
+  }
+
+  @Post('assets/:id/quality/test')
+  @Requires('asset.view')
+  @SignedInOnly()
+  @ApiOperation({
+    summary: 'Measure a quality rule now without saving it',
+    description:
+      'Nothing is stored and no finding changes. Whole-table rules run their query and wait up to a minute. Needs the right to govern the asset.',
+  })
+  @ApiOkResponse({ type: QualityTestResultDto })
+  testQualityRule(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: SaveQualityRuleDto,
+  ): Promise<QualityTestResultDto> {
+    return this.governance.testQualityRule(id, body);
   }
 
   @Post('assets/:id/quality/run')

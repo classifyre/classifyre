@@ -17,6 +17,7 @@ All URIs are relative to *http://localhost*
 | [**governanceControllerLinkTerm**](GovernanceApi.md#governancecontrollerlinkterm) | **POST** /assets/{id}/governance/meaning | Link a glossary term to an asset by hand |
 | [**governanceControllerMoveColumn**](GovernanceApi.md#governancecontrollermovecolumn) | **POST** /assets/{id}/columns/{name}/move | Move a removed column\&#39;s annotations to the column it became |
 | [**governanceControllerPrincipals**](GovernanceApi.md#governancecontrollerprincipals) | **GET** /governance/principals | People and groups of the tenant, for the owner and steward pickers |
+| [**governanceControllerQualityOptions**](GovernanceApi.md#governancecontrollerqualityoptions) | **GET** /assets/{id}/quality/options | What a quality rule on this asset can use: columns, SQL name, open findings by kind |
 | [**governanceControllerRemoveAssetRole**](GovernanceApi.md#governancecontrollerremoveassetrole) | **DELETE** /assets/{id}/governance/roles/{roleId} | End a role on an asset (kept as history) |
 | [**governanceControllerRemoveColumn**](GovernanceApi.md#governancecontrollerremovecolumn) | **DELETE** /assets/{id}/columns/{name} | Forget what was said about one column |
 | [**governanceControllerRemoveQualityRule**](GovernanceApi.md#governancecontrollerremovequalityrule) | **DELETE** /quality-rules/{ruleId} | Delete a quality rule; its open finding is resolved |
@@ -24,6 +25,7 @@ All URIs are relative to *http://localhost*
 | [**governanceControllerRunQuality**](GovernanceApi.md#governancecontrollerrunquality) | **POST** /assets/{id}/quality/run | Evaluate an asset\&#39;s quality rules now |
 | [**governanceControllerSourceGovernance**](GovernanceApi.md#governancecontrollersourcegovernance) | **GET** /sources/{id}/governance | A source\&#39;s owners, stewards and custodians, and its coverage |
 | [**governanceControllerSummary**](GovernanceApi.md#governancecontrollersummary) | **GET** /governance/summary | How far the workspace is governed: coverage per source, what to govern first, yours |
+| [**governanceControllerTestQualityRule**](GovernanceApi.md#governancecontrollertestqualityrule) | **POST** /assets/{id}/quality/test | Measure a quality rule now without saving it |
 | [**governanceControllerUnlinkTerm**](GovernanceApi.md#governancecontrollerunlinkterm) | **DELETE** /assets/{id}/governance/meaning/{termId} | Remove a term linked by hand |
 | [**governanceControllerUpdateAssetGovernance**](GovernanceApi.md#governancecontrollerupdateassetgovernance) | **PUT** /assets/{id}/governance | Change an asset\&#39;s description, legal basis or lifecycle |
 | [**governanceControllerUpdateColumn**](GovernanceApi.md#governancecontrollerupdatecolumn) | **PUT** /assets/{id}/columns/{name} | Describe, classify or confirm one column |
@@ -921,6 +923,71 @@ No authorization required
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
 
+## governanceControllerQualityOptions
+
+> QualityOptionsDto governanceControllerQualityOptions(id)
+
+What a quality rule on this asset can use: columns, SQL name, open findings by kind
+
+### Example
+
+```ts
+import {
+  Configuration,
+  GovernanceApi,
+} from '@workspace/api-client';
+import type { GovernanceControllerQualityOptionsRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new GovernanceApi();
+
+  const body = {
+    // string
+    id: id_example,
+  } satisfies GovernanceControllerQualityOptionsRequest;
+
+  try {
+    const data = await api.governanceControllerQualityOptions(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+[**QualityOptionsDto**](QualityOptionsDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
 ## governanceControllerRemoveAssetRole
 
 > AssetGovernanceDto governanceControllerRemoveAssetRole(id, roleId)
@@ -1374,6 +1441,76 @@ No authorization required
 ### HTTP request headers
 
 - **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## governanceControllerTestQualityRule
+
+> QualityTestResultDto governanceControllerTestQualityRule(id, saveQualityRuleDto)
+
+Measure a quality rule now without saving it
+
+Nothing is stored and no finding changes. Whole-table rules run their query and wait up to a minute. Needs the right to govern the asset.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  GovernanceApi,
+} from '@workspace/api-client';
+import type { GovernanceControllerTestQualityRuleRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new GovernanceApi();
+
+  const body = {
+    // string
+    id: id_example,
+    // SaveQualityRuleDto
+    saveQualityRuleDto: ...,
+  } satisfies GovernanceControllerTestQualityRuleRequest;
+
+  try {
+    const data = await api.governanceControllerTestQualityRule(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+| **saveQualityRuleDto** | [SaveQualityRuleDto](SaveQualityRuleDto.md) |  | |
+
+### Return type
+
+[**QualityTestResultDto**](QualityTestResultDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
 - **Accept**: `application/json`
 
 

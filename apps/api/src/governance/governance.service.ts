@@ -14,7 +14,10 @@ import { ActorContextService } from '../identity/actor-context.service';
 import { ActorDirectoryService } from '../identity/actor-directory.service';
 import { parseActorRef } from '../identity/actor-ref';
 import { governanceResources } from '../identity/audit-resources';
-import { AuditTrailService } from '../identity/audit-trail.service';
+import {
+  AuditTrailService,
+  type AuditChange,
+} from '../identity/audit-trail.service';
 import {
   CLS_ORG_ID,
   CLS_PERSON,
@@ -28,7 +31,12 @@ import {
   QualityService,
   type AssetQuality,
 } from './quality.service';
-import { RuleError, validateRule, type RuleInput } from './quality-rules';
+import {
+  RuleError,
+  validateRule,
+  type RuleInput,
+  type ValidRule,
+} from './quality-rules';
 import { GovernanceNotifier } from './governance-notifier';
 import { fromContract, toContract, type ContractPlan } from './odcs';
 import { parse as parseYaml } from 'yaml';
@@ -64,6 +72,12 @@ import type {
 
 const MEMBERS_TTL_MS = 60_000;
 const MAX_PRINCIPALS = 20;
+
+type QualitySummary = {
+  rules: number;
+  failing: number;
+  score: number | null;
+};
 
 type Target =
   | { scopeType: 'ASSET'; assetId: string; sourceId: string; name: string }
@@ -276,7 +290,18 @@ export class GovernanceService {
         ...(sourceOwned ? {} : { id: { in: ownedIds } }),
       },
     });
-    return { assets, owned, active };
+    const [checked, failing] = await Promise.all([
+      this.prisma.asset.count({
+        where: { ...live, qualityRules: { some: { enabled: true } } },
+      }),
+      this.prisma.asset.count({
+        where: {
+          ...live,
+          findings: { some: { detectorType: 'QUALITY', status: 'OPEN' } },
+        },
+      }),
+    ]);
+    return { assets, owned, active, checked, failing };
   }
 
   // ── Principals ────────────────────────────────────────────────────────────
@@ -483,6 +508,7 @@ export class GovernanceService {
     operation: string,
     fields: string[],
     status = 200,
+    changes?: AuditChange[],
   ): void {
     void this.audit.record({
       actor: this.actors.current(),
@@ -498,7 +524,26 @@ export class GovernanceService {
       }),
       fields,
       status,
+      ...(changes?.length ? { changes } : {}),
     });
+  }
+
+  /** People and groups by name, for what an audit event says changed. */
+  private async names(refs: readonly string[]): Promise<Map<string, string>> {
+    const out = new Map<string, string>();
+    if (!refs.length) return out;
+    const resolved = await this.directory
+      .resolve([...new Set(refs)])
+      .catch(() => []);
+    for (const actor of resolved) out.set(actor.ref, actor.displayName);
+    return out;
+  }
+
+  private async termName(termId: string): Promise<string> {
+    const term = await this.prisma.glossaryTerm
+      .findUnique({ where: { id: termId }, select: { term: true } })
+      .catch(() => null);
+    return term?.term ?? termId;
   }
 
   async updateAssetGovernance(
@@ -542,12 +587,29 @@ export class GovernanceService {
       },
       update: data,
     });
+    const before: Record<string, unknown> = {
+      status: 'DRAFT',
+      ...(current ?? {}),
+    };
+    const changes: AuditChange[] = [];
+    for (const field of fields) {
+      const from = before[field] ?? null;
+      const to = (patch as Record<string, unknown>)[field] ?? null;
+      if (from === to) continue;
+      changes.push({
+        field,
+        from: valueText(from),
+        to: valueText(to),
+      });
+    }
     this.record(
       target,
       patch.status && patch.status !== current?.status
         ? `governance.status.${patch.status.toLowerCase()}`
         : 'governance.update',
       fields,
+      200,
+      changes,
     );
     if (patch.status && patch.status !== (current?.status ?? 'DRAFT')) {
       void this.notifier.statusChanged({
@@ -678,11 +740,13 @@ export class GovernanceService {
     const scopeId =
       target.scopeType === 'ASSET' ? target.assetId : target.sourceId;
     const actorRef = this.actors.current().ref ?? null;
+    let held: string[] = [];
     try {
       await this.prisma.$transaction(async (tx) => {
         const open = await tx.governanceRole.findMany({
           where: { scopeType, scopeId, role: kind, dateOut: null },
         });
+        held = open.map((row) => row.principalRef);
         if (open.some((row) => row.principalRef === ref)) {
           throw new ConflictException('Already holds this role here.');
         }
@@ -721,11 +785,24 @@ export class GovernanceService {
       }
       throw error;
     }
+    // An owner replaces the one before; stewards and custodians are added.
+    const named = await this.names([ref, ...held]);
+    const label = (one: string) => named.get(one) ?? one;
     this.record(
       target,
       `governance.role.${kind.toLowerCase()}.assign`,
       ['principalRef', 'role'],
       201,
+      [
+        {
+          field: kind.toLowerCase(),
+          from: held.length ? held.map(label).join(', ') : null,
+          to:
+            kind === 'OWNER'
+              ? label(ref)
+              : [...held, ref].map(label).join(', '),
+        },
+      ],
     );
     void this.notifier.roleAssigned({
       scope: target.scopeType === 'ASSET' ? 'asset' : 'source',
@@ -753,9 +830,20 @@ export class GovernanceService {
         removedBy: this.actors.current().ref ?? null,
       },
     });
-    this.record(target, `governance.role.${row.role.toLowerCase()}.remove`, [
-      'role',
-    ]);
+    const named = await this.names([row.principalRef]);
+    this.record(
+      target,
+      `governance.role.${row.role.toLowerCase()}.remove`,
+      ['role'],
+      200,
+      [
+        {
+          field: row.role.toLowerCase(),
+          from: named.get(row.principalRef) ?? row.principalRef,
+          to: null,
+        },
+      ],
+    );
   }
 
   // ── Meaning (glossary terms) ────────────────────────────────────────────────
@@ -787,7 +875,9 @@ export class GovernanceService {
       throw new BadRequestException('termId names a glossary term.');
     }
     await this.meaning.link(assetId, termId, this.actorName());
-    this.record(target, 'governance.meaning.link', ['termId'], 201);
+    this.record(target, 'governance.meaning.link', ['termId'], 201, [
+      { field: 'term', from: null, to: await this.termName(termId) },
+    ]);
     return this.assetMeaning(assetId);
   }
 
@@ -795,15 +885,29 @@ export class GovernanceService {
     const target = await this.assetTarget(assetId);
     await this.authorize(target);
     await this.meaning.unlink(assetId, termId, this.actorName());
-    this.record(target, 'governance.meaning.unlink', ['termId']);
+    this.record(target, 'governance.meaning.unlink', ['termId'], 200, [
+      { field: 'term', from: await this.termName(termId), to: null },
+    ]);
     return this.assetMeaning(assetId);
   }
 
   async dismissSuggestion(assetId: string, suggestionId: string) {
     const target = await this.assetTarget(assetId);
     await this.authorize(target);
+    const suggestion = await this.prisma.semanticSuggestion.findFirst({
+      where: { id: suggestionId, assetId },
+      select: { termId: true },
+    });
     await this.meaning.dismiss(assetId, suggestionId, this.actorName());
-    this.record(target, 'governance.meaning.dismiss', ['suggestionId']);
+    this.record(target, 'governance.meaning.dismiss', ['suggestionId'], 200, [
+      {
+        field: 'suggested term',
+        from: suggestion?.termId
+          ? await this.termName(suggestion.termId)
+          : suggestionId,
+        to: 'dismissed',
+      },
+    ]);
     return this.assetMeaning(assetId);
   }
 
@@ -866,6 +970,7 @@ export class GovernanceService {
       'governance.quality.rule.create',
       Object.keys(body ?? {}).sort(),
       201,
+      [{ field: `rule ${rule.key}`, from: null, to: ruleText(rule) }],
     );
     // A new rule says something only once it is measured.
     await this.quality.evaluate([assetId], 'manual', {
@@ -899,6 +1004,8 @@ export class GovernanceService {
       target,
       'governance.quality.rule.update',
       Object.keys(body ?? {}).sort(),
+      200,
+      ruleChanges(this.quality.toValid(current), rule),
     );
     await this.quality.evaluate([current.assetId], 'manual', {
       actorRef: this.actors.current().ref ?? null,
@@ -912,8 +1019,29 @@ export class GovernanceService {
     const target = await this.assetTarget(current.assetId);
     await this.authorize(target);
     await this.quality.remove(ruleId);
-    this.record(target, 'governance.quality.rule.remove', ['ruleId']);
+    const gone = this.quality.toValid(current);
+    this.record(target, 'governance.quality.rule.remove', ['ruleId'], 200, [
+      { field: `rule ${gone.key}`, from: ruleText(gone), to: null },
+    ]);
     return this.assetQuality(current.assetId);
+  }
+
+  async qualityOptions(assetId: string) {
+    await this.assetTarget(assetId);
+    return this.quality.options(assetId);
+  }
+
+  /** Measure a rule as written, saving nothing (the editor's test run). */
+  async testQualityRule(assetId: string, body: RuleInput) {
+    const target = await this.assetTarget(assetId);
+    await this.authorize(target);
+    const input = { ...(body ?? {}) };
+    if (typeof input.name !== 'string' || !input.name.trim()) {
+      input.name = 'Test run';
+    }
+    const rule = this.validRule(input);
+    if (rule.columnName) await this.assertColumn(assetId, rule.columnName);
+    return this.quality.test(assetId, rule);
   }
 
   async runQuality(assetId: string) {
@@ -1263,7 +1391,24 @@ export class GovernanceService {
         ruleIds: touched,
       });
     }
-    this.record(target, 'governance.contract.import', ['contract']);
+    this.record(target, 'governance.contract.import', ['contract'], 200, [
+      ...Object.entries(applied)
+        .filter(([, count]) => typeof count === 'number' && count > 0)
+        .map(([field, count]) => ({
+          field: `contract ${field}`,
+          from: null,
+          to: `${count} applied`,
+        })),
+      ...(skipped.length
+        ? [
+            {
+              field: 'contract skipped',
+              from: null,
+              to: skipped.map((item) => item.path).join(', '),
+            },
+          ]
+        : []),
+    ]);
     return { applied, skipped };
   }
 
@@ -1376,6 +1521,9 @@ export class GovernanceService {
       fields.push('reviewClassification');
     }
     if (!fields.length) return this.assetColumns(assetId);
+    const previous = await this.prisma.assetColumnAnnotation.findUnique({
+      where: { assetId_columnName: { assetId, columnName: name } },
+    });
     await this.prisma.assetColumnAnnotation.upsert({
       where: { assetId_columnName: { assetId, columnName: name } },
       create: {
@@ -1385,7 +1533,44 @@ export class GovernanceService {
       },
       update: data,
     });
-    this.record(target, 'governance.column.update', fields.sort());
+    const changes: AuditChange[] = [];
+    for (const field of fields) {
+      if (field === 'reviewClassification') {
+        if (!('classification' in body)) {
+          changes.push({
+            field: `${name}.classification`,
+            from: null,
+            to: 'reviewed',
+          });
+        }
+        continue;
+      }
+      const key = field as
+        | 'businessName'
+        | 'description'
+        | 'termId'
+        | 'criticalDataElement'
+        | 'classification';
+      let from: unknown = previous?.[key] ?? null;
+      let to: unknown = (data as Record<string, unknown>)[key] ?? null;
+      if (from === to) continue;
+      if (key === 'termId') {
+        from = typeof from === 'string' ? await this.termName(from) : null;
+        to = typeof to === 'string' ? await this.termName(to) : null;
+      }
+      changes.push({
+        field: `${name}.${key === 'termId' ? 'term' : key}`,
+        from: valueText(from),
+        to: valueText(to),
+      });
+    }
+    this.record(
+      target,
+      'governance.column.update',
+      fields.sort(),
+      200,
+      changes,
+    );
     return this.assetColumns(assetId);
   }
 
@@ -1427,7 +1612,9 @@ export class GovernanceService {
         updatedBy: this.actors.current().ref ?? null,
       },
     });
-    this.record(target, 'governance.column.move', ['columnName', 'to']);
+    this.record(target, 'governance.column.move', ['columnName', 'to'], 200, [
+      { field: 'column', from: columnName, to: dest.name },
+    ]);
     return this.assetColumns(assetId);
   }
 
@@ -1441,7 +1628,11 @@ export class GovernanceService {
     const { count } = await this.prisma.assetColumnAnnotation.deleteMany({
       where: { assetId, columnName },
     });
-    if (count) this.record(target, 'governance.column.remove', ['columnName']);
+    if (count) {
+      this.record(target, 'governance.column.remove', ['columnName'], 200, [
+        { field: 'column', from: columnName, to: null },
+      ]);
+    }
     return this.assetColumns(assetId);
   }
 
@@ -1451,19 +1642,28 @@ export class GovernanceService {
    * Owner and lifecycle of each asset on a page of search results (§5.7):
    * one query for the page's roles, one for its records.
    */
-  async summaries(
-    assets: readonly { id: string; sourceId: string }[],
-  ): Promise<
-    Map<string, { status: GovernanceStatus | null; ownerRef: string | null }>
+  async summaries(assets: readonly { id: string; sourceId: string }[]): Promise<
+    Map<
+      string,
+      {
+        status: GovernanceStatus | null;
+        ownerRef: string | null;
+        quality: QualitySummary | null;
+      }
+    >
   > {
     const out = new Map<
       string,
-      { status: GovernanceStatus | null; ownerRef: string | null }
+      {
+        status: GovernanceStatus | null;
+        ownerRef: string | null;
+        quality: QualitySummary | null;
+      }
     >();
     if (!assets.length) return out;
     const assetIds = assets.map((asset) => asset.id);
     const sourceIds = [...new Set(assets.map((asset) => asset.sourceId))];
-    const [owners, records] = await Promise.all([
+    const [owners, records, quality] = await Promise.all([
       this.prisma.governanceRole.findMany({
         where: {
           role: 'OWNER',
@@ -1479,6 +1679,7 @@ export class GovernanceService {
         where: { assetId: { in: assetIds } },
         select: { assetId: true, status: true },
       }),
+      this.quality.summaries(assetIds),
     ]);
     const ownerOf = new Map(
       owners.map((row) => [
@@ -1494,6 +1695,7 @@ export class GovernanceService {
         null;
       out.set(asset.id, {
         ownerRef,
+        quality: quality.get(asset.id) ?? null,
         status: effectiveStatus(
           statusOf.has(asset.id) ? { status: statusOf.get(asset.id)! } : null,
           ownerRef !== null,
@@ -1502,4 +1704,63 @@ export class GovernanceService {
     }
     return out;
   }
+}
+
+/** One line for a rule: what it measures and what it must be. */
+function ruleText(rule: ValidRule): string {
+  const threshold = Array.isArray(rule.threshold)
+    ? `${rule.threshold[0]}..${rule.threshold[1]}`
+    : String(rule.threshold);
+  const where = rule.columnName ? ` on ${rule.columnName}` : '';
+  return `${rule.name}: ${rule.metric}${where} ${rule.operator} ${threshold}${
+    rule.unit === 'percent' ? '%' : ''
+  } (${rule.severity}${rule.enabled ? '' : ', off'})`;
+}
+
+const RULE_FIELDS = [
+  'name',
+  'columnName',
+  'metric',
+  'operator',
+  'threshold',
+  'unit',
+  'severity',
+  'enabled',
+  'schedule',
+  'dimension',
+  'description',
+] as const;
+
+/** What an edit changed in a rule, field by field. */
+function ruleChanges(before: ValidRule, after: ValidRule): AuditChange[] {
+  const show = (value: unknown): string | null =>
+    Array.isArray(value) ? value.join('..') : valueText(value);
+  const out: AuditChange[] = [];
+  for (const field of RULE_FIELDS) {
+    const from = show(before[field]);
+    const to = show(after[field]);
+    if (from !== to) out.push({ field: `${after.key}.${field}`, from, to });
+  }
+  if (JSON.stringify(before.arguments) !== JSON.stringify(after.arguments)) {
+    out.push({
+      field: `${after.key}.arguments`,
+      from: JSON.stringify(before.arguments),
+      to: JSON.stringify(after.arguments),
+    });
+  }
+  return out;
+}
+
+/** A value as the audit trail keeps it: text, a date, or JSON. */
+function valueText(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  if (value instanceof Date) return value.toISOString();
+  if (
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
+  ) {
+    return String(value);
+  }
+  return JSON.stringify(value) ?? null;
 }

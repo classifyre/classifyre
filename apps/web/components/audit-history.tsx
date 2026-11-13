@@ -3,9 +3,10 @@
 import * as React from "react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { History, Search } from "lucide-react";
+import { ArrowRight, History, Search } from "lucide-react";
 import {
   api,
+  type AuditChangeDto,
   AuditControllerListSortByEnum,
   AuditControllerListSortOrderEnum,
   AuditEventDtoChannelEnum,
@@ -47,6 +48,7 @@ import {
 import { useTranslation } from "@/hooks/use-translation";
 import { useLocale } from "@/lib/app-path";
 import { formatDate, formatRelative } from "@/lib/date";
+import type { TranslationKey } from "@/i18n";
 
 export interface AuditFilter {
   entityType?: string;
@@ -291,7 +293,7 @@ export function AuditEventTable({
               />
               <TableHead>
                 <span className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                  {t("audit.table.fields")}
+                  {t("audit.table.changes")}
                 </span>
               </TableHead>
               <TableHead>
@@ -315,10 +317,14 @@ export function AuditEventTable({
                 <TableCell>
                   <ActorChip actorRef={event.actor} />
                 </TableCell>
-                <TableCell className="font-mono text-[11px]">
-                  {event.channel === "mcp"
-                    ? t("audit.mcpTool", { tool: event.operation })
-                    : event.operation}
+                <TableCell className="text-xs">
+                  {event.channel === "mcp" ? (
+                    <span className="font-mono text-[11px]">
+                      {t("audit.mcpTool", { tool: event.operation })}
+                    </span>
+                  ) : (
+                    <OperationLabel operation={event.operation} />
+                  )}
                 </TableCell>
                 {showEntity && (
                   <TableCell className="text-xs text-muted-foreground">
@@ -332,8 +338,11 @@ export function AuditEventTable({
                 <TableCell className="font-mono text-[11px] text-muted-foreground">
                   {event.capability}
                 </TableCell>
-                <TableCell className="max-w-[220px] truncate text-[11px] text-muted-foreground">
-                  {event.fields.length > 0 ? event.fields.join(", ") : "—"}
+                <TableCell className="max-w-[360px] text-[11px] text-muted-foreground">
+                  <ChangesCell
+                    changes={event.changes ?? null}
+                    fields={event.fields}
+                  />
                 </TableCell>
                 <TableCell className="text-[11px] text-muted-foreground">
                   {event.channel === "mcp" ? t("audit.table.mcp") : t("audit.table.rest")}
@@ -490,7 +499,8 @@ export function ChangedBy({
   const { events } = useAuditEvents(
     canSeeActivity ? { entityType, entityId } : null,
   );
-  const last = events[0];
+  // Reads (a quality query reading the table) are not changes.
+  const last = events.find((event) => !event.operation.endsWith("read-table"));
 
   return (
     <div
@@ -522,7 +532,7 @@ export function ChangedBy({
         </Button>
       )}
       <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent className="w-full overflow-y-auto sm:max-w-2xl">
+        <SheetContent className="w-full overflow-y-auto sm:max-w-5xl">
           <SheetHeader>
             <SheetTitle>{t("audit.historyTitle")}</SheetTitle>
             <SheetDescription>{t("audit.historyDescription")}</SheetDescription>
@@ -535,3 +545,79 @@ export function ChangedBy({
     </div>
   );
 }
+
+/**
+ * A readable name for an operation the app has one for (governance changes),
+ * with the raw operation underneath for whoever searches by it.
+ */
+function OperationLabel({ operation }: { operation: string }) {
+  const { t } = useTranslation();
+  const key = `audit.ops.${operation}`;
+  const label = t(key as TranslationKey);
+  if (label === key) {
+    return <span className="font-mono text-[11px]">{operation}</span>;
+  }
+  return (
+    <span className="flex flex-col">
+      <span className="font-medium text-foreground">{label}</span>
+      <span className="font-mono text-[10px] text-muted-foreground">
+        {operation}
+      </span>
+    </span>
+  );
+}
+
+/**
+ * What changed: "steward: Ann → Ann, Ben" where the event kept values
+ * (governance), otherwise the names of the fields it touched.
+ */
+function ChangesCell({
+  changes,
+  fields,
+}: {
+  changes: AuditChangeDto[] | null;
+  fields: string[];
+}) {
+  const { t } = useTranslation();
+  if (!changes?.length) {
+    return (
+      <span className="block truncate">
+        {fields.length > 0 ? fields.join(", ") : "—"}
+      </span>
+    );
+  }
+  const value = (text: string | null | undefined, strike = false) =>
+    text === null || text === undefined || text === "" ? (
+      <span className="italic">{t("audit.table.emptyValue")}</span>
+    ) : (
+      <span
+        className={`break-words text-foreground ${strike ? "line-through decoration-muted-foreground/60" : ""}`}
+        title={text}
+      >
+        {text.length > 80 ? `${text.slice(0, 80)}…` : text}
+      </span>
+    );
+  return (
+    <ul className="space-y-0.5" data-testid="audit-changes">
+      {changes.map((change, index) => (
+        <li key={`${change.field}-${index}`} className="flex flex-wrap items-baseline gap-x-1">
+          <span className="font-mono text-[10px] uppercase tracking-wide">
+            {change.field}
+          </span>
+          {change.from !== null && change.from !== undefined && (
+            <>
+              {value(change.from, change.to !== null && change.to !== undefined)}
+              <ArrowRight className="h-3 w-3 shrink-0 self-center" aria-hidden />
+            </>
+          )}
+          {change.from === null || change.from === undefined
+            ? value(change.to)
+            : change.to === null || change.to === undefined
+              ? <span className="italic">{t("audit.table.emptyValue")}</span>
+              : value(change.to)}
+        </li>
+      ))}
+    </ul>
+  );
+}
+

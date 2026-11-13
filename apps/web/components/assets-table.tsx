@@ -81,6 +81,7 @@ import type { TranslationKey } from "../i18n";
 import { FeatureOffNotice } from "@/components/feature-off-notice";
 import { AssetFilterBar } from "@/components/asset-filter-bar";
 import { GovernanceBadge } from "@/components/governance/governance-badge";
+import { QualityChip } from "@/components/governance/quality-chip";
 import { ActorChip } from "@/components/actor-chip";
 
 type AssetsTableScope = {
@@ -119,6 +120,7 @@ const GOVERNANCE_FILTER_VALUES = [
   "active",
   "deprecated",
   "retired",
+  "failing",
   "mine",
   "stewarding",
 ] as const;
@@ -939,6 +941,12 @@ export function AssetsTable({
                     )}
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
+                    {t("governance.column")}
+                  </TableHead>
+                  <TableHead className="bg-white/95 dark:bg-card/95">
+                    {t("governance.qualityColumn")}
+                  </TableHead>
+                  <TableHead className="bg-white/95 dark:bg-card/95">
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
@@ -961,9 +969,6 @@ export function AssetsTable({
                       t("common.status"),
                       SearchAssetsSortByEnum.Status,
                     )}
-                  </TableHead>
-                  <TableHead className="bg-white/95 dark:bg-card/95">
-                    {t("governance.column")}
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
                     <Tooltip>
@@ -1134,6 +1139,27 @@ export function AssetsTable({
                         </TableCell>
 
                         <TableCell>
+                          <div className="flex flex-col items-start gap-1">
+                            <GovernanceBadge
+                              status={item.governance?.status ?? null}
+                            />
+                            {item.governance?.ownerRef && (
+                              <ActorChip actorRef={item.governance.ownerRef} />
+                            )}
+                          </div>
+                        </TableCell>
+
+                        <TableCell data-testid="asset-quality-cell">
+                          {item.governance?.quality?.rules ? (
+                            <QualityChip quality={item.governance.quality} />
+                          ) : (
+                            <span className="text-xs text-muted-foreground">
+                              —
+                            </span>
+                          )}
+                        </TableCell>
+
+                        <TableCell>
                           <ToneBadge tone="neutral">
                             {formatEnumLabel(asset.sourceType)}
                           </ToneBadge>
@@ -1151,17 +1177,6 @@ export function AssetsTable({
                               `sources.asset${asset.status.charAt(0) + asset.status.slice(1).toLowerCase()}` as TranslationKey,
                             )}
                           </ToneBadge>
-                        </TableCell>
-
-                        <TableCell>
-                          <div className="flex flex-col items-start gap-1">
-                            <GovernanceBadge
-                              status={item.governance?.status ?? null}
-                            />
-                            {item.governance?.ownerRef && (
-                              <ActorChip actorRef={item.governance.ownerRef} />
-                            )}
-                          </div>
                         </TableCell>
 
                         <TableCell>
@@ -1269,7 +1284,7 @@ export function AssetsTable({
 
                       {isExpanded && canExpand && (
                         <TableRow>
-                          <TableCell colSpan={14} className="p-0 bg-muted/15">
+                          <TableCell colSpan={15} className="p-0 bg-muted/15">
                             <FindingsSubTable
                               findings={item.findings}
                               onFindingClick={(findingId) =>

@@ -159,6 +159,12 @@ export class SourceGovernanceCoverageDto {
 
   @ApiProperty({ description: 'Owned assets whose lifecycle is ACTIVE.' })
   active: number;
+
+  @ApiProperty({ description: 'Assets with at least one quality check.' })
+  checked: number;
+
+  @ApiProperty({ description: 'Assets with a failing quality check.' })
+  failing: number;
 }
 
 export class SourceGovernanceDto {
@@ -807,6 +813,92 @@ export class AssetQualityDto {
 
   @ApiProperty()
   canGovern: boolean;
+}
+
+export class QualityTestResultDto {
+  @ApiPropertyOptional({ nullable: true })
+  measuredValue: number | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'null when it could not be measured.',
+  })
+  passed: boolean | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  error: string | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Rows the whole-table query read.',
+  })
+  rowsChecked: number | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'The query that measured it (table rules).',
+  })
+  sql: string | null;
+
+  @ApiProperty()
+  tookMs: number;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'What the finding would say when it fails.',
+  })
+  failure: string | null;
+}
+
+export class QualityOptionCountDto {
+  @ApiProperty()
+  value: string;
+
+  @ApiProperty()
+  count: number;
+}
+
+export class QualityOptionColumnDto {
+  @ApiProperty()
+  name: string;
+
+  @ApiPropertyOptional({ nullable: true })
+  type: string | null;
+}
+
+export class QualityOptionsDto {
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'SQL name of the table; null when SQL cannot read it.',
+  })
+  table: string | null;
+
+  @ApiProperty({ type: [QualityOptionColumnDto] })
+  columns: QualityOptionColumnDto[];
+
+  @ApiPropertyOptional({ nullable: true })
+  rowCount: number | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  lastScannedAt: Date | null;
+
+  @ApiProperty()
+  openFindings: number;
+
+  @ApiProperty({ type: [QualityOptionCountDto] })
+  detectorTypes: QualityOptionCountDto[];
+
+  @ApiProperty({ type: [QualityOptionCountDto] })
+  customDetectors: QualityOptionCountDto[];
+
+  @ApiProperty({ type: [QualityOptionCountDto] })
+  findingTypes: QualityOptionCountDto[];
+
+  @ApiProperty({ type: [QualityOptionCountDto] })
+  categories: QualityOptionCountDto[];
+
+  @ApiProperty({ type: [QualityOptionCountDto] })
+  columnsWithFindings: QualityOptionCountDto[];
 }
 
 export class SaveQualityRuleDto {

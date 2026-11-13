@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
+import { ShieldCheck } from "lucide-react";
 import { api } from "@workspace/api-client";
 import { Spinner } from "@workspace/ui/components";
 import { useTranslation } from "@/hooks/use-translation";
@@ -21,6 +22,10 @@ import { MeaningStep } from "./meaning-step";
 import { OwnershipCard } from "./ownership-card";
 import { QualityStep } from "./quality-step";
 import { ContractCard } from "./contract-card";
+import { GovernanceBadge } from "./governance-badge";
+import { QualityChip } from "./quality-chip";
+import { RoleIcon } from "./role-style";
+import { ChangedBy } from "@/components/audit-history";
 
 /** Which step fixes which checklist item. */
 const STEP_OF: Record<string, string> = {
@@ -68,6 +73,9 @@ export function AssetGovernanceView({
 }) {
   const { t } = useTranslation();
   const [jump, setJump] = useState<{ id: string; at: number } | null>(null);
+  // Bumped on every change made here, so "last changed" reads the trail again.
+  const [changes, setChanges] = useState(0);
+  const changed = () => setChanges((n) => n + 1);
 
   if (!governance) {
     return loading ? (
@@ -81,9 +89,17 @@ export function AssetGovernanceView({
     governance.checklist.find((item: { key: string }) => item.key === key)
       ?.done;
   const assetId = governance.assetId;
+  const apply = (next: AssetGovernanceDto) => {
+    onChange(next);
+    changed();
+  };
+  const refresh = () => {
+    reload();
+    changed();
+  };
 
   const assign = async (role: GovernanceRoleKind, principalRef: string) => {
-    onChange(
+    apply(
       await api.governance.governanceControllerAssignAssetRole({
         id: assetId,
         assignGovernanceRoleDto: { role, principalRef },
@@ -91,7 +107,7 @@ export function AssetGovernanceView({
     );
   };
   const remove = async (roleId: string) => {
-    onChange(
+    apply(
       await api.governance.governanceControllerRemoveAssetRole({
         id: assetId,
         roleId,
@@ -109,7 +125,6 @@ export function AssetGovernanceView({
         <OwnershipCard
           scope="asset"
           roles={governance.roles}
-          history={governance.history}
           canGovern={governance.canAssignRoles}
           onAssign={assign}
           onRemove={remove}
@@ -126,7 +141,7 @@ export function AssetGovernanceView({
         <DescriptionCard
           governance={governance}
           onSave={async (patch) =>
-            onChange(await saveGovernance(assetId, patch, t))
+            apply(await saveGovernance(assetId, patch, t))
           }
         />
       ),
@@ -136,7 +151,7 @@ export function AssetGovernanceView({
       title: t("governance.steps.meaning"),
       description: t("governance.steps.meaningDesc"),
       complete: Boolean(done("meaning")),
-      content: <MeaningStep assetId={assetId} onChanged={reload} />,
+      content: <MeaningStep assetId={assetId} onChanged={refresh} />,
     },
     ...(columns && columns.columns.length > 0
       ? [
@@ -151,7 +166,7 @@ export function AssetGovernanceView({
                 state={columns}
                 onChange={(next) => {
                   onColumnsChange(next);
-                  reload();
+                  refresh();
                 }}
               />
             ),
@@ -167,11 +182,10 @@ export function AssetGovernanceView({
         <QualityStep
           assetId={assetId}
           quality={quality}
-          columns={(columns?.columns ?? []).map((column) => column.name)}
           isTable={isTable}
           onChange={(next) => {
             onQualityChange(next);
-            reload();
+            refresh();
           }}
         />
       ),
@@ -187,7 +201,7 @@ export function AssetGovernanceView({
             governance={governance}
             onStatus={async (status) => {
               try {
-                onChange(await saveGovernance(assetId, { status }, t));
+                apply(await saveGovernance(assetId, { status }, t));
               } catch {
                 // saveGovernance already said why.
               }
@@ -199,12 +213,23 @@ export function AssetGovernanceView({
           <ContractCard
             assetId={assetId}
             canGovern={governance.canGovern}
-            onImported={reloadAll}
+            onImported={() => {
+              reloadAll();
+              changed();
+            }}
           />
         </div>
       ),
     },
   ];
+
+  const owner = governance.roles.find(
+    (role: { role: string }) => role.role === "OWNER",
+  );
+  const checked = governance.checklist.filter(
+    (item: { done: boolean }) => item.done,
+  ).length;
+  const total = governance.checklist.length;
 
   return (
     <GovernanceSteps
@@ -212,20 +237,121 @@ export function AssetGovernanceView({
       label={t("governance.steps.label")}
       jumpTo={jump}
       banner={
-        !governance.governed ? (
-          <div
-            className="mb-6 rounded-md border-2 border-dashed border-border p-4"
-            data-testid="ungoverned-banner"
-          >
-            <div className="font-semibold">
-              {t("governance.ungoverned.title")}
-            </div>
-            <p className="text-sm text-muted-foreground">
-              {t("governance.ungoverned.body")}
-            </p>
+        <div className="mb-8 space-y-3" data-testid="governance-overview">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <OverviewTile
+              label={t("governance.overview.status")}
+              icon={<ShieldCheck className="h-4 w-4" aria-hidden />}
+              onClick={() => setJump({ id: "certification", at: Date.now() })}
+            >
+              <GovernanceBadge status={governance.status} />
+              <span className="text-[11px] leading-snug text-muted-foreground">
+                {t(
+                  `governance.statusHint.${governance.status ?? "UNGOVERNED"}` as Parameters<typeof t>[0],
+                )}
+              </span>
+            </OverviewTile>
+            <OverviewTile
+              label={t("governance.role.OWNER")}
+              icon={<RoleIcon role="OWNER" size="sm" />}
+              onClick={() => setJump({ id: "ownership", at: Date.now() })}
+            >
+              <span className="truncate text-sm font-semibold">
+                {owner?.principal.displayName ?? t("governance.ownership.nobody")}
+              </span>
+              {owner?.inherited && (
+                <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
+                  {t("governance.ownership.inherited")}
+                </span>
+              )}
+            </OverviewTile>
+            <OverviewTile
+              label={t("governance.overview.checklist")}
+              icon={<span className="font-mono text-xs">{checked}/{total}</span>}
+              onClick={() => setJump({ id: "certification", at: Date.now() })}
+            >
+              <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full bg-accent-ink"
+                  style={{ width: `${total ? Math.round((checked / total) * 100) : 0}%` }}
+                />
+              </div>
+              <span className="text-[11px] text-muted-foreground">
+                {t("governance.checklist.progress", { done: checked, total })}
+              </span>
+            </OverviewTile>
+            <OverviewTile
+              label={t("governance.steps.quality")}
+              icon={null}
+              onClick={() => setJump({ id: "quality", at: Date.now() })}
+            >
+              {quality && quality.rules.length > 0 ? (
+                <QualityChip
+                  quality={{
+                    rules: quality.rules.filter((rule) => rule.enabled).length,
+                    failing: quality.failing,
+                    score: quality.score ?? null,
+                  }}
+                />
+              ) : (
+                <span className="text-sm text-muted-foreground">
+                  {t("governance.overview.noChecks")}
+                </span>
+              )}
+              {quality?.lastEvaluatedAt && (
+                <span className="text-[11px] text-muted-foreground">
+                  {t("governance.overview.measured", {
+                    when: new Date(quality.lastEvaluatedAt).toLocaleString(),
+                  })}
+                </span>
+              )}
+            </OverviewTile>
           </div>
-        ) : undefined
+          <ChangedBy key={changes} entityType="asset" entityId={assetId} />
+          {!governance.governed && (
+            <div
+              className="rounded-[4px] border-2 border-dashed border-border p-4"
+              data-testid="ungoverned-banner"
+            >
+              <div className="font-semibold">
+                {t("governance.ungoverned.title")}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {t("governance.ungoverned.body")}
+              </p>
+            </div>
+          )}
+        </div>
       }
     />
+  );
+}
+
+/** One fact of the overview row; clicking it goes to the step behind it. */
+function OverviewTile({
+  label,
+  icon,
+  onClick,
+  children,
+}: {
+  label: string;
+  icon: ReactNode;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex min-w-0 flex-col items-start gap-2 rounded-[4px] border border-border bg-card p-3 text-left shadow-[3px_3px_0_0_var(--border)] transition-transform hover:-translate-y-0.5"
+    >
+      <span className="flex w-full items-center justify-between gap-2">
+        <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+          {label}
+        </span>
+        {icon}
+      </span>
+      {children}
+    </button>
   );
 }
