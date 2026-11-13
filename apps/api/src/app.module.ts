@@ -26,6 +26,8 @@ import { NotebookModule } from './notebook/notebook.module';
 import { DeploymentSettingsModule } from './deployment-settings/deployment-settings.module';
 import { DataQueryModule } from './data-query/data-query.module';
 import { GovernanceModule } from './governance/governance.module';
+import { SqlConnectionsModule } from './sql-connections/sql-connections.module';
+import { SqlGatewayModule } from './sql-gateway/sql-gateway.module';
 import { WebSocketModule } from './websocket/websocket.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { MatchingModule } from './matching/matching.module';
@@ -129,6 +131,8 @@ import {
     NotebookModule,
     DataQueryModule,
     GovernanceModule,
+    SqlConnectionsModule,
+    SqlGatewayModule,
     DeploymentSettingsModule,
     WebSocketModule,
     SchedulerModule,

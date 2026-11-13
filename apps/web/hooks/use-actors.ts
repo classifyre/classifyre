@@ -61,8 +61,9 @@ function subscribe(listener: () => void) {
 export interface ActorDisplay {
   kind: ActorKind;
   name: string;
-  /** The MCP token a person's action came through. */
+  /** The MCP token or SQL connection a person's action came through. */
   via?: string;
+  viaKind?: "mcp" | "sql";
 }
 
 /** What to show for an actor reference; null for no reference. */
@@ -86,6 +87,7 @@ export function useActor(ref: string | null | undefined): ActorDisplay | null {
       kind,
       name: resolved.displayName,
       ...(resolved.viaDisplayName ? { via: resolved.viaDisplayName } : {}),
+      ...(resolved.viaKind ? { viaKind: resolved.viaKind } : {}),
     };
   }
   if (kind === "name") return { kind, name: ref };

@@ -15,7 +15,8 @@ export type ResourceRef =
         | 'inquiry'
         | 'detector'
         | 'entity'
-        | 'mcp-token';
+        | 'mcp-token'
+        | 'data-connection';
       id: string;
     };
 
@@ -56,4 +57,6 @@ export interface ResourceGrants {
 /** Capabilities that can be granted on a single source or table. */
 export const RESOURCE_GRANTABLE_CAPABILITIES: readonly Capability[] = [
   'data.query',
+  // A Data reader of one table may connect a tool to that table.
+  'data.connect',
 ];

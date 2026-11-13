@@ -10,6 +10,7 @@ export type ActorKind =
 export type ActorVia =
   | 'oidc'
   | 'mcp-token'
+  | 'sql-connection'
   | 'internal-key'
   | 'autopilot'
   | 'none';

@@ -733,7 +733,8 @@
       "workers": "Workers",
       "cleanup": "Cleanup",
       "activity": "Activity",
-      "access": "Access"
+      "access": "Access",
+      "sqlConnections": "SQL connections"
     },
     "cleanup": {
       "title": "Storage & cleanup",
@@ -7019,6 +7020,7 @@
     "person": "Someone",
     "selfDeclared": "Name entered by the person; not verified without sign-in",
     "viaToken": "Acted through the MCP token {{token}}",
+    "viaConnection": "Read through the SQL connection {{token}}",
     "via": "via {{token}}",
     "kinds": {
       "user": "Signed-in person",
@@ -7106,6 +7108,20 @@
           "move": "Column notes moved",
           "remove": "Column notes removed"
         }
+      },
+      "data-connections": {
+        "create": "SQL connection created",
+        "issue": "SQL connection given",
+        "reveal": "SQL connection password revealed",
+        "password": "SQL connection password replaced",
+        "revoke": "SQL connection revoked",
+        "block": "Closed to a SQL connection",
+        "unblock": "Opened again to a SQL connection",
+        "sign-in": "Signed in through a SQL connection",
+        "sign-in-refused": "SQL connection sign-in refused"
+      },
+      "query-runs": {
+        "read-table": "Table read"
       }
     }
   },
@@ -7136,26 +7152,28 @@
     "group": "Group",
     "pickGroup": "Choose a group",
     "groupsHint": "Groups and their people are kept in the identity server, by your operators or your company directory; a group gets access here.",
-    "role": "Role",
     "untilOptional": "Until (optional)",
+    "roles": "Roles",
+    "pickRoles": "Choose roles",
+    "searchRoles": "Search roles…",
+    "noRoles": "No role matches.",
+    "addedPartial": "Gave {{done}} of {{total}} roles. Not given: {{failed}}. {{reason}}",
+    "rolesCount": "{{count}} role(s)",
+    "capabilitiesMore": "+{{count}} more",
+    "capabilitiesLess": "show less",
+    "cannotOpen": "{{roles}} only adds to a role that opens the workspace. This group has none, so its people cannot see the workspace through it — give the group Viewer (or another role that opens it) too, unless their other groups already do.",
+    "cannotOpenRow": "This role does not open the workspace by itself.",
+    "opensNothing": "{{roles}} does not open the workspace by itself. Pick Viewer (or another role that opens it) as well, unless the group already has one.",
     "add": "Give access",
     "whyTitle": "What I can do",
-    "whyDescription": "Every capability you hold here, with the group, role and scope that gives it. Sort any column.",
-    "pickCapability": "Choose something you can do",
-    "becauseOf": "{{subject}} as {{role}} on {{scope}}",
+    "whyDescription": "The groups that give you access here, with each role, what it lets you do and where it applies.",
     "canDo": {
-      "capability": "Capability",
-      "group": "Group",
-      "role": "Role",
-      "tenant": "Tenant",
-      "scope": "Scope",
-      "via": "Via",
-      "empty": "Nothing explains that capability yet.",
       "none": "You hold nothing here yet."
     },
     "grantsTable": {
       "group": "Group",
       "role": "Role",
+      "capabilities": "Can do",
       "scope": "Scope",
       "until": "Until",
       "origin": "Origin",
@@ -7163,7 +7181,7 @@
       "actions": "Actions"
     },
     "giveAccessTitle": "Give access",
-    "giveAccessDescription": "Give a group a role on this workspace — or, for Data reader, on one source or one table — optionally until a date. You can only give roles whose capabilities you all hold here.",
+    "giveAccessDescription": "Give a group one or more roles on this workspace — or, for Data reader, on one source or one table — optionally until a date. Each role is its own grant. You can only give roles whose capabilities you all hold here.",
     "cancel": "Cancel",
     "allWorkspaces": "All workspaces",
     "tenantTitle": "Tenant",
@@ -7172,7 +7190,6 @@
     "tenantGrantsGrouped": "Grouped by group",
     "tenantGrantsUngrouped": "All grants",
     "removedGroupId": "Removed group {{id}}",
-    "scope": "Applies to",
     "scopes": {
       "tenant": "The whole tenant",
       "group": "A group's workspaces",
@@ -7180,7 +7197,6 @@
     },
     "ownedBy": "Workspaces owned by",
     "workspace": "Workspace",
-    "pickScope": "Choose",
     "tabs": {
       "access": "Access",
       "activity": "Activity"
@@ -7611,7 +7627,13 @@
       "topReaders": "Read most by",
       "readerCounts": "{{reads}} reads · {{exports}} exports",
       "formats": "Exported as {{list}}",
-      "none": "Nobody read it here in this period."
+      "none": "Nobody read it here in this period.",
+      "channels": "Through: {{list}}",
+      "channel": {
+        "rest": "the app",
+        "mcp": "MCP",
+        "sql": "SQL connections"
+      }
     },
     "page": {
       "title": "Governance",
@@ -7663,7 +7685,9 @@
       "coverage": "Coverage",
       "coverageDesc": "How much is governed",
       "quality": "Quality",
-      "qualityDesc": "Rules and their results"
+      "qualityDesc": "Rules and their results",
+      "access": "Access",
+      "accessDesc": "Who reads it from BI tools, through which connection; give or close access here."
     },
     "meaning": {
       "title": "Meaning",
@@ -8021,5 +8045,77 @@
         "metadata": "Saved, it is measured at once and again after every scan of the source."
       }
     }
+  },
+  "sqlConnections": {
+    "title": "SQL connections",
+    "description": "Connect BI tools and drivers (Power BI, Excel, Tableau, DBeaver, psql, JDBC, ODBC) to the tables you may query, over the PostgreSQL protocol. Each connection is yours: it reads what you may read right now, every read is recorded with it, and it can be revoked.",
+    "viewMine": "Mine",
+    "viewAll": "Everyone’s",
+    "mineIntro": "Your connections. A connection never reads more than you may.",
+    "allIntro": "Every SQL connection in this workspace.",
+    "onTarget": "SQL connections that read {{name}}, name it, or are closed on it (last 90 days).",
+    "thisTable": "this table",
+    "thisSource": "this source",
+    "create": "New connection",
+    "createTitle": "New SQL connection",
+    "createIntro": "Name it after the tool that will use it. Its password is shown once; only a verifier is kept.",
+    "issue": "Give a connection",
+    "issueTitle": "Give a SQL connection for {{name}}",
+    "issueIntro": "The person gets a notice and reveals the password themselves; you never see it. The connection reads only this, and only if they may read it.",
+    "issued": "Connection given to {{name}}",
+    "person": "Person",
+    "name": "Name",
+    "expiresIn": "Expires in",
+    "cancel": "Cancel",
+    "done": "Done",
+    "cannotCreate": "You need the right to query tables here (a Data reader role, or tables you own) to make a connection.",
+    "none": "No SQL connections yet.",
+    "noneOnTarget": "No SQL connection has read this yet.",
+    "secretTitle": "Password for {{name}}",
+    "secretOnce": "Copy it now: it is shown once. Lost it? Make a new one; the old one stops working.",
+    "password": "Password",
+    "reveal": "Get password",
+    "newPassword": "New password",
+    "revoke": "Revoke",
+    "revoked": "Connection revoked",
+    "block": "Close here",
+    "blocked": "Closed {{name}} to this connection",
+    "unblock": "Open again",
+    "unblocked": "Opened again",
+    "failed": "That did not work.",
+    "failedToLoad": "SQL connections could not be loaded.",
+    "scopeAll": "Everything its person may query",
+    "lastUsed": "Signed in {{when}} from {{from}}",
+    "neverUsed": "Never signed in",
+    "expires": "Expires {{when}}",
+    "revokedAt": "Revoked {{when}}",
+    "issuedBy": "Given by",
+    "status": {
+      "active": "Active",
+      "pending": "Waiting for its password",
+      "expired": "Expired",
+      "revoked": "Revoked"
+    },
+    "connectTool": "Connect a tool",
+    "connectIntro": "Reach these tables from a BI tool or driver with one of your SQL connections. Queries run like here, with the same rights and limits.",
+    "noConnectionYet": "You have no active SQL connection yet.",
+    "manage": "Manage SQL connections",
+    "gatewayOff": "SQL connections are not switched on in this deployment.",
+    "host": "Host",
+    "port": "Port",
+    "database": "Database",
+    "user": "User",
+    "ssl": "SSL mode",
+    "copy": "Copy {{what}}",
+    "copied": "{{what}} copied",
+    "downloadCa": "Download the certificate authority",
+    "caHint": "Clients check the server’s certificate against it (sslmode=verify-full).",
+    "jdbcHint": "DBeaver, Tableau, Metabase, DataGrip: PostgreSQL driver, this URL, the password.",
+    "odbcHint": "Excel and other ODBC tools: the psqlODBC driver (PostgreSQL Unicode).",
+    "powerBiHint": "Power BI: Get data → PostgreSQL database, server host:port, database as above; install the certificate authority in Windows’ trusted roots.",
+    "governanceTitle": "Access through SQL connections",
+    "governanceLead": "Who reads this from BI tools and drivers, when and how often. Owners and stewards can give a connection for it, or close it to one.",
+    "reads": "{{count}} reads here",
+    "days": "{{count}} days"
   }
 }

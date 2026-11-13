@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { assetResource } from '../identity/audit-resources';
+import { personOf } from '../identity/actor-ref';
 import type { GovernancePerson } from './governance-rules';
 
 const READ = 'query-runs.read-table';
@@ -15,6 +16,8 @@ export interface AssetUsage {
   perDay: { day: string; reads: number; exports: number }[];
   topReaders: { actorRef: string; reads: number; exports: number }[];
   exportsByFormat: { format: string; count: number }[];
+  /** Reads and exports by how they came: the app, MCP, a SQL connection. */
+  byChannel: { channel: string; reads: number; exports: number }[];
 }
 
 export interface SourceCoverageRow {
@@ -57,15 +60,22 @@ export class GovernanceInsightsService {
     const since = new Date(Date.now() - span * 86_400_000);
     const tag = assetResource(assetId);
     const rows = await this.prisma.$queryRaw<
-      { day: Date; actor: string | null; operation: string; count: bigint }[]
+      {
+        day: Date;
+        actor: string | null;
+        channel: string;
+        operation: string;
+        count: bigint;
+      }[]
     >`
-      SELECT date_trunc('day', occurred_at) AS day, actor, operation,
+      SELECT date_trunc('day', occurred_at) AS day, actor, channel, operation,
              count(*) AS count
         FROM audit_events
        WHERE resources @> ARRAY[${tag}]::text[]
          AND (operation = ${READ} OR operation LIKE ${`${EXPORT_PREFIX}%`})
          AND occurred_at >= ${since}
-       GROUP BY 1, 2, 3`;
+       GROUP BY 1, 2, 3, 4`;
+    const channels = new Map<string, { reads: number; exports: number }>();
 
     const perDay = new Map<string, { reads: number; exports: number }>();
     const perActor = new Map<string, { reads: number; exports: number }>();
@@ -77,7 +87,17 @@ export class GovernanceInsightsService {
       const isExport = row.operation.startsWith(EXPORT_PREFIX);
       const day = row.day.toISOString().slice(0, 10);
       const dayEntry = perDay.get(day) ?? { reads: 0, exports: 0 };
-      const actorKey = row.actor ?? '';
+      // A reader is a person, however they read: the app, an MCP token, a
+      // SQL connection (`user:x@sql:c` counts as `user:x`).
+      const actorKey = personOf(row.actor) ?? '';
+      const channelEntry = channels.get(row.channel) ?? {
+        reads: 0,
+        exports: 0,
+      };
+      if (row.operation.startsWith(EXPORT_PREFIX))
+        channelEntry.exports += count;
+      else channelEntry.reads += count;
+      channels.set(row.channel, channelEntry);
       const actorEntry = perActor.get(actorKey) ?? { reads: 0, exports: 0 };
       if (isExport) {
         exports += count;
@@ -114,6 +134,9 @@ export class GovernanceInsightsService {
       exportsByFormat: [...formats.entries()]
         .map(([format, count]) => ({ format, count }))
         .sort((a, b) => b.count - a.count),
+      byChannel: [...channels.entries()]
+        .map(([channel, entry]) => ({ channel, ...entry }))
+        .sort((a, b) => b.reads + b.exports - (a.reads + a.exports)),
     };
   }
 

@@ -30,6 +30,7 @@ import { GovernanceService } from './governance.service';
     GovernanceInsightsService,
     QualityService,
     QualityWorker,
+    GovernanceNotifier,
   ],
 })
 export class GovernanceModule {}

@@ -39,7 +39,12 @@ export function ActorChip({
     actor.kind === "name"
       ? t("actors.selfDeclared")
       : actor.via
-        ? t("actors.viaToken", { token: actor.via })
+        ? t(
+            actor.viaKind === "sql"
+              ? "actors.viaConnection"
+              : "actors.viaToken",
+            { token: actor.via },
+          )
         : t(`actors.kinds.${actor.kind}`);
 
   return (

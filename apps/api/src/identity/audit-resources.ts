@@ -11,6 +11,8 @@
  * - `governance`: owners, stewards, descriptions and lifecycle of assets and
  *   sources (docs/prd/GOV-governed-data-assets.md R4). The Governance page
  *   filters on it.
+ * - `connection:<id>`: a SQL connection — given, revealed, revoked, blocked,
+ *   and every table read through it (docs/prd/DQ-data-query.md §5.7).
  *
  * One vocabulary for both writers (the per-table reads in query-run.service
  * and the grant changes in audit.interceptor) and the one reader (the
@@ -27,15 +29,21 @@ export function assetResource(assetId: string): string {
   return `asset:${assetId}`;
 }
 
+export function connectionResource(connectionId: string): string {
+  return `connection:${connectionId}`;
+}
+
 /** A table read or export: the data area, the table, and its source. */
 export function tableReadResources(table: {
   assetId: string;
   sourceId?: string | null;
+  connectionId?: string | null;
 }): string[] {
   return [
     DATA_RESOURCE,
     assetResource(table.assetId),
     ...(table.sourceId ? [sourceResource(table.sourceId)] : []),
+    ...(table.connectionId ? [connectionResource(table.connectionId)] : []),
   ];
 }
 

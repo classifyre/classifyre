@@ -53,6 +53,13 @@ profiles:
         namespace: classifyre-dev
         port: 8080
         localPort: 8280
+      # SQL connections: BI tools and psql on the Mac connect to localhost:25432
+      # (15432 is often taken by other local PostgreSQL forwards).
+      - resourceType: service
+        resourceName: classifyre-sql-gateway
+        namespace: classifyre-dev
+        port: 5432
+        localPort: 25432
 
   # Same local cluster, but writable and pointed at the VPS demo instance's
   # database — so the public instance can stay in read-only demo mode while you

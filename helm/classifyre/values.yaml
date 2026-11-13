@@ -688,6 +688,109 @@ api:
         # -- TTL for completed prune jobs (seconds).
         ttlSecondsAfterFinished: 3600
 
+sqlGateway:
+  # -- SQL connections (docs/prd/DQ-data-query.md §5.7): a PostgreSQL endpoint
+  # -- for BI tools and drivers (psql, DBeaver, Power BI, Excel, Tableau, JDBC,
+  # -- ODBC). Runs the API image with SERVICE_ROLE=sql. People sign in with a
+  # -- SQL connection made in the app; every query runs as a query job and is
+  # -- audited with the connection.
+  enabled: false
+
+  # -- Gateway replicas. A client session stays on one pod; more replicas
+  # -- spread sessions (each holds an in-memory catalog of ~150 MB).
+  replicaCount: 1
+
+  # -- Port the gateway listens on inside the pod and on its Service.
+  port: 5432
+
+  # -- The host name people connect to, shown in the app next to each
+  # -- connection, and put in the generated certificate. Required to show
+  # -- connection details; e.g. `sql.example.com`.
+  publicHost: ""
+
+  # -- The port people connect to (the Service's, a NodePort, or a Traefik
+  # -- entrypoint's).
+  publicPort: 5432
+
+  # -- Sessions one gateway pod holds at once; size `resources` to about
+  # -- 150 MB per session on top of the process.
+  maxSessions: 16
+
+  # -- Sessions one SQL connection may have open at once.
+  maxSessionsPerConnection: 4
+
+  # -- Minutes a session may sit idle before it is closed.
+  idleMinutes: 30
+
+  # -- Client networks allowed to connect (CIDRs, checked in the gateway on
+  # -- the real client address). Empty: any. Also set
+  # -- `service.loadBalancerSourceRanges` for a LoadBalancer.
+  allowedCidrs: []
+
+  # -- Expect a PROXY protocol header (v1 or v2) on every connection, so the
+  # -- gateway sees the real client behind a TCP proxy (Traefik, HAProxy, a
+  # -- cloud load balancer) for lockouts and `allowedCidrs`. Turn on only when
+  # -- every connection comes through such a proxy.
+  proxyProtocol: false
+
+  # -- V8 heap cap (MB) of the gateway process. The catalogs live outside the
+  # -- JS heap (WebAssembly), so this stays small.
+  maxOldSpaceSizeMb: 1024
+
+  resources:
+    requests:
+      cpu: 250m
+      memory: 1Gi
+    limits:
+      memory: 4Gi
+
+  service:
+    # -- `ClusterIP` when a TCP proxy (Traefik) exposes it; `LoadBalancer` or
+    # -- `NodePort` to expose it directly — the gateway does its own TLS, so no
+    # -- reverse proxy is needed at all.
+    type: ClusterIP
+    # -- Fixed node port for `NodePort`/`LoadBalancer`.
+    nodePort: null
+    annotations: {}
+    # -- For a LoadBalancer: the client networks it accepts.
+    loadBalancerSourceRanges: []
+    # -- `Local` keeps the client address for `allowedCidrs` without PROXY protocol.
+    externalTrafficPolicy: ""
+
+  tls:
+    # -- A `kubernetes.io/tls` Secret (`tls.crt`, `tls.key`, optionally
+    # -- `ca.crt`) for `publicHost`. Empty: cert-manager below, or a CA and
+    # -- certificate the chart makes once and keeps (its CA is downloadable in
+    # -- the app, so clients can use `sslmode=verify-full`).
+    existingSecret: ""
+    certManager:
+      # -- Let cert-manager issue the certificate for `publicHost`.
+      enabled: false
+      issuerRef:
+        name: ""
+        kind: ClusterIssuer
+    # -- Extra names for the generated certificate (besides `publicHost`,
+    # -- `localhost` and the Service's names).
+    extraSans: []
+    # -- Development only: accept connections without TLS.
+    allowPlaintext: false
+
+  traefik:
+    # -- Expose through Traefik (v3) as an IngressRouteTCP. Needs a Traefik
+    # -- entrypoint for it (e.g. `--entryPoints.postgres.address=:5432`).
+    enabled: false
+    entryPoints:
+      - postgres
+    # -- `none`: Traefik forwards raw TCP from a dedicated entrypoint
+    # -- (`HostSNI(*)`) and TLS is negotiated with the gateway, end to end —
+    # -- works with every client. `passthrough`: route by `publicHost` (SNI) on
+    # -- a shared entrypoint; Traefik answers PostgreSQL's SSLRequest and passes
+    # -- the TLS stream through, so TLS still ends at the gateway. `terminate`:
+    # -- Traefik ends TLS with `traefik.secretName` and forwards plaintext with a
+    # -- PROXY header (the gateway then accepts plaintext from proxies only).
+    tls: none
+    secretName: ""
+
 worker:
   # -- Number of worker replicas. The worker runs the same image as the API
   # -- (SERVICE_ROLE=worker) to process background pg-boss queue jobs and

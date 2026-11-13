@@ -242,6 +242,20 @@ export const CAPABILITIES = [
     description:
       'Query the rows of tables with SQL: every table here, or only the sources and tables a grant names.',
   },
+  {
+    // A channel for data.query, never more (docs/prd/DQ-data-query.md §5.7):
+    // a BI tool or driver reads, over PostgreSQL, what its person may query.
+    id: 'data.connect',
+    scope: 'workspace',
+    description:
+      'Create your own SQL connections for BI tools and drivers (PostgreSQL protocol).',
+  },
+  {
+    id: 'data.connection.manage',
+    scope: 'workspace',
+    description:
+      'See, give and revoke the SQL connections of everyone in the workspace.',
+  },
   // Tokens
   {
     id: 'mcp.token.own',

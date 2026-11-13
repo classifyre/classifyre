@@ -31,7 +31,7 @@ export class AuditEventDto {
   @ApiProperty({ example: 'mcp-token' })
   via: string;
 
-  @ApiProperty({ enum: ['rest', 'mcp'] })
+  @ApiProperty({ enum: ['rest', 'mcp', 'sql'] })
   channel: string;
 
   @ApiProperty({ example: 'source.manage' })
@@ -197,9 +197,16 @@ export class ResolvedActorDto {
   displayName: string;
 
   @ApiPropertyOptional({
-    description: 'For an action delegated through an MCP token: the token.',
+    description:
+      'For an action delegated through an MCP token or a SQL connection: its name.',
   })
   viaDisplayName?: string;
+
+  @ApiPropertyOptional({
+    enum: ['mcp', 'sql'],
+    description: 'What `viaDisplayName` names: an MCP token or a SQL connection.',
+  })
+  viaKind?: 'mcp' | 'sql';
 
   @ApiPropertyOptional({
     description: 'For a group: its path in the tenant.',

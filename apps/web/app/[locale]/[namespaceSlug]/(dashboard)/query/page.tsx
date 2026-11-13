@@ -1,5 +1,6 @@
 "use client";
 
+import { ConnectToolButton } from "@/components/sql-connections/connect-tool-button";
 import * as React from "react";
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
@@ -103,6 +104,9 @@ function QueryPageContent() {
           />
         </section>
         <section className="w-full min-w-0 shrink-0 overflow-x-clip px-2 py-2 xl:w-80 xl:border-l">
+          <div className="mb-2 flex justify-end">
+            <ConnectToolButton />
+          </div>
           <QueryExplorer
             catalog={catalog}
             history={history}

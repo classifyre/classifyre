@@ -1,0 +1,33 @@
+{{- if .Values.sqlGateway.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "classifyre.sqlGateway.fullname" . }}
+  labels:
+    {{- include "classifyre.commonLabels" . | nindent 4 }}
+    app.kubernetes.io/component: sql-gateway
+  {{- with .Values.sqlGateway.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.sqlGateway.service.type }}
+  {{- with .Values.sqlGateway.service.loadBalancerSourceRanges }}
+  loadBalancerSourceRanges:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.sqlGateway.service.externalTrafficPolicy }}
+  externalTrafficPolicy: {{ . }}
+  {{- end }}
+  selector:
+    {{- include "classifyre.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: sql-gateway
+  ports:
+    - name: postgres
+      port: {{ .Values.sqlGateway.port }}
+      targetPort: postgres
+      protocol: TCP
+      {{- if and (or (eq .Values.sqlGateway.service.type "NodePort") (eq .Values.sqlGateway.service.type "LoadBalancer")) .Values.sqlGateway.service.nodePort }}
+      nodePort: {{ .Values.sqlGateway.service.nodePort }}
+      {{- end }}
+{{- end }}

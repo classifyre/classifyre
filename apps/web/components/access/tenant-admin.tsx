@@ -8,7 +8,6 @@ import {
   History,
   KeyRound,
   Search,
-  Trash2,
   UserPlus,
   UsersRound,
 } from "lucide-react";
@@ -24,20 +23,14 @@ import {
   type TenantEventDto,
   type TenantGroupDto,
 } from "@workspace/api-client";
-import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import { Card, CardContent } from "@workspace/ui/components/card";
 import { DataTableFooter } from "@/components/data-table-footer";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@workspace/ui/components/dialog";
+
+
 import { Input } from "@workspace/ui/components/input";
-import { Label } from "@workspace/ui/components/label";
+
+
 import {
   Select,
   SelectContent,
@@ -60,9 +53,10 @@ import {
   TabsTrigger,
 } from "@workspace/ui/components/tabs";
 import { ActorChip } from "@/components/actor-chip";
+import { GiveAccessDialog } from "@/components/access/give-access-dialog";
+import { GrantsByGroup } from "@/components/access/grants-by-group";
 import {
   SortableHead,
-  sortRows,
   useTableSort,
 } from "@/components/sortable-table-head";
 import { useIamConsole } from "@/components/iam-session";
@@ -71,8 +65,6 @@ import { useLocale } from "@/lib/app-path";
 import { formatDate, formatRelative } from "@/lib/date";
 import { extractApiErrorMessage } from "@/lib/extract-api-error-message";
 
-type ScopeType = "tenant" | "group" | "workspace";
-type GrantsSortCol = "group" | "role" | "scope" | "until";
 type ActivitySortCol = "when" | "who" | "what";
 
 const TAB_TRIGGER_CLASS =
@@ -215,13 +207,12 @@ export function TenantAdmin() {
                   onRemove={remove}
                 />
                 {tenant && (
-                  <TenantGrantDialog
+                  <GiveAccessDialog
                     open={dialogOpen}
                     onOpenChange={setDialogOpen}
-                    tenant={tenant}
                     groups={groups}
                     roles={roles}
-                    workspaces={workspaces}
+                    where={{ kind: "tenant", tenant, workspaces }}
                     onAdded={load}
                   />
                 )}
@@ -254,7 +245,7 @@ export function TenantAdmin() {
 }
 
 
-/** All grants of the tenant, sortable and grouped by group — no paging, it fits. */
+/** All grants of the tenant, grouped by group with what each role gives — no paging, it fits. */
 function TenantGrantsTable({
   grants,
   groups,
@@ -269,148 +260,44 @@ function TenantGrantsTable({
   onRemove: (grant: GrantDto) => void;
 }) {
   const { t } = useTranslation();
-  const sort = useTableSort<GrantsSortCol>("group");
-  const { sortCol, sortDir } = sort;
-
-  const roleTitle = React.useCallback(
-    (key: string) => roles.find((role) => role.key === key)?.title ?? key,
-    [roles],
-  );
   const groupPath = React.useCallback(
-    (id: string) =>
-      groups.find((group) => group.id === id)?.path ??
-      t("access.removedGroupId", { id: id.slice(0, 8) }),
+    (grant: GrantDto) =>
+      groups.find((group) => group.id === grant.subjectId)?.path ??
+      t("access.removedGroupId", { id: grant.subjectId.slice(0, 8) }),
     [groups, t],
   );
   const scopeName = React.useCallback(
-    (grant: GrantDto) =>
-      grant.scopeType === "workspace"
-        ? (workspaces.find((ws) => ws.id === grant.scopeId)?.name ??
-          grant.scopeLabel)
-        : grant.scopeLabel,
+    (grant: GrantDto) => {
+      const name =
+        grant.scopeType === "workspace"
+          ? (workspaces.find((ws) => ws.id === grant.scopeId)?.name ??
+            grant.scopeLabel)
+          : grant.scopeLabel;
+      return grant.scopeType === "group" ||
+        grant.scopeType === "source" ||
+        grant.scopeType === "asset" ? (
+        <>
+          {name}
+          <span className="ml-2 font-mono text-[11px]">
+            {grant.scopeId.slice(0, 8)}
+          </span>
+        </>
+      ) : (
+        name
+      );
+    },
     [workspaces],
   );
 
-  const sorted = React.useMemo(
-    () =>
-      sortRows(
-        grants,
-        (grant) =>
-          sortCol === "role"
-            ? roleTitle(grant.roleKey)
-            : sortCol === "scope"
-              ? scopeName(grant)
-              : sortCol === "until"
-                ? grant.expiresAt
-                : groupPath(grant.subjectId),
-        sortDir,
-      ),
-    [grants, sortCol, sortDir, roleTitle, scopeName, groupPath],
-  );
-
-  const grouped = React.useMemo(() => {
-    const byGroup = new Map<string, GrantDto[]>();
-    for (const grant of sorted) {
-      const list = byGroup.get(grant.subjectId) ?? [];
-      list.push(grant);
-      byGroup.set(grant.subjectId, list);
-    }
-    return [...byGroup.entries()].sort(([a], [b]) =>
-      groupPath(a).localeCompare(groupPath(b)),
-    );
-  }, [sorted, groupPath]);
-
-  if (grants.length === 0) {
-    return (
-      <p className="rounded-[4px] border border-border px-3 py-4 text-center text-sm text-muted-foreground">
-        {t("access.none")}
-      </p>
-    );
-  }
-
   return (
-    <div className="space-y-4">
-      {grouped.map(([subjectId, rows]) => (
-        <section key={subjectId} className="space-y-1">
-          <div className="flex items-center gap-2 px-1">
-            <Badge variant="outline" className="gap-1.5 py-1">
-              <UsersRound className="h-3 w-3 text-muted-foreground" aria-hidden />
-              <span className="max-w-[320px] truncate font-medium">
-                {groupPath(subjectId)}
-              </span>
-            </Badge>
-            <span className="text-xs text-muted-foreground">
-              {rows.length === 1
-                ? t("access.group")
-                : t("notificationAudiences.groups")}
-            </span>
-          </div>
-          <div className="overflow-x-auto rounded-[4px] border border-border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <SortableHead
-                    label={t("access.grantsTable.role")}
-                    column="role"
-                    sort={sort}
-                  />
-                  <SortableHead
-                    label={t("access.grantsTable.scope")}
-                    column="scope"
-                    sort={sort}
-                  />
-                  <SortableHead
-                    label={t("access.grantsTable.until")}
-                    column="until"
-                    sort={sort}
-                  />
-                  <TableHead className="text-right">
-                    <span className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                      {t("access.grantsTable.actions")}
-                    </span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((grant) => (
-                  <TableRow key={grant.id}>
-                    <TableCell className="font-medium">
-                      {roleTitle(grant.roleKey)}
-                      <span className="ml-2 font-mono text-[11px] text-muted-foreground">
-                        {grant.roleKey}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {scopeName(grant)}
-                      {grant.scopeType === "group" ||
-                      grant.scopeType === "source" ||
-                      grant.scopeType === "asset" ? (
-                        <span className="ml-2 font-mono text-[11px]">
-                          {grant.scopeId.slice(0, 8)}
-                        </span>
-                      ) : null}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {grant.expiresAt ? formatDate(grant.expiresAt) : "—"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        aria-label={t("access.remove")}
-                        onClick={() => void onRemove(grant)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </section>
-      ))}
-    </div>
+    <GrantsByGroup
+      grants={grants}
+      roles={roles}
+      groupLabel={groupPath}
+      scopeLabel={scopeName}
+      canRemove={() => true}
+      onRemove={onRemove}
+    />
   );
 }
 
@@ -651,180 +538,5 @@ function TenantActivityTable({
         <p className="text-xs text-muted-foreground">{t("common.loading")}</p>
       )}
     </div>
-  );
-}
-
-function TenantGrantDialog({
-  open,
-  onOpenChange,
-  tenant,
-  groups,
-  roles,
-  workspaces,
-  onAdded,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  tenant: TenantDto;
-  groups: TenantGroupDto[];
-  roles: RoleDto[];
-  workspaces: Namespace[];
-  onAdded: () => Promise<void>;
-}) {
-  const { t } = useTranslation();
-  const [subjectId, setSubjectId] = React.useState("");
-  const [roleKey, setRoleKey] = React.useState("viewer");
-  const [scopeType, setScopeType] = React.useState<ScopeType>("group");
-  const [scopeId, setScopeId] = React.useState("");
-  const [saving, setSaving] = React.useState(false);
-  const role = roles.find((candidate) => candidate.key === roleKey);
-  const scopes = React.useMemo(
-    () => (role?.scopes ?? ["tenant"]) as ScopeType[],
-    [role],
-  );
-
-  React.useEffect(() => {
-    if (open) {
-      setSubjectId("");
-      setRoleKey("viewer");
-      setScopeType("group");
-      setScopeId("");
-      setSaving(false);
-    }
-  }, [open ]);
-
-  React.useEffect(() => {
-    if (!scopes.includes(scopeType)) setScopeType(scopes[0] ?? "tenant");
-  }, [scopes, scopeType]);
-
-  const submit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    try {
-      setSaving(true);
-      await api.access.tenantAccessControllerAddGrant({
-        createGrantDto: {
-          subjectType: "group",
-          subjectId,
-          roleKey,
-          scopeType,
-          scopeId: scopeType === "tenant" ? tenant.id : scopeId,
-        },
-      });
-      toast.success(t("access.added"));
-      onOpenChange(false);
-      await onAdded();
-    } catch (error) {
-      toast.error(await extractApiErrorMessage(error, t("access.addFailed")));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{t("access.giveAccessTitle")}</DialogTitle>
-          <DialogDescription>{t("access.groupsHint")}</DialogDescription>
-        </DialogHeader>
-        <form onSubmit={(event) => void submit(event)} className="grid gap-3">
-          <div className="grid gap-2 sm:grid-cols-2">
-            <div className="grid gap-1">
-              <Label>{t("access.group")}</Label>
-              <Select value={subjectId} onValueChange={setSubjectId}>
-                <SelectTrigger>
-                  <SelectValue placeholder={t("access.pickGroup")} />
-                </SelectTrigger>
-                <SelectContent>
-                  {groups.map((group) => (
-                    <SelectItem key={group.id} value={group.id}>
-                      {group.path}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-1">
-              <Label>{t("access.role")}</Label>
-              <Select value={roleKey} onValueChange={setRoleKey}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {roles.map((candidate) => (
-                    <SelectItem key={candidate.key} value={candidate.key}>
-                      {candidate.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-1">
-              <Label>{t("access.scope")}</Label>
-              <Select
-                value={scopeType}
-                onValueChange={(value) => {
-                  setScopeType(value as ScopeType);
-                  setScopeId("");
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {scopes.map((scope) => (
-                    <SelectItem key={scope} value={scope}>
-                      {t(`access.scopes.${scope}`)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {scopeType !== "tenant" && (
-              <div className="grid gap-1">
-                <Label>
-                  {scopeType === "group" ? t("access.ownedBy") : t("access.workspace")}
-                </Label>
-                <Select value={scopeId} onValueChange={setScopeId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={t("access.pickScope")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(scopeType === "group"
-                      ? groups.map((group) => ({ id: group.id, label: group.path }))
-                      : workspaces.map((ws) => ({ id: ws.id, label: ws.name }))
-                    ).map((option) => (
-                      <SelectItem key={option.id} value={option.id}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {t("access.groupsHint")}
-          </p>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={saving}
-            >
-              {t("access.cancel")}
-            </Button>
-            <Button
-              type="submit"
-              disabled={!subjectId || (scopeType !== "tenant" && !scopeId) || saving}
-            >
-              <UserPlus className="h-4 w-4" />
-              {t("access.add")}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
   );
 }

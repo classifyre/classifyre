@@ -308,6 +308,40 @@ esac
 # The identity server's Java heap: small and fixed, it holds one realm.
 default JAVA_OPTS_KC_HEAP        "-Xms64m -Xmx${CLASSIFYRE_IAM_HEAP_MB:-512}m"
 
+# ── SQL connections ───────────────────────────────────────────────────────────
+# The API (SERVICE_ROLE=all) also runs the SQL gateway: PostgreSQL clients —
+# BI tools, psql, JDBC, ODBC — connect with a SQL connection made in the app
+# (docs: SQL Connections). The bundled PostgreSQL holds 5432 inside the
+# container, so the gateway listens on 5433; publish it as you like
+# (`-p 5432:5433`). TLS always: without a mounted certificate a CA and a
+# certificate for the public host are made once and kept beside the data; the
+# app offers the CA for download.
+default SQL_GATEWAY_ENABLED "true"
+default SQL_GATEWAY_PORT "${PORT_SQL:-5433}"
+sql_url_host="${CLASSIFYRE_URL#*://}"; sql_url_host="${sql_url_host%%[:/]*}"
+default SQL_GATEWAY_PUBLIC_HOST "${sql_url_host:-localhost}"
+default SQL_GATEWAY_PUBLIC_PORT "5432"
+sql_tls="${CLASSIFYRE_SQL_TLS_DIR:-/var/lib/classifyre/sql-tls}"
+if [ "${SQL_GATEWAY_ENABLED}" = "true" ] && [ ! -s "${sql_tls}/tls.crt" ]; then
+  mkdir -p "${sql_tls}"
+  ( umask 077
+    openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
+      -subj "/CN=Classifyre SQL gateway CA" \
+      -keyout "${sql_tls}/ca.key" -out "${sql_tls}/ca.crt" >/dev/null 2>&1
+    openssl req -newkey rsa:2048 -nodes -subj "/CN=${SQL_GATEWAY_PUBLIC_HOST}" \
+      -keyout "${sql_tls}/tls.key" -out "${sql_tls}/tls.csr" >/dev/null 2>&1
+    printf 'subjectAltName=DNS:%s,DNS:localhost,IP:127.0.0.1\n' "${SQL_GATEWAY_PUBLIC_HOST}" > "${sql_tls}/san.ext"
+    openssl x509 -req -in "${sql_tls}/tls.csr" -CA "${sql_tls}/ca.crt" -CAkey "${sql_tls}/ca.key" \
+      -CAcreateserial -days 825 -extfile "${sql_tls}/san.ext" -out "${sql_tls}/tls.crt" >/dev/null 2>&1
+    rm -f "${sql_tls}/tls.csr" "${sql_tls}/san.ext" "${sql_tls}/ca.srl" )
+  chmod 644 "${sql_tls}/ca.crt" "${sql_tls}/tls.crt"
+  chown -R 10001:10001 "${sql_tls}"
+  log "Made a certificate authority and a certificate for ${SQL_GATEWAY_PUBLIC_HOST} in ${sql_tls} (SQL connections)."
+fi
+default SQL_GATEWAY_TLS_CERT_FILE "${sql_tls}/tls.crt"
+default SQL_GATEWAY_TLS_KEY_FILE "${sql_tls}/tls.key"
+[ -s "${sql_tls}/ca.crt" ] && default SQL_GATEWAY_TLS_CA_FILE "${sql_tls}/ca.crt"
+
 # ── Runtime directories ───────────────────────────────────────────────────────
 # The Dockerfile creates these, but a mount replaces whatever the image had at
 # that path: a named volume is seeded from the image, a *bind* mount is not — it

@@ -733,7 +733,8 @@
       "workers": "Worker",
       "cleanup": "Bereinigung",
       "activity": "Aktivität",
-      "access": "Zugriff"
+      "access": "Zugriff",
+      "sqlConnections": "SQL-Verbindungen"
     },
     "cleanup": {
       "title": "Speicher & Bereinigung",
@@ -7019,6 +7020,7 @@
     "person": "Jemand",
     "selfDeclared": "Von der Person eingegebener Name; ohne Anmeldung nicht geprüft",
     "viaToken": "Über das MCP-Token {{token}} ausgeführt",
+    "viaConnection": "Über die SQL-Verbindung {{token}} gelesen",
     "via": "über {{token}}",
     "kinds": {
       "user": "Angemeldete Person",
@@ -7106,6 +7108,20 @@
           "move": "Spaltenangaben verschoben",
           "remove": "Spaltenangaben entfernt"
         }
+      },
+      "data-connections": {
+        "create": "SQL-Verbindung erstellt",
+        "issue": "SQL-Verbindung vergeben",
+        "reveal": "Passwort der SQL-Verbindung abgerufen",
+        "password": "Passwort der SQL-Verbindung ersetzt",
+        "revoke": "SQL-Verbindung widerrufen",
+        "block": "Für eine SQL-Verbindung gesperrt",
+        "unblock": "Für eine SQL-Verbindung wieder geöffnet",
+        "sign-in": "Über eine SQL-Verbindung angemeldet",
+        "sign-in-refused": "Anmeldung einer SQL-Verbindung abgelehnt"
+      },
+      "query-runs": {
+        "read-table": "Tabelle gelesen"
       }
     }
   },
@@ -7136,26 +7152,28 @@
     "group": "Gruppe",
     "pickGroup": "Gruppe wählen",
     "groupsHint": "Gruppen und ihre Personen werden im Identitätsserver gepflegt, von Ihren Betreibern oder Ihrem Firmenverzeichnis; hier erhält eine Gruppe Zugriff.",
-    "role": "Rolle",
     "untilOptional": "Bis (optional)",
+    "roles": "Rollen",
+    "pickRoles": "Rollen wählen",
+    "searchRoles": "Rollen suchen…",
+    "noRoles": "Keine Rolle passt.",
+    "addedPartial": "{{done}} von {{total}} Rollen vergeben. Nicht vergeben: {{failed}}. {{reason}}",
+    "rolesCount": "{{count}} Rolle(n)",
+    "capabilitiesMore": "+{{count}} weitere",
+    "capabilitiesLess": "weniger anzeigen",
+    "cannotOpen": "{{roles}} ergänzt nur eine Rolle, die den Arbeitsbereich öffnet. Diese Gruppe hat keine, ihre Personen sehen den Arbeitsbereich darüber also nicht – geben Sie der Gruppe zusätzlich Betrachter (oder eine andere Rolle, die ihn öffnet), es sei denn, ihre anderen Gruppen tun das schon.",
+    "cannotOpenRow": "Diese Rolle öffnet den Arbeitsbereich nicht von selbst.",
+    "opensNothing": "{{roles}} öffnet den Arbeitsbereich nicht von selbst. Wählen Sie zusätzlich Betrachter (oder eine andere Rolle, die ihn öffnet), es sei denn, die Gruppe hat schon eine.",
     "add": "Zugriff gewähren",
     "whyTitle": "Was ich darf",
-    "whyDescription": "Jede Fähigkeit, die Sie hier haben, mit Gruppe, Rolle und Bereich, der sie gibt. Jede Spalte ist sortierbar.",
-    "pickCapability": "Etwas wählen, das Sie dürfen",
-    "becauseOf": "{{subject}} als {{role}} auf {{scope}}",
+    "whyDescription": "Die Gruppen, die Ihnen hier Zugriff geben, mit jeder Rolle, was sie Ihnen erlaubt und wo sie gilt.",
     "canDo": {
-      "capability": "Fähigkeit",
-      "group": "Gruppe",
-      "role": "Rolle",
-      "tenant": "Mandant",
-      "scope": "Bereich",
-      "via": "Über",
-      "empty": "Nichts erklärt diese Fähigkeit bisher.",
       "none": "Sie haben hier noch nichts."
     },
     "grantsTable": {
       "group": "Gruppe",
       "role": "Rolle",
+      "capabilities": "Darf",
       "scope": "Bereich",
       "until": "Bis",
       "origin": "Herkunft",
@@ -7163,7 +7181,7 @@
       "actions": "Aktionen"
     },
     "giveAccessTitle": "Zugriff gewähren",
-    "giveAccessDescription": "Geben Sie einer Gruppe eine Rolle für diesen Arbeitsbereich – beim Datenleser auch für eine Quelle oder eine Tabelle –, auf Wunsch bis zu einem Datum. Sie können nur Rollen geben, deren Fähigkeiten Sie hier alle selbst haben.",
+    "giveAccessDescription": "Geben Sie einer Gruppe eine oder mehrere Rollen für diesen Arbeitsbereich – beim Datenleser auch für eine Quelle oder eine Tabelle –, auf Wunsch bis zu einem Datum. Jede Rolle ist eine eigene Freigabe. Sie können nur Rollen geben, deren Fähigkeiten Sie hier alle selbst haben.",
     "cancel": "Abbrechen",
     "allWorkspaces": "Alle Arbeitsbereiche",
     "tenantTitle": "Mandant",
@@ -7172,7 +7190,6 @@
     "tenantGrantsGrouped": "Nach Gruppe",
     "tenantGrantsUngrouped": "Alle Freigaben",
     "removedGroupId": "Entfernte Gruppe {{id}}",
-    "scope": "Gilt für",
     "scopes": {
       "tenant": "Den ganzen Mandanten",
       "group": "Arbeitsbereiche einer Gruppe",
@@ -7180,7 +7197,6 @@
     },
     "ownedBy": "Arbeitsbereiche von",
     "workspace": "Arbeitsbereich",
-    "pickScope": "Wählen",
     "tabs": {
       "access": "Zugriff",
       "activity": "Aktivität"
@@ -7611,7 +7627,13 @@
       "topReaders": "Am meisten gelesen von",
       "readerCounts": "{{reads}} Abfragen · {{exports}} Exporte",
       "formats": "Exportiert als {{list}}",
-      "none": "In diesem Zeitraum hat es hier niemand gelesen."
+      "none": "In diesem Zeitraum hat es hier niemand gelesen.",
+      "channels": "Über: {{list}}",
+      "channel": {
+        "rest": "die App",
+        "mcp": "MCP",
+        "sql": "SQL-Verbindungen"
+      }
     },
     "page": {
       "title": "Governance",
@@ -7663,7 +7685,9 @@
       "coverage": "Abdeckung",
       "coverageDesc": "Wie viel gesteuert ist",
       "quality": "Qualität",
-      "qualityDesc": "Regeln und Ergebnisse"
+      "qualityDesc": "Regeln und Ergebnisse",
+      "access": "Zugriff",
+      "accessDesc": "Wer es aus BI-Werkzeugen liest, über welche Verbindung; Zugang hier vergeben oder sperren."
     },
     "meaning": {
       "title": "Bedeutung",
@@ -8021,5 +8045,77 @@
         "metadata": "Gespeichert wird sie sofort gemessen und nach jedem Scan der Quelle erneut."
       }
     }
+  },
+  "sqlConnections": {
+    "title": "SQL-Verbindungen",
+    "description": "Verbinden Sie BI-Werkzeuge und Treiber (Power BI, Excel, Tableau, DBeaver, psql, JDBC, ODBC) über das PostgreSQL-Protokoll mit den Tabellen, die Sie abfragen dürfen. Jede Verbindung gehört Ihnen: Sie liest, was Sie gerade lesen dürfen, jeder Lesezugriff wird mit ihr protokolliert, und sie kann widerrufen werden.",
+    "viewMine": "Meine",
+    "viewAll": "Alle",
+    "mineIntro": "Ihre Verbindungen. Eine Verbindung liest nie mehr, als Sie dürfen.",
+    "allIntro": "Alle SQL-Verbindungen dieses Arbeitsbereichs.",
+    "onTarget": "SQL-Verbindungen, die {{name}} gelesen haben, es nennen oder dafür gesperrt sind (letzte 90 Tage).",
+    "thisTable": "diese Tabelle",
+    "thisSource": "diese Quelle",
+    "create": "Neue Verbindung",
+    "createTitle": "Neue SQL-Verbindung",
+    "createIntro": "Benennen Sie sie nach dem Werkzeug, das sie nutzt. Das Passwort wird einmal angezeigt; gespeichert wird nur ein Prüfwert.",
+    "issue": "Verbindung vergeben",
+    "issueTitle": "SQL-Verbindung für {{name}} vergeben",
+    "issueIntro": "Die Person erhält eine Benachrichtigung und ruft das Passwort selbst ab; Sie sehen es nie. Die Verbindung liest nur dies, und nur wenn die Person es lesen darf.",
+    "issued": "Verbindung an {{name}} vergeben",
+    "person": "Person",
+    "name": "Name",
+    "expiresIn": "Läuft ab in",
+    "cancel": "Abbrechen",
+    "done": "Fertig",
+    "cannotCreate": "Für eine Verbindung brauchen Sie das Recht, hier Tabellen abzufragen (die Rolle Datenleser oder eigene Tabellen).",
+    "none": "Noch keine SQL-Verbindungen.",
+    "noneOnTarget": "Noch keine SQL-Verbindung hat dies gelesen.",
+    "secretTitle": "Passwort für {{name}}",
+    "secretOnce": "Jetzt kopieren: Es wird nur einmal angezeigt. Verloren? Erzeugen Sie ein neues; das alte gilt dann nicht mehr.",
+    "password": "Passwort",
+    "reveal": "Passwort abrufen",
+    "newPassword": "Neues Passwort",
+    "revoke": "Widerrufen",
+    "revoked": "Verbindung widerrufen",
+    "block": "Hier sperren",
+    "blocked": "{{name}} für diese Verbindung gesperrt",
+    "unblock": "Wieder öffnen",
+    "unblocked": "Wieder geöffnet",
+    "failed": "Das hat nicht geklappt.",
+    "failedToLoad": "SQL-Verbindungen konnten nicht geladen werden.",
+    "scopeAll": "Alles, was ihre Person abfragen darf",
+    "lastUsed": "Angemeldet {{when}} von {{from}}",
+    "neverUsed": "Nie angemeldet",
+    "expires": "Läuft ab am {{when}}",
+    "revokedAt": "Widerrufen am {{when}}",
+    "issuedBy": "Vergeben von",
+    "status": {
+      "active": "Aktiv",
+      "pending": "Wartet auf Passwortabruf",
+      "expired": "Abgelaufen",
+      "revoked": "Widerrufen"
+    },
+    "connectTool": "Werkzeug verbinden",
+    "connectIntro": "Erreichen Sie diese Tabellen aus einem BI-Werkzeug oder Treiber mit einer Ihrer SQL-Verbindungen. Abfragen laufen wie hier, mit denselben Rechten und Grenzen.",
+    "noConnectionYet": "Sie haben noch keine aktive SQL-Verbindung.",
+    "manage": "SQL-Verbindungen verwalten",
+    "gatewayOff": "SQL-Verbindungen sind in dieser Installation nicht eingeschaltet.",
+    "host": "Host",
+    "port": "Port",
+    "database": "Datenbank",
+    "user": "Benutzer",
+    "ssl": "SSL-Modus",
+    "copy": "{{what}} kopieren",
+    "copied": "{{what}} kopiert",
+    "downloadCa": "Zertifizierungsstelle herunterladen",
+    "caHint": "Clients prüfen das Serverzertifikat damit (sslmode=verify-full).",
+    "jdbcHint": "DBeaver, Tableau, Metabase, DataGrip: PostgreSQL-Treiber, diese URL, das Passwort.",
+    "odbcHint": "Excel und andere ODBC-Werkzeuge: der psqlODBC-Treiber (PostgreSQL Unicode).",
+    "powerBiHint": "Power BI: Daten abrufen → PostgreSQL-Datenbank, Server host:port, Datenbank wie oben; die Zertifizierungsstelle in Windows als vertrauenswürdig installieren.",
+    "governanceTitle": "Zugriff über SQL-Verbindungen",
+    "governanceLead": "Wer dies aus BI-Werkzeugen und Treibern liest, wann und wie oft. Eigentümer und Verwalter können dafür eine Verbindung vergeben oder es für eine sperren.",
+    "reads": "{{count}} Lesezugriffe hier",
+    "days": "{{count}} Tagen"
   }
 }

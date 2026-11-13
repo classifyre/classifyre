@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { ExternalLink, Lock } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
+import { ConnectToolButton } from "@/components/sql-connections/connect-tool-button";
 import { useNamespace } from "@/components/namespace-provider";
 import { useCan } from "@/hooks/use-me";
 import { useTranslation } from "@/hooks/use-translation";
@@ -72,6 +73,7 @@ export function DataTab({
         )}
         <div className="ml-auto flex flex-wrap items-center gap-1">
           {canManage && <GiveDataAccessButton scope={scope} access={access} />}
+          <ConnectToolButton />
           <Button asChild size="sm" variant="ghost">
             <Link
               href={`${nsHref("/query")}?sql=${encodeURIComponent(sql)}`}

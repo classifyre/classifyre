@@ -325,7 +325,9 @@ api:
   startupProbe:
     enabled: true
     periodSeconds: 2
-    failureThreshold: 90
+    # 10 minutes: API, worker and SQL gateway boot together on one k3d node
+    # (tenant migrations, route mapping) and took over 3 minutes each.
+    failureThreshold: 300
 
   # With the init-container disabled, the API's existing Kubernetes startup
   # path applies pending migrations using the same source-mounted runtime.
@@ -462,6 +464,23 @@ api:
       size: 5Gi
       prune:
         enabled: false
+
+# SQL connections (docs/prd/DQ-data-query.md §5.7): the PostgreSQL endpoint,
+# reached from the Mac through skaffold's port-forward on localhost:25432
+# (psql "host=localhost port=15432 dbname=<workspace> user=<connection>
+# sslmode=verify-full sslrootcert=<CA from the app>"). The chart makes a CA and
+# a certificate for localhost and the Service names.
+sqlGateway:
+  enabled: true
+  publicHost: localhost
+  publicPort: 25432
+  maxSessions: 8
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      memory: 3Gi
 
 worker:
   replicaCount: 1

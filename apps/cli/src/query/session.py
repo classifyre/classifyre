@@ -85,6 +85,12 @@ class QueryRequest:
     callback_token: str | None = None
     #: "xlsx" | "csv" | "parquet": write a file instead of returning Arrow.
     export_format: str | None = None
+    #: "postgres" for SQL from a SQL connection (a PostgreSQL client).
+    dialect: str = "duckdb"
+    #: The PostgreSQL database the client named (the workspace), postgres only.
+    database: str | None = None
+    #: The client's search path as ``source.schema`` entries, postgres only.
+    search_path: list[str] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> QueryRequest:
@@ -110,6 +116,9 @@ class QueryRequest:
                 if str(data.get("exportFormat") or "").lower() in EXPORT_FORMATS
                 else None
             ),
+            dialect="postgres" if data.get("dialect") == "postgres" else "duckdb",
+            database=str(data["database"]) if data.get("database") else None,
+            search_path=[str(p) for p in data.get("searchPath") or [] if isinstance(p, str)],
         )
 
 
@@ -298,7 +307,13 @@ class QuerySession:
 
     def run(self) -> QueryResult:
         started = time.monotonic()
-        validated = validate(self.request.sql, self._tables.keys())
+        validated = validate(
+            self.request.sql,
+            self._tables.keys(),
+            self.request.dialect,
+            database=self.request.database,
+            search_path=self.request.search_path,
+        )
         conn = self._open()
         self._conn = conn
         with self._deadline(conn, self.request.timeout_seconds) as fired:

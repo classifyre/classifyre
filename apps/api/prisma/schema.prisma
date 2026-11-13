@@ -187,15 +187,82 @@ model QueryRun {
   jobNamespace      String?        @map("job_namespace")
   /// sha256 of the token the job posts its result with; cleared once it has.
   callbackTokenHash String?        @map("callback_token_hash")
+  /// The person behind the run (`user:<sub>`), whatever channel it came
+  /// through: the per-person cap counts on it (docs/prd/DQ §5.7).
+  personRef         String?        @map("person_ref")
+  /// `rest` (the app), `mcp` or `sql` (a SQL connection).
+  channel           String         @default("rest")
+  /// The SQL connection the run came through, for `sql`.
+  connectionId      String?        @map("connection_id")
   startedAt         DateTime?      @map("started_at")
   finishedAt        DateTime?      @map("finished_at")
   createdAt         DateTime       @default(now()) @map("created_at")
   expiresAt         DateTime       @map("expires_at")
 
   @@index([actorRef, createdAt(sort: Desc)])
+  @@index([personRef, status])
   @@index([status])
   @@index([expiresAt])
   @@map("query_runs")
+}
+
+/// A SQL connection: the credential one person's BI tool or driver signs in
+/// with over the PostgreSQL wire protocol (docs/prd/DQ-data-query.md §5.7).
+/// A channel, not a right: it reads what its person may read right now,
+/// narrowed by `scopeSourceIds`/`scopeAssetIds` and minus its blocks.
+model DataConnection {
+  id              String    @id @default(uuid())
+  name            String
+  /// The person it belongs to (`user:<sub>`); only they ever see the password.
+  personRef       String    @map("person_ref")
+  /// What the client signs in as; unique in the workspace.
+  username        String    @unique
+  /// SCRAM-SHA-256 verifier (RFC 5802/7677): the password is never stored.
+  /// Null while an issued connection waits for its person to reveal it.
+  scramSalt       String?   @map("scram_salt")
+  scramIterations Int?      @map("scram_iterations")
+  scramStoredKey  String?   @map("scram_stored_key")
+  scramServerKey  String?   @map("scram_server_key")
+  /// Last characters of the password, to tell connections apart.
+  secretPreview   String?   @map("secret_preview")
+  /// Empty both = everything the person may read.
+  scopeSourceIds  String[]  @default([]) @map("scope_source_ids")
+  scopeAssetIds   String[]  @default([]) @map("scope_asset_ids")
+  /// Who gave it, when someone else did (an admin, an owner); null = made by its person.
+  issuedBy        String?   @map("issued_by")
+  revealedAt      DateTime? @map("revealed_at")
+  expiresAt       DateTime  @map("expires_at")
+  lastUsedAt      DateTime? @map("last_used_at")
+  lastUsedIp      String?   @map("last_used_ip")
+  revokedAt       DateTime? @map("revoked_at")
+  revokedBy       String?   @map("revoked_by")
+  revokeReason    String?   @map("revoke_reason")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  blocks DataConnectionBlock[]
+
+  @@index([personRef])
+  @@index([revokedAt])
+  @@map("data_connections")
+}
+
+/// An owner's or steward's "not through this connection" on their asset or
+/// source (docs/prd/DQ §5.7): the rest of the connection keeps working.
+model DataConnectionBlock {
+  id           String          @id @default(uuid())
+  connectionId String          @map("connection_id")
+  scopeType    GovernanceScope @map("scope_type")
+  scopeId      String          @map("scope_id")
+  blockedBy    String?         @map("blocked_by")
+  reason       String?
+  createdAt    DateTime        @default(now()) @map("created_at")
+
+  connection DataConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@unique([connectionId, scopeType, scopeId])
+  @@index([scopeType, scopeId])
+  @@map("data_connection_blocks")
 }
 
 enum QueryRunStatus {

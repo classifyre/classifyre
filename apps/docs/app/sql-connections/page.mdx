@@ -1,0 +1,183 @@
+---
+title: SQL connections for BI tools and drivers
+sidebarTitle: SQL Connections
+description: Connect Power BI, Excel, Tableau, DBeaver, psql, JDBC and ODBC clients to the tables you may query, over the PostgreSQL protocol, with a personal, audited and revocable SQL connection.
+---
+
+import { Callout, Steps, Tabs } from "nextra/components"
+
+# SQL connections
+
+The [SQL](/data-query) page and the Data tabs run queries in the app. A **SQL connection** lets the tools you already use do the same: Power BI, Excel, Tableau, DBeaver, Metabase, `psql`, and anything with a PostgreSQL JDBC or ODBC driver. Classifyre answers as a PostgreSQL database: the workspace is the database, each source schema is a schema, each table you may query is a table.
+
+- **It is yours.** A connection belongs to one person and reads exactly what that person may query right now — their roles, their Data reader grants, the tables they own. It never gives access of its own: when a grant is removed, the connection stops reading that table at once.
+- **Everything is recorded.** Every table read through a connection is in the table's **Activity** and **Usage**, with the person and the connection's name.
+- **It can be taken back.** Its person or an admin can revoke it; a table's owner can close their table to one connection; it expires.
+- **No password is stored.** Only a SCRAM-SHA-256 verifier is kept. The password is shown once, to its person only, and never crosses the network.
+
+## Make a connection
+
+<Steps>
+### Open Settings → SQL connections
+
+Choose **New connection**, name it after the tool (`Power BI`, `DBeaver`) and pick when it expires.
+
+### Copy the password
+
+It is shown once. Lost it? **New password** replaces it; tools signed in with the old one stop at their next sign-in.
+
+### Connect the tool
+
+The dialog shows the host, port, database and user, and the same as a `psql` line, a JDBC URL, an ODBC string and a Power BI connection string. **Connect a tool** next to the SQL editor shows them again at any time.
+</Steps>
+
+You need the right to query tables to make a connection: the **Data reader** role (on the workspace, a source or a table), a workspace admin role, or tables you own.
+
+### Given by an owner or admin
+
+A table's or source's owner or steward can **give a connection** for it to someone on its **Governance** tab, and an admin can give one for anything. The person is notified and reveals the password themselves — the one who gave it never sees it. The connection reads only what it was given for, and only if the person may read it: an owner who wants someone to read their table also grants them access (or approves their request).
+
+## Connect your tool
+
+Every connection uses TLS and checks the server's certificate (`sslmode=verify-full`). When your installation uses its own certificate authority, download it from the connection dialog (**Download the certificate authority**) and point your tool at it.
+
+<Tabs items={["psql", "DBeaver / JDBC", "Power BI", "Excel / ODBC", "Tableau"]}>
+<Tabs.Tab>
+```bash
+psql "host=sql.example.com port=5432 dbname=finance user=ana_power_bi sslmode=verify-full sslrootcert=classifyre-sql-ca.crt"
+```
+`\dn` lists the schemas (`<source>.<schema>`), `\dt "lake_finance.ledger".*` their tables, `\d+` shows the descriptions the table's stewards wrote.
+</Tabs.Tab>
+<Tabs.Tab>
+New connection → PostgreSQL. Host, port, database and user from the dialog, the password, and on **SSL**: *Use SSL*, mode `verify-full`, root certificate the downloaded CA. Or paste the JDBC URL:
+
+```text
+jdbc:postgresql://sql.example.com:5432/finance?user=ana_dbeaver&ssl=true&sslmode=verify-full&sslrootcert=classifyre-sql-ca.crt
+```
+</Tabs.Tab>
+<Tabs.Tab>
+**Get data → PostgreSQL database**. Server `sql.example.com:5432`, database `finance`, **Database** credentials with the user and password. Power BI checks the certificate against Windows: install the downloaded CA in *Trusted Root Certification Authorities* first. Import mode works best; DirectQuery sends a query per visual, and each query takes seconds (see [Speed](#speed)).
+</Tabs.Tab>
+<Tabs.Tab>
+Install the PostgreSQL ODBC driver (*psqlODBC*, "PostgreSQL Unicode"), then in Excel **Data → Get Data → From Other Sources → From ODBC** with:
+
+```text
+Driver={PostgreSQL Unicode};Server=sql.example.com;Port=5432;Database=finance;Uid=ana_excel;Pwd=…;SSLMode=verify-full;
+```
+</Tabs.Tab>
+<Tabs.Tab>
+**Connect → PostgreSQL**: server, port, database, username and password; tick **Require SSL**. Tableau uses its bundled JDBC driver and the JDBC settings above.
+</Tabs.Tab>
+</Tabs>
+
+### Naming tables
+
+A table you see on the SQL page as `source.schema.table` is the PostgreSQL table `"source.schema".table` — the quotes are needed because of the dot. Tools quote names for you; when writing SQL by hand, set the search path once:
+
+```sql
+SET search_path = "lake_finance.ledger";
+SELECT * FROM invoices WHERE amount > 1000;
+```
+
+Without quotes, PostgreSQL reads `source.schema.table` as *database.schema.table* and refuses it; write `"source.schema".table`, or `"lakehouse-lab"."source.schema".table` with the workspace as the database.
+
+## What happens to a query
+
+Catalog queries — the schemas, tables and columns tools read to show you what is there — are answered at once from a PostgreSQL catalog made for your session. A query that reads your tables runs as a SQL job, exactly like one from the SQL page: the same SQL gate (one read-only statement, only the tables you may read), the same time limit, recorded per table.
+
+- **Rows.** A result has at most the workspace's row limit (Settings → General, 10,000 by default), or its export limit if you may export (`data.export`). More is refused with an error, never cut silently: add a filter or a `LIMIT`.
+- **Read only.** Writes, temporary tables in your sources and settings that change data are refused.
+- **Cancel** in your tool stops the job.
+- **Mixing.** One statement reads either your tables or the catalog (`pg_catalog`, `information_schema`), not both.
+
+### Speed
+
+Each query starts a short-lived job, which takes seconds before the query itself runs. Tools that import data (Power BI import mode, Excel, extracts in Tableau) work well; tools that send a query for every click feel slow.
+
+## Governance and activity
+
+On a table's or source's **Governance** tab, **Access** lists the SQL connections that read it in the last 90 days, how often and when, whose they are, and those its scope names or that are closed on it. Its owner and stewards can:
+
+- **give a connection** for it to a person;
+- **close it here** for one connection — the rest of that connection keeps working, and its person is told;
+- open it again.
+
+The table's **Activity** shows each read with the connection's name (*via SQL connection Power BI*), and its **Usage** counts the people reading it, however they read. Creating, giving, revealing, revoking and closing connections, sign-ins (at most once an hour per connection) and refused sign-ins are on the workspace's activity too.
+
+## Who may do what
+
+| | Its person | Owner or steward of a table/source | Admin (`data.connection.manage`) |
+| --- | --- | --- | --- |
+| Make one for themselves | ✓ (with `data.connect` or tables to read) | | ✓ |
+| See its password | ✓, once per password | never | never |
+| Give one to someone | | for what they govern | for anything |
+| Close a table or source to one | | for what they govern | ✓ |
+| Revoke | ✓ | | ✓ |
+| See them | their own | those that concern their table | all |
+
+The **Data reader** role includes `data.connect`; a Data reader grant on one table lets its holders connect a tool to that table.
+
+## Making the endpoint reachable
+
+Administrators: the endpoint is the **SQL gateway**, a separate service of the same image (Helm `sqlGateway`, off by default). It always does TLS itself and speaks to clients directly, so it needs a plain TCP path, not an HTTP ingress.
+
+<Tabs items={["No proxy", "Traefik", "ingress-nginx", "Docker"]}>
+<Tabs.Tab>
+Without any TCP-capable proxy, give the gateway its own address:
+
+```yaml
+sqlGateway:
+  enabled: true
+  publicHost: sql.example.com
+  publicPort: 5432
+  service:
+    type: LoadBalancer           # or NodePort
+    loadBalancerSourceRanges: [203.0.113.0/24]
+    externalTrafficPolicy: Local # keeps client addresses for allowedCidrs
+  allowedCidrs: [203.0.113.0/24]
+```
+
+The chart makes a certificate authority and a certificate for `publicHost` and keeps them across upgrades; people download the CA from the app. To use your own certificate, set `sqlGateway.tls.existingSecret` (a `kubernetes.io/tls` Secret) or let cert-manager issue one (`sqlGateway.tls.certManager`).
+</Tabs.Tab>
+<Tabs.Tab>
+Traefik v3 routes PostgreSQL with an `IngressRouteTCP`. Give it an entrypoint (`--entryPoints.postgres.address=:5432`) and:
+
+```yaml
+sqlGateway:
+  enabled: true
+  publicHost: sql.example.com
+  traefik:
+    enabled: true
+    entryPoints: [postgres]
+    tls: none          # raw TCP, TLS end to end with the gateway: every client works
+  proxyProtocol: true  # optional: real client addresses for lockouts and allowedCidrs
+```
+
+`tls: passthrough` routes by host name (SNI) on a shared entrypoint: Traefik answers PostgreSQL's SSL request and passes the encrypted stream to the gateway, which still holds the certificate. `tls: terminate` lets Traefik hold the certificate (`traefik.secretName`) and forward plain TCP with a PROXY header; the gateway then accepts plain text only through the proxy.
+</Tabs.Tab>
+<Tabs.Tab>
+ingress-nginx forwards TCP ports through its `tcp-services` ConfigMap (no host names on TCP):
+
+```yaml
+# ingress-nginx values
+tcp:
+  "5432": "classifyre/classifyre-sql-gateway:5432"
+```
+
+Keep `sqlGateway.service.type: ClusterIP`; TLS still ends at the gateway.
+</Tabs.Tab>
+<Tabs.Tab>
+The all-in-one image runs the gateway too, on port 5433 inside the container (its own PostgreSQL holds 5432). Publish it and, when people reach it under another name than `CLASSIFYRE_URL`'s host, say which:
+
+```bash
+docker run -p 3000:3000 -p 5432:5433 \
+  -e CLASSIFYRE_URL=https://classifyre.example.com \
+  -e SQL_GATEWAY_PUBLIC_HOST=sql.example.com \
+  classifyre/classifyre
+```
+
+It makes a certificate authority and a certificate under `/var/lib/classifyre/sql-tls` on first start unless `tls.crt` and `tls.key` are already there (mount your own). `SQL_GATEWAY_ENABLED=false` turns it off.
+</Tabs.Tab>
+</Tabs>
+
+Other settings: `maxSessions` per gateway pod (each session holds a catalog of about 150 MB), `maxSessionsPerConnection`, `idleMinutes`. Ten failed sign-ins within 15 minutes lock a user name, and an address, out for 15 minutes.

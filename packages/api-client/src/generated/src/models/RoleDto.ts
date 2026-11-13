@@ -102,6 +102,8 @@ export const RoleDtoCapabilitiesEnum = {
     AgentUse: 'agent.use',
     DataExport: 'data.export',
     DataQuery: 'data.query',
+    DataConnect: 'data.connect',
+    DataConnectionManage: 'data.connection.manage',
     McpTokenOwn: 'mcp.token.own',
     McpTokenAdmin: 'mcp.token.admin',
     TenantWorkspaceCreate: 'tenant.workspace.create',

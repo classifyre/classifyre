@@ -21,4 +21,24 @@ fi
 kubectl config use-context k3d-classifyre >/dev/null
 # --cleanup=false leaves the Helm release (and the persistent Postgres PVC)
 # running when you Ctrl-C, so the database survives across dev sessions.
-exec skaffold dev --profile dev --kube-context k3d-classifyre --cleanup=false
+
+# Skaffold forwards the SQL gateway to localhost:25432 itself (skaffold.yaml).
+# This watcher only fills the gap when that forward is missing or drops (the
+# gateway pod restarted, or the service appeared after skaffold started): it
+# opens a plain kubectl forward whenever nothing listens on the port.
+sql_port=25432
+(
+  while true; do
+    if ! nc -z localhost "${sql_port}" >/dev/null 2>&1 \
+      && kubectl -n classifyre-dev get endpoints classifyre-sql-gateway \
+        -o jsonpath='{.subsets[0].addresses[0].ip}' 2>/dev/null | grep -q .; then
+      kubectl -n classifyre-dev port-forward svc/classifyre-sql-gateway \
+        "${sql_port}:5432" >/dev/null 2>&1 || true
+    fi
+    sleep 10
+  done
+) &
+watcher_pid=$!
+trap 'kill "${watcher_pid}" 2>/dev/null || true; pkill -P "${watcher_pid}" 2>/dev/null || true' EXIT
+
+skaffold dev --profile dev --kube-context k3d-classifyre --cleanup=false

@@ -46,6 +46,20 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- printf "%s-worker" (include "classifyre.fullname" .) | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
+{{- define "classifyre.sqlGateway.fullname" -}}
+{{- printf "%s-sql-gateway" (include "classifyre.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{- /* The Secret with the SQL gateway's certificate (tls.crt, tls.key, ca.crt). */ -}}
+{{- define "classifyre.sqlGateway.tlsSecret" -}}
+{{- .Values.sqlGateway.tls.existingSecret | default (printf "%s-sql-tls" (include "classifyre.fullname" .)) -}}
+{{- end -}}
+
+{{- /* TLS ends at the gateway unless Traefik terminates it. */ -}}
+{{- define "classifyre.sqlGateway.terminatesTls" -}}
+{{- if not (and .Values.sqlGateway.traefik.enabled (eq .Values.sqlGateway.traefik.tls "terminate")) }}true{{ end -}}
+{{- end -}}
+
 {{- define "classifyre.postgres.fullname" -}}
 {{- printf "%s-postgres" (include "classifyre.fullname" .) | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
@@ -383,6 +397,9 @@ which each deployment sets on its own after including this block.
 {{- if and (eq $role "worker") .Values.worker.maxOldSpaceSizeMb }}
 {{- $heapMb = int .Values.worker.maxOldSpaceSizeMb }}
 {{- end }}
+{{- if and (eq $role "sql") .Values.sqlGateway.maxOldSpaceSizeMb }}
+{{- $heapMb = int .Values.sqlGateway.maxOldSpaceSizeMb }}
+{{- end }}
 {{- if not (hasKey .Values.api.env "NODE_OPTIONS") }}
 - name: NODE_OPTIONS
   value: "--max-old-space-size={{ $heapMb }}"
@@ -401,6 +418,7 @@ which each deployment sets on its own after including this block.
      Size it against the memory limit instead, so it fires as the real backstop
      it is meant to be — just before the cgroup OOM-kills the pod. */}}
 {{- $roleValues := ternary .Values.worker .Values.api (eq $role "worker") }}
+{{- if eq $role "sql" }}{{- $roleValues = .Values.sqlGateway }}{{- end }}
 {{- $limitMb := "" }}
 {{- if $roleValues.resources }}{{- if $roleValues.resources.limits }}
 {{- $limitMb = include "classifyre.memQuantityMb" ($roleValues.resources.limits.memory | default "") }}
@@ -579,6 +597,15 @@ which each deployment sets on its own after including this block.
     secretKeyRef:
       name: {{ include "classifyre.iam.secretName" . }}
       key: api-client-secret
+{{- if .Values.sqlGateway.enabled }}
+{{- /* Where tools connect, shown in the app (every role: the API answers it). */}}
+- name: SQL_GATEWAY_PUBLIC_HOST
+  value: {{ .Values.sqlGateway.publicHost | quote }}
+- name: SQL_GATEWAY_PUBLIC_PORT
+  value: {{ .Values.sqlGateway.publicPort | quote }}
+- name: SQL_GATEWAY_TLS_CA_FILE
+  value: /etc/classifyre/sql-tls/ca.crt
+{{- end }}
 {{- with .Values.api.extraEnv }}
 {{- toYaml . | nindent 0 }}
 {{- end }}

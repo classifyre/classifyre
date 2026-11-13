@@ -23,6 +23,7 @@ import { useNsPath } from "@/lib/ns-path";
 import type { SourceGovernanceDto } from "@/lib/governance";
 import { ChangedBy } from "@/components/audit-history";
 import { OwnershipCard } from "./ownership-card";
+import { AccessCard } from "./access-card";
 import { RoleIcon } from "./role-style";
 
 /**
@@ -114,6 +115,16 @@ export function SourceGovernanceView({
           )
         }
       />
+
+      {governance.canGovern && (
+        <AccessCard
+          target={{
+            type: "source",
+            id: sourceId,
+            name: t("sqlConnections.thisSource"),
+          }}
+        />
+      )}
 
       <Card data-testid="source-coverage">
         <CardHeader className="pb-3">

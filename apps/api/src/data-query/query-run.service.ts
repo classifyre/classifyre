@@ -13,7 +13,12 @@ import { PrismaService } from '../prisma.service';
 import { CliRunnerService } from '../cli-runner/cli-runner.service';
 import { MaskedConfigCryptoService } from '../masked-config-crypto.service';
 import { ActorContextService } from '../identity/actor-context.service';
-import { AuditTrailService } from '../identity/audit-trail.service';
+import {
+  AuditTrailService,
+  type AuditChannel,
+} from '../identity/audit-trail.service';
+import type { Actor } from '../identity/actor';
+import { parseActorRef } from '../identity/actor-ref';
 import { tableReadResources } from '../identity/audit-resources';
 import {
   QueryCatalogService,
@@ -89,6 +94,30 @@ export interface QueryCallbackMeta {
   error?: { code?: string; message?: string };
 }
 
+/** Who a run is for and how it came: the cap counts people, the audit names the channel. */
+interface RunOrigin {
+  actorRef: string | null;
+  personRef: string | null;
+  channel: AuditChannel;
+  connectionId: string | null;
+}
+
+export function runOrigin(actor: Actor): RunOrigin {
+  const parsed = actor.ref ? parseActorRef(actor.ref) : null;
+  return {
+    actorRef: actor.ref ?? null,
+    personRef:
+      parsed?.kind === 'user' ? `user:${parsed.id}` : (actor.ref ?? null),
+    channel:
+      parsed?.via?.kind === 'sql'
+        ? 'sql'
+        : parsed?.via?.kind === 'mcp'
+          ? 'mcp'
+          : 'rest',
+    connectionId: parsed?.via?.kind === 'sql' ? parsed.via.id : null,
+  };
+}
+
 function tokenHash(token: string): string {
   return createHash('sha256').update(token, 'utf8').digest('hex');
 }
@@ -150,20 +179,8 @@ export class QueryRunService {
         });
       }
     }
-    const active = await this.prisma.queryRun.count({
-      where: {
-        actorRef: actor.ref ?? null,
-        status: { in: [QueryRunStatus.PENDING, QueryRunStatus.RUNNING] },
-      },
-    });
-    if (active >= MAX_ACTIVE_PER_ACTOR) {
-      throw new ConflictException({
-        statusCode: 409,
-        error: 'Conflict',
-        code: 'TOO_MANY_QUERIES',
-        message: `You have ${active} queries running. Wait for one to finish or cancel it.`,
-      });
-    }
+    const origin = runOrigin(actor);
+    await this.assertBelowCap(origin);
 
     const catalog = await this.catalog.catalog();
     const allowed = catalog.sources
@@ -193,6 +210,8 @@ export class QueryRunService {
           sql: text,
           status: QueryRunStatus.ERROR,
           actorRef: actor.ref ?? null,
+          personRef: origin.personRef,
+          channel: origin.channel,
           assetIds: [],
           sourceIds: [],
           error: { code: refusal.code, message: refusal.message },
@@ -234,6 +253,207 @@ export class QueryRunService {
     const tablesNamedInCode = tablesWithSource.filter(({ table }) =>
       namesInCode.has(table.sqlName),
     );
+    const run = await this.launch({
+      actor,
+      origin,
+      sql: text,
+      used: used.map((entry) => entry.source),
+      tables: tablesWithSource,
+      namedAssetIds: tablesNamedInCode.map(({ table }) => table.assetId),
+      maxRows: exportFormat ? settings.exportMaxRows : settings.maxRows,
+      maxResultBytes: exportFormat ? MAX_EXPORT_BYTES : MAX_RESULT_BYTES,
+      exportFormat,
+      timeoutSeconds: settings.timeoutSeconds,
+    });
+    return this.view(run);
+  }
+
+  /**
+   * A query from a SQL connection (docs/prd/DQ-data-query.md §5.7): SQL as a
+   * PostgreSQL client wrote it, over the tables the gateway found it reads.
+   * Runs in the context the gateway set up for the connection's person, so
+   * the catalog already says what they may read through this connection;
+   * a table outside it is refused here, and the job's gate refuses it again.
+   * `onDone` gets the run once the job has ended.
+   */
+  async createForConnection(input: {
+    sql: string;
+    tables: string[];
+    database: string;
+    searchPath: string[];
+    maxRows: number;
+    onDone: (runId: string) => void;
+  }): Promise<
+    | { runId: string }
+    | { refused: { code: string; message: string; sqlState: string } }
+  > {
+    const actor = this.actors.current();
+    const origin = runOrigin(actor);
+    const active = await this.activeRuns(origin);
+    if (active >= MAX_ACTIVE_PER_ACTOR) {
+      return {
+        refused: {
+          code: 'too_many_queries',
+          sqlState: '53000',
+          message: `${active} of your queries are running; wait for one to finish.`,
+        },
+      };
+    }
+    const settings = await this.catalog.settings();
+    const catalog = await this.catalog.catalog();
+    const wanted = new Set(input.tables.map((name) => name.toLowerCase()));
+    const used = catalog.sources
+      .map((source) => ({
+        source,
+        tables: source.tables.filter(
+          (t) => wanted.has(t.sqlName) && t.canQuery && t.location,
+        ),
+      }))
+      .filter((entry) => entry.tables.length);
+    const found = new Set(
+      used.flatMap((entry) => entry.tables.map((t) => t.sqlName)),
+    );
+    const missing = [...wanted].filter((name) => !found.has(name));
+    if (missing.length || !used.length) {
+      return {
+        refused: {
+          code: 'table_not_available',
+          sqlState: '42501',
+          message: missing.length
+            ? `You cannot query ${missing.join(', ')} through this connection.`
+            : 'This statement reads no table.',
+        },
+      };
+    }
+    if (used.length > MAX_SOURCES_PER_QUERY) {
+      return {
+        refused: {
+          code: 'too_many_sources',
+          sqlState: '54000',
+          message: `One query can read from at most ${MAX_SOURCES_PER_QUERY} sources.`,
+        },
+      };
+    }
+    const tables = used.flatMap((entry) =>
+      entry.tables.map((table) => ({
+        entrySourceSqlName: entry.source.sqlName,
+        table,
+      })),
+    );
+    const run = await this.launch({
+      actor,
+      origin,
+      sql: input.sql,
+      used: used.map((entry) => entry.source),
+      tables,
+      namedAssetIds: tables.map(({ table }) => table.assetId),
+      maxRows: input.maxRows,
+      maxResultBytes: MAX_EXPORT_BYTES,
+      timeoutSeconds: settings.timeoutSeconds,
+      extra: {
+        dialect: 'postgres',
+        database: input.database,
+        searchPath: input.searchPath,
+      },
+      onDone: input.onDone,
+    });
+    return { runId: run.id };
+  }
+
+  /**
+   * A connection's finished run, taken once: the Arrow bytes leave the
+   * database as they are read, since a BI tool never asks for them again.
+   */
+  async takeConnectionResult(runId: string): Promise<{
+    status: QueryRunStatus;
+    error: { code: string; message: string } | null;
+    arrow: Buffer | null;
+    truncated: boolean;
+  }> {
+    const run = await this.prisma.queryRun.findUnique({
+      where: { id: runId },
+      select: { status: true, error: true, result: true, truncated: true },
+    });
+    if (!run) {
+      return {
+        status: QueryRunStatus.ERROR,
+        error: { code: 'no_result', message: 'The query run is gone.' },
+        arrow: null,
+        truncated: false,
+      };
+    }
+    if (run.result) {
+      await this.prisma.queryRun
+        .update({
+          where: { id: runId },
+          data: { result: null },
+        })
+        .catch(() => undefined);
+    }
+    return {
+      status: run.status,
+      error: (run.error as { code: string; message: string } | null) ?? null,
+      arrow: run.result ? Buffer.from(run.result) : null,
+      truncated: run.truncated,
+    };
+  }
+
+  /** Stops a connection's run (a client's CancelRequest, a closed session). */
+  async cancelConnectionRun(runId: string): Promise<void> {
+    // Cancelled first, then the job stopped: the job's exit must not be
+    // recorded as a failure before the cancel is.
+    await this.prisma.queryRun
+      .updateMany({
+        where: { id: runId, status: { notIn: TERMINAL } },
+        data: {
+          status: QueryRunStatus.CANCELLED,
+          finishedAt: new Date(),
+          callbackTokenHash: null,
+        },
+      })
+      .catch(() => undefined);
+    await this.cliRunner.cancelQueryExecution(runId).catch(() => undefined);
+  }
+
+  private async activeRuns(origin: RunOrigin): Promise<number> {
+    return this.prisma.queryRun.count({
+      where: {
+        ...(origin.personRef
+          ? { personRef: origin.personRef }
+          : { actorRef: origin.actorRef }),
+        status: { in: [QueryRunStatus.PENDING, QueryRunStatus.RUNNING] },
+      },
+    });
+  }
+
+  /** One person's queries at once, whichever way they came (app, MCP, SQL connection). */
+  private async assertBelowCap(origin: RunOrigin): Promise<void> {
+    const active = await this.activeRuns(origin);
+    if (active >= MAX_ACTIVE_PER_ACTOR) {
+      throw new ConflictException({
+        statusCode: 409,
+        error: 'Conflict',
+        code: 'TOO_MANY_QUERIES',
+        message: `You have ${active} queries running. Wait for one to finish or cancel it.`,
+      });
+    }
+  }
+
+  /** Creates the run and starts its job: the part every person's query shares. */
+  private async launch(input: {
+    actor: Actor;
+    origin: RunOrigin;
+    sql: string;
+    used: { id: string; sqlName: string }[];
+    tables: { entrySourceSqlName: string; table: CatalogTable }[];
+    namedAssetIds: string[];
+    maxRows: number;
+    maxResultBytes: number;
+    exportFormat?: ExportFormat;
+    timeoutSeconds: number;
+    extra?: Record<string, unknown>;
+    onDone?: (runId: string) => void;
+  }) {
     void this.purgeExpired().catch(() => undefined);
     const token = randomBytes(32).toString('base64url');
     // `assetIds` starts as the tables named in code and is replaced with the
@@ -242,19 +462,22 @@ export class QueryRunService {
     // audit nothing and successes audit exactly what was read.
     const run = await this.prisma.queryRun.create({
       data: {
-        sql: text,
+        sql: input.sql,
         status: QueryRunStatus.PENDING,
-        actorRef: actor.ref ?? null,
-        assetIds: tablesNamedInCode.map(({ table }) => table.assetId),
-        sourceIds: used.map((entry) => entry.source.id),
+        actorRef: input.actor.ref ?? null,
+        personRef: input.origin.personRef,
+        channel: input.origin.channel,
+        connectionId: input.origin.connectionId,
+        assetIds: input.namedAssetIds,
+        sourceIds: input.used.map((source) => source.id),
         callbackTokenHash: tokenHash(token),
-        resultFormat: exportFormat ?? null,
+        resultFormat: input.exportFormat ?? null,
         expiresAt: new Date(Date.now() + RESULT_TTL_MS),
       },
     });
 
     const sources = await this.prisma.source.findMany({
-      where: { id: { in: used.map((entry) => entry.source.id) } },
+      where: { id: { in: input.used.map((source) => source.id) } },
       select: { id: true, type: true, config: true },
     });
     const recipes = new Map(
@@ -267,19 +490,20 @@ export class QueryRunService {
     );
     const request = {
       runId: run.id,
-      sql: text,
-      maxRows: exportFormat ? settings.exportMaxRows : settings.maxRows,
-      maxResultBytes: exportFormat ? MAX_EXPORT_BYTES : MAX_RESULT_BYTES,
-      ...(exportFormat ? { exportFormat } : {}),
-      timeoutSeconds: settings.timeoutSeconds,
+      sql: input.sql,
+      maxRows: input.maxRows,
+      maxResultBytes: input.maxResultBytes,
+      ...(input.exportFormat ? { exportFormat: input.exportFormat } : {}),
+      ...(input.extra ?? {}),
+      timeoutSeconds: input.timeoutSeconds,
       callbackUrl: `${this.cliRunner.queryCallbackBaseUrl(this.actors.workspaceId())}/query-runs/${run.id}/result`,
       callbackToken: token,
-      sources: used.map((entry) => ({
-        alias: entry.source.sqlName,
-        sourceId: entry.source.id,
-        recipe: recipes.get(entry.source.id),
+      sources: input.used.map((source) => ({
+        alias: source.sqlName,
+        sourceId: source.id,
+        recipe: recipes.get(source.id),
       })),
-      tables: tablesWithSource.map(({ entrySourceSqlName, table }) => ({
+      tables: input.tables.map(({ entrySourceSqlName, table }) => ({
         source: entrySourceSqlName,
         schema: table.schema,
         table: table.table,
@@ -288,8 +512,10 @@ export class QueryRunService {
       })),
     };
 
-    void this.execute(run.id, request, settings.timeoutSeconds);
-    return this.view(run);
+    void this.execute(run.id, request, input.timeoutSeconds).then(() =>
+      input.onDone?.(run.id),
+    );
+    return run;
   }
 
   /**
@@ -525,6 +751,8 @@ export class QueryRunService {
         actorRef: true,
         resultFormat: true,
         purpose: true,
+        channel: true,
+        connectionId: true,
       },
     });
     const expected = run?.callbackTokenHash;
@@ -575,11 +803,20 @@ export class QueryRunService {
       // reads without resolving asset ids — and the per-table tab filters
       // on names, not just ids.
       if (assetIds?.length && run.actorRef) {
-        const actor = {
+        const channel = (
+          ['rest', 'mcp', 'sql'].includes(run.channel) ? run.channel : 'rest'
+        ) as AuditChannel;
+        const actor: Actor = {
           id: null,
           displayName: null,
-          kind: run.purpose ? ('system' as const) : ('person' as const),
-          via: 'none' as const,
+          kind: run.purpose ? 'system' : 'person',
+          via: run.purpose
+            ? 'none'
+            : channel === 'sql'
+              ? 'sql-connection'
+              : channel === 'mcp'
+                ? 'mcp-token'
+                : 'oidc',
           ref: run.actorRef,
         };
         const tables = await this.tablesFor(assetIds);
@@ -589,7 +826,7 @@ export class QueryRunService {
         for (const assetId of assetIds) {
           void this.audit.record({
             actor,
-            channel: 'rest',
+            channel,
             capability: isExport ? 'data.export' : 'data.query',
             operation: run.purpose
               ? `${run.purpose}.read-table`
@@ -602,6 +839,7 @@ export class QueryRunService {
             resources: tableReadResources({
               assetId,
               sourceId: tables.get(assetId)?.sourceId,
+              connectionId: run.connectionId,
             }),
             fields: [],
           });

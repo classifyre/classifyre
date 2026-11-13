@@ -21,16 +21,23 @@ const grants = [
   grant({ id: "g-other", subjectId: "hr", subjectLabel: "/hr", scopeType: "source", scopeId: "ws-1/s-crm", scopeLabel: "CRM" }),
   grant({ id: "g-ws", subjectId: "analysts", subjectLabel: "/analysts", scopeType: "workspace", scopeId: "ws-1", scopeLabel: "This workspace" }),
   grant({ id: "g-viewer", subjectId: "everyone", subjectLabel: "/everyone", roleKey: "viewer", scopeType: "workspace", scopeId: "ws-1", scopeLabel: "This workspace" }),
+  // /legal can open the workspace (Viewer), /finance cannot (Data reader alone).
+  grant({ id: "g-legal-viewer", subjectId: "legal", subjectLabel: "/legal", roleKey: "viewer", scopeType: "workspace", scopeId: "ws-1", scopeLabel: "This workspace" }),
   grant({ id: "g-tenant", subjectId: "auditors", subjectLabel: "/auditors", scopeType: "tenant", scopeId: "t1", scopeLabel: "Acme", inherited: true }),
 ];
 
 const ROLES = [
-  { key: "viewer", title: "Viewer", scopes: ["workspace", "group", "tenant"], capabilities: [] },
+  {
+    key: "viewer",
+    title: "Viewer",
+    scopes: ["workspace", "group", "tenant"],
+    capabilities: ["workspace.view", "finding.view"],
+  },
   {
     key: "data-reader",
     title: "Data reader",
     scopes: ["workspace", "group", "tenant", "source", "asset"],
-    capabilities: [],
+    capabilities: ["data.query", "data.connect"],
   },
 ];
 
@@ -70,7 +77,7 @@ const ADMIN = ["workspace.view", "access.view", "access.manage", "activity.view"
 async function giveInFixedDialog(page: CtPage, until: string) {
   const dialog = page.getByTestId("give-access-dialog");
   await expect(dialog.getByTestId("give-access-role")).toBeDisabled();
-  await expect(dialog.getByTestId("give-access-role")).toContainText("Data reader");
+  await expect(dialog.getByTestId("give-access-role")).toHaveValue("Data reader");
   await dialog.getByTestId("give-access-group").click();
   await page.getByRole("option", { name: "/sales" }).click();
   await dialog.getByTestId("give-access-until").fill(until);
@@ -151,4 +158,26 @@ test("without access.view there is no access block", async ({ mount, page }) => 
   await expect(component.getByTestId("data-access")).toHaveCount(0);
   await page.waitForTimeout(300);
   expect(audit).toEqual([]);
+});
+
+test("the access table is the grouped one, with capabilities, and warns about a group that cannot open the workspace", async ({
+  mount,
+  page,
+}) => {
+  await signedInAs(page, ADMIN);
+  await mockApi(page);
+  const component = await mount(
+    <DataAccessHarness
+      scope={{ kind: "asset", assetId: "a-orders", sourceId: "s-shop", name: "orders" }}
+    />,
+  );
+
+  const sections = component.getByTestId("grants-group");
+  const finance = sections.filter({ hasText: "/finance" });
+  const legal = sections.filter({ hasText: "/legal" });
+  await expect(finance.getByText("data.query")).toBeVisible();
+  // Data reader on the table and no role that opens the workspace.
+  await expect(finance.getByTestId("grants-cannot-open")).toContainText("Data reader");
+  // Its Viewer is not a row here, yet it settles the question.
+  await expect(legal.getByTestId("grants-cannot-open")).toHaveCount(0);
 });

@@ -13,6 +13,8 @@ export interface ResolvedActor {
   displayName: string;
   /** For a delegated action: the token it came through. */
   viaDisplayName?: string;
+  /** `mcp` (an MCP token) or `sql` (a SQL connection). */
+  viaKind?: 'mcp' | 'sql';
   /** For a group: its path in the tenant (`/finance/controlling`). */
   path?: string;
 }
@@ -73,18 +75,37 @@ export class ActorDirectoryService {
       ...new Set(
         parsed.flatMap((actor) => [
           ...(actor.kind === 'mcp' ? [actor.id] : []),
-          ...(actor.via ? [actor.via.id] : []),
+          ...(actor.via?.kind === 'mcp' ? [actor.via.id] : []),
         ]),
       ),
     ];
-    const tokens =
-      tokenIds.length && options.withTokens !== false
-        ? await this.prisma.mcpAccessToken.findMany({
+    const connectionIds = [
+      ...new Set(
+        parsed.flatMap((actor) =>
+          actor.via?.kind === 'sql' ? [actor.via.id] : [],
+        ),
+      ),
+    ];
+    const withTokens = options.withTokens !== false;
+    const named: Promise<{ id: string; name: string }[]>[] = [
+      tokenIds.length && withTokens
+        ? this.prisma.mcpAccessToken.findMany({
             where: { id: { in: tokenIds } },
             select: { id: true, name: true },
           })
-        : [];
+        : Promise.resolve([]),
+      connectionIds.length && withTokens
+        ? this.prisma.dataConnection.findMany({
+            where: { id: { in: connectionIds } },
+            select: { id: true, name: true },
+          })
+        : Promise.resolve([]),
+    ];
+    const [tokens, connections] = await Promise.all(named);
     const tokenName = new Map(tokens.map((token) => [token.id, token.name]));
+    const connectionName = new Map(
+      connections.map((connection) => [connection.id, connection.name]),
+    );
     const people = await this.tenancy.principalNames([
       ...new Set(
         parsed
@@ -113,7 +134,15 @@ export class ActorDirectoryService {
                 : actor.kind === 'group'
                   ? (groups.get(actor.id)?.name ?? 'Removed group')
                   : actor.id,
-      ...(actor.via ? { viaDisplayName: nameOfToken(actor.via.id) } : {}),
+      ...(actor.via
+        ? {
+            viaKind: actor.via.kind,
+            viaDisplayName:
+              actor.via.kind === 'sql'
+                ? (connectionName.get(actor.via.id) ?? 'Deleted SQL connection')
+                : nameOfToken(actor.via.id),
+          }
+        : {}),
       ...(actor.kind === 'group' && groups.get(actor.id)
         ? { path: groups.get(actor.id)!.path }
         : {}),

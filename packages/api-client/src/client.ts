@@ -80,6 +80,7 @@ export { GlossaryApi } from "./generated/src/apis/GlossaryApi";
 export { NotebooksApi } from "./generated/src/apis/NotebooksApi";
 export { DataQueryApi } from "./generated/src/apis/DataQueryApi";
 export { GovernanceApi } from "./generated/src/apis/GovernanceApi";
+export { SQLConnectionsApi } from "./generated/src/apis/SQLConnectionsApi";
 export { AIApi } from "./generated/src/apis/AIApi";
 export { WorkerQueuesApi } from "./generated/src/apis/WorkerQueuesApi";
 export { IdentityApi } from "./generated/src/apis/IdentityApi";
@@ -623,6 +624,18 @@ export type {
   ColumnFindingGroupDto,
   UpdateAssetColumnDto,
   AssetUsageDto,
+  UsageChannelDto,
+  DataConnectionDto,
+  DataConnectionListDto,
+  DataConnectionSecretDto,
+  DataConnectionEndpointDto,
+  DataConnectionScopeItemDto,
+  DataConnectionBlockDto,
+  DataConnectionReadsDto,
+  CreateDataConnectionDto,
+  IssueDataConnectionDto,
+  RevokeDataConnectionDto,
+  BlockDataConnectionDto,
   GovernanceSummaryDto,
   GovernFirstDto,
   SourceCoverageDto,
@@ -1404,6 +1417,7 @@ import { SourcesApi } from "./generated/src/apis/SourcesApi";
 import { NotebooksApi } from "./generated/src/apis/NotebooksApi";
 import { DataQueryApi } from "./generated/src/apis/DataQueryApi";
 import { GovernanceApi } from "./generated/src/apis/GovernanceApi";
+import { SQLConnectionsApi } from "./generated/src/apis/SQLConnectionsApi";
 import { AIApi } from "./generated/src/apis/AIApi";
 import { AssetsApi } from "./generated/src/apis/AssetsApi";
 import { HealthApi } from "./generated/src/apis/HealthApi";
@@ -2050,6 +2064,7 @@ class ApiClient {
   public notebooks: NotebooksApi;
   public dataQuery: DataQueryApi;
   public governance: GovernanceApi;
+  public sqlConnections: SQLConnectionsApi;
   public ai: AIApi;
   public assets: AssetsApi;
   public health: HealthApi;
@@ -2086,6 +2101,7 @@ class ApiClient {
     this.notebooks = new NotebooksApi(this.config);
     this.dataQuery = new DataQueryApi(this.config);
     this.governance = new GovernanceApi(this.config);
+    this.sqlConnections = new SQLConnectionsApi(this.config);
     this.ai = new AIApi(this.config);
     this.assets = new AssetsApi(this.config);
     this.health = new HealthApi(this.config);

@@ -13,6 +13,7 @@ Name | Type
 `perDay` | [Array&lt;UsageDayDto&gt;](UsageDayDto.md)
 `topReaders` | [Array&lt;UsageReaderDto&gt;](UsageReaderDto.md)
 `exportsByFormat` | [Array&lt;UsageFormatDto&gt;](UsageFormatDto.md)
+`byChannel` | [Array&lt;UsageChannelDto&gt;](UsageChannelDto.md)
 
 ## Example
 
@@ -28,6 +29,7 @@ const example = {
   "perDay": null,
   "topReaders": null,
   "exportsByFormat": null,
+  "byChannel": null,
 } satisfies AssetUsageDto
 
 console.log(example)

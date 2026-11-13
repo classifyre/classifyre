@@ -101,6 +101,11 @@ spec:
             {{- toYaml . | nindent 12 }}
           {{- end }}
           volumeMounts:
+            {{- if .Values.sqlGateway.enabled }}
+            - name: sql-tls
+              mountPath: /etc/classifyre/sql-tls
+              readOnly: true
+            {{- end }}
             {{- if .Values.api.embedding.enabled }}
             - name: embedding-cache
               mountPath: {{ .Values.api.embedding.cacheDir | quote }}
@@ -155,6 +160,15 @@ spec:
             {{- toYaml . | nindent 12 }}
           {{- end }}
       volumes:
+        {{- if .Values.sqlGateway.enabled }}
+        - name: sql-tls
+          secret:
+            secretName: {{ include "classifyre.sqlGateway.tlsSecret" . }}
+            optional: true
+            items:
+              - key: ca.crt
+                path: ca.crt
+        {{- end }}
         {{- if .Values.api.embedding.enabled }}
         - name: embedding-cache
           emptyDir:

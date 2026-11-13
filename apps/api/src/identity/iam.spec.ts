@@ -566,11 +566,10 @@ describe('IdentityService', () => {
   it("stops a suspended tenant's MCP agents too", async () => {
     tenantStatus = 'suspended';
     expect(
-      await service({ enabled: true, orgs: ['acme'] }).principalForOwner(
-        'u1',
-        'tok',
-        'ws-ledger',
-      ),
+      await service({ enabled: true, orgs: ['acme'] }).principalFor('u1', 'ws-ledger', {
+        kind: 'mcp',
+        id: 'tok',
+      }),
     ).toBeNull();
   });
 

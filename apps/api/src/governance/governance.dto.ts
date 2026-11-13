@@ -429,6 +429,17 @@ export class UsageFormatDto {
   count: number;
 }
 
+export class UsageChannelDto {
+  @ApiProperty({ enum: ['rest', 'mcp', 'sql'] })
+  channel: string;
+
+  @ApiProperty()
+  reads: number;
+
+  @ApiProperty()
+  exports: number;
+}
+
 export class AssetUsageDto {
   @ApiProperty()
   days: number;
@@ -439,7 +450,7 @@ export class AssetUsageDto {
   @ApiProperty()
   exports: number;
 
-  @ApiProperty({ description: 'Distinct people and tokens.' })
+  @ApiProperty({ description: 'Distinct people, however they read.' })
   readers: number;
 
   @ApiProperty({ type: [UsageDayDto] })
@@ -450,6 +461,12 @@ export class AssetUsageDto {
 
   @ApiProperty({ type: [UsageFormatDto] })
   exportsByFormat: UsageFormatDto[];
+
+  @ApiProperty({
+    type: [UsageChannelDto],
+    description: 'By how the reads came: `rest` (the app), `mcp`, `sql` (SQL connections).',
+  })
+  byChannel: UsageChannelDto[];
 }
 
 export class GovernanceTotalsDto {
