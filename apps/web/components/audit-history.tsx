@@ -256,6 +256,7 @@ export function AuditEventTable({
             <SelectItem value="ALL">{t("audit.table.allChannels")}</SelectItem>
             <SelectItem value={AuditEventDtoChannelEnum.Rest}>{t("audit.table.rest")}</SelectItem>
             <SelectItem value={AuditEventDtoChannelEnum.Mcp}>{t("audit.table.mcp")}</SelectItem>
+            <SelectItem value={AuditEventDtoChannelEnum.Sql}>{t("audit.table.sql")}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -345,7 +346,11 @@ export function AuditEventTable({
                   />
                 </TableCell>
                 <TableCell className="text-[11px] text-muted-foreground">
-                  {event.channel === "mcp" ? t("audit.table.mcp") : t("audit.table.rest")}
+                  {event.channel === "mcp"
+                    ? t("audit.table.mcp")
+                    : event.channel === "sql"
+                      ? t("audit.table.sql")
+                      : t("audit.table.rest")}
                 </TableCell>
               </TableRow>
             ))}

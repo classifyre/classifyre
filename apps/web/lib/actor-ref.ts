@@ -1,13 +1,13 @@
 /**
  * Actor references, as the API stores them (apps/api/src/identity/actor-ref.ts):
  * `user:<sub>`, `group:<id>`, `mcp:<tokenId>`, `agent:<kind>`, `system:<job>`, optionally
- * `@mcp:<tokenId>` for an action delegated through a token. Anything else is
- * a self-declared name.
+ * `@mcp:<tokenId>` for an action delegated through a token or `@sql:<connectionId>`
+ * for a read through a SQL connection. Anything else is a self-declared name.
  */
 export type ActorKind = "user" | "group" | "mcp" | "agent" | "system" | "name";
 
 const TYPED_REF =
-  /^(user|group|mcp|agent|system):([A-Za-z0-9._:-]+?)(?:@mcp:([A-Za-z0-9-]+))?$/;
+  /^(user|group|mcp|agent|system):([A-Za-z0-9._:-]+?)(?:@(?:mcp|sql):([A-Za-z0-9-]+))?$/;
 
 export function actorKind(ref: string): ActorKind {
   const match = TYPED_REF.exec(ref);
@@ -21,6 +21,7 @@ export function needsResolving(ref: string): boolean {
     kind === "mcp" ||
     kind === "user" ||
     kind === "group" ||
-    ref.includes("@mcp:")
+    ref.includes("@mcp:") ||
+    ref.includes("@sql:")
   );
 }
