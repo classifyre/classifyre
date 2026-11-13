@@ -176,13 +176,6 @@ All URIs are relative to *http://localhost*
 *CasesApi* | [**casesControllerUnlinkInquiry**](docs/CasesApi.md#casescontrollerunlinkinquiry) | **DELETE** /cases/{id}/inquiries/{inquiryId} | Unlink an inquiry from a case (the inquiry is untouched)
 *CasesApi* | [**casesControllerUpdate**](docs/CasesApi.md#casescontrollerupdate) | **PATCH** /cases/{id} | Update a case
 *CasesApi* | [**caseworkControllerSummary**](docs/CasesApi.md#caseworkcontrollersummary) | **GET** /casework/summary | Counts and recent activity across cases, inquiries and leads
-*ChatBotsApi* | [**chatBotsControllerCreate**](docs/ChatBotsApi.md#chatbotscontrollercreate) | **POST** /instance-settings/chat/bots | Create a chat bot
-*ChatBotsApi* | [**chatBotsControllerDiagnostics**](docs/ChatBotsApi.md#chatbotscontrollerdiagnostics) | **GET** /instance-settings/chat/bots/{id}/diagnostics | Chat bot diagnostics
-*ChatBotsApi* | [**chatBotsControllerList**](docs/ChatBotsApi.md#chatbotscontrollerlist) | **GET** /instance-settings/chat/bots | List chat bots
-*ChatBotsApi* | [**chatBotsControllerRemove**](docs/ChatBotsApi.md#chatbotscontrollerremove) | **DELETE** /instance-settings/chat/bots/{id} | Delete a chat bot
-*ChatBotsApi* | [**chatBotsControllerSimulate**](docs/ChatBotsApi.md#chatbotscontrollersimulate) | **POST** /instance-settings/chat/bots/{id}/simulate | Send a test message to a chat bot
-*ChatBotsApi* | [**chatBotsControllerTest**](docs/ChatBotsApi.md#chatbotscontrollertest) | **POST** /instance-settings/chat/bots/{id}/test | Test chat bot connection
-*ChatBotsApi* | [**chatBotsControllerUpdate**](docs/ChatBotsApi.md#chatbotscontrollerupdate) | **PATCH** /instance-settings/chat/bots/{id} | Update a chat bot
 *CorrelationApi* | [**correlationControllerAddExclusion**](docs/CorrelationApi.md#correlationcontrolleraddexclusion) | **POST** /correlation/exclusions | Add an exclusion rule (ignore noisy values) and recompute
 *CorrelationApi* | [**correlationControllerCaseAction**](docs/CorrelationApi.md#correlationcontrollercaseaction) | **POST** /correlation/case-action | Create a case (or add to one) from assets selected in the fingerprints graph
 *CorrelationApi* | [**correlationControllerGetConfig**](docs/CorrelationApi.md#correlationcontrollergetconfig) | **GET** /correlation/config | Correlation tuning: per-label weights (dynamic) + match thresholds
@@ -688,13 +681,6 @@ All URIs are relative to *http://localhost*
 - [CaseworkInquiryStatusBreakdownDto](docs/CaseworkInquiryStatusBreakdownDto.md)
 - [CaseworkLeadsDto](docs/CaseworkLeadsDto.md)
 - [CaseworkSummaryDto](docs/CaseworkSummaryDto.md)
-- [ChatBotActivityEntryDto](docs/ChatBotActivityEntryDto.md)
-- [ChatBotDiagnosticsDto](docs/ChatBotDiagnosticsDto.md)
-- [ChatBotResponseDto](docs/ChatBotResponseDto.md)
-- [ChatBotSimulateDto](docs/ChatBotSimulateDto.md)
-- [ChatBotSimulateResultDto](docs/ChatBotSimulateResultDto.md)
-- [ChatBotTestCheckDto](docs/ChatBotTestCheckDto.md)
-- [ChatBotTestResultDto](docs/ChatBotTestResultDto.md)
 - [ClearCaseEscalationsDto](docs/ClearCaseEscalationsDto.md)
 - [ClearCaseEscalationsResponseDto](docs/ClearCaseEscalationsResponseDto.md)
 - [CliRunnerControllerUpdateRunnerStatusRequest](docs/CliRunnerControllerUpdateRunnerStatusRequest.md)
@@ -719,7 +705,6 @@ All URIs are relative to *http://localhost*
 - [CreateAiProviderConfigDto](docs/CreateAiProviderConfigDto.md)
 - [CreateCaseDto](docs/CreateCaseDto.md)
 - [CreateCaseEventDto](docs/CreateCaseEventDto.md)
-- [CreateChatBotDto](docs/CreateChatBotDto.md)
 - [CreateCustomDetectorDto](docs/CreateCustomDetectorDto.md)
 - [CreateDetectorNotebookExecutionDto](docs/CreateDetectorNotebookExecutionDto.md)
 - [CreateExternalRunnerDto](docs/CreateExternalRunnerDto.md)
@@ -1128,7 +1113,6 @@ All URIs are relative to *http://localhost*
 - [UpdateCaseFindingFilterDto](docs/UpdateCaseFindingFilterDto.md)
 - [UpdateCaseFindingNoteDto](docs/UpdateCaseFindingNoteDto.md)
 - [UpdateCaseHypothesisRuleDto](docs/UpdateCaseHypothesisRuleDto.md)
-- [UpdateChatBotDto](docs/UpdateChatBotDto.md)
 - [UpdateCorrelationConfigDto](docs/UpdateCorrelationConfigDto.md)
 - [UpdateCustomDetectorDto](docs/UpdateCustomDetectorDto.md)
 - [UpdateDataQuerySettingsDto](docs/UpdateDataQuerySettingsDto.md)

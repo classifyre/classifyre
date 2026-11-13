@@ -137,8 +137,7 @@ const DIRECTORY: Array<{ name: string; blurb: string; href: string }> = [
   },
   {
     name: "Settings",
-    blurb:
-      "Locale, scan limits, SQL limits, and MCP and chat integrations.",
+    blurb: "Locale, scan limits, SQL limits, and the MCP server.",
     href: "/settings/",
   },
 ];

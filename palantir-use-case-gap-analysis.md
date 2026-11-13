@@ -343,7 +343,7 @@ What exists:
 
 The holes:
 
-- **Alerts don't leave the app.** No email, no Slack or Teams push, no webhook. The Telegram and Slack bots answer questions; they don't push. The research's adoption lesson is to put the decision where people already work.
+- **Alerts don't leave the app.** No email, no Slack or Teams push, no webhook. (The former Telegram and Slack chat bots were removed on 2026-11-13.) The research's adoption lesson is to put the decision where people already work.
 - **A case can't leave either.** There is no export for a regulator, a board, a court or a data-protection officer. Phase 8 of the investigation roadmap lists it; it isn't built.
 
 Don't build a dashboard builder or maps. Live query already feeds Excel and Power BI.
@@ -386,7 +386,7 @@ This is deployment safety, not governance. An exposed instance on the internet w
 |---|---|---|---|---|---|
 | **G1** | PYTHON detector | As in §4.2 | Notebook runtime, augmentation readers, scope and budget, scan cache, test scenarios, the Tag severity ceiling | Extensibility is what open-source users build on and contribute to. Rules and quality checks become reusable; list screening and bring-your-own-model come with it | M |
 | **G2** | European detection coverage | National-ID detectors with checksum validation for the missing member states; EU VAT numbers; Art. 9 special categories as starter detectors (LLM or GLiNER2); export and import of detector definitions as files | The PII detector's recognizer registry, the starter-example catalogue, custom-detector JSON | A French, Dutch or Nordic evaluator's first scan finds their own ID numbers. The data-protection-officer use case works across the EU. The community can contribute country packs | S–M |
-| **G3** | Things leave the app | Signed webhooks with retry on domain events (new watch matches, escalation, case status change, lead proposed). Push through the existing Slack and Telegram connectors, plus email. Case export as Markdown and JSON | Chat-gateway connectors, the case timeline | Technical adopters expect webhooks, and exported cases get shared. Tickets flow through the customer's own automation instead of N write-back connectors | S–M |
+| **G3** | Things leave the app | Signed webhooks with retry on domain events (new watch matches, escalation, case status change, lead proposed). Push to Slack and Telegram (new connectors), plus email. Case export as Markdown and JSON | The case timeline | Technical adopters expect webhooks, and exported cases get shared. Tickets flow through the customer's own automation instead of N write-back connectors | S–M |
 | **G4** | Usable extracted values and watch predicates | A typed side table for output fields; predicates on watches, case filters and search; the fields as CSV and live-query columns | The `query_assets` predicate vocabulary; the matcher SQL conformance tests | Makes LLM extraction demo-able end to end: "extract contract terms, then watch for penalties over 5 %" | M |
 | **G5** | Entities | As in §4.4 | Glossary, correlation values, duplicate-review UX, polymorphic edges and evidence | The strongest demo: one page for a company or person across every source. Also the base of an access-request answer | L |
 | **G6** | Workspace triage queue | `CaseLead` without a case, fed by watches flagged as queues | The leads model and UI | AML- and QA-style queues | S–M, after G4 |

@@ -43,7 +43,6 @@ describe('NamespaceWorkerManager pause handling', () => {
     embedding: { registerForNamespace: asyncNoop, stopForSchema: asyncNoop },
     embeddingService: { clearForSchema: noop },
     embeddingCapability: { clearForSchema: noop },
-    chat: { refresh: asyncNoop, stopForSchema: asyncNoop },
     cliRunner: {
       activateForSchema: noop,
       stopForSchema: asyncNoop,
@@ -56,7 +55,6 @@ describe('NamespaceWorkerManager pause handling', () => {
     runnerEvents: { stopForSchema: noop },
     notificationEvents: { stopForSchema: noop },
     prisma: {},
-    leadership: { start: noop, isLeader: () => false },
     ...over,
   });
 
@@ -77,7 +75,6 @@ describe('NamespaceWorkerManager pause handling', () => {
       d.embedding as never,
       d.embeddingService as never,
       d.embeddingCapability as never,
-      d.chat as never,
       d.cliRunner as never,
       d.mcpClient as never,
       d.pgStream as never,
@@ -86,7 +83,6 @@ describe('NamespaceWorkerManager pause handling', () => {
       d.semantic as never,
       d.runnerEvents as never,
       d.notificationEvents as never,
-      d.leadership as never,
       d.prisma as never,
     );
     return { manager, deps: d };
@@ -161,7 +157,6 @@ describe('NamespaceWorkerManager pause handling', () => {
         onPauseChanged: noop,
         list: () => Promise.resolve([pausedRow]),
       },
-      leadership: { start: noop, isLeader: () => false },
     });
 
     await manager.onApplicationBootstrap();

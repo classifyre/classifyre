@@ -75,7 +75,6 @@ export { ThreadsApi } from "./generated/src/apis/ThreadsApi";
 export { AutopilotApi } from "./generated/src/apis/AutopilotApi";
 export { CorrelationApi } from "./generated/src/apis/CorrelationApi";
 export { CorrelationReviewApi } from "./generated/src/apis/CorrelationReviewApi";
-export { ChatBotsApi } from "./generated/src/apis/ChatBotsApi";
 export { EmbeddingsApi } from "./generated/src/apis/EmbeddingsApi";
 export { GlossaryApi } from "./generated/src/apis/GlossaryApi";
 export { NotebooksApi } from "./generated/src/apis/NotebooksApi";
@@ -191,25 +190,10 @@ export type {
   UpdateEmbeddingSettingsResponseDto,
 } from "./generated/src/models";
 export type {
-  ChatBotResponseDto,
-  ChatBotDiagnosticsDto,
-  ChatBotActivityEntryDto,
-  ChatBotSimulateDto,
-  ChatBotSimulateResultDto,
-  ChatBotTestResultDto,
-  ChatBotTestCheckDto,
-  CreateChatBotDto,
-  UpdateChatBotDto,
-} from "./generated/src/models";
-export type {
   WorkerOverviewDto,
   WorkerQueueDto,
   WorkerQueueInstanceDto,
   SetWorkerQueuePausedDto,
-} from "./generated/src/models";
-export {
-  ChatBotResponseDtoPlatformEnum,
-  CreateChatBotDtoPlatformEnum,
 } from "./generated/src/models";
 export {
   FindingBulkOperationDtoKindEnum,
@@ -1439,7 +1423,6 @@ import { ThreadsApi } from "./generated/src/apis/ThreadsApi";
 import { AutopilotApi } from "./generated/src/apis/AutopilotApi";
 import { CorrelationApi } from "./generated/src/apis/CorrelationApi";
 import { CorrelationReviewApi } from "./generated/src/apis/CorrelationReviewApi";
-import { ChatBotsApi } from "./generated/src/apis/ChatBotsApi";
 import { EmbeddingsApi } from "./generated/src/apis/EmbeddingsApi";
 import { GlossaryApi } from "./generated/src/apis/GlossaryApi";
 import { WorkerQueuesApi } from "./generated/src/apis/WorkerQueuesApi";
@@ -2086,7 +2069,6 @@ class ApiClient {
   public autopilot: AutopilotApi;
   public correlation: CorrelationApi;
   public correlationReview: CorrelationReviewApi;
-  public chatBots: ChatBotsApi;
   public embeddings: EmbeddingsApi;
   public glossary: GlossaryApi;
   public workerQueues: WorkerQueuesApi;
@@ -2123,7 +2105,6 @@ class ApiClient {
     this.autopilot = new AutopilotApi(this.config);
     this.correlation = new CorrelationApi(this.config);
     this.correlationReview = new CorrelationReviewApi(this.config);
-    this.chatBots = new ChatBotsApi(this.config);
     this.embeddings = new EmbeddingsApi(this.config);
     this.glossary = new GlossaryApi(this.config);
     this.workerQueues = new WorkerQueuesApi(this.config);

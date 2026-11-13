@@ -57,7 +57,6 @@ export const HarnessMissionDtoKindEnum = {
     Config: 'CONFIG',
     DetectorAuthor: 'DETECTOR_AUTHOR',
     Escalation: 'ESCALATION',
-    Chat: 'CHAT',
     Supervisor: 'SUPERVISOR'
 } as const;
 export type HarnessMissionDtoKindEnum = typeof HarnessMissionDtoKindEnum[keyof typeof HarnessMissionDtoKindEnum];

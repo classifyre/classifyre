@@ -1042,21 +1042,12 @@ export const FACTORY_POLICY: Readonly<Record<AgentKind, AgentPolicy>> = {
     minIntervalMinutes: 0,
     maxStalenessHours: 0,
   },
-  // The two kinds the cycle never schedules. DUPLICATES is deterministic and
-  // driven from the correlation queue; CHAT is one run per inbound chat
-  // message. Neither has a mission, so neither reaches the policy engine —
-  // they are here because the record is exhaustive over AgentKind, and MANUAL
-  // is the truthful value should anything ever consult them: a cycle will not
-  // start either one.
+  // The one kind the cycle never schedules. DUPLICATES is deterministic and
+  // driven from the correlation queue. It has no mission, so it never reaches
+  // the policy engine — it is here because the record is exhaustive over
+  // AgentKind, and MANUAL is the truthful value should anything ever consult
+  // it: a cycle will not start it.
   [AgentKind.DUPLICATES]: {
-    triggerMode: AgentTriggerMode.MANUAL,
-    waitForMatching: false,
-    waitForEvidence: false,
-    waitForScans: false,
-    minIntervalMinutes: 0,
-    maxStalenessHours: 0,
-  },
-  [AgentKind.CHAT]: {
     triggerMode: AgentTriggerMode.MANUAL,
     waitForMatching: false,
     waitForEvidence: false,

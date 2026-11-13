@@ -163,13 +163,11 @@ import { InquiriesService } from '../inquiries.service';
     SupervisorWorker,
     SupervisorService,
     UndoService,
-    // Shared harness infrastructure consumed by the chat gateway (AppModule):
-    // the same registry/dispatcher instances, so tools the gateway bridges are
-    // dispatched with identical gating and audit behavior.
+    // Consumed by BuiltinMcpToolsService (AppModule), which bridges the
+    // built-in MCP tools into this same registry instance.
     ToolRegistry,
-    ToolDispatcherService,
-    AgentAuditService,
-    AgentLoggerService,
+    // Consumed by NamespaceWorkerManager (AppModule) to refresh per-workspace
+    // MCP connections.
     McpClientService,
     // Consumed by AiProviderConfigController (AppModule) so the Settings →
     // Assistant capability test grades the model against these same

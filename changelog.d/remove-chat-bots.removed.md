@@ -1,0 +1,1 @@
+The Telegram and Slack chat bots are gone, along with Settings → Chat Bots: bots stop answering, and their saved tokens, conversation history and the usage recorded for chat replies are deleted when you upgrade. The in-app Assistant and the MCP server are not affected; to reach Classifyre from your own tools, use the MCP server.

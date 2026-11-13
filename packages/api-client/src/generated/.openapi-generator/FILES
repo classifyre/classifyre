@@ -155,14 +155,6 @@ docs/CaseworkInquiryDto.md
 docs/CaseworkInquiryStatusBreakdownDto.md
 docs/CaseworkLeadsDto.md
 docs/CaseworkSummaryDto.md
-docs/ChatBotActivityEntryDto.md
-docs/ChatBotDiagnosticsDto.md
-docs/ChatBotResponseDto.md
-docs/ChatBotSimulateDto.md
-docs/ChatBotSimulateResultDto.md
-docs/ChatBotTestCheckDto.md
-docs/ChatBotTestResultDto.md
-docs/ChatBotsApi.md
 docs/ClearCaseEscalationsDto.md
 docs/ClearCaseEscalationsResponseDto.md
 docs/CliRunnerControllerUpdateRunnerStatusRequest.md
@@ -189,7 +181,6 @@ docs/CreateAgentMemoryDto.md
 docs/CreateAiProviderConfigDto.md
 docs/CreateCaseDto.md
 docs/CreateCaseEventDto.md
-docs/CreateChatBotDto.md
 docs/CreateCustomDetectorDto.md
 docs/CreateDetectorNotebookExecutionDto.md
 docs/CreateExternalRunnerDto.md
@@ -624,7 +615,6 @@ docs/UpdateCaseEventDto.md
 docs/UpdateCaseFindingFilterDto.md
 docs/UpdateCaseFindingNoteDto.md
 docs/UpdateCaseHypothesisRuleDto.md
-docs/UpdateChatBotDto.md
 docs/UpdateCorrelationConfigDto.md
 docs/UpdateCustomDetectorDto.md
 docs/UpdateDataQuerySettingsDto.md
@@ -671,7 +661,6 @@ src/apis/AssistantApi.ts
 src/apis/AutopilotApi.ts
 src/apis/CaseBoardApi.ts
 src/apis/CasesApi.ts
-src/apis/ChatBotsApi.ts
 src/apis/CorrelationApi.ts
 src/apis/CorrelationReviewApi.ts
 src/apis/CustomDetectorExtractionsApi.ts
@@ -849,13 +838,6 @@ src/models/CaseworkInquiryDto.ts
 src/models/CaseworkInquiryStatusBreakdownDto.ts
 src/models/CaseworkLeadsDto.ts
 src/models/CaseworkSummaryDto.ts
-src/models/ChatBotActivityEntryDto.ts
-src/models/ChatBotDiagnosticsDto.ts
-src/models/ChatBotResponseDto.ts
-src/models/ChatBotSimulateDto.ts
-src/models/ChatBotSimulateResultDto.ts
-src/models/ChatBotTestCheckDto.ts
-src/models/ChatBotTestResultDto.ts
 src/models/ClearCaseEscalationsDto.ts
 src/models/ClearCaseEscalationsResponseDto.ts
 src/models/CliRunnerControllerUpdateRunnerStatusRequest.ts
@@ -880,7 +862,6 @@ src/models/CreateAgentMemoryDto.ts
 src/models/CreateAiProviderConfigDto.ts
 src/models/CreateCaseDto.ts
 src/models/CreateCaseEventDto.ts
-src/models/CreateChatBotDto.ts
 src/models/CreateCustomDetectorDto.ts
 src/models/CreateDetectorNotebookExecutionDto.ts
 src/models/CreateExternalRunnerDto.ts
@@ -1289,7 +1270,6 @@ src/models/UpdateCaseEventDto.ts
 src/models/UpdateCaseFindingFilterDto.ts
 src/models/UpdateCaseFindingNoteDto.ts
 src/models/UpdateCaseHypothesisRuleDto.ts
-src/models/UpdateChatBotDto.ts
 src/models/UpdateCorrelationConfigDto.ts
 src/models/UpdateCustomDetectorDto.ts
 src/models/UpdateDataQuerySettingsDto.ts

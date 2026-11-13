@@ -7,11 +7,9 @@ import type { ToolContext } from './tool.types';
  * The bridge adapter treats every non-read MCP tool as mutating and fails
  * closed, because the MCP surface carries no gate of its own — it has no actor
  * attribution and no decision ledger, so the dispatcher is the only thing that
- * makes those calls reviewable. Until now the single caller that could open
- * that gate was a chat bot, and the check lived in the chat adapter.
- *
- * The supervisor is the second such caller, and it is not a chat bot. Rather
- * than teach the adapter about every future caller, both set a flag here.
+ * makes those calls reviewable. The supervisor is the caller that opens that
+ * gate. Rather than teach the adapter about every future caller, a caller sets
+ * a flag here.
  *
  * This flag is deliberately coarse: it says "this caller is authorised in
  * principle", not "this caller may call this tool". Per-tool authority is the

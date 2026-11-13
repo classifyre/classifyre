@@ -80,7 +80,6 @@ describe('NamespaceWorkerManager cold mode', () => {
     embedding: { registerForNamespace: asyncNoop, stopForSchema: asyncNoop },
     embeddingService: { clearForSchema: noop },
     embeddingCapability: { clearForSchema: noop },
-    chat: { refresh: asyncNoop, stopForSchema: asyncNoop },
     cliRunner: { activateForSchema: noop, stopForSchema: asyncNoop },
     mcpClient: { refresh: asyncNoop, stopForSchema: asyncNoop },
     pgStream: { dropForSchema: asyncNoop },
@@ -89,7 +88,6 @@ describe('NamespaceWorkerManager cold mode', () => {
     semantic: { registerForNamespace: asyncNoop },
     runnerEvents: { stopForSchema: noop },
     notificationEvents: { stopForSchema: noop },
-    leadership: { start: noop, isLeader: () => false },
     prisma: {
       runner: {
         count: () => Promise.resolve(activity.runnersInFlight),
@@ -129,7 +127,6 @@ describe('NamespaceWorkerManager cold mode', () => {
       d.embedding,
       d.embeddingService,
       d.embeddingCapability,
-      d.chat,
       d.cliRunner,
       d.mcpClient,
       d.pgStream,
@@ -138,7 +135,6 @@ describe('NamespaceWorkerManager cold mode', () => {
       d.semantic,
       d.runnerEvents,
       d.notificationEvents,
-      d.leadership,
       d.prisma,
     ];
     return new NamespaceWorkerManager(

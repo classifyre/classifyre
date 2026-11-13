@@ -131,7 +131,7 @@ export class AgentAuditService {
    * served from its prompt cache), not additional tokens — it is priced at
    * `cachedInputCostPerMTok` and the remainder of the input tokens at the
    * full `inputCostPerMTok`. Defaults to 0 for callers that don't track it
-   * (e.g. the chat agent loop) — an untracked run simply reports no cache use.
+   * — an untracked run simply reports no cache use.
    */
   async saveUsage(
     runId: string,

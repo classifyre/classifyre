@@ -75,7 +75,6 @@ export const AgentUsageBucketDtoAgentKindEnum = {
     Config: 'CONFIG',
     DetectorAuthor: 'DETECTOR_AUTHOR',
     Escalation: 'ESCALATION',
-    Chat: 'CHAT',
     Supervisor: 'SUPERVISOR'
 } as const;
 export type AgentUsageBucketDtoAgentKindEnum = typeof AgentUsageBucketDtoAgentKindEnum[keyof typeof AgentUsageBucketDtoAgentKindEnum];

@@ -3955,7 +3955,6 @@
                 "CONFIG",
                 "DETECTOR_AUTHOR",
                 "ESCALATION",
-                "CHAT",
                 "SUPERVISOR"
               ]
             },
@@ -4098,7 +4097,6 @@
                 "CONFIG",
                 "DETECTOR_AUTHOR",
                 "ESCALATION",
-                "CHAT",
                 "SUPERVISOR"
               ]
             },
@@ -4206,7 +4204,6 @@
                 "CONFIG",
                 "DETECTOR_AUTHOR",
                 "ESCALATION",
-                "CHAT",
                 "SUPERVISOR"
               ]
             },

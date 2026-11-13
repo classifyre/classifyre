@@ -1,5 +1,5 @@
 import { MCP_CAPABILITY_GROUPS } from '../../mcp-catalog';
-import { BUILTIN_MCP_PREFIX } from '../../chat-gateway/builtin-mcp-tool-adapter';
+import { BUILTIN_MCP_PREFIX } from '../tools/builtin-mcp-tool-adapter';
 import type { Tool } from '../tools/tool.types';
 
 /**

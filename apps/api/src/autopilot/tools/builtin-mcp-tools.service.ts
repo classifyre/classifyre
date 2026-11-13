@@ -6,8 +6,8 @@ import {
 } from '@nestjs/common';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { McpServerFactoryService } from '../mcp-server.factory';
-import { ToolRegistry } from '../autopilot/tools/tool-registry.service';
+import { McpServerFactoryService } from '../../mcp-server.factory';
+import { ToolRegistry } from './tool-registry.service';
 import {
   adaptBuiltinMcpTool,
   type BuiltinRemoteTool,
@@ -17,8 +17,8 @@ const CALL_TIMEOUT_MS = 60_000;
 
 /**
  * Bridges the built-in Classifyre MCP server into the harness tool registry —
- * in-process over a linked in-memory transport pair, so the chat agent (and,
- * if explicitly assigned, autopilot missions) can call the same ~36 tools an
+ * in-process over a linked in-memory transport pair, so the supervisor (and,
+ * if explicitly assigned, autopilot missions) can call the same tools an
  * external MCP client sees, without HTTP or an access token.
  */
 @Injectable()
@@ -66,7 +66,7 @@ export class BuiltinMcpToolsService implements OnModuleInit, OnModuleDestroy {
     await this.factory.createServer().connect(serverTransport);
 
     const client = new Client({
-      name: 'classifyre-chat-gateway',
+      name: 'classifyre-harness-bridge',
       version: '1.0.0',
     });
     await client.connect(clientTransport);
@@ -91,11 +91,11 @@ export class BuiltinMcpToolsService implements OnModuleInit, OnModuleDestroy {
     if (!this.client) {
       throw new Error('Built-in MCP bridge is not connected.');
     }
-    // Chat bots act without a signed-in person, so they only read until they
-    // get a role of their own (docs/prd IAM, step 9).
+    // The bridge has no signed-in person behind it, so it only reads until
+    // callers carry a role of their own (docs/prd IAM, step 9).
     if (this.readOnly.get(name) !== true) {
       throw new Error(
-        `Chat bots can only use read tools; "${name}" changes data.`,
+        `The in-process MCP bridge only runs read tools; "${name}" changes data.`,
       );
     }
     const result = await this.client.callTool(

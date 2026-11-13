@@ -8,7 +8,6 @@ import {
 import { ClsService } from 'nestjs-cls';
 import { runsBackgroundWorkers } from '../service-role';
 import { PgBossService } from '../scheduler/pg-boss.service';
-import { WorkerLeadershipService } from '../scheduler/worker-leadership.service';
 import { PrismaClientManager } from '../prisma/prisma-client-manager';
 import { QualityWorker } from '../governance/quality.worker';
 import { NamespaceRegistryService } from '../registry/namespace-registry.service';
@@ -22,7 +21,6 @@ import { SupervisorWorker } from '../autopilot/supervisor/supervisor.worker';
 import { EmbeddingQueueService } from '../embedding/embedding-queue.service';
 import { EmbeddingService } from '../embedding/embedding.service';
 import { EmbeddingCapabilityService } from '../embedding/embedding-capability.service';
-import { ChatGatewayService } from '../chat-gateway/chat-gateway.service';
 import { CliRunnerService } from '../cli-runner/cli-runner.service';
 import { McpClientService } from '../autopilot/mcp-client/mcp-client.service';
 import { PgStreamService } from '../export/pg-stream.service';
@@ -79,7 +77,6 @@ export class NamespaceWorkerManager
     string,
     { ctx: NamespaceContext; since: Date }
   >();
-  private configWatchTimer?: NodeJS.Timeout;
   private reconcileTimer?: NodeJS.Timeout;
   private idleTimer?: NodeJS.Timeout;
   private embeddingSwitchTimer?: NodeJS.Timeout;
@@ -108,7 +105,6 @@ export class NamespaceWorkerManager
     private readonly embedding: EmbeddingQueueService,
     private readonly embeddingService: EmbeddingService,
     private readonly embeddingCapability: EmbeddingCapabilityService,
-    private readonly chat: ChatGatewayService,
     private readonly cliRunner: CliRunnerService,
     private readonly mcpClient: McpClientService,
     private readonly pgStream: PgStreamService,
@@ -117,7 +113,6 @@ export class NamespaceWorkerManager
     private readonly semantic: SemanticWorker,
     private readonly runnerEvents: RunnerEventsGateway,
     private readonly notificationEvents: NotificationEventsGateway,
-    private readonly leadership: WorkerLeadershipService,
     private readonly prisma: PrismaService,
     // Last and optional: specs construct this class positionally.
     @Optional() private readonly caseLeads?: CaseLeadsWorker,
@@ -164,22 +159,6 @@ export class NamespaceWorkerManager
     }
 
     this.registry.onCreated((e) => this.start(e));
-
-    // Chat connectors are the only piece that must not run twice, so they are
-    // gated on a cross-replica election rather than on "am I the worker".
-    // Everything else above is already replica-safe: pg-boss hands each job to
-    // one consumer and the slot semaphore is a shared advisory lock.
-    this.leadership.start({
-      onAcquired: () => this.startConnectorsEverywhere(),
-      onLost: () => this.chat.stopAllConnectors(),
-    });
-
-    // Single loop that picks up per-namespace chat-bot config changes made via
-    // API pods (the connectors run only on the leader).
-    this.configWatchTimer = setInterval(() => {
-      void this.watchConfigs();
-    }, ChatGatewayService.CONFIG_WATCH_INTERVAL_MS);
-    this.configWatchTimer.unref();
 
     // Cold mode: put scan-idle namespaces to sleep and wake them when scans
     // (or schedules) reappear. Runs only here, on worker pods.
@@ -254,28 +233,7 @@ export class NamespaceWorkerManager
     );
   }
 
-  /**
-   * Bring up chat connectors for every namespace already running here.
-   *
-   * Leadership can be won long after the namespaces started — that is the
-   * normal case on failover — so this cannot live in `start()` alone.
-   */
-  private async startConnectorsEverywhere(): Promise<void> {
-    for (const ctx of [...this.active.values()]) {
-      await this.runInNamespace(ctx, () =>
-        this.chat
-          .refresh()
-          .catch((error) =>
-            this.logger.warn(
-              `Chat gateway refresh failed for '${ctx.slug}': ${String(error)}`,
-            ),
-          ),
-      );
-    }
-  }
-
   async onApplicationShutdown(): Promise<void> {
-    if (this.configWatchTimer) clearInterval(this.configWatchTimer);
     if (this.reconcileTimer) clearInterval(this.reconcileTimer);
     if (this.idleTimer) clearInterval(this.idleTimer);
     if (this.embeddingSwitchTimer) clearInterval(this.embeddingSwitchTimer);
@@ -334,18 +292,7 @@ export class NamespaceWorkerManager
               `MCP client refresh failed for '${e.slug}': ${String(error)}`,
             ),
           );
-        // Long-poll chat connectors + orphaned-runner recovery (non-pg-boss).
-        // Connectors only on the elected leader; a second poller double-polls
-        // Telegram and double-replies on Slack.
-        if (this.leadership.isLeader()) {
-          await this.chat
-            .refresh()
-            .catch((error) =>
-              this.logger.warn(
-                `Chat gateway refresh failed for '${e.slug}': ${String(error)}`,
-              ),
-            );
-        }
+        // Orphaned-runner recovery (non-pg-boss).
         if (typeof this.cliRunner.reconcileOnStartup === 'function') {
           await this.cliRunner
             .reconcileOnStartup()
@@ -402,7 +349,6 @@ export class NamespaceWorkerManager
       this.runInNamespace(this.store(e), () =>
         Promise.all([
           settle('cliRunner', () => this.cliRunner.stopForSchema(e.schemaName)),
-          settle('chat', () => this.chat.stopForSchema(e.schemaName)),
           settle('embedding', () => this.embedding.stopForSchema(e.schemaName)),
           settle('mcpClient', () => this.mcpClient.stopForSchema(e.schemaName)),
         ]),
@@ -433,17 +379,6 @@ export class NamespaceWorkerManager
     );
     if (wasActive) {
       this.logger.log(`Stopped workers for namespace schema '${e.schemaName}'`);
-    }
-  }
-
-  private async watchConfigs(): Promise<void> {
-    if (!this.leadership.isLeader()) return;
-    for (const ns of await this.registry.list().catch(() => [])) {
-      if (!this.active.has(ns.schemaName)) continue;
-      await this.runInNamespace(
-        { namespaceId: ns.id, slug: ns.slug, schemaName: ns.schemaName },
-        () => this.chat.refreshIfConfigChanged().catch(() => undefined),
-      );
     }
   }
 
