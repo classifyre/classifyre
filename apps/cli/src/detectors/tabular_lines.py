@@ -19,7 +19,9 @@ import re
 from dataclasses import dataclass
 
 _ROW_RE = re.compile(r"^row_(\d+):$")
-_CELL_RE = re.compile(r"^  ([^:]+):(?: ?(.*))?$")
+# Two spaces then a name that does not start with a space: a deeper line
+# (``    password: x``) is a continuation of the cell above, not a column.
+_CELL_RE = re.compile(r"^  ([^\s:][^:]*):(?: ?(.*))?$")
 _CONTINUATION_RE = re.compile(r"^    ")
 
 
@@ -32,10 +34,12 @@ class LineCell:
 def cells_of_lines(lines: list[str]) -> list[LineCell | None]:
     """For each line, the cell it is part of; None outside any cell.
 
-    Text that is not a tabular sample (no ``row_1:`` line) has no cells.
+    Text that is not a tabular sample (no ``row_<n>:`` line) has no cells.
+    A page of a sweep starts at its own row (``row_2:``, ``row_41:``), so
+    any row header counts, not only the first.
     """
     out: list[LineCell | None] = [None] * len(lines)
-    if "row_1:" not in lines:
+    if not any(_ROW_RE.match(line) for line in lines):
         return out
     row: int | None = None
     column: str | None = None

@@ -18,7 +18,12 @@ import {
 } from './column-masks';
 import { clearScopeFor, readsInClear, type ClearScope } from './clear-scope';
 import type { DataPrincipal } from './data-principal';
-import { rowFilterFor, selectsEveryRow, type RowFilter } from './row-filters';
+import {
+  rowFilterAsSeen,
+  rowFilterFor,
+  selectsEveryRow,
+  type RowFilter,
+} from './row-filters';
 import { personOf } from '../identity/actor-ref';
 import {
   columnFloors,
@@ -583,7 +588,8 @@ export class QueryCatalogService {
   /**
    * The catalog as a person's browser gets it: the columns already say what
    * is masked and hidden ones are counted, so the job's mask list (which
-   * names hidden columns) stays on the server.
+   * names hidden columns) stays on the server, and row filters are told
+   * without the hidden columns they test.
    */
   async publicCatalog(): Promise<QueryCatalog> {
     const catalog = await this.catalog();
@@ -591,7 +597,11 @@ export class QueryCatalogService {
       ...catalog,
       sources: catalog.sources.map((source) => ({
         ...source,
-        tables: source.tables.map(({ masks: _masks, ...table }) => table),
+        tables: source.tables.map(({ masks, ...table }) =>
+          table.rowFilter
+            ? { ...table, rowFilter: rowFilterAsSeen(table.rowFilter, masks) }
+            : table,
+        ),
       })),
     };
   }

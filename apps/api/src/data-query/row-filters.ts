@@ -202,6 +202,37 @@ export function describeCondition(condition: RowCondition): string {
     : `${condition.column} is none of ${values}`;
 }
 
+/** What a filter condition says about a column hidden from the reader. */
+export const HIDDEN_COLUMN = '(a hidden column)';
+
+/**
+ * A row filter as its reader may see it described: a condition on a column
+ * hidden from them names neither the column nor its values (hidden columns
+ * are counted, never named, DQ §5.8), and one on a masked column keeps the
+ * name but not the values. The job still gets the filter itself.
+ */
+export function rowFilterAsSeen(
+  filter: RowFilter,
+  masks: readonly { column: string; action: string }[] | undefined,
+): RowFilter {
+  if (!masks?.length) return filter;
+  const actionOf = new Map(
+    masks.map((mask) => [mask.column.toLowerCase(), mask.action]),
+  );
+  return {
+    anyOf: filter.anyOf.map((conditions) =>
+      conditions.map((condition) => {
+        const action = actionOf.get(condition.column.toLowerCase());
+        if (action === 'hide') {
+          return { ...condition, column: HIDDEN_COLUMN, values: ['…'] };
+        }
+        if (action) return { ...condition, values: ['…'] };
+        return condition;
+      }),
+    ),
+  };
+}
+
 /** A table's row filter as a run keeps it, to show "Rows filtered for you". */
 export type RunRowFilter = {
   table: string;
@@ -210,11 +241,18 @@ export type RunRowFilter = {
 
 /** The row filters of the tables a run names. */
 export function runRowFiltersOf(
-  tables: readonly { sqlName: string; rowFilter?: RowFilter }[],
+  tables: readonly {
+    sqlName: string;
+    rowFilter?: RowFilter;
+    masks?: readonly { column: string; action: string }[];
+  }[],
 ): RunRowFilter[] {
   return tables
     .filter((table) => table.rowFilter)
-    .map((table) => ({ table: table.sqlName, anyOf: table.rowFilter!.anyOf }));
+    .map((table) => ({
+      table: table.sqlName,
+      anyOf: rowFilterAsSeen(table.rowFilter!, table.masks).anyOf,
+    }));
 }
 
 /** A run's stored row filters; entries of another shape are dropped. */

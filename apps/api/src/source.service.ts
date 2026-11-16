@@ -14,7 +14,10 @@ import { mergeEncryptedConfigs } from './utils/masked-config.utils';
 import { normalizeSourceConfig } from './utils/source-config-normalizer';
 import { RunnerLogStorageService } from './cli-runner/runner-log-storage.service';
 import { CorrelationJobScheduler } from './correlation/correlation-job-scheduler.service';
-import { governedAssetWhere } from './governance/governance-filter';
+import {
+  governedAssetWhere,
+  protectedAssetWhere,
+} from './governance/governance-filter';
 import type {
   PurgeSourceAssetsQueryDto,
   PurgeSourceAssetsResponseDto,
@@ -550,15 +553,15 @@ export class SourceService {
     );
     const dryRun = predicate?.dryRun === true;
 
-    // Governed assets (an owner on them or their source) are never purged:
-    // they stay, and the response says how many.
-    const governed = await governedAssetWhere(this.prisma);
-    const keptGoverned = governed
-      ? await this.prisma.asset.count({ where: { AND: [matching, governed] } })
-      : 0;
-    const where: Prisma.AssetWhereInput = governed
-      ? { AND: [matching, { NOT: governed }] }
-      : matching;
+    // Governed assets (an owner on them or their source) are never purged,
+    // nor any with a row filter, a column setting or a steward: their
+    // protections would cascade away and a re-scan would bring the asset
+    // back without them. They stay, and the response says how many.
+    const kept = await protectedAssetWhere(this.prisma);
+    const keptGoverned = await this.prisma.asset.count({
+      where: { AND: [matching, kept] },
+    });
+    const where: Prisma.AssetWhereInput = { AND: [matching, { NOT: kept }] };
 
     if (dryRun) {
       const purgeable = await this.prisma.asset.count({ where });

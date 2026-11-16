@@ -7,6 +7,10 @@ jest.mock('uuid', () => ({
   v4: jest.fn().mockReturnValue('mocked-uuid'),
 }));
 
+/** What a purge deleted, without the clause that keeps protected assets. */
+const purged = (deleteMany: jest.Mock): unknown =>
+  (deleteMany.mock.calls[0][0] as { where: { AND: unknown[] } }).where.AND[0];
+
 describe('SourceService', () => {
   const originalEnv = process.env;
 
@@ -355,10 +359,7 @@ describe('SourceService', () => {
           AND: [
             { sourceId: 'source-1' },
             {
-              OR: [
-                { id: { in: ['asset-1'] } },
-                { sourceId: { in: [] } },
-              ],
+              OR: [{ id: { in: ['asset-1'] } }, { sourceId: { in: [] } }],
             },
           ],
         },
@@ -487,7 +488,11 @@ describe('SourceService', () => {
     const arrange = (count = 7, type = 'LOCAL_FOLDER') => {
       const deleteMany = jest.fn().mockResolvedValue({ count });
       const sourceUpdateMany = jest.fn().mockResolvedValue({ count: 1 });
-      const assetCount = jest.fn().mockResolvedValue(count);
+      // First the protected assets among the matches (none), then the rest.
+      const assetCount = jest
+        .fn()
+        .mockResolvedValueOnce(0)
+        .mockResolvedValue(count);
       // The purge collects the ids it is about to destroy so it can clear the
       // edges naming them: `edges` has no foreign key to `assets`, so an
       // orphan survives the delete and permanently fails the review rebuild.
@@ -520,7 +525,7 @@ describe('SourceService', () => {
 
       const result = await service.purgeAssets('src-1');
 
-      expect(deleteMany).toHaveBeenCalledWith({ where: { sourceId: 'src-1' } });
+      expect(purged(deleteMany)).toEqual({ sourceId: 'src-1' });
       expect(result).toMatchObject({
         purgedAssets: 1352,
         dryRun: false,
@@ -535,11 +540,9 @@ describe('SourceService', () => {
         externalIdPrefix: 'fin-',
       });
 
-      expect(deleteMany).toHaveBeenCalledWith({
-        where: {
-          sourceId: 'src-1',
-          metadata: { path: ['external_id'], string_starts_with: 'fin-' },
-        },
+      expect(purged(deleteMany)).toEqual({
+        sourceId: 'src-1',
+        metadata: { path: ['external_id'], string_starts_with: 'fin-' },
       });
       expect(result.purgedAssets).toBe(372);
       expect(result.predicate).toEqual({ externalIdPrefix: 'fin-' });
@@ -572,19 +575,17 @@ describe('SourceService', () => {
         notScannedSince: '2026-08-01T00:00:00Z',
       });
 
-      expect(deleteMany).toHaveBeenCalledWith({
-        where: {
-          sourceId: 'src-1',
-          assetType: 'record',
-          name: { startsWith: 'Jahresabschluss' },
-          urn: { startsWith: 'document://at/firmenbuch/' },
-          // Never scanned counts as stale: an asset ingested before scan
-          // tracking existed is exactly this predicate's target.
-          OR: [
-            { lastScannedAt: { lt: new Date('2026-08-01T00:00:00Z') } },
-            { lastScannedAt: null },
-          ],
-        },
+      expect(purged(deleteMany)).toEqual({
+        sourceId: 'src-1',
+        assetType: 'record',
+        name: { startsWith: 'Jahresabschluss' },
+        urn: { startsWith: 'document://at/firmenbuch/' },
+        // Never scanned counts as stale: an asset ingested before scan
+        // tracking existed is exactly this predicate's target.
+        OR: [
+          { lastScannedAt: { lt: new Date('2026-08-01T00:00:00Z') } },
+          { lastScannedAt: null },
+        ],
       });
     });
 
@@ -616,11 +617,30 @@ describe('SourceService', () => {
       const governed = {
         OR: [{ id: { in: ['owned-1'] } }, { sourceId: { in: [] } }],
       };
+      // Governed, or carrying a protection a purge would drop.
+      const kept = {
+        OR: [
+          { rowPolicy: { isNot: null } },
+          {
+            columnAnnotations: {
+              some: {
+                OR: [
+                  { access: { not: null } },
+                  { maskKind: { not: null } },
+                  { classification: { not: null } },
+                ],
+              },
+            },
+          },
+          governed,
+          governed,
+        ],
+      };
       expect(assetCount).toHaveBeenCalledWith({
-        where: { AND: [{ sourceId: 'src-1' }, governed] },
+        where: { AND: [{ sourceId: 'src-1' }, kept] },
       });
       expect(deleteMany).toHaveBeenCalledWith({
-        where: { AND: [{ sourceId: 'src-1' }, { NOT: governed }] },
+        where: { AND: [{ sourceId: 'src-1' }, { NOT: kept }] },
       });
       expect(result).toMatchObject({
         purgedAssets: 5,
@@ -675,7 +695,7 @@ describe('SourceService', () => {
         assetKind: '',
       });
 
-      expect(deleteMany).toHaveBeenCalledWith({ where: { sourceId: 'src-1' } });
+      expect(purged(deleteMany)).toEqual({ sourceId: 'src-1' });
       expect(result.predicate).toEqual({});
     });
 

@@ -27,6 +27,8 @@ function setup(input: {
     principalRef: string;
   }[];
   stored?: Record<string, unknown>[];
+  /** The requester's groups when a request is decided. */
+  requesterGroups?: string[];
 }) {
   const me = input.me ?? 'user:ana';
   const stored = [...(input.stored ?? [])];
@@ -124,6 +126,13 @@ function setup(input: {
     }),
   };
   const access = {
+    identity: {
+      membership: {
+        groupIds: jest
+          .fn()
+          .mockResolvedValue(new Set(input.requesterGroups ?? ['g-9'])),
+      },
+    },
     addGrant: jest.fn(
       (_p: unknown, grant: Record<string, unknown>, _holdings: Set<string>) =>
         Promise.resolve({
@@ -272,7 +281,21 @@ describe('asking for access', () => {
 });
 
 describe('deciding', () => {
-  const principal = {} as never;
+  const principal = { orgId: 'org-1' } as never;
+
+  it('refuses when the requester has left the group the grant goes to', async () => {
+    const { svc, access } = setup({
+      roles: [OWNER],
+      queries: ['a-1'],
+      inClear: ['a-1'],
+      stored: [waiting()],
+      requesterGroups: ['g-2'],
+    });
+    expect(await outcome(() => svc.approve(principal, 'req-1', {}))).toBe(
+      'REQUESTER_LEFT_GROUP',
+    );
+    expect(access.addGrant).not.toHaveBeenCalled();
+  });
 
   it('lets the owner approve into an expiring grant on the table for the group', async () => {
     const { svc, access, notifier } = setup({

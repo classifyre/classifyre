@@ -1,7 +1,7 @@
 import { GovernanceService } from './governance/governance.service';
 import { QueryCatalogService } from './data-query/query-catalog.service';
 import { QueryRunService } from './data-query/query-run.service';
-import { describeCondition } from './data-query/row-filters';
+import { describeCondition, rowFilterAsSeen } from './data-query/row-filters';
 import { CLS_PERSON as CLS_PERSON_KEY } from './identity/iam-access-policy';
 import { ClsServiceManager } from 'nestjs-cls';
 import {
@@ -730,8 +730,8 @@ export class McpServerFactoryService {
               ...(table.rowFilter
                 ? {
                     rowFilter: table.rowFilter.anyOf.length
-                      ? table.rowFilter.anyOf
-                          .map((conditions) =>
+                      ? rowFilterAsSeen(table.rowFilter, table.masks)
+                          .anyOf.map((conditions) =>
                             conditions.map(describeCondition).join(' and '),
                           )
                           .join('; or ')

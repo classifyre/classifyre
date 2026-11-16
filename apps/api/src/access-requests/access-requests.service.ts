@@ -513,7 +513,21 @@ export class AccessRequestsService {
         message:
           missing === 'data.unmask'
             ? 'You do not read this in clear yourself, so you can approve it only as Data reader.'
-            : `You cannot give access you do not have here (${missing}).`,
+            : missing === 'data.query'
+              ? 'You cannot query this table yourself, and nobody gives access they do not have: a steward without Data reader here leaves this request to a workspace admin.'
+              : `You cannot give access you do not have here (${missing}).`,
+      });
+    }
+    // The grant goes to the group the requester asked for, as one of theirs
+    // (§5.9). Someone who has left it since would hand its other members
+    // access none of them asked for.
+    if (!(await this.requesterStillIn(row, principal))) {
+      throw new ConflictException({
+        statusCode: 409,
+        error: 'Conflict',
+        code: 'REQUESTER_LEFT_GROUP',
+        message:
+          'The person who asked is no longer in the group the access would go to. Deny this request; they can ask again for a group of theirs.',
       });
     }
     const expiresAt = new Date(Date.now() + durationDays * 86_400_000);
@@ -637,6 +651,22 @@ export class AccessRequestsService {
   }
 
   /** A waiting request the caller may decide, and not their own. */
+  /** Whether the requester is still a member of the request's group. */
+  private async requesterStillIn(
+    row: DataAccessRequest,
+    principal: Principal,
+  ): Promise<boolean> {
+    const sub = row.requesterRef.startsWith('user:')
+      ? row.requesterRef.slice('user:'.length)
+      : null;
+    if (!sub || !principal.orgId) return false;
+    const groups = await this.access.identity.membership.groupIds(
+      sub,
+      principal.orgId,
+    );
+    return groups.has(row.groupId);
+  }
+
   private async decidable(id: string): Promise<{
     row: DataAccessRequest;
     target: RequestTarget;

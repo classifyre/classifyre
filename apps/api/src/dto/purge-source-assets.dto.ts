@@ -88,7 +88,8 @@ export class PurgeSourceAssetsResponseDto {
   @ApiProperty({
     description:
       'Selected assets kept because they are governed (they or their source ' +
-      'have an owner). Governed assets are never purged.',
+      'have an owner) or carry a protection a purge would drop: a row ' +
+      'filter, a column setting, a steward or custodian. These are never purged.',
   })
   keptGoverned: number;
 

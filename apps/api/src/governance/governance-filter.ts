@@ -85,6 +85,42 @@ export async function governedAssetWhere(
   return either(owned);
 }
 
+/**
+ * The assets a purge keeps (GOV §4, DQ §5.8, §5.10): the governed ones, and
+ * any that carry a protection someone set — a row filter, a column hidden,
+ * masked or classified, or an open steward or custodian role. Their rows
+ * cascade with the asset, and a re-scan brings the asset back with the same
+ * id but without them: grant holders would then see every row and every
+ * column, past ALL_ROWS_REQUIRED and UNMASK_REQUIRED.
+ */
+export async function protectedAssetWhere(
+  db: Db,
+): Promise<Prisma.AssetWhereInput> {
+  const [governed, roles] = await Promise.all([
+    governedAssetWhere(db),
+    openScopes(db, {}),
+  ]);
+  const clauses: Prisma.AssetWhereInput[] = [
+    { rowPolicy: { isNot: null } },
+    {
+      columnAnnotations: {
+        some: {
+          OR: [
+            { access: { not: null } },
+            { maskKind: { not: null } },
+            { classification: { not: null } },
+          ],
+        },
+      },
+    },
+  ];
+  if (governed) clauses.push(governed);
+  if (roles.assetIds.length || roles.sourceIds.length) {
+    clauses.push(either(roles));
+  }
+  return { OR: clauses };
+}
+
 /** The where-clause for the governance filters, or null when none is set. */
 export async function governanceAssetWhere(
   db: Db,

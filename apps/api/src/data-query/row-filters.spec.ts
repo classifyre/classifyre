@@ -1,4 +1,6 @@
 import {
+  HIDDEN_COLUMN,
+  rowFilterAsSeen,
   RowRuleError,
   parseConditions,
   parseRowPrincipal,
@@ -101,5 +103,33 @@ describe('row filter rules (DQ §5.10)', () => {
         { anyOf: [] },
       ]),
     ).toEqual([{ table: 'a.b.c', anyOf: [at] }]);
+  });
+});
+
+describe('rowFilterAsSeen', () => {
+  const filter = {
+    anyOf: [
+      [
+        { column: 'salary_band', op: 'in' as const, values: ['A'] },
+        { column: 'email', op: 'in' as const, values: ['x@example.test'] },
+        { column: 'region', op: 'in' as const, values: ['EU'] },
+      ],
+    ],
+  };
+
+  it('names neither a hidden column nor its values, and keeps masked values back', () => {
+    const seen = rowFilterAsSeen(filter, [
+      { column: 'salary_band', action: 'hide' },
+      { column: 'EMAIL', action: 'mask' },
+    ]);
+    expect(seen.anyOf[0]).toEqual([
+      { column: HIDDEN_COLUMN, op: 'in', values: ['…'] },
+      { column: 'email', op: 'in', values: ['…'] },
+      { column: 'region', op: 'in', values: ['EU'] },
+    ]);
+  });
+
+  it('leaves the filter alone for someone who reads in clear', () => {
+    expect(rowFilterAsSeen(filter, undefined)).toBe(filter);
   });
 });
