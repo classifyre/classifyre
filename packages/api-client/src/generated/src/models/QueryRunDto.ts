@@ -20,6 +20,13 @@ import {
     QueryRunErrorDtoToJSON,
     QueryRunErrorDtoToJSONTyped,
 } from './QueryRunErrorDto';
+import type { QueryRunRowFilterDto } from './QueryRunRowFilterDto';
+import {
+    QueryRunRowFilterDtoFromJSON,
+    QueryRunRowFilterDtoFromJSONTyped,
+    QueryRunRowFilterDtoToJSON,
+    QueryRunRowFilterDtoToJSONTyped,
+} from './QueryRunRowFilterDto';
 import type { QueryColumnDto } from './QueryColumnDto';
 import {
     QueryColumnDtoFromJSON,
@@ -102,6 +109,12 @@ export interface QueryRunDto {
      */
     masks: Array<QueryRunMaskDto>;
     /**
+     * Row filters of the tables it names, as they applied to you when it ran.
+     * @type {Array<QueryRunRowFilterDto>}
+     * @memberof QueryRunDto
+     */
+    rowFilters: Array<QueryRunRowFilterDto>;
+    /**
      * setupMs, executeMs, totalMs (inside the job).
      * @type {{ [key: string]: number; }}
      * @memberof QueryRunDto
@@ -170,6 +183,7 @@ export function instanceOfQueryRunDto(value: object): value is QueryRunDto {
     if (!('assetIds' in value) || value['assetIds'] === undefined) return false;
     if (!('truncated' in value) || value['truncated'] === undefined) return false;
     if (!('masks' in value) || value['masks'] === undefined) return false;
+    if (!('rowFilters' in value) || value['rowFilters'] === undefined) return false;
     if (!('createdAt' in value) || value['createdAt'] === undefined) return false;
     return true;
 }
@@ -194,6 +208,7 @@ export function QueryRunDtoFromJSONTyped(json: any, ignoreDiscriminator: boolean
         'truncatedReason': json['truncatedReason'] == null ? undefined : json['truncatedReason'],
         'columns': json['columns'] == null ? undefined : ((json['columns'] as Array<any>).map(QueryColumnDtoFromJSON)),
         'masks': ((json['masks'] as Array<any>).map(QueryRunMaskDtoFromJSON)),
+        'rowFilters': ((json['rowFilters'] as Array<any>).map(QueryRunRowFilterDtoFromJSON)),
         'timings': json['timings'] == null ? undefined : json['timings'],
         'error': json['error'] == null ? undefined : QueryRunErrorDtoFromJSON(json['error']),
         'resultBytes': json['resultBytes'] == null ? undefined : json['resultBytes'],
@@ -225,6 +240,7 @@ export function QueryRunDtoToJSONTyped(value?: QueryRunDto | null, ignoreDiscrim
         'truncatedReason': value['truncatedReason'],
         'columns': value['columns'] == null ? undefined : ((value['columns'] as Array<any>).map(QueryColumnDtoToJSON)),
         'masks': ((value['masks'] as Array<any>).map(QueryRunMaskDtoToJSON)),
+        'rowFilters': ((value['rowFilters'] as Array<any>).map(QueryRunRowFilterDtoToJSON)),
         'timings': value['timings'],
         'error': QueryRunErrorDtoToJSON(value['error']),
         'resultBytes': value['resultBytes'],

@@ -10,6 +10,7 @@ import {
   Database,
   ExternalLink,
   FileText,
+  Filter,
   History,
   Lock,
   Play,
@@ -38,6 +39,8 @@ import {
 import { cn } from "@workspace/ui/lib/utils";
 import { ColumnAccessChip } from "@/components/governance/column-access-chip";
 import { useTranslation } from "@/hooks/use-translation";
+import { useRowWords } from "@/hooks/use-row-words";
+import { describeFilter } from "@/lib/row-filters";
 import { useNamespace } from "@/components/namespace-provider";
 import { formatDate, formatRelative } from "@/lib/date";
 import {
@@ -135,6 +138,7 @@ export function QueryExplorer({
   activeRunId?: string | null;
 }) {
   const { t } = useTranslation();
+  const rowWords = useRowWords();
   const { nsHref } = useNamespace();
   const insert = onInsert;
   const [tab, setTab] = React.useState("tables");
@@ -537,6 +541,23 @@ export function QueryExplorer({
                                       </TooltipContent>
                                     </Tooltip>
                                   ))}
+                                  {table.rowFilter && (
+                                    <p
+                                      className="flex items-start gap-1 px-1 text-[11px] text-muted-foreground"
+                                      data-testid="explorer-row-filter"
+                                    >
+                                      <Filter
+                                        className="mt-0.5 h-3 w-3 shrink-0"
+                                        aria-hidden
+                                      />
+                                      {t("rowFilters.tableFiltered", {
+                                        rows: describeFilter(
+                                          table.rowFilter.anyOf,
+                                          rowWords,
+                                        ),
+                                      })}
+                                    </p>
+                                  )}
                                   {(table.hiddenColumns ?? 0) > 0 && (
                                     <p
                                       className="flex items-center gap-1 px-1 text-[11px] text-muted-foreground"

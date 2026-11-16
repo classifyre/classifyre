@@ -1,3 +1,11 @@
+import {
+  COLUMN_ACTIONS,
+  isColumnAction,
+  isMaskKind,
+  MASK_KINDS,
+  type ColumnAction,
+  type MaskKind,
+} from '../data-query/column-masks';
 import type { RuleInput, Threshold } from './quality-rules';
 import { OPERATORS } from './quality-rules';
 
@@ -59,6 +67,12 @@ export interface ContractInput {
     classification: string | null;
     criticalDataElement: boolean;
     termKey: string | null;
+    /** What people who do not read it in clear get (DQ §5.8). */
+    access: ColumnAction;
+    /** For `mask`. */
+    maskKind: MaskKind | null;
+    /** True when it follows the classification, not a steward's choice. */
+    accessFromClassification: boolean;
   }[];
   rules: ContractRule[];
   qualityScore: number | null;
@@ -138,6 +152,27 @@ const dropEmpty = (value: Record<string, unknown>) =>
     ),
   );
 
+/**
+ * A column's access as ODCS custom properties (the standard has no field for
+ * it): `access` (clear, mask, hide), `maskKind` for a mask, and `accessFrom`
+ * saying whether a steward chose it or it follows the classification, so an
+ * import keeps a derived policy derived.
+ */
+function accessProperties(
+  column: ContractInput['columns'][number],
+): { property: string; value: string }[] {
+  return [
+    { property: 'access', value: column.access },
+    ...(column.access === 'mask' && column.maskKind
+      ? [{ property: 'maskKind', value: column.maskKind }]
+      : []),
+    {
+      property: 'accessFrom',
+      value: column.accessFromClassification ? 'classification' : 'steward',
+    },
+  ];
+}
+
 /** The contract object, ready for YAML or JSON. */
 export function toContract(input: ContractInput): Record<string, unknown> {
   const objectRules = input.rules.filter((r) => !r.columnName);
@@ -213,6 +248,7 @@ export function toContract(input: ContractInput): Record<string, unknown> {
             quality: input.rules
               .filter((r) => r.columnName === column.name)
               .map(quality),
+            customProperties: accessProperties(column),
           }),
         ),
       }),
@@ -247,6 +283,9 @@ export interface ContractPlan {
     classification?: string | null;
     criticalDataElement?: boolean;
     termKey?: string | null;
+    /** Null: follow the classification. */
+    access?: ColumnAction | null;
+    maskKind?: MaskKind | null;
   }[];
   rules: (RuleInput & { key: string })[];
   skipped: { path: string; reason: string }[];
@@ -273,6 +312,46 @@ function termKey(definitions: unknown): string | null {
     }
   }
   return null;
+}
+
+/** A property's `access`/`maskKind`/`accessFrom` custom properties, as a change. */
+function accessOf(
+  prop: Record<string, unknown>,
+  path: string,
+  skipped: ContractPlan['skipped'],
+): { access?: ColumnAction | null; maskKind?: MaskKind | null } {
+  const custom = Array.isArray(prop.customProperties)
+    ? (prop.customProperties as { property?: unknown; value?: unknown }[])
+    : [];
+  const value = (name: string) => {
+    const entry = custom.find((p) => p?.property === name);
+    return entry ? (asText(entry.value)?.toLowerCase() ?? null) : undefined;
+  };
+  const access = value('access');
+  const maskKind = value('maskKind');
+  if (value('accessFrom') === 'classification') {
+    return { access: null, maskKind: null };
+  }
+  if (access === undefined) return {};
+  if (!isColumnAction(access)) {
+    skipped.push({
+      path: `${path}.customProperties.access`,
+      reason: `${String(access)} is not one of ${COLUMN_ACTIONS.join(', ')}.`,
+    });
+    return {};
+  }
+  if (access !== 'mask') return { access, maskKind: null };
+  if (maskKind === undefined || maskKind === null) {
+    return { access, maskKind: null };
+  }
+  if (!isMaskKind(maskKind)) {
+    skipped.push({
+      path: `${path}.customProperties.maskKind`,
+      reason: `${maskKind} is not one of ${MASK_KINDS.join(', ')}.`,
+    });
+    return {};
+  }
+  return { access, maskKind };
 }
 
 function rule(
@@ -438,6 +517,7 @@ export function fromContract(doc: unknown): ContractPlan {
         ...('authoritativeDefinitions' in prop
           ? { termKey: termKey(prop.authoritativeDefinitions) }
           : {}),
+        ...accessOf(prop, `schema[0].properties[${i}]`, skipped),
       });
       (Array.isArray(prop.quality) ? prop.quality : []).forEach((q, j) => {
         const r = rule(

@@ -1,6 +1,12 @@
 import { GovernanceService } from './governance/governance.service';
+import { QueryCatalogService } from './data-query/query-catalog.service';
+import { QueryRunService } from './data-query/query-run.service';
+import { describeCondition } from './data-query/row-filters';
+import { CLS_PERSON as CLS_PERSON_KEY } from './identity/iam-access-policy';
+import { ClsServiceManager } from 'nestjs-cls';
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   Optional,
@@ -457,6 +463,8 @@ export class McpServerFactoryService {
     @Optional() private readonly exploreService?: ExploreService,
     @Optional() private readonly auditTrail?: AuditTrailService,
     @Optional() private readonly governance?: GovernanceService,
+    @Optional() private readonly queryCatalog?: QueryCatalogService,
+    @Optional() private readonly queryRuns?: QueryRunService,
   ) {}
 
   /**
@@ -499,6 +507,7 @@ export class McpServerFactoryService {
     this.registerEntityTools(srv);
     this.registerCaseLeadTools(srv);
     this.registerAutopilotTools(srv);
+    this.registerDataTools(srv);
 
     if (options?.toolGroupIds) {
       this.restrictToGroups(server, options.toolGroupIds);
@@ -653,6 +662,151 @@ export class McpServerFactoryService {
         tool.disable();
       }
     }
+  }
+
+  /**
+   * SQL over the tables the person may read (docs/prd/DQ-data-query.md
+   * §5.11): the SQL page's own path — their grants, masked and hidden
+   * columns, row filters, limits and per-table audit, channel `mcp`. Only
+   * for a signed-in person's token: an agent acting for nobody reads no rows.
+   */
+  private registerDataTools(server: McpServerCompat) {
+    const requirePerson = () => {
+      const cls = ClsServiceManager.getClsService();
+      const person = cls.isActive()
+        ? cls.get<{ actorRef: string } | undefined>(CLS_PERSON_KEY)
+        : undefined;
+      if (!person?.actorRef.startsWith('user:')) {
+        throw new ForbiddenException(
+          'Table rows are read for a signed-in person: use an MCP token of yours.',
+        );
+      }
+    };
+
+    server.registerTool(
+      'list_queryable_tables',
+      {
+        title: 'List Queryable Tables',
+        description:
+          'The tables you may query with query_data, named as SQL needs them (`source.schema.table`), with their columns as you see them: masked columns say how, hidden ones are only counted, and a row filter says which rows you read. Tables you cannot query are left out; ask for access in the app.',
+        inputSchema: z.strictObject({
+          search: z
+            .string()
+            .max(200)
+            .optional()
+            .describe('Only tables whose SQL name or name contains this'),
+        }),
+        annotations: { readOnlyHint: true, idempotentHint: true },
+      },
+      async ({ search }) => {
+        requirePerson();
+        if (!this.queryCatalog) throw new NotFoundException('SQL is off');
+        const catalog = await this.queryCatalog.publicCatalog();
+        const needle = (search ?? '').trim().toLowerCase();
+        const tables = catalog.sources.flatMap((source) =>
+          source.tables
+            .filter((table) => table.canQuery)
+            .filter(
+              (table) =>
+                !needle ||
+                table.sqlName.includes(needle) ||
+                table.name.toLowerCase().includes(needle),
+            )
+            .map((table) => ({
+              sqlName: table.sqlName,
+              name: table.name,
+              assetId: table.assetId,
+              source: source.name,
+              columns: table.columns.map((column) => ({
+                name: column.name,
+                type: column.type,
+                ...(column.access && !column.inClear
+                  ? { access: column.access, mask: column.mask }
+                  : {}),
+              })),
+              ...(table.hiddenColumns
+                ? { hiddenColumns: table.hiddenColumns }
+                : {}),
+              ...(table.rowFilter
+                ? {
+                    rowFilter: table.rowFilter.anyOf.length
+                      ? table.rowFilter.anyOf
+                          .map((conditions) =>
+                            conditions.map(describeCondition).join(' and '),
+                          )
+                          .join('; or ')
+                      : 'no rows are shared with you',
+                  }
+                : {}),
+            })),
+        );
+        return jsonResult({ limits: catalog.limits, tables });
+      },
+    );
+
+    server.registerTool(
+      'query_data',
+      {
+        title: 'Query Data',
+        description:
+          'Run one SELECT (DuckDB SQL) over the tables list_queryable_tables shows, and read up to maxRows rows. It runs as you, through the same rights, masked columns, row filters, limits and audit as the SQL page; it waits for the result (usually 10–30 s). Name tables in full: source.schema.table.',
+        inputSchema: z.strictObject({
+          sql: z.string().min(1).max(100_000),
+          maxRows: z
+            .number()
+            .int()
+            .min(1)
+            .max(500)
+            .optional()
+            .describe('Rows to return (default 100, at most 500)'),
+        }),
+        annotations: { readOnlyHint: true, openWorldHint: false },
+      },
+      async ({ sql, maxRows }) => {
+        requirePerson();
+        if (!this.queryRuns) throw new NotFoundException('SQL is off');
+        const wanted = maxRows ?? 100;
+        const { run, columns, rows } = await this.queryRuns.runAndRead(
+          sql,
+          wanted,
+        );
+        const payload = {
+          runId: run.id,
+          status: run.status,
+          ...(run.error ? { error: run.error } : {}),
+          columns,
+          rows,
+          rowCount: run.rowCount,
+          returnedRows: rows.length,
+          ...(run.rowCount !== null && run.rowCount > rows.length
+            ? {
+                note: `Showing ${rows.length} of ${run.rowCount} rows: aggregate in SQL, or raise maxRows (at most 500).`,
+              }
+            : {}),
+          ...(run.truncated
+            ? { truncated: true, truncatedReason: run.truncatedReason }
+            : {}),
+          ...(run.masks.length ? { masks: run.masks } : {}),
+          ...(run.rowFilters.length
+            ? {
+                rowFilters: run.rowFilters.map((filter) => ({
+                  table: filter.table,
+                  rows: filter.anyOf.length
+                    ? filter.anyOf
+                        .map((conditions) =>
+                          conditions.map(describeCondition).join(' and '),
+                        )
+                        .join('; or ')
+                    : 'none',
+                })),
+              }
+            : {}),
+        };
+        return run.status === 'SUCCESS'
+          ? jsonResult(payload)
+          : { ...jsonResult(payload), isError: true };
+      },
+    );
   }
 
   private registerAutopilotTools(server: McpServerCompat) {
@@ -1456,7 +1610,8 @@ export class McpServerFactoryService {
       'delete_source',
       {
         title: 'Delete Source',
-        description: 'Delete a source and its associated schedules and data.',
+        description:
+          'Delete a source and its associated schedules and data. Refused (409) for a governed source: one with an owner, or with assets that have one. Governed assets are never deleted.',
         inputSchema: z.strictObject({
           id: z.string().uuid(),
         }),
@@ -1467,6 +1622,7 @@ export class McpServerFactoryService {
       },
       async ({ id }) => {
         await this.requireSource(id);
+        await this.sourceService.assertSourceDeletable(id);
         await this.schedulerService.removeSchedule(id);
         await this.sourceService.deleteSource({ id });
         return jsonResult({ deleted: true, sourceId: id });
@@ -3509,7 +3665,9 @@ export class McpServerFactoryService {
           'its scope, the assets it used to produce are stranded, because retirement ' +
           'requires a run that saw the whole scope and found them gone — and a ' +
           'rotating-sample connector never has one. ALWAYS call once with dry_run ' +
-          'first and report what it matched before deleting.',
+          'first and report what it matched before deleting.\n\n' +
+          'Governed assets (an owner on them or their source) are never purged: ' +
+          'they are kept and counted in keptGoverned.',
         inputSchema: z.strictObject({
           source_id: z.string().describe('Source whose assets to purge'),
           confirm: z

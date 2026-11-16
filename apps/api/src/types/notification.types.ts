@@ -37,4 +37,7 @@ export enum NotificationEvent {
   GOVERNANCE_CONNECTION_ISSUED = 'governance.connection_issued',
   GOVERNANCE_CONNECTION_REVOKED = 'governance.connection_revoked',
   GOVERNANCE_CONNECTION_BLOCKED = 'governance.connection_blocked',
+  // Access requests (DQ §5.9): to whoever decides, then to the requester.
+  GOVERNANCE_ACCESS_REQUESTED = 'governance.access_requested',
+  GOVERNANCE_ACCESS_DECIDED = 'governance.access_decided',
 }

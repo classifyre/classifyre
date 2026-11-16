@@ -34,6 +34,8 @@ function service(input: {
     maskKind: string | null;
     classification: string | null;
   }[];
+  /** Row rules of a-1, when it filters rows. */
+  rowRules?: { principalRef: string; conditions: unknown }[];
 }) {
   const derived = [
     {
@@ -53,6 +55,19 @@ function service(input: {
     $queryRaw: jest.fn().mockResolvedValue(derived),
     assetColumnAnnotation: {
       findMany: jest.fn().mockResolvedValue(input.notes ?? []),
+    },
+    assetRowPolicy: {
+      findMany: jest.fn().mockResolvedValue(
+        input.rowRules
+          ? [
+              {
+                assetId: 'a-1',
+                asset: { sourceId: 's-1' },
+                rules: input.rowRules,
+              },
+            ]
+          : [],
+      ),
     },
     governanceRole: {
       findMany: jest.fn(({ where }: { where: { role: unknown } }) =>
@@ -179,5 +194,68 @@ describe('QueryCatalogService column masks', () => {
       role: { in: ['OWNER', 'STEWARD'] },
       principalRef: { in: ['user:ana', 'group:g-1'] },
     });
+  });
+});
+
+describe('QueryCatalogService row filters (DQ §5.10)', () => {
+  const region = (values: string[]) => [
+    { column: 'country', op: 'in', values },
+  ];
+
+  it('reads every row of a table that does not filter rows', async () => {
+    const { svc } = service({});
+    expect((await table(svc)).rowFilter).toBeUndefined();
+  });
+
+  it('reads the rows of the rules for everyone and for their groups only', async () => {
+    const { svc } = service({
+      rowRules: [
+        { principalRef: 'group:g-1', conditions: region(['AT']) },
+        { principalRef: 'everyone', conditions: region(['DE']) },
+        { principalRef: 'group:g-2', conditions: region(['FR']) },
+      ],
+    });
+    expect((await table(svc)).rowFilter).toEqual({
+      anyOf: [region(['AT']), region(['DE'])],
+    });
+  });
+
+  it('reads no row without a rule for them', async () => {
+    const { svc } = service({
+      rowRules: [{ principalRef: 'group:g-2', conditions: region(['FR']) }],
+    });
+    expect((await table(svc)).rowFilter).toEqual({ anyOf: [] });
+  });
+
+  it('reads every row through a rule without conditions', async () => {
+    const { svc } = service({
+      rowRules: [{ principalRef: 'group:g-1', conditions: [] }],
+    });
+    expect((await table(svc)).rowFilter).toBeUndefined();
+  });
+
+  it('is not filtered on what they own or steward, even with data.unmask aside', async () => {
+    const { svc } = service({
+      governs: [{ scopeType: 'ASSET', scopeId: 'a-1' }],
+      rowRules: [{ principalRef: 'group:g-2', conditions: region(['FR']) }],
+    });
+    expect((await table(svc)).rowFilter).toBeUndefined();
+  });
+
+  it('filters people who read in clear: unmasking is about columns', async () => {
+    const { svc } = service({
+      capabilities: ['data.query', 'data.unmask'],
+      rowRules: [{ principalRef: 'group:g-1', conditions: region(['AT']) }],
+    });
+    const t = await table(svc);
+    expect(t.masks).toBeUndefined();
+    expect(t.rowFilter).toEqual({ anyOf: [region(['AT'])] });
+  });
+
+  it('lets a stored rule that no longer parses select nothing', async () => {
+    const { svc } = service({
+      rowRules: [{ principalRef: 'group:g-1', conditions: 'everything' }],
+    });
+    expect((await table(svc)).rowFilter).toEqual({ anyOf: [] });
   });
 });

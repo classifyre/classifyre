@@ -57,6 +57,12 @@ export interface AssetColumnsDto {
      * @memberof AssetColumnsDto
      */
     canGovern: boolean;
+    /**
+     * You read this table in clear (DQ §5.8): only then may you make a column show more than it does.
+     * @type {boolean}
+     * @memberof AssetColumnsDto
+     */
+    inClear: boolean;
 }
 
 /**
@@ -67,6 +73,7 @@ export function instanceOfAssetColumnsDto(value: object): value is AssetColumnsD
     if (!('removed' in value) || value['removed'] === undefined) return false;
     if (!('findingsWithoutColumn' in value) || value['findingsWithoutColumn'] === undefined) return false;
     if (!('canGovern' in value) || value['canGovern'] === undefined) return false;
+    if (!('inClear' in value) || value['inClear'] === undefined) return false;
     return true;
 }
 
@@ -85,6 +92,7 @@ export function AssetColumnsDtoFromJSONTyped(json: any, ignoreDiscriminator: boo
         'findingsWithoutColumn': json['findingsWithoutColumn'],
         'classificationReviewed': json['classificationReviewed'] == null ? undefined : json['classificationReviewed'],
         'canGovern': json['canGovern'],
+        'inClear': json['inClear'],
     };
 }
 
@@ -104,6 +112,7 @@ export function AssetColumnsDtoToJSONTyped(value?: AssetColumnsDto | null, ignor
         'findingsWithoutColumn': value['findingsWithoutColumn'],
         'classificationReviewed': value['classificationReviewed'],
         'canGovern': value['canGovern'],
+        'inClear': value['inClear'],
     };
 }
 

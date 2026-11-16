@@ -32,6 +32,7 @@ const GROUP_ORDER = [
   "extractions",
   "findings",
   "assets",
+  "data",
   "lineage",
   "inquiries",
   "cases",

@@ -733,7 +733,7 @@
         ]
       },
       "delete": {
-        "description": "Permanently delete a data source and all its associated data",
+        "description": "Permanently delete a data source and all its associated data. Refused for a governed source: one with an owner, or with assets that have one.",
         "operationId": "SourcesController_deleteSource",
         "parameters": [
           {
@@ -753,6 +753,9 @@
           },
           "404": {
             "description": "Source not found"
+          },
+          "409": {
+            "description": "The source or some of its assets have an owner (governed)"
           }
         },
         "summary": "Delete a data source",
@@ -1105,7 +1108,7 @@
     },
     "/sources/{id}/assets": {
       "delete": {
-        "description": "Permanently delete assets of the source, along with their findings, extractions, correlation values, signatures and chunks (all cascade via FK). Correlation fingerprints are recomputed in the background. Irreversible.\n\nWith no query parameters this deletes EVERY asset of the source. The optional predicate exists for the case a scan can never resolve on its own: when a connector narrows its scope (one source split into two), the assets it used to produce stay behind forever, because retirement requires a run that covered the whole scope and found them gone — and a rotating-sample connector never has one. Pass dryRun=true first to see what a predicate would take with it.",
+        "description": "Permanently delete assets of the source, along with their findings, extractions, correlation values, signatures and chunks (all cascade via FK). Correlation fingerprints are recomputed in the background. Irreversible. Governed assets (an owner on them or their source) are never purged: they are kept and counted in keptGoverned.\n\nWith no query parameters this deletes EVERY asset of the source. The optional predicate exists for the case a scan can never resolve on its own: when a connector narrows its scope (one source split into two), the assets it used to produce stay behind forever, because retirement requires a run that covered the whole scope and found them gone — and a rotating-sample connector never has one. Pass dryRun=true first to see what a predicate would take with it.",
         "operationId": "SourcesController_purgeAssets",
         "parameters": [
           {
@@ -12220,6 +12223,77 @@
         ]
       }
     },
+    "/assets/{id}/rows": {
+      "get": {
+        "operationId": "GovernanceController_assetRows",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetRowsDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "A table's row filtering: on or off, and its rules for whoever governs it",
+        "tags": [
+          "Governance"
+        ]
+      },
+      "put": {
+        "description": "Needs asset.govern, or the owner or steward role. Showing readers more rows (off, a new or wider rule) needs the owner or steward role: they see every row.",
+        "operationId": "GovernanceController_updateAssetRows",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAssetRowsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetRowsDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Turn row filtering on or off and set the table's rules",
+        "tags": [
+          "Governance"
+        ]
+      }
+    },
     "/assets/{id}/columns": {
       "get": {
         "operationId": "GovernanceController_assetColumns",
@@ -15873,6 +15947,259 @@
         ]
       }
     },
+    "/data-access-requests": {
+      "get": {
+        "operationId": "AccessRequestsController_list",
+        "parameters": [
+          {
+            "name": "view",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "mine",
+                "decide"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "scopeType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "asset",
+                "source"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "scopeId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AccessRequestDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Access requests: yours (view=mine), waiting for you (view=decide), or on one table or source you decide",
+        "tags": [
+          "Access requests"
+        ]
+      },
+      "post": {
+        "operationId": "AccessRequestsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAccessRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessRequestDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Ask to query a table or source, for a group of yours",
+        "tags": [
+          "Access requests"
+        ]
+      }
+    },
+    "/data-access-requests/options": {
+      "get": {
+        "operationId": "AccessRequestsController_options",
+        "parameters": [
+          {
+            "name": "scopeType",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "asset",
+                "source"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "scopeId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessRequestOptionsDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Asking for one table or source: your groups, who decides, a request of yours still waiting",
+        "tags": [
+          "Access requests"
+        ]
+      }
+    },
+    "/data-access-requests/{id}/approve": {
+      "post": {
+        "description": "Its owner, else a steward, or someone with access.manage; never more than you hold on it, never your own request.",
+        "operationId": "AccessRequestsController_approve",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApproveAccessRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessRequestDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Approve: the group gets an expiring Data reader grant on it",
+        "tags": [
+          "Access requests"
+        ]
+      }
+    },
+    "/data-access-requests/{id}/deny": {
+      "post": {
+        "operationId": "AccessRequestsController_deny",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DenyAccessRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessRequestDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Decline a request, saying why",
+        "tags": [
+          "Access requests"
+        ]
+      }
+    },
+    "/data-access-requests/{id}/withdraw": {
+      "post": {
+        "operationId": "AccessRequestsController_withdraw",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessRequestDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Take back a request of yours still waiting",
+        "tags": [
+          "Access requests"
+        ]
+      }
+    },
     "/runner-limits": {
       "get": {
         "operationId": "DeploymentSettingsController_get",
@@ -19219,7 +19546,11 @@
           },
           "matchedAssets": {
             "type": "number",
-            "description": "Assets the predicate selected. Equals purgedAssets outside a dry run."
+            "description": "Assets the predicate selected, governed ones included. Outside a dry run, purgedAssets + keptGoverned."
+          },
+          "keptGoverned": {
+            "type": "number",
+            "description": "Selected assets kept because they are governed (they or their source have an owner). Governed assets are never purged."
           },
           "dryRun": {
             "type": "boolean",
@@ -19234,6 +19565,7 @@
         "required": [
           "purgedAssets",
           "matchedAssets",
+          "keptGoverned",
           "dryRun",
           "predicate"
         ]
@@ -36099,6 +36431,48 @@
           "mode"
         ]
       },
+      "RowConditionDto": {
+        "type": "object",
+        "properties": {
+          "column": {
+            "type": "string",
+            "example": "region"
+          },
+          "op": {
+            "type": "string",
+            "enum": [
+              "in",
+              "not_in"
+            ],
+            "description": "in: is one of; not_in: is none of."
+          },
+          "values": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            },
+            "example": [
+              "Tirol",
+              "Salzburg"
+            ]
+          }
+        },
+        "required": [
+          "column",
+          "op",
+          "values"
+        ]
+      },
       "SavedQueryDto": {
         "type": "object",
         "properties": {
@@ -36205,6 +36579,24 @@
           "type"
         ]
       },
+      "RowFilterDto": {
+        "type": "object",
+        "properties": {
+          "anyOf": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/RowConditionDto"
+              }
+            },
+            "description": "A row shows when it meets every condition of at least one entry; an empty list shows no row."
+          }
+        },
+        "required": [
+          "anyOf"
+        ]
+      },
       "QueryCatalogTableDto": {
         "type": "object",
         "properties": {
@@ -36250,6 +36642,14 @@
           "hiddenColumns": {
             "type": "number",
             "description": "How many columns governance hides from you (DQ §5.8)."
+          },
+          "rowFilter": {
+            "description": "The rows you read of this table (DQ §5.10); absent when you read every row.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RowFilterDto"
+              }
+            ]
           }
         },
         "required": [
@@ -36399,15 +36799,16 @@
             "type": "string",
             "example": "shop_lake.shop.customers"
           },
-          "column": {
-            "type": "string"
-          },
           "action": {
             "type": "string",
             "enum": [
               "mask",
               "hide"
             ]
+          },
+          "column": {
+            "type": "string",
+            "description": "The masked column. A hidden column is counted, never named."
           },
           "mask": {
             "type": "string",
@@ -36421,8 +36822,30 @@
         },
         "required": [
           "table",
-          "column",
           "action"
+        ]
+      },
+      "QueryRunRowFilterDto": {
+        "type": "object",
+        "properties": {
+          "anyOf": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/RowConditionDto"
+              }
+            },
+            "description": "A row shows when it meets every condition of at least one entry; an empty list shows no row."
+          },
+          "table": {
+            "type": "string",
+            "example": "shop_lake.shop.customers"
+          }
+        },
+        "required": [
+          "anyOf",
+          "table"
         ]
       },
       "QueryRunErrorDto": {
@@ -36499,6 +36922,13 @@
               "$ref": "#/components/schemas/QueryRunMaskDto"
             }
           },
+          "rowFilters": {
+            "description": "Row filters of the tables it names, as they applied to you when it ran.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QueryRunRowFilterDto"
+            }
+          },
           "timings": {
             "type": "object",
             "nullable": true,
@@ -36547,6 +36977,7 @@
           "assetIds",
           "truncated",
           "masks",
+          "rowFilters",
           "createdAt"
         ]
       },
@@ -37333,6 +37764,167 @@
           "tookMs"
         ]
       },
+      "GovernancePrincipalDto": {
+        "type": "object",
+        "properties": {
+          "ref": {
+            "type": "string",
+            "example": "user:5c1f…"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "user",
+              "group"
+            ]
+          },
+          "displayName": {
+            "type": "string",
+            "example": "Jordan Reyes"
+          },
+          "email": {
+            "type": "string",
+            "example": "jordan@example.org"
+          },
+          "path": {
+            "type": "string",
+            "description": "For a group: its path in the tenant.",
+            "example": "/finance/controlling"
+          }
+        },
+        "required": [
+          "ref",
+          "kind",
+          "displayName"
+        ]
+      },
+      "AssetRowRuleDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "principalRef": {
+            "type": "string",
+            "example": "group:9f2c…",
+            "description": "`group:<id>`, or `everyone`."
+          },
+          "principal": {
+            "nullable": true,
+            "description": "The group, by name; null for everyone.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/GovernancePrincipalDto"
+              }
+            ]
+          },
+          "conditions": {
+            "description": "A row must meet all of them; none selects every row.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RowConditionDto"
+            }
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedBy": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "principalRef",
+          "conditions",
+          "updatedAt"
+        ]
+      },
+      "AssetRowsDto": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Rows are filtered: each reader sees only what a rule for them selects, and no row without one."
+          },
+          "rules": {
+            "description": "Empty for people who do not govern the table.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssetRowRuleDto"
+            }
+          },
+          "canGovern": {
+            "type": "boolean"
+          },
+          "readsEveryRow": {
+            "type": "boolean",
+            "description": "You see every row (owner or steward of the table or its source): only you may show readers more."
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "updatedBy": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "assetId",
+          "enabled",
+          "rules",
+          "canGovern",
+          "readsEveryRow"
+        ]
+      },
+      "RowRuleInputDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Set to keep an existing rule."
+          },
+          "principalRef": {
+            "type": "string",
+            "example": "group:9f2c…",
+            "description": "`group:<id>` or `everyone`."
+          },
+          "conditions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RowConditionDto"
+            }
+          }
+        },
+        "required": [
+          "principalRef",
+          "conditions"
+        ]
+      },
+      "UpdateAssetRowsDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "rules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RowRuleInputDto"
+            }
+          }
+        },
+        "required": [
+          "enabled"
+        ]
+      },
       "ColumnTermDto": {
         "type": "object",
         "properties": {
@@ -37571,13 +38163,18 @@
           },
           "canGovern": {
             "type": "boolean"
+          },
+          "inClear": {
+            "type": "boolean",
+            "description": "You read this table in clear (DQ §5.8): only then may you make a column show more than it does."
           }
         },
         "required": [
           "columns",
           "removed",
           "findingsWithoutColumn",
-          "canGovern"
+          "canGovern",
+          "inClear"
         ]
       },
       "UpdateAssetColumnDto": {
@@ -37909,40 +38506,6 @@
           "sources",
           "governFirst",
           "mine"
-        ]
-      },
-      "GovernancePrincipalDto": {
-        "type": "object",
-        "properties": {
-          "ref": {
-            "type": "string",
-            "example": "user:5c1f…"
-          },
-          "kind": {
-            "type": "string",
-            "enum": [
-              "user",
-              "group"
-            ]
-          },
-          "displayName": {
-            "type": "string",
-            "example": "Jordan Reyes"
-          },
-          "email": {
-            "type": "string",
-            "example": "jordan@example.org"
-          },
-          "path": {
-            "type": "string",
-            "description": "For a group: its path in the tenant.",
-            "example": "/finance/controlling"
-          }
-        },
-        "required": [
-          "ref",
-          "kind",
-          "displayName"
         ]
       },
       "GovernanceRoleDto": {
@@ -40025,6 +40588,339 @@
           "type",
           "id"
         ]
+      },
+      "AccessRequestDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "scopeType": {
+            "type": "string",
+            "enum": [
+              "asset",
+              "source"
+            ]
+          },
+          "scopeId": {
+            "type": "string",
+            "description": "The table (asset) or source id."
+          },
+          "sourceId": {
+            "type": "string"
+          },
+          "targetName": {
+            "type": "string",
+            "example": "customers"
+          },
+          "sqlName": {
+            "type": "string",
+            "nullable": true,
+            "example": "shop_lake.shop.customers"
+          },
+          "requesterRef": {
+            "type": "string",
+            "example": "user:5c1f…"
+          },
+          "requesterName": {
+            "type": "string"
+          },
+          "groupId": {
+            "type": "string",
+            "description": "The group of the requester the grant goes to."
+          },
+          "groupName": {
+            "type": "string"
+          },
+          "groupPath": {
+            "type": "string",
+            "nullable": true
+          },
+          "roleKey": {
+            "type": "string",
+            "enum": [
+              "data-reader",
+              "data-reader-unmasked"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "durationDays": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "APPROVED",
+              "DENIED",
+              "WITHDRAWN"
+            ]
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "decidedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "decidedByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "decidedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "decisionNote": {
+            "type": "string",
+            "nullable": true
+          },
+          "grantExpiresAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "When the grant an approval gave ends."
+          },
+          "canDecide": {
+            "type": "boolean",
+            "description": "You may approve or decline it now."
+          },
+          "canWithdraw": {
+            "type": "boolean",
+            "description": "It is yours and still waiting."
+          }
+        },
+        "required": [
+          "id",
+          "scopeType",
+          "scopeId",
+          "sourceId",
+          "targetName",
+          "requesterRef",
+          "requesterName",
+          "groupId",
+          "groupName",
+          "roleKey",
+          "reason",
+          "durationDays",
+          "status",
+          "createdAt",
+          "canDecide",
+          "canWithdraw"
+        ]
+      },
+      "AccessRequestTargetDto": {
+        "type": "object",
+        "properties": {
+          "scopeType": {
+            "type": "string",
+            "enum": [
+              "asset",
+              "source"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "sourceId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sqlName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "scopeType",
+          "id",
+          "sourceId",
+          "name"
+        ]
+      },
+      "AccessRequestGroupDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "AccessRequestDeciderDto": {
+        "type": "object",
+        "properties": {
+          "ref": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "OWNER",
+              "STEWARD"
+            ]
+          }
+        },
+        "required": [
+          "ref",
+          "displayName",
+          "role"
+        ]
+      },
+      "AccessRequestOptionsDto": {
+        "type": "object",
+        "properties": {
+          "target": {
+            "$ref": "#/components/schemas/AccessRequestTargetDto"
+          },
+          "canQuery": {
+            "type": "boolean"
+          },
+          "readsInClear": {
+            "type": "boolean"
+          },
+          "groups": {
+            "description": "Your groups: access is given to one of them.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AccessRequestGroupDto"
+            }
+          },
+          "deciders": {
+            "description": "Who decides: the owner, else the stewards; empty: the workspace admins.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AccessRequestDeciderDto"
+            }
+          },
+          "pending": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AccessRequestDto"
+              }
+            ]
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "data-reader",
+                "data-reader-unmasked"
+              ]
+            }
+          },
+          "defaultDays": {
+            "type": "number"
+          },
+          "maxDays": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "target",
+          "canQuery",
+          "readsInClear",
+          "groups",
+          "deciders",
+          "roles",
+          "defaultDays",
+          "maxDays"
+        ]
+      },
+      "CreateAccessRequestDto": {
+        "type": "object",
+        "properties": {
+          "scopeType": {
+            "type": "string",
+            "enum": [
+              "asset",
+              "source"
+            ]
+          },
+          "scopeId": {
+            "type": "string"
+          },
+          "groupId": {
+            "type": "string",
+            "description": "One of your groups."
+          },
+          "roleKey": {
+            "type": "string",
+            "enum": [
+              "data-reader",
+              "data-reader-unmasked"
+            ],
+            "default": "data-reader"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 2000
+          },
+          "durationDays": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 365,
+            "default": 90
+          }
+        },
+        "required": [
+          "scopeType",
+          "scopeId",
+          "groupId",
+          "reason"
+        ]
+      },
+      "ApproveAccessRequestDto": {
+        "type": "object",
+        "properties": {
+          "roleKey": {
+            "type": "string",
+            "enum": [
+              "data-reader"
+            ],
+            "description": "Give Data reader instead of the unmasked role asked for."
+          },
+          "durationDays": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 365
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      },
+      "DenyAccessRequestDto": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "description": "Why, for the requester."
+          }
+        }
       },
       "RunnerLimitDto": {
         "type": "object",

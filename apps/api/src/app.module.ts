@@ -27,6 +27,7 @@ import { DeploymentSettingsModule } from './deployment-settings/deployment-setti
 import { DataQueryModule } from './data-query/data-query.module';
 import { GovernanceModule } from './governance/governance.module';
 import { SqlConnectionsModule } from './sql-connections/sql-connections.module';
+import { AccessRequestsModule } from './access-requests/access-requests.module';
 import { SqlGatewayModule } from './sql-gateway/sql-gateway.module';
 import { WebSocketModule } from './websocket/websocket.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
@@ -132,6 +133,7 @@ import {
     DataQueryModule,
     GovernanceModule,
     SqlConnectionsModule,
+    AccessRequestsModule,
     SqlGatewayModule,
     DeploymentSettingsModule,
     WebSocketModule,

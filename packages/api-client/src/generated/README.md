@@ -74,6 +74,12 @@ All URIs are relative to *http://localhost*
 *AccessApi* | [**workspaceAccessControllerGroups**](docs/AccessApi.md#workspaceaccesscontrollergroups) | **GET** /access/groups | Groups of this tenant, to grant access to
 *AccessApi* | [**workspaceAccessControllerRemoveGrant**](docs/AccessApi.md#workspaceaccesscontrollerremovegrant) | **DELETE** /access/grants/{id} | Remove a grant made on this workspace
 *AccessApi* | [**workspaceAccessControllerRoles**](docs/AccessApi.md#workspaceaccesscontrollerroles) | **GET** /access/roles | The built-in roles and what each one allows
+*AccessRequestsApi* | [**accessRequestsControllerApprove**](docs/AccessRequestsApi.md#accessrequestscontrollerapprove) | **POST** /data-access-requests/{id}/approve | Approve: the group gets an expiring Data reader grant on it
+*AccessRequestsApi* | [**accessRequestsControllerCreate**](docs/AccessRequestsApi.md#accessrequestscontrollercreate) | **POST** /data-access-requests | Ask to query a table or source, for a group of yours
+*AccessRequestsApi* | [**accessRequestsControllerDeny**](docs/AccessRequestsApi.md#accessrequestscontrollerdeny) | **POST** /data-access-requests/{id}/deny | Decline a request, saying why
+*AccessRequestsApi* | [**accessRequestsControllerList**](docs/AccessRequestsApi.md#accessrequestscontrollerlist) | **GET** /data-access-requests | Access requests: yours (view&#x3D;mine), waiting for you (view&#x3D;decide), or on one table or source you decide
+*AccessRequestsApi* | [**accessRequestsControllerOptions**](docs/AccessRequestsApi.md#accessrequestscontrolleroptions) | **GET** /data-access-requests/options | Asking for one table or source: your groups, who decides, a request of yours still waiting
+*AccessRequestsApi* | [**accessRequestsControllerWithdraw**](docs/AccessRequestsApi.md#accessrequestscontrollerwithdraw) | **POST** /data-access-requests/{id}/withdraw | Take back a request of yours still waiting
 *AssetsApi* | [**assetsControllerGetAsset**](docs/AssetsApi.md#assetscontrollergetasset) | **GET** /assets/{id} | Get asset by ID
 *AssetsApi* | [**assetsControllerGetReferencingFindings**](docs/AssetsApi.md#assetscontrollergetreferencingfindings) | **GET** /assets/{id}/referencing-findings | Findings recorded on assets that point at this one
 *AssetsApi* | [**searchAssetsControllerExportAssets**](docs/AssetsApi.md#searchassetscontrollerexportassets) | **GET** /search/assets/export | Export assets (with findings) as CSV
@@ -327,6 +333,7 @@ All URIs are relative to *http://localhost*
 *GovernanceApi* | [**governanceControllerAssetGovernance**](docs/GovernanceApi.md#governancecontrollerassetgovernance) | **GET** /assets/{id}/governance | An asset\&#39;s owners, description, lifecycle and checklist
 *GovernanceApi* | [**governanceControllerAssetMeaning**](docs/GovernanceApi.md#governancecontrollerassetmeaning) | **GET** /assets/{id}/governance/meaning | The glossary terms an asset is about, and suggested ones
 *GovernanceApi* | [**governanceControllerAssetQuality**](docs/GovernanceApi.md#governancecontrollerassetquality) | **GET** /assets/{id}/quality | An asset\&#39;s quality rules, their latest results and its score
+*GovernanceApi* | [**governanceControllerAssetRows**](docs/GovernanceApi.md#governancecontrollerassetrows) | **GET** /assets/{id}/rows | A table\&#39;s row filtering: on or off, and its rules for whoever governs it
 *GovernanceApi* | [**governanceControllerAssignAssetRole**](docs/GovernanceApi.md#governancecontrollerassignassetrole) | **POST** /assets/{id}/governance/roles | Make someone owner, steward or custodian of an asset
 *GovernanceApi* | [**governanceControllerAssignSourceRole**](docs/GovernanceApi.md#governancecontrollerassignsourcerole) | **POST** /sources/{id}/governance/roles | Make someone owner, steward or custodian of a source
 *GovernanceApi* | [**governanceControllerCreateQualityRule**](docs/GovernanceApi.md#governancecontrollercreatequalityrule) | **POST** /assets/{id}/quality/rules | Add a quality rule to an asset (and evaluate it at once)
@@ -347,6 +354,7 @@ All URIs are relative to *http://localhost*
 *GovernanceApi* | [**governanceControllerTestQualityRule**](docs/GovernanceApi.md#governancecontrollertestqualityrule) | **POST** /assets/{id}/quality/test | Measure a quality rule now without saving it
 *GovernanceApi* | [**governanceControllerUnlinkTerm**](docs/GovernanceApi.md#governancecontrollerunlinkterm) | **DELETE** /assets/{id}/governance/meaning/{termId} | Remove a term linked by hand
 *GovernanceApi* | [**governanceControllerUpdateAssetGovernance**](docs/GovernanceApi.md#governancecontrollerupdateassetgovernance) | **PUT** /assets/{id}/governance | Change an asset\&#39;s description, legal basis or lifecycle
+*GovernanceApi* | [**governanceControllerUpdateAssetRows**](docs/GovernanceApi.md#governancecontrollerupdateassetrows) | **PUT** /assets/{id}/rows | Turn row filtering on or off and set the table\&#39;s rules
 *GovernanceApi* | [**governanceControllerUpdateColumn**](docs/GovernanceApi.md#governancecontrollerupdatecolumn) | **PUT** /assets/{id}/columns/{name} | Describe, classify or confirm one column
 *GovernanceApi* | [**governanceControllerUpdateQualityRule**](docs/GovernanceApi.md#governancecontrollerupdatequalityrule) | **PUT** /quality-rules/{ruleId} | Change a quality rule (and evaluate it at once)
 *GovernanceApi* | [**governanceControllerUsage**](docs/GovernanceApi.md#governancecontrollerusage) | **GET** /assets/{id}/usage | Who read and exported a table, per day, over the last days
@@ -550,6 +558,11 @@ All URIs are relative to *http://localhost*
 
 ### Models
 
+- [AccessRequestDeciderDto](docs/AccessRequestDeciderDto.md)
+- [AccessRequestDto](docs/AccessRequestDto.md)
+- [AccessRequestGroupDto](docs/AccessRequestGroupDto.md)
+- [AccessRequestOptionsDto](docs/AccessRequestOptionsDto.md)
+- [AccessRequestTargetDto](docs/AccessRequestTargetDto.md)
 - [AddCaseFindingFiltersDto](docs/AddCaseFindingFiltersDto.md)
 - [AddCaseHypothesisRuleDto](docs/AddCaseHypothesisRuleDto.md)
 - [AddEvidenceDto](docs/AddEvidenceDto.md)
@@ -584,6 +597,7 @@ All URIs are relative to *http://localhost*
 - [AppliedBoardOpDto](docs/AppliedBoardOpDto.md)
 - [ApplyBoardOpsDto](docs/ApplyBoardOpsDto.md)
 - [ApplyBoardOpsResponseDto](docs/ApplyBoardOpsResponseDto.md)
+- [ApproveAccessRequestDto](docs/ApproveAccessRequestDto.md)
 - [AssetChunkDto](docs/AssetChunkDto.md)
 - [AssetColumnDto](docs/AssetColumnDto.md)
 - [AssetColumnsDto](docs/AssetColumnsDto.md)
@@ -599,6 +613,8 @@ All URIs are relative to *http://localhost*
 - [AssetMediaChunkDto](docs/AssetMediaChunkDto.md)
 - [AssetQualityDto](docs/AssetQualityDto.md)
 - [AssetResponseDto](docs/AssetResponseDto.md)
+- [AssetRowRuleDto](docs/AssetRowRuleDto.md)
+- [AssetRowsDto](docs/AssetRowsDto.md)
 - [AssetSeverityCountsItemDto](docs/AssetSeverityCountsItemDto.md)
 - [AssetSeverityCountsRequestDto](docs/AssetSeverityCountsRequestDto.md)
 - [AssetSeverityCountsResponseDto](docs/AssetSeverityCountsResponseDto.md)
@@ -718,6 +734,7 @@ All URIs are relative to *http://localhost*
 - [CorrelationGraphResponseDto](docs/CorrelationGraphResponseDto.md)
 - [CorrelationLabelWeightDto](docs/CorrelationLabelWeightDto.md)
 - [CorrelationRecomputeNoteDto](docs/CorrelationRecomputeNoteDto.md)
+- [CreateAccessRequestDto](docs/CreateAccessRequestDto.md)
 - [CreateAgentMemoryDto](docs/CreateAgentMemoryDto.md)
 - [CreateAiProviderConfigDto](docs/CreateAiProviderConfigDto.md)
 - [CreateCaseDto](docs/CreateCaseDto.md)
@@ -761,6 +778,7 @@ All URIs are relative to *http://localhost*
 - [DecisionsToInquiryResponseDto](docs/DecisionsToInquiryResponseDto.md)
 - [DeleteGlossaryTermResponseDto](docs/DeleteGlossaryTermResponseDto.md)
 - [DeleteRunnerResponseDto](docs/DeleteRunnerResponseDto.md)
+- [DenyAccessRequestDto](docs/DenyAccessRequestDto.md)
 - [DeprecateGlossaryTermDto](docs/DeprecateGlossaryTermDto.md)
 - [DiscoveryRecentRunDto](docs/DiscoveryRecentRunDto.md)
 - [DiscoveryRunSourceDto](docs/DiscoveryRunSourceDto.md)
@@ -942,6 +960,7 @@ All URIs are relative to *http://localhost*
 - [QueryRunDto](docs/QueryRunDto.md)
 - [QueryRunErrorDto](docs/QueryRunErrorDto.md)
 - [QueryRunMaskDto](docs/QueryRunMaskDto.md)
+- [QueryRunRowFilterDto](docs/QueryRunRowFilterDto.md)
 - [QuickSearchAssetDto](docs/QuickSearchAssetDto.md)
 - [QuickSearchFindingDto](docs/QuickSearchFindingDto.md)
 - [QuickSearchRequestDto](docs/QuickSearchRequestDto.md)
@@ -995,6 +1014,10 @@ All URIs are relative to *http://localhost*
 - [ReviewWaterfallRowDto](docs/ReviewWaterfallRowDto.md)
 - [RevokeDataConnectionDto](docs/RevokeDataConnectionDto.md)
 - [RoleDto](docs/RoleDto.md)
+- [RowConditionDto](docs/RowConditionDto.md)
+- [RowConditionDtoValuesInner](docs/RowConditionDtoValuesInner.md)
+- [RowFilterDto](docs/RowFilterDto.md)
+- [RowRuleInputDto](docs/RowRuleInputDto.md)
 - [RunnerAssetFindingSummaryDto](docs/RunnerAssetFindingSummaryDto.md)
 - [RunnerAssetItemDto](docs/RunnerAssetItemDto.md)
 - [RunnerAssetProgressDto](docs/RunnerAssetProgressDto.md)
@@ -1140,6 +1163,7 @@ All URIs are relative to *http://localhost*
 - [UpdateAiProviderConfigDto](docs/UpdateAiProviderConfigDto.md)
 - [UpdateAssetColumnDto](docs/UpdateAssetColumnDto.md)
 - [UpdateAssetGovernanceDto](docs/UpdateAssetGovernanceDto.md)
+- [UpdateAssetRowsDto](docs/UpdateAssetRowsDto.md)
 - [UpdateCapabilitiesDto](docs/UpdateCapabilitiesDto.md)
 - [UpdateCaseDto](docs/UpdateCaseDto.md)
 - [UpdateCaseEventDto](docs/UpdateCaseEventDto.md)

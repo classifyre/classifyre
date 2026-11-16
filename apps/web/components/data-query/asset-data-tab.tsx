@@ -7,6 +7,7 @@ import {
   type QueryCatalogTable,
 } from "@/lib/data-query";
 import { DataNotice, DataTab } from "./data-tab";
+import { RequestAccess } from "@/components/access-requests/request-access";
 
 /**
  * A table's rows, queried in place: the editor starts with this table, the
@@ -32,11 +33,20 @@ export function AssetDataTab({
   }
   if (!table.canQuery) {
     return (
-      <DataNotice title={t("dataQuery.assetLockedTitle")} locked>
-        {t("dataQuery.assetLocked")}
-      </DataNotice>
+      <div className="space-y-3">
+        <DataNotice title={t("dataQuery.assetLockedTitle")} locked>
+          {t("dataQuery.assetLocked")}
+        </DataNotice>
+        <RequestAccess
+          target={{ scopeType: "asset", scopeId: table.assetId }}
+        />
+      </div>
     );
   }
+  // Masked or hidden for this person: they may ask to read it in clear.
+  const masked =
+    (table.hiddenColumns ?? 0) > 0 ||
+    table.columns.some((column) => column.access && !column.inClear);
   return (
     <DataTab
       testId="asset-data-tab"
@@ -50,6 +60,15 @@ export function AssetDataTab({
       sqlName={table.sqlName}
       initialSql={previewSql(table.sqlName)}
       editorPath={`query://asset/${table.assetId}.sql`}
+      actions={
+        masked ? (
+          <RequestAccess
+            target={{ scopeType: "asset", scopeId: table.assetId }}
+            unmasked
+            compact
+          />
+        ) : undefined
+      }
     />
   );
 }

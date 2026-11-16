@@ -230,7 +230,7 @@
         {
           "name": "delete_source",
           "title": "Delete Source",
-          "description": "Delete a source and its associated schedules and data.",
+          "description": "Delete a source and its associated schedules and data. Refused (409) for a governed source: one with an owner, or with assets that have one. Governed assets are never deleted.",
           "readOnly": false,
           "destructive": true,
           "idempotent": false,
@@ -1463,7 +1463,7 @@
         {
           "name": "purge_source_assets",
           "title": "Purge Source Assets",
-          "description": "Permanently delete assets of a source, and with them every finding, extraction, correlation value and chunk derived from those assets. Heavier than purge_source_findings: it removes the ingested material itself, so the source must be re-scanned before anything from it can be examined again. Correlation fingerprints are recomputed afterwards.\n\nWith no filter this deletes EVERY asset of the source. The filters exist for the case a scan can never resolve on its own: when a connector narrows its scope, the assets it used to produce are stranded, because retirement requires a run that saw the whole scope and found them gone — and a rotating-sample connector never has one. ALWAYS call once with dry_run first and report what it matched before deleting.",
+          "description": "Permanently delete assets of a source, and with them every finding, extraction, correlation value and chunk derived from those assets. Heavier than purge_source_findings: it removes the ingested material itself, so the source must be re-scanned before anything from it can be examined again. Correlation fingerprints are recomputed afterwards.\n\nWith no filter this deletes EVERY asset of the source. The filters exist for the case a scan can never resolve on its own: when a connector narrows its scope, the assets it used to produce are stranded, because retirement requires a run that saw the whole scope and found them gone — and a rotating-sample connector never has one. ALWAYS call once with dry_run first and report what it matched before deleting.\n\nGoverned assets (an owner on them or their source) are never purged: they are kept and counted in keptGoverned.",
           "readOnly": false,
           "destructive": true,
           "idempotent": false,
@@ -1577,6 +1577,54 @@
               "type": "string",
               "required": true,
               "format": "uuid"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "data",
+      "title": "Data",
+      "description": "Query the tables you may read with SQL: the same grants, masked columns, row filters, limits and audit as the SQL page.",
+      "operations": [
+        "List the tables you can query, with what is masked or filtered for you",
+        "Run one SELECT and read up to 500 rows"
+      ],
+      "tools": [
+        {
+          "name": "list_queryable_tables",
+          "title": "List Queryable Tables",
+          "description": "The tables you may query with query_data, named as SQL needs them (`source.schema.table`), with their columns as you see them: masked columns say how, hidden ones are only counted, and a row filter says which rows you read. Tables you cannot query are left out; ask for access in the app.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "search",
+              "type": "string",
+              "required": false,
+              "description": "Only tables whose SQL name or name contains this"
+            }
+          ]
+        },
+        {
+          "name": "query_data",
+          "title": "Query Data",
+          "description": "Run one SELECT (DuckDB SQL) over the tables list_queryable_tables shows, and read up to maxRows rows. It runs as you, through the same rights, masked columns, row filters, limits and audit as the SQL page; it waits for the result (usually 10–30 s). Name tables in full: source.schema.table.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "sql",
+              "type": "string",
+              "required": true
+            },
+            {
+              "name": "maxRows",
+              "type": "integer",
+              "required": false,
+              "description": "Rows to return (default 100, at most 500)"
             }
           ]
         }

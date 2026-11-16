@@ -15,6 +15,7 @@ import {
   Res,
 } from '@nestjs/common';
 import {
+  ApiExtraModels,
   ApiOkResponse,
   ApiOperation,
   ApiProduces,
@@ -33,6 +34,7 @@ import {
   DataQuerySettingsDto,
   QueryCatalogDto,
   QueryRunDto,
+  RowConditionDto,
   SavedQueryDto,
   SaveSavedQueryDto,
   UpdateDataQuerySettingsDto,
@@ -54,6 +56,7 @@ import {
  * public workspace: no catalog, no runs, no history, nothing saved.
  */
 @ApiTags('Data query')
+@ApiExtraModels(RowConditionDto)
 @SignedInOnly()
 @Controller()
 export class DataQueryController {
@@ -113,17 +116,8 @@ export class DataQueryController {
       'The tables you can query with SQL, and those you could with access',
   })
   @ApiOkResponse({ type: QueryCatalogDto })
-  async getCatalog(): Promise<QueryCatalogDto> {
-    const catalog = await this.catalog.catalog();
-    // The job's mask list stays on the server: the columns already say
-    // what is masked, and hidden ones are counted, not named.
-    return {
-      ...catalog,
-      sources: catalog.sources.map((source) => ({
-        ...source,
-        tables: source.tables.map(({ masks: _masks, ...table }) => table),
-      })),
-    };
+  getCatalog(): Promise<QueryCatalogDto> {
+    return this.catalog.publicCatalog();
   }
 
   @Get('data-query/settings')

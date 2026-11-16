@@ -72,6 +72,19 @@ const either = (scopes: {
   OR: [{ id: { in: scopes.assetIds } }, { sourceId: { in: scopes.sourceIds } }],
 });
 
+/**
+ * The governed assets (GOV §4): those with an open OWNER, or whose source has
+ * one. Null when nothing in the workspace is owned. Governed assets are never
+ * hard-deleted: a purge keeps them and a source with any is not deleted.
+ */
+export async function governedAssetWhere(
+  db: Db,
+): Promise<Prisma.AssetWhereInput | null> {
+  const owned = await openScopes(db, { role: 'OWNER' });
+  if (!owned.assetIds.length && !owned.sourceIds.length) return null;
+  return either(owned);
+}
+
 /** The where-clause for the governance filters, or null when none is set. */
 export async function governanceAssetWhere(
   db: Db,

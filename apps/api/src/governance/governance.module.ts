@@ -10,6 +10,7 @@ import { GovernanceController } from './governance.controller';
 import { GovernanceColumnsService } from './governance-columns.service';
 import { GovernanceInsightsService } from './governance-insights.service';
 import { GovernanceService } from './governance.service';
+import { GovernanceRowsService } from './governance-rows.service';
 
 /** Governed data assets (docs/prd/GOV-governed-data-assets.md). */
 @Module({
@@ -18,6 +19,7 @@ import { GovernanceService } from './governance.service';
   providers: [
     PrismaService,
     GovernanceService,
+    GovernanceRowsService,
     GovernanceColumnsService,
     GovernanceInsightsService,
     GovernanceMeaningService,

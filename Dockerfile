@@ -134,8 +134,12 @@ ENV UV_LINK_MODE=copy \
 # the CLI loads from before it tries the shared extension cache or INSTALL.
 # ODBC is in the same list: pyodbc (group `odbc`) and DuckDB's ODBC scanner, which
 # DuckDB publishes only in its nightly repository (`INSTALL odbc FROM core_nightly`).
+# Byte-compiled here, since every job is a fresh pod that would otherwise compile
+# each module it imports on every start: about a second of a query job's start
+# (measured 2026-11-15: 1.1-1.5 s of imports cold, 0.4 s compiled).
 RUN uv venv --python /usr/local/bin/python3 .venv \
-    && uv sync --locked --no-dev --group file-processing --group lineage --group odbc \
+    && UV_COMPILE_BYTECODE=1 uv sync --locked --no-dev --group file-processing --group lineage --group odbc \
+    && .venv/bin/python -m compileall -q -j 0 src \
     && .venv/bin/python -c "import duckdb; c = duckdb.connect(); c.execute(\"SET extension_directory = '/opt/duckdb-extensions'\"); [c.execute('INSTALL ' + e) for e in ('httpfs', 'postgres', 'mysql', 'sqlite', 'delta', 'iceberg', 'ducklake', 'azure', 'avro', 'excel', 'unity_catalog', 'spatial')]" \
     && .venv/bin/python -c "import duckdb; c = duckdb.connect(); c.execute(\"SET extension_directory = '/opt/duckdb-extensions'\"); c.execute('INSTALL odbc FROM core_nightly')"
 

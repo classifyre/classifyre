@@ -65,9 +65,14 @@ import {
 import {
   COLUMN_ACTIONS,
   MASK_KINDS,
+  effectiveColumnPolicy,
+  exposureOf,
   isColumnAction,
   isMaskKind,
+  type ColumnAction,
+  type MaskKind,
 } from '../data-query/column-masks';
+import { clearScopeOf, readsInClear } from '../data-query/clear-scope';
 import type {
   AssetGovernanceDto,
   GovernancePrincipalDto,
@@ -483,7 +488,7 @@ export class GovernanceService {
   }
 
   /** Whether the ref names a current member or group of the tenant. */
-  private async assertPrincipalExists(ref: string): Promise<void> {
+  async assertPrincipalExists(ref: string): Promise<void> {
     const orgId = this.orgId();
     if (!orgId) {
       throw new BadRequestException(
@@ -525,6 +530,35 @@ export class GovernanceService {
           'Changing governance needs asset.govern, or the owner or steward role on this asset or its source.',
       });
     }
+  }
+
+  /**
+   * Whether the caller reads this table or source in clear (DQ §5.8). Only
+   * they may make a column show more than it does, or name themselves to a
+   * role that reads it in clear: nobody gives more than they have, and
+   * `asset.govern` alone is not `data.unmask`.
+   */
+  private async callerReadsInClear(target: Target): Promise<boolean> {
+    const scope = await clearScopeOf(
+      this.prisma,
+      this.policy,
+      this.actors.current(),
+      this.person(),
+    );
+    return readsInClear(scope, {
+      sourceId: target.sourceId,
+      assetId: target.scopeType === 'ASSET' ? target.assetId : null,
+    });
+  }
+
+  /** The caller, or a group of theirs. */
+  private isCallerOrTheirGroup(ref: string): boolean {
+    const person = this.person();
+    if (!person) return false;
+    return (
+      ref === person.actorRef ||
+      person.groupIds.some((id) => ref === `group:${id}`)
+    );
   }
 
   /**
@@ -777,6 +811,22 @@ export class GovernanceService {
     if (problem) throw new BadRequestException(problem);
     await this.authorizeRoles();
     await this.assertPrincipalExists(ref);
+    // Owners and stewards read their tables in clear (DQ §5.8): naming
+    // yourself one would be unmasking yourself.
+    if (
+      (kind === 'OWNER' || kind === 'STEWARD') &&
+      this.isCallerOrTheirGroup(ref) &&
+      !(await this.callerReadsInClear(target))
+    ) {
+      throw new ForbiddenException({
+        statusCode: 403,
+        error: 'Forbidden',
+        code: 'UNMASK_REQUIRED',
+        capability: 'data.unmask',
+        message:
+          'Owners and stewards read masked columns in clear, so you cannot name yourself or a group of yours here without reading it in clear already. Ask another admin to name you, or for Data reader, unmasked.',
+      });
+    }
 
     const scopeType = target.scopeType;
     const scopeId =
@@ -1180,6 +1230,9 @@ export class GovernanceService {
         classification: column.effectiveClassification,
         criticalDataElement: column.criticalDataElement,
         termKey: column.term?.key ?? null,
+        access: column.effectiveAccess.action,
+        maskKind: column.effectiveAccess.mask ?? null,
+        accessFromClassification: column.effectiveAccess.fromClassification,
       })),
       rules: quality.rules.map((rule) => ({
         key: rule.key,
@@ -1346,6 +1399,9 @@ export class GovernanceService {
         body.description = column.description;
       if (column.criticalDataElement !== undefined)
         body.criticalDataElement = column.criticalDataElement;
+      // DQ §5.8: updateColumn refuses showing more without reading in clear.
+      if (column.access !== undefined) body.access = column.access;
+      if (column.maskKind !== undefined) body.maskKind = column.maskKind;
       if (column.classification !== undefined) {
         if (
           column.classification === null ||
@@ -1458,7 +1514,7 @@ export class GovernanceService {
 
   async assetColumns(
     assetId: string,
-  ): Promise<AssetColumns & { canGovern: boolean }> {
+  ): Promise<AssetColumns & { canGovern: boolean; inClear: boolean }> {
     const target = await this.assetTarget(assetId);
     if (target.scopeType !== 'ASSET') throw new Error('unreachable');
     const [state, assetRows, sourceRows] = await Promise.all([
@@ -1469,6 +1525,7 @@ export class GovernanceService {
     return {
       ...state,
       canGovern: await this.mayGovern([...assetRows, ...sourceRows]),
+      inClear: await this.callerReadsInClear(target),
     };
   }
 
@@ -1490,7 +1547,7 @@ export class GovernanceService {
       access?: unknown;
       maskKind?: unknown;
     },
-  ): Promise<AssetColumns & { canGovern: boolean }> {
+  ): Promise<AssetColumns & { canGovern: boolean; inClear: boolean }> {
     const target = await this.assetTarget(assetId);
     await this.authorize(target);
     const name = columnName.trim();
@@ -1543,6 +1600,12 @@ export class GovernanceService {
       data.criticalDataElement = body.criticalDataElement;
       fields.push('criticalDataElement');
     }
+    const column = [...state.columns, ...state.removed].find(
+      (c) => c.name === name,
+    )!;
+    let nextClassification: string | null = column.classification;
+    let nextAccess: ColumnAction | null = column.access;
+    let nextMaskKind: MaskKind | null = column.maskKind;
     let reviewed = body.reviewClassification === true;
     if ('classification' in body) {
       const value = body.classification;
@@ -1558,6 +1621,7 @@ export class GovernanceService {
       data.classification = value;
       fields.push('classification');
       reviewed = reviewed || value !== null;
+      nextClassification = value;
     }
     // DQ §5.8: what people who may not unmask see of this column.
     if ('access' in body) {
@@ -1569,6 +1633,7 @@ export class GovernanceService {
       }
       data.access = value;
       fields.push('access');
+      nextAccess = value;
     }
     if ('maskKind' in body) {
       const value = body.maskKind;
@@ -1579,6 +1644,7 @@ export class GovernanceService {
       }
       data.maskKind = value;
       fields.push('maskKind');
+      nextMaskKind = value;
     }
     if (reviewed) {
       data.classificationReviewedAt = new Date();
@@ -1586,6 +1652,27 @@ export class GovernanceService {
       fields.push('reviewClassification');
     }
     if (!fields.length) return this.assetColumns(assetId);
+    // DQ §5.8: making a column show more to people who may not unmask —
+    // clear instead of masked, a weaker mask, a lower classification — is
+    // giving them what it hides; only someone who reads it may do that.
+    const after = effectiveColumnPolicy({
+      access: nextAccess,
+      maskKind: nextMaskKind,
+      classification: nextClassification ?? column.derivedClassification,
+    });
+    if (
+      exposureOf(after) > exposureOf(column.effectiveAccess) &&
+      !(await this.callerReadsInClear(target))
+    ) {
+      throw new ForbiddenException({
+        statusCode: 403,
+        error: 'Forbidden',
+        code: 'UNMASK_REQUIRED',
+        capability: 'data.unmask',
+        message:
+          'Showing more of this column needs you to read it in clear: Data reader, unmasked, on this table or its source, or its owner or steward role.',
+      });
+    }
     const previous = await this.prisma.assetColumnAnnotation.findUnique({
       where: { assetId_columnName: { assetId, columnName: name } },
     });
@@ -1649,7 +1736,7 @@ export class GovernanceService {
     assetId: string,
     columnName: string,
     to: unknown,
-  ): Promise<AssetColumns & { canGovern: boolean }> {
+  ): Promise<AssetColumns & { canGovern: boolean; inClear: boolean }> {
     const target = await this.assetTarget(assetId);
     await this.authorize(target);
     if (typeof to !== 'string' || !to.trim()) {
@@ -1689,7 +1776,7 @@ export class GovernanceService {
   async removeColumn(
     assetId: string,
     columnName: string,
-  ): Promise<AssetColumns & { canGovern: boolean }> {
+  ): Promise<AssetColumns & { canGovern: boolean; inClear: boolean }> {
     const target = await this.assetTarget(assetId);
     await this.authorize(target);
     const { count } = await this.prisma.assetColumnAnnotation.deleteMany({

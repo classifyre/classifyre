@@ -3,6 +3,7 @@
 export { AIApi } from './AIApi';
 export { AIProviderConfigsApi } from './AIProviderConfigsApi';
 export { AccessApi } from './AccessApi';
+export { AccessRequestsApi } from './AccessRequestsApi';
 export { AssetsApi } from './AssetsApi';
 export { AssistantApi } from './AssistantApi';
 export { AutopilotApi } from './AutopilotApi';

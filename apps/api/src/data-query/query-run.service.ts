@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { Prisma, QueryRunStatus } from '@prisma/client';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { tableFromIPC } from 'apache-arrow';
 import { PrismaService } from '../prisma.service';
 import { CliRunnerService } from '../cli-runner/cli-runner.service';
 import { MaskedConfigCryptoService } from '../masked-config-crypto.service';
@@ -28,7 +29,17 @@ import {
   type CatalogTable,
 } from './query-catalog.service';
 import { mentionedSourceNames } from './sql-names';
-import { maskSalt, type ColumnMask } from './column-masks';
+import {
+  maskSalt,
+  parseRunMasks,
+  runMasksOf,
+  type RunMask,
+} from './column-masks';
+import {
+  parseRunRowFilters,
+  runRowFiltersOf,
+  type RunRowFilter,
+} from './row-filters';
 import { resolveApplicationSecretKey } from '../secret-key.util';
 import {
   extractThreePartNames,
@@ -79,6 +90,8 @@ export interface QueryRunView {
   columns: { name: string; type: string }[] | null;
   /** Masked and hidden columns of the tables it names (DQ §5.8). */
   masks: RunMask[];
+  /** Row filters of the tables it names (DQ §5.10). */
+  rowFilters: RunRowFilter[];
   timings: Record<string, number> | null;
   error: { code: string; message: string } | null;
   resultBytes: number | null;
@@ -87,18 +100,6 @@ export interface QueryRunView {
   createdAt: Date;
   startedAt: Date | null;
   finishedAt: Date | null;
-}
-
-/** A masked or hidden column of a table a run names, as it ran. */
-export interface RunMask extends ColumnMask {
-  table: string;
-}
-
-/** The masks of the tables a run names: what its result shows them as. */
-export function runMasks(tables: readonly CatalogTable[]): RunMask[] {
-  return tables.flatMap((table) =>
-    (table.masks ?? []).map((mask) => ({ table: table.sqlName, ...mask })),
-  );
 }
 
 export interface QueryCallbackMeta {
@@ -131,6 +132,65 @@ export function runOrigin(actor: Actor): RunOrigin {
   };
 }
 
+/** A value of a result row as JSON can carry it. */
+function jsonValue(value: unknown): unknown {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'bigint') {
+    return value <= BigInt(Number.MAX_SAFE_INTEGER) &&
+      value >= BigInt(Number.MIN_SAFE_INTEGER)
+      ? Number(value)
+      : value.toString();
+  }
+  if (value instanceof Date) return value.toISOString();
+  if (value instanceof Uint8Array) {
+    return `<${value.byteLength} bytes>`;
+  }
+  if (Array.isArray(value)) return value.map(jsonValue);
+  if (typeof value === 'object') {
+    const plain =
+      typeof (value as { toJSON?: () => unknown }).toJSON === 'function'
+        ? (value as { toJSON: () => unknown }).toJSON()
+        : value;
+    if (plain && typeof plain === 'object' && !Array.isArray(plain)) {
+      return Object.fromEntries(
+        Object.entries(plain as Record<string, unknown>).map(([k, v]) => [
+          k,
+          jsonValue(v),
+        ]),
+      );
+    }
+    return jsonValue(plain);
+  }
+  return value;
+}
+
+/** Up to `maxRows` rows of an Arrow IPC stream, as JSON-safe objects. */
+export function readArrowRows(
+  bytes: Buffer,
+  maxRows: number,
+): {
+  columns: { name: string; type: string }[];
+  rows: Record<string, unknown>[];
+} {
+  const table = tableFromIPC(bytes);
+  const fields = table.schema.fields;
+  const columns = fields.map((field) => ({
+    name: field.name,
+    type: String(field.type),
+  }));
+  const vectors = fields.map((_, i) => table.getChildAt(i));
+  const rows: Record<string, unknown>[] = [];
+  const count = Math.min(table.numRows, maxRows);
+  for (let r = 0; r < count; r++) {
+    const row: Record<string, unknown> = {};
+    fields.forEach((field, i) => {
+      row[field.name] = jsonValue(vectors[i]?.get(r));
+    });
+    rows.push(row);
+  }
+  return { columns, rows };
+}
+
 function tokenHash(token: string): string {
   return createHash('sha256').update(token, 'utf8').digest('hex');
 }
@@ -160,6 +220,37 @@ export class QueryRunService {
   ) {}
 
   async create(sql: string, format?: string): Promise<QueryRunView> {
+    return (await this.begin(sql, format)).view;
+  }
+
+  /**
+   * A query for an AI agent working for a person (MCP `query_data`, DQ
+   * §5.11): the same run as the SQL page's — the person's catalog, masks,
+   * row filters, caps and audit, channel `mcp` — awaited, with at most
+   * `maxRows` rows decoded from its Arrow result.
+   */
+  async runAndRead(
+    sql: string,
+    maxRows: number,
+  ): Promise<{
+    run: QueryRunView;
+    columns: { name: string; type: string }[];
+    rows: Record<string, unknown>[];
+  }> {
+    const { view, done } = await this.begin(sql);
+    await done;
+    const run = await this.get(view.id);
+    if (run.status !== QueryRunStatus.SUCCESS) {
+      return { run, columns: [], rows: [] };
+    }
+    const { bytes } = await this.result(view.id);
+    return { run, ...readArrowRows(bytes, maxRows) };
+  }
+
+  private async begin(
+    sql: string,
+    format?: string,
+  ): Promise<{ view: QueryRunView; done: Promise<void> }> {
     const text = (sql ?? '').trim();
     const exportFormat = format
       ? EXPORT_FORMATS.find((f) => f === format.toLowerCase())
@@ -233,7 +324,7 @@ export class QueryRunService {
           expiresAt: new Date(Date.now() + RESULT_TTL_MS),
         },
       });
-      return this.view(refused);
+      return { view: this.view(refused), done: Promise.resolve() };
     }
     const mentioned = mentionedSourceNames(
       text,
@@ -266,7 +357,7 @@ export class QueryRunService {
     const tablesNamedInCode = tablesWithSource.filter(({ table }) =>
       namesInCode.has(table.sqlName),
     );
-    const { run } = await this.launch({
+    const { run, done } = await this.launch({
       actor,
       origin,
       sql: text,
@@ -278,7 +369,7 @@ export class QueryRunService {
       exportFormat,
       timeoutSeconds: settings.timeoutSeconds,
     });
-    return this.view(run);
+    return { view: this.view(run), done };
   }
 
   /**
@@ -426,6 +517,19 @@ export class QueryRunService {
     await this.cliRunner.cancelQueryExecution(runId).catch(() => undefined);
   }
 
+  /**
+   * The workspace's key for `hash` masks. A person's run always has a
+   * workspace; without one there is no key to give, rather than a key
+   * every workspace would share.
+   */
+  private maskSalt(): string {
+    const workspaceId = this.actors.workspaceId();
+    if (!workspaceId) {
+      throw new Error('A masked query needs its workspace for the hash key.');
+    }
+    return maskSalt(resolveApplicationSecretKey(), workspaceId);
+  }
+
   private async activeRuns(origin: RunOrigin): Promise<number> {
     return this.prisma.queryRun.count({
       where: {
@@ -476,6 +580,9 @@ export class QueryRunService {
   }) {
     void this.purgeExpired().catch(() => undefined);
     const token = randomBytes(32).toString('base64url');
+    const named = input.tables
+      .map(({ table }) => table)
+      .filter((table) => input.namedAssetIds.includes(table.assetId));
     // `assetIds` starts as the tables named in code and is replaced with the
     // job's authoritative table list on success (received in `receiveResult`);
     // per-table audit is recorded there, never here, so refusals and failures
@@ -490,11 +597,8 @@ export class QueryRunService {
         connectionId: input.origin.connectionId,
         assetIds: input.namedAssetIds,
         sourceIds: input.used.map((source) => source.id),
-        masks: runMasks(
-          input.tables
-            .map(({ table }) => table)
-            .filter((table) => input.namedAssetIds.includes(table.assetId)),
-        ) as unknown as Prisma.InputJsonValue,
+        masks: runMasksOf(named),
+        rowFilters: runRowFiltersOf(named),
         callbackTokenHash: tokenHash(token),
         resultFormat: input.exportFormat ?? null,
         expiresAt: new Date(Date.now() + RESULT_TTL_MS),
@@ -534,15 +638,28 @@ export class QueryRunService {
         table: table.table,
         assetId: table.assetId,
         location: table.location,
-        // DQ §5.8: the job's view of this table hides and masks these.
-        ...(table.masks?.length ? { columns: table.masks } : {}),
+        // DQ §5.8: the job's view of this table hides and masks these, and
+        // hides any column the scan did not record (renamed since), which
+        // no mask can be known not to be for.
+        ...(table.masks?.length
+          ? {
+              columns: table.masks,
+              ...(table.columns.length
+                ? {
+                    knownColumns: [
+                      ...table.columns.map((column) => column.name),
+                      ...table.masks.map((mask) => mask.column),
+                    ],
+                  }
+                : {}),
+            }
+          : {}),
+        // DQ §5.10: the view shows only the rows these select.
+        ...(table.rowFilter ? { rows: table.rowFilter } : {}),
       })),
       ...(input.tables.some(({ table }) => table.masks?.length)
         ? {
-            maskSalt: maskSalt(
-              resolveApplicationSecretKey(),
-              this.actors.workspaceId() ?? '',
-            ),
+            maskSalt: this.maskSalt(),
           }
         : {}),
     };
@@ -935,6 +1052,7 @@ export class QueryRunService {
         truncatedReason: true,
         columns: true,
         masks: true,
+        rowFilters: true,
         timings: true,
         error: true,
         resultBytes: true,
@@ -990,6 +1108,7 @@ export class QueryRunService {
     truncatedReason: string | null;
     columns: Prisma.JsonValue;
     masks: Prisma.JsonValue;
+    rowFilters: Prisma.JsonValue;
     timings: Prisma.JsonValue;
     error: Prisma.JsonValue;
     resultBytes: number | null;
@@ -1008,9 +1127,8 @@ export class QueryRunService {
       truncated: run.truncated,
       truncatedReason: run.truncatedReason,
       columns: (run.columns as QueryRunView['columns']) ?? null,
-      masks: Array.isArray(run.masks)
-        ? (run.masks as unknown as RunMask[])
-        : [],
+      masks: parseRunMasks(run.masks),
+      rowFilters: parseRunRowFilters(run.rowFilters),
       timings: (run.timings as QueryRunView['timings']) ?? null,
       error: (run.error as QueryRunView['error']) ?? null,
       resultBytes: run.resultBytes,

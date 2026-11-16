@@ -483,7 +483,12 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
     const ns = await this.registry.resolve(database).catch(() => null);
     if (!ns)
       throw new Refusal('3D000', `database "${database}" does not exist`);
-    const keys = [`u:${ns.namespaceId}:${username}`, `ip:${client ?? '-'}`];
+    // User names are looked up without case: so is the lockout, or `Ana`,
+    // `ANA`, … would each get their own ten tries.
+    const keys = [
+      `u:${ns.namespaceId}:${username.toLowerCase()}`,
+      `ip:${client ?? '-'}`,
+    ];
     const locked = keys.find((key) => this.lockout.isLocked(key));
     if (locked) {
       if (this.lockout.shouldReport(locked)) {

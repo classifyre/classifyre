@@ -71,6 +71,21 @@ stateDiagram-v2
 The mechanics of how a scan diffs against the previous run live in the
 **[Scans](/flow/)** section.
 
+### Governed assets are never deleted
+
+An asset is **governed** once it has an owner, or its source has one. Its
+owner, stewards, masks, row filters, quality checks and the access given on it
+belong to that one asset, so it is never deleted for good:
+
+- **Purge assets** on a source deletes the assets that match and keeps the
+  governed ones. The result says how many it kept.
+- **Delete source** is refused while the source has an owner, or any of its
+  assets has one.
+
+To delete a governed asset after all, remove its owner first, on its
+**Governance** tab (or the source's). A scan that no longer finds the item
+still marks it **Deleted** as above, which keeps everything about it.
+
 ---
 
 ## Asset metadata

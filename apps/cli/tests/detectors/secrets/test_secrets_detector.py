@@ -265,3 +265,36 @@ async def test_detect_runs_entirely_in_memory():
     assert len(temp_created) == 0
     # But we should still get findings
     assert len(results) >= 1
+
+
+@pytest.mark.asyncio
+async def test_secret_in_a_table_cell_names_its_column(sample_github_token):
+    """A secret in a sampled row says which column holds it (DQ §5.8)."""
+    token = sample_github_token
+    content = "\n".join(
+        [
+            "table=lab.public.deploy_keys",
+            "sampling_strategy=RANDOM",
+            "sampled_rows=2",
+            "",
+            "row_1:",
+            "  owner: lantern-bot",
+            f"  api_token: {token}",
+            "",
+            "row_2:",
+            "  owner: pip.marlow",
+            "  api_token: none",
+        ]
+    )
+    results = await SecretsDetector().detect(content)
+    assert results, "the token should be found"
+    for finding in results:
+        assert finding.metadata["tabular_column_name"] == "api_token"
+        assert finding.metadata["tabular_row_index"] == 1
+
+
+@pytest.mark.asyncio
+async def test_secret_in_plain_text_has_no_column(sample_github_token):
+    results = await SecretsDetector().detect(sample_github_token)
+    assert results
+    assert all("tabular_column_name" not in r.metadata for r in results)

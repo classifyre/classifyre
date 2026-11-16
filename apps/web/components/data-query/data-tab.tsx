@@ -32,6 +32,7 @@ export function DataTab({
   initialSql,
   editorPath,
   explorer = false,
+  actions,
   testId,
 }: {
   scope: DataScope;
@@ -43,6 +44,8 @@ export function DataTab({
   editorPath: string;
   /** Lists the scope's tables beside the editor (a source's tab). */
   explorer?: boolean;
+  /** More buttons beside Give access (asking to read in clear). */
+  actions?: React.ReactNode;
   testId: string;
 }) {
   const { t } = useTranslation();
@@ -67,11 +70,14 @@ export function DataTab({
   return (
     <div className="space-y-4" data-testid={testId}>
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        <code className="rounded bg-muted px-1.5 py-0.5 text-xs">{sqlName}</code>
+        <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+          {sqlName}
+        </code>
         {summary && (
           <span className="text-xs text-muted-foreground">{summary}</span>
         )}
         <div className="ml-auto flex flex-wrap items-center gap-1">
+          {actions}
           {canManage && <GiveDataAccessButton scope={scope} access={access} />}
           <ConnectToolButton scope={scope} />
           <Button asChild size="sm" variant="ghost">

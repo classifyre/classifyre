@@ -18,6 +18,7 @@ import type {
   AssetColumnsDto,
   AssetGovernanceDto,
   AssetQualityDto,
+  AssetRowsDto,
   AssetUsageDto,
   AssignGovernanceRoleDto,
   ContractImportResultDto,
@@ -33,6 +34,7 @@ import type {
   SourceGovernanceDto,
   UpdateAssetColumnDto,
   UpdateAssetGovernanceDto,
+  UpdateAssetRowsDto,
 } from '../models/index';
 import {
     AssetColumnsDtoFromJSON,
@@ -41,6 +43,8 @@ import {
     AssetGovernanceDtoToJSON,
     AssetQualityDtoFromJSON,
     AssetQualityDtoToJSON,
+    AssetRowsDtoFromJSON,
+    AssetRowsDtoToJSON,
     AssetUsageDtoFromJSON,
     AssetUsageDtoToJSON,
     AssignGovernanceRoleDtoFromJSON,
@@ -71,6 +75,8 @@ import {
     UpdateAssetColumnDtoToJSON,
     UpdateAssetGovernanceDtoFromJSON,
     UpdateAssetGovernanceDtoToJSON,
+    UpdateAssetRowsDtoFromJSON,
+    UpdateAssetRowsDtoToJSON,
 } from '../models/index';
 
 export interface GovernanceControllerAssetColumnsRequest {
@@ -86,6 +92,10 @@ export interface GovernanceControllerAssetMeaningRequest {
 }
 
 export interface GovernanceControllerAssetQualityRequest {
+    id: string;
+}
+
+export interface GovernanceControllerAssetRowsRequest {
     id: string;
 }
 
@@ -183,6 +193,11 @@ export interface GovernanceControllerUnlinkTermRequest {
 export interface GovernanceControllerUpdateAssetGovernanceRequest {
     id: string;
     updateAssetGovernanceDto: UpdateAssetGovernanceDto;
+}
+
+export interface GovernanceControllerUpdateAssetRowsRequest {
+    id: string;
+    updateAssetRowsDto: UpdateAssetRowsDto;
 }
 
 export interface GovernanceControllerUpdateColumnRequest {
@@ -351,6 +366,43 @@ export class GovernanceApi extends runtime.BaseAPI {
      */
     async governanceControllerAssetQuality(requestParameters: GovernanceControllerAssetQualityRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AssetQualityDto> {
         const response = await this.governanceControllerAssetQualityRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * A table\'s row filtering: on or off, and its rules for whoever governs it
+     */
+    async governanceControllerAssetRowsRaw(requestParameters: GovernanceControllerAssetRowsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AssetRowsDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling governanceControllerAssetRows().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/assets/{id}/rows`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => AssetRowsDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * A table\'s row filtering: on or off, and its rules for whoever governs it
+     */
+    async governanceControllerAssetRows(requestParameters: GovernanceControllerAssetRowsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AssetRowsDto> {
+        const response = await this.governanceControllerAssetRowsRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -1236,6 +1288,55 @@ export class GovernanceApi extends runtime.BaseAPI {
      */
     async governanceControllerUpdateAssetGovernance(requestParameters: GovernanceControllerUpdateAssetGovernanceRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AssetGovernanceDto> {
         const response = await this.governanceControllerUpdateAssetGovernanceRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Needs asset.govern, or the owner or steward role. Showing readers more rows (off, a new or wider rule) needs the owner or steward role: they see every row.
+     * Turn row filtering on or off and set the table\'s rules
+     */
+    async governanceControllerUpdateAssetRowsRaw(requestParameters: GovernanceControllerUpdateAssetRowsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AssetRowsDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling governanceControllerUpdateAssetRows().'
+            );
+        }
+
+        if (requestParameters['updateAssetRowsDto'] == null) {
+            throw new runtime.RequiredError(
+                'updateAssetRowsDto',
+                'Required parameter "updateAssetRowsDto" was null or undefined when calling governanceControllerUpdateAssetRows().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/assets/{id}/rows`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'PUT',
+            headers: headerParameters,
+            query: queryParameters,
+            body: UpdateAssetRowsDtoToJSON(requestParameters['updateAssetRowsDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => AssetRowsDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Needs asset.govern, or the owner or steward role. Showing readers more rows (off, a new or wider rule) needs the owner or steward role: they see every row.
+     * Turn row filtering on or off and set the table\'s rules
+     */
+    async governanceControllerUpdateAssetRows(requestParameters: GovernanceControllerUpdateAssetRowsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AssetRowsDto> {
+        const response = await this.governanceControllerUpdateAssetRowsRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

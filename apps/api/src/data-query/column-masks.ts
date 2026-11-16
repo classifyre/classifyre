@@ -19,6 +19,10 @@ import { createHmac } from 'node:crypto';
 export const COLUMN_ACTIONS = ['clear', 'mask', 'hide'] as const;
 export type ColumnAction = (typeof COLUMN_ACTIONS)[number];
 
+/** What a column can be for someone who does not read it in clear. */
+export const COLUMN_MASK_ACTIONS = ['mask', 'hide'] as const;
+export type ColumnMaskAction = (typeof COLUMN_MASK_ACTIONS)[number];
+
 /**
  * - `redact`: text becomes `****`, anything else NULL;
  * - `partial`: text keeps its last four characters (`••••••1234`), anything
@@ -96,10 +100,29 @@ export function effectiveColumnPolicy(input: {
     : { action: derived.action, fromClassification: true };
 }
 
+/** How much of a column's values each mask leaves to see, least first. */
+const MASK_EXPOSURE: Readonly<Record<MaskKind, number>> = {
+  null: 1,
+  redact: 1,
+  hash: 2,
+  partial: 3,
+};
+
+/**
+ * How much a policy shows of a column, least to most: hidden, emptied or
+ * redacted, hashed (equal values still tell), last four, clear. A change
+ * that raises it gives people who may not unmask more than they had.
+ */
+export function exposureOf(policy: ColumnPolicy): number {
+  if (policy.action === 'hide') return 0;
+  if (policy.action === 'clear') return 4;
+  return MASK_EXPOSURE[policy.mask ?? DEFAULT_MASK];
+}
+
 /** One masked or hidden column, as the query job applies it. */
 export interface ColumnMask {
   column: string;
-  action: 'mask' | 'hide';
+  action: ColumnMaskAction;
   mask?: MaskKind;
 }
 
@@ -113,16 +136,106 @@ export function toColumnMask(
     : { column, action: 'hide' };
 }
 
+/**
+ * A masked or hidden column of a table a run names, as it ran — what the
+ * result says above itself. A hidden column is counted, never named: its
+ * name is as much the person's business as its values.
+ */
+export type RunMask =
+  | { table: string; action: 'mask'; column: string; mask: MaskKind }
+  | { table: string; action: 'hide' };
+
+/** The masks of the tables a run names. */
+export function runMasksOf(
+  tables: readonly { sqlName: string; masks?: readonly ColumnMask[] }[],
+): RunMask[] {
+  return tables.flatMap((table) =>
+    (table.masks ?? []).map(
+      (mask): RunMask =>
+        mask.action === 'hide'
+          ? { table: table.sqlName, action: 'hide' }
+          : {
+              table: table.sqlName,
+              action: 'mask',
+              column: mask.column,
+              mask: mask.mask ?? DEFAULT_MASK,
+            },
+    ),
+  );
+}
+
+/** A run's stored masks, read back: anything not shaped like one is dropped. */
+export function parseRunMasks(value: unknown): RunMask[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item): RunMask[] => {
+    if (!item || typeof item !== 'object') return [];
+    const { table, action, column, mask } = item as Record<string, unknown>;
+    if (typeof table !== 'string') return [];
+    if (action === 'hide') return [{ table, action }];
+    if (action !== 'mask' || typeof column !== 'string') return [];
+    return [
+      {
+        table,
+        action,
+        column,
+        mask: isMaskKind(mask) ? mask : DEFAULT_MASK,
+      },
+    ];
+  });
+}
+
+/** Top-level parts of a DuckDB type list (`a INT, "b c" STRUCT(x INT)`). */
+function splitTypeList(body: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let quoted = false;
+  let start = 0;
+  for (let i = 0; i < body.length; i += 1) {
+    const char = body[i];
+    if (char === '"') quoted = !quoted;
+    else if (quoted) continue;
+    else if (char === '(' || char === '[') depth += 1;
+    else if (char === ')' || char === ']') depth -= 1;
+    else if (char === ',' && depth === 0) {
+      parts.push(body.slice(start, i).trim());
+      start = i + 1;
+    }
+  }
+  parts.push(body.slice(start).trim());
+  return parts.filter(Boolean);
+}
+
+/**
+ * The type of a hashed value: text, field by field and element by element
+ * for structs and lists, as the job's views mask them (`masks.py`).
+ */
+function hashedType(type: string): string {
+  const t = type.trim();
+  const list = /^(.*)\[\d*\]$/s.exec(t);
+  if (list && !/^STRUCT\(.*\)$/is.test(t)) return `${hashedType(list[1])}[]`;
+  const struct = /^STRUCT\((.*)\)$/is.exec(t);
+  if (struct) {
+    const fields = splitTypeList(struct[1]).map((part) => {
+      const quoted = /^("(?:[^"]|"")*")\s+(.+)$/s.exec(part);
+      const bare = /^(\S+)\s+(.+)$/s.exec(part);
+      const match = quoted ?? bare;
+      return match ? `${match[1]} ${hashedType(match[2])}` : null;
+    });
+    if (fields.every(Boolean)) return `STRUCT(${fields.join(', ')})`;
+  }
+  return 'VARCHAR';
+}
+
 /** The type a masked column has: a hash is text, every other mask keeps it. */
 export function maskedType(type: string, mask: MaskKind | undefined): string {
-  return mask === 'hash' ? 'VARCHAR' : type;
+  return mask === 'hash' ? hashedType(type) : type;
 }
 
 export interface MaskedColumn {
   name: string;
   type: string;
   /** Set when governance masks or hides it. */
-  access?: 'mask' | 'hide';
+  access?: ColumnMaskAction;
   mask?: MaskKind;
   /** It is masked or hidden for others, and this person reads it in clear. */
   inClear?: boolean;

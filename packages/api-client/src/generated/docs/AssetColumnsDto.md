@@ -11,6 +11,7 @@ Name | Type
 `findingsWithoutColumn` | number
 `classificationReviewed` | boolean
 `canGovern` | boolean
+`inClear` | boolean
 
 ## Example
 
@@ -24,6 +25,7 @@ const example = {
   "findingsWithoutColumn": null,
   "classificationReviewed": null,
   "canGovern": null,
+  "inClear": null,
 } satisfies AssetColumnsDto
 
 console.log(example)

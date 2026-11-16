@@ -8,6 +8,7 @@ Name | Type
 ------------ | -------------
 `purgedAssets` | number
 `matchedAssets` | number
+`keptGoverned` | number
 `dryRun` | boolean
 `predicate` | { [key: string]: any; }
 
@@ -20,6 +21,7 @@ import type { PurgeSourceAssetsResponseDto } from '@workspace/api-client'
 const example = {
   "purgedAssets": null,
   "matchedAssets": null,
+  "keptGoverned": null,
   "dryRun": null,
   "predicate": null,
 } satisfies PurgeSourceAssetsResponseDto

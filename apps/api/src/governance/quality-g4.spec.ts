@@ -201,6 +201,9 @@ describe('ODCS contracts (GOV §5.5)', () => {
         classification: 'personal',
         criticalDataElement: true,
         termKey: 'email-address',
+        access: 'mask' as const,
+        maskKind: 'hash' as const,
+        accessFromClassification: false,
       },
       {
         name: 'id',
@@ -210,6 +213,9 @@ describe('ODCS contracts (GOV §5.5)', () => {
         classification: null,
         criticalDataElement: false,
         termKey: null,
+        access: 'clear' as const,
+        maskKind: null,
+        accessFromClassification: true,
       },
     ],
     rules: [
@@ -322,6 +328,14 @@ describe('ODCS contracts (GOV §5.5)', () => {
       classification: 'personal',
       criticalDataElement: true,
       termKey: 'email-address',
+      access: 'mask',
+      maskKind: 'hash',
+    });
+    // A policy that follows the classification stays that way.
+    expect(plan.columns[1]).toMatchObject({
+      name: 'id',
+      access: null,
+      maskKind: null,
     });
     expect(
       plan.rules.map((r) => [r.key, r.type, r.metric, r.columnName]),
@@ -332,6 +346,62 @@ describe('ODCS contracts (GOV §5.5)', () => {
     ]);
     expect(plan.legalBasis).toBe('CONTRACT');
     expect(plan.skipped).toEqual([]);
+  });
+
+  it('writes column access as custom properties (DQ §5.8)', () => {
+    const contract = toContract(input) as Record<string, any>;
+    const [email, id] = contract.schema[0].properties;
+    expect(email.customProperties).toEqual([
+      { property: 'access', value: 'mask' },
+      { property: 'maskKind', value: 'hash' },
+      { property: 'accessFrom', value: 'steward' },
+    ]);
+    expect(id.customProperties).toEqual([
+      { property: 'access', value: 'clear' },
+      { property: 'accessFrom', value: 'classification' },
+    ]);
+  });
+
+  it('reads column access, and skips what it does not know', () => {
+    const prop = (name: string, custom: unknown[]) => ({
+      name,
+      customProperties: custom,
+    });
+    const plan = fromContract({
+      kind: 'DataContract',
+      schema: [
+        {
+          name: 't',
+          properties: [
+            prop('a', [{ property: 'access', value: 'Hide' }]),
+            prop('b', [
+              { property: 'access', value: 'mask' },
+              { property: 'maskKind', value: 'rot13' },
+            ]),
+            prop('c', [{ property: 'access', value: 'shown' }]),
+            prop('d', [{ property: 'access', value: 'mask' }]),
+            prop('e', []),
+          ],
+        },
+      ],
+    });
+    expect(
+      plan.columns.map(({ name, access, maskKind }) => [
+        name,
+        access,
+        maskKind,
+      ]),
+    ).toEqual([
+      ['a', 'hide', null],
+      ['b', undefined, undefined],
+      ['c', undefined, undefined],
+      ['d', 'mask', null],
+      ['e', undefined, undefined],
+    ]);
+    expect(plan.skipped.map((s) => s.path)).toEqual([
+      'schema[0].properties[1].customProperties.maskKind',
+      'schema[0].properties[2].customProperties.access',
+    ]);
   });
 
   it('skips what it cannot evaluate, and says why', () => {

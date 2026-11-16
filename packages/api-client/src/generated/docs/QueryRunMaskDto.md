@@ -7,8 +7,8 @@
 Name | Type
 ------------ | -------------
 `table` | string
-`column` | string
 `action` | string
+`column` | string
 `mask` | string
 
 ## Example
@@ -19,8 +19,8 @@ import type { QueryRunMaskDto } from '@workspace/api-client'
 // TODO: Update the object below with actual values
 const example = {
   "table": shop_lake.shop.customers,
-  "column": null,
   "action": null,
+  "column": null,
   "mask": null,
 } satisfies QueryRunMaskDto
 

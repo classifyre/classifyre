@@ -24,6 +24,7 @@ import type { SourceGovernanceDto } from "@/lib/governance";
 import { ChangedBy } from "@/components/audit-history";
 import { OwnershipCard } from "./ownership-card";
 import { AccessCard } from "./access-card";
+import { AccessRequestsCard } from "./access-requests-card";
 import { RoleIcon } from "./role-style";
 
 /**
@@ -115,6 +116,12 @@ export function SourceGovernanceView({
           )
         }
       />
+
+      {governance.canGovern && (
+        <AccessRequestsCard
+          filter={{ scopeType: "source", scopeId: sourceId }}
+        />
+      )}
 
       {governance.canGovern && (
         <AccessCard
@@ -215,7 +222,15 @@ function CoverageTile({
   );
 }
 
-function Bar({ label, value, of }: { label: string; value: number; of: number }) {
+function Bar({
+  label,
+  value,
+  of,
+}: {
+  label: string;
+  value: number;
+  of: number;
+}) {
   const percent = of ? Math.round((value / of) * 100) : 0;
   return (
     <div className="space-y-1">
@@ -224,7 +239,10 @@ function Bar({ label, value, of }: { label: string; value: number; of: number })
         <span className="font-mono">{percent}%</span>
       </div>
       <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-        <div className="h-full bg-accent-ink" style={{ width: `${percent}%` }} />
+        <div
+          className="h-full bg-accent-ink"
+          style={{ width: `${percent}%` }}
+        />
       </div>
     </div>
   );

@@ -17,6 +17,7 @@ Name | Type
 `canQuery` | boolean
 `reason` | string
 `hiddenColumns` | number
+`rowFilter` | [RowFilterDto](RowFilterDto.md)
 
 ## Example
 
@@ -36,6 +37,7 @@ const example = {
   "canQuery": null,
   "reason": null,
   "hiddenColumns": null,
+  "rowFilter": null,
 } satisfies QueryCatalogTableDto
 
 console.log(example)

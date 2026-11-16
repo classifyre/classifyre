@@ -81,6 +81,7 @@ export { NotebooksApi } from "./generated/src/apis/NotebooksApi";
 export { DataQueryApi } from "./generated/src/apis/DataQueryApi";
 export { GovernanceApi } from "./generated/src/apis/GovernanceApi";
 export { SQLConnectionsApi } from "./generated/src/apis/SQLConnectionsApi";
+export { AccessRequestsApi } from "./generated/src/apis/AccessRequestsApi";
 export { AIApi } from "./generated/src/apis/AIApi";
 export { WorkerQueuesApi } from "./generated/src/apis/WorkerQueuesApi";
 export { IdentityApi } from "./generated/src/apis/IdentityApi";
@@ -643,6 +644,22 @@ export type {
   IssueDataConnectionDto,
   RevokeDataConnectionDto,
   BlockDataConnectionDto,
+  AccessRequestDto,
+  AccessRequestOptionsDto,
+  AccessRequestTargetDto,
+  AccessRequestGroupDto,
+  AccessRequestDeciderDto,
+  CreateAccessRequestDto,
+  ApproveAccessRequestDto,
+  DenyAccessRequestDto,
+  AssetRowsDto,
+  AssetRowRuleDto,
+  UpdateAssetRowsDto,
+  RowRuleInputDto,
+  RowConditionDto,
+  RowConditionDtoValuesInner,
+  RowFilterDto,
+  QueryRunRowFilterDto,
   GovernanceSummaryDto,
   GovernFirstDto,
   SourceCoverageDto,
@@ -1428,6 +1445,7 @@ import { NotebooksApi } from "./generated/src/apis/NotebooksApi";
 import { DataQueryApi } from "./generated/src/apis/DataQueryApi";
 import { GovernanceApi } from "./generated/src/apis/GovernanceApi";
 import { SQLConnectionsApi } from "./generated/src/apis/SQLConnectionsApi";
+import { AccessRequestsApi } from "./generated/src/apis/AccessRequestsApi";
 import { AIApi } from "./generated/src/apis/AIApi";
 import { AssetsApi } from "./generated/src/apis/AssetsApi";
 import { HealthApi } from "./generated/src/apis/HealthApi";
@@ -2075,6 +2093,7 @@ class ApiClient {
   public dataQuery: DataQueryApi;
   public governance: GovernanceApi;
   public sqlConnections: SQLConnectionsApi;
+  public accessRequests: AccessRequestsApi;
   public ai: AIApi;
   public assets: AssetsApi;
   public health: HealthApi;
@@ -2112,6 +2131,7 @@ class ApiClient {
     this.dataQuery = new DataQueryApi(this.config);
     this.governance = new GovernanceApi(this.config);
     this.sqlConnections = new SQLConnectionsApi(this.config);
+    this.accessRequests = new AccessRequestsApi(this.config);
     this.ai = new AIApi(this.config);
     this.assets = new AssetsApi(this.config);
     this.health = new HealthApi(this.config);

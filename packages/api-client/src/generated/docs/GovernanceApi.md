@@ -8,6 +8,7 @@ All URIs are relative to *http://localhost*
 | [**governanceControllerAssetGovernance**](GovernanceApi.md#governancecontrollerassetgovernance) | **GET** /assets/{id}/governance | An asset\&#39;s owners, description, lifecycle and checklist |
 | [**governanceControllerAssetMeaning**](GovernanceApi.md#governancecontrollerassetmeaning) | **GET** /assets/{id}/governance/meaning | The glossary terms an asset is about, and suggested ones |
 | [**governanceControllerAssetQuality**](GovernanceApi.md#governancecontrollerassetquality) | **GET** /assets/{id}/quality | An asset\&#39;s quality rules, their latest results and its score |
+| [**governanceControllerAssetRows**](GovernanceApi.md#governancecontrollerassetrows) | **GET** /assets/{id}/rows | A table\&#39;s row filtering: on or off, and its rules for whoever governs it |
 | [**governanceControllerAssignAssetRole**](GovernanceApi.md#governancecontrollerassignassetrole) | **POST** /assets/{id}/governance/roles | Make someone owner, steward or custodian of an asset |
 | [**governanceControllerAssignSourceRole**](GovernanceApi.md#governancecontrollerassignsourcerole) | **POST** /sources/{id}/governance/roles | Make someone owner, steward or custodian of a source |
 | [**governanceControllerCreateQualityRule**](GovernanceApi.md#governancecontrollercreatequalityrule) | **POST** /assets/{id}/quality/rules | Add a quality rule to an asset (and evaluate it at once) |
@@ -28,6 +29,7 @@ All URIs are relative to *http://localhost*
 | [**governanceControllerTestQualityRule**](GovernanceApi.md#governancecontrollertestqualityrule) | **POST** /assets/{id}/quality/test | Measure a quality rule now without saving it |
 | [**governanceControllerUnlinkTerm**](GovernanceApi.md#governancecontrollerunlinkterm) | **DELETE** /assets/{id}/governance/meaning/{termId} | Remove a term linked by hand |
 | [**governanceControllerUpdateAssetGovernance**](GovernanceApi.md#governancecontrollerupdateassetgovernance) | **PUT** /assets/{id}/governance | Change an asset\&#39;s description, legal basis or lifecycle |
+| [**governanceControllerUpdateAssetRows**](GovernanceApi.md#governancecontrollerupdateassetrows) | **PUT** /assets/{id}/rows | Turn row filtering on or off and set the table\&#39;s rules |
 | [**governanceControllerUpdateColumn**](GovernanceApi.md#governancecontrollerupdatecolumn) | **PUT** /assets/{id}/columns/{name} | Describe, classify or confirm one column |
 | [**governanceControllerUpdateQualityRule**](GovernanceApi.md#governancecontrollerupdatequalityrule) | **PUT** /quality-rules/{ruleId} | Change a quality rule (and evaluate it at once) |
 | [**governanceControllerUsage**](GovernanceApi.md#governancecontrollerusage) | **GET** /assets/{id}/usage | Who read and exported a table, per day, over the last days |
@@ -275,6 +277,71 @@ example().catch(console.error);
 ### Return type
 
 [**AssetQualityDto**](AssetQualityDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## governanceControllerAssetRows
+
+> AssetRowsDto governanceControllerAssetRows(id)
+
+A table\&#39;s row filtering: on or off, and its rules for whoever governs it
+
+### Example
+
+```ts
+import {
+  Configuration,
+  GovernanceApi,
+} from '@workspace/api-client';
+import type { GovernanceControllerAssetRowsRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new GovernanceApi();
+
+  const body = {
+    // string
+    id: id_example,
+  } satisfies GovernanceControllerAssetRowsRequest;
+
+  try {
+    const data = await api.governanceControllerAssetRows(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+[**AssetRowsDto**](AssetRowsDto.md)
 
 ### Authorization
 
@@ -1641,6 +1708,76 @@ example().catch(console.error);
 ### Return type
 
 [**AssetGovernanceDto**](AssetGovernanceDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## governanceControllerUpdateAssetRows
+
+> AssetRowsDto governanceControllerUpdateAssetRows(id, updateAssetRowsDto)
+
+Turn row filtering on or off and set the table\&#39;s rules
+
+Needs asset.govern, or the owner or steward role. Showing readers more rows (off, a new or wider rule) needs the owner or steward role: they see every row.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  GovernanceApi,
+} from '@workspace/api-client';
+import type { GovernanceControllerUpdateAssetRowsRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new GovernanceApi();
+
+  const body = {
+    // string
+    id: id_example,
+    // UpdateAssetRowsDto
+    updateAssetRowsDto: ...,
+  } satisfies GovernanceControllerUpdateAssetRowsRequest;
+
+  try {
+    const data = await api.governanceControllerUpdateAssetRows(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+| **updateAssetRowsDto** | [UpdateAssetRowsDto](UpdateAssetRowsDto.md) |  | |
+
+### Return type
+
+[**AssetRowsDto**](AssetRowsDto.md)
 
 ### Authorization
 

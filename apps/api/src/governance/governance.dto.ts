@@ -2,7 +2,13 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { GovernanceStatus, LegalBasis } from '@prisma/client';
 import { IsEnum, IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 import { GOVERNANCE_ROLES } from './governance-rules';
-import { COLUMN_ACTIONS, MASK_KINDS } from '../data-query/column-masks';
+import {
+  COLUMN_ACTIONS,
+  MASK_KINDS,
+  type ColumnAction,
+  type MaskKind,
+} from '../data-query/column-masks';
+import { RowConditionDto } from '../data-query/data-query.dto';
 
 /** A person or group as the governance screens show it. */
 export class GovernancePrincipalDto {
@@ -282,10 +288,10 @@ export class ColumnTermDto {
 
 export class ColumnAccessDto {
   @ApiProperty({ enum: COLUMN_ACTIONS })
-  action: string;
+  action: ColumnAction;
 
   @ApiPropertyOptional({ enum: MASK_KINDS })
-  mask?: string;
+  mask?: MaskKind;
 
   @ApiProperty({
     description: 'It follows the classification, not a steward.',
@@ -338,10 +344,10 @@ export class AssetColumnDto {
     type: String,
     description: "A steward's access; null when it follows the classification.",
   })
-  access: string | null;
+  access: ColumnAction | null;
 
   @ApiProperty({ enum: MASK_KINDS, nullable: true, type: String })
-  maskKind: string | null;
+  maskKind: MaskKind | null;
 
   @ApiProperty({ type: () => ColumnAccessDto })
   effectiveAccess: ColumnAccessDto;
@@ -382,6 +388,12 @@ export class AssetColumnsDto {
 
   @ApiProperty()
   canGovern: boolean;
+
+  @ApiProperty({
+    description:
+      'You read this table in clear (DQ §5.8): only then may you make a column show more than it does.',
+  })
+  inClear: boolean;
 }
 
 export class UpdateAssetColumnDto {
@@ -1059,4 +1071,90 @@ export class ContractImportResultDto {
 
   @ApiProperty({ type: [ContractSkippedDto] })
   skipped: ContractSkippedDto[];
+}
+
+/** One row rule of a table (DQ §5.10): who it is for and which rows. */
+export class AssetRowRuleDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty({
+    example: 'group:9f2c…',
+    description: '`group:<id>`, or `everyone`.',
+  })
+  principalRef: string;
+
+  @ApiPropertyOptional({
+    type: GovernancePrincipalDto,
+    nullable: true,
+    description: 'The group, by name; null for everyone.',
+  })
+  principal: GovernancePrincipalDto | null;
+
+  @ApiProperty({
+    type: [RowConditionDto],
+    description: 'A row must meet all of them; none selects every row.',
+  })
+  conditions: RowConditionDto[];
+
+  @ApiProperty()
+  updatedAt: Date;
+
+  @ApiPropertyOptional({ nullable: true })
+  updatedBy: string | null;
+}
+
+/** Row filtering of a table (DQ §5.10). */
+export class AssetRowsDto {
+  @ApiProperty()
+  assetId: string;
+
+  @ApiProperty({
+    description:
+      'Rows are filtered: each reader sees only what a rule for them selects, and no row without one.',
+  })
+  enabled: boolean;
+
+  @ApiProperty({
+    type: [AssetRowRuleDto],
+    description: 'Empty for people who do not govern the table.',
+  })
+  rules: AssetRowRuleDto[];
+
+  @ApiProperty()
+  canGovern: boolean;
+
+  @ApiProperty({
+    description:
+      'You see every row (owner or steward of the table or its source): only you may show readers more.',
+  })
+  readsEveryRow: boolean;
+
+  @ApiPropertyOptional({ nullable: true })
+  updatedAt: Date | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  updatedBy: string | null;
+}
+
+export class RowRuleInputDto {
+  @ApiPropertyOptional({ description: 'Set to keep an existing rule.' })
+  id?: string;
+
+  @ApiProperty({
+    example: 'group:9f2c…',
+    description: '`group:<id>` or `everyone`.',
+  })
+  principalRef: string;
+
+  @ApiProperty({ type: [RowConditionDto] })
+  conditions: RowConditionDto[];
+}
+
+export class UpdateAssetRowsDto {
+  @ApiProperty()
+  enabled: boolean;
+
+  @ApiPropertyOptional({ type: [RowRuleInputDto] })
+  rules?: RowRuleInputDto[];
 }

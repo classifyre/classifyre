@@ -1,0 +1,1 @@
+Governed assets are no longer deleted for good. Purging a source's assets keeps the ones that have an owner, or whose source has one, and says how many it kept; deleting a source is refused while it or any of its assets has an owner. Remove the owner on the Governance tab first to delete such an asset after all.

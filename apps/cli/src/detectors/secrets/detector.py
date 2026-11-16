@@ -15,6 +15,7 @@ from ...models.generated_detectors import DetectorConfig, SecretsDetectorConfig,
 from ...models.generated_single_asset_scan_results import DetectionResult, DetectorType, Location
 from ..base import BaseDetector
 from ..dependencies import MissingDependencyError, require_module
+from ..tabular_lines import cells_of_lines
 
 logger = logging.getLogger(__name__)
 
@@ -189,6 +190,13 @@ _CONFIDENCE_RULES: list[tuple[float, list[str]]] = [
 ]
 
 
+def _cell_metadata(cell: Any) -> dict[str, Any]:
+    """``tabular_row_index`` / ``tabular_column_name`` of a finding in a table cell."""
+    if cell is None:
+        return {}
+    return {"tabular_row_index": cell.row_index, "tabular_column_name": cell.column_name}
+
+
 class SecretsDetector(BaseDetector):
     """Secrets detector backed by the detect-secrets library.
 
@@ -313,6 +321,9 @@ class SecretsDetector(BaseDetector):
             return []
 
         lines = content.splitlines()
+        # A table's sampled rows: a secret is tagged with its row and column,
+        # so the column is classified (and masked) as holding secrets.
+        cells = cells_of_lines(lines)
         confidence_threshold: float = self._cfg.confidence_threshold or 0.7
         severity_threshold = self._cfg.severity_threshold
         min_severity_rank = _SEVERITY_RANK.get(severity_threshold, 0) if severity_threshold else 0
@@ -381,6 +392,7 @@ class SecretsDetector(BaseDetector):
                                 "detector": "secrets",
                                 "plugin": secret_type,
                                 "is_verified": is_verified,
+                                **_cell_metadata(cells[line_number - 1]),
                             },
                         )
                     )

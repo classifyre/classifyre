@@ -1,5 +1,52 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsString, MaxLength } from 'class-validator';
+import {
+  COLUMN_MASK_ACTIONS,
+  MASK_KINDS,
+  type ColumnMaskAction,
+  type MaskKind,
+} from './column-masks';
+import { ROW_OPS, type RowOp } from './row-filters';
+
+/** One column test of a row filter (DQ §5.10). */
+export class RowConditionDto {
+  @ApiProperty({ example: 'region' })
+  column: string;
+
+  @ApiProperty({
+    enum: ROW_OPS,
+    description: 'in: is one of; not_in: is none of.',
+  })
+  op: RowOp;
+
+  @ApiProperty({
+    type: 'array',
+    items: {
+      oneOf: [{ type: 'string' }, { type: 'number' }, { type: 'boolean' }],
+    },
+    example: ['Tirol', 'Salzburg'],
+  })
+  values: (string | number | boolean)[];
+}
+
+/** The rows a person reads of a filtered table: rows meeting every condition of one entry. */
+export class RowFilterDto {
+  @ApiProperty({
+    type: 'array',
+    items: {
+      type: 'array',
+      items: { $ref: '#/components/schemas/RowConditionDto' },
+    },
+    description:
+      'A row shows when it meets every condition of at least one entry; an empty list shows no row.',
+  })
+  anyOf: RowConditionDto[][];
+}
+
+export class QueryRunRowFilterDto extends RowFilterDto {
+  @ApiProperty({ example: 'shop_lake.shop.customers' })
+  table: string;
+}
 
 export class QueryColumnDto {
   @ApiProperty()
@@ -9,14 +56,14 @@ export class QueryColumnDto {
   type: string;
 
   @ApiPropertyOptional({
-    enum: ['mask', 'hide'],
+    enum: COLUMN_MASK_ACTIONS,
     description:
       'Governance masks or hides this column (DQ §5.8). Hidden columns are left out unless you read them in clear.',
   })
-  access?: 'mask' | 'hide';
+  access?: ColumnMaskAction;
 
-  @ApiPropertyOptional({ enum: ['redact', 'partial', 'hash', 'null'] })
-  mask?: 'redact' | 'partial' | 'hash' | 'null';
+  @ApiPropertyOptional({ enum: MASK_KINDS })
+  mask?: MaskKind;
 
   @ApiPropertyOptional({
     description:
@@ -29,14 +76,16 @@ export class QueryRunMaskDto {
   @ApiProperty({ example: 'shop_lake.shop.customers' })
   table: string;
 
-  @ApiProperty()
-  column: string;
+  @ApiProperty({ enum: COLUMN_MASK_ACTIONS })
+  action: ColumnMaskAction;
 
-  @ApiProperty({ enum: ['mask', 'hide'] })
-  action: 'mask' | 'hide';
+  @ApiPropertyOptional({
+    description: 'The masked column. A hidden column is counted, never named.',
+  })
+  column?: string;
 
-  @ApiPropertyOptional({ enum: ['redact', 'partial', 'hash', 'null'] })
-  mask?: 'redact' | 'partial' | 'hash' | 'null';
+  @ApiPropertyOptional({ enum: MASK_KINDS })
+  mask?: MaskKind;
 }
 
 export class QueryCatalogTableDto {
@@ -84,6 +133,13 @@ export class QueryCatalogTableDto {
     description: 'How many columns governance hides from you (DQ §5.8).',
   })
   hiddenColumns?: number;
+
+  @ApiPropertyOptional({
+    type: RowFilterDto,
+    description:
+      'The rows you read of this table (DQ §5.10); absent when you read every row.',
+  })
+  rowFilter?: RowFilterDto;
 }
 
 export class QueryCatalogSourceDto {
@@ -263,6 +319,13 @@ export class QueryRunDto {
       'Columns of the tables it names that were masked or hidden for you when it ran.',
   })
   masks: QueryRunMaskDto[];
+
+  @ApiProperty({
+    type: [QueryRunRowFilterDto],
+    description:
+      'Row filters of the tables it names, as they applied to you when it ran.',
+  })
+  rowFilters: QueryRunRowFilterDto[];
 
   @ApiPropertyOptional({
     nullable: true,

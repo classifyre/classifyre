@@ -4,6 +4,7 @@ import * as React from "react";
 import { ShieldCheck, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { GiveAccessDialog } from "@/components/access/give-access-dialog";
+import { AccessRequestsList } from "@/components/access-requests/access-requests-list";
 import { GrantsByGroup } from "@/components/access/grants-by-group";
 import {
   api,
@@ -13,9 +14,6 @@ import {
 } from "@workspace/api-client";
 import { Button } from "@workspace/ui/components/button";
 import { Card, CardContent } from "@workspace/ui/components/card";
-
-
-
 
 import { useMe, useCan, Can } from "@/hooks/use-me";
 import { useTranslation } from "@/hooks/use-translation";
@@ -63,7 +61,9 @@ export function WorkspaceAccessCard() {
       toast.success(t("access.removed", { subject: grant.subjectLabel }));
       await load();
     } catch (error) {
-      toast.error(await extractApiErrorMessage(error, t("access.removeFailed")));
+      toast.error(
+        await extractApiErrorMessage(error, t("access.removeFailed")),
+      );
     }
   };
 
@@ -112,6 +112,18 @@ export function WorkspaceAccessCard() {
             roles={roles.filter((role) => role.scopes.includes("workspace"))}
             onAdded={load}
           />
+        </Can>
+
+        <Can capability="access.manage">
+          <div className="space-y-2" data-testid="workspace-access-requests">
+            <p className="text-xs font-mono uppercase tracking-[0.14em]">
+              {t("accessRequests.listTitle")}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {t("accessRequests.settingsLead")}
+            </p>
+            <AccessRequestsList filter={{ view: "decide" }} showTarget />
+          </div>
         </Can>
 
         <WhatICanDo roles={roles} />

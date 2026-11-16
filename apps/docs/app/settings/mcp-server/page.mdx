@@ -120,6 +120,14 @@ putting findings on a board goes better with **Findings** and **Assets** to
 search for them. A scope never grants anything outside its own tools.
 </Callout>
 
+<Callout type="info">
+**Data** reads table rows as you: `query_data` goes through your Data reader
+grants, masked columns, row filters and limits, and every table it reads is
+recorded in **Activity** as yours, via the token (see
+[AI agents](/data-query#ai-agents-mcp)). Leave it out of a token that has no
+business reading rows.
+</Callout>
+
 <Callout type="warning">
 **Case Board is its own scope since v0.6.3.** Its tools used to belong to
 **Cases**. Tokens that had **Cases** were given **Case Board** as well when

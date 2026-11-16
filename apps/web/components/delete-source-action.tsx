@@ -23,6 +23,7 @@ import {
 } from "@workspace/ui/components";
 import { cn } from "@workspace/ui/lib/utils";
 import { toast } from "sonner";
+import { extractApiErrorMessage } from "@/lib/extract-api-error-message";
 
 type DeleteSourceActionProps = {
   sourceId: string;
@@ -61,7 +62,7 @@ export function DeleteSourceAction({
     } catch (error) {
       console.error("Failed to delete source:", error);
       toast.error(
-        error instanceof Error ? error.message : t("sources.deleteFailed"),
+        await extractApiErrorMessage(error, t("sources.deleteFailed")),
       );
     } finally {
       setIsDeleting(false);
@@ -120,7 +121,7 @@ export function DeleteSourceAction({
           <ShieldAlert className="h-4 w-4" />
           <AlertTitle>{t("sources.delete.permanentTitle")}</AlertTitle>
           <AlertDescription>
-            {t("sources.delete.permanentBody")}
+            {t("sources.delete.permanentBody")} {t("sources.delete.governed")}
           </AlertDescription>
         </Alert>
         <AlertDialogFooter>

@@ -1159,7 +1159,8 @@
       "title": "Delete source?",
       "cannotUndo": "This action cannot be undone.",
       "permanentTitle": "Permanent removal",
-      "permanentBody": "Deleting this source will permanently remove the source, all related assets, and all findings."
+      "permanentBody": "Deleting this source will permanently remove the source, all related assets, and all findings.",
+      "governed": "A source with an owner, or with assets that have one, is governed and cannot be deleted: remove the owners first."
     },
     "typeRequired": "Source type is required",
     "nameRequired": "Source name is required",
@@ -1414,13 +1415,15 @@
     },
     "purgeAssets": {
       "button": "Purge assets",
-      "title": "Purge all assets?",
-      "cannotUndo": "This permanently deletes every asset of this source, along with their findings, and cannot be undone.",
+      "title": "Purge assets?",
+      "cannotUndo": "This permanently deletes the assets of this source that are not governed, along with their findings, and cannot be undone.",
       "permanentTitle": "Permanent removal",
-      "permanentBody": "All assets of this source will be permanently deleted — including their extracted text, findings, correlation data and chunks. Evidence fingerprints are recomputed in the background.",
+      "permanentBody": "These assets will be permanently deleted — including their extracted text, findings, correlation data and chunks. Evidence fingerprints are recomputed in the background.",
       "confirm": "Purge assets",
       "success": "Assets purged",
-      "failed": "Failed to purge assets"
+      "failed": "Failed to purge assets",
+      "successKept": "{{purged}} assets purged. {{kept}} governed assets were kept.",
+      "governedKept": "Governed assets — those with an owner, or whose source has one — are kept: they are never deleted."
     },
     "schedule": {
       "resumed": "Automatic scanning resumed."
@@ -7108,6 +7111,9 @@
           "update": "Column described",
           "move": "Column notes moved",
           "remove": "Column notes removed"
+        },
+        "rows": {
+          "update": "Row filtering changed"
         }
       },
       "data-connections": {
@@ -7125,6 +7131,12 @@
       },
       "query-runs": {
         "read-table": "Table read"
+      },
+      "data-access-requests": {
+        "create": "Access requested",
+        "approve": "Access request approved",
+        "deny": "Access request declined",
+        "withdraw": "Access request withdrawn"
       }
     }
   },
@@ -7330,9 +7342,9 @@
     "openInQueryHint": "Open this query in the SQL page",
     "assetTab": "Data",
     "assetLockedTitle": "No data access",
-    "assetLocked": "You can see this table but not its rows. A workspace admin can give your group the Data reader role on this table or its source.",
+    "assetLocked": "You can see this table but not its rows. Ask its owner for access with Request access, or a workspace admin can give your group the Data reader role on this table or its source.",
     "sourceTables": "{{count}} of {{total}} tables you can query",
-    "sourceLocked": "You cannot query any table of {{name}}. A workspace admin can give your group the Data reader role on the source or its tables.",
+    "sourceLocked": "You cannot query any table of {{name}}. Ask its owner for access with Request access, or a workspace admin can give your group the Data reader role on the source or its tables.",
     "explorer": {
       "tables": "Tables",
       "history": "History",
@@ -7623,6 +7635,7 @@
       "access": "Access",
       "accessDefault": "Follow the classification ({{value}})",
       "accessHint": "What people who may query this table see. Its owner and stewards, and people with Data reader, unmasked, read it in clear.",
+      "accessNeedsClear": "Showing more of this column than it shows now needs you to read it in clear: Data reader, unmasked, on this table or its source, or its owner or steward role.",
       "maskKind": "Shown as",
       "maskKindDefault": "Default (redacted)"
     },
@@ -7696,7 +7709,9 @@
       "quality": "Quality",
       "qualityDesc": "Rules and their results",
       "access": "Access",
-      "accessDesc": "Who reads it from BI tools, through which connection; give or close access here."
+      "accessDesc": "Who reads it from BI tools, through which connection; give or close access here.",
+      "rows": "Rows",
+      "rowsDesc": "Which rows each reader sees"
     },
     "meaning": {
       "title": "Meaning",
@@ -7842,7 +7857,7 @@
     },
     "contract": {
       "title": "Data contract",
-      "description": "This asset as an Open Data Contract Standard (ODCS v3.2) contract: description, team, columns and quality rules. Apply one to fill them in.",
+      "description": "This asset as an Open Data Contract Standard (ODCS v3.2) contract: description, team, columns with their access (clear, masked, hidden) and quality rules. Apply one to fill them in.",
       "yaml": "Download YAML",
       "json": "Download JSON",
       "import": "Apply a contract",
@@ -8168,6 +8183,88 @@
     "inClear": "masked or hidden for others; you read it in clear",
     "hiddenCount": "{{count}} hidden column(s)",
     "runMasked": "Masked for you: {{list}}. People with Data reader, unmasked, and the table's owner and stewards read them in clear.",
-    "runHidden": "Hidden from you: {{list}}."
+    "runHidden": "{{count}} column(s) hidden from you."
+  },
+  "rowFilters": {
+    "title": "Rows",
+    "lead": "Which rows each reader sees. Off: everyone who may query the table sees every row. On: a reader sees only the rows a rule for them selects, and no row without one. The owner and stewards always see every row.",
+    "enabled": "Filter rows",
+    "off": "Every reader sees every row.",
+    "onReadOnly": "Rows are filtered: each reader sees only the rows shared with them. The owner and stewards keep the rules.",
+    "noRules": "No rules yet: nobody but the owner and stewards sees a row.",
+    "addRule": "Add rule",
+    "for": "For",
+    "aGroup": "A group",
+    "everyone": "Everyone who may query it",
+    "pickGroup": "Pick a group",
+    "removeRule": "Remove rule",
+    "everyRowRule": "No condition: every row.",
+    "andLabel": "and",
+    "column": "Column",
+    "op": {
+      "in": "is one of",
+      "not_in": "is none of"
+    },
+    "values": "Values, separated by commas",
+    "removeCondition": "Remove condition",
+    "addCondition": "Add condition",
+    "save": "Save rows",
+    "saved": "Row filtering saved",
+    "saveFailed": "Could not save the row filtering",
+    "onlyEveryRow": "You see only some rows yourself: you can turn filtering on and remove rules. Showing readers more (off, a new or a wider rule) is for the owner or a steward.",
+    "runFiltered": "Rows filtered for you: {{list}}.",
+    "andJoin": " and ",
+    "orJoin": "; or ",
+    "noneShared": "no rows are shared with you",
+    "tableFiltered": "Rows filtered for you: {{rows}}"
+  },
+  "accessRequests": {
+    "request": "Request access",
+    "requestUnmasked": "Ask to read in clear",
+    "title": "Request access to {{name}}",
+    "lead": "Say why you need it and for how long. {{who}} decides; approval gives a group of yours the Data reader role on it until the end date.",
+    "admins": "The workspace admins",
+    "group": "For which group of yours",
+    "groupHint": "Access is given to groups: everyone in the group you pick can query it.",
+    "noGroups": "You are in no group, and access is given to groups. Ask an admin to put you in one.",
+    "role": "Access",
+    "roles": {
+      "data-reader": "Data reader (masked columns stay masked)",
+      "data-reader-unmasked": "Data reader, unmasked (columns in clear)"
+    },
+    "days": "For how many days",
+    "reason": "Why you need it",
+    "reasonHint": "At least 10 characters. Whoever decides reads this.",
+    "send": "Send request",
+    "sent": "Request sent to {{who}}",
+    "sendFailed": "Could not send the request",
+    "pending": "You asked on {{date}}; waiting for {{who}}.",
+    "withdraw": "Withdraw",
+    "withdrawn": "Request withdrawn",
+    "listTitle": "Access requests",
+    "listLead": "People asking to query this. Approving gives the group they named an expiring Data reader grant on it.",
+    "settingsLead": "Requests waiting for you across this workspace. A table's owner decides first, with no owner its stewards; you can decide any of them.",
+    "none": "No requests.",
+    "status": {
+      "PENDING": "Waiting",
+      "APPROVED": "Approved",
+      "DENIED": "Declined",
+      "WITHDRAWN": "Withdrawn"
+    },
+    "asks": "{{who}} asks for {{group}}",
+    "forDays": "{{role}} for {{days}} days",
+    "decidedBy": "Decided by {{who}} on {{date}}",
+    "until": "until {{date}}",
+    "approve": "Approve",
+    "deny": "Decline",
+    "approveTitle": "Approve access for {{group}}",
+    "approveLead": "{{group}} gets {{role}} on {{name}} until {{date}}. Everyone in the group can query it.",
+    "giveMasked": "Give Data reader instead: masked columns stay masked",
+    "note": "Note for the requester (optional)",
+    "denyTitle": "Decline the request",
+    "denyNote": "Why (the requester reads this)",
+    "approved": "Approved: access until {{date}}",
+    "denied": "Request declined",
+    "decideFailed": "Could not decide the request"
   }
 }

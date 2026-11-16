@@ -4,6 +4,12 @@ README.md
 docs/AIApi.md
 docs/AIProviderConfigsApi.md
 docs/AccessApi.md
+docs/AccessRequestDeciderDto.md
+docs/AccessRequestDto.md
+docs/AccessRequestGroupDto.md
+docs/AccessRequestOptionsDto.md
+docs/AccessRequestTargetDto.md
+docs/AccessRequestsApi.md
 docs/AddCaseFindingFiltersDto.md
 docs/AddCaseHypothesisRuleDto.md
 docs/AddEvidenceDto.md
@@ -38,6 +44,7 @@ docs/AnnotateJournalDto.md
 docs/AppliedBoardOpDto.md
 docs/ApplyBoardOpsDto.md
 docs/ApplyBoardOpsResponseDto.md
+docs/ApproveAccessRequestDto.md
 docs/AssetChunkDto.md
 docs/AssetColumnDto.md
 docs/AssetColumnsDto.md
@@ -53,6 +60,8 @@ docs/AssetListResponseDto.md
 docs/AssetMediaChunkDto.md
 docs/AssetQualityDto.md
 docs/AssetResponseDto.md
+docs/AssetRowRuleDto.md
+docs/AssetRowsDto.md
 docs/AssetSeverityCountsItemDto.md
 docs/AssetSeverityCountsRequestDto.md
 docs/AssetSeverityCountsResponseDto.md
@@ -179,6 +188,7 @@ docs/CorrelationGraphResponseDto.md
 docs/CorrelationLabelWeightDto.md
 docs/CorrelationRecomputeNoteDto.md
 docs/CorrelationReviewApi.md
+docs/CreateAccessRequestDto.md
 docs/CreateAgentMemoryDto.md
 docs/CreateAiProviderConfigDto.md
 docs/CreateCaseDto.md
@@ -226,6 +236,7 @@ docs/DecisionsToInquiryDto.md
 docs/DecisionsToInquiryResponseDto.md
 docs/DeleteGlossaryTermResponseDto.md
 docs/DeleteRunnerResponseDto.md
+docs/DenyAccessRequestDto.md
 docs/DeprecateGlossaryTermDto.md
 docs/DiscoveryRecentRunDto.md
 docs/DiscoveryRunSourceDto.md
@@ -423,6 +434,7 @@ docs/QueryLimitsDto.md
 docs/QueryRunDto.md
 docs/QueryRunErrorDto.md
 docs/QueryRunMaskDto.md
+docs/QueryRunRowFilterDto.md
 docs/QuickSearchAssetDto.md
 docs/QuickSearchFindingDto.md
 docs/QuickSearchRequestDto.md
@@ -476,6 +488,10 @@ docs/ReviewWaterfallDto.md
 docs/ReviewWaterfallRowDto.md
 docs/RevokeDataConnectionDto.md
 docs/RoleDto.md
+docs/RowConditionDto.md
+docs/RowConditionDtoValuesInner.md
+docs/RowFilterDto.md
+docs/RowRuleInputDto.md
 docs/RunnerAssetFindingSummaryDto.md
 docs/RunnerAssetItemDto.md
 docs/RunnerAssetProgressDto.md
@@ -628,6 +644,7 @@ docs/UpdateAgentMemoryDto.md
 docs/UpdateAiProviderConfigDto.md
 docs/UpdateAssetColumnDto.md
 docs/UpdateAssetGovernanceDto.md
+docs/UpdateAssetRowsDto.md
 docs/UpdateCapabilitiesDto.md
 docs/UpdateCaseDto.md
 docs/UpdateCaseEventDto.md
@@ -676,6 +693,7 @@ package.json
 src/apis/AIApi.ts
 src/apis/AIProviderConfigsApi.ts
 src/apis/AccessApi.ts
+src/apis/AccessRequestsApi.ts
 src/apis/AssetsApi.ts
 src/apis/AssistantApi.ts
 src/apis/AutopilotApi.ts
@@ -713,6 +731,11 @@ src/apis/ThreadsApi.ts
 src/apis/WorkerQueuesApi.ts
 src/apis/index.ts
 src/index.ts
+src/models/AccessRequestDeciderDto.ts
+src/models/AccessRequestDto.ts
+src/models/AccessRequestGroupDto.ts
+src/models/AccessRequestOptionsDto.ts
+src/models/AccessRequestTargetDto.ts
 src/models/AddCaseFindingFiltersDto.ts
 src/models/AddCaseHypothesisRuleDto.ts
 src/models/AddEvidenceDto.ts
@@ -747,6 +770,7 @@ src/models/AnnotateJournalDto.ts
 src/models/AppliedBoardOpDto.ts
 src/models/ApplyBoardOpsDto.ts
 src/models/ApplyBoardOpsResponseDto.ts
+src/models/ApproveAccessRequestDto.ts
 src/models/AssetChunkDto.ts
 src/models/AssetColumnDto.ts
 src/models/AssetColumnsDto.ts
@@ -762,6 +786,8 @@ src/models/AssetListResponseDto.ts
 src/models/AssetMediaChunkDto.ts
 src/models/AssetQualityDto.ts
 src/models/AssetResponseDto.ts
+src/models/AssetRowRuleDto.ts
+src/models/AssetRowsDto.ts
 src/models/AssetSeverityCountsItemDto.ts
 src/models/AssetSeverityCountsRequestDto.ts
 src/models/AssetSeverityCountsResponseDto.ts
@@ -881,6 +907,7 @@ src/models/CorrelationConfigResponseDto.ts
 src/models/CorrelationGraphResponseDto.ts
 src/models/CorrelationLabelWeightDto.ts
 src/models/CorrelationRecomputeNoteDto.ts
+src/models/CreateAccessRequestDto.ts
 src/models/CreateAgentMemoryDto.ts
 src/models/CreateAiProviderConfigDto.ts
 src/models/CreateCaseDto.ts
@@ -924,6 +951,7 @@ src/models/DecisionsToInquiryDto.ts
 src/models/DecisionsToInquiryResponseDto.ts
 src/models/DeleteGlossaryTermResponseDto.ts
 src/models/DeleteRunnerResponseDto.ts
+src/models/DenyAccessRequestDto.ts
 src/models/DeprecateGlossaryTermDto.ts
 src/models/DiscoveryRecentRunDto.ts
 src/models/DiscoveryRunSourceDto.ts
@@ -1105,6 +1133,7 @@ src/models/QueryLimitsDto.ts
 src/models/QueryRunDto.ts
 src/models/QueryRunErrorDto.ts
 src/models/QueryRunMaskDto.ts
+src/models/QueryRunRowFilterDto.ts
 src/models/QuickSearchAssetDto.ts
 src/models/QuickSearchFindingDto.ts
 src/models/QuickSearchRequestDto.ts
@@ -1158,6 +1187,10 @@ src/models/ReviewWaterfallDto.ts
 src/models/ReviewWaterfallRowDto.ts
 src/models/RevokeDataConnectionDto.ts
 src/models/RoleDto.ts
+src/models/RowConditionDto.ts
+src/models/RowConditionDtoValuesInner.ts
+src/models/RowFilterDto.ts
+src/models/RowRuleInputDto.ts
 src/models/RunnerAssetFindingSummaryDto.ts
 src/models/RunnerAssetItemDto.ts
 src/models/RunnerAssetProgressDto.ts
@@ -1303,6 +1336,7 @@ src/models/UpdateAgentMemoryDto.ts
 src/models/UpdateAiProviderConfigDto.ts
 src/models/UpdateAssetColumnDto.ts
 src/models/UpdateAssetGovernanceDto.ts
+src/models/UpdateAssetRowsDto.ts
 src/models/UpdateCapabilitiesDto.ts
 src/models/UpdateCaseDto.ts
 src/models/UpdateCaseEventDto.ts

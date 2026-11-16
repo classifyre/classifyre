@@ -80,9 +80,17 @@ export class PurgeSourceAssetsResponseDto {
 
   @ApiProperty({
     description:
-      'Assets the predicate selected. Equals purgedAssets outside a dry run.',
+      'Assets the predicate selected, governed ones included. Outside a dry ' +
+      'run, purgedAssets + keptGoverned.',
   })
   matchedAssets: number;
+
+  @ApiProperty({
+    description:
+      'Selected assets kept because they are governed (they or their source ' +
+      'have an owner). Governed assets are never purged.',
+  })
+  keptGoverned: number;
 
   @ApiProperty({ description: 'Whether this call deleted anything.' })
   dryRun: boolean;

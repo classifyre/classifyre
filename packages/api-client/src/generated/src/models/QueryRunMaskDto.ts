@@ -30,13 +30,13 @@ export interface QueryRunMaskDto {
      * @type {string}
      * @memberof QueryRunMaskDto
      */
-    column: string;
+    action: QueryRunMaskDtoActionEnum;
     /**
-     * 
+     * The masked column. A hidden column is counted, never named.
      * @type {string}
      * @memberof QueryRunMaskDto
      */
-    action: QueryRunMaskDtoActionEnum;
+    column?: string;
     /**
      * 
      * @type {string}
@@ -72,7 +72,6 @@ export type QueryRunMaskDtoMaskEnum = typeof QueryRunMaskDtoMaskEnum[keyof typeo
  */
 export function instanceOfQueryRunMaskDto(value: object): value is QueryRunMaskDto {
     if (!('table' in value) || value['table'] === undefined) return false;
-    if (!('column' in value) || value['column'] === undefined) return false;
     if (!('action' in value) || value['action'] === undefined) return false;
     return true;
 }
@@ -88,8 +87,8 @@ export function QueryRunMaskDtoFromJSONTyped(json: any, ignoreDiscriminator: boo
     return {
         
         'table': json['table'],
-        'column': json['column'],
         'action': json['action'],
+        'column': json['column'] == null ? undefined : json['column'],
         'mask': json['mask'] == null ? undefined : json['mask'],
     };
 }
@@ -106,8 +105,8 @@ export function QueryRunMaskDtoToJSONTyped(value?: QueryRunMaskDto | null, ignor
     return {
         
         'table': value['table'],
-        'column': value['column'],
         'action': value['action'],
+        'column': value['column'],
         'mask': value['mask'],
     };
 }

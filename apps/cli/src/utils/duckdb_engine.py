@@ -110,6 +110,13 @@ NIGHTLY_EXTENSIONS = {"odbc_scanner": "odbc"}
 NIGHTLY_REPOSITORY_ENV = "CLASSIFYRE_DUCKDB_NIGHTLY_REPOSITORY"
 
 
+#: Extensions another one needs loaded first. DuckDB would otherwise autoload
+#: it from the extension directory, or install it there, and so never from the
+#: image's own copy: iceberg's start-up fails when that directory is not
+#: writable and the network is out of reach.
+_DEPENDENCIES: dict[str, tuple[str, ...]] = {"iceberg": ("avro",)}
+
+
 #: Extensions whose file is named differently from what LOAD takes.
 _EXTENSION_FILES = {
     "postgres": "postgres_scanner",
@@ -147,8 +154,11 @@ def load_extension(conn: Any, name: str) -> None:
     from DuckDB's community repository, or from
     ``CLASSIFYRE_DUCKDB_COMMUNITY_REPOSITORY`` where a mirror stands in for it;
     the nightly ones (``odbc_scanner``) from ``core_nightly`` or
-    ``CLASSIFYRE_DUCKDB_NIGHTLY_REPOSITORY``.
+    ``CLASSIFYRE_DUCKDB_NIGHTLY_REPOSITORY``. What an extension needs
+    (:data:`_DEPENDENCIES`) is loaded the same way first.
     """
+    for dependency in _DEPENDENCIES.get(name, ()):
+        load_extension(conn, dependency)
     try:
         conn.execute(f"LOAD {name}")
         return

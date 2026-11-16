@@ -26,11 +26,17 @@ export interface PurgeSourceAssetsResponseDto {
      */
     purgedAssets: number;
     /**
-     * Assets the predicate selected. Equals purgedAssets outside a dry run.
+     * Assets the predicate selected, governed ones included. Outside a dry run, purgedAssets + keptGoverned.
      * @type {number}
      * @memberof PurgeSourceAssetsResponseDto
      */
     matchedAssets: number;
+    /**
+     * Selected assets kept because they are governed (they or their source have an owner). Governed assets are never purged.
+     * @type {number}
+     * @memberof PurgeSourceAssetsResponseDto
+     */
+    keptGoverned: number;
     /**
      * Whether this call deleted anything.
      * @type {boolean}
@@ -51,6 +57,7 @@ export interface PurgeSourceAssetsResponseDto {
 export function instanceOfPurgeSourceAssetsResponseDto(value: object): value is PurgeSourceAssetsResponseDto {
     if (!('purgedAssets' in value) || value['purgedAssets'] === undefined) return false;
     if (!('matchedAssets' in value) || value['matchedAssets'] === undefined) return false;
+    if (!('keptGoverned' in value) || value['keptGoverned'] === undefined) return false;
     if (!('dryRun' in value) || value['dryRun'] === undefined) return false;
     if (!('predicate' in value) || value['predicate'] === undefined) return false;
     return true;
@@ -68,6 +75,7 @@ export function PurgeSourceAssetsResponseDtoFromJSONTyped(json: any, ignoreDiscr
         
         'purgedAssets': json['purgedAssets'],
         'matchedAssets': json['matchedAssets'],
+        'keptGoverned': json['keptGoverned'],
         'dryRun': json['dryRun'],
         'predicate': json['predicate'],
     };
@@ -86,6 +94,7 @@ export function PurgeSourceAssetsResponseDtoToJSONTyped(value?: PurgeSourceAsset
         
         'purgedAssets': value['purgedAssets'],
         'matchedAssets': value['matchedAssets'],
+        'keptGoverned': value['keptGoverned'],
         'dryRun': value['dryRun'],
         'predicate': value['predicate'],
     };

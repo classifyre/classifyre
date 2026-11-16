@@ -2,12 +2,12 @@ import {
   governedDataScope,
   ownerDataScope,
 } from '../governance/governance-filter';
+import { CLS_PERSON, type ClsPerson } from '../identity/iam-access-policy';
 import {
   deriveClassification,
   type Classification,
   type ColumnFindingGroup,
 } from '../governance/governance-rules';
-import { CLS_PERSON, type ClsPerson } from '../identity/iam-access-policy';
 import {
   columnsAsSeen,
   effectiveColumnPolicy,
@@ -15,6 +15,8 @@ import {
   type ColumnMask,
   type MaskedColumn,
 } from './column-masks';
+import { clearScopeOf, readsInClear, type ClearScope } from './clear-scope';
+import { rowFilterFor, selectsEveryRow, type RowFilter } from './row-filters';
 import { personOf } from '../identity/actor-ref';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ClsService } from 'nestjs-cls';
@@ -36,9 +38,6 @@ import {
   type ConnectionScope,
 } from './connection-scope';
 
-/** A column as the person sees it (masked ones marked, hidden ones gone). */
-export type CatalogColumn = MaskedColumn;
-
 export interface CatalogTable {
   assetId: string;
   sourceId: string;
@@ -48,7 +47,8 @@ export interface CatalogTable {
   table: string;
   /** `<source>.<schema>.<table>`: what to type. */
   sqlName: string;
-  columns: CatalogColumn[];
+  /** As the person sees them: masked ones marked, hidden ones gone. */
+  columns: MaskedColumn[];
   /** DuckDB can read it at all. */
   queryable: boolean;
   /** This person may query it (and the workspace answers SQL). */
@@ -62,6 +62,12 @@ export interface CatalogTable {
    * absent when they read the table in clear. Never sent to the browser.
    */
   masks?: ColumnMask[];
+  /**
+   * The rows this person reads (DQ §5.10): absent when they read every row
+   * (no filtering on the table, or they answer for it). Only the rules for
+   * them, never another group's.
+   */
+  rowFilter?: RowFilter;
 }
 
 export interface CatalogSource {
@@ -101,13 +107,6 @@ interface CachedClassifications {
   at: number;
   /** asset id → column → what its open findings classify it as. */
   byAsset: Map<string, Map<string, Classification>>;
-}
-
-/** Who reads masked columns in clear (DQ §5.8). */
-export interface ClearScope {
-  all: boolean;
-  sourceIds: ReadonlySet<string>;
-  assetIds: ReadonlySet<string>;
 }
 
 /**
@@ -224,24 +223,53 @@ export class QueryCatalogService {
    * grant), and the owners and stewards of what they govern.
    */
   async clearScope(): Promise<ClearScope> {
-    const actor = this.actors.current();
-    const capabilities = await this.policy.capabilities(actor);
-    if (capabilities.has('data.unmask')) {
-      return { all: true, sourceIds: new Set(), assetIds: new Set() };
-    }
-    const grants = this.policy.resourceGrants?.('data.unmask') ?? {
-      sourceIds: [],
-      assetIds: [],
-    };
     const person = this.cls.isActive()
       ? this.cls.get<ClsPerson | undefined>(CLS_PERSON)
       : undefined;
-    const governed = await governedDataScope(this.prisma, person ?? null);
-    return {
-      all: false,
-      sourceIds: new Set([...grants.sourceIds, ...governed.sourceIds]),
-      assetIds: new Set([...grants.assetIds, ...governed.assetIds]),
+    return clearScopeOf(
+      this.prisma,
+      this.policy,
+      this.actors.current(),
+      person ?? null,
+    );
+  }
+
+  /**
+   * asset id → the rows the current person reads of each filtered table
+   * (DQ §5.10); tables not in the map show every row. Read every time, like
+   * the masks: a rule a steward removes stops applying at once. The tables
+   * and sources the person owns or stewards are left out: they see it all.
+   */
+  async rowFilters(): Promise<Map<string, RowFilter>> {
+    const policies = await this.prisma.assetRowPolicy.findMany({
+      select: {
+        assetId: true,
+        asset: { select: { sourceId: true } },
+        rules: { select: { principalRef: true, conditions: true } },
+      },
+    });
+    const out = new Map<string, RowFilter>();
+    if (!policies.length) return out;
+    const person = this.cls.isActive()
+      ? (this.cls.get<ClsPerson | undefined>(CLS_PERSON) ?? null)
+      : null;
+    const governed = await governedDataScope(this.prisma, person);
+    const everyRow = {
+      sourceIds: new Set(governed.sourceIds),
+      assetIds: new Set(governed.assetIds),
     };
+    for (const policy of policies) {
+      if (
+        everyRow.assetIds.has(policy.assetId) ||
+        everyRow.sourceIds.has(policy.asset.sourceId)
+      ) {
+        continue;
+      }
+      const filter = rowFilterFor(policy.rules, person?.groupIds ?? []);
+      if (selectsEveryRow(filter)) continue;
+      out.set(policy.assetId, filter);
+    }
+    return out;
   }
 
   /**
@@ -356,12 +384,13 @@ export class QueryCatalogService {
   }
 
   async catalog(): Promise<QueryCatalog> {
-    const [settings, scope, cached, clear, masks] = await Promise.all([
+    const [settings, scope, cached, clear, masks, rows] = await Promise.all([
       this.settings(),
       this.scope(),
       this.tables(),
       this.clearScope(),
       this.columnMasks(),
+      this.rowFilters(),
     ]);
     const sources = new Map<string, CatalogSource>();
     for (const source of cached.sources) {
@@ -389,10 +418,7 @@ export class QueryCatalogService {
       // DQ §5.8: hidden columns leave the list, masked ones say so; the
       // job gets the same masks, so what the list shows is what runs.
       const tableMasks = masks.get(table.assetId) ?? [];
-      const inClear =
-        clear.all ||
-        clear.sourceIds.has(table.sourceId) ||
-        clear.assetIds.has(table.assetId);
+      const inClear = readsInClear(clear, table);
       const seen = columnsAsSeen(table.columns, tableMasks, inClear);
       sources.get(table.sourceId)?.tables.push({
         ...table,
@@ -401,6 +427,9 @@ export class QueryCatalogService {
         ...(reason ? { reason } : {}),
         ...(seen.hidden ? { hiddenColumns: seen.hidden } : {}),
         ...(!inClear && tableMasks.length ? { masks: tableMasks } : {}),
+        ...(rows.has(table.assetId)
+          ? { rowFilter: rows.get(table.assetId) }
+          : {}),
       });
     }
     return {
@@ -411,6 +440,22 @@ export class QueryCatalogService {
         exportMaxRows: settings.exportMaxRows,
       },
       sources: [...sources.values()].filter((source) => source.tables.length),
+    };
+  }
+
+  /**
+   * The catalog as a person's browser gets it: the columns already say what
+   * is masked and hidden ones are counted, so the job's mask list (which
+   * names hidden columns) stays on the server.
+   */
+  async publicCatalog(): Promise<QueryCatalog> {
+    const catalog = await this.catalog();
+    return {
+      ...catalog,
+      sources: catalog.sources.map((source) => ({
+        ...source,
+        tables: source.tables.map(({ masks: _masks, ...table }) => table),
+      })),
     };
   }
 
@@ -560,10 +605,10 @@ export class QueryCatalogService {
   }
 }
 
-function columnsOf(metadata: Record<string, unknown>): CatalogColumn[] {
+function columnsOf(metadata: Record<string, unknown>): MaskedColumn[] {
   const columns = metadata.columns;
   if (!Array.isArray(columns)) return [];
-  const out: CatalogColumn[] = [];
+  const out: MaskedColumn[] = [];
   for (const column of columns) {
     if (typeof column === 'string') {
       out.push({ name: column, type: '' });

@@ -16,6 +16,10 @@ from ..utils.duckdb_engine import quote_identifier
 
 MASK_KINDS = ("redact", "partial", "hash", "null")
 
+#: Shorter values are redacted whole by a ``partial`` mask: their last four
+#: characters would be most of them.
+PARTIAL_MIN_LENGTH = 9
+
 #: DuckDB's names for text (``TEXT`` and ``STRING`` are aliases of VARCHAR,
 #: but the scan may report them as the source did).
 _TEXT_TYPES = ("VARCHAR", "TEXT", "STRING", "CHAR", "BPCHAR")
@@ -61,26 +65,134 @@ def _literal(text: str) -> str:
     return "'" + text.replace("'", "''") + "'"
 
 
-def mask_expression(column: str, type_name: str, mask: str, salt: str) -> str:
-    """The DuckDB expression that shows ``column`` masked, named as itself."""
-    q = quote_identifier(column)
-    null = f"CAST(NULL AS {type_name})" if type_name else "NULL"
+def _top_level(type_name: str) -> list[tuple[int, str]]:
+    """Positions of ``( ) [ ] ,`` outside quotes, with their nesting depth applied."""
+    out: list[tuple[int, str]] = []
+    quoted = False
+    for index, char in enumerate(type_name):
+        if char == '"':
+            quoted = not quoted
+        elif not quoted and char in "()[],":
+            out.append((index, char))
+    return out
+
+
+def _split_fields(body: str) -> list[str]:
+    """``a INT, "b c" STRUCT(x INT, y INT)`` → its top-level comma-separated parts."""
+    parts: list[str] = []
+    depth = 0
+    start = 0
+    for index, char in _top_level(body):
+        if char in "([":
+            depth += 1
+        elif char in ")]":
+            depth -= 1
+        elif depth == 0:
+            parts.append(body[start:index].strip())
+            start = index + 1
+    parts.append(body[start:].strip())
+    return [part for part in parts if part]
+
+
+def _field(part: str) -> tuple[str, str] | None:
+    """``"my field" VARCHAR`` → ``("my field", "VARCHAR")``."""
+    if part.startswith('"'):
+        index = 1
+        name = []
+        while index < len(part):
+            if part[index] == '"':
+                if part[index + 1 : index + 2] == '"':
+                    name.append('"')
+                    index += 2
+                    continue
+                break
+            name.append(part[index])
+            index += 1
+        rest = part[index + 1 :].strip()
+        return ("".join(name), rest) if rest else None
+    head, _, rest = part.partition(" ")
+    return (head, rest.strip()) if head and rest.strip() else None
+
+
+def _element_type(type_name: str) -> str | None:
+    """``VARCHAR[]`` or ``INTEGER[2]`` → the element type; None for anything else."""
+    if not type_name.endswith("]"):
+        return None
+    depth = 0
+    for index, char in reversed(_top_level(type_name)):
+        if char in ")]":
+            depth += 1
+        elif char in "([":
+            depth -= 1
+            if depth == 0:
+                return type_name[:index].strip() if char == "[" else None
+    return None
+
+
+def _struct_fields(type_name: str) -> list[tuple[str, str]] | None:
+    """``STRUCT(a INT, b VARCHAR)`` → its fields; None for anything else."""
+    if not (type_name.upper().startswith("STRUCT(") and type_name.endswith(")")):
+        return None
+    fields = [_field(part) for part in _split_fields(type_name[len("STRUCT(") : -1])]
+    if not fields or any(field is None for field in fields):
+        return None
+    return [field for field in fields if field is not None]
+
+
+def _masked_leaf(expr: str, type_name: str, mask: str, salt: str) -> str:
     if mask == "hash":
-        expr = (
-            f"CASE WHEN {q} IS NULL THEN NULL "
-            f"ELSE left(sha256({_literal(salt)} || CAST({q} AS VARCHAR)), 16) END"
+        return (
+            f"CASE WHEN {expr} IS NULL THEN NULL "
+            f"ELSE left(sha256({_literal(salt)} || CAST({expr} AS VARCHAR)), 16) END"
         )
-    elif mask == "null" or not _is_text(type_name):
-        # A number, a date or a struct has no "partly hidden" form.
-        expr = null
-    elif mask == "partial":
-        expr = (
-            f"CASE WHEN {q} IS NULL THEN NULL "
-            f"WHEN length({q}) <= 4 THEN repeat('•', length({q})) "
-            f"ELSE repeat('•', length({q}) - 4) || right({q}, 4) END"
+    if mask == "null" or not _is_text(type_name):
+        # A number, a date or a map has no "partly hidden" form.
+        return f"CAST(NULL AS {type_name})" if type_name else "NULL"
+    if mask == "partial":
+        # Last four only of values long enough that four is under half of
+        # them, behind a fixed run of dots so the length does not show.
+        return (
+            f"CASE WHEN {expr} IS NULL THEN NULL "
+            f"WHEN length({expr}) < {PARTIAL_MIN_LENGTH} THEN '****' "
+            f"ELSE '••••' || right({expr}, 4) END"
         )
+    return f"CASE WHEN {expr} IS NULL THEN NULL ELSE '****' END"
+
+
+def _masked_value(expr: str, type_name: str, mask: str, salt: str, depth: int) -> str:
+    """``expr`` masked value by value: a struct keeps its fields and a list its
+    elements, each masked as a column of its own type would be, so the shape
+    (and, for ``hash``, every field's joinability) survives."""
+    fields = _struct_fields(type_name)
+    if fields is not None:
+        packed = ", ".join(
+            f"{quote_identifier(name)} := "
+            + _masked_value(
+                f"struct_extract({expr}, {_literal(name)})", field_type, mask, salt, depth
+            )
+            for name, field_type in fields
+        )
+        return f"CASE WHEN {expr} IS NULL THEN NULL ELSE struct_pack({packed}) END"
+    element = _element_type(type_name)
+    if element is not None:
+        var = f"__mask_{depth}"
+        inner = _masked_value(var, element, mask, salt, depth + 1)
+        return f"list_transform({expr}, lambda {var}: {inner})"
+    return _masked_leaf(expr, type_name, mask, salt)
+
+
+def mask_expression(column: str, type_name: str, mask: str, salt: str) -> str:
+    """The DuckDB expression that shows ``column`` masked, named as itself.
+
+    Struct and list columns are masked field by field and element by element
+    (``null`` aside, which empties the column whole); a map or a union has no
+    fields of its own to keep and is masked whole.
+    """
+    q = quote_identifier(column)
+    if mask == "null":
+        expr = f"CAST(NULL AS {type_name})" if type_name else "NULL"
     else:
-        expr = f"CASE WHEN {q} IS NULL THEN NULL ELSE '****' END"
+        expr = _masked_value(q, type_name.strip(), mask, salt, 0)
     return f"{expr} AS {q}"
 
 
@@ -88,22 +200,31 @@ def masked_projection(
     columns: list[tuple[str, str]],
     masks: list[ColumnMask],
     salt: str,
+    known: list[str] | None = None,
 ) -> str | None:
     """The SELECT list of a table's view, or None when nothing is masked.
 
     ``columns`` are ``(name, type)`` as DuckDB describes the table. Masks name
     columns as the scan recorded them: matched exactly, then without case.
-    Masks for columns the table no longer has change nothing.
+    ``known`` are the columns the scan recorded: one the table has now that
+    is neither masked nor known (renamed at the source, or named differently
+    by DuckDB) is hidden, because nothing says it is not what a mask was
+    for. Masks for columns the table no longer has change nothing.
     """
     if not masks:
         return None
     exact = {m.column: m for m in masks}
     folded = {m.column.lower(): m for m in masks}
+    known_exact = set(known or ())
+    known_folded = {name.lower() for name in known_exact}
     parts: list[str] = []
     touched = False
     for name, type_name in columns:
         found = exact.get(name) or folded.get(name.lower())
         if found is None:
+            if known is not None and name not in known_exact and name.lower() not in known_folded:
+                touched = True
+                continue
             parts.append(quote_identifier(name))
         elif found.action == "hide":
             touched = True

@@ -13,6 +13,13 @@
  */
 
 import { mapValues } from '../runtime';
+import type { RowFilterDto } from './RowFilterDto';
+import {
+    RowFilterDtoFromJSON,
+    RowFilterDtoFromJSONTyped,
+    RowFilterDtoToJSON,
+    RowFilterDtoToJSONTyped,
+} from './RowFilterDto';
 import type { QueryColumnDto } from './QueryColumnDto';
 import {
     QueryColumnDtoFromJSON,
@@ -93,6 +100,12 @@ export interface QueryCatalogTableDto {
      * @memberof QueryCatalogTableDto
      */
     hiddenColumns?: number;
+    /**
+     * The rows you read of this table (DQ §5.10); absent when you read every row.
+     * @type {RowFilterDto}
+     * @memberof QueryCatalogTableDto
+     */
+    rowFilter?: RowFilterDto;
 }
 
 /**
@@ -132,6 +145,7 @@ export function QueryCatalogTableDtoFromJSONTyped(json: any, ignoreDiscriminator
         'canQuery': json['canQuery'],
         'reason': json['reason'] == null ? undefined : json['reason'],
         'hiddenColumns': json['hiddenColumns'] == null ? undefined : json['hiddenColumns'],
+        'rowFilter': json['rowFilter'] == null ? undefined : RowFilterDtoFromJSON(json['rowFilter']),
     };
 }
 
@@ -157,6 +171,7 @@ export function QueryCatalogTableDtoToJSONTyped(value?: QueryCatalogTableDto | n
         'canQuery': value['canQuery'],
         'reason': value['reason'],
         'hiddenColumns': value['hiddenColumns'],
+        'rowFilter': RowFilterDtoToJSON(value['rowFilter']),
     };
 }
 

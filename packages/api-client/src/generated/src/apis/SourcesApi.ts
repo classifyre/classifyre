@@ -754,7 +754,7 @@ export class SourcesApi extends runtime.BaseAPI {
     }
 
     /**
-     * Permanently delete a data source and all its associated data
+     * Permanently delete a data source and all its associated data. Refused for a governed source: one with an owner, or with assets that have one.
      * Delete a data source
      */
     async sourcesControllerDeleteSourceRaw(requestParameters: SourcesControllerDeleteSourceRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
@@ -784,7 +784,7 @@ export class SourcesApi extends runtime.BaseAPI {
     }
 
     /**
-     * Permanently delete a data source and all its associated data
+     * Permanently delete a data source and all its associated data. Refused for a governed source: one with an owner, or with assets that have one.
      * Delete a data source
      */
     async sourcesControllerDeleteSource(requestParameters: SourcesControllerDeleteSourceRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
@@ -944,7 +944,7 @@ export class SourcesApi extends runtime.BaseAPI {
     }
 
     /**
-     * Permanently delete assets of the source, along with their findings, extractions, correlation values, signatures and chunks (all cascade via FK). Correlation fingerprints are recomputed in the background. Irreversible.  With no query parameters this deletes EVERY asset of the source. The optional predicate exists for the case a scan can never resolve on its own: when a connector narrows its scope (one source split into two), the assets it used to produce stay behind forever, because retirement requires a run that covered the whole scope and found them gone — and a rotating-sample connector never has one. Pass dryRun=true first to see what a predicate would take with it.
+     * Permanently delete assets of the source, along with their findings, extractions, correlation values, signatures and chunks (all cascade via FK). Correlation fingerprints are recomputed in the background. Irreversible. Governed assets (an owner on them or their source) are never purged: they are kept and counted in keptGoverned.  With no query parameters this deletes EVERY asset of the source. The optional predicate exists for the case a scan can never resolve on its own: when a connector narrows its scope (one source split into two), the assets it used to produce stay behind forever, because retirement requires a run that covered the whole scope and found them gone — and a rotating-sample connector never has one. Pass dryRun=true first to see what a predicate would take with it.
      * Retire a source\'s assets — all of them, or a named subset
      */
     async sourcesControllerPurgeAssetsRaw(requestParameters: SourcesControllerPurgeAssetsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PurgeSourceAssetsResponseDto>> {
@@ -998,7 +998,7 @@ export class SourcesApi extends runtime.BaseAPI {
     }
 
     /**
-     * Permanently delete assets of the source, along with their findings, extractions, correlation values, signatures and chunks (all cascade via FK). Correlation fingerprints are recomputed in the background. Irreversible.  With no query parameters this deletes EVERY asset of the source. The optional predicate exists for the case a scan can never resolve on its own: when a connector narrows its scope (one source split into two), the assets it used to produce stay behind forever, because retirement requires a run that covered the whole scope and found them gone — and a rotating-sample connector never has one. Pass dryRun=true first to see what a predicate would take with it.
+     * Permanently delete assets of the source, along with their findings, extractions, correlation values, signatures and chunks (all cascade via FK). Correlation fingerprints are recomputed in the background. Irreversible. Governed assets (an owner on them or their source) are never purged: they are kept and counted in keptGoverned.  With no query parameters this deletes EVERY asset of the source. The optional predicate exists for the case a scan can never resolve on its own: when a connector narrows its scope (one source split into two), the assets it used to produce stay behind forever, because retirement requires a run that covered the whole scope and found them gone — and a rotating-sample connector never has one. Pass dryRun=true first to see what a predicate would take with it.
      * Retire a source\'s assets — all of them, or a named subset
      */
     async sourcesControllerPurgeAssets(requestParameters: SourcesControllerPurgeAssetsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PurgeSourceAssetsResponseDto> {

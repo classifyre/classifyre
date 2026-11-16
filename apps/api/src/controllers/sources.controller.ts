@@ -1330,7 +1330,9 @@ export class SourcesController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Delete a data source',
-    description: 'Permanently delete a data source and all its associated data',
+    description:
+      'Permanently delete a data source and all its associated data. Refused for a ' +
+      'governed source: one with an owner, or with assets that have one.',
   })
   @ApiParam({
     name: 'id',
@@ -1345,12 +1347,17 @@ export class SourcesController {
     status: 404,
     description: 'Source not found',
   })
+  @ApiResponse({
+    status: 409,
+    description: 'The source or some of its assets have an owner (governed)',
+  })
   async deleteSource(@Param('id') id: string): Promise<void> {
     const source = await this.sourceService.source({ id });
     if (!source) {
       throw new NotFoundException(`Source with ID ${id} not found`);
     }
 
+    await this.sourceService.assertSourceDeletable(id);
     await this.schedulerService.removeSchedule(id);
     await this.sourceService.deleteSource({ id });
   }
@@ -1389,7 +1396,8 @@ export class SourcesController {
     description:
       'Permanently delete assets of the source, along with their findings, extractions, ' +
       'correlation values, signatures and chunks (all cascade via FK). Correlation fingerprints ' +
-      'are recomputed in the background. Irreversible.\n\n' +
+      'are recomputed in the background. Irreversible. Governed assets (an owner on them or ' +
+      'their source) are never purged: they are kept and counted in keptGoverned.\n\n' +
       'With no query parameters this deletes EVERY asset of the source. The optional predicate ' +
       'exists for the case a scan can never resolve on its own: when a connector narrows its ' +
       'scope (one source split into two), the assets it used to produce stay behind forever, ' +

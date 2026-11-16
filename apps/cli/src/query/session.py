@@ -29,6 +29,7 @@ from ..utils.duckdb_engine import connect, load_extension, quote_identifier, req
 from .bindings import BindingError, SourceBinding, TableLocation
 from .gate import QueryRefusedError, TableName, validate
 from .masks import ColumnMask, ColumnsHiddenError, masked_projection
+from .rows import RowFilter, row_predicate
 
 logger = logging.getLogger(__name__)
 
@@ -147,6 +148,17 @@ class _Table:
     location: TableLocation
     #: Columns masked or hidden for the person (docs/prd/DQ-data-query.md §5.8).
     masks: list[ColumnMask] = field(default_factory=list)
+    #: The columns the scan recorded, sent with masks: any other is hidden.
+    known_columns: list[str] | None = None
+    #: The rows the person reads (§5.10); None: every row.
+    rows: RowFilter | None = None
+
+
+def _known_columns(value: Any) -> list[str] | None:
+    """``knownColumns`` of a request table: names, or None when not sent."""
+    if not isinstance(value, list):
+        return None
+    return [str(name) for name in value if isinstance(name, str)]
 
 
 class QuerySession:
@@ -179,6 +191,8 @@ class QuerySession:
                     name.source,
                     TableLocation.from_dict(location),
                     ColumnMask.parse(entry.get("columns")),
+                    _known_columns(entry.get("knownColumns")),
+                    RowFilter.parse(entry.get("rows")),
                 )
 
     def __enter__(self) -> QuerySession:
@@ -248,25 +262,34 @@ class QuerySession:
             target = ".".join(quote_identifier(p) for p in (name.source, name.schema, name.table))
             try:
                 projection = "*"
-                if entry.masks:
-                    # The view is the only way to the table: masked here, the
-                    # query filters and joins on masked values; hidden, the
-                    # column does not exist for it.
+                where = ""
+                if entry.masks or entry.rows is not None:
                     described = conn.execute(f"DESCRIBE SELECT * FROM {relation}").fetchall()
-                    try:
-                        projection = (
-                            masked_projection(
-                                [(str(row[0]), str(row[1])) for row in described],
-                                entry.masks,
-                                self.request.mask_salt,
+                    columns = [(str(row[0]), str(row[1])) for row in described]
+                    if entry.rows is not None:
+                        # Only the rows the person reads exist in the view;
+                        # the filter sees the table's own values, before any
+                        # mask (§5.10).
+                        where = f" WHERE {row_predicate(entry.rows, columns)}"
+                    if entry.masks:
+                        # The view is the only way to the table: masked here,
+                        # the query filters and joins on masked values;
+                        # hidden, the column does not exist for it.
+                        try:
+                            projection = (
+                                masked_projection(
+                                    columns,
+                                    entry.masks,
+                                    self.request.mask_salt,
+                                    entry.known_columns,
+                                )
+                                or "*"
                             )
-                            or "*"
-                        )
-                    except ColumnsHiddenError:
-                        raise QueryRefusedError(
-                            f"Every column of {name} is hidden from you.", "columns_hidden"
-                        ) from None
-                conn.execute(f"CREATE VIEW {target} AS SELECT {projection} FROM {relation}")
+                        except ColumnsHiddenError:
+                            raise QueryRefusedError(
+                                f"Every column of {name} is hidden from you.", "columns_hidden"
+                            ) from None
+                conn.execute(f"CREATE VIEW {target} AS SELECT {projection} FROM {relation}{where}")
             except QueryRefusedError:
                 raise
             except Exception as exc:

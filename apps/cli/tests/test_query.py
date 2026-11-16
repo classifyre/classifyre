@@ -261,7 +261,7 @@ def test_masked_column_shows_masked_values_and_filters_on_them(folder: Path) -> 
     assert _rows(payload, result) == [{"n": 0}]
 
 
-@pytest.mark.parametrize(("mask", "expected"), [("partial", "••"), ("null", None)])
+@pytest.mark.parametrize(("mask", "expected"), [("partial", "****"), ("null", None)])
 def test_mask_kinds(folder: Path, mask: str, expected: str | None) -> None:
     masks = [{"column": "country", "action": "mask", "mask": mask}]
     payload, result = run_query(
@@ -272,9 +272,17 @@ def test_mask_kinds(folder: Path, mask: str, expected: str | None) -> None:
 
 @pytest.mark.parametrize(
     ("value", "expected"),
-    [("DE", "••"), ("AT-1234", "•••1234"), (None, None)],
+    [
+        ("DE", "****"),
+        ("AT-1234", "****"),
+        ("AT-123456", "••••3456"),
+        ("4111111111111111", "••••1111"),
+        (None, None),
+    ],
 )
-def test_partial_mask_keeps_the_last_four(value: str | None, expected: str | None) -> None:
+def test_partial_mask_keeps_the_last_four_of_long_values(
+    value: str | None, expected: str | None
+) -> None:
     conn = duckdb.connect()
     conn.execute("CREATE TABLE t AS SELECT CAST(? AS VARCHAR) AS v", [value])
     expr = mask_expression("v", "VARCHAR", "partial", "")
@@ -285,6 +293,87 @@ def test_masks_on_other_types_are_null() -> None:
     conn = duckdb.connect()
     expr = mask_expression("v", "DATE", "redact", "")
     assert conn.execute(f"SELECT {expr} FROM (SELECT DATE '2026-01-01' AS v)").fetchone() == (None,)
+
+
+_NESTED = (
+    "SELECT {'name': 'Ann Example', 'age': 41, 'home': {'city': 'Graz', 'zip': 8010},"
+    " 'phones': ['+43 660 1234567', NULL]} AS v"
+)
+
+
+@pytest.mark.parametrize(
+    ("mask", "expected"),
+    [
+        (
+            "redact",
+            {
+                "name": "****",
+                "age": None,
+                "home": {"city": "****", "zip": None},
+                "phones": ["****", None],
+            },
+        ),
+        (
+            "partial",
+            {
+                "name": "••••mple",
+                "age": None,
+                "home": {"city": "****", "zip": None},
+                "phones": ["••••4567", None],
+            },
+        ),
+        ("null", None),
+    ],
+)
+def test_struct_columns_are_masked_field_by_field(mask: str, expected: Any) -> None:
+    conn = duckdb.connect()
+    conn.execute(f"CREATE TABLE t AS {_NESTED}")
+    type_name = conn.execute("DESCRIBE t").fetchone()[1]
+    expr = mask_expression("v", type_name, mask, "")
+    assert conn.execute(f"SELECT {expr} FROM t").fetchone() == (expected,)
+
+
+def test_hashed_struct_fields_join_like_columns() -> None:
+    conn = duckdb.connect()
+    conn.execute(f"CREATE TABLE t AS {_NESTED}, 'Graz' AS city")
+    columns = conn.execute("DESCRIBE t").fetchall()
+    projection = ", ".join(
+        mask_expression(name, type_name, "hash", "k") for name, type_name, *_ in columns
+    )
+    row = conn.execute(
+        f"SELECT v.home.city = city, v.home.zip, v.phones[2] FROM (SELECT {projection} FROM t)"
+    ).fetchone()
+    # The same value hashes the same in a field as in a column, so it still
+    # joins; a number in a struct becomes its hash too; NULL stays NULL.
+    assert row[0] is True
+    assert isinstance(row[1], str) and len(row[1]) == 16
+    assert row[2] is None
+
+
+def test_lists_are_masked_element_by_element() -> None:
+    conn = duckdb.connect()
+    conn.execute(
+        "CREATE TABLE t AS SELECT ['a@example.org', 'b@example.org'] AS v, [{'e': 'c@example.org'}] AS w, MAP(['k'], [1]) AS m"
+    )
+    columns = conn.execute("DESCRIBE t").fetchall()
+    projection = ", ".join(
+        mask_expression(name, type_name, "redact", "") for name, type_name, *_ in columns
+    )
+    assert conn.execute(f"SELECT {projection} FROM t").fetchone() == (
+        ["****", "****"],
+        [{"e": "****"}],
+        None,  # a map has no fields of its own to keep: masked whole
+    )
+
+
+def test_quoted_struct_field_names() -> None:
+    conn = duckdb.connect()
+    conn.execute("""CREATE TABLE t AS SELECT {'e-mail "work"': 'a@example.org', 'n': 1} AS v""")
+    type_name = conn.execute("DESCRIBE t").fetchone()[1]
+    expr = mask_expression("v", type_name, "redact", "")
+    assert conn.execute(f"SELECT {expr} FROM t").fetchone() == (
+        {'e-mail "work"': "****", "n": None},
+    )
 
 
 def test_hash_mask_is_stable_and_joinable(folder: Path) -> None:
@@ -302,6 +391,25 @@ def test_hidden_column_does_not_exist(folder: Path) -> None:
     payload, _ = run_query(_masked(folder, "SELECT country FROM files.local.customers", masks))
     assert payload["status"] == "error"
     assert "country" in payload["error"]["message"].lower()
+
+
+def test_column_the_scan_did_not_record_is_hidden(folder: Path) -> None:
+    # The scan knew "id" and a masked "country_code"; the table now says
+    # "country" (renamed at the source): nothing says it is not what the
+    # mask was for, so it is hidden, not shown in clear.
+    masks = [{"column": "country_code", "action": "mask", "mask": "redact"}]
+    request = _masked(folder, "SELECT * FROM files.local.customers", masks)
+    request["tables"][0]["knownColumns"] = ["id", "country_code"]
+    payload, result = run_query(request)
+    assert set(_rows(payload, result)[0]) == {"id"}
+
+
+def test_known_columns_stay_as_they_are(folder: Path) -> None:
+    masks = [{"column": "country", "action": "mask", "mask": "redact"}]
+    request = _masked(folder, "SELECT * FROM files.local.customers WHERE id = 1", masks)
+    request["tables"][0]["knownColumns"] = ["ID", "country"]
+    payload, result = run_query(request)
+    assert _rows(payload, result) == [{"id": 1, "country": "****"}]
 
 
 def test_every_column_hidden_is_refused(folder: Path) -> None:
@@ -325,6 +433,99 @@ def test_export_is_masked_too(folder: Path) -> None:
     lines = result.arrow.decode().splitlines()
     assert lines[0] == "country"
     assert set(lines[1:]) == {"****"}
+
+
+def _filtered(folder: Path, sql: str, rows: Any, **extra: Any) -> Any:
+    request = _request(folder, sql, **extra)
+    request["tables"][0]["rows"] = rows
+    return request
+
+
+def _countries(folder: Path, rows: Any, sql: str | None = None) -> list[dict[str, Any]]:
+    payload, result = run_query(
+        _filtered(
+            folder,
+            sql
+            or "SELECT country, count(*) AS n FROM files.local.customers GROUP BY ALL ORDER BY 1",
+            rows,
+        )
+    )
+    return _rows(payload, result)
+
+
+def test_row_filter_shows_only_the_rows_it_selects(folder: Path) -> None:
+    rows = {"anyOf": [[{"column": "country", "op": "in", "values": ["AT", "DE"]}]]}
+    assert _countries(folder, rows) == [{"country": "AT", "n": 10}, {"country": "DE", "n": 10}]
+    # No WHERE of the query's own reaches the other rows.
+    assert _countries(
+        folder,
+        rows,
+        "SELECT count(*) AS n FROM files.local.customers WHERE country = 'FR' OR TRUE",
+    ) == [{"n": 20}]
+
+
+def test_row_filter_entries_are_or_and_conditions_are_and(folder: Path) -> None:
+    rows = {
+        "anyOf": [
+            [
+                {"column": "country", "op": "in", "values": ["AT"]},
+                {"column": "id", "op": "in", "values": [0, 3]},
+            ],
+            [{"column": "country", "op": "not_in", "values": ["AT", "DE"]}],
+        ]
+    }
+    assert _countries(folder, rows) == [{"country": "AT", "n": 2}, {"country": "FR", "n": 10}]
+
+
+def test_row_filter_with_no_entry_shows_no_row(folder: Path) -> None:
+    assert _countries(folder, {"anyOf": []}) == []
+    # A filter that does not read as one fails closed too.
+    assert _countries(folder, {"rules": "everything"}) == []
+
+
+def test_row_filter_entry_without_conditions_shows_every_row(folder: Path) -> None:
+    rows = {"anyOf": [[{"column": "country", "op": "in", "values": ["AT"]}], []]}
+    assert [r["n"] for r in _countries(folder, rows)] == [10, 10, 10]
+
+
+def test_row_filter_on_a_missing_column_selects_nothing(folder: Path) -> None:
+    rows = {"anyOf": [[{"column": "region", "op": "in", "values": ["AT"]}]]}
+    assert _countries(folder, rows) == []
+
+
+def test_row_filter_values_are_literals_not_sql(folder: Path) -> None:
+    rows = {"anyOf": [[{"column": "country", "op": "in", "values": ["AT') OR (1=1"]}]]}
+    assert _countries(folder, rows) == []
+    # A value the column's type cannot hold matches nothing.
+    rows = {"anyOf": [[{"column": "id", "op": "in", "values": ["not a number"]}]]}
+    assert _countries(folder, rows) == []
+
+
+def test_row_filter_sees_values_before_masks(folder: Path) -> None:
+    request = _filtered(
+        folder,
+        "SELECT country, count(*) AS n FROM files.local.customers GROUP BY ALL",
+        {"anyOf": [[{"column": "country", "op": "in", "values": ["DE"]}]]},
+        maskSalt="salt-1",
+    )
+    request["tables"][0]["columns"] = [{"column": "country", "action": "mask", "mask": "redact"}]
+    payload, result = run_query(request)
+    assert _rows(payload, result) == [{"country": "****", "n": 10}]
+
+
+def test_row_filter_applies_to_exports(folder: Path) -> None:
+    payload, result = run_query(
+        _filtered(
+            folder,
+            "SELECT country FROM files.local.customers",
+            {"anyOf": [[{"column": "country", "op": "in", "values": ["FR"]}]]},
+            exportFormat="csv",
+            maxRows=1000,
+        )
+    )
+    assert payload["status"] == "success", payload
+    lines = result.arrow.decode().splitlines()
+    assert lines[1:] and set(lines[1:]) == {"FR"}
 
 
 def test_row_cap_truncates_exactly(folder: Path) -> None:

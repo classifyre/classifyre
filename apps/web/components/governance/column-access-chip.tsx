@@ -9,6 +9,7 @@ import {
 } from "@workspace/ui/components";
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
+import { DEFAULT_MASK } from "@/lib/column-access";
 
 /**
  * How a column shows to people who may query its table but not read it in
@@ -44,7 +45,7 @@ export function ColumnAccessChip({
   const label =
     action === "hide"
       ? t("columnAccess.hide")
-      : `${t("columnAccess.mask")} · ${t(`columnAccess.kind.${mask ?? "redact"}` as TranslationKey)}`;
+      : `${t("columnAccess.mask")} · ${t(`columnAccess.kind.${mask ?? DEFAULT_MASK}` as TranslationKey)}`;
   const why = inClear
     ? t("columnAccess.inClear")
     : fromClassification === undefined

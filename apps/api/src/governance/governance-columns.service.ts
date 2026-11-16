@@ -1,7 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import {
   effectiveColumnPolicy,
+  isColumnAction,
+  isMaskKind,
+  type ColumnAction,
   type ColumnPolicy,
+  type MaskKind,
 } from '../data-query/column-masks';
 import { PrismaService } from '../prisma.service';
 import {
@@ -27,9 +31,9 @@ export interface ColumnState {
   effectiveClassification: string | null;
   findings: ColumnFindingGroup[];
   /** The steward's access (`clear`, `mask`, `hide`); null follows the classification. */
-  access: string | null;
+  access: ColumnAction | null;
   /** The steward's mask kind, for a mask (theirs or the default one). */
-  maskKind: string | null;
+  maskKind: MaskKind | null;
   /** What people who do not read it in clear get (DQ §5.8). */
   effectiveAccess: ColumnPolicy;
   reviewedAt: Date | null;
@@ -157,8 +161,8 @@ export class GovernanceColumnsService {
         derivedClassification: derived,
         effectiveClassification: note?.classification ?? derived,
         findings,
-        access: note?.access ?? null,
-        maskKind: note?.maskKind ?? null,
+        access: isColumnAction(note?.access) ? note.access : null,
+        maskKind: isMaskKind(note?.maskKind) ? note.maskKind : null,
         effectiveAccess: effectiveColumnPolicy({
           access: note?.access,
           maskKind: note?.maskKind,
@@ -192,4 +196,5 @@ export class GovernanceColumnsService {
         : {}),
     };
   }
+
 }

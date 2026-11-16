@@ -212,6 +212,76 @@ export class GovernanceNotifier {
     });
   }
 
+  /**
+   * Someone asks for access (DQ §5.9): the owner hears, else the stewards;
+   * with neither, the groups chosen for governance notifications here (the
+   * workspace's owning group by default), whose admins decide.
+   */
+  async accessRequested(input: {
+    to: string[];
+    requestId: string;
+    targetName: string;
+    targetPath: string;
+    sourceId: string;
+    requesterName: string;
+    requesterRef: string;
+    reason: string;
+  }): Promise<void> {
+    const note = {
+      event: NotificationEvent.GOVERNANCE_ACCESS_REQUESTED,
+      title: `${input.requesterName} asks to query ${input.targetName}`,
+      message: input.reason.slice(0, 500),
+      actionUrl: `${input.targetPath}?tab=governance&request=${input.requestId}`,
+      sourceId: input.sourceId,
+      triggeredBy: input.requesterRef,
+      metadata: { requestId: input.requestId },
+    };
+    const to = audienceOf(input.to, input.requesterRef);
+    if (to.personRefs.length || to.groupIds.length) {
+      await this.send(to, note);
+      return;
+    }
+    try {
+      await this.notifications()?.create({
+        type: NotificationType.GOVERNANCE,
+        severity: 'INFO',
+        ...note,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Access request notification not sent: ${String(error)}`,
+      );
+    }
+  }
+
+  /** The requester hears how their request was decided. */
+  async accessDecided(input: {
+    requesterRef: string;
+    approved: boolean;
+    targetName: string;
+    targetPath: string;
+    sourceId: string;
+    deciderRef: string;
+    note: string | null;
+    expiresAt?: Date;
+    groupName?: string;
+    requestId: string;
+  }): Promise<void> {
+    await this.send(audienceOf([input.requesterRef]), {
+      event: NotificationEvent.GOVERNANCE_ACCESS_DECIDED,
+      title: input.approved
+        ? `You can now query ${input.targetName}`
+        : `Your request to query ${input.targetName} was declined`,
+      message: input.approved
+        ? `Given to ${input.groupName ?? 'your group'} until ${input.expiresAt?.toISOString().slice(0, 10)}.${input.note ? ` ${input.note}` : ''}`
+        : (input.note ?? 'Ask its owner if you need to know why.'),
+      actionUrl: `${input.targetPath}?tab=data`,
+      sourceId: input.sourceId,
+      triggeredBy: input.deciderRef,
+      metadata: { requestId: input.requestId, approved: input.approved },
+    });
+  }
+
   /** Someone changed the lifecycle: the others who answer for it hear of it. */
   async statusChanged(input: {
     assetId: string;

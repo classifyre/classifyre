@@ -58,6 +58,7 @@ import {
   COLUMN_ACTIONS,
   MASK_KINDS,
   columnAccessFor,
+  exposureOf,
 } from "@/lib/column-access";
 import { ColumnAccessChip } from "./column-access-chip";
 
@@ -123,11 +124,14 @@ export function ClassificationChip({ column }: { column: AssetColumnDto }) {
 function ColumnDialog({
   assetId,
   column,
+  inClear,
   onClose,
   onSaved,
 }: {
   assetId: string;
   column: AssetColumnDto;
+  /** The caller reads this table in clear: only then may a column show more. */
+  inClear: boolean;
   onClose: () => void;
   onSaved: (next: AssetColumnsDto) => void;
 }) {
@@ -165,6 +169,11 @@ function ColumnDialog({
     maskKind: maskKind === DEFAULT ? null : maskKind,
     classification: classificationNow ?? null,
   });
+
+  // DQ §5.8: showing more of a column than it shows now is giving people
+  // what it hides; the API refuses it unless you read the table in clear.
+  const loosens =
+    !inClear && exposureOf(preview) > exposureOf(column.effectiveAccess);
 
   const save = async (reviewClassification: boolean) => {
     setBusy(true);
@@ -332,6 +341,14 @@ function ColumnDialog({
             <p className="text-xs text-muted-foreground">
               {t("governance.columns.accessHint")}
             </p>
+            {loosens && (
+              <p
+                className="text-xs text-destructive"
+                data-testid="column-access-loosens"
+              >
+                {t("governance.columns.accessNeedsClear")}
+              </p>
+            )}
           </div>
         </div>
         <DialogFooter className="gap-2">
@@ -342,7 +359,7 @@ function ColumnDialog({
             <Button
               variant="outline"
               onClick={() => void save(true)}
-              disabled={busy}
+              disabled={busy || loosens}
               data-testid="column-save-review"
             >
               {t("governance.columns.saveAndConfirm")}
@@ -350,7 +367,7 @@ function ColumnDialog({
           )}
           <Button
             onClick={() => void save(false)}
-            disabled={busy}
+            disabled={busy || loosens}
             data-testid="column-save"
           >
             {t("common.save")}
@@ -618,6 +635,7 @@ export function ColumnsCard({
         <ColumnDialog
           assetId={assetId}
           column={editing}
+          inClear={state.inClear}
           onClose={() => setEditing(null)}
           onSaved={onChange}
         />

@@ -31,6 +31,9 @@ export const MCP_GROUP_ACCESS: Record<string, AccessAreaOptions> = {
   glossary: { view: 'glossary.view', change: 'glossary.edit' },
   entities: { view: 'entity.view', change: 'entity.manage' },
   lineage: { view: 'asset.view', change: 'asset.tag' },
+  // What a person reads is decided per table by the query catalog (grants,
+  // ownership), like the REST routes, which also need only workspace.view.
+  data: { view: 'workspace.view', change: 'workspace.view' },
 };
 
 export const MCP_TOOL_CAPABILITY_OVERRIDES: Record<string, Capability> = {

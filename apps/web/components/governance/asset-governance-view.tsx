@@ -23,6 +23,8 @@ import { OwnershipCard } from "./ownership-card";
 import { QualityStep } from "./quality-step";
 import { ContractCard } from "./contract-card";
 import { AccessCard } from "./access-card";
+import { RowsCard } from "./rows-card";
+import { AccessRequestsCard } from "./access-requests-card";
 import { GovernanceBadge } from "./governance-badge";
 import { QualityChip } from "./quality-chip";
 import { RoleIcon } from "./role-style";
@@ -174,6 +176,22 @@ export function AssetGovernanceView({
           },
         ]
       : []),
+    ...(isTable && columns && columns.columns.length > 0
+      ? [
+          {
+            id: "rows",
+            title: t("governance.steps.rows"),
+            description: t("governance.steps.rowsDesc"),
+            complete: true,
+            content: (
+              <RowsCard
+                assetId={assetId}
+                columns={columns.columns.map((column) => column.name)}
+              />
+            ),
+          },
+        ]
+      : []),
     {
       id: "quality",
       title: t("governance.steps.quality"),
@@ -199,13 +217,18 @@ export function AssetGovernanceView({
             description: t("governance.steps.accessDesc"),
             complete: true,
             content: (
-              <AccessCard
-                target={{
-                  type: "asset",
-                  id: assetId,
-                  name: t("sqlConnections.thisTable"),
-                }}
-              />
+              <div className="space-y-4">
+                <AccessRequestsCard
+                  filter={{ scopeType: "asset", scopeId: assetId }}
+                />
+                <AccessCard
+                  target={{
+                    type: "asset",
+                    id: assetId,
+                    name: t("sqlConnections.thisTable"),
+                  }}
+                />
+              </div>
             ),
           },
         ]
@@ -267,7 +290,9 @@ export function AssetGovernanceView({
               <GovernanceBadge status={governance.status} />
               <span className="text-[11px] leading-snug text-muted-foreground">
                 {t(
-                  `governance.statusHint.${governance.status ?? "UNGOVERNED"}` as Parameters<typeof t>[0],
+                  `governance.statusHint.${governance.status ?? "UNGOVERNED"}` as Parameters<
+                    typeof t
+                  >[0],
                 )}
               </span>
             </OverviewTile>
@@ -277,7 +302,8 @@ export function AssetGovernanceView({
               onClick={() => setJump({ id: "ownership", at: Date.now() })}
             >
               <span className="truncate text-sm font-semibold">
-                {owner?.principal.displayName ?? t("governance.ownership.nobody")}
+                {owner?.principal.displayName ??
+                  t("governance.ownership.nobody")}
               </span>
               {owner?.inherited && (
                 <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
@@ -287,13 +313,19 @@ export function AssetGovernanceView({
             </OverviewTile>
             <OverviewTile
               label={t("governance.overview.checklist")}
-              icon={<span className="font-mono text-xs">{checked}/{total}</span>}
+              icon={
+                <span className="font-mono text-xs">
+                  {checked}/{total}
+                </span>
+              }
               onClick={() => setJump({ id: "certification", at: Date.now() })}
             >
               <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                 <div
                   className="h-full bg-accent-ink"
-                  style={{ width: `${total ? Math.round((checked / total) * 100) : 0}%` }}
+                  style={{
+                    width: `${total ? Math.round((checked / total) * 100) : 0}%`,
+                  }}
                 />
               </div>
               <span className="text-[11px] text-muted-foreground">

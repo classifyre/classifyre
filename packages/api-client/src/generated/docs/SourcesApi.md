@@ -871,7 +871,7 @@ No authorization required
 
 Delete a data source
 
-Permanently delete a data source and all its associated data
+Permanently delete a data source and all its associated data. Refused for a governed source: one with an owner, or with assets that have one.
 
 ### Example
 
@@ -929,6 +929,7 @@ No authorization required
 |-------------|-------------|------------------|
 | **204** | Source successfully deleted |  -  |
 | **404** | Source not found |  -  |
+| **409** | The source or some of its assets have an owner (governed) |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
@@ -1205,7 +1206,7 @@ No authorization required
 
 Retire a source\&#39;s assets — all of them, or a named subset
 
-Permanently delete assets of the source, along with their findings, extractions, correlation values, signatures and chunks (all cascade via FK). Correlation fingerprints are recomputed in the background. Irreversible.  With no query parameters this deletes EVERY asset of the source. The optional predicate exists for the case a scan can never resolve on its own: when a connector narrows its scope (one source split into two), the assets it used to produce stay behind forever, because retirement requires a run that covered the whole scope and found them gone — and a rotating-sample connector never has one. Pass dryRun&#x3D;true first to see what a predicate would take with it.
+Permanently delete assets of the source, along with their findings, extractions, correlation values, signatures and chunks (all cascade via FK). Correlation fingerprints are recomputed in the background. Irreversible. Governed assets (an owner on them or their source) are never purged: they are kept and counted in keptGoverned.  With no query parameters this deletes EVERY asset of the source. The optional predicate exists for the case a scan can never resolve on its own: when a connector narrows its scope (one source split into two), the assets it used to produce stay behind forever, because retirement requires a run that covered the whole scope and found them gone — and a rotating-sample connector never has one. Pass dryRun&#x3D;true first to see what a predicate would take with it.
 
 ### Example
 

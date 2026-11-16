@@ -21,6 +21,7 @@ import {
 } from "@workspace/ui/components";
 import { cn } from "@workspace/ui/lib/utils";
 import { toast } from "sonner";
+import { extractApiErrorMessage } from "@/lib/extract-api-error-message";
 
 type PurgeAssetsActionProps = {
   sourceId: string;
@@ -46,15 +47,25 @@ export function PurgeAssetsAction({
   const handlePurge = async () => {
     try {
       setIsPurging(true);
-      await api.sources.sourcesControllerPurgeAssets({ id: sourceId });
-      toast.success(t("sources.purgeAssets.success"));
+      const result = await api.sources.sourcesControllerPurgeAssets({
+        id: sourceId,
+      });
+      // Governed assets (an owner on them or the source) are never purged.
+      if (result.keptGoverned > 0) {
+        toast.success(
+          t("sources.purgeAssets.successKept", {
+            purged: result.purgedAssets,
+            kept: result.keptGoverned,
+          }),
+        );
+      } else {
+        toast.success(t("sources.purgeAssets.success"));
+      }
       onPurged?.();
     } catch (error) {
       console.error("Failed to purge assets:", error);
       toast.error(
-        error instanceof Error
-          ? error.message
-          : t("sources.purgeAssets.failed"),
+        await extractApiErrorMessage(error, t("sources.purgeAssets.failed")),
       );
     } finally {
       setIsPurging(false);
@@ -95,7 +106,8 @@ export function PurgeAssetsAction({
           <ShieldAlert className="h-4 w-4" />
           <AlertTitle>{t("sources.purgeAssets.permanentTitle")}</AlertTitle>
           <AlertDescription>
-            {t("sources.purgeAssets.permanentBody")}
+            {t("sources.purgeAssets.permanentBody")}{" "}
+            {t("sources.purgeAssets.governedKept")}
           </AlertDescription>
         </Alert>
         <AlertDialogFooter>

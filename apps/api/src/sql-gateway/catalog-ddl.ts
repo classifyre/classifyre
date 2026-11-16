@@ -1,4 +1,5 @@
 import type { CatalogSource } from '../data-query/query-catalog.service';
+import { DEFAULT_MASK } from '../data-query/column-masks';
 import { ddlType } from './pg-types';
 
 /** PostgreSQL's identifier limit (NAMEDATALEN - 1), in bytes. */
@@ -85,7 +86,7 @@ export function catalogDdl(
         // A masked column says so: BI tools show comments next to columns.
         const masked =
           column.access === 'mask' && !column.inClear
-            ? `Masked (${column.mask ?? 'redact'})`
+            ? `Masked (${column.mask ?? DEFAULT_MASK})`
             : null;
         const text = [note?.businessName, note?.description, masked]
           .filter(Boolean)

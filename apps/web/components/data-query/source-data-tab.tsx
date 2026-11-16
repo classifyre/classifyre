@@ -8,6 +8,7 @@ import {
   type QueryCatalog,
 } from "@/lib/data-query";
 import { DataNotice, DataTab } from "./data-tab";
+import { RequestAccess } from "@/components/access-requests/request-access";
 
 /**
  * A source's tables, queried in place: the same layout as a table's Data
@@ -42,9 +43,12 @@ export function SourceDataTab({
   }
   if (!queryable.length) {
     return (
-      <DataNotice title={t("dataQuery.assetLockedTitle")} locked>
-        {t("dataQuery.sourceLocked", { name: sourceName })}
-      </DataNotice>
+      <div className="space-y-3">
+        <DataNotice title={t("dataQuery.assetLockedTitle")} locked>
+          {t("dataQuery.sourceLocked", { name: sourceName })}
+        </DataNotice>
+        <RequestAccess target={{ scopeType: "source", scopeId: sourceId }} />
+      </div>
     );
   }
   return (

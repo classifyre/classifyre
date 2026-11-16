@@ -103,6 +103,17 @@ export const MCP_CAPABILITY_GROUPS: McpCapabilityGroupDto[] = [
     ],
   },
   {
+    id: 'data',
+    title: 'Data',
+    description:
+      'Query the tables you may read with SQL: the same grants, masked columns, row filters, limits and audit as the SQL page.',
+    toolNames: ['list_queryable_tables', 'query_data'],
+    operations: [
+      'List the tables you can query, with what is masked or filtered for you',
+      'Run one SELECT and read up to 500 rows',
+    ],
+  },
+  {
     id: 'assets',
     title: 'Assets',
     description:

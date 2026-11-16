@@ -46,6 +46,7 @@ describe('SourcesController', () => {
   const mockSourceService = {
     source: jest.fn(),
     deleteSource: jest.fn(),
+    assertSourceDeletable: jest.fn(),
     sources: jest.fn(),
     createFromConfig: jest.fn(),
     updateFromConfig: jest.fn(),

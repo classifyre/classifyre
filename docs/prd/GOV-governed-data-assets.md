@@ -85,6 +85,8 @@ So GOV adds rules and results, and bridges them into findings both ways:
 
 **Governed = has an owner.** Assigning the first owner creates the asset's `asset_governance` row in `draft`. Removing the last owner does not delete the row: the asset shows as *ownerless*, so its description and rules are kept.
 
+A governed asset is never hard-deleted (decided 2026-11-14): purging a source's assets keeps it, and a source with an owner, or with any owned asset, cannot be deleted. Its owner is removed first, deliberately. Retiring through a scan (status `DELETED`) keeps the row and is unaffected.
+
 **Lifecycle** (ODCS `status`, independent of the scan's `AssetStatus`):
 
 | Status | Meaning | Set by |

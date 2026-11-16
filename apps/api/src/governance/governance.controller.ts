@@ -39,9 +39,12 @@ import {
   GovernancePrincipalDto,
   SourceGovernanceDto,
   UpdateAssetGovernanceDto,
+  AssetRowsDto,
+  UpdateAssetRowsDto,
 } from './governance.dto';
 import { GovernanceInsightsService } from './governance-insights.service';
 import { GovernanceService } from './governance.service';
+import { GovernanceRowsService } from './governance-rows.service';
 
 /**
  * Governed data assets (docs/prd/GOV-governed-data-assets.md, G-1).
@@ -57,6 +60,7 @@ export class GovernanceController {
   constructor(
     private readonly governance: GovernanceService,
     private readonly insights: GovernanceInsightsService,
+    private readonly rows: GovernanceRowsService,
   ) {}
 
   @Get('assets/:id/governance/meaning')
@@ -250,6 +254,33 @@ export class GovernanceController {
   @ApiOkResponse({ type: AssetQualityDto })
   runQuality(@Param('id', ParseUUIDPipe) id: string): Promise<AssetQualityDto> {
     return this.governance.runQuality(id);
+  }
+
+  @Get('assets/:id/rows')
+  @Requires('asset.view')
+  @ApiOperation({
+    summary:
+      "A table's row filtering: on or off, and its rules for whoever governs it",
+  })
+  @ApiOkResponse({ type: AssetRowsDto })
+  assetRows(@Param('id', ParseUUIDPipe) id: string): Promise<AssetRowsDto> {
+    return this.rows.assetRows(id);
+  }
+
+  @Put('assets/:id/rows')
+  @Requires('asset.view')
+  @SignedInOnly()
+  @ApiOperation({
+    summary: "Turn row filtering on or off and set the table's rules",
+    description:
+      'Needs asset.govern, or the owner or steward role. Showing readers more rows (off, a new or wider rule) needs the owner or steward role: they see every row.',
+  })
+  @ApiOkResponse({ type: AssetRowsDto })
+  updateAssetRows(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: UpdateAssetRowsDto,
+  ): Promise<AssetRowsDto> {
+    return this.rows.updateAssetRows(id, body ?? {});
   }
 
   @Get('assets/:id/columns')

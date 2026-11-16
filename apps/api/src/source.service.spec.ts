@@ -34,6 +34,10 @@ describe('SourceService', () => {
       runner: {
         findMany: jest.fn().mockResolvedValue([]),
       },
+      governanceRole: {
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+      },
       $executeRaw: jest.fn().mockResolvedValue(0),
       $transaction: jest.fn(),
       ...prismaOverrides,
@@ -310,6 +314,70 @@ describe('SourceService', () => {
     expect(prisma.source.delete).not.toHaveBeenCalled();
   });
 
+  // Governed assets (GOV §4: an owner on them or their source) are never
+  // hard-deleted; their owners are removed first, deliberately.
+  describe('governed sources', () => {
+    const owners = (rows: Array<{ scopeType: string; scopeId: string }>) =>
+      jest.fn().mockResolvedValue(rows);
+
+    it('refuses to delete a source that has an owner', async () => {
+      const { service, prisma } = createService({
+        governanceRole: {
+          findMany: owners([{ scopeType: 'SOURCE', scopeId: 'source-1' }]),
+          count: jest.fn().mockResolvedValue(1),
+        },
+        asset: { count: jest.fn().mockResolvedValue(0) },
+      });
+      prisma.source.findUnique.mockResolvedValue({ id: 'source-1' });
+
+      await expect(service.deleteSource({ id: 'source-1' })).rejects.toThrow(
+        'This source has an owner',
+      );
+      expect(prisma.source.delete).not.toHaveBeenCalled();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('refuses to delete a source with owned assets', async () => {
+      const assetCount = jest.fn().mockResolvedValue(2);
+      const { service, prisma } = createService({
+        governanceRole: {
+          findMany: owners([{ scopeType: 'ASSET', scopeId: 'asset-1' }]),
+          count: jest.fn().mockResolvedValue(0),
+        },
+        asset: { count: assetCount },
+      });
+
+      await expect(service.assertSourceDeletable('source-1')).rejects.toThrow(
+        '2 asset(s) of this source have an owner',
+      );
+      expect(assetCount).toHaveBeenCalledWith({
+        where: {
+          AND: [
+            { sourceId: 'source-1' },
+            {
+              OR: [
+                { id: { in: ['asset-1'] } },
+                { sourceId: { in: [] } },
+              ],
+            },
+          ],
+        },
+      });
+      expect(prisma.source.delete).not.toHaveBeenCalled();
+    });
+
+    it('deletes a source when nothing in the workspace is owned', async () => {
+      const { service, prisma } = createService();
+      prisma.source.findUnique.mockResolvedValue({ id: 'source-1' });
+      prisma.source.delete.mockResolvedValue({ id: 'source-1' });
+
+      await service.deleteSource({ id: 'source-1' });
+
+      expect(prisma.governanceRole.count).not.toHaveBeenCalled();
+      expect(prisma.source.delete).toHaveBeenCalled();
+    });
+  });
+
   describe('searchSources', () => {
     it('reports a queued run as PENDING even though the source is claimed as RUNNING', async () => {
       const runner = {
@@ -517,6 +585,76 @@ describe('SourceService', () => {
             { lastScannedAt: null },
           ],
         },
+      });
+    });
+
+    it('keeps governed assets and says how many', async () => {
+      const deleteMany = jest.fn().mockResolvedValue({ count: 5 });
+      const assetCount = jest.fn().mockResolvedValue(2);
+      const { service } = createService({
+        source: {
+          findUnique: jest
+            .fn()
+            .mockResolvedValue({ id: 'src-1', type: 'LOCAL_FOLDER' }),
+          updateMany: jest.fn(),
+        },
+        asset: {
+          deleteMany,
+          count: assetCount,
+          findMany: jest.fn().mockResolvedValue([]),
+        },
+        edge: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
+        governanceRole: {
+          findMany: jest
+            .fn()
+            .mockResolvedValue([{ scopeType: 'ASSET', scopeId: 'owned-1' }]),
+        },
+      });
+
+      const result = await service.purgeAssets('src-1');
+
+      const governed = {
+        OR: [{ id: { in: ['owned-1'] } }, { sourceId: { in: [] } }],
+      };
+      expect(assetCount).toHaveBeenCalledWith({
+        where: { AND: [{ sourceId: 'src-1' }, governed] },
+      });
+      expect(deleteMany).toHaveBeenCalledWith({
+        where: { AND: [{ sourceId: 'src-1' }, { NOT: governed }] },
+      });
+      expect(result).toMatchObject({
+        purgedAssets: 5,
+        matchedAssets: 7,
+        keptGoverned: 2,
+      });
+    });
+
+    it('counts governed assets apart in a dry run', async () => {
+      const assetCount = jest
+        .fn()
+        .mockResolvedValueOnce(4) // governed among the matches
+        .mockResolvedValueOnce(10); // purgeable
+      const deleteMany = jest.fn();
+      const { service } = createService({
+        source: {
+          findUnique: jest.fn().mockResolvedValue({ id: 'src-1', type: 'S3' }),
+        },
+        asset: { deleteMany, count: assetCount, findMany: jest.fn() },
+        governanceRole: {
+          findMany: jest
+            .fn()
+            .mockResolvedValue([{ scopeType: 'SOURCE', scopeId: 'src-1' }]),
+        },
+      });
+
+      const result = await service.purgeAssets('src-1', { dryRun: true });
+
+      expect(deleteMany).not.toHaveBeenCalled();
+      expect(result).toMatchObject({
+        purgedAssets: 0,
+        matchedAssets: 14,
+        keptGoverned: 4,
+        dryRun: true,
       });
     });
 

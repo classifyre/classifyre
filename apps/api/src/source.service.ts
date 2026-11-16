@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -13,6 +14,7 @@ import { mergeEncryptedConfigs } from './utils/masked-config.utils';
 import { normalizeSourceConfig } from './utils/source-config-normalizer';
 import { RunnerLogStorageService } from './cli-runner/runner-log-storage.service';
 import { CorrelationJobScheduler } from './correlation/correlation-job-scheduler.service';
+import { governedAssetWhere } from './governance/governance-filter';
 import type {
   PurgeSourceAssetsQueryDto,
   PurgeSourceAssetsResponseDto,
@@ -289,6 +291,40 @@ export class SourceService {
     });
   }
 
+  /**
+   * Refuse to delete a governed source (GOV §4): one with an open owner, or
+   * with an asset that has one. Deleting it would hard-delete governed
+   * assets; their owners are removed first, deliberately, on the Governance
+   * tab. Callers check before anything else (a schedule removed, logs gone).
+   */
+  async assertSourceDeletable(sourceId: string): Promise<void> {
+    const governed = await governedAssetWhere(this.prisma);
+    if (!governed) return;
+    const [sourceOwners, assets] = await Promise.all([
+      this.prisma.governanceRole.count({
+        where: {
+          scopeType: 'SOURCE',
+          scopeId: sourceId,
+          role: 'OWNER',
+          dateOut: null,
+        },
+      }),
+      this.prisma.asset.count({ where: { AND: [{ sourceId }, governed] } }),
+    ]);
+    if (sourceOwners > 0) {
+      throw new ConflictException(
+        'This source has an owner, so it and its assets are governed and are ' +
+          'never deleted. Remove the owner on its Governance tab first.',
+      );
+    }
+    if (assets > 0) {
+      throw new ConflictException(
+        `${assets} asset(s) of this source have an owner, so they are governed ` +
+          'and are never deleted. Remove their owners on their Governance tabs first.',
+      );
+    }
+  }
+
   async deleteSource(where: Prisma.SourceWhereUniqueInput): Promise<Source> {
     const existing = await this.prisma.source.findUnique({
       where,
@@ -298,6 +334,7 @@ export class SourceService {
     if (!sourceId) {
       return this.prisma.source.delete({ where });
     }
+    await this.assertSourceDeletable(sourceId);
 
     const sourceRunners = await this.prisma.runner.findMany({
       where: { sourceId },
@@ -446,13 +483,6 @@ export class SourceService {
   }
 
   /**
-   * Permanently delete every asset of a source. Findings, extractions,
-   * correlation values, signatures, cluster memberships and chunks all
-   * cascade via FK (onDelete: Cascade from Asset). Correlation fingerprints
-   * are derived from findings, so a full background recompute is scheduled
-   * afterwards.
-   */
-  /**
    * Retire a source's assets — all of them, or the subset a predicate names.
    *
    * The predicate exists because "the connector no longer produces this" has no
@@ -471,6 +501,12 @@ export class SourceService {
    * `dryRun` answers "what would this take with it" before anything is
    * destroyed, which is the difference between a usable predicate and a loaded
    * gun. With no predicate the behaviour is the original: everything.
+   *
+   * Deleted for good: findings, extractions, correlation values, signatures,
+   * cluster memberships and chunks cascade via FK, and the correlation
+   * fingerprints are recomputed in the background. Governed assets (GOV §4,
+   * an owner on them or their source) are never purged: they are kept and
+   * counted in `keptGoverned`.
    */
   async purgeAssets(
     sourceId: string,
@@ -484,14 +520,28 @@ export class SourceService {
       throw new NotFoundException(`Source with ID ${sourceId} not found`);
     }
 
-    const { where, applied } = this.buildPurgeWhere(sourceId, predicate);
+    const { where: matching, applied } = this.buildPurgeWhere(
+      sourceId,
+      predicate,
+    );
     const dryRun = predicate?.dryRun === true;
 
+    // Governed assets (an owner on them or their source) are never purged:
+    // they stay, and the response says how many.
+    const governed = await governedAssetWhere(this.prisma);
+    const keptGoverned = governed
+      ? await this.prisma.asset.count({ where: { AND: [matching, governed] } })
+      : 0;
+    const where: Prisma.AssetWhereInput = governed
+      ? { AND: [matching, { NOT: governed }] }
+      : matching;
+
     if (dryRun) {
-      const matched = await this.prisma.asset.count({ where });
+      const purgeable = await this.prisma.asset.count({ where });
       return {
         purgedAssets: 0,
-        matchedAssets: matched,
+        matchedAssets: purgeable + keptGoverned,
+        keptGoverned,
         dryRun: true,
         predicate: applied,
       };
@@ -550,9 +600,16 @@ export class SourceService {
 
     await this.correlationJobs.scheduleFull('source assets purged');
 
+    if (keptGoverned > 0) {
+      this.logger.warn(
+        `Kept ${keptGoverned} governed asset(s) of source ${sourceId}.`,
+      );
+    }
+
     return {
       purgedAssets: result.count,
-      matchedAssets: result.count,
+      matchedAssets: result.count + keptGoverned,
+      keptGoverned,
       dryRun: false,
       predicate: applied,
     };

@@ -1159,7 +1159,8 @@
       "title": "Quelle löschen?",
       "cannotUndo": "Diese Aktion kann nicht rückgängig gemacht werden.",
       "permanentTitle": "Dauerhafte Entfernung",
-      "permanentBody": "Durch das Löschen dieser Quelle werden die Quelle, alle zugehörigen Assets und alle Befunde dauerhaft entfernt."
+      "permanentBody": "Durch das Löschen dieser Quelle werden die Quelle, alle zugehörigen Assets und alle Befunde dauerhaft entfernt.",
+      "governed": "Eine Quelle mit Owner, oder mit Assets, die einen haben, ist verwaltet und kann nicht gelöscht werden: Entfernen Sie zuerst die Owner."
     },
     "typeRequired": "Quellentyp ist erforderlich",
     "nameRequired": "Quellenname ist erforderlich",
@@ -1414,13 +1415,15 @@
     },
     "purgeAssets": {
       "button": "Assets bereinigen",
-      "title": "Alle Assets endgültig löschen?",
-      "cannotUndo": "Dies löscht alle Assets dieser Quelle samt ihrer Findings unwiderruflich.",
+      "title": "Assets endgültig löschen?",
+      "cannotUndo": "Dies löscht die nicht verwalteten Assets dieser Quelle samt ihrer Findings unwiderruflich.",
       "permanentTitle": "Endgültige Entfernung",
-      "permanentBody": "Alle Assets dieser Quelle werden endgültig gelöscht — einschließlich extrahiertem Text, Findings, Korrelationsdaten und Chunks. Evidenz-Fingerprints werden im Hintergrund neu berechnet.",
+      "permanentBody": "Diese Assets werden endgültig gelöscht — einschließlich extrahiertem Text, Findings, Korrelationsdaten und Chunks. Evidenz-Fingerprints werden im Hintergrund neu berechnet.",
       "confirm": "Assets löschen",
       "success": "Assets bereinigt",
-      "failed": "Assets konnten nicht bereinigt werden"
+      "failed": "Assets konnten nicht bereinigt werden",
+      "successKept": "{{purged}} Assets gelöscht. {{kept}} verwaltete Assets wurden behalten.",
+      "governedKept": "Verwaltete Assets – mit einem Owner, oder deren Quelle einen hat – bleiben erhalten: Sie werden nie gelöscht."
     },
     "schedule": {
       "resumed": "Automatische Scans fortgesetzt."
@@ -7108,6 +7111,9 @@
           "update": "Spalte beschrieben",
           "move": "Spaltenangaben verschoben",
           "remove": "Spaltenangaben entfernt"
+        },
+        "rows": {
+          "update": "Zeilenfilter geändert"
         }
       },
       "data-connections": {
@@ -7125,6 +7131,12 @@
       },
       "query-runs": {
         "read-table": "Tabelle gelesen"
+      },
+      "data-access-requests": {
+        "create": "Zugriff angefragt",
+        "approve": "Zugriffsanfrage zugestimmt",
+        "deny": "Zugriffsanfrage abgelehnt",
+        "withdraw": "Zugriffsanfrage zurückgezogen"
       }
     }
   },
@@ -7330,9 +7342,9 @@
     "openInQueryHint": "Diese Abfrage auf der SQL-Seite öffnen",
     "assetTab": "Daten",
     "assetLockedTitle": "Kein Datenzugriff",
-    "assetLocked": "Sie sehen diese Tabelle, aber nicht ihre Zeilen. Ein Admin des Arbeitsbereichs kann Ihrer Gruppe die Rolle Datenleser für diese Tabelle oder ihre Quelle geben.",
+    "assetLocked": "Sie sehen diese Tabelle, aber nicht ihre Zeilen. Fragen Sie mit „Zugriff anfragen“ beim Eigentümer an, oder ein Admin des Arbeitsbereichs gibt Ihrer Gruppe die Rolle Datenleser für diese Tabelle oder ihre Quelle.",
     "sourceTables": "{{count}} von {{total}} Tabellen abfragbar",
-    "sourceLocked": "Sie dürfen keine Tabelle von {{name}} abfragen. Ein Admin des Arbeitsbereichs kann Ihrer Gruppe die Rolle Datenleser für die Quelle oder ihre Tabellen geben.",
+    "sourceLocked": "Sie dürfen keine Tabelle von {{name}} abfragen. Fragen Sie mit „Zugriff anfragen“ beim Eigentümer an, oder ein Admin des Arbeitsbereichs gibt Ihrer Gruppe die Rolle Datenleser für die Quelle oder ihre Tabellen.",
     "explorer": {
       "tables": "Tabellen",
       "history": "Verlauf",
@@ -7623,6 +7635,7 @@
       "access": "Zugriff",
       "accessDefault": "Der Klassifizierung folgen ({{value}})",
       "accessHint": "Was Personen sehen, die diese Tabelle abfragen dürfen. Eigentümer, Stewards und Personen mit „Datenleser, unmaskiert“ lesen sie im Klartext.",
+      "accessNeedsClear": "Mehr von dieser Spalte zu zeigen als bisher setzt voraus, dass Sie sie im Klartext lesen: „Datenleser, unmaskiert“ auf dieser Tabelle oder ihrer Quelle, oder die Rolle Eigentümer oder Steward.",
       "maskKind": "Angezeigt als",
       "maskKindDefault": "Standard (geschwärzt)"
     },
@@ -7696,7 +7709,9 @@
       "quality": "Qualität",
       "qualityDesc": "Regeln und Ergebnisse",
       "access": "Zugriff",
-      "accessDesc": "Wer es aus BI-Werkzeugen liest, über welche Verbindung; Zugang hier vergeben oder sperren."
+      "accessDesc": "Wer es aus BI-Werkzeugen liest, über welche Verbindung; Zugang hier vergeben oder sperren.",
+      "rows": "Zeilen",
+      "rowsDesc": "Welche Zeilen wer sieht"
     },
     "meaning": {
       "title": "Bedeutung",
@@ -7842,7 +7857,7 @@
     },
     "contract": {
       "title": "Datenvertrag",
-      "description": "Dieses Asset als Open-Data-Contract-Standard-Vertrag (ODCS v3.2): Beschreibung, Team, Spalten und Qualitätsregeln. Einen anwenden, um sie auszufüllen.",
+      "description": "Dieses Asset als Open-Data-Contract-Standard-Vertrag (ODCS v3.2): Beschreibung, Team, Spalten mit ihrem Zugriff (lesbar, maskiert, ausgeblendet) und Qualitätsregeln. Einen anwenden, um sie auszufüllen.",
       "yaml": "YAML herunterladen",
       "json": "JSON herunterladen",
       "import": "Vertrag anwenden",
@@ -8168,6 +8183,88 @@
     "inClear": "für andere maskiert oder verborgen; Sie lesen sie im Klartext",
     "hiddenCount": "{{count}} verborgene Spalte(n)",
     "runMasked": "Für Sie maskiert: {{list}}. Personen mit „Datenleser, unmaskiert“ sowie Eigentümer und Stewards der Tabelle lesen sie im Klartext.",
-    "runHidden": "Für Sie verborgen: {{list}}."
+    "runHidden": "{{count}} Spalte(n) für Sie verborgen."
+  },
+  "rowFilters": {
+    "title": "Zeilen",
+    "lead": "Welche Zeilen jede lesende Person sieht. Aus: Wer die Tabelle abfragen darf, sieht alle Zeilen. An: Man sieht nur die Zeilen, die eine Regel für einen auswählt, ohne Regel keine. Eigentümer und Stewards sehen immer alle Zeilen.",
+    "enabled": "Zeilen filtern",
+    "off": "Alle Lesenden sehen alle Zeilen.",
+    "onReadOnly": "Zeilen sind gefiltert: Jede lesende Person sieht nur die für sie freigegebenen Zeilen. Eigentümer und Stewards pflegen die Regeln.",
+    "noRules": "Noch keine Regeln: Außer Eigentümer und Stewards sieht niemand eine Zeile.",
+    "addRule": "Regel hinzufügen",
+    "for": "Für",
+    "aGroup": "Eine Gruppe",
+    "everyone": "Alle, die abfragen dürfen",
+    "pickGroup": "Gruppe wählen",
+    "removeRule": "Regel entfernen",
+    "everyRowRule": "Keine Bedingung: alle Zeilen.",
+    "andLabel": "und",
+    "column": "Spalte",
+    "op": {
+      "in": "ist eines von",
+      "not_in": "ist keines von"
+    },
+    "values": "Werte, durch Kommas getrennt",
+    "removeCondition": "Bedingung entfernen",
+    "addCondition": "Bedingung hinzufügen",
+    "save": "Zeilen speichern",
+    "saved": "Zeilenfilter gespeichert",
+    "saveFailed": "Zeilenfilter konnte nicht gespeichert werden",
+    "onlyEveryRow": "Sie sehen selbst nur einen Teil der Zeilen: Sie können das Filtern einschalten und Regeln entfernen. Lesenden mehr zu zeigen (aus, eine neue oder weitere Regel) ist Sache von Eigentümer oder Steward.",
+    "runFiltered": "Für Sie gefilterte Zeilen: {{list}}.",
+    "andJoin": " und ",
+    "orJoin": "; oder ",
+    "noneShared": "keine Zeilen für Sie freigegeben",
+    "tableFiltered": "Für Sie gefilterte Zeilen: {{rows}}"
+  },
+  "accessRequests": {
+    "request": "Zugriff anfragen",
+    "requestUnmasked": "Klartext anfragen",
+    "title": "Zugriff auf {{name}} anfragen",
+    "lead": "Sagen Sie, wofür und wie lange Sie ihn brauchen. {{who}} entscheidet; eine Zustimmung gibt einer Ihrer Gruppen die Rolle Datenleser darauf bis zum Enddatum.",
+    "admins": "Die Admins des Arbeitsbereichs",
+    "group": "Für welche Ihrer Gruppen",
+    "groupHint": "Zugriff geht an Gruppen: Alle in der gewählten Gruppe können es abfragen.",
+    "noGroups": "Sie sind in keiner Gruppe, und Zugriff geht an Gruppen. Bitten Sie einen Admin, Sie in eine aufzunehmen.",
+    "role": "Zugriff",
+    "roles": {
+      "data-reader": "Datenleser (maskierte Spalten bleiben maskiert)",
+      "data-reader-unmasked": "Datenleser, unmaskiert (Spalten im Klartext)"
+    },
+    "days": "Für wie viele Tage",
+    "reason": "Wofür Sie ihn brauchen",
+    "reasonHint": "Mindestens 10 Zeichen. Wer entscheidet, liest das.",
+    "send": "Anfrage senden",
+    "sent": "Anfrage an {{who}} gesendet",
+    "sendFailed": "Anfrage konnte nicht gesendet werden",
+    "pending": "Angefragt am {{date}}; wartet auf {{who}}.",
+    "withdraw": "Zurückziehen",
+    "withdrawn": "Anfrage zurückgezogen",
+    "listTitle": "Zugriffsanfragen",
+    "listLead": "Personen, die das abfragen möchten. Eine Zustimmung gibt der genannten Gruppe eine befristete Datenleser-Berechtigung darauf.",
+    "settingsLead": "Anfragen in diesem Arbeitsbereich, die auf Sie warten. Zuerst entscheidet der Eigentümer einer Tabelle, ohne Eigentümer die Stewards; Sie können jede entscheiden.",
+    "none": "Keine Anfragen.",
+    "status": {
+      "PENDING": "Wartet",
+      "APPROVED": "Zugestimmt",
+      "DENIED": "Abgelehnt",
+      "WITHDRAWN": "Zurückgezogen"
+    },
+    "asks": "{{who}} fragt für {{group}} an",
+    "forDays": "{{role}} für {{days}} Tage",
+    "decidedBy": "Entschieden von {{who}} am {{date}}",
+    "until": "bis {{date}}",
+    "approve": "Zustimmen",
+    "deny": "Ablehnen",
+    "approveTitle": "Zugriff für {{group}} zustimmen",
+    "approveLead": "{{group}} erhält {{role}} auf {{name}} bis {{date}}. Alle in der Gruppe können es abfragen.",
+    "giveMasked": "Stattdessen Datenleser geben: maskierte Spalten bleiben maskiert",
+    "note": "Notiz für die anfragende Person (optional)",
+    "denyTitle": "Anfrage ablehnen",
+    "denyNote": "Warum (die anfragende Person liest das)",
+    "approved": "Zugestimmt: Zugriff bis {{date}}",
+    "denied": "Anfrage abgelehnt",
+    "decideFailed": "Anfrage konnte nicht entschieden werden"
   }
 }
