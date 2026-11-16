@@ -211,6 +211,11 @@
       "description": "Create your own SQL connections for BI tools and drivers (PostgreSQL protocol)."
     },
     {
+      "id": "dataset.publish",
+      "scope": "workspace",
+      "description": "Share a query over tables you can read as a dataset other groups read without access to those tables."
+    },
+    {
       "id": "data.connection.manage",
       "scope": "workspace",
       "description": "See, give and revoke the SQL connections of everyone in the workspace."
@@ -394,6 +399,7 @@
         "data.export",
         "data.query",
         "data.connect",
+        "dataset.publish",
         "data.connection.manage",
         "mcp.token.own",
         "mcp.token.admin"
@@ -417,6 +423,15 @@
         "data.query",
         "data.connect",
         "data.unmask",
+        "notification.view"
+      ]
+    },
+    {
+      "key": "dataset-publisher",
+      "title": "Dataset publisher",
+      "scope": "workspace",
+      "capabilities": [
+        "dataset.publish",
         "notification.view"
       ]
     },
@@ -475,6 +490,7 @@
         "data.export",
         "data.query",
         "data.connect",
+        "dataset.publish",
         "data.connection.manage",
         "mcp.token.own",
         "mcp.token.admin"
@@ -539,6 +555,7 @@
         "data.query",
         "data.unmask",
         "data.connect",
+        "dataset.publish",
         "data.connection.manage",
         "mcp.token.own",
         "mcp.token.admin",

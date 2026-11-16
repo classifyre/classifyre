@@ -20,6 +20,13 @@ import {
     ColumnFindingGroupDtoToJSON,
     ColumnFindingGroupDtoToJSONTyped,
 } from './ColumnFindingGroupDto';
+import type { InheritedColumnDto } from './InheritedColumnDto';
+import {
+    InheritedColumnDtoFromJSON,
+    InheritedColumnDtoFromJSONTyped,
+    InheritedColumnDtoToJSON,
+    InheritedColumnDtoToJSONTyped,
+} from './InheritedColumnDto';
 import type { ColumnAccessDto } from './ColumnAccessDto';
 import {
     ColumnAccessDtoFromJSON,
@@ -143,6 +150,12 @@ export interface AssetColumnDto {
      * @memberof AssetColumnDto
      */
     updatedBy?: string | null;
+    /**
+     * Set on a shared dataset’s columns: what its inputs give it.
+     * @type {InheritedColumnDto}
+     * @memberof AssetColumnDto
+     */
+    inherited?: InheritedColumnDto;
 }
 
 
@@ -248,6 +261,7 @@ export function AssetColumnDtoFromJSONTyped(json: any, ignoreDiscriminator: bool
         'reviewedBy': json['reviewedBy'] == null ? undefined : json['reviewedBy'],
         'updatedAt': json['updatedAt'] == null ? undefined : (new Date(json['updatedAt'])),
         'updatedBy': json['updatedBy'] == null ? undefined : json['updatedBy'],
+        'inherited': json['inherited'] == null ? undefined : InheritedColumnDtoFromJSON(json['inherited']),
     };
 }
 
@@ -279,6 +293,7 @@ export function AssetColumnDtoToJSONTyped(value?: AssetColumnDto | null, ignoreD
         'reviewedBy': value['reviewedBy'],
         'updatedAt': value['updatedAt'] == null ? value['updatedAt'] : value['updatedAt'].toISOString(),
         'updatedBy': value['updatedBy'],
+        'inherited': InheritedColumnDtoToJSON(value['inherited']),
     };
 }
 

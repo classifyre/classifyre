@@ -6,6 +6,7 @@ import { DataQueryController } from './data-query.controller';
 import { QueryCatalogService } from './query-catalog.service';
 import { QueryRunService } from './query-run.service';
 import { SavedQueriesService } from './saved-queries.service';
+import { SharedDatasetResolver } from './shared-dataset-resolver';
 
 /** SQL over the tables of a workspace (docs/prd/DQ-data-query.md). */
 @Module({
@@ -17,7 +18,13 @@ import { SavedQueriesService } from './saved-queries.service';
     QueryCatalogService,
     QueryRunService,
     SavedQueriesService,
+    SharedDatasetResolver,
   ],
-  exports: [QueryCatalogService, QueryRunService, SavedQueriesService],
+  exports: [
+    QueryCatalogService,
+    QueryRunService,
+    SavedQueriesService,
+    SharedDatasetResolver,
+  ],
 })
 export class DataQueryModule {}

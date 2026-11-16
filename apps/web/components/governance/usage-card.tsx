@@ -116,7 +116,7 @@ export function UsageCard({
                   list: usage.byChannel
                     .map(
                       (item) =>
-                        `${t(`governance.usage.channel.${asAuditChannel(item.channel)}`)} ${item.reads + item.exports}`,
+                        `${t(item.channel === "dataset" ? "governance.usage.channel.dataset" : `governance.usage.channel.${asAuditChannel(item.channel)}`)} ${item.reads + item.exports}`,
                     )
                     .join(" · "),
                 })}

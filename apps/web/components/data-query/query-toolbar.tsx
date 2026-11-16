@@ -5,6 +5,7 @@ import {
   BookmarkPlus,
   Loader2,
   Play,
+  Share2,
   Square,
   WandSparkles,
 } from "lucide-react";
@@ -43,6 +44,8 @@ export function QueryToolbar({
   onStop,
   onFormat,
   onSave,
+  onShare,
+  shareLabel,
 }: {
   busy: boolean;
   canRun: boolean;
@@ -53,6 +56,9 @@ export function QueryToolbar({
   onStop: () => void;
   onFormat: () => void;
   onSave: () => void;
+  /** Share the query as a dataset (DQ §5.12), for whoever may. */
+  onShare?: () => void;
+  shareLabel?: string;
 }) {
   const { t } = useTranslation();
   const timings = run?.timings ?? undefined;
@@ -91,6 +97,18 @@ export function QueryToolbar({
         <BookmarkPlus className="mr-1.5 h-3.5 w-3.5" />
         {t("dataQuery.explorer.save")}
       </Button>
+      {onShare && (
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={onShare}
+          disabled={!canRun}
+          data-testid="share-dataset"
+        >
+          <Share2 className="mr-1.5 h-3.5 w-3.5" />
+          {shareLabel ?? t("sharedDatasets.share.button")}
+        </Button>
+      )}
       <span className="hidden text-[11px] text-muted-foreground lg:inline">
         {t("dataQuery.shortcut")}
       </span>

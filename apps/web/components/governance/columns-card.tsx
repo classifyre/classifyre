@@ -45,6 +45,7 @@ import {
   type StatusTone,
 } from "@workspace/ui/components";
 import { useTranslation } from "@/hooks/use-translation";
+import { InheritedTag } from "@/components/shared-datasets/inherited-tag";
 import type { TranslationKey } from "@/i18n";
 import { extractApiErrorMessage } from "@/lib/extract-api-error-message";
 import type { LookupHit } from "@/lib/semantic-api";
@@ -525,6 +526,15 @@ export function ColumnsCard({
                   </TableCell>
                   <TableCell>
                     <ClassificationChip column={column} />
+                    {column.inherited?.floor && (
+                      <div className="mt-1">
+                        <InheritedTag
+                          floor={column.inherited.floor}
+                          from={column.inherited.from}
+                          traced={column.inherited.traced}
+                        />
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell>
                     <ColumnAccessChip

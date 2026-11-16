@@ -914,3 +914,185 @@ def test_odbc_missing_driver_is_explained() -> None:
         RuntimeError("[unixODBC][Driver Manager]Can't open lib 'X' : not found")
     )
     assert reason is not None and "driver" in reason
+
+
+# ── Shared datasets (docs/prd/DQ-data-query.md §5.12) ──────────────────
+
+DATASET_SQL = (
+    "SELECT c.id, c.country, sum(o.amount) AS total FROM files.local.customers c "
+    "JOIN files.local.orders o ON o.customer_id = c.id GROUP BY c.id, c.country"
+)
+
+
+def _dataset_request(
+    folder: Path,
+    sql: str,
+    *,
+    group_masks: list[dict[str, Any]] | None = None,
+    group_rows: Any = None,
+    reader_masks: list[dict[str, Any]] | None = None,
+    reader_rows: Any = None,
+    reader_tables: bool = False,
+) -> dict[str, Any]:
+    """A reader's request naming ``shared.sales.by_customer``: its inputs come
+    with the owning group's masks and rows; the reader's own tables only when
+    ``reader_tables``."""
+    base = _request(folder, sql, maskSalt="salt-1")
+    inputs = [dict(t) for t in base["tables"]]
+    if group_masks:
+        inputs[0]["columns"] = group_masks
+    if group_rows is not None:
+        inputs[0]["rows"] = group_rows
+    dataset: dict[str, Any] = {
+        "source": "shared",
+        "schema": "sales",
+        "table": "by_customer",
+        "location": {"kind": "dataset"},
+        "dataset": {"sql": DATASET_SQL, "inputs": inputs},
+        "knownColumns": ["id", "country", "total"],
+    }
+    if reader_masks:
+        dataset["columns"] = reader_masks
+    if reader_rows is not None:
+        dataset["rows"] = reader_rows
+    base["tables"] = [dataset, *(base["tables"] if reader_tables else [])]
+    return base
+
+
+def test_dataset_reads_its_inputs_without_the_reader_naming_them(folder: Path) -> None:
+    payload, result = run_query(
+        _dataset_request(
+            folder,
+            "SELECT country, sum(total) AS t FROM shared.sales.by_customer GROUP BY 1 ORDER BY 1",
+        )
+    )
+    rows = _rows(payload, result)
+    assert [r["country"] for r in rows] == ["AT", "DE", "FR"]
+    assert sum(r["t"] for r in rows) == sum(i * 2 for i in range(300))
+    assert payload["tables"] == ["shared.sales.by_customer"]
+
+
+def test_reader_cannot_name_the_datasets_inputs(folder: Path) -> None:
+    for sql in (
+        "SELECT * FROM files.local.customers",
+        'SELECT * FROM "__ds_0".main.t0',
+    ):
+        payload, _ = run_query(_dataset_request(folder, sql))
+        assert payload["status"] == "error"
+        assert payload["error"]["code"] in {"table_not_available", "table_name_required"}
+
+
+def test_inputs_are_masked_for_the_owning_group(folder: Path) -> None:
+    payload, result = run_query(
+        _dataset_request(
+            folder,
+            "SELECT DISTINCT country FROM shared.sales.by_customer",
+            group_masks=[{"column": "country", "action": "mask", "mask": "redact"}],
+        )
+    )
+    assert _rows(payload, result) == [{"country": "****"}]
+
+
+def test_inputs_are_filtered_for_the_owning_group(folder: Path) -> None:
+    rows = {"anyOf": [[{"column": "country", "op": "in", "values": ["AT"]}]]}
+    payload, result = run_query(
+        _dataset_request(
+            folder, "SELECT DISTINCT country FROM shared.sales.by_customer", group_rows=rows
+        )
+    )
+    assert _rows(payload, result) == [{"country": "AT"}]
+
+
+def test_reader_masks_and_rows_apply_on_the_output(folder: Path) -> None:
+    payload, result = run_query(
+        _dataset_request(
+            folder,
+            "SELECT DISTINCT country FROM shared.sales.by_customer ORDER BY 1",
+            reader_masks=[{"column": "country", "action": "mask", "mask": "hash"}],
+            reader_rows={"anyOf": [[{"column": "country", "op": "in", "values": ["DE"]}]]},
+        )
+    )
+    rows = _rows(payload, result)
+    # Filtered on the output's own values, then hashed: one hashed country.
+    assert len(rows) == 1 and rows[0]["country"] not in {"AT", "DE", "FR"}
+
+
+def test_output_column_not_recorded_is_hidden(folder: Path) -> None:
+    request = _dataset_request(
+        folder,
+        "SELECT * FROM shared.sales.by_customer LIMIT 1",
+        reader_masks=[{"column": "total", "action": "mask", "mask": "null"}],
+    )
+    request["tables"][0]["knownColumns"] = ["id", "total"]
+    payload, result = run_query(request)
+    assert list(_rows(payload, result)[0]) == ["id", "total"]
+
+
+def test_dataset_joins_with_the_readers_own_tables(folder: Path) -> None:
+    payload, result = run_query(
+        _dataset_request(
+            folder,
+            "SELECT count(*) AS n FROM shared.sales.by_customer d "
+            "JOIN files.local.customers c ON c.id = d.id",
+            group_masks=[{"column": "country", "action": "mask", "mask": "redact"}],
+            reader_tables=True,
+        )
+    )
+    assert _rows(payload, result) == [{"n": 30}]
+
+
+def test_dataset_sql_is_gated_against_its_inputs(folder: Path) -> None:
+    request = _dataset_request(folder, "SELECT * FROM shared.sales.by_customer")
+    request["tables"][0]["dataset"]["sql"] = "SELECT * FROM read_csv('/etc/passwd')"
+    payload, _ = run_query(request)
+    assert payload["status"] == "error"
+    assert payload["error"]["code"] == "function_not_allowed"
+
+
+def test_describe_returns_columns_and_lineage(folder: Path) -> None:
+    payload, result = run_query(_request(folder, DATASET_SQL, describe=True))
+    assert payload["status"] == "success" and result is None
+    described = payload["describe"]
+    assert [c["name"] for c in described["columns"]] == ["id", "country", "total"]
+    by_table = {entry["table"]: entry["fields"] for entry in described["lineage"]}
+    customers = {f["downstream"]: f for f in by_table["files.local.customers"]}
+    assert customers["country"]["upstreams"] == ["country"]
+    assert customers["country"]["type"] == "IDENTITY"
+    orders = {f["downstream"]: f for f in by_table["files.local.orders"] if f["downstream"]}
+    assert orders["total"]["upstreams"] == ["amount"]
+    assert orders["total"]["type"] == "AGGREGATED"
+
+
+def test_describe_expands_star_and_unqualified_join_columns(folder: Path) -> None:
+    payload, _ = run_query(
+        _request(
+            folder,
+            "SELECT *, amount FROM files.local.customers JOIN files.local.orders "
+            "ON customer_id = id",
+            describe=True,
+        )
+    )
+    by_table = {entry["table"]: entry["fields"] for entry in payload["describe"]["lineage"]}
+    customers = {f["downstream"] for f in by_table["files.local.customers"] if f["downstream"]}
+    orders = {f["downstream"] for f in by_table["files.local.orders"] if f["downstream"]}
+    assert customers == {"id", "country"}
+    assert {"oid", "customer_id", "amount"} <= orders
+
+
+def test_dataset_without_masks_still_hides_unrecorded_columns(folder: Path) -> None:
+    request = _dataset_request(folder, "SELECT * FROM shared.sales.by_customer LIMIT 1")
+    request["tables"][0]["knownColumns"] = ["id", "country"]
+    payload, result = run_query(request)
+    assert list(_rows(payload, result)[0]) == ["id", "country"]
+
+
+def test_describe_marks_columns_no_table_feeds(folder: Path) -> None:
+    payload, _ = run_query(
+        _request(
+            folder,
+            "SELECT c.country, count(*) OVER () AS n, 'x' AS label FROM files.local.customers c",
+            describe=True,
+        )
+    )
+    by_table = {entry["table"]: entry["fields"] for entry in payload["describe"]["lineage"]}
+    assert {f["downstream"] for f in by_table[""]} >= {"n", "label"}

@@ -261,6 +261,53 @@ An AI client connected to Classifyre's [MCP server](/settings/mcp-server) with y
 
 It is the SQL page's own path: your grants, masks, row filters, limits and per-table audit apply, and the reads show in **Activity** as yours, *via* the token. The agent never reads more than you could. Only a token of a signed-in person reads rows; agents running on their own (Autopilot) do not.
 
+## Shared datasets
+
+A **shared dataset** is a query you share with other groups as a dataset of its own: they read the result without any access to the tables behind it. Typical uses are an extract for another department, a reporting table for auditors, or the figures a partner needs — without handing over the raw tables.
+
+It is a saved query, not a copy: every read runs its SQL live. Readers query it like any table, by its name `shared.<domain>.<name>`, on the SQL page, its **Data** tab, in exports, over [SQL connections](/sql-connections) (Power BI, Excel, DBeaver…) and through AI agents.
+
+### Sharing one
+
+1. Write the query on the **SQL** page and choose **Share as dataset**.
+2. Give it a domain and a name (`shared.sales.orders_by_region`) and a description.
+3. Pick its **owning group**, one of yours. The tables are read with that group's access, checked again on every read: if the group loses access to one of them, the dataset stops until it gets it back. You become its owner.
+4. The sheet checks the query: which tables it reads and who answers for them, whether the owning group may read them, and for each column the classification it inherits.
+5. Pick the groups that read it, as **Data reader** or **Data reader, unmasked**, and **Share**.
+
+You may share a dataset with the **Dataset publisher** role (or a role above it, such as Workspace admin), or when you own or steward every table it reads. Either way you must be able to query those tables yourself.
+
+### What it inherits, and what it adds
+
+A shared dataset is an asset like any table, so it has its own owner, stewards, description, certification, quality checks, row filters, access requests, activity and lineage. On top of that, it inherits from the tables it reads, and the stricter rule always wins:
+
+| | Inherited from the tables it reads | Its own |
+| --- | --- | --- |
+| Masks | The tables are read masked as the owning group reads them | Columns can be masked or hidden further |
+| Classification | Each column is at least as strictly classified as the table columns it comes from | Can be raised, never lowered |
+| Rows | The tables' row filters apply to the owning group | Its own row filters apply to readers |
+| Access | The owning group must keep access to every table | Its readers need none |
+| Owner | The tables' owners are told when their table is shared | Its own owner answers for it |
+
+Nobody — not even a tenant admin — can make a column of a shared dataset show more than it inherits; the Columns step says *a shared dataset can make it stricter, never show more*. A column whose origin cannot be traced takes the strictest classification of all the tables it reads; name your columns explicitly to avoid that.
+
+### Badges
+
+- **Promoted**: its owner or a steward says it is ready to use.
+- **Certified**: it went through governance (the lifecycle on its Governance tab).
+
+### Owners of the tables it reads
+
+When a table you own or steward is read by a new shared dataset, you get a notification. Its **Governance → Access** step lists the shared datasets that read it, with how often they were read, and **Block** stops one from reading your table until you lift the block; its owner is told. Reads through a shared dataset show in your table's Activity and Usage (*through shared datasets*).
+
+### Its page
+
+- **Definition**: the SQL, its columns with where each comes from and what it inherits, and every version. Its owner and stewards **Edit on the SQL page**; saving makes a new version.
+- **Connections**: lineage from the tables it reads, down to each column.
+- **Data**, **Governance**, **Activity**: as for any table.
+
+All shared datasets are listed on the **Shared datasets** page. Everyone who can see assets finds them there; a locked one leads to **Request access**, which its owner decides.
+
 ## Settings
 
 **Settings → General → SQL over tables**, for people who can change workspace settings:
@@ -274,4 +321,4 @@ It is the SQL page's own path: your grants, masks, row filters, limits and per-t
 ## Coming next
 
 - Rows filtered by who the reader is (their own department or region from the directory), not only by the groups a rule names.
-- Publishing a query that joins several tables as a Delta table of its own, which can be shared without sharing the tables it reads.
+- Shared datasets refreshed on a schedule into storage of the workspace (Parquet, later Delta), and shared outside the organisation (partners, open data portals).

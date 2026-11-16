@@ -23,6 +23,7 @@ import { OwnershipCard } from "./ownership-card";
 import { QualityStep } from "./quality-step";
 import { ContractCard } from "./contract-card";
 import { AccessCard } from "./access-card";
+import { DatasetUsesCard } from "@/components/shared-datasets/dataset-cards";
 import { RowsCard } from "./rows-card";
 import { AccessRequestsCard } from "./access-requests-card";
 import { GovernanceBadge } from "./governance-badge";
@@ -58,6 +59,7 @@ export function AssetGovernanceView({
   isTable,
   reloadAll,
   sourceHref,
+  extraSteps = [],
 }: {
   governance: AssetGovernanceDto | null;
   loading: boolean;
@@ -73,6 +75,8 @@ export function AssetGovernanceView({
   /** Re-read governance, columns and quality (after a contract import). */
   reloadAll: () => void;
   sourceHref?: string;
+  /** Steps of its own kind, after Ownership (a shared dataset's Inputs, DQ §5.12). */
+  extraSteps?: GovernanceStep[];
 }) {
   const { t } = useTranslation();
   const [jump, setJump] = useState<{ id: string; at: number } | null>(null);
@@ -135,6 +139,7 @@ export function AssetGovernanceView({
         />
       ),
     },
+    ...extraSteps,
     {
       id: "description",
       title: t("governance.steps.description"),
@@ -228,6 +233,7 @@ export function AssetGovernanceView({
                     name: t("sqlConnections.thisTable"),
                   }}
                 />
+                <DatasetUsesCard scopeType="asset" scopeId={assetId} />
               </div>
             ),
           },

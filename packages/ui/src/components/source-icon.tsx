@@ -43,6 +43,7 @@ import {
   Mail,
   Monitor,
   Settings,
+  Share2,
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { simpleIconComponent } from "./simple-icon";
@@ -269,6 +270,8 @@ export const SOURCE_ICON_BY_TYPE = {
   ...SOURCE_ICON_BY_INGESTION_TYPE,
   ...SOURCE_ICON_BY_INGESTION_TYPE_LOWERCASE,
   CUSTOM: Settings,
+  // The built-in source of shared datasets (docs/prd/DQ-data-query.md §5.12).
+  SHARED_DATASET: Share2,
   filesystem: Folder,
   github: simpleIconComponent(siGithub),
   s3: Cloud,

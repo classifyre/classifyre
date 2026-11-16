@@ -1260,6 +1260,12 @@ export class CliRunnerService {
         const { source, previousSourceState, hasSuccessfulRuns } =
           await this.claimSourceForRunnerCreation(tx, sourceId);
 
+        if (source.type === AssetType.SHARED_DATASET) {
+          // Built in (docs/prd/DQ-data-query.md §5.12): nothing to scan.
+          throw new BadRequestException(
+            'Shared datasets are saved queries: there is nothing to scan.',
+          );
+        }
         if (source.type === AssetType.SANDBOX) {
           const uploadedFileCount = await tx.uploadedSourceFile.count({
             where: { sourceId },

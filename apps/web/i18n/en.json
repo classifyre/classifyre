@@ -177,6 +177,7 @@
     "findings": "Findings",
     "assets": "Assets",
     "query": "SQL",
+    "sharedDatasets": "Shared datasets",
     "sources": "Sources",
     "detectors": "Custom Detectors",
     "investigations": "Investigations",
@@ -7137,6 +7138,14 @@
         "approve": "Access request approved",
         "deny": "Access request declined",
         "withdraw": "Access request withdrawn"
+      },
+      "shared-datasets": {
+        "create": "Dataset shared",
+        "update": "Dataset changed (new version)",
+        "promote": "Dataset promoted",
+        "unpromote": "Dataset no longer promoted",
+        "block": "Dataset blocked by a table it reads",
+        "unblock": "Dataset block lifted"
       }
     }
   },
@@ -7654,7 +7663,8 @@
       "channel": {
         "rest": "the app",
         "mcp": "MCP",
-        "sql": "SQL connections"
+        "sql": "SQL connections",
+        "dataset": "shared datasets"
       }
     },
     "page": {
@@ -8266,5 +8276,126 @@
     "approved": "Approved: access until {{date}}",
     "denied": "Request declined",
     "decideFailed": "Could not decide the request"
+  },
+  "sharedDatasets": {
+    "badge": "Shared dataset",
+    "promoted": "Promoted",
+    "allDatasets": "All shared datasets",
+    "definitionTab": "Definition",
+    "activityTab": "Activity",
+    "state": {
+      "live": "Live",
+      "blocked": "Blocked",
+      "unavailable": "Cannot be read",
+      "retired": "Retired"
+    },
+    "page": {
+      "title": "Shared datasets",
+      "lead": "Saved queries shared with groups as governed datasets. Readers need no access to the tables behind them; the tables' masks and classification carry over.",
+      "new": "New shared dataset",
+      "search": "Search by name, description or group",
+      "emptyTitle": "No shared datasets yet",
+      "emptyLead": "Write a query on the SQL page and choose Share as dataset.",
+      "dataset": "Dataset",
+      "trust": "Status",
+      "inputs": "Tables",
+      "locked": "You cannot read it yet: open it to request access"
+    },
+    "share": {
+      "button": "Share as dataset",
+      "editButton": "Save as new version of {{name}}",
+      "title": "Share as dataset",
+      "editTitle": "New version of {{name}}",
+      "lead": "Other groups read the result without access to the tables it reads. Masks and classification of those tables carry over and cannot be loosened; their owners are told and can block it.",
+      "whatTitle": "What it is",
+      "domain": "Domain",
+      "name": "Name",
+      "sqlNameHint": "Readers query it as",
+      "description": "Description",
+      "descriptionHint": "What it shows and what it is for. Readers see this first.",
+      "ownTitle": "Who owns it, and what it inherits",
+      "owningGroup": "Owning group",
+      "pickGroup": "Pick a group of yours",
+      "owningGroupHint": "The tables are read with this group's access, checked on every read. You become its owner.",
+      "checking": "Checking the query…",
+      "inputs": "Reads {{count}} table(s)",
+      "youGovern": "You own or steward it",
+      "told": "{{list}} will be told",
+      "ungoverned": "No owner: nobody is told",
+      "groupReads": "group can read",
+      "groupCannot": "group cannot read",
+      "columns": "Columns and what they inherit",
+      "untraced": "Could not trace where {{list}} come(s) from: they take the strictest classification of all tables read. Name those columns explicitly to narrow it.",
+      "floorRule": "A shared dataset can make a column stricter than what it inherits, never show more.",
+      "audienceTitle": "Who reads it",
+      "audiencePlaceholder": "Groups that may read it",
+      "audienceSearch": "Find a group",
+      "audienceEmpty": "No group found",
+      "audienceHint": "Everyone with access to assets can find it; only these groups read it. You can give and remove access later on its Data tab, and others can request it.",
+      "submit": "Share",
+      "saveVersion": "Save version {{version}}",
+      "shared": "{{name}} is shared",
+      "savedVersion": "Version {{version}} saved"
+    },
+    "inherited": {
+      "tag": "From input",
+      "from": "Inherited from {{list}}",
+      "untraced": "Where this column comes from could not be traced: it takes the strictest classification of all tables read",
+      "floorHint": "The least it is guarded: the dataset can be stricter, never looser."
+    },
+    "overview": {
+      "noDescription": "No description yet.",
+      "owner": "Owner",
+      "noOwner": "No owner",
+      "owningGroup": "Owning group",
+      "owningGroupHint": "Its tables are read with this group's access.",
+      "version": "Version",
+      "versionValue": "{{version}}, changed {{date}}",
+      "promoted": "Promoted",
+      "promotedBy": "Promoted by {{name}}",
+      "notPromoted": "Not promoted",
+      "promote": "Promote",
+      "unpromote": "Take back",
+      "reads": "Reads {{count}} table(s)"
+    },
+    "definition": {
+      "title": "Definition",
+      "lead": "The SQL every read runs, live, over its tables as its owning group reads them.",
+      "query": "Query it",
+      "edit": "Edit on the SQL page",
+      "versions": "Versions",
+      "versionsLead": "Every change of the SQL, description or owning group is a version.",
+      "version": "Version {{version}}"
+    },
+    "columns": {
+      "title": "Columns",
+      "lead": "Each column with the table columns it comes from (column lineage) and the classification it inherits.",
+      "name": "Column",
+      "comesFrom": "Comes from",
+      "inherits": "Inherits",
+      "atLeast": "Readers get at least",
+      "readers": "Readers get",
+      "untraced": "not traced"
+    },
+    "inputs": {
+      "step": "Inputs",
+      "stepDesc": "The tables it reads, who answers for them, and whether one blocks it.",
+      "title": "Tables it reads",
+      "lead": "Their owners were told when it was shared and can block it. Their masks and classification carry into its columns.",
+      "answeredBy": "Answered for by {{list}}",
+      "blocks": "Blocks it"
+    },
+    "uses": {
+      "title": "Shared datasets using this",
+      "leadTable": "Saved queries that share columns of this table with other groups. Blocking one stops every read of it until you lift the block.",
+      "leadSource": "Saved queries that share columns of this source's tables with other groups. Blocking one stops every read of it until you lift the block.",
+      "by": "{{owner}} · {{group}}",
+      "reads": "{{count}} read(s) in 30 days",
+      "blocked": "Blocked by {{name}}",
+      "block": "Block",
+      "lift": "Lift block",
+      "reasonHint": "Why (its owner reads this)",
+      "blockConfirm": "Block it"
+    }
   }
 }

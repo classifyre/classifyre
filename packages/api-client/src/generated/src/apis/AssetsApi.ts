@@ -844,7 +844,8 @@ export const SearchAssetsControllerExportAssetsAssetSourceTypeEnum = {
     Athena: 'ATHENA',
     Bigquery: 'BIGQUERY',
     Redshift: 'REDSHIFT',
-    Custom: 'CUSTOM'
+    Custom: 'CUSTOM',
+    SharedDataset: 'SHARED_DATASET'
 } as const;
 export type SearchAssetsControllerExportAssetsAssetSourceTypeEnum = typeof SearchAssetsControllerExportAssetsAssetSourceTypeEnum[keyof typeof SearchAssetsControllerExportAssetsAssetSourceTypeEnum];
 /**
@@ -978,6 +979,7 @@ export const SourceAssetsControllerListSourceAssetsSourceTypesEnum = {
     Athena: 'ATHENA',
     Bigquery: 'BIGQUERY',
     Redshift: 'REDSHIFT',
-    Custom: 'CUSTOM'
+    Custom: 'CUSTOM',
+    SharedDataset: 'SHARED_DATASET'
 } as const;
 export type SourceAssetsControllerListSourceAssetsSourceTypesEnum = typeof SourceAssetsControllerListSourceAssetsSourceTypesEnum[keyof typeof SourceAssetsControllerListSourceAssetsSourceTypesEnum];

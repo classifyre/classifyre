@@ -104,6 +104,7 @@ export const RoleDtoCapabilitiesEnum = {
     DataQuery: 'data.query',
     DataUnmask: 'data.unmask',
     DataConnect: 'data.connect',
+    DatasetPublish: 'dataset.publish',
     DataConnectionManage: 'data.connection.manage',
     McpTokenOwn: 'mcp.token.own',
     McpTokenAdmin: 'mcp.token.admin',

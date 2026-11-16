@@ -177,6 +177,7 @@
     "findings": "Befunde",
     "assets": "Assets",
     "query": "SQL",
+    "sharedDatasets": "Geteilte Datensätze",
     "sources": "Quellen",
     "detectors": "Custom-Detektoren",
     "investigations": "Ermittlungen",
@@ -7137,6 +7138,14 @@
         "approve": "Zugriffsanfrage zugestimmt",
         "deny": "Zugriffsanfrage abgelehnt",
         "withdraw": "Zugriffsanfrage zurückgezogen"
+      },
+      "shared-datasets": {
+        "create": "Datensatz geteilt",
+        "update": "Datensatz geändert (neue Version)",
+        "promote": "Datensatz empfohlen",
+        "unpromote": "Empfehlung zurückgenommen",
+        "block": "Datensatz von einer gelesenen Tabelle gesperrt",
+        "unblock": "Sperre des Datensatzes aufgehoben"
       }
     }
   },
@@ -7654,7 +7663,8 @@
       "channel": {
         "rest": "die App",
         "mcp": "MCP",
-        "sql": "SQL-Verbindungen"
+        "sql": "SQL-Verbindungen",
+        "dataset": "geteilte Datensätze"
       }
     },
     "page": {
@@ -8266,5 +8276,126 @@
     "approved": "Zugestimmt: Zugriff bis {{date}}",
     "denied": "Anfrage abgelehnt",
     "decideFailed": "Anfrage konnte nicht entschieden werden"
+  },
+  "sharedDatasets": {
+    "badge": "Geteilter Datensatz",
+    "promoted": "Empfohlen",
+    "allDatasets": "Alle geteilten Datensätze",
+    "definitionTab": "Definition",
+    "activityTab": "Aktivität",
+    "state": {
+      "live": "Aktiv",
+      "blocked": "Gesperrt",
+      "unavailable": "Nicht lesbar",
+      "retired": "Stillgelegt"
+    },
+    "page": {
+      "title": "Geteilte Datensätze",
+      "lead": "Gespeicherte Abfragen, mit Gruppen als verwaltete Datensätze geteilt. Lesende brauchen keinen Zugriff auf die Tabellen dahinter; deren Masken und Klassifizierung gelten weiter.",
+      "new": "Neuer geteilter Datensatz",
+      "search": "Nach Name, Beschreibung oder Gruppe suchen",
+      "emptyTitle": "Noch keine geteilten Datensätze",
+      "emptyLead": "Schreiben Sie auf der SQL-Seite eine Abfrage und wählen Sie Als Datensatz teilen.",
+      "dataset": "Datensatz",
+      "trust": "Status",
+      "inputs": "Tabellen",
+      "locked": "Sie können ihn noch nicht lesen: öffnen Sie ihn, um Zugriff anzufragen"
+    },
+    "share": {
+      "button": "Als Datensatz teilen",
+      "editButton": "Als neue Version von {{name}} speichern",
+      "title": "Als Datensatz teilen",
+      "editTitle": "Neue Version von {{name}}",
+      "lead": "Andere Gruppen lesen das Ergebnis ohne Zugriff auf die gelesenen Tabellen. Deren Masken und Klassifizierung gelten weiter und lassen sich nicht lockern; ihre Verantwortlichen werden informiert und können ihn sperren.",
+      "whatTitle": "Was er ist",
+      "domain": "Bereich",
+      "name": "Name",
+      "sqlNameHint": "Lesende fragen ihn ab als",
+      "description": "Beschreibung",
+      "descriptionHint": "Was er zeigt und wofür er da ist. Lesende sehen das zuerst.",
+      "ownTitle": "Wem er gehört und was er erbt",
+      "owningGroup": "Besitzende Gruppe",
+      "pickGroup": "Eine Ihrer Gruppen wählen",
+      "owningGroupHint": "Die Tabellen werden mit dem Zugriff dieser Gruppe gelesen, bei jedem Lesen geprüft. Sie werden Verantwortliche:r.",
+      "checking": "Abfrage wird geprüft…",
+      "inputs": "Liest {{count}} Tabelle(n)",
+      "youGovern": "Sie sind verantwortlich oder Steward",
+      "told": "{{list}} wird informiert",
+      "ungoverned": "Ohne Verantwortliche: niemand wird informiert",
+      "groupReads": "Gruppe darf lesen",
+      "groupCannot": "Gruppe darf nicht lesen",
+      "columns": "Spalten und was sie erben",
+      "untraced": "Herkunft von {{list}} ließ sich nicht verfolgen: sie erhalten die strengste Klassifizierung aller gelesenen Tabellen. Nennen Sie diese Spalten ausdrücklich, um das einzugrenzen.",
+      "floorRule": "Ein geteilter Datensatz kann eine Spalte strenger machen als geerbt, aber nie mehr zeigen.",
+      "audienceTitle": "Wer ihn liest",
+      "audiencePlaceholder": "Gruppen, die ihn lesen dürfen",
+      "audienceSearch": "Gruppe suchen",
+      "audienceEmpty": "Keine Gruppe gefunden",
+      "audienceHint": "Alle mit Zugriff auf Assets finden ihn; nur diese Gruppen lesen ihn. Zugriff geben und entziehen Sie später auf seinem Daten-Tab, andere können ihn anfragen.",
+      "submit": "Teilen",
+      "saveVersion": "Version {{version}} speichern",
+      "shared": "{{name}} ist geteilt",
+      "savedVersion": "Version {{version}} gespeichert"
+    },
+    "inherited": {
+      "tag": "Aus Eingabe",
+      "from": "Geerbt von {{list}}",
+      "untraced": "Die Herkunft dieser Spalte ließ sich nicht verfolgen: sie erhält die strengste Klassifizierung aller gelesenen Tabellen",
+      "floorHint": "Mindestens so geschützt: der Datensatz kann strenger sein, nie lockerer."
+    },
+    "overview": {
+      "noDescription": "Noch keine Beschreibung.",
+      "owner": "Verantwortlich",
+      "noOwner": "Niemand verantwortlich",
+      "owningGroup": "Besitzende Gruppe",
+      "owningGroupHint": "Seine Tabellen werden mit dem Zugriff dieser Gruppe gelesen.",
+      "version": "Version",
+      "versionValue": "{{version}}, geändert {{date}}",
+      "promoted": "Empfohlen",
+      "promotedBy": "Empfohlen von {{name}}",
+      "notPromoted": "Nicht empfohlen",
+      "promote": "Empfehlen",
+      "unpromote": "Zurücknehmen",
+      "reads": "Liest {{count}} Tabelle(n)"
+    },
+    "definition": {
+      "title": "Definition",
+      "lead": "Das SQL, das jedes Lesen live über seine Tabellen ausführt, so wie die besitzende Gruppe sie liest.",
+      "query": "Abfragen",
+      "edit": "Auf der SQL-Seite bearbeiten",
+      "versions": "Versionen",
+      "versionsLead": "Jede Änderung von SQL, Beschreibung oder besitzender Gruppe ist eine Version.",
+      "version": "Version {{version}}"
+    },
+    "columns": {
+      "title": "Spalten",
+      "lead": "Jede Spalte mit den Tabellenspalten, aus denen sie stammt (Spalten-Lineage), und der geerbten Klassifizierung.",
+      "name": "Spalte",
+      "comesFrom": "Stammt aus",
+      "inherits": "Erbt",
+      "atLeast": "Lesende erhalten mindestens",
+      "readers": "Lesende erhalten",
+      "untraced": "nicht verfolgt"
+    },
+    "inputs": {
+      "step": "Eingaben",
+      "stepDesc": "Die gelesenen Tabellen, wer für sie verantwortlich ist und ob eine ihn sperrt.",
+      "title": "Gelesene Tabellen",
+      "lead": "Ihre Verantwortlichen wurden beim Teilen informiert und können ihn sperren. Ihre Masken und Klassifizierung gehen in seine Spalten über.",
+      "answeredBy": "Verantwortlich: {{list}}",
+      "blocks": "Sperrt ihn"
+    },
+    "uses": {
+      "title": "Geteilte Datensätze, die dies lesen",
+      "leadTable": "Gespeicherte Abfragen, die Spalten dieser Tabelle mit anderen Gruppen teilen. Eine Sperre stoppt jedes Lesen, bis Sie sie aufheben.",
+      "leadSource": "Gespeicherte Abfragen, die Spalten der Tabellen dieser Quelle mit anderen Gruppen teilen. Eine Sperre stoppt jedes Lesen, bis Sie sie aufheben.",
+      "by": "{{owner}} · {{group}}",
+      "reads": "{{count}} Lesezugriff(e) in 30 Tagen",
+      "blocked": "Gesperrt von {{name}}",
+      "block": "Sperren",
+      "lift": "Sperre aufheben",
+      "reasonHint": "Warum (die Verantwortlichen lesen das)",
+      "blockConfirm": "Sperren"
+    }
   }
 }

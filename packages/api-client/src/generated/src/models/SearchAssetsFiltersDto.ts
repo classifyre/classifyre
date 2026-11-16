@@ -158,7 +158,8 @@ export const SearchAssetsFiltersDtoSourceTypesEnum = {
     Athena: 'ATHENA',
     Bigquery: 'BIGQUERY',
     Redshift: 'REDSHIFT',
-    Custom: 'CUSTOM'
+    Custom: 'CUSTOM',
+    SharedDataset: 'SHARED_DATASET'
 } as const;
 export type SearchAssetsFiltersDtoSourceTypesEnum = typeof SearchAssetsFiltersDtoSourceTypesEnum[keyof typeof SearchAssetsFiltersDtoSourceTypesEnum];
 

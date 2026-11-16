@@ -59,6 +59,8 @@ export function QueryWorkbench({
   disabled = false,
   onRunFinished,
   onSaved,
+  onShare,
+  shareLabel,
   ref,
 }: {
   catalog: QueryCatalog | null;
@@ -69,6 +71,9 @@ export function QueryWorkbench({
   disabled?: boolean;
   onRunFinished?: (run: QueryRun) => void;
   onSaved?: () => void;
+  /** Share the SQL as it stands as a dataset (DQ §5.12). */
+  onShare?: (sql: string) => void;
+  shareLabel?: string;
   ref?: React.Ref<QueryWorkbenchHandle>;
 }) {
   const { t } = useTranslation();
@@ -238,6 +243,8 @@ export function QueryWorkbench({
         onStop={() => void stop()}
         onFormat={() => void format()}
         onSave={() => setSaveOpen(true)}
+        onShare={onShare ? () => onShare(sql) : undefined}
+        shareLabel={shareLabel}
       />
 
       {error && (

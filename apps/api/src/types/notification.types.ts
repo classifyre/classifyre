@@ -40,4 +40,10 @@ export enum NotificationEvent {
   // Access requests (DQ §5.9): to whoever decides, then to the requester.
   GOVERNANCE_ACCESS_REQUESTED = 'governance.access_requested',
   GOVERNANCE_ACCESS_DECIDED = 'governance.access_decided',
+  // Shared datasets (DQ §5.12): to the owners and stewards of the tables a
+  // dataset reads, and to the dataset's own owner and stewards.
+  GOVERNANCE_DATASET_SHARED = 'governance.dataset_shared',
+  GOVERNANCE_DATASET_BLOCKED = 'governance.dataset_blocked',
+  GOVERNANCE_DATASET_UNBLOCKED = 'governance.dataset_unblocked',
+  GOVERNANCE_DATASET_UNAVAILABLE = 'governance.dataset_unavailable',
 }

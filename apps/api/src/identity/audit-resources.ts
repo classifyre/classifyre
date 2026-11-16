@@ -15,6 +15,8 @@ import { DATA_ROLE_KEYS } from './roles';
  *   filters on it.
  * - `connection:<id>`: a SQL connection — given, revealed, revoked, blocked,
  *   and every table read through it (docs/prd/DQ-data-query.md §5.7).
+ * - `dataset:<asset id>`: an input table read through a shared dataset
+ *   (docs/prd/DQ-data-query.md §5.12).
  *
  * One vocabulary for both writers (the per-table reads in query-run.service
  * and the grant changes in audit.interceptor) and the one reader (the
@@ -29,6 +31,11 @@ export function sourceResource(sourceId: string): string {
 
 export function assetResource(assetId: string): string {
   return `asset:${assetId}`;
+}
+
+/** A shared dataset (§5.12): set on reads of its inputs made through it. */
+export function datasetResource(datasetAssetId: string): string {
+  return `dataset:${datasetAssetId}`;
 }
 
 export function connectionResource(connectionId: string): string {

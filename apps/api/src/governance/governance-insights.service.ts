@@ -65,16 +65,19 @@ export class GovernanceInsightsService {
         actor: string | null;
         channel: string;
         operation: string;
+        via_dataset: boolean;
         count: bigint;
       }[]
     >`
       SELECT date_trunc('day', occurred_at) AS day, actor, channel, operation,
+             EXISTS (SELECT 1 FROM unnest(resources) AS r WHERE r LIKE 'dataset:%')
+               AS via_dataset,
              count(*) AS count
         FROM audit_events
        WHERE resources @> ARRAY[${tag}]::text[]
          AND (operation = ${READ} OR operation LIKE ${`${EXPORT_PREFIX}%`})
          AND occurred_at >= ${since}
-       GROUP BY 1, 2, 3, 4`;
+       GROUP BY 1, 2, 3, 4, 5`;
     const channels = new Map<string, { reads: number; exports: number }>();
 
     const perDay = new Map<string, { reads: number; exports: number }>();
@@ -90,14 +93,17 @@ export class GovernanceInsightsService {
       // A reader is a person, however they read: the app, an MCP token, a
       // SQL connection (`user:x@sql:c` counts as `user:x`).
       const actorKey = personOf(row.actor) ?? '';
-      const channelEntry = channels.get(row.channel) ?? {
+      // Reads that reached this table through a shared dataset (DQ §5.12)
+      // count as their own channel, whichever way the dataset was read.
+      const channelKey = row.via_dataset ? 'dataset' : row.channel;
+      const channelEntry = channels.get(channelKey) ?? {
         reads: 0,
         exports: 0,
       };
       if (row.operation.startsWith(EXPORT_PREFIX))
         channelEntry.exports += count;
       else channelEntry.reads += count;
-      channels.set(row.channel, channelEntry);
+      channels.set(channelKey, channelEntry);
       const actorEntry = perActor.get(actorKey) ?? { reads: 0, exports: 0 };
       if (isExport) {
         exports += count;

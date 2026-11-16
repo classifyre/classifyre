@@ -515,6 +515,17 @@ All URIs are relative to *http://localhost*
 *SemanticApi* | [**semanticControllerVocabularyValues**](docs/SemanticApi.md#semanticcontrollervocabularyvalues) | **GET** /semantic/vocabulary/values | Top observed values with counts, for the binding dialog
 *SettingsApi* | [**deploymentSettingsControllerGet**](docs/SettingsApi.md#deploymentsettingscontrollerget) | **GET** /runner-limits | Scan limits of this workspace: what is saved in Settings and what the chart or image sets
 *SettingsApi* | [**deploymentSettingsControllerUpdate**](docs/SettingsApi.md#deploymentsettingscontrollerupdate) | **PUT** /runner-limits | Set scan limits for this workspace; null hands a limit back to the chart or image. Scans at once can only be held below the installation-wide ceiling
+*SharedDatasetsApi* | [**sharedDatasetsControllerBlock**](docs/SharedDatasetsApi.md#shareddatasetscontrollerblock) | **POST** /shared-datasets/{id}/blocks | Block it from reading your table (or source): nobody reads it until lifted
+*SharedDatasetsApi* | [**sharedDatasetsControllerCreate**](docs/SharedDatasetsApi.md#shareddatasetscontrollercreate) | **POST** /shared-datasets | Share a query as a dataset
+*SharedDatasetsApi* | [**sharedDatasetsControllerDescribe**](docs/SharedDatasetsApi.md#shareddatasetscontrollerdescribe) | **POST** /shared-datasets/describe | What a query would be as a shared dataset: columns, inherited classification, inputs, whether you may share it
+*SharedDatasetsApi* | [**sharedDatasetsControllerGet**](docs/SharedDatasetsApi.md#shareddatasetscontrollerget) | **GET** /shared-datasets/{id} | One shared dataset (its asset id)
+*SharedDatasetsApi* | [**sharedDatasetsControllerList**](docs/SharedDatasetsApi.md#shareddatasetscontrollerlist) | **GET** /shared-datasets | Every shared dataset of the workspace
+*SharedDatasetsApi* | [**sharedDatasetsControllerOptions**](docs/SharedDatasetsApi.md#shareddatasetscontrolleroptions) | **GET** /shared-datasets/options | Whether you may share datasets here, and your groups
+*SharedDatasetsApi* | [**sharedDatasetsControllerPromote**](docs/SharedDatasetsApi.md#shareddatasetscontrollerpromote) | **POST** /shared-datasets/{id}/promote | Mark it promoted (ready), or take that back
+*SharedDatasetsApi* | [**sharedDatasetsControllerUnblock**](docs/SharedDatasetsApi.md#shareddatasetscontrollerunblock) | **DELETE** /shared-datasets/{id}/blocks/{blockId} | Lift a block
+*SharedDatasetsApi* | [**sharedDatasetsControllerUpdate**](docs/SharedDatasetsApi.md#shareddatasetscontrollerupdate) | **PATCH** /shared-datasets/{id} | Change the SQL, description or owning group (a new version)
+*SharedDatasetsApi* | [**sharedDatasetsControllerUses**](docs/SharedDatasetsApi.md#shareddatasetscontrolleruses) | **GET** /shared-datasets/uses | Shared datasets that read a table or any table of a source
+*SharedDatasetsApi* | [**sharedDatasetsControllerVersions**](docs/SharedDatasetsApi.md#shareddatasetscontrollerversions) | **GET** /shared-datasets/{id}/versions | Every saved version of its definition
 *SitemapApi* | [**sitemapControllerGetEntries**](docs/SitemapApi.md#sitemapcontrollergetentries) | **GET** /sitemap/entries | One chunk of detail-page ids + last-modified dates
 *SitemapApi* | [**sitemapControllerGetIndex**](docs/SitemapApi.md#sitemapcontrollergetindex) | **GET** /sitemap | Sitemap index: per-entity chunk counts and last-modified dates
 *SourcesApi* | [**cohortControllerPreview**](docs/SourcesApi.md#cohortcontrollerpreview) | **GET** /sources/{id}/cohort-weights | Preview the band split of a source\&#39;s cohorts for its next run
@@ -632,6 +643,7 @@ All URIs are relative to *http://localhost*
 - [AuditEventsResponseDto](docs/AuditEventsResponseDto.md)
 - [AutopilotStatsDto](docs/AutopilotStatsDto.md)
 - [BlockDataConnectionDto](docs/BlockDataConnectionDto.md)
+- [BlockSharedDatasetDto](docs/BlockSharedDatasetDto.md)
 - [BoardEndpointDto](docs/BoardEndpointDto.md)
 - [BoardItemDto](docs/BoardItemDto.md)
 - [BoardLinkCertainty](docs/BoardLinkCertainty.md)
@@ -752,6 +764,7 @@ All URIs are relative to *http://localhost*
 - [CreateMcpTokenDto](docs/CreateMcpTokenDto.md)
 - [CreateNotebookExecutionDto](docs/CreateNotebookExecutionDto.md)
 - [CreateQueryRunDto](docs/CreateQueryRunDto.md)
+- [CreateSharedDatasetDto](docs/CreateSharedDatasetDto.md)
 - [CreateSourceDto](docs/CreateSourceDto.md)
 - [CreateSupervisorGoalDto](docs/CreateSupervisorGoalDto.md)
 - [CreateThreadDto](docs/CreateThreadDto.md)
@@ -780,6 +793,7 @@ All URIs are relative to *http://localhost*
 - [DeleteRunnerResponseDto](docs/DeleteRunnerResponseDto.md)
 - [DenyAccessRequestDto](docs/DenyAccessRequestDto.md)
 - [DeprecateGlossaryTermDto](docs/DeprecateGlossaryTermDto.md)
+- [DescribeSharedDatasetDto](docs/DescribeSharedDatasetDto.md)
 - [DiscoveryRecentRunDto](docs/DiscoveryRecentRunDto.md)
 - [DiscoveryRunSourceDto](docs/DiscoveryRunSourceDto.md)
 - [DisplaySettingsDto](docs/DisplaySettingsDto.md)
@@ -874,6 +888,8 @@ All URIs are relative to *http://localhost*
 - [HypothesisStatus](docs/HypothesisStatus.md)
 - [ImportContractDto](docs/ImportContractDto.md)
 - [IngestEdgeDto](docs/IngestEdgeDto.md)
+- [InheritedColumnDto](docs/InheritedColumnDto.md)
+- [InheritedColumnSourceDto](docs/InheritedColumnSourceDto.md)
 - [InquiryActivityDto](docs/InquiryActivityDto.md)
 - [InquiryLinkedCaseDto](docs/InquiryLinkedCaseDto.md)
 - [InquiryListResponseDto](docs/InquiryListResponseDto.md)
@@ -935,6 +951,7 @@ All URIs are relative to *http://localhost*
 - [PreviewDiagnosticDto](docs/PreviewDiagnosticDto.md)
 - [PreviewInquiryDto](docs/PreviewInquiryDto.md)
 - [PreviewResponseDto](docs/PreviewResponseDto.md)
+- [PromoteSharedDatasetDto](docs/PromoteSharedDatasetDto.md)
 - [ProposeCaseLeadDto](docs/ProposeCaseLeadDto.md)
 - [PullFromInquiryDto](docs/PullFromInquiryDto.md)
 - [PullFromInquiryResponseDto](docs/PullFromInquiryResponseDto.md)
@@ -1105,6 +1122,19 @@ All URIs are relative to *http://localhost*
 - [SetDataConnectionExposureDto](docs/SetDataConnectionExposureDto.md)
 - [SetInquiryAutoPullDto](docs/SetInquiryAutoPullDto.md)
 - [SetWorkerQueuePausedDto](docs/SetWorkerQueuePausedDto.md)
+- [SharedDatasetActorDto](docs/SharedDatasetActorDto.md)
+- [SharedDatasetAudienceDto](docs/SharedDatasetAudienceDto.md)
+- [SharedDatasetBlockDto](docs/SharedDatasetBlockDto.md)
+- [SharedDatasetColumnDto](docs/SharedDatasetColumnDto.md)
+- [SharedDatasetDescriptionDto](docs/SharedDatasetDescriptionDto.md)
+- [SharedDatasetDto](docs/SharedDatasetDto.md)
+- [SharedDatasetGroupDto](docs/SharedDatasetGroupDto.md)
+- [SharedDatasetInputDto](docs/SharedDatasetInputDto.md)
+- [SharedDatasetOptionsDto](docs/SharedDatasetOptionsDto.md)
+- [SharedDatasetSummaryDto](docs/SharedDatasetSummaryDto.md)
+- [SharedDatasetUpstreamDto](docs/SharedDatasetUpstreamDto.md)
+- [SharedDatasetUseDto](docs/SharedDatasetUseDto.md)
+- [SharedDatasetVersionDto](docs/SharedDatasetVersionDto.md)
 - [SimilarFindingAssetDto](docs/SimilarFindingAssetDto.md)
 - [SimilarFindingDto](docs/SimilarFindingDto.md)
 - [SimilarFindingEvidenceAnalysisDto](docs/SimilarFindingEvidenceAnalysisDto.md)
@@ -1188,6 +1218,7 @@ All URIs are relative to *http://localhost*
 - [UpdateNotificationImportanceDto](docs/UpdateNotificationImportanceDto.md)
 - [UpdateRunnerAssetStatusDto](docs/UpdateRunnerAssetStatusDto.md)
 - [UpdateRunnerLimitsDto](docs/UpdateRunnerLimitsDto.md)
+- [UpdateSharedDatasetDto](docs/UpdateSharedDatasetDto.md)
 - [UpdateSourceDto](docs/UpdateSourceDto.md)
 - [UpdateSupervisorDto](docs/UpdateSupervisorDto.md)
 - [UpdateSupervisorGoalDto](docs/UpdateSupervisorGoalDto.md)

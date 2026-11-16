@@ -282,6 +282,77 @@ export class GovernanceNotifier {
     });
   }
 
+  /**
+   * A shared dataset reads a table (DQ §5.12): the table's owners and
+   * stewards hear who shares its columns with whom, and can block it.
+   */
+  async datasetShared(input: {
+    inputAssetId: string;
+    inputName: string;
+    datasetId: string;
+    datasetName: string;
+    audience: string;
+    actorRef: string | null;
+    actorName: string;
+  }): Promise<void> {
+    await this.send(
+      audienceOf(await this.answerFor(input.inputAssetId), input.actorRef),
+      {
+        event: NotificationEvent.GOVERNANCE_DATASET_SHARED,
+        title: `${input.inputName} is read by the shared dataset ${input.datasetName}`,
+        message: `${input.actorName} shares columns of ${input.inputName} with ${input.audience}. Its masks and classification carry over; you can block it.`,
+        actionUrl: `/assets/${input.inputAssetId}?tab=governance&step=access`,
+        triggeredBy: input.actorRef,
+        metadata: { datasetId: input.datasetId },
+      },
+    );
+  }
+
+  /** An input's owner blocked or lifted a block: the dataset's owner hears. */
+  async datasetBlocked(input: {
+    datasetId: string;
+    datasetName: string;
+    inputName: string;
+    blocked: boolean;
+    reason: string | null;
+    actorRef: string | null;
+  }): Promise<void> {
+    await this.send(
+      audienceOf(await this.answerFor(input.datasetId), input.actorRef),
+      {
+        event: input.blocked
+          ? NotificationEvent.GOVERNANCE_DATASET_BLOCKED
+          : NotificationEvent.GOVERNANCE_DATASET_UNBLOCKED,
+        severity: input.blocked ? 'HIGH' : 'INFO',
+        title: input.blocked
+          ? `${input.datasetName} was blocked by the owner of ${input.inputName}`
+          : `${input.datasetName} is no longer blocked by ${input.inputName}`,
+        message: input.blocked
+          ? (input.reason ?? 'Nobody can read it until the block is lifted.')
+          : 'It can be read again.',
+        actionUrl: `/assets/${input.datasetId}?tab=governance`,
+        triggeredBy: input.actorRef,
+        metadata: { datasetId: input.datasetId },
+      },
+    );
+  }
+
+  /** The owning group lost an input: the dataset's owner hears, once. */
+  async datasetUnavailable(input: {
+    datasetId: string;
+    datasetName: string;
+    reason: string;
+  }): Promise<void> {
+    await this.send(audienceOf(await this.answerFor(input.datasetId)), {
+      event: NotificationEvent.GOVERNANCE_DATASET_UNAVAILABLE,
+      severity: 'HIGH',
+      title: `${input.datasetName} cannot be read`,
+      message: input.reason,
+      actionUrl: `/assets/${input.datasetId}?tab=governance`,
+      metadata: { datasetId: input.datasetId },
+    });
+  }
+
   /** Someone changed the lifecycle: the others who answer for it hear of it. */
   async statusChanged(input: {
     assetId: string;

@@ -28,7 +28,14 @@ export const QUERYABLE_SOURCE_TYPES = new Set([
   'AZURE_BLOB_STORAGE',
   'GOOGLE_CLOUD_STORAGE',
   'LOCAL_FOLDER',
+  // Shared datasets (§5.12): not attached, but expanded into views over
+  // their inputs by the API and the job.
+  'SHARED_DATASET',
 ]);
+
+/** The built-in source of shared datasets (§5.12) and its SQL name. */
+export const SHARED_DATASET_SOURCE_TYPE = 'SHARED_DATASET';
+export const SHARED_DATASET_SQL_NAME = 'shared';
 
 const OBJECT_STORAGE_TYPES = new Set([
   'S3_COMPATIBLE_STORAGE',
@@ -87,6 +94,8 @@ const RESERVED = new Set([
   'main',
   'information_schema',
   'pg_catalog',
+  // The built-in source of shared datasets (§5.12).
+  SHARED_DATASET_SQL_NAME,
 ]);
 
 /** A plain lower-case SQL identifier made from any text. */
@@ -125,7 +134,9 @@ export type TableLocation =
       qualifiedName?: string;
     }
   | { kind: 'lakehouse'; format: string; objectKey: string }
-  | { kind: 'file'; format: string; objectKey: string };
+  | { kind: 'file'; format: string; objectKey: string }
+  /** A shared dataset (§5.12): its SQL over its inputs, expanded per read. */
+  | { kind: 'dataset'; datasetId: string };
 
 export interface TableAddress {
   /** Unsanitised, before collisions are resolved. */
@@ -262,6 +273,15 @@ export function tableAddress(
       table: tableName,
       location: schema ? { kind: 'catalog', schema, table: tableName } : null,
       reason: schema ? undefined : 'Scan the source again to locate it.',
+    };
+  }
+  if (sourceType === SHARED_DATASET_SOURCE_TYPE) {
+    const datasetId = text(metadata.dataset_id);
+    return {
+      schema: text(metadata.domain) ?? 'main',
+      table: tableName,
+      location: datasetId ? { kind: 'dataset', datasetId } : null,
+      reason: datasetId ? undefined : 'This shared dataset has no definition.',
     };
   }
   if (OBJECT_STORAGE_TYPES.has(sourceType)) {

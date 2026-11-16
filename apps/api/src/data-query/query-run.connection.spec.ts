@@ -93,6 +93,7 @@ function setup(options: { active?: number; result?: Buffer | null } = {}) {
     { current: () => actor, workspaceId: () => 'ns' } as never,
     { record: () => Promise.resolve() } as never,
     { check: () => Promise.resolve({ allow: true }) } as never,
+    { resolve: () => Promise.resolve({ datasets: [] }) } as never,
   );
   return { service, created, updates, order };
 }

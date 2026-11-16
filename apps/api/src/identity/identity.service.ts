@@ -5,8 +5,13 @@ import type { Capability } from './capabilities';
 import {
   canCreateWorkspaceFor,
   capabilitiesInWorkspace,
+  resourceGrantsInWorkspace,
   tenantCapabilities,
 } from './grant-evaluation';
+import {
+  RESOURCE_GRANTABLE_CAPABILITIES,
+  type ResourceGrants,
+} from './access-policy';
 import type { IamConfig } from './iam-config';
 import { InvalidTokenError, JwtVerifier } from './jwt-verifier';
 import { MembershipService, type OrgGroup } from './membership.service';
@@ -446,6 +451,51 @@ export class IdentityService {
     const capabilities = await this.capabilitiesIn(principal, namespaceId);
     if (!capabilities?.has('workspace.view')) return null;
     return { principal, capabilities };
+  }
+
+  /**
+   * What one group holds in a workspace (DQ §5.12, a shared dataset's owning
+   * group): the group and the groups above it, the capabilities its grants
+   * give there, and the sources and tables resource grants open to it. Null
+   * when the workspace's tenant is gone or inactive, or the group is not one
+   * of its organization's. Rebuilt on every use, like {@link principalFor}:
+   * a grant removed from the group stops its datasets at the next read.
+   */
+  async groupAccessIn(
+    groupId: string,
+    namespaceId: string,
+  ): Promise<{
+    lineage: string[];
+    capabilities: Set<Capability>;
+    resourceGrants: Partial<Record<Capability, ResourceGrants>>;
+  } | null> {
+    const tenancy = await this.tenancy.workspaceTenancy(namespaceId);
+    const tenant = tenancy
+      ? await this.tenancy.tenantById(tenancy.tenantId)
+      : null;
+    if (!tenancy || !tenant?.orgId || tenant.status !== 'active') return null;
+    const groups = await this.membership.groups(tenant.orgId);
+    if (!groups.some((group) => group.id === groupId)) return null;
+    const lineage = await this.membership.ancestry(tenant.orgId, groupId);
+    const grants = await this.tenancy.grantsFor(tenant.id, new Set(lineage));
+    const ownerLineage = tenancy.ownerGroupId
+      ? await this.membership.ancestry(tenant.orgId, tenancy.ownerGroupId)
+      : [];
+    const capabilities = capabilitiesInWorkspace(grants, {
+      namespaceId,
+      ownerLineage,
+      visibility: tenancy.visibility,
+    });
+    return {
+      lineage,
+      capabilities,
+      resourceGrants: Object.fromEntries(
+        RESOURCE_GRANTABLE_CAPABILITIES.map((capability) => [
+          capability,
+          resourceGrantsInWorkspace(grants, namespaceId, capability),
+        ]),
+      ),
+    };
   }
 
   /**

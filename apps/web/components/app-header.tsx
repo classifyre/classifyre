@@ -79,6 +79,7 @@ function pageLabel(segment: string, previous: string | undefined, t: T): string 
     glossary: t("glossary.title"),
     governance: t("nav.governance"),
     explore: t("nav.explore"),
+    "shared-datasets": t("nav.sharedDatasets"),
   };
   if (segment === "new") {
     if (previous === "providers") return t("breadcrumb.newProvider");

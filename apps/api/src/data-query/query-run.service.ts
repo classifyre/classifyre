@@ -23,12 +23,20 @@ import {
 } from '../identity/audit-trail.service';
 import type { Actor } from '../identity/actor';
 import { parseActorRef, personOf } from '../identity/actor-ref';
-import { tableReadResources } from '../identity/audit-resources';
+import {
+  datasetResource,
+  tableReadResources,
+} from '../identity/audit-resources';
 import {
   QueryCatalogService,
   type CatalogTable,
 } from './query-catalog.service';
-import { mentionedSourceNames } from './sql-names';
+import { SHARED_DATASET_SOURCE_TYPE, mentionedSourceNames } from './sql-names';
+import {
+  SharedDatasetResolver,
+  type ResolvedDataset,
+} from './shared-dataset-resolver';
+import type { DescribedLineage } from './dataset-floor';
 import {
   maskSalt,
   parseRunMasks,
@@ -112,6 +120,19 @@ export interface QueryCallbackMeta {
   timings?: Record<string, number>;
   tables?: string[];
   error?: { code?: string; message?: string };
+  /** A describe run's answer (§5.12): output columns and their lineage. */
+  describe?: {
+    columns: { name: string; type: string }[];
+    lineage: DescribedLineage[];
+  };
+}
+
+/** What a query would return and where each column comes from (§5.12). */
+export interface QueryDescription {
+  columns: { name: string; type: string }[];
+  lineage: DescribedLineage[];
+  /** `source.schema.table` of every table it reads. */
+  tables: string[];
 }
 
 /** Who a run is for and how it came: the cap counts people, the audit names the channel. */
@@ -191,6 +212,41 @@ export function readArrowRows(
   return { columns, rows };
 }
 
+/**
+ * One table of a job request: where it lives, and the masks and rows of
+ * whoever reads it (DQ §5.8, §5.10). `known` overrides the recorded columns
+ * (a shared dataset's output, which is always projected to them).
+ */
+function tableEntry(
+  sourceSqlName: string,
+  table: CatalogTable,
+  known?: string[],
+): Record<string, unknown> {
+  const masks = table.masks ?? [];
+  const knownColumns = known
+    ? [...known, ...masks.map((mask) => mask.column)]
+    : masks.length && table.columns.length
+      ? [
+          ...table.columns.map((column) => column.name),
+          ...masks.map((mask) => mask.column),
+        ]
+      : undefined;
+  return {
+    source: sourceSqlName,
+    schema: table.schema,
+    table: table.table,
+    assetId: table.assetId,
+    location: table.location,
+    // DQ §5.8: the job's view of this table hides and masks these, and
+    // hides any column the scan did not record (renamed since), which no
+    // mask can be known not to be for.
+    ...(masks.length ? { columns: masks } : {}),
+    ...(knownColumns ? { knownColumns } : {}),
+    // DQ §5.10: the view shows only the rows these select.
+    ...(table.rowFilter ? { rows: table.rowFilter } : {}),
+  };
+}
+
 function tokenHash(token: string): string {
   return createHash('sha256').update(token, 'utf8').digest('hex');
 }
@@ -217,6 +273,7 @@ export class QueryRunService {
     private readonly actors: ActorContextService,
     private readonly audit: AuditTrailService,
     @Inject(ACCESS_POLICY) private readonly policy: AccessPolicy,
+    private readonly datasets: SharedDatasetResolver,
   ) {}
 
   async create(sql: string, format?: string): Promise<QueryRunView> {
@@ -247,9 +304,49 @@ export class QueryRunService {
     return { run, ...readArrowRows(bytes, maxRows) };
   }
 
+  /**
+   * What a query returns, without reading a row (§5.12: a query about to be
+   * shared as a dataset): its output columns and their column lineage, run
+   * as the person over the tables they may query (masked as they read them).
+   */
+  async describe(
+    sql: string,
+  ): Promise<
+    | { description: QueryDescription }
+    | { error: { code: string; message: string } }
+  > {
+    const { view, done } = await this.begin(sql, undefined, true);
+    await done;
+    const run = await this.prisma.queryRun.findUnique({
+      where: { id: view.id },
+      select: { status: true, error: true, result: true },
+    });
+    if (!run || run.status !== QueryRunStatus.SUCCESS || !run.result) {
+      const error = (run?.error ?? null) as {
+        code?: string;
+        message?: string;
+      } | null;
+      return {
+        error: {
+          code: error?.code ?? 'execution_error',
+          message: error?.message ?? 'The query could not be described.',
+        },
+      };
+    }
+    await this.prisma.queryRun
+      .update({ where: { id: view.id }, data: { result: null } })
+      .catch(() => undefined);
+    return {
+      description: JSON.parse(
+        Buffer.from(run.result).toString('utf8'),
+      ) as QueryDescription,
+    };
+  }
+
   private async begin(
     sql: string,
     format?: string,
+    describe = false,
   ): Promise<{ view: QueryRunView; done: Promise<void> }> {
     const text = (sql ?? '').trim();
     const exportFormat = format
@@ -368,6 +465,7 @@ export class QueryRunService {
       maxResultBytes: exportFormat ? MAX_EXPORT_BYTES : MAX_RESULT_BYTES,
       exportFormat,
       timeoutSeconds: settings.timeoutSeconds,
+      ...(describe ? { describe: true, extra: { describe: true } } : {}),
     });
     return { view: this.view(run), done };
   }
@@ -569,20 +667,55 @@ export class QueryRunService {
     actor: Actor;
     origin: RunOrigin;
     sql: string;
-    used: { id: string; sqlName: string }[];
+    used: { id: string; sqlName: string; type?: string }[];
     tables: { entrySourceSqlName: string; table: CatalogTable }[];
     namedAssetIds: string[];
     maxRows: number;
     maxResultBytes: number;
     exportFormat?: ExportFormat;
     timeoutSeconds: number;
+    /** Describe the SQL (columns and lineage) instead of running it. */
+    describe?: boolean;
     extra?: Record<string, unknown>;
   }) {
     void this.purgeExpired().catch(() => undefined);
-    const token = randomBytes(32).toString('base64url');
     const named = input.tables
       .map(({ table }) => table)
       .filter((table) => input.namedAssetIds.includes(table.assetId));
+
+    // DQ §5.12: a shared dataset the SQL names is expanded into its SQL over
+    // its inputs, read with its owning group's rights (checked now, on every
+    // read). Its built-in source has nothing to attach.
+    const datasetIds = named
+      .filter((table) => table.location?.kind === 'dataset')
+      .map((table) => table.assetId);
+    let resolved: ResolvedDataset[] = [];
+    if (datasetIds.length) {
+      const expanded = await this.datasets.resolve(datasetIds);
+      if ('refused' in expanded) {
+        return this.refusedRun(input, expanded.refused);
+      }
+      resolved = expanded.datasets;
+    }
+    const attach = new Map<string, { id: string; sqlName: string }>();
+    for (const source of input.used) {
+      if (source.type !== SHARED_DATASET_SOURCE_TYPE) {
+        attach.set(source.id, { id: source.id, sqlName: source.sqlName });
+      }
+    }
+    for (const dataset of resolved) {
+      for (const { source } of dataset.inputs) {
+        attach.set(source.id, { id: source.id, sqlName: source.sqlName });
+      }
+    }
+    if (attach.size > MAX_SOURCES_PER_QUERY) {
+      return this.refusedRun(input, {
+        code: 'too_many_sources',
+        message: `One query can read from at most ${MAX_SOURCES_PER_QUERY} sources, shared datasets' tables included.`,
+      });
+    }
+    const attached = [...attach.values()];
+    const token = randomBytes(32).toString('base64url');
     // `assetIds` starts as the tables named in code and is replaced with the
     // job's authoritative table list on success (received in `receiveResult`);
     // per-table audit is recorded there, never here, so refusals and failures
@@ -596,17 +729,20 @@ export class QueryRunService {
         channel: input.origin.channel,
         connectionId: input.origin.connectionId,
         assetIds: input.namedAssetIds,
-        sourceIds: input.used.map((source) => source.id),
+        sourceIds: attached.map((source) => source.id),
         masks: runMasksOf(named),
         rowFilters: runRowFiltersOf(named),
         callbackTokenHash: tokenHash(token),
-        resultFormat: input.exportFormat ?? null,
+        resultFormat: input.describe
+          ? 'describe'
+          : (input.exportFormat ?? null),
+        ...(input.describe ? { purpose: 'describe' } : {}),
         expiresAt: new Date(Date.now() + RESULT_TTL_MS),
       },
     });
 
     const sources = await this.prisma.source.findMany({
-      where: { id: { in: input.used.map((source) => source.id) } },
+      where: { id: { in: attached.map((source) => source.id) } },
       select: { id: true, type: true, config: true },
     });
     const recipes = new Map(
@@ -627,37 +763,34 @@ export class QueryRunService {
       timeoutSeconds: input.timeoutSeconds,
       callbackUrl: `${this.cliRunner.queryCallbackBaseUrl(this.actors.workspaceId())}/query-runs/${run.id}/result`,
       callbackToken: token,
-      sources: input.used.map((source) => ({
+      sources: attached.map((source) => ({
         alias: source.sqlName,
         sourceId: source.id,
         recipe: recipes.get(source.id),
       })),
-      tables: input.tables.map(({ entrySourceSqlName, table }) => ({
-        source: entrySourceSqlName,
-        schema: table.schema,
-        table: table.table,
-        assetId: table.assetId,
-        location: table.location,
-        // DQ §5.8: the job's view of this table hides and masks these, and
-        // hides any column the scan did not record (renamed since), which
-        // no mask can be known not to be for.
-        ...(table.masks?.length
-          ? {
-              columns: table.masks,
-              ...(table.columns.length
-                ? {
-                    knownColumns: [
-                      ...table.columns.map((column) => column.name),
-                      ...table.masks.map((mask) => mask.column),
-                    ],
-                  }
-                : {}),
-            }
-          : {}),
-        // DQ §5.10: the view shows only the rows these select.
-        ...(table.rowFilter ? { rows: table.rowFilter } : {}),
-      })),
-      ...(input.tables.some(({ table }) => table.masks?.length)
+      tables: input.tables
+        .map(({ entrySourceSqlName, table }) => {
+          const dataset = resolved.find((d) => d.assetId === table.assetId);
+          if (dataset) {
+            return {
+              ...tableEntry(entrySourceSqlName, table, dataset.columns),
+              dataset: {
+                sql: dataset.sql,
+                inputs: dataset.inputs.map((i) =>
+                  tableEntry(i.source.sqlName, i.table),
+                ),
+              },
+            };
+          }
+          if (table.location?.kind === 'dataset') {
+            // Not named in the SQL: nothing to expand, nothing to read.
+            return null;
+          }
+          return tableEntry(entrySourceSqlName, table);
+        })
+        .filter((entry) => entry !== null),
+      ...(input.tables.some(({ table }) => table.masks?.length) ||
+      resolved.some((d) => d.inputs.some((i) => i.table.masks?.length))
         ? {
             maskSalt: this.maskSalt(),
           }
@@ -667,6 +800,39 @@ export class QueryRunService {
     // Settles once the job has ended: its result arrived, or it failed.
     const done = this.execute(run.id, request, input.timeoutSeconds);
     return { run, done };
+  }
+
+  /** A run refused before any job (a dataset that cannot be read now). */
+  private async refusedRun(
+    input: {
+      actor: Actor;
+      origin: RunOrigin;
+      sql: string;
+      exportFormat?: ExportFormat;
+      describe?: boolean;
+    },
+    refusal: { code: string; message: string },
+  ) {
+    const run = await this.prisma.queryRun.create({
+      data: {
+        sql: input.sql,
+        status: QueryRunStatus.ERROR,
+        actorRef: input.actor.ref ?? null,
+        personRef: input.origin.personRef,
+        channel: input.origin.channel,
+        connectionId: input.origin.connectionId,
+        assetIds: [],
+        sourceIds: [],
+        error: refusal,
+        resultFormat: input.describe
+          ? 'describe'
+          : (input.exportFormat ?? null),
+        ...(input.describe ? { purpose: 'describe' } : {}),
+        finishedAt: new Date(),
+        expiresAt: new Date(Date.now() + RESULT_TTL_MS),
+      },
+    });
+    return { run, done: Promise.resolve() };
   }
 
   /**
@@ -706,6 +872,15 @@ export class QueryRunService {
         busy: true,
       };
     }
+    // A shared dataset (§5.12) is measured as its owning group reads it.
+    let dataset: ResolvedDataset | null = null;
+    if (table.location.kind === 'dataset') {
+      const expanded = await this.datasets.resolve([table.assetId]);
+      if ('refused' in expanded) return { refused: expanded.refused.message };
+      dataset = expanded.datasets[0] ?? null;
+      if (!dataset)
+        return { refused: 'This shared dataset has no definition.' };
+    }
     const settings = await this.catalog.settings();
     const token = randomBytes(32).toString('base64url');
     const run = await this.prisma.queryRun.create({
@@ -721,13 +896,24 @@ export class QueryRunService {
         expiresAt: new Date(Date.now() + RESULT_TTL_MS),
       },
     });
-    const row = await this.prisma.source.findUnique({
-      where: { id: source.id },
-      select: { type: true, config: true },
+    const attach = dataset
+      ? [
+          ...new Map(
+            dataset.inputs.map((i) => [i.source.id, i.source.sqlName]),
+          ),
+        ].map(([id, sqlName]) => ({ id, sqlName }))
+      : [{ id: source.id, sqlName: source.sqlName }];
+    const rows = await this.prisma.source.findMany({
+      where: { id: { in: attach.map((a) => a.id) } },
+      select: { id: true, type: true, config: true },
     });
-    const config = this.crypto.decryptMaskedConfig(
-      (row?.config ?? {}) as Record<string, unknown>,
-    );
+    const recipeOf = (id: string) => {
+      const row = rows.find((r) => r.id === id);
+      const config = this.crypto.decryptMaskedConfig(
+        (row?.config ?? {}) as Record<string, unknown>,
+      );
+      return { ...config, type: config.type ?? row?.type };
+    };
     const request = {
       runId: run.id,
       sql: input.sql,
@@ -737,22 +923,38 @@ export class QueryRunService {
       timeoutSeconds: settings.timeoutSeconds,
       callbackUrl: `${this.cliRunner.queryCallbackBaseUrl(this.actors.workspaceId())}/query-runs/${run.id}/result`,
       callbackToken: token,
-      sources: [
-        {
-          alias: source.sqlName,
-          sourceId: source.id,
-          recipe: { ...config, type: config.type ?? row?.type },
-        },
-      ],
+      sources: attach.map((a) => ({
+        alias: a.sqlName,
+        sourceId: a.id,
+        recipe: recipeOf(a.id),
+      })),
       tables: [
-        {
-          source: source.sqlName,
-          schema: table.schema,
-          table: table.table,
-          assetId: table.assetId,
-          location: table.location,
-        },
+        dataset
+          ? {
+              source: source.sqlName,
+              schema: table.schema,
+              table: table.table,
+              assetId: table.assetId,
+              location: table.location,
+              knownColumns: dataset.columns,
+              dataset: {
+                sql: dataset.sql,
+                inputs: dataset.inputs.map((i) =>
+                  tableEntry(i.source.sqlName, i.table),
+                ),
+              },
+            }
+          : {
+              source: source.sqlName,
+              schema: table.schema,
+              table: table.table,
+              assetId: table.assetId,
+              location: table.location,
+            },
       ],
+      ...(dataset?.inputs.some((i) => i.table.masks?.length)
+        ? { maskSalt: this.maskSalt() }
+        : {}),
     };
     void this.execute(run.id, request, settings.timeoutSeconds).then(() =>
       input
@@ -918,6 +1120,35 @@ export class QueryRunService {
     }
     if (TERMINAL.includes(run.status)) return;
 
+    if (
+      !Buffer.isBuffer(body) &&
+      body?.status === 'success' &&
+      body.format === 'describe'
+    ) {
+      // A describe (§5.12): columns and lineage, no rows, nothing read.
+      const meta = body as QueryCallbackMeta;
+      const description: QueryDescription = {
+        columns: meta.describe?.columns ?? meta.columns ?? [],
+        lineage: meta.describe?.lineage ?? [],
+        tables: (meta.tables ?? []).map((t) => t.toLowerCase()),
+      };
+      const bytes = Buffer.from(JSON.stringify(description), 'utf8');
+      await this.prisma.queryRun.update({
+        where: { id: runId },
+        data: {
+          status: QueryRunStatus.SUCCESS,
+          result: new Uint8Array(bytes),
+          resultBytes: bytes.length,
+          rowCount: 0,
+          columns: description.columns,
+          timings: meta.timings ?? {},
+          finishedAt: new Date(),
+          callbackTokenHash: null,
+        },
+      });
+      return;
+    }
+
     if (Buffer.isBuffer(body)) {
       let meta: QueryCallbackMeta = {};
       try {
@@ -987,6 +1218,15 @@ export class QueryRunService {
             fields: [],
           });
         }
+        if (!run.purpose) {
+          await this.auditDatasetInputs(assetIds, {
+            actor,
+            channel,
+            isExport,
+            format: run.resultFormat,
+            connectionId: run.connectionId,
+          });
+        }
       }
       return;
     }
@@ -996,6 +1236,55 @@ export class QueryRunService {
       error.code ?? 'execution_error',
       error.message ?? 'The query failed.',
     );
+  }
+
+  /**
+   * A read of a shared dataset reached its inputs (§5.12): one event per
+   * input, tagged with the dataset, so the input's owner sees who received
+   * their data and through which dataset.
+   */
+  private async auditDatasetInputs(
+    assetIds: string[],
+    context: {
+      actor: Actor;
+      channel: AuditChannel;
+      isExport: boolean;
+      format: string | null;
+      connectionId: string | null;
+    },
+  ): Promise<void> {
+    const datasets = await this.prisma.sharedDataset.findMany({
+      where: { assetId: { in: assetIds } },
+      select: { assetId: true, inputs: true, domain: true, name: true },
+    });
+    if (!datasets.length) return;
+    const tables = await this.tablesFor(datasets.flatMap((d) => d.inputs));
+    for (const dataset of datasets) {
+      const via = `shared.${dataset.domain}.${dataset.name}`;
+      for (const inputId of dataset.inputs) {
+        void this.audit.record({
+          actor: context.actor,
+          channel: context.channel,
+          capability: context.isExport ? 'data.export' : 'data.query',
+          operation: context.isExport
+            ? `query-runs.export-table.${context.format}`
+            : 'query-runs.read-table',
+          entityType: 'asset',
+          entityId: inputId,
+          entityName: tables.get(inputId)?.sqlName ?? null,
+          resources: [
+            ...tableReadResources({
+              assetId: inputId,
+              sourceId: tables.get(inputId)?.sourceId,
+              connectionId: context.connectionId,
+            }),
+            datasetResource(dataset.assetId),
+          ],
+          fields: [],
+          changes: [{ field: 'via', to: via }],
+        });
+      }
+    }
   }
 
   private async assetIdsFor(sqlNames: string[]): Promise<string[]> {
@@ -1038,7 +1327,8 @@ export class QueryRunService {
 
   async list(limit = 20): Promise<QueryRunView[]> {
     const runs = await this.prisma.queryRun.findMany({
-      where: { actorRef: this.actors.current().ref ?? null },
+      // A person's own queries: describes (§5.12) and system runs are not history.
+      where: { actorRef: this.actors.current().ref ?? null, purpose: null },
       orderBy: { createdAt: 'desc' },
       take: Math.min(Math.max(limit, 1), 100),
       select: {

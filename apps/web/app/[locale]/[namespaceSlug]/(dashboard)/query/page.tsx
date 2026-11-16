@@ -3,7 +3,7 @@
 import { ConnectToolButton } from "@/components/sql-connections/connect-tool-button";
 import * as React from "react";
 import { Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslation } from "@/hooks/use-translation";
 import { QueryExplorer } from "@/components/data-query/query-explorer";
 import { Lock } from "lucide-react";
@@ -13,6 +13,12 @@ import {
   QueryWorkbench,
   type QueryWorkbenchHandle,
 } from "@/components/data-query/query-workbench";
+import { useNsPath } from "@/lib/ns-path";
+import { ShareDatasetSheet } from "@/components/shared-datasets/share-dataset-sheet";
+import {
+  useSharedDataset,
+  useSharedDatasetOptions,
+} from "@/lib/shared-datasets";
 import {
   fetchCatalog,
   fetchRecentRuns,
@@ -41,6 +47,12 @@ function QueryPageContent() {
   const workbench = React.useRef<QueryWorkbenchHandle>(null);
   const seeded = React.useRef(false);
   const { t } = useTranslation();
+  const router = useRouter();
+  const nsPath = useNsPath();
+  // DQ §5.12: `?dataset=<id>` edits a shared dataset's SQL (a new version).
+  const editing = useSharedDataset(params.get("dataset"));
+  const shareOptions = useSharedDatasetOptions();
+  const [shareSql, setShareSql] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     fetchCatalog()
@@ -71,9 +83,15 @@ function QueryPageContent() {
 
   React.useEffect(() => {
     if (!catalog || seeded.current) return;
+    if (params.get("dataset") && !editing.data) return;
     seeded.current = true;
-    workbench.current?.setSql(params.get("sql") ?? starterSql(catalog).sql);
-  }, [catalog, params]);
+    workbench.current?.setSql(
+      editing.data?.sql ?? params.get("sql") ?? starterSql(catalog).sql,
+    );
+  }, [catalog, params, editing.data]);
+
+  const editable = editing.data?.canEdit ? editing.data : null;
+  const canShare = Boolean(editable || shareOptions.data?.canShare);
 
   return (
     <div className="-mx-4 -mb-4 flex min-h-[calc(100vh-10rem)] min-w-0 flex-col">
@@ -101,6 +119,24 @@ function QueryPageContent() {
               });
             }}
             onSaved={() => reloadSaved()}
+            onShare={canShare ? (sql) => setShareSql(sql) : undefined}
+            shareLabel={
+              editable
+                ? t("sharedDatasets.share.editButton", {
+                    name: editable.sqlName,
+                  })
+                : undefined
+            }
+          />
+          <ShareDatasetSheet
+            open={shareSql !== null}
+            sql={shareSql ?? ""}
+            dataset={editable}
+            onClose={() => setShareSql(null)}
+            onShared={(dataset) => {
+              setShareSql(null);
+              router.push(nsPath(`/assets/${dataset.assetId}?tab=definition`));
+            }}
           />
         </section>
         <section className="w-full min-w-0 shrink-0 overflow-x-clip px-2 py-2 xl:w-80 xl:border-l">

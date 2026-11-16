@@ -20,7 +20,7 @@ import { mapValues } from '../runtime';
  */
 export interface UsageChannelDto {
     /**
-     * 
+     * `dataset`: reads that reached this table through a shared dataset (DQ §5.12).
      * @type {string}
      * @memberof UsageChannelDto
      */
@@ -46,7 +46,8 @@ export interface UsageChannelDto {
 export const UsageChannelDtoChannelEnum = {
     Rest: 'rest',
     Mcp: 'mcp',
-    Sql: 'sql'
+    Sql: 'sql',
+    Dataset: 'dataset'
 } as const;
 export type UsageChannelDtoChannelEnum = typeof UsageChannelDtoChannelEnum[keyof typeof UsageChannelDtoChannelEnum];
 

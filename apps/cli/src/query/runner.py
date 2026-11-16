@@ -130,6 +130,17 @@ def run_query(request_data: dict[str, Any]) -> tuple[dict[str, Any], QueryResult
         # to the person; they pass through the redactor in case a connection
         # string ever reaches one.
         return _error("execution_error", redact(text[:2000])), None
+    if result.description is not None:
+        # A describe: columns and lineage only, sent as JSON (no rows).
+        return {
+            "status": "success",
+            "format": "describe",
+            "rowCount": 0,
+            "columns": result.columns,
+            "timings": result.timings,
+            "tables": result.tables,
+            "describe": result.description,
+        }, None
     payload = {
         "status": "success",
         "rowCount": result.row_count,

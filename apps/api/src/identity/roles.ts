@@ -136,6 +136,14 @@ export const BUILT_IN_ROLES = [
     ],
   },
   {
+    // Add-on to Data reader (or a role that queries): sharing queries as
+    // datasets (docs/prd/DQ-data-query.md §5.12).
+    key: 'dataset-publisher',
+    title: 'Dataset publisher',
+    scope: 'workspace',
+    capabilities: ['dataset.publish', 'notification.view'],
+  },
+  {
     // Add-on: combined with another role, never granted alone in practice.
     key: 'code-author',
     title: 'Code author',

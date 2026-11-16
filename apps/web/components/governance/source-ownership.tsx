@@ -24,6 +24,7 @@ import type { SourceGovernanceDto } from "@/lib/governance";
 import { ChangedBy } from "@/components/audit-history";
 import { OwnershipCard } from "./ownership-card";
 import { AccessCard } from "./access-card";
+import { DatasetUsesCard } from "@/components/shared-datasets/dataset-cards";
 import { AccessRequestsCard } from "./access-requests-card";
 import { RoleIcon } from "./role-style";
 
@@ -131,6 +132,10 @@ export function SourceGovernanceView({
             name: t("sqlConnections.thisSource"),
           }}
         />
+      )}
+
+      {governance.canGovern && (
+        <DatasetUsesCard scopeType="source" scopeId={sourceId} />
       )}
 
       <Card data-testid="source-coverage">

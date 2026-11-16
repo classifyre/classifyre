@@ -260,6 +260,15 @@ export const CAPABILITIES = [
       'Create your own SQL connections for BI tools and drivers (PostgreSQL protocol).',
   },
   {
+    // A saved query shared with groups as a governed dataset of its own
+    // (docs/prd/DQ-data-query.md §5.12). Owners and stewards of every table
+    // a dataset reads may share it without this.
+    id: 'dataset.publish',
+    scope: 'workspace',
+    description:
+      'Share a query over tables you can read as a dataset other groups read without access to those tables.',
+  },
+  {
     id: 'data.connection.manage',
     scope: 'workspace',
     description:

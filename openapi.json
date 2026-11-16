@@ -1717,7 +1717,8 @@
                   "ATHENA",
                   "BIGQUERY",
                   "REDSHIFT",
-                  "CUSTOM"
+                  "CUSTOM",
+                  "SHARED_DATASET"
                 ]
               }
             }
@@ -2102,7 +2103,8 @@
                   "ATHENA",
                   "BIGQUERY",
                   "REDSHIFT",
-                  "CUSTOM"
+                  "CUSTOM",
+                  "SHARED_DATASET"
                 ]
               }
             }
@@ -16200,6 +16202,392 @@
         ]
       }
     },
+    "/shared-datasets": {
+      "get": {
+        "operationId": "SharedDatasetsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SharedDatasetSummaryDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Every shared dataset of the workspace",
+        "tags": [
+          "Shared datasets"
+        ]
+      },
+      "post": {
+        "operationId": "SharedDatasetsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSharedDatasetDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedDatasetDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Share a query as a dataset",
+        "tags": [
+          "Shared datasets"
+        ]
+      }
+    },
+    "/shared-datasets/options": {
+      "get": {
+        "operationId": "SharedDatasetsController_options",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedDatasetOptionsDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Whether you may share datasets here, and your groups",
+        "tags": [
+          "Shared datasets"
+        ]
+      }
+    },
+    "/shared-datasets/uses": {
+      "get": {
+        "operationId": "SharedDatasetsController_uses",
+        "parameters": [
+          {
+            "name": "scopeType",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "asset",
+                "source"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "scopeId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SharedDatasetUseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Shared datasets that read a table or any table of a source",
+        "tags": [
+          "Shared datasets"
+        ]
+      }
+    },
+    "/shared-datasets/describe": {
+      "post": {
+        "operationId": "SharedDatasetsController_describe",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DescribeSharedDatasetDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedDatasetDescriptionDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "What a query would be as a shared dataset: columns, inherited classification, inputs, whether you may share it",
+        "tags": [
+          "Shared datasets"
+        ]
+      }
+    },
+    "/shared-datasets/{id}": {
+      "get": {
+        "operationId": "SharedDatasetsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedDatasetDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "One shared dataset (its asset id)",
+        "tags": [
+          "Shared datasets"
+        ]
+      },
+      "patch": {
+        "operationId": "SharedDatasetsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSharedDatasetDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedDatasetDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Change the SQL, description or owning group (a new version)",
+        "tags": [
+          "Shared datasets"
+        ]
+      }
+    },
+    "/shared-datasets/{id}/versions": {
+      "get": {
+        "operationId": "SharedDatasetsController_versions",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SharedDatasetVersionDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Every saved version of its definition",
+        "tags": [
+          "Shared datasets"
+        ]
+      }
+    },
+    "/shared-datasets/{id}/promote": {
+      "post": {
+        "operationId": "SharedDatasetsController_promote",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromoteSharedDatasetDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedDatasetDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Mark it promoted (ready), or take that back",
+        "tags": [
+          "Shared datasets"
+        ]
+      }
+    },
+    "/shared-datasets/{id}/blocks": {
+      "post": {
+        "operationId": "SharedDatasetsController_block",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BlockSharedDatasetDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SharedDatasetUseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Block it from reading your table (or source): nobody reads it until lifted",
+        "tags": [
+          "Shared datasets"
+        ]
+      }
+    },
+    "/shared-datasets/{id}/blocks/{blockId}": {
+      "delete": {
+        "operationId": "SharedDatasetsController_unblock",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "blockId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SharedDatasetUseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lift a block",
+        "tags": [
+          "Shared datasets"
+        ]
+      }
+    },
     "/runner-limits": {
       "get": {
         "operationId": "DeploymentSettingsController_get",
@@ -18898,7 +19286,8 @@
                 "ATHENA",
                 "BIGQUERY",
                 "REDSHIFT",
-                "CUSTOM"
+                "CUSTOM",
+                "SHARED_DATASET"
               ]
             }
           },
@@ -19948,7 +20337,8 @@
               "ATHENA",
               "BIGQUERY",
               "REDSHIFT",
-              "CUSTOM"
+              "CUSTOM",
+              "SHARED_DATASET"
             ]
           },
           "sourceId": {
@@ -20455,7 +20845,8 @@
                 "ATHENA",
                 "BIGQUERY",
                 "REDSHIFT",
-                "CUSTOM"
+                "CUSTOM",
+                "SHARED_DATASET"
               ]
             }
           },
@@ -21604,7 +21995,8 @@
               "ATHENA",
               "BIGQUERY",
               "REDSHIFT",
-              "CUSTOM"
+              "CUSTOM",
+              "SHARED_DATASET"
             ]
           }
         },
@@ -31825,6 +32217,7 @@
                 "data.query",
                 "data.unmask",
                 "data.connect",
+                "dataset.publish",
                 "data.connection.manage",
                 "mcp.token.own",
                 "mcp.token.admin",
@@ -32090,6 +32483,7 @@
                 "data.query",
                 "data.unmask",
                 "data.connect",
+                "dataset.publish",
                 "data.connection.manage",
                 "mcp.token.own",
                 "mcp.token.admin",
@@ -32318,6 +32712,7 @@
                 "data.query",
                 "data.unmask",
                 "data.connect",
+                "dataset.publish",
                 "data.connection.manage",
                 "mcp.token.own",
                 "mcp.token.admin",
@@ -32956,7 +33351,8 @@
                 "ATHENA",
                 "BIGQUERY",
                 "REDSHIFT",
-                "CUSTOM"
+                "CUSTOM",
+                "SHARED_DATASET"
               ]
             }
           },
@@ -38010,6 +38406,50 @@
           "fromClassification"
         ]
       },
+      "InheritedColumnSourceDto": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string"
+          },
+          "table": {
+            "type": "string",
+            "example": "shop_lake.shop.customers"
+          },
+          "column": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "assetId",
+          "table",
+          "column"
+        ]
+      },
+      "InheritedColumnDto": {
+        "type": "object",
+        "properties": {
+          "floor": {
+            "type": "string",
+            "nullable": true,
+            "description": "The least it is classified: the strictest of the input columns it comes from."
+          },
+          "from": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InheritedColumnSourceDto"
+            }
+          },
+          "traced": {
+            "type": "boolean",
+            "description": "False: lineage could not trace it, so every input counts."
+          }
+        },
+        "required": [
+          "from",
+          "traced"
+        ]
+      },
       "AssetColumnDto": {
         "type": "object",
         "properties": {
@@ -38125,6 +38565,14 @@
           "updatedBy": {
             "type": "string",
             "nullable": true
+          },
+          "inherited": {
+            "description": "Set on a shared dataset’s columns: what its inputs give it.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/InheritedColumnDto"
+              }
+            ]
           }
         },
         "required": [
@@ -38311,8 +38759,10 @@
             "enum": [
               "rest",
               "mcp",
-              "sql"
-            ]
+              "sql",
+              "dataset"
+            ],
+            "description": "`dataset`: reads that reached this table through a shared dataset (DQ §5.12)."
           },
           "reads": {
             "type": "number"
@@ -40921,6 +41371,715 @@
             "description": "Why, for the requester."
           }
         }
+      },
+      "SharedDatasetGroupDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "example": "/finance"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "SharedDatasetActorDto": {
+        "type": "object",
+        "properties": {
+          "ref": {
+            "type": "string",
+            "example": "user:5c1f…"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ref",
+          "name"
+        ]
+      },
+      "SharedDatasetSummaryDto": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "description": "The dataset is this asset."
+          },
+          "sqlName": {
+            "type": "string",
+            "example": "shared.sales.orders_by_region"
+          },
+          "domain": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "owningGroup": {
+            "$ref": "#/components/schemas/SharedDatasetGroupDto"
+          },
+          "owner": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SharedDatasetActorDto"
+              }
+            ]
+          },
+          "lifecycle": {
+            "type": "string",
+            "example": "ACTIVE",
+            "description": "GOV lifecycle: ACTIVE is Certified."
+          },
+          "promoted": {
+            "type": "boolean",
+            "description": "Its owner or a steward says it is ready."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "live",
+              "blocked",
+              "unavailable",
+              "retired"
+            ]
+          },
+          "stateReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "inputCount": {
+            "type": "number"
+          },
+          "canQuery": {
+            "type": "boolean",
+            "description": "You may query it."
+          },
+          "version": {
+            "type": "number"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "assetId",
+          "sqlName",
+          "domain",
+          "name",
+          "owningGroup",
+          "lifecycle",
+          "promoted",
+          "state",
+          "inputCount",
+          "canQuery",
+          "version",
+          "updatedAt"
+        ]
+      },
+      "SharedDatasetOptionsDto": {
+        "type": "object",
+        "properties": {
+          "canShare": {
+            "type": "boolean",
+            "description": "You may share datasets here (by role, or over tables you govern)."
+          },
+          "viaRole": {
+            "type": "boolean",
+            "description": "Through the Dataset publisher role (or one above it)."
+          },
+          "groups": {
+            "description": "Your groups: an owning group is one of them.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SharedDatasetGroupDto"
+            }
+          },
+          "domains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "canShare",
+          "viaRole",
+          "groups",
+          "domains"
+        ]
+      },
+      "SharedDatasetBlockDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "scopeType": {
+            "type": "string",
+            "enum": [
+              "asset",
+              "source"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "blockedBy": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SharedDatasetActorDto"
+              }
+            ]
+          },
+          "blockedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "scopeType",
+          "blockedAt"
+        ]
+      },
+      "SharedDatasetUseDto": {
+        "type": "object",
+        "properties": {
+          "datasetId": {
+            "type": "string"
+          },
+          "sqlName": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "owner": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SharedDatasetActorDto"
+              }
+            ]
+          },
+          "owningGroup": {
+            "$ref": "#/components/schemas/SharedDatasetGroupDto"
+          },
+          "block": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SharedDatasetBlockDto"
+              }
+            ]
+          },
+          "reads30d": {
+            "type": "number",
+            "description": "Reads of this table through it in 30 days."
+          },
+          "canBlock": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "datasetId",
+          "sqlName",
+          "name",
+          "owningGroup",
+          "reads30d",
+          "canBlock"
+        ]
+      },
+      "DescribeSharedDatasetDto": {
+        "type": "object",
+        "properties": {
+          "sql": {
+            "type": "string"
+          },
+          "owningGroupId": {
+            "type": "string",
+            "description": "Check the owning group’s access too."
+          }
+        },
+        "required": [
+          "sql"
+        ]
+      },
+      "SharedDatasetUpstreamDto": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string"
+          },
+          "table": {
+            "type": "string",
+            "example": "shop_lake.shop.customers"
+          },
+          "column": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "assetId",
+          "table",
+          "column"
+        ]
+      },
+      "SharedDatasetColumnDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "floor": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "public",
+              "internal",
+              "confidential",
+              "personal",
+              "sensitive",
+              "secret"
+            ],
+            "description": "The strictest classification of the input columns it comes from: the least it is guarded."
+          },
+          "from": {
+            "description": "The input columns that set the floor.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SharedDatasetUpstreamDto"
+            }
+          },
+          "upstreams": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SharedDatasetUpstreamDto"
+            }
+          },
+          "traced": {
+            "type": "boolean",
+            "description": "False when lineage could not say where it comes from: it then takes the strictest classification of every input."
+          },
+          "transform": {
+            "type": "string",
+            "nullable": true,
+            "example": "AGGREGATED",
+            "description": "IDENTITY, MAPPED, TRANSFORMED or AGGREGATED."
+          }
+        },
+        "required": [
+          "name",
+          "type",
+          "from",
+          "upstreams",
+          "traced"
+        ]
+      },
+      "SharedDatasetInputDto": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string"
+          },
+          "sqlName": {
+            "type": "string",
+            "example": "shop_lake.shop.orders"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sourceId": {
+            "type": "string"
+          },
+          "sourceName": {
+            "type": "string"
+          },
+          "answeredBy": {
+            "description": "Its owners, else its stewards: told of the dataset, and may block it.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SharedDatasetActorDto"
+            }
+          },
+          "groupCanQuery": {
+            "type": "boolean",
+            "nullable": true,
+            "description": "Whether the owning group may query it now (null: no group given)."
+          },
+          "youGovern": {
+            "type": "boolean",
+            "description": "You own or steward it, or its source."
+          },
+          "blocked": {
+            "type": "boolean",
+            "description": "It (or its source) blocks the dataset."
+          }
+        },
+        "required": [
+          "assetId",
+          "sqlName",
+          "name",
+          "sourceId",
+          "sourceName",
+          "answeredBy",
+          "youGovern",
+          "blocked"
+        ]
+      },
+      "SharedDatasetDescriptionDto": {
+        "type": "object",
+        "properties": {
+          "columns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SharedDatasetColumnDto"
+            }
+          },
+          "inputs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SharedDatasetInputDto"
+            }
+          },
+          "untraced": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "canShare": {
+            "type": "boolean"
+          },
+          "problems": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "columns",
+          "inputs",
+          "untraced",
+          "canShare",
+          "problems"
+        ]
+      },
+      "SharedDatasetAudienceDto": {
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "string"
+          },
+          "roleKey": {
+            "type": "string",
+            "enum": [
+              "data-reader",
+              "data-reader-unmasked"
+            ],
+            "default": "data-reader"
+          }
+        },
+        "required": [
+          "groupId"
+        ]
+      },
+      "CreateSharedDatasetDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "orders_by_region"
+          },
+          "domain": {
+            "type": "string",
+            "example": "sales"
+          },
+          "description": {
+            "type": "string"
+          },
+          "sql": {
+            "type": "string"
+          },
+          "owningGroupId": {
+            "type": "string",
+            "description": "The group whose rights read the inputs."
+          },
+          "audience": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SharedDatasetAudienceDto"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "domain",
+          "sql",
+          "owningGroupId"
+        ]
+      },
+      "SharedDatasetDto": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "description": "The dataset is this asset."
+          },
+          "sqlName": {
+            "type": "string",
+            "example": "shared.sales.orders_by_region"
+          },
+          "domain": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "owningGroup": {
+            "$ref": "#/components/schemas/SharedDatasetGroupDto"
+          },
+          "owner": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SharedDatasetActorDto"
+              }
+            ]
+          },
+          "lifecycle": {
+            "type": "string",
+            "example": "ACTIVE",
+            "description": "GOV lifecycle: ACTIVE is Certified."
+          },
+          "promoted": {
+            "type": "boolean",
+            "description": "Its owner or a steward says it is ready."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "live",
+              "blocked",
+              "unavailable",
+              "retired"
+            ]
+          },
+          "stateReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "inputCount": {
+            "type": "number"
+          },
+          "canQuery": {
+            "type": "boolean",
+            "description": "You may query it."
+          },
+          "version": {
+            "type": "number"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "sql": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "example": "query"
+          },
+          "sourceId": {
+            "type": "string",
+            "description": "The built-in Shared datasets source."
+          },
+          "promotedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "promotedBy": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SharedDatasetActorDto"
+              }
+            ]
+          },
+          "inputs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SharedDatasetInputDto"
+            }
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SharedDatasetColumnDto"
+            }
+          },
+          "createdBy": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SharedDatasetActorDto"
+              }
+            ]
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "canEdit": {
+            "type": "boolean"
+          },
+          "canPromote": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "assetId",
+          "sqlName",
+          "domain",
+          "name",
+          "owningGroup",
+          "lifecycle",
+          "promoted",
+          "state",
+          "inputCount",
+          "canQuery",
+          "version",
+          "updatedAt",
+          "sql",
+          "kind",
+          "sourceId",
+          "inputs",
+          "columns",
+          "createdAt",
+          "canEdit",
+          "canPromote"
+        ]
+      },
+      "UpdateSharedDatasetDto": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "sql": {
+            "type": "string"
+          },
+          "owningGroupId": {
+            "type": "string"
+          }
+        }
+      },
+      "SharedDatasetVersionDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number"
+          },
+          "sql": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "owningGroup": {
+            "$ref": "#/components/schemas/SharedDatasetGroupDto"
+          },
+          "inputs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "changedBy": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SharedDatasetActorDto"
+              }
+            ]
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "sql",
+          "owningGroup",
+          "inputs",
+          "createdAt"
+        ]
+      },
+      "PromoteSharedDatasetDto": {
+        "type": "object",
+        "properties": {
+          "promoted": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "promoted"
+        ]
+      },
+      "BlockSharedDatasetDto": {
+        "type": "object",
+        "properties": {
+          "scopeType": {
+            "type": "string",
+            "enum": [
+              "asset",
+              "source"
+            ]
+          },
+          "scopeId": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "scopeType",
+          "scopeId"
+        ]
       },
       "RunnerLimitDto": {
         "type": "object",

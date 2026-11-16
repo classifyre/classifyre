@@ -3,6 +3,7 @@ import { governedDataScope } from '../governance/governance-filter';
 import type { GovernancePerson } from '../governance/governance-rules';
 import type { AccessPolicy } from '../identity/access-policy';
 import type { Actor } from '../identity/actor';
+import type { DataPrincipal } from './data-principal';
 
 /** Who reads masked and hidden columns in clear (DQ §5.8). */
 export interface ClearScope {
@@ -25,14 +26,25 @@ export async function clearScopeOf(
   person: GovernancePerson | null,
 ): Promise<ClearScope> {
   const capabilities = await policy.capabilities(actor);
-  if (capabilities.has('data.unmask')) {
+  return clearScopeFor(db, {
+    ownerRef: null,
+    person,
+    capabilities,
+    resourceGrants: (capability) =>
+      policy.resourceGrants?.(capability) ?? { sourceIds: [], assetIds: [] },
+  });
+}
+
+/** {@link clearScopeOf} for any principal: a person or a dataset's owning group. */
+export async function clearScopeFor(
+  db: Pick<PrismaClient, 'governanceRole'>,
+  principal: DataPrincipal,
+): Promise<ClearScope> {
+  if (principal.capabilities.has('data.unmask')) {
     return { all: true, sourceIds: new Set(), assetIds: new Set() };
   }
-  const grants = policy.resourceGrants?.('data.unmask') ?? {
-    sourceIds: [],
-    assetIds: [],
-  };
-  const governed = await governedDataScope(db, person);
+  const grants = principal.resourceGrants('data.unmask');
+  const governed = await governedDataScope(db, principal.person);
   return {
     all: false,
     sourceIds: new Set([...grants.sourceIds, ...governed.sourceIds]),

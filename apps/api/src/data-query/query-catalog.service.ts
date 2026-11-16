@@ -15,9 +15,17 @@ import {
   type ColumnMask,
   type MaskedColumn,
 } from './column-masks';
-import { clearScopeOf, readsInClear, type ClearScope } from './clear-scope';
+import { clearScopeFor, readsInClear, type ClearScope } from './clear-scope';
+import type { DataPrincipal } from './data-principal';
 import { rowFilterFor, selectsEveryRow, type RowFilter } from './row-filters';
 import { personOf } from '../identity/actor-ref';
+import {
+  columnFloors,
+  datasetColumnPolicy,
+  parseDatasetColumns,
+  stricterClassification,
+  type UpstreamColumn,
+} from './dataset-floor';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ClsService } from 'nestjs-cls';
 import { PrismaService } from '../prisma.service';
@@ -191,29 +199,47 @@ export class QueryCatalogService {
     return this.cls.isActive() ? this.cls.get<string>(CLS_SCHEMA) : undefined;
   }
 
+  /**
+   * The current request's person as a {@link DataPrincipal}: their
+   * capabilities and resource grants in this workspace, their groups.
+   */
+  async requestPrincipal(): Promise<DataPrincipal> {
+    const actor = this.actors.current();
+    const capabilities = await this.policy.capabilities(actor);
+    const person = this.cls.isActive()
+      ? (this.cls.get<ClsPerson | undefined>(CLS_PERSON) ?? null)
+      : null;
+    return {
+      ownerRef: personOf(actor.ref),
+      person,
+      capabilities,
+      resourceGrants: (capability) =>
+        this.policy.resourceGrants?.(capability) ?? {
+          sourceIds: [],
+          assetIds: [],
+        },
+    };
+  }
+
   /** Who may query what: everything, or the sources and tables granted. */
-  async scope(): Promise<{
+  async scope(principal?: DataPrincipal): Promise<{
     all: boolean;
     sourceIds: ReadonlySet<string>;
     assetIds: ReadonlySet<string>;
     seeLocked: boolean;
   }> {
-    const actor = this.actors.current();
-    const capabilities = await this.policy.capabilities(actor);
-    const grants = this.policy.resourceGrants?.('data.query') ?? {
-      sourceIds: [],
-      assetIds: [],
-    };
-    const all = capabilities.has('data.query');
+    const p = principal ?? (await this.requestPrincipal());
+    const grants = p.resourceGrants('data.query');
+    const all = p.capabilities.has('data.query');
     // An owner reads the tables they own (GOV R3), without a grant.
     const owned = all
       ? { sourceIds: [], assetIds: [] }
-      : await ownerDataScope(this.prisma, personOf(actor.ref));
+      : await ownerDataScope(this.prisma, p.ownerRef);
     return {
       all,
       sourceIds: new Set([...grants.sourceIds, ...owned.sourceIds]),
       assetIds: new Set([...grants.assetIds, ...owned.assetIds]),
-      seeLocked: capabilities.has('asset.view'),
+      seeLocked: p.capabilities.has('asset.view'),
     };
   }
 
@@ -222,25 +248,20 @@ export class QueryCatalogService {
    * the workspace (a role), on a source or table (an unmasked Data reader
    * grant), and the owners and stewards of what they govern.
    */
-  async clearScope(): Promise<ClearScope> {
-    const person = this.cls.isActive()
-      ? this.cls.get<ClsPerson | undefined>(CLS_PERSON)
-      : undefined;
-    return clearScopeOf(
+  async clearScope(principal?: DataPrincipal): Promise<ClearScope> {
+    return clearScopeFor(
       this.prisma,
-      this.policy,
-      this.actors.current(),
-      person ?? null,
+      principal ?? (await this.requestPrincipal()),
     );
   }
 
   /**
-   * asset id → the rows the current person reads of each filtered table
+   * asset id → the rows the principal reads of each filtered table
    * (DQ §5.10); tables not in the map show every row. Read every time, like
    * the masks: a rule a steward removes stops applying at once. The tables
-   * and sources the person owns or stewards are left out: they see it all.
+   * and sources the principal owns or stewards are left out: they see it all.
    */
-  async rowFilters(): Promise<Map<string, RowFilter>> {
+  async rowFilters(principal?: DataPrincipal): Promise<Map<string, RowFilter>> {
     const policies = await this.prisma.assetRowPolicy.findMany({
       select: {
         assetId: true,
@@ -250,9 +271,11 @@ export class QueryCatalogService {
     });
     const out = new Map<string, RowFilter>();
     if (!policies.length) return out;
-    const person = this.cls.isActive()
-      ? (this.cls.get<ClsPerson | undefined>(CLS_PERSON) ?? null)
-      : null;
+    const person = principal
+      ? principal.person
+      : this.cls.isActive()
+        ? (this.cls.get<ClsPerson | undefined>(CLS_PERSON) ?? null)
+        : null;
     const governed = await governedDataScope(this.prisma, person);
     const everyRow = {
       sourceIds: new Set(governed.sourceIds),
@@ -278,7 +301,7 @@ export class QueryCatalogService {
    * hidden at once); what findings classify is reused like the table list.
    */
   async columnMasks(): Promise<Map<string, ColumnMask[]>> {
-    const [derived, notes] = await Promise.all([
+    const [derived, notes, datasets] = await Promise.all([
       this.derivedClassifications(),
       this.prisma.assetColumnAnnotation.findMany({
         where: {
@@ -296,6 +319,9 @@ export class QueryCatalogService {
           classification: true,
         },
       }),
+      this.prisma.sharedDataset.findMany({
+        select: { assetId: true, inputs: true, columns: true },
+      }),
     ]);
     const out = new Map<string, ColumnMask[]>();
     const add = (assetId: string, mask: ColumnMask | null) => {
@@ -304,8 +330,13 @@ export class QueryCatalogService {
       list.push(mask);
       out.set(assetId, list);
     };
+    const datasetIds = new Set(datasets.map((d) => d.assetId));
     const noted = new Set<string>();
+    const noteOf = new Map<string, (typeof notes)[number]>();
     for (const note of notes) {
+      noteOf.set(`${note.assetId}\u0000${note.columnName}`, note);
+      // A shared dataset's columns follow their floor, below.
+      if (datasetIds.has(note.assetId)) continue;
       noted.add(`${note.assetId}\u0000${note.columnName}`);
       const policy = effectiveColumnPolicy({
         access: note.access,
@@ -318,6 +349,7 @@ export class QueryCatalogService {
       add(note.assetId, toColumnMask(note.columnName, policy));
     }
     for (const [assetId, columns] of derived) {
+      if (datasetIds.has(assetId)) continue;
       for (const [column, classification] of columns) {
         if (noted.has(`${assetId}\u0000${column}`)) continue;
         const policy = effectiveColumnPolicy({
@@ -327,6 +359,87 @@ export class QueryCatalogService {
         });
         add(assetId, toColumnMask(column, policy));
       }
+    }
+    // DQ §5.12: a shared dataset's columns inherit their inputs' strictest
+    // classification as a floor; its own settings can only add to it.
+    const index = classificationIndex(derived, notes);
+    for (const dataset of datasets) {
+      const floors = columnFloors(
+        parseDatasetColumns(dataset.columns),
+        index.classify,
+        index.strictestOf(dataset.inputs),
+      );
+      for (const [column, { floor }] of floors) {
+        const note = noteOf.get(`${dataset.assetId}\u0000${column}`);
+        const policy = datasetColumnPolicy({
+          floor,
+          access: note?.access,
+          maskKind: note?.maskKind,
+          classification: note?.classification,
+        });
+        add(dataset.assetId, toColumnMask(column, policy));
+      }
+    }
+    return out;
+  }
+
+  /**
+   * A shared dataset's output columns with their floor (DQ §5.12): the
+   * strictest classification of the input columns each comes from, and
+   * which ones. For governance and the dataset's pages.
+   */
+  async datasetFloors(
+    assetId: string,
+  ): Promise<
+    Map<string, { floor: Classification | null; from: UpstreamColumn[] }>
+  > {
+    const dataset = await this.prisma.sharedDataset.findUnique({
+      where: { assetId },
+      select: { inputs: true, columns: true },
+    });
+    if (!dataset) return new Map();
+    const [derived, notes] = await Promise.all([
+      this.derivedClassifications(),
+      this.prisma.assetColumnAnnotation.findMany({
+        where: {
+          assetId: { in: dataset.inputs },
+          classification: { not: null },
+        },
+        select: { assetId: true, columnName: true, classification: true },
+      }),
+    ]);
+    const index = classificationIndex(derived, notes);
+    return columnFloors(
+      parseDatasetColumns(dataset.columns),
+      index.classify,
+      index.strictestOf(dataset.inputs),
+    );
+  }
+
+  /** Each column's effective classification on these tables (a steward's, else derived). */
+  async classificationsOf(
+    assetIds: readonly string[],
+  ): Promise<Map<string, Map<string, Classification>>> {
+    const [derived, notes] = await Promise.all([
+      this.derivedClassifications(),
+      this.prisma.assetColumnAnnotation.findMany({
+        where: {
+          assetId: { in: [...assetIds] },
+          classification: { not: null },
+        },
+        select: { assetId: true, columnName: true, classification: true },
+      }),
+    ]);
+    const out = new Map<string, Map<string, Classification>>();
+    for (const assetId of assetIds) {
+      const map = new Map<string, Classification>(derived.get(assetId) ?? []);
+      out.set(assetId, map);
+    }
+    for (const note of notes) {
+      if (!note.classification) continue;
+      out
+        .get(note.assetId)
+        ?.set(note.columnName, note.classification as Classification);
     }
     return out;
   }
@@ -383,22 +496,29 @@ export class QueryCatalogService {
     return byAsset;
   }
 
-  async catalog(): Promise<QueryCatalog> {
+  /**
+   * What a principal may query, as they see it. Without one, the request's
+   * person (through their SQL connection's scope, if any); with one — a
+   * shared dataset's owning group — exactly that principal's rights.
+   */
+  async catalog(principal?: DataPrincipal): Promise<QueryCatalog> {
+    const p = principal ?? (await this.requestPrincipal());
     const [settings, scope, cached, clear, masks, rows] = await Promise.all([
       this.settings(),
-      this.scope(),
+      this.scope(p),
       this.tables(),
-      this.clearScope(),
+      this.clearScope(p),
       this.columnMasks(),
-      this.rowFilters(),
+      this.rowFilters(p),
     ]);
     const sources = new Map<string, CatalogSource>();
     for (const source of cached.sources) {
       sources.set(source.id, { ...source, tables: [] });
     }
-    const connection = this.cls.isActive()
-      ? this.cls.get<ConnectionScope | undefined>(CLS_CONNECTION_SCOPE)
-      : undefined;
+    const connection =
+      !principal && this.cls.isActive()
+        ? this.cls.get<ConnectionScope | undefined>(CLS_CONNECTION_SCOPE)
+        : undefined;
     for (const table of cached.tables) {
       // Through a SQL connection only what it opens shows at all: a BI tool
       // has no use for locked tables, and blocked ones are not its business.
@@ -620,4 +740,48 @@ function columnsOf(metadata: Record<string, unknown>): MaskedColumn[] {
     }
   }
   return out;
+}
+
+/**
+ * Effective column classifications (a steward's, else what findings derive),
+ * as lookups for a dataset's floor.
+ */
+function classificationIndex(
+  derived: Map<string, Map<string, Classification>>,
+  notes: readonly {
+    assetId: string;
+    columnName: string;
+    classification: string | null;
+  }[],
+) {
+  const set = new Map<string, string>();
+  for (const note of notes) {
+    if (note.classification) {
+      set.set(`${note.assetId}\u0000${note.columnName}`, note.classification);
+    }
+  }
+  const classify = (assetId: string, column: string) =>
+    set.get(`${assetId}\u0000${column}`) ??
+    derived.get(assetId)?.get(column) ??
+    // Column names from lineage may differ in case from the scan's.
+    [...(derived.get(assetId) ?? [])].find(
+      ([name]) => name.toLowerCase() === column.toLowerCase(),
+    )?.[1] ??
+    null;
+  const strictestOf = (assetIds: readonly string[]) => {
+    let best: Classification | null = null;
+    for (const assetId of assetIds) {
+      const columns = new Set([
+        ...(derived.get(assetId)?.keys() ?? []),
+        ...notes
+          .filter((note) => note.assetId === assetId)
+          .map((note) => note.columnName),
+      ]);
+      for (const column of columns) {
+        best = stricterClassification(best, classify(assetId, column));
+      }
+    }
+    return best;
+  };
+  return { classify, strictestOf };
 }

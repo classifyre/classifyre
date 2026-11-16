@@ -209,9 +209,11 @@ def masked_projection(
     ``known`` are the columns the scan recorded: one the table has now that
     is neither masked nor known (renamed at the source, or named differently
     by DuckDB) is hidden, because nothing says it is not what a mask was
-    for. Masks for columns the table no longer has change nothing.
+    for. Masks for columns the table no longer has change nothing. With no
+    masks, ``known`` alone still hides what is not known (a shared dataset's
+    output columns, §5.12).
     """
-    if not masks:
+    if not masks and known is None:
         return None
     exact = {m.column: m for m in masks}
     folded = {m.column.lower(): m for m in masks}

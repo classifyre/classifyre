@@ -82,6 +82,7 @@ export { DataQueryApi } from "./generated/src/apis/DataQueryApi";
 export { GovernanceApi } from "./generated/src/apis/GovernanceApi";
 export { SQLConnectionsApi } from "./generated/src/apis/SQLConnectionsApi";
 export { AccessRequestsApi } from "./generated/src/apis/AccessRequestsApi";
+export { SharedDatasetsApi } from "./generated/src/apis/SharedDatasetsApi";
 export { AIApi } from "./generated/src/apis/AIApi";
 export { WorkerQueuesApi } from "./generated/src/apis/WorkerQueuesApi";
 export { IdentityApi } from "./generated/src/apis/IdentityApi";
@@ -652,6 +653,26 @@ export type {
   CreateAccessRequestDto,
   ApproveAccessRequestDto,
   DenyAccessRequestDto,
+  SharedDatasetActorDto,
+  SharedDatasetGroupDto,
+  SharedDatasetUpstreamDto,
+  SharedDatasetColumnDto,
+  SharedDatasetInputDto,
+  SharedDatasetSummaryDto,
+  SharedDatasetDto,
+  DescribeSharedDatasetDto,
+  SharedDatasetDescriptionDto,
+  SharedDatasetAudienceDto,
+  CreateSharedDatasetDto,
+  UpdateSharedDatasetDto,
+  PromoteSharedDatasetDto,
+  SharedDatasetVersionDto,
+  SharedDatasetBlockDto,
+  SharedDatasetUseDto,
+  BlockSharedDatasetDto,
+  SharedDatasetOptionsDto,
+  InheritedColumnDto,
+  InheritedColumnSourceDto,
   AssetRowsDto,
   AssetRowRuleDto,
   UpdateAssetRowsDto,
@@ -1446,6 +1467,7 @@ import { DataQueryApi } from "./generated/src/apis/DataQueryApi";
 import { GovernanceApi } from "./generated/src/apis/GovernanceApi";
 import { SQLConnectionsApi } from "./generated/src/apis/SQLConnectionsApi";
 import { AccessRequestsApi } from "./generated/src/apis/AccessRequestsApi";
+import { SharedDatasetsApi } from "./generated/src/apis/SharedDatasetsApi";
 import { AIApi } from "./generated/src/apis/AIApi";
 import { AssetsApi } from "./generated/src/apis/AssetsApi";
 import { HealthApi } from "./generated/src/apis/HealthApi";
@@ -2094,6 +2116,7 @@ class ApiClient {
   public governance: GovernanceApi;
   public sqlConnections: SQLConnectionsApi;
   public accessRequests: AccessRequestsApi;
+  public sharedDatasets: SharedDatasetsApi;
   public ai: AIApi;
   public assets: AssetsApi;
   public health: HealthApi;
@@ -2132,6 +2155,7 @@ class ApiClient {
     this.governance = new GovernanceApi(this.config);
     this.sqlConnections = new SQLConnectionsApi(this.config);
     this.accessRequests = new AccessRequestsApi(this.config);
+    this.sharedDatasets = new SharedDatasetsApi(this.config);
     this.ai = new AIApi(this.config);
     this.assets = new AssetsApi(this.config);
     this.health = new HealthApi(this.config);

@@ -8,6 +8,12 @@ import {
   type MaskKind,
 } from '../data-query/column-masks';
 import { PrismaService } from '../prisma.service';
+import { QueryCatalogService } from '../data-query/query-catalog.service';
+import {
+  datasetColumnPolicy,
+  parseDatasetColumns,
+  stricterClassification,
+} from '../data-query/dataset-floor';
 import {
   classificationReviewed,
   deriveClassification,
@@ -40,6 +46,15 @@ export interface ColumnState {
   reviewedBy: string | null;
   updatedAt: Date | null;
   updatedBy: string | null;
+  /**
+   * A shared dataset's column (DQ §5.12): the classification it inherits from
+   * the input columns it comes from — a floor it cannot go below.
+   */
+  inherited?: {
+    floor: Classification | null;
+    from: { assetId: string; table: string; column: string }[];
+    traced: boolean;
+  };
 }
 
 export interface AssetColumns {
@@ -82,7 +97,10 @@ const SEVERITY_RANK = ['INFO', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
  */
 @Injectable()
 export class GovernanceColumnsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly catalog: QueryCatalogService,
+  ) {}
 
   async state(assetId: string, metadata?: unknown): Promise<AssetColumns> {
     const meta =
@@ -143,12 +161,50 @@ export class GovernanceColumnsService {
       byColumn.set(row.column, list);
     }
     const noteOf = new Map(annotations.map((row) => [row.columnName, row]));
+    const inherited = await this.inheritedFloors(assetId);
 
     const build = (name: string, type: string): ColumnState => {
       const note = noteOf.get(name);
       const findings = (byColumn.get(name) ?? []).sort(
         (a, b) => b.count - a.count,
       );
+      const floor = inherited?.get(name);
+      if (inherited) {
+        // A shared dataset: what its inputs give is its floor (§5.12).
+        const own = note?.classification ?? null;
+        return {
+          name,
+          type,
+          businessName: note?.businessName ?? null,
+          description: note?.description ?? null,
+          term: note?.term ?? null,
+          criticalDataElement: note?.criticalDataElement ?? false,
+          classification: own,
+          derivedClassification: floor?.floor ?? null,
+          effectiveClassification: stricterClassification(
+            own,
+            floor?.floor ?? null,
+          ),
+          findings,
+          access: isColumnAction(note?.access) ? note.access : null,
+          maskKind: isMaskKind(note?.maskKind) ? note.maskKind : null,
+          effectiveAccess: datasetColumnPolicy({
+            floor: floor?.floor ?? null,
+            access: note?.access,
+            maskKind: note?.maskKind,
+            classification: own,
+          }),
+          reviewedAt: note?.classificationReviewedAt ?? null,
+          reviewedBy: note?.classificationReviewedBy ?? null,
+          updatedAt: note?.updatedAt ?? null,
+          updatedBy: note?.updatedBy ?? null,
+          inherited: {
+            floor: floor?.floor ?? null,
+            from: floor?.from ?? [],
+            traced: floor?.traced ?? false,
+          },
+        };
+      }
       const derived = deriveClassification(findings);
       return {
         name,
@@ -197,4 +253,41 @@ export class GovernanceColumnsService {
     };
   }
 
+  /** A shared dataset's floors by column, or null for any other asset. */
+  private async inheritedFloors(assetId: string): Promise<Map<
+    string,
+    {
+      floor: Classification | null;
+      from: { assetId: string; table: string; column: string }[];
+      traced: boolean;
+    }
+  > | null> {
+    const dataset = await this.prisma.sharedDataset.findUnique({
+      where: { assetId },
+      select: { columns: true },
+    });
+    if (!dataset) return null;
+    const [floors, tables] = await Promise.all([
+      this.catalog.datasetFloors(assetId),
+      this.catalog.tables(),
+    ]);
+    const sqlOf = new Map(tables.tables.map((t) => [t.assetId, t.sqlName]));
+    const traced = new Map(
+      parseDatasetColumns(dataset.columns).map((c) => [c.name, c.traced]),
+    );
+    return new Map(
+      [...floors].map(([name, value]) => [
+        name,
+        {
+          floor: value.floor,
+          from: value.from.map((u) => ({
+            assetId: u.assetId,
+            table: sqlOf.get(u.assetId) ?? u.assetId,
+            column: u.column,
+          })),
+          traced: traced.get(name) ?? false,
+        },
+      ]),
+    );
+  }
 }

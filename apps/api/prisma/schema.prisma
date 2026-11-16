@@ -491,6 +491,7 @@ model Asset {
   columnAnnotations         AssetColumnAnnotation[]
   rowPolicy                 AssetRowPolicy?
   qualityRules              QualityRule[]
+  sharedDataset             SharedDataset?
 
   @@unique([sourceId, hash])
   @@index([urn])
@@ -638,40 +639,120 @@ model DataAccessRequest {
   @@map("data_access_requests")
 }
 
+/// A shared dataset (docs/prd/DQ-data-query.md §5.12): a saved query that a
+/// publisher owns and shares with audience groups. Its asset (of the built-in
+/// `SHARED_DATASET` source) carries everything governance hangs on assets;
+/// this row is its definition. Not materialised: every read runs the SQL, its
+/// inputs read with the owning group's rights.
+model SharedDataset {
+  assetId        String                 @id @map("asset_id")
+  /// `shared.<domain>.<name>` in SQL.
+  domain         String
+  name           String
+  description    String?                @db.Text
+  sql            String                 @db.Text
+  /// The group whose rights read the inputs, checked on every read.
+  owningGroupId  String                 @map("owning_group_id")
+  /// `query` (v1); `materialized` and `external` are reserved (§5.13).
+  kind           String                 @default("query")
+  /// Asset ids of the tables the SQL reads.
+  inputs         String[]
+  /// The output columns: `[{name, type, upstreams: [{assetId, column}], traced}]`.
+  columns        Json                   @db.JsonB
+  /// Field mappings per input, as the job described them (lineage edges).
+  lineage        Json                   @default("[]") @db.JsonB
+  version        Int                    @default(1)
+  promotedAt     DateTime?              @map("promoted_at")
+  promotedBy     String?                @map("promoted_by")
+  /// Set when a read found the owning group without an input; cleared by the
+  /// next read that succeeds. The owner is told once per outage.
+  unavailableAt  DateTime?              @map("unavailable_at")
+  unavailableWhy String?                @map("unavailable_why") @db.Text
+  createdBy      String?                @map("created_by")
+  createdAt      DateTime               @default(now()) @map("created_at")
+  updatedBy      String?                @map("updated_by")
+  updatedAt      DateTime               @updatedAt @map("updated_at")
+  asset          Asset                  @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  versions       SharedDatasetVersion[]
+  blocks         SharedDatasetBlock[]
+
+  @@unique([domain, name])
+  @@index([owningGroupId])
+  @@index([inputs], type: Gin)
+  @@map("shared_datasets")
+}
+
+/// One saved state of a shared dataset's definition: its history.
+model SharedDatasetVersion {
+  id            String        @id @default(uuid())
+  assetId       String        @map("asset_id")
+  version       Int
+  sql           String        @db.Text
+  owningGroupId String        @map("owning_group_id")
+  description   String?       @db.Text
+  inputs        String[]
+  changedBy     String?       @map("changed_by")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  dataset       SharedDataset @relation(fields: [assetId], references: [assetId], onDelete: Cascade)
+
+  @@unique([assetId, version])
+  @@map("shared_dataset_versions")
+}
+
+/// An input (a table, or its whole source) closed to one shared dataset by
+/// the input's owner or steward. Open while `liftedAt` is null.
+model SharedDatasetBlock {
+  id        String        @id @default(uuid())
+  assetId   String        @map("asset_id")
+  /// `asset` or `source`.
+  scopeType String        @map("scope_type")
+  scopeId   String        @map("scope_id")
+  reason    String?       @db.Text
+  blockedBy String?       @map("blocked_by")
+  blockedAt DateTime      @default(now()) @map("blocked_at")
+  liftedBy  String?       @map("lifted_by")
+  liftedAt  DateTime?     @map("lifted_at")
+  dataset   SharedDataset @relation(fields: [assetId], references: [assetId], onDelete: Cascade)
+
+  @@index([assetId])
+  @@index([scopeType, scopeId])
+  @@map("shared_dataset_blocks")
+}
+
 /// A data quality rule on an asset or one of its columns, ODCS-shaped
 /// (GOV §5.4). `detector` rules count open findings, `metadata` rules read
 /// what the scan recorded; `library` and `sql` (G-4) measure whole tables.
 model QualityRule {
-  id             String          @id @default(uuid())
-  assetId        String          @map("asset_id")
-  columnName     String?         @map("column_name")
+  id              String          @id @default(uuid())
+  assetId         String          @map("asset_id")
+  columnName      String?         @map("column_name")
   /// ODCS `id`: unique per asset, used in finding types (`quality:<key>`).
-  key            String
-  name           String
-  description    String?         @db.Text
+  key             String
+  name            String
+  description     String?         @db.Text
   /// accuracy, completeness, conformity, consistency, coverage, timeliness, uniqueness
-  dimension      String
+  dimension       String
   /// detector, metadata (later library, sql)
-  type           String
+  type            String
   /// openFindings, rowCount, freshness
-  metric         String
-  arguments      Json            @default("{}") @db.JsonB
+  metric          String
+  arguments       Json            @default("{}") @db.JsonB
   /// mustBe, mustNotBe, mustBeGreaterThan, …, mustBeBetween, mustNotBeBetween
-  operator       String
+  operator        String
   /// A number, or [low, high] for the between operators.
-  threshold      Json            @db.JsonB
-  unit           String
-  severity       Severity        @default(MEDIUM)
-  businessImpact String?         @map("business_impact") @db.Text
+  threshold       Json            @db.JsonB
+  unit            String
+  severity        Severity        @default(MEDIUM)
+  businessImpact  String?         @map("business_impact") @db.Text
   /// Cron (UTC, at most hourly); null = after each scan and on request only.
   schedule        String?
   lastScheduledAt DateTime?       @map("last_scheduled_at")
-  enabled        Boolean         @default(true)
-  createdBy      String?         @map("created_by")
-  createdAt      DateTime        @default(now()) @map("created_at")
-  updatedAt      DateTime        @updatedAt @map("updated_at")
-  asset          Asset           @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  results        QualityResult[]
+  enabled         Boolean         @default(true)
+  createdBy       String?         @map("created_by")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+  asset           Asset           @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  results         QualityResult[]
 
   @@unique([assetId, key])
   @@index([assetId, enabled])
@@ -1413,29 +1494,29 @@ model RunnerAsset {
 }
 
 model Notification {
-  id               String           @id @default(uuid())
-  type             NotificationType
-  event            String?
-  severity         Severity         @default(INFO)
-  title            String
-  message          String
-  actionUrl        String?          @map("action_url")
-  sourceId         String?          @map("source_id")
-  runnerId         String?          @map("runner_id")
-  findingId        String?          @map("finding_id")
-  triggeredBy      String?          @map("triggered_by")
+  id                 String           @id @default(uuid())
+  type               NotificationType
+  event              String?
+  severity           Severity         @default(INFO)
+  title              String
+  message            String
+  actionUrl          String?          @map("action_url")
+  sourceId           String?          @map("source_id")
+  runnerId           String?          @map("runner_id")
+  findingId          String?          @map("finding_id")
+  triggeredBy        String?          @map("triggered_by")
   /// Importance the producer gave it; each person can override it for
   /// themselves (NotificationState.important).
-  isImportant      Boolean          @default(false) @map("is_important")
+  isImportant        Boolean          @default(false) @map("is_important")
   /// Who gets it: identity-server group ids, fixed when it is made (from
   /// NotificationAudience). Empty: the workspace's owning group.
-  audienceGroupIds String[]         @default([]) @map("audience_group_ids")
+  audienceGroupIds   String[]         @default([]) @map("audience_group_ids")
   /// People it is for by name (`user:<sub>`), besides the groups: an asset's
   /// owner hears about their asset (GOV G-5). Both empty: the owning group.
-  audiencePersonRefs String[]       @default([]) @map("audience_person_refs")
-  metadata         Json?            @db.JsonB
-  createdAt        DateTime         @default(now()) @map("created_at")
-  updatedAt        DateTime         @updatedAt @map("updated_at")
+  audiencePersonRefs String[]         @default([]) @map("audience_person_refs")
+  metadata           Json?            @db.JsonB
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
 
   source  Source?             @relation(fields: [sourceId], references: [id], onDelete: SetNull)
   runner  Runner?             @relation(fields: [runnerId], references: [id], onDelete: SetNull)
@@ -1743,6 +1824,9 @@ enum AssetType {
   BIGQUERY
   REDSHIFT
   CUSTOM
+  /// The built-in source of shared datasets (docs/prd/DQ-data-query.md §5.12):
+  /// one per workspace, never scanned, never deleted.
+  SHARED_DATASET
 }
 
 enum RunnerStatus {
@@ -3774,28 +3858,28 @@ enum GlossaryRelationType {
 }
 
 model GlossaryTerm {
-  id               String             @id @default(uuid())
+  id                String                  @id @default(uuid())
   // Canonical name. Unique per scheme for CONCEPTs only, case-insensitively,
   // through a partial index Prisma cannot express (migration
   // 20261001120000_glossary_model):
   //   glossary_terms_concept_scheme_term_key
   //     ON (COALESCE(scheme_id, ''), lower(term)) WHERE kind = 'CONCEPT'
-  term             String
-  aliases          String[]           @default([])
+  term              String
+  aliases           String[]                @default([])
   // Agent-suggested aliases stay out of lookup until an operator accepts them.
-  proposedAliases  String[]           @default([]) @map("proposed_aliases")
-  entityType       GlossaryEntityType @default(TERM) @map("entity_type")
-  notes            String?            @db.Text
-  origin           GlossaryOrigin     @default(OPERATOR)
+  proposedAliases   String[]                @default([]) @map("proposed_aliases")
+  entityType        GlossaryEntityType      @default(TERM) @map("entity_type")
+  notes             String?                 @db.Text
+  origin            GlossaryOrigin          @default(OPERATOR)
   // The approval stamp: APPROVED <=> approvedAt is set (SL1 R6).
-  approvedAt       DateTime?          @map("approved_at")
-  approvedBy       String?            @map("approved_by")
+  approvedAt        DateTime?               @map("approved_at")
+  approvedBy        String?                 @map("approved_by")
   // Content hash of "term + aliases + codes + definition + notes" in the
   // shared embedding store (hidden aliases excluded, SL1 R7).
-  embedContentHash String?            @map("embed_content_hash")
+  embedContentHash  String?                 @map("embed_content_hash")
   columnAnnotations AssetColumnAnnotation[]
-  createdAt        DateTime           @default(now()) @map("created_at")
-  updatedAt        DateTime           @updatedAt @map("updated_at")
+  createdAt         DateTime                @default(now()) @map("created_at")
+  updatedAt         DateTime                @updatedAt @map("updated_at")
 
   kind          GlossaryTermKind @default(CONCEPT)
   // Stable reference (contract C8): ^[a-z0-9][a-z0-9._-]{0,99}$. A renamed
@@ -4563,7 +4647,7 @@ model AuditEvent {
   fields     String[] @default([])
   /// What changed, where the values are not secret (governance: owner Ann →
   /// Ben, status DRAFT → ACTIVE): `[{field, from, to}]`, texts cut short.
-  changes    Json?      @db.JsonB
+  changes    Json?    @db.JsonB
   /// HTTP status of the response (REST only).
   status     Int?
 

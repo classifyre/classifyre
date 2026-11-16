@@ -144,6 +144,12 @@ export class SourceService {
   }): Promise<Source> {
     const { config, type, name: providedName, description } = createSourceDto;
     const assetType = this.asAssetType(type);
+    if (assetType === AssetType.SHARED_DATASET) {
+      // Built in, one per workspace (docs/prd/DQ-data-query.md §5.12).
+      throw new ConflictException(
+        'Shared datasets is a built-in source of every workspace: it cannot be created.',
+      );
+    }
     const fallbackSuffix = crypto.randomUUID().split('-')[0];
     const name = providedName || `${type}_${fallbackSuffix}`;
     const normalizedConfigForStorage = normalizeSourceConfig(type, config);
@@ -221,6 +227,7 @@ export class SourceService {
     data: Prisma.SourceUpdateInput;
   }): Promise<Source> {
     const { where, data } = params;
+    await this.assertNotBuiltIn(where);
     const source = await this.prisma.source.update({
       data,
       where,
@@ -292,12 +299,29 @@ export class SourceService {
   }
 
   /**
+   * The built-in source of shared datasets (docs/prd/DQ-data-query.md §5.12)
+   * exists in every workspace, always: nobody deletes, renames or edits it.
+   */
+  async assertNotBuiltIn(where: Prisma.SourceWhereUniqueInput): Promise<void> {
+    const source = await this.prisma.source.findUnique({
+      where,
+      select: { type: true },
+    });
+    if (source?.type === AssetType.SHARED_DATASET) {
+      throw new ConflictException(
+        'Shared datasets is a built-in source of every workspace: it cannot be changed or deleted.',
+      );
+    }
+  }
+
+  /**
    * Refuse to delete a governed source (GOV §4): one with an open owner, or
    * with an asset that has one. Deleting it would hard-delete governed
    * assets; their owners are removed first, deliberately, on the Governance
    * tab. Callers check before anything else (a schedule removed, logs gone).
    */
   async assertSourceDeletable(sourceId: string): Promise<void> {
+    await this.assertNotBuiltIn({ id: sourceId });
     const governed = await governedAssetWhere(this.prisma);
     if (!governed) return;
     const [sourceOwners, assets] = await Promise.all([
@@ -695,7 +719,13 @@ export class SourceService {
       page?.sortOrder ?? SearchSourcesSortOrder.DESC
     ).toLowerCase() as Prisma.SortOrder;
 
-    const where: Prisma.SourceWhereInput = {};
+    // The built-in source of shared datasets is listed on its own page
+    // (DQ §5.12), not among the sources people connect and scan.
+    const where: Prisma.SourceWhereInput = filters?.type?.includes(
+      AssetType.SHARED_DATASET,
+    )
+      ? {}
+      : { type: { not: AssetType.SHARED_DATASET } };
 
     if (filters?.search) {
       where.name = { contains: filters.search, mode: 'insensitive' };

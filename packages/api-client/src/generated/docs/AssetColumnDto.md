@@ -23,6 +23,7 @@ Name | Type
 `reviewedBy` | string
 `updatedAt` | Date
 `updatedBy` | string
+`inherited` | [InheritedColumnDto](InheritedColumnDto.md)
 
 ## Example
 
@@ -48,6 +49,7 @@ const example = {
   "reviewedBy": null,
   "updatedAt": null,
   "updatedBy": null,
+  "inherited": null,
 } satisfies AssetColumnDto
 
 console.log(example)

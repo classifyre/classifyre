@@ -165,7 +165,8 @@ export const AssetListItemDtoSourceTypeEnum = {
     Athena: 'ATHENA',
     Bigquery: 'BIGQUERY',
     Redshift: 'REDSHIFT',
-    Custom: 'CUSTOM'
+    Custom: 'CUSTOM',
+    SharedDataset: 'SHARED_DATASET'
 } as const;
 export type AssetListItemDtoSourceTypeEnum = typeof AssetListItemDtoSourceTypeEnum[keyof typeof AssetListItemDtoSourceTypeEnum];
 

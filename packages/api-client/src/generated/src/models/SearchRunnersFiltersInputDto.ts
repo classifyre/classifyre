@@ -123,7 +123,8 @@ export const SearchRunnersFiltersInputDtoSourceTypeEnum = {
     Athena: 'ATHENA',
     Bigquery: 'BIGQUERY',
     Redshift: 'REDSHIFT',
-    Custom: 'CUSTOM'
+    Custom: 'CUSTOM',
+    SharedDataset: 'SHARED_DATASET'
 } as const;
 export type SearchRunnersFiltersInputDtoSourceTypeEnum = typeof SearchRunnersFiltersInputDtoSourceTypeEnum[keyof typeof SearchRunnersFiltersInputDtoSourceTypeEnum];
 

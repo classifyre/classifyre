@@ -95,6 +95,9 @@ class QueryRequest:
     search_path: list[str] = field(default_factory=list)
     #: Key of the ``hash`` masks: one per workspace (§5.8).
     mask_salt: str = ""
+    #: Describe the SQL instead of running it: its output columns and their
+    #: column lineage, no rows (a shared dataset being shared, §5.12).
+    describe: bool = False
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> QueryRequest:
@@ -124,6 +127,7 @@ class QueryRequest:
             database=str(data["database"]) if data.get("database") else None,
             search_path=[str(p) for p in data.get("searchPath") or [] if isinstance(p, str)],
             mask_salt=str(data.get("maskSalt") or ""),
+            describe=data.get("describe") is True,
         )
 
 
@@ -139,6 +143,20 @@ class QueryResult:
     tables: list[str] = field(default_factory=list)
     media_type: str = "application/vnd.apache.arrow.stream"
     export_format: str | None = None
+    #: For a describe request: output columns and column lineage, no rows.
+    description: dict[str, Any] | None = None
+
+
+@dataclass
+class _Dataset:
+    """A shared dataset (docs/prd/DQ-data-query.md §5.12): its SQL over its
+    inputs, which are read as its owning group sees them and live under a
+    catalog of their own that the reader's SQL cannot name."""
+
+    sql: str
+    inputs: dict[TableName, _Table]
+    #: The hidden catalog its inputs are attached under (``__ds_<n>``).
+    catalog: str
 
 
 @dataclass
@@ -152,6 +170,8 @@ class _Table:
     known_columns: list[str] | None = None
     #: The rows the person reads (§5.10); None: every row.
     rows: RowFilter | None = None
+    #: Set for a shared dataset: the view is its SQL, not a source's table.
+    dataset: _Dataset | None = None
 
 
 def _known_columns(value: Any) -> list[str] | None:
@@ -179,21 +199,58 @@ class QuerySession:
                 )
         self._tables: dict[TableName, _Table] = {}
         for entry in request.tables:
-            name = TableName.of(
-                str(entry.get("source") or ""),
-                str(entry.get("schema") or ""),
-                str(entry.get("table") or ""),
-            )
-            location = entry.get("location")
-            if name.source in self._bindings and isinstance(location, dict):
-                self._tables[name] = _Table(
-                    name,
-                    name.source,
-                    TableLocation.from_dict(location),
-                    ColumnMask.parse(entry.get("columns")),
-                    _known_columns(entry.get("knownColumns")),
-                    RowFilter.parse(entry.get("rows")),
-                )
+            dataset = entry.get("dataset")
+            if isinstance(dataset, dict):
+                table = self._dataset_table(entry, dataset, len(self._tables))
+            else:
+                table = self._source_table(entry)
+            if table is not None:
+                self._tables[table.name] = table
+
+    def _source_table(self, entry: dict[str, Any]) -> _Table | None:
+        name = TableName.of(
+            str(entry.get("source") or ""),
+            str(entry.get("schema") or ""),
+            str(entry.get("table") or ""),
+        )
+        location = entry.get("location")
+        if name.source not in self._bindings or not isinstance(location, dict):
+            return None
+        return _Table(
+            name,
+            name.source,
+            TableLocation.from_dict(location),
+            ColumnMask.parse(entry.get("columns")),
+            _known_columns(entry.get("knownColumns")),
+            RowFilter.parse(entry.get("rows")),
+        )
+
+    def _dataset_table(
+        self, entry: dict[str, Any], dataset: dict[str, Any], index: int
+    ) -> _Table | None:
+        name = TableName.of(
+            str(entry.get("source") or ""),
+            str(entry.get("schema") or ""),
+            str(entry.get("table") or ""),
+        )
+        sql = dataset.get("sql")
+        if not isinstance(sql, str) or not sql.strip() or name.source in self._bindings:
+            return None
+        inputs: dict[TableName, _Table] = {}
+        for raw in dataset.get("inputs") or []:
+            if isinstance(raw, dict):
+                table = self._source_table(raw)
+                if table is not None:
+                    inputs[table.name] = table
+        return _Table(
+            name,
+            "",
+            TableLocation.from_dict({"kind": "dataset"}),
+            ColumnMask.parse(entry.get("columns")),
+            _known_columns(entry.get("knownColumns")),
+            RowFilter.parse(entry.get("rows")),
+            dataset=_Dataset(sql, inputs, f"__ds_{index}"),
+        )
 
     def __enter__(self) -> QuerySession:
         return self
@@ -234,68 +291,115 @@ class QuerySession:
     def _attach_tables_as_views(self, conn: Any, tables: set[TableName]) -> None:
         created_catalogs: set[str] = set()
         created_schemas: set[tuple[str, str]] = set()
-        for name in sorted(tables, key=str):
-            entry = self._tables[name]
-            binding = self._bindings[entry.source_alias]
-            try:
-                relation = binding.relation(conn, entry.location)
-            except BindingError as exc:
-                # Scan wording: "Failed to connect to <label>: <cause>".
-                # The binding already names the endpoint in its message, so
-                # keep it whole instead of prefixing the table again.
-                raise BindingError(f"Failed to connect to {binding.label()}: {exc}") from exc
-            except Exception as exc:
-                raise BindingError(
-                    f"Failed to connect to {binding.label()}: {_first_line(exc)}"
-                ) from exc
-            if binding.source_type == "POSTGRESQL":
-                _postgres_settings(conn)
-            if name.source not in created_catalogs:
-                conn.execute(f"ATTACH ':memory:' AS {quote_identifier(name.source)}")
-                created_catalogs.add(name.source)
-            if (name.source, name.schema) not in created_schemas:
+
+        def target_of(catalog: str, schema: str, table: str) -> str:
+            if catalog not in created_catalogs:
+                conn.execute(f"ATTACH ':memory:' AS {quote_identifier(catalog)}")
+                created_catalogs.add(catalog)
+            if (catalog, schema) not in created_schemas:
                 conn.execute(
                     f"CREATE SCHEMA IF NOT EXISTS "
-                    f"{quote_identifier(name.source)}.{quote_identifier(name.schema)}"
+                    f"{quote_identifier(catalog)}.{quote_identifier(schema)}"
                 )
-                created_schemas.add((name.source, name.schema))
-            target = ".".join(quote_identifier(p) for p in (name.source, name.schema, name.table))
-            try:
-                projection = "*"
-                where = ""
-                if entry.masks or entry.rows is not None:
-                    described = conn.execute(f"DESCRIBE SELECT * FROM {relation}").fetchall()
-                    columns = [(str(row[0]), str(row[1])) for row in described]
-                    if entry.rows is not None:
-                        # Only the rows the person reads exist in the view;
-                        # the filter sees the table's own values, before any
-                        # mask (§5.10).
-                        where = f" WHERE {row_predicate(entry.rows, columns)}"
-                    if entry.masks:
-                        # The view is the only way to the table: masked here,
-                        # the query filters and joins on masked values;
-                        # hidden, the column does not exist for it.
-                        try:
-                            projection = (
-                                masked_projection(
-                                    columns,
-                                    entry.masks,
-                                    self.request.mask_salt,
-                                    entry.known_columns,
-                                )
-                                or "*"
+                created_schemas.add((catalog, schema))
+            return ".".join(quote_identifier(p) for p in (catalog, schema, table))
+
+        for name in sorted(tables, key=str):
+            entry = self._tables[name]
+            target = target_of(name.source, name.schema, name.table)
+            if entry.dataset is not None:
+                relation = self._dataset_relation(conn, entry.dataset, target_of)
+                self._create_view(conn, target, relation, entry, label=str(name), binding=None)
+            else:
+                self._source_view(conn, target, entry)
+
+    def _source_view(self, conn: Any, target: str, entry: _Table) -> None:
+        binding = self._bindings[entry.source_alias]
+        try:
+            relation = binding.relation(conn, entry.location)
+        except BindingError as exc:
+            # Scan wording: "Failed to connect to <label>: <cause>".
+            # The binding already names the endpoint in its message, so
+            # keep it whole instead of prefixing the table again.
+            raise BindingError(f"Failed to connect to {binding.label()}: {exc}") from exc
+        except Exception as exc:
+            raise BindingError(
+                f"Failed to connect to {binding.label()}: {_first_line(exc)}"
+            ) from exc
+        if binding.source_type == "POSTGRESQL":
+            _postgres_settings(conn)
+        self._create_view(conn, target, relation, entry, label=str(entry.name), binding=binding)
+
+    def _dataset_relation(self, conn: Any, dataset: _Dataset, target_of: Any) -> str:
+        """A shared dataset's SQL over its inputs (§5.12), as a relation.
+
+        Each input becomes a view ``"__ds_<n>"."main"."t<j>"``, masked and
+        filtered for the dataset's owning group; the dataset's SQL is checked
+        against its inputs and rewritten onto those names, which the reader's
+        own SQL can never name (the gate allows only the request's tables).
+        """
+        hidden: dict[TableName, tuple[str, str, str]] = {}
+        for j, input_name in enumerate(sorted(dataset.inputs, key=str)):
+            hidden[input_name] = (dataset.catalog, "main", f"t{j}")
+        validated = validate(dataset.sql, dataset.inputs.keys(), rename=hidden)
+        for input_name in sorted(validated.tables, key=str):
+            catalog, schema, table = hidden[input_name]
+            self._source_view(conn, target_of(catalog, schema, table), dataset.inputs[input_name])
+        return f"({validated.sql}) AS __dataset"
+
+    def _create_view(
+        self,
+        conn: Any,
+        target: str,
+        relation: str,
+        entry: _Table,
+        *,
+        label: str,
+        binding: SourceBinding | None,
+    ) -> None:
+        try:
+            projection = "*"
+            where = ""
+            # A shared dataset shows only the columns it was saved with
+            # (§5.12), masked or not.
+            only_known = entry.dataset is not None and entry.known_columns is not None
+            if entry.masks or entry.rows is not None or only_known:
+                described = conn.execute(f"DESCRIBE SELECT * FROM {relation}").fetchall()
+                columns = [(str(row[0]), str(row[1])) for row in described]
+                if entry.rows is not None:
+                    # Only the rows the person reads exist in the view;
+                    # the filter sees the table's own values, before any
+                    # mask (§5.10).
+                    where = f" WHERE {row_predicate(entry.rows, columns)}"
+                if entry.masks or only_known:
+                    # The view is the only way to the table: masked here,
+                    # the query filters and joins on masked values;
+                    # hidden, the column does not exist for it.
+                    try:
+                        projection = (
+                            masked_projection(
+                                columns,
+                                entry.masks,
+                                self.request.mask_salt,
+                                entry.known_columns,
                             )
-                        except ColumnsHiddenError:
-                            raise QueryRefusedError(
-                                f"Every column of {name} is hidden from you.", "columns_hidden"
-                            ) from None
-                conn.execute(f"CREATE VIEW {target} AS SELECT {projection} FROM {relation}{where}")
-            except QueryRefusedError:
+                            or "*"
+                        )
+                    except ColumnsHiddenError:
+                        raise QueryRefusedError(
+                            f"Every column of {label} is hidden from you.", "columns_hidden"
+                        ) from None
+            conn.execute(f"CREATE VIEW {target} AS SELECT {projection} FROM {relation}{where}")
+        except QueryRefusedError:
+            raise
+        except BindingError:
+            raise
+        except Exception as exc:
+            if binding is None:
                 raise
-            except Exception as exc:
-                raise BindingError(
-                    f"Failed to read {binding.label()}: {binding.explain(exc) or _first_line(exc)}"
-                ) from exc
+            raise BindingError(
+                f"Failed to read {binding.label()}: {binding.explain(exc) or _first_line(exc)}"
+            ) from exc
 
     @contextmanager
     def _deadline(self, conn: Any, seconds: float) -> Iterator[threading.Event]:
@@ -360,7 +464,55 @@ class QuerySession:
             export_format=fmt,
         )
 
+    def describe(self) -> QueryResult:
+        """The SQL's output columns and their column lineage, reading no rows
+        (§5.12: what a shared dataset would be, before it is shared)."""
+        from .describe import column_lineage
+
+        started = time.monotonic()
+        validated = validate(self.request.sql, self._tables.keys())
+        conn = self._open()
+        self._conn = conn
+        with self._deadline(conn, self.request.timeout_seconds) as fired:
+            try:
+                self._attach_tables_as_views(conn, validated.tables)
+                described = conn.execute(
+                    f"DESCRIBE SELECT * FROM ({validated.sql}) AS __result"
+                ).fetchall()
+                schemas: dict[TableName, list[str]] = {}
+                for name in validated.tables:
+                    target = ".".join(
+                        quote_identifier(p) for p in (name.source, name.schema, name.table)
+                    )
+                    schemas[name] = [
+                        str(row[0])
+                        for row in conn.execute(f"DESCRIBE SELECT * FROM {target}").fetchall()
+                    ]
+            except Exception:
+                if fired.is_set():
+                    raise QueryTimeoutError(
+                        f"Describing the query took longer than "
+                        f"{self.request.timeout_seconds} s and was stopped."
+                    ) from None
+                raise
+        columns = [{"name": str(row[0]), "type": str(row[1])} for row in described]
+        return QueryResult(
+            arrow=b"",
+            row_count=0,
+            truncated=False,
+            truncated_reason=None,
+            columns=columns,
+            timings={"totalMs": int((time.monotonic() - started) * 1000)},
+            tables=sorted(str(t) for t in validated.tables),
+            description={
+                "columns": columns,
+                "lineage": column_lineage(validated.sql, schemas),
+            },
+        )
+
     def run(self) -> QueryResult:
+        if self.request.describe:
+            return self.describe()
         started = time.monotonic()
         validated = validate(
             self.request.sql,

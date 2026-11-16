@@ -35,6 +35,7 @@ export { RunnersApi } from './RunnersApi';
 export { SQLConnectionsApi } from './SQLConnectionsApi';
 export { SemanticApi } from './SemanticApi';
 export { SettingsApi } from './SettingsApi';
+export { SharedDatasetsApi } from './SharedDatasetsApi';
 export { SitemapApi } from './SitemapApi';
 export { SourcesApi } from './SourcesApi';
 export { ThreadsApi } from './ThreadsApi';

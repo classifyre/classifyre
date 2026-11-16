@@ -56,6 +56,7 @@ function service(input: {
     assetColumnAnnotation: {
       findMany: jest.fn().mockResolvedValue(input.notes ?? []),
     },
+    sharedDataset: { findMany: jest.fn().mockResolvedValue([]) },
     assetRowPolicy: {
       findMany: jest.fn().mockResolvedValue(
         input.rowRules
@@ -257,5 +258,67 @@ describe('QueryCatalogService row filters (DQ §5.10)', () => {
       rowRules: [{ principalRef: 'group:g-1', conditions: 'everything' }],
     });
     expect((await table(svc)).rowFilter).toEqual({ anyOf: [] });
+  });
+});
+
+describe('QueryCatalogService shared dataset floors (DQ §5.12)', () => {
+  function withDataset(notes: Parameters<typeof service>[0]['notes'] = []) {
+    const { svc, prisma } = service({ notes });
+    prisma.sharedDataset.findMany.mockResolvedValue([
+      {
+        assetId: 'ds-1',
+        inputs: ['a-1'],
+        columns: [
+          {
+            name: 'contact',
+            type: 'VARCHAR',
+            upstreams: [{ assetId: 'a-1', column: 'email' }],
+            traced: true,
+          },
+          {
+            name: 'country',
+            type: 'VARCHAR',
+            upstreams: [{ assetId: 'a-1', column: 'country' }],
+            traced: true,
+          },
+          { name: 'mystery', type: 'VARCHAR', upstreams: [], traced: false },
+        ],
+      },
+    ]);
+    return svc;
+  }
+
+  it('carries the input columns’ classification to the output', async () => {
+    const masks = await withDataset().columnMasks();
+    expect(masks.get('ds-1')).toEqual([
+      // email is personal → masked; country unclassified → clear; untraced
+      // takes the strictest input column (api_key: secret) → hidden.
+      { column: 'contact', action: 'mask', mask: 'redact' },
+      { column: 'mystery', action: 'hide' },
+    ]);
+  });
+
+  it('a steward of the dataset cannot loosen what it inherits', async () => {
+    const masks = await withDataset([
+      {
+        assetId: 'ds-1',
+        columnName: 'contact',
+        access: 'clear',
+        maskKind: null,
+        classification: 'public',
+      },
+      {
+        assetId: 'ds-1',
+        columnName: 'country',
+        access: 'hide',
+        maskKind: null,
+        classification: null,
+      },
+    ]).columnMasks();
+    expect(masks.get('ds-1')).toEqual([
+      { column: 'contact', action: 'mask', mask: 'redact' },
+      { column: 'country', action: 'hide' },
+      { column: 'mystery', action: 'hide' },
+    ]);
   });
 });

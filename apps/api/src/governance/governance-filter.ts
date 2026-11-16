@@ -196,19 +196,21 @@ export async function ownerDataScope(
  * What a person reads in clear because they answer for it (DQ §5.8): the
  * tables and sources they, or a group of theirs, own or steward. Columns
  * governance masks are theirs to judge; custodians run the system and get
- * nothing from this.
+ * nothing from this. A group as principal (a shared dataset's owning group,
+ * DQ §5.12) gets what it, or a group above it, stewards.
  */
 export async function governedDataScope(
   db: Db,
   person: GovernancePerson | null,
 ): Promise<{ assetIds: string[]; sourceIds: string[] }> {
-  if (!person?.actorRef.startsWith('user:')) {
-    return { assetIds: [], sourceIds: [] };
-  }
+  const refs = person?.actorRef.startsWith('user:')
+    ? [person.actorRef, ...person.groupIds.map((id) => `group:${id}`)]
+    : person?.actorRef.startsWith('group:')
+      ? person.groupIds.map((id) => `group:${id}`)
+      : [];
+  if (!refs.length) return { assetIds: [], sourceIds: [] };
   return openScopes(db, {
     role: { in: ['OWNER', 'STEWARD'] },
-    principalRef: {
-      in: [person.actorRef, ...person.groupIds.map((id) => `group:${id}`)],
-    },
+    principalRef: { in: refs },
   });
 }

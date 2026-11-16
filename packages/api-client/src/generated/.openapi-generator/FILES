@@ -82,6 +82,7 @@ docs/AuditEventsResponseDto.md
 docs/AutopilotApi.md
 docs/AutopilotStatsDto.md
 docs/BlockDataConnectionDto.md
+docs/BlockSharedDatasetDto.md
 docs/BoardEndpointDto.md
 docs/BoardItemDto.md
 docs/BoardLinkCertainty.md
@@ -206,6 +207,7 @@ docs/CreateMcpServerDto.md
 docs/CreateMcpTokenDto.md
 docs/CreateNotebookExecutionDto.md
 docs/CreateQueryRunDto.md
+docs/CreateSharedDatasetDto.md
 docs/CreateSourceDto.md
 docs/CreateSupervisorGoalDto.md
 docs/CreateThreadDto.md
@@ -238,6 +240,7 @@ docs/DeleteGlossaryTermResponseDto.md
 docs/DeleteRunnerResponseDto.md
 docs/DenyAccessRequestDto.md
 docs/DeprecateGlossaryTermDto.md
+docs/DescribeSharedDatasetDto.md
 docs/DiscoveryRecentRunDto.md
 docs/DiscoveryRunSourceDto.md
 docs/DisplaySettingsDto.md
@@ -341,6 +344,8 @@ docs/HypothesisStatus.md
 docs/IdentityApi.md
 docs/ImportContractDto.md
 docs/IngestEdgeDto.md
+docs/InheritedColumnDto.md
+docs/InheritedColumnSourceDto.md
 docs/InquiriesApi.md
 docs/InquiryActivityDto.md
 docs/InquiryLinkedCaseDto.md
@@ -409,6 +414,7 @@ docs/PreviewCaseFindingFiltersDto.md
 docs/PreviewDiagnosticDto.md
 docs/PreviewInquiryDto.md
 docs/PreviewResponseDto.md
+docs/PromoteSharedDatasetDto.md
 docs/ProposeCaseLeadDto.md
 docs/PullFromInquiryDto.md
 docs/PullFromInquiryResponseDto.md
@@ -583,6 +589,20 @@ docs/SetDataConnectionExposureDto.md
 docs/SetInquiryAutoPullDto.md
 docs/SetWorkerQueuePausedDto.md
 docs/SettingsApi.md
+docs/SharedDatasetActorDto.md
+docs/SharedDatasetAudienceDto.md
+docs/SharedDatasetBlockDto.md
+docs/SharedDatasetColumnDto.md
+docs/SharedDatasetDescriptionDto.md
+docs/SharedDatasetDto.md
+docs/SharedDatasetGroupDto.md
+docs/SharedDatasetInputDto.md
+docs/SharedDatasetOptionsDto.md
+docs/SharedDatasetSummaryDto.md
+docs/SharedDatasetUpstreamDto.md
+docs/SharedDatasetUseDto.md
+docs/SharedDatasetVersionDto.md
+docs/SharedDatasetsApi.md
 docs/SimilarFindingAssetDto.md
 docs/SimilarFindingDto.md
 docs/SimilarFindingEvidenceAnalysisDto.md
@@ -669,6 +689,7 @@ docs/UpdateNotificationAudienceDto.md
 docs/UpdateNotificationImportanceDto.md
 docs/UpdateRunnerAssetStatusDto.md
 docs/UpdateRunnerLimitsDto.md
+docs/UpdateSharedDatasetDto.md
 docs/UpdateSourceDto.md
 docs/UpdateSupervisorDto.md
 docs/UpdateSupervisorGoalDto.md
@@ -725,6 +746,7 @@ src/apis/RunnersApi.ts
 src/apis/SQLConnectionsApi.ts
 src/apis/SemanticApi.ts
 src/apis/SettingsApi.ts
+src/apis/SharedDatasetsApi.ts
 src/apis/SitemapApi.ts
 src/apis/SourcesApi.ts
 src/apis/ThreadsApi.ts
@@ -805,6 +827,7 @@ src/models/AuditEventDto.ts
 src/models/AuditEventsResponseDto.ts
 src/models/AutopilotStatsDto.ts
 src/models/BlockDataConnectionDto.ts
+src/models/BlockSharedDatasetDto.ts
 src/models/BoardEndpointDto.ts
 src/models/BoardItemDto.ts
 src/models/BoardLinkCertainty.ts
@@ -925,6 +948,7 @@ src/models/CreateMcpServerDto.ts
 src/models/CreateMcpTokenDto.ts
 src/models/CreateNotebookExecutionDto.ts
 src/models/CreateQueryRunDto.ts
+src/models/CreateSharedDatasetDto.ts
 src/models/CreateSourceDto.ts
 src/models/CreateSupervisorGoalDto.ts
 src/models/CreateThreadDto.ts
@@ -953,6 +977,7 @@ src/models/DeleteGlossaryTermResponseDto.ts
 src/models/DeleteRunnerResponseDto.ts
 src/models/DenyAccessRequestDto.ts
 src/models/DeprecateGlossaryTermDto.ts
+src/models/DescribeSharedDatasetDto.ts
 src/models/DiscoveryRecentRunDto.ts
 src/models/DiscoveryRunSourceDto.ts
 src/models/DisplaySettingsDto.ts
@@ -1047,6 +1072,8 @@ src/models/HealthControllerGetHealth200Response.ts
 src/models/HypothesisStatus.ts
 src/models/ImportContractDto.ts
 src/models/IngestEdgeDto.ts
+src/models/InheritedColumnDto.ts
+src/models/InheritedColumnSourceDto.ts
 src/models/InquiryActivityDto.ts
 src/models/InquiryLinkedCaseDto.ts
 src/models/InquiryListResponseDto.ts
@@ -1108,6 +1135,7 @@ src/models/PreviewCaseFindingFiltersDto.ts
 src/models/PreviewDiagnosticDto.ts
 src/models/PreviewInquiryDto.ts
 src/models/PreviewResponseDto.ts
+src/models/PromoteSharedDatasetDto.ts
 src/models/ProposeCaseLeadDto.ts
 src/models/PullFromInquiryDto.ts
 src/models/PullFromInquiryResponseDto.ts
@@ -1278,6 +1306,19 @@ src/models/SemanticFindingsSearchDto.ts
 src/models/SetDataConnectionExposureDto.ts
 src/models/SetInquiryAutoPullDto.ts
 src/models/SetWorkerQueuePausedDto.ts
+src/models/SharedDatasetActorDto.ts
+src/models/SharedDatasetAudienceDto.ts
+src/models/SharedDatasetBlockDto.ts
+src/models/SharedDatasetColumnDto.ts
+src/models/SharedDatasetDescriptionDto.ts
+src/models/SharedDatasetDto.ts
+src/models/SharedDatasetGroupDto.ts
+src/models/SharedDatasetInputDto.ts
+src/models/SharedDatasetOptionsDto.ts
+src/models/SharedDatasetSummaryDto.ts
+src/models/SharedDatasetUpstreamDto.ts
+src/models/SharedDatasetUseDto.ts
+src/models/SharedDatasetVersionDto.ts
 src/models/SimilarFindingAssetDto.ts
 src/models/SimilarFindingDto.ts
 src/models/SimilarFindingEvidenceAnalysisDto.ts
@@ -1361,6 +1402,7 @@ src/models/UpdateNotificationAudienceDto.ts
 src/models/UpdateNotificationImportanceDto.ts
 src/models/UpdateRunnerAssetStatusDto.ts
 src/models/UpdateRunnerLimitsDto.ts
+src/models/UpdateSharedDatasetDto.ts
 src/models/UpdateSourceDto.ts
 src/models/UpdateSupervisorDto.ts
 src/models/UpdateSupervisorGoalDto.ts

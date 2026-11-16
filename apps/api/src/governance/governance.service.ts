@@ -73,6 +73,7 @@ import {
   type MaskKind,
 } from '../data-query/column-masks';
 import { clearScopeOf, readsInClear } from '../data-query/clear-scope';
+import { rankOf as rankOfClassification } from '../data-query/dataset-floor';
 import type {
   AssetGovernanceDto,
   GovernancePrincipalDto,
@@ -1672,6 +1673,33 @@ export class GovernanceService {
         message:
           'Showing more of this column needs you to read it in clear: Data reader, unmasked, on this table or its source, or its owner or steward role.',
       });
+    }
+    // DQ §5.12: a shared dataset's column never shows more than what its
+    // inputs give it (its floor), whoever asks: removing an inherited mask is
+    // the input owner's call, not the dataset's.
+    if (column.inherited) {
+      const floorPolicy = effectiveColumnPolicy({
+        access: null,
+        maskKind: null,
+        classification: column.inherited.floor,
+      });
+      const lowered =
+        nextClassification !== null &&
+        nextClassification !== undefined &&
+        rankOfClassification(nextClassification) <
+          rankOfClassification(column.inherited.floor);
+      if (lowered || exposureOf(after) > exposureOf(floorPolicy)) {
+        throw new ForbiddenException({
+          statusCode: 403,
+          error: 'Forbidden',
+          code: 'INHERITED_FLOOR',
+          message: `This column comes from ${
+            column.inherited.from
+              .map((u) => `${u.table}.${u.column}`)
+              .join(', ') || 'the tables it reads'
+          }, classified ${column.inherited.floor ?? 'none'}: a shared dataset can make it stricter, never show more.`,
+        });
+      }
     }
     const previous = await this.prisma.assetColumnAnnotation.findUnique({
       where: { assetId_columnName: { assetId, columnName: name } },

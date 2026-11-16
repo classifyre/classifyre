@@ -17,7 +17,7 @@ Keep the refusal ``code`` values and their messages in sync.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 
 import sqlglot
@@ -156,6 +156,7 @@ def validate(
     *,
     database: str | None = None,
     search_path: Iterable[str] = (),
+    rename: Mapping[TableName, tuple[str, str, str]] | None = None,
 ) -> Validated:
     """Check ``sql`` against the allowlist and return it rewritten for DuckDB.
 
@@ -166,6 +167,10 @@ def validate(
     Raises :class:`QueryRefusedError` with a stable ``code`` the UI can show:
     ``invalid_sql``, ``select_only``, ``function_not_allowed``,
     ``table_name_required`` or ``table_not_available``.
+
+    ``rename`` writes allowed names as other, hidden ones: a shared dataset's
+    SQL (§5.12) reads its inputs under its own catalog, where the reader's
+    SQL cannot name them.
     """
     postgres = dialect == "postgres"
     path = [p.lower() for p in search_path]
@@ -223,9 +228,7 @@ def validate(
                     "table_not_available",
                 )
             referenced.add(mapped)
-            table.set("catalog", exp.to_identifier(mapped.source, quoted=True))
-            table.set("db", exp.to_identifier(mapped.schema, quoted=True))
-            table.set("this", exp.to_identifier(mapped.table, quoted=True))
+            _write_name(table, mapped, rename)
             continue
         if not (table.catalog and table.db):
             raise QueryRefusedError(
@@ -239,11 +242,21 @@ def validate(
                 "table_not_available",
             )
         referenced.add(candidate)
-        table.set("catalog", exp.to_identifier(candidate.source, quoted=True))
-        table.set("db", exp.to_identifier(candidate.schema, quoted=True))
-        table.set("this", exp.to_identifier(candidate.table, quoted=True))
+        _write_name(table, candidate, rename)
 
     return Validated(sql=tree.sql(dialect="duckdb"), tables=referenced)
+
+
+def _write_name(
+    table: exp.Table,
+    name: TableName,
+    rename: Mapping[TableName, tuple[str, str, str]] | None,
+) -> None:
+    """Write a checked name back quoted, or as the hidden name it maps to."""
+    parts = (rename or {}).get(name) or (name.source, name.schema, name.table)
+    table.set("catalog", exp.to_identifier(parts[0], quoted=True))
+    table.set("db", exp.to_identifier(parts[1], quoted=True))
+    table.set("this", exp.to_identifier(parts[2], quoted=True))
 
 
 def _first_line(exc: BaseException) -> str:

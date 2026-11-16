@@ -52,6 +52,14 @@ import { UsageCard } from "@/components/governance/usage-card";
 import { GovernanceBadge } from "@/components/governance/governance-badge";
 import { QualityChip } from "@/components/governance/quality-chip";
 import { ActorChip } from "@/components/actor-chip";
+import { AuditEventList } from "@/components/audit-history";
+import { useSharedDataset } from "@/lib/shared-datasets";
+import {
+  DatasetBadges,
+  DatasetDefinitionCard,
+  DatasetInputsCard,
+  DatasetOverviewCard,
+} from "@/components/shared-datasets/dataset-cards";
 
 // Monaco and the results grid: client-only, loaded when the Data tab opens.
 const AssetDataTab = dynamic(
@@ -190,6 +198,12 @@ export default function AssetDetailPage() {
     };
   }, [assetId]);
 
+  // DQ §5.12: a shared dataset is an asset of the built-in source, with a
+  // definition of its own (its SQL, versions, inputs) and no findings.
+  const isDataset = assetDetails?.sourceType === "SHARED_DATASET";
+  const dataset = useSharedDataset(isDataset ? assetId : null);
+  const canViewActivity = useCan("activity.view");
+
   const sourceId = sourceMeta?.id || assetDetails?.sourceId;
   const sourceLabel = sourceMeta?.name || t("assets.detail.unknownSource");
   const sourceType = assetDetails?.sourceType ?? "filesystem";
@@ -262,8 +276,14 @@ export default function AssetDetailPage() {
               <h1 className="font-serif text-3xl font-black uppercase tracking-[0.08em]">
                 {t("assets.detail.title")}
               </h1>
-              <AssetKindBadge kind={assetDetails.assetType} />
-              <Badge variant="outline">{assetDetails.sourceType}</Badge>
+              {isDataset ? (
+                dataset.data && <DatasetBadges dataset={dataset.data} />
+              ) : (
+                <>
+                  <AssetKindBadge kind={assetDetails.assetType} />
+                  <Badge variant="outline">{assetDetails.sourceType}</Badge>
+                </>
+              )}
               {governance.data && (
                 <GovernanceBadge status={governance.data.status} />
               )}
@@ -299,12 +319,20 @@ export default function AssetDetailPage() {
             </p>
           </div>
         </div>
-        {sourceId && (
+        {isDataset ? (
           <Button size="sm" asChild>
-            <Link href={nsPath(`/sources/${sourceId}`)}>
-              {t("assets.detail.openSource")}
+            <Link href={nsPath("/shared-datasets")}>
+              {t("sharedDatasets.allDatasets")}
             </Link>
           </Button>
+        ) : (
+          sourceId && (
+            <Button size="sm" asChild>
+              <Link href={nsPath(`/sources/${sourceId}`)}>
+                {t("assets.detail.openSource")}
+              </Link>
+            </Button>
+          )
         )}
       </div>
 
@@ -312,7 +340,7 @@ export default function AssetDetailPage() {
         <Tabs
           // Remounted once the Data tab is known, so ?tab=data opens it: the
           // tabs read the address when they mount.
-          key={queryTable ? "with-data" : "without-data"}
+          key={`${queryTable ? "with-data" : "without-data"}-${isDataset ? "dataset" : "asset"}`}
           value={tab}
           onValueChange={setTab}
           urlParam="tab"
@@ -322,12 +350,19 @@ export default function AssetDetailPage() {
             <TabsTrigger value="overview" data-testid="asset-overview-tab">
               {t("governance.overviewTab")}
             </TabsTrigger>
+            {isDataset && (
+              <TabsTrigger value="definition" data-testid="dataset-definition-tab">
+                {t("sharedDatasets.definitionTab")}
+              </TabsTrigger>
+            )}
             <TabsTrigger value="governance" data-testid="asset-governance-tab">
               {t("governance.tab")}
             </TabsTrigger>
-            <TabsTrigger value="findings">
-              {t("correlation.findingsTab")}
-            </TabsTrigger>
+            {!isDataset && (
+              <TabsTrigger value="findings">
+                {t("correlation.findingsTab")}
+              </TabsTrigger>
+            )}
             <TabsTrigger
               value="connections"
               data-testid="asset-connections-tab"
@@ -337,6 +372,11 @@ export default function AssetDetailPage() {
             {queryTable && (
               <TabsTrigger value="data" data-testid="asset-data-tab-trigger">
                 {t("dataQuery.assetTab")}
+              </TabsTrigger>
+            )}
+            {isDataset && canViewActivity && (
+              <TabsTrigger value="activity" data-testid="dataset-activity-tab">
+                {t("sharedDatasets.activityTab")}
               </TabsTrigger>
             )}
           </TabsList>
@@ -350,6 +390,13 @@ export default function AssetDetailPage() {
                     onOpen={() => setTab("governance")}
                   />
                 )}
+                {isDataset && dataset.data && (
+                  <DatasetOverviewCard
+                    dataset={dataset.data}
+                    onChange={dataset.setData}
+                  />
+                )}
+                {!isDataset && (
                 <Card className="lg:col-span-2">
                   <CardHeader>
                     <CardTitle>{t("assets.detail.metadata")}</CardTitle>
@@ -425,6 +472,7 @@ export default function AssetDetailPage() {
                     </div>
                   </CardContent>
                 </Card>
+                )}
               </div>
               <div className="space-y-4">
                 {(usage.data || usage.loading) && (
@@ -432,13 +480,36 @@ export default function AssetDetailPage() {
                 )}
               </div>
             </div>
-            {assetDetails.metadata &&
+            {!isDataset &&
+              assetDetails.metadata &&
               Object.keys(assetDetails.metadata).length > 0 && (
                 <AssetMetadataCard metadata={assetDetails.metadata} />
               )}
           </TabsContent>
+          {isDataset && (
+            <TabsContent value="definition" className="space-y-4">
+              {dataset.data ? (
+                <DatasetDefinitionCard dataset={dataset.data} />
+              ) : (
+                <Spinner />
+              )}
+            </TabsContent>
+          )}
           <TabsContent value="governance" className="space-y-4">
             <AssetGovernanceView
+              extraSteps={
+                isDataset && dataset.data
+                  ? [
+                      {
+                        id: "inputs",
+                        title: t("sharedDatasets.inputs.step"),
+                        description: t("sharedDatasets.inputs.stepDesc"),
+                        complete: !dataset.data.inputs.some((i) => i.blocked),
+                        content: <DatasetInputsCard dataset={dataset.data} />,
+                      },
+                    ]
+                  : []
+              }
               governance={governance.data}
               loading={governance.loading}
               onChange={governance.setData}
@@ -456,6 +527,11 @@ export default function AssetDetailPage() {
               sourceHref={sourceId ? nsPath(`/sources/${sourceId}`) : undefined}
             />
           </TabsContent>
+          {isDataset && canViewActivity && (
+            <TabsContent value="activity" className="space-y-4">
+              <AuditEventList filter={{ resource: `asset:${assetDetails.id}` }} />
+            </TabsContent>
+          )}
           <TabsContent value="findings" className="space-y-4">
             <Suspense>
               <FindingsTable lockedFilters={lockedFilters} />

@@ -299,6 +299,35 @@ export class ColumnAccessDto {
   fromClassification: boolean;
 }
 
+export class InheritedColumnSourceDto {
+  @ApiProperty()
+  assetId: string;
+
+  @ApiProperty({ example: 'shop_lake.shop.customers' })
+  table: string;
+
+  @ApiProperty()
+  column: string;
+}
+
+/** What a shared dataset's column inherits from its inputs (DQ §5.12). */
+export class InheritedColumnDto {
+  @ApiPropertyOptional({
+    nullable: true,
+    description:
+      'The least it is classified: the strictest of the input columns it comes from.',
+  })
+  floor: string | null;
+
+  @ApiProperty({ type: [InheritedColumnSourceDto] })
+  from: InheritedColumnSourceDto[];
+
+  @ApiProperty({
+    description: 'False: lineage could not trace it, so every input counts.',
+  })
+  traced: boolean;
+}
+
 export class AssetColumnDto {
   @ApiProperty()
   name: string;
@@ -363,6 +392,12 @@ export class AssetColumnDto {
 
   @ApiPropertyOptional({ nullable: true })
   updatedBy: string | null;
+
+  @ApiPropertyOptional({
+    type: () => InheritedColumnDto,
+    description: 'Set on a shared dataset’s columns: what its inputs give it.',
+  })
+  inherited?: InheritedColumnDto;
 }
 
 export class AssetColumnsDto {
@@ -487,7 +522,11 @@ export class UsageFormatDto {
 }
 
 export class UsageChannelDto {
-  @ApiProperty({ enum: ['rest', 'mcp', 'sql'] })
+  @ApiProperty({
+    enum: ['rest', 'mcp', 'sql', 'dataset'],
+    description:
+      '`dataset`: reads that reached this table through a shared dataset (DQ §5.12).',
+  })
   channel: string;
 
   @ApiProperty()
