@@ -1234,6 +1234,7 @@ export class SharedDatasetsService implements OnModuleInit {
       | {
           floor: Classification | null;
           from: { assetId: string; column: string }[];
+          traced: boolean;
         }
       | undefined,
     sqlOf: Map<string, string>,
@@ -1249,7 +1250,9 @@ export class SharedDatasetsService implements OnModuleInit {
       floor: floor?.floor ?? null,
       from: (floor?.from ?? []).map(named),
       upstreams: column.upstreams.map(named),
-      traced: column.traced,
+      // The floor knows better: lineage can name something that is no
+      // column of its input (a whole row), which counts as untraced.
+      traced: floor ? floor.traced : column.traced,
       transform: column.transform ?? null,
     };
   }
