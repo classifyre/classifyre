@@ -291,6 +291,7 @@ Detector rules also work on non-table assets (pages, documents). Library and SQL
 - The run is a system run, `actorRef = system:quality`. It is authorised by the rule, whose author held `asset.govern`, not by a person's `data.query`.
 - `QueryRunService` gains a system path: no per-person cap, a per-workspace cap of 2 concurrent quality jobs, and the workspace's DQ timeout and memory settings. Its reads are audited as `quality.read-table`, with `system:quality` as actor and the table's resources.
 - The rows themselves are never returned or stored, only numbers.
+- A library or sql rule reads the table's values with no masks or row filters, and its numbers are shown to everyone who sees the asset. So writing, changing, testing or importing one needs someone who may query the table, reads it in clear and sees all of its rows; otherwise `403 TABLE_READ_REQUIRED` (built 2026-11-16, after a review found a steward could read cells one number at a time). A sql rule must stay inside the parentheses it is measured in: no comments, `E'…'` or `$$` strings, balanced parentheses. Engine errors kept with a result have their quoted literals cut. Each test run is audited as `governance.quality.test` under the person.
 
 **Bridge to findings (R9).** When a rule's result is `passed = false`, the API upserts one finding:
 

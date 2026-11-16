@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { scalarQueryProblem } from './quality-sql';
 
 /**
  * Data quality rules as ODCS writes them (docs/prd/GOV-governed-data-assets.md
@@ -287,9 +288,8 @@ export function validateRule(input: RuleInput, current?: ValidRule): ValidRule {
     if (!query || !/^\s*(select|with)\b/i.test(query)) {
       throw new RuleError('A sql rule needs one SELECT in arguments.query.');
     }
-    if (query.includes(';')) {
-      throw new RuleError('arguments.query is one statement, without ";".');
-    }
+    const problem = scalarQueryProblem(query);
+    if (problem) throw new RuleError(problem);
     args.query = query;
   }
   const columnName = text(pick('columnName'), 200, 'columnName');

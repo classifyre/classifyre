@@ -4,7 +4,12 @@ import { PrismaService } from '../prisma.service';
 import { QueryRunService } from '../data-query/query-run.service';
 import { columnsOf } from './governance-columns.service';
 import { GovernanceNotifier } from './governance-notifier';
-import { compileQuality, readCsvRow, ROWS_ALIAS } from './quality-sql';
+import {
+  compileQuality,
+  readCsvRow,
+  redactQueryError,
+  ROWS_ALIAS,
+} from './quality-sql';
 import { HistoryEventType } from '../types/finding-history.types';
 import {
   TABLE_RULE_TYPES,
@@ -353,7 +358,12 @@ export class QualityService {
     const result = await this.queries.systemResult(runId);
     if (result.status !== 'SUCCESS' || result.csv === null) {
       return done(
-        { value: null, error: result.error ?? 'The quality query failed.' },
+        {
+          value: null,
+          error: result.error
+            ? redactQueryError(result.error)
+            : 'The quality query failed.',
+        },
         { sql: compiled.sql },
       );
     }
@@ -763,7 +773,11 @@ export class QualityService {
             const result = await this.queries.systemResult(runId);
             if (result.status !== 'SUCCESS' || result.csv === null) {
               await finish(
-                allError(result.error ?? 'The quality query failed.'),
+                allError(
+                  result.error
+                    ? redactQueryError(result.error)
+                    : 'The quality query failed.',
+                ),
                 'error',
                 runId,
               );

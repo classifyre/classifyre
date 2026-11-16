@@ -33,6 +33,7 @@ import {
 } from './quality.service';
 import {
   RuleError,
+  TABLE_RULE_TYPES,
   validateRule,
   type RuleInput,
   type ValidRule,
@@ -73,6 +74,7 @@ import {
   type MaskKind,
 } from '../data-query/column-masks';
 import { clearScopeOf, readsInClear } from '../data-query/clear-scope';
+import { QueryCatalogService } from '../data-query/query-catalog.service';
 import { rankOf as rankOfClassification } from '../data-query/dataset-floor';
 import type {
   AssetGovernanceDto,
@@ -123,6 +125,7 @@ export class GovernanceService {
     private readonly notifier: GovernanceNotifier,
     @Inject(ACCESS_POLICY) private readonly policy: AccessPolicy,
     @Inject(IDENTITY) private readonly identity: IdentityService,
+    private readonly catalog: QueryCatalogService,
   ) {}
 
   // ── Who is asking ─────────────────────────────────────────────────────────
@@ -549,6 +552,46 @@ export class GovernanceService {
     return readsInClear(scope, {
       sourceId: target.sourceId,
       assetId: target.scopeType === 'ASSET' ? target.assetId : null,
+    });
+  }
+
+  /**
+   * A library or sql quality rule reads the table's values, and what it
+   * measures is shown to everyone who sees the asset (GOV §5.4). So only
+   * someone who queries the table, reads it in clear and sees every row of
+   * it may write or test one; otherwise a rule would be a way round the
+   * missing grant, the masks and the row filters (`asset.govern` and
+   * stewardship give no data access, DQ §5.8).
+   */
+  private async assertReadsTableFully(
+    target: Target,
+    rule: { type: string },
+  ): Promise<void> {
+    if (!TABLE_RULE_TYPES.includes(rule.type)) return;
+    if (target.scopeType !== 'ASSET') return;
+    const principal = await this.catalog.requestPrincipal();
+    const [scope, clear, filters] = await Promise.all([
+      this.catalog.scope(principal),
+      this.catalog.clearScope(principal),
+      this.catalog.rowFilters(principal),
+    ]);
+    const queries =
+      scope.all ||
+      scope.sourceIds.has(target.sourceId) ||
+      scope.assetIds.has(target.assetId);
+    if (
+      queries &&
+      readsInClear(clear, target) &&
+      !filters.has(target.assetId)
+    ) {
+      return;
+    }
+    throw new ForbiddenException({
+      statusCode: 403,
+      error: 'Forbidden',
+      code: 'TABLE_READ_REQUIRED',
+      message:
+        'A library or SQL quality rule reads the values of this table, so it needs someone who queries the table, reads it in clear and sees all of its rows.',
     });
   }
 
@@ -1044,6 +1087,7 @@ export class GovernanceService {
     const target = await this.assetTarget(assetId);
     await this.authorize(target);
     const rule = this.validRule(body);
+    await this.assertReadsTableFully(target, rule);
     if (rule.columnName) await this.assertColumn(assetId, rule.columnName);
     let created: { id: string };
     try {
@@ -1078,6 +1122,7 @@ export class GovernanceService {
     const target = await this.assetTarget(current.assetId);
     await this.authorize(target);
     const rule = this.validRule(body, this.quality.toValid(current));
+    await this.assertReadsTableFully(target, rule);
     if (rule.columnName)
       await this.assertColumn(current.assetId, rule.columnName);
     try {
@@ -1133,7 +1178,14 @@ export class GovernanceService {
       input.name = 'Test run';
     }
     const rule = this.validRule(input);
+    await this.assertReadsTableFully(target, rule);
     if (rule.columnName) await this.assertColumn(assetId, rule.columnName);
+    // A test run reads the table for this person: their name goes on it.
+    this.record(target, 'governance.quality.test', [
+      'type',
+      'metric',
+      ...(rule.columnName ? ['columnName'] : []),
+    ]);
     return this.quality.test(assetId, rule);
   }
 
@@ -1462,10 +1514,12 @@ export class GovernanceService {
         if (before) {
           const current = await this.quality.rule(before.id);
           const rule = this.validRule(input, this.quality.toValid(current));
+          await this.assertReadsTableFully(target, rule);
           await this.quality.update(before.id, rule);
           touched.push(before.id);
         } else {
           const rule = this.validRule(input);
+          await this.assertReadsTableFully(target, rule);
           const created = await this.quality.create(
             assetId,
             rule,

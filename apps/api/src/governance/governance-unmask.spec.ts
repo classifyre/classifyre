@@ -52,6 +52,8 @@ function service(input: {
   /** Roles the caller (user:ana) holds, as governanceRole rows. */
   holds?: { scopeType: 'ASSET' | 'SOURCE'; scopeId: string; role: string }[];
   state?: ReturnType<typeof column>;
+  /** What the caller reads of table a-1 (quality rules). */
+  reads?: { queries?: boolean; clear?: boolean; filtered?: boolean };
 }) {
   const caps = new Set(input.capabilities ?? ['asset.govern', 'data.query']);
   const holds = input.holds ?? [];
@@ -112,18 +114,38 @@ function service(input: {
       groups: jest.fn().mockResolvedValue([{ id: 'g-1' }, { id: 'g-2' }]),
     },
   };
+  const reads = { queries: true, clear: true, filtered: false, ...input.reads };
+  const ids = (on: boolean) => new Set(on ? ['a-1'] : []);
+  const catalog = {
+    requestPrincipal: jest.fn().mockResolvedValue({}),
+    scope: jest.fn().mockResolvedValue({
+      all: false,
+      sourceIds: new Set(),
+      assetIds: ids(reads.queries),
+    }),
+    clearScope: jest.fn().mockResolvedValue({
+      all: false,
+      sourceIds: new Set(),
+      assetIds: ids(reads.clear),
+    }),
+    rowFilters: jest
+      .fn()
+      .mockResolvedValue(new Map(reads.filtered ? [['a-1', {}]] : [])),
+  };
+  const quality = { test: jest.fn().mockRejectedValue(STOP) };
   return new GovernanceService(
     prisma as never,
     cls as never,
     actors as never,
     {} as never,
-    {} as never,
+    { record: jest.fn().mockResolvedValue(undefined) } as never,
     columns as never,
     {} as never,
-    {} as never,
+    quality as never,
     {} as never,
     policy,
     identity as never,
+    catalog as never,
   );
 }
 
@@ -214,6 +236,55 @@ describe('naming owners and stewards', () => {
         service({
           capabilities: ['asset.govern', 'data.unmask'],
         }).assignAssetRole('a-1', 'STEWARD', 'user:ana'),
+      ),
+    ).toBe('allowed');
+  });
+});
+
+describe('quality rules that read the table', () => {
+  const sqlRule = {
+    name: 'Probe',
+    type: 'sql',
+    metric: 'query',
+    dimension: 'accuracy',
+    operator: 'mustBe',
+    threshold: 0,
+    arguments: { query: "SELECT COUNT(*) FROM {object} WHERE email LIKE 'a%'" },
+  };
+  const rowCount = {
+    name: 'Rows',
+    type: 'metadata',
+    metric: 'rowCount',
+    dimension: 'completeness',
+    operator: 'mustBeGreaterThan',
+    threshold: 0,
+  };
+
+  it.each([
+    ['without a grant to query it', { queries: false }],
+    ['reading it masked', { clear: false }],
+    ['behind a row filter', { filtered: true }],
+  ])('refuses a test run by someone %s', async (_, reads) => {
+    expect(
+      await outcome(() =>
+        service({ reads }).testQualityRule('a-1', sqlRule as never),
+      ),
+    ).toBe('TABLE_READ_REQUIRED');
+  });
+
+  it('lets someone who reads the whole table in clear test it', async () => {
+    expect(
+      await outcome(() => service({}).testQualityRule('a-1', sqlRule as never)),
+    ).toBe('allowed');
+  });
+
+  it('leaves rules that read no values to anyone who governs', async () => {
+    expect(
+      await outcome(() =>
+        service({ reads: { queries: false, clear: false } }).testQualityRule(
+          'a-1',
+          rowCount as never,
+        ),
       ),
     ).toBe('allowed');
   });

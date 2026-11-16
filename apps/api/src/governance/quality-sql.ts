@@ -37,6 +37,73 @@ export function literal(value: string | number): string {
     : `'${value.replace(/'/g, "''")}'`;
 }
 
+/**
+ * Why a sql rule's query could leave the parentheses it is measured in, or
+ * null when it cannot. The query becomes one column of a larger SELECT
+ * (`(<query>) AS q_0`), so an unbalanced `)` or a comment that swallows the
+ * closing one would let it add columns of its own, and their rows would be
+ * stored. Quotes are tracked so a `)` inside a string does not count;
+ * backslash-escaped (`E'…'`) and dollar-quoted strings are refused because
+ * their ends are not where a plain scan finds them.
+ */
+export function scalarQueryProblem(query: string): string | null {
+  let depth = 0;
+  for (let i = 0; i < query.length; i += 1) {
+    const ch = query[i];
+    const next = query[i + 1];
+    if (ch === "'" || ch === '"') {
+      const before = query[i - 1] ?? '';
+      if (
+        ch === "'" &&
+        /[eE]/.test(before) &&
+        !/[A-Za-z0-9_]/.test(query[i - 2] ?? '')
+      ) {
+        return 'Escaped strings (E\'…\') are not allowed in a sql rule.';
+      }
+      let j = i + 1;
+      for (; j < query.length; j += 1) {
+        if (query[j] === ch) {
+          if (query[j + 1] === ch) {
+            j += 1;
+            continue;
+          }
+          break;
+        }
+      }
+      if (j >= query.length) return 'The query has an unclosed quote.';
+      i = j;
+      continue;
+    }
+    if ((ch === '-' && next === '-') || (ch === '/' && next === '*')) {
+      return 'Comments are not allowed in a sql rule.';
+    }
+    if (ch === '$' && next === '$') {
+      return 'Dollar-quoted strings are not allowed in a sql rule.';
+    }
+    if (ch === ';') return 'A sql rule is one statement, without ";".';
+    if (ch === '(') depth += 1;
+    if (ch === ')') {
+      depth -= 1;
+      if (depth < 0) return 'The query closes a parenthesis it never opened.';
+    }
+  }
+  return depth === 0 ? null : 'The query leaves a parenthesis open.';
+}
+
+/**
+ * A query job's error as it may be shown or kept with a quality result:
+ * quoted literals are cut, since an engine error can quote the value it
+ * failed on (`Could not convert string 'jane@…' to INT32`), and a result is
+ * read by everyone who sees the asset.
+ */
+export function redactQueryError(message: string): string {
+  return message
+    .replace(/'(?:[^']|'')*'/g, "'…'")
+    .replace(/"(?:[^"]|"")*"/g, (quoted) =>
+      quoted.length > 66 ? '"…"' : quoted,
+    );
+}
+
 function asText(column: string): string {
   return `CAST(${ident(column)} AS VARCHAR)`;
 }
@@ -58,6 +125,8 @@ function expression(
   }
   const args = rule.arguments ?? {};
   if (rule.type === 'sql') {
+    const problem = scalarQueryProblem(args.query ?? '');
+    if (problem) return { error: problem };
     const query = (args.query ?? '')
       .replace(/\{object\}/g, table)
       .replace(/\{property\}/g, column ? ident(column) : '{property}');
