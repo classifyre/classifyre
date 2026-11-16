@@ -4,7 +4,7 @@ import { CorrelationService } from './correlation.service';
  * `correlation_pair_staging` is scratch: `stagePairAggregates` fills it with
  * the pairwise-overlap aggregation, the scoring loop streams it back into
  * edges, and it is cleared again before the recompute returns. Nothing else in
- * the codebase reads it, and it is excluded from namespace export.
+ * the codebase reads it.
  *
  * The clearing used to live only in a `finally`, keyed on a `runId` generated
  * per invocation. That is enough for a thrown error and not enough for a

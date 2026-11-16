@@ -269,11 +269,10 @@ These come from the code and from incidents already paid for. Every PRD's implem
 | 11 | Prefer typed columns over JSONB predicates for anything filtered at scale | JSONB predicates have produced 1-row estimates against 28k rows |
 | 12 | Use a **value import** for any class injected with `@Optional()` | A type-only import yields an undefined injection |
 | 13 | Every write endpoint is either blocked in demo mode or explicitly `@AllowInDemoMode()` | Demo mode is the public showcase's write protection |
-| 14 | Every new table is added to `data-transfer/transfer-scopes.ts`, or listed in its "deliberately absent" comment with a reason | That registry is the single source of truth for archives |
-| 15 | Every UI string has EN and DE keys (`apps/web/i18n/en.json`, `de.json`). Status pills use `lib/status-tone.ts` | The UI ships in two languages |
-| 16 | New mutating autopilot tools respect `aiMode` (observe-only), write `AgentDecision` rows, and support undo where possible | Operator trust in the autopilot |
-| 17 | Any matched content leaving the process goes through the content presenter ([S1](S1-enterprise-extension-seams.md)) | One place for enterprise redaction |
-| 18 | Adding a Prisma model or enum can crash the dev watch-mode API and worker pods until they are restarted; plan dev rollouts for it | Dev stack behaviour |
+| 14 | Every UI string has EN and DE keys (`apps/web/i18n/en.json`, `de.json`). Status pills use `lib/status-tone.ts` | The UI ships in two languages |
+| 15 | New mutating autopilot tools respect `aiMode` (observe-only), write `AgentDecision` rows, and support undo where possible | Operator trust in the autopilot |
+| 16 | Any matched content leaving the process goes through the content presenter ([S1](S1-enterprise-extension-seams.md)) | One place for enterprise redaction |
+| 17 | Adding a Prisma model or enum can crash the dev watch-mode API and worker pods until they are restarted; plan dev rollouts for it | Dev stack behaviour |
 
 ## 9. Definition of done (every PRD)
 
@@ -283,7 +282,6 @@ These come from the code and from incidents already paid for. Every PRD's implem
 - [ ] MCP tools in a capability group; completeness spec green; the generated MCP docs catalogue refreshed.
 - [ ] Web UI with EN and DE strings and namespace-aware links.
 - [ ] Demo-mode behaviour decided and tested.
-- [ ] Data-transfer scope updated, or the exclusion documented with a reason.
 - [ ] Domain events emitted per the catalogue (F1), with payload schemas in `packages/schemas`.
 - [ ] Actor from `ActorContextService`, `@Access(...)` on routes, content through the presenter (F6).
 - [ ] Human decisions write `decision_log` rows ([G7](G7-outcome-metrics.md)) where applicable.

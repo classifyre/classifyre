@@ -30,7 +30,7 @@ function setup(input: {
   /** The requester's groups when a request is decided. */
   requesterGroups?: string[];
 }) {
-  const me = input.me ?? 'user:ana';
+  const me = input.me ?? 'user:zephyr';
   const stored = [...(input.stored ?? [])];
   const prisma = {
     governanceRole: {
@@ -184,7 +184,7 @@ const waiting = (over: Record<string, unknown> = {}) => ({
   scopeType: 'ASSET',
   scopeId: 'a-1',
   sourceId: 's-1',
-  requesterRef: 'user:ben',
+  requesterRef: 'user:quill',
   groupId: 'g-9',
   roleKey: 'data-reader',
   reason: 'Monthly churn report',
@@ -202,13 +202,13 @@ const waiting = (over: Record<string, unknown> = {}) => ({
 const OWNER = {
   scopeType: 'ASSET' as const,
   role: 'OWNER',
-  principalRef: 'user:ana',
+  principalRef: 'user:zephyr',
 };
 
 describe('asking for access', () => {
   it('asks for a group of theirs and tells the owner', async () => {
     const { svc, notifier } = setup({
-      me: 'user:ben',
+      me: 'user:quill',
       roles: [
         OWNER,
         { scopeType: 'SOURCE', role: 'STEWARD', principalRef: 'group:s' },
@@ -221,13 +221,13 @@ describe('asking for access', () => {
       durationDays: 90,
     });
     expect(notifier.accessRequested).toHaveBeenCalledWith(
-      expect.objectContaining({ to: ['user:ana'] }),
+      expect.objectContaining({ to: ['user:zephyr'] }),
     );
   });
 
   it('goes to the stewards when nobody owns it', async () => {
     const { svc, notifier } = setup({
-      me: 'user:ben',
+      me: 'user:quill',
       roles: [
         { scopeType: 'SOURCE', role: 'STEWARD', principalRef: 'group:s' },
       ],
@@ -262,7 +262,7 @@ describe('asking for access', () => {
     [
       'twice',
       {},
-      { stored: [waiting({ requesterRef: 'user:ana' })] },
+      { stored: [waiting({ requesterRef: 'user:zephyr' })] },
       'REQUEST_PENDING',
     ],
   ])('refuses asking %s', async (_, body, setupInput, expected) => {
@@ -321,7 +321,7 @@ describe('deciding', () => {
       expect.arrayContaining(['data.query', 'data.connect', 'data.unmask']),
     );
     expect(notifier.accessDecided).toHaveBeenCalledWith(
-      expect.objectContaining({ approved: true, requesterRef: 'user:ben' }),
+      expect.objectContaining({ approved: true, requesterRef: 'user:quill' }),
     );
   });
 
@@ -388,7 +388,7 @@ describe('deciding', () => {
   it('refuses deciding your own request', async () => {
     const { svc } = setup({
       capabilities: ['workspace.view', 'access.manage'],
-      stored: [waiting({ requesterRef: 'user:ana' })],
+      stored: [waiting({ requesterRef: 'user:zephyr' })],
     });
     expect(await outcome(() => svc.deny('req-1', {}))).toBe('OWN_REQUEST');
   });
@@ -409,7 +409,7 @@ describe('deciding', () => {
   });
 
   it('lets only the requester withdraw', async () => {
-    const mine = setup({ me: 'user:ben', stored: [waiting()] });
+    const mine = setup({ me: 'user:quill', stored: [waiting()] });
     expect((await mine.svc.withdraw('req-1')).status).toBe('WITHDRAWN');
     const other = setup({ stored: [waiting()] });
     expect(await outcome(() => other.svc.withdraw('req-1'))).toBe(

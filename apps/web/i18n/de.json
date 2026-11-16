@@ -6591,7 +6591,7 @@
       "title": "Einstellungen — Arbeitsbereich, Region & Harness-Konfiguration",
       "description": "Konfigurieren Sie diesen Arbeitsbereich: Sprache und Zeitvorgaben, Instanzversion, KI-Anbieter, Harness-Autopilot, Embedding, MCP-Server sowie Export und Import. Alle Einstellungen gelten je Arbeitsbereich.",
       "ogTitle": "Einstellungen — Konfiguration des Arbeitsbereichs | Classifyre",
-      "ogDescription": "Region, KI-Anbieter, Harness, Embedding und Datentransfer — die Einstellungen des Arbeitsbereichs an einem Ort."
+      "ogDescription": "Region, KI-Anbieter, Harness, Embedding und Scan-Limits — die Einstellungen des Arbeitsbereichs an einem Ort."
     },
     "notifications": {
       "title": "Benachrichtigungen — Warnungen & Systemsignale",

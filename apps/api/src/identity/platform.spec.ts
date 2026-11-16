@@ -26,7 +26,7 @@ const operator: Operator = {
 describe('PlatformService', () => {
   const originalUrl = process.env.DATABASE_URL;
   beforeAll(() => {
-    // Its pool connects lazily; only workspace imports would use it.
+    // Its pool connects lazily; these tests never use it.
     process.env.DATABASE_URL ??= 'postgresql://u:p@localhost:5432/db';
   });
   afterAll(() => {

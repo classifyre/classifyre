@@ -265,7 +265,7 @@ helm upgrade --install classifyre ./helm/classifyre \
 | api.embedding.workerConcurrency | int | `1` | Maximum embedding batches processed concurrently across all API replicas. |
 | api.env.CLI_JOB_REAP_CRON | string | `"*/5 * * * *"` | MAX_CONCURRENT_RUNNERS because that cap counts runner rows, not pods. |
 | api.env.ENVIRONMENT | string | `"kubernetes"` | Execution mode used by API. |
-| api.env.MAX_CONCURRENT_RUNNERS | string | `"3"` | ceiling is this number times the number of workspaces running scans. |
+| api.env.MAX_CONCURRENT_RUNNERS | string | `"3"` | in Settings. |
 | api.env.MAX_RUNNERS_PER_SOURCE | string | `"5"` | exceeds this value. Set to "0" to disable cleanup. |
 | api.env.NAMESPACE_IDLE_AFTER_DAYS | string | `"7"` | for testing. Set to "0" to disable cold mode. |
 | api.env.NAMESPACE_IDLE_CHECK_MS | string | `"60000"` | and wake sleeping namespaces. Code default when unset: 60000. |

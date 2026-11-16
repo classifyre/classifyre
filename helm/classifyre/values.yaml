@@ -229,9 +229,9 @@ api:
     # -- Maximum number of runners that can execute concurrently. New runs are
     # -- queued in PENDING state when this limit is reached. Set "0" for no limit.
     # --
-    # -- Enforced PER NAMESPACE, not per deployment: CliRunnerService counts
-    # -- runner rows through the namespace-scoped Prisma client, so the real
-    # -- ceiling is this number times the number of workspaces running scans.
+    # -- Scans running at once across the whole installation (every
+    # -- workspace together); each workspace can set a lower limit of its own
+    # -- in Settings.
     MAX_CONCURRENT_RUNNERS: "3"
     # -- Days of scan history kept. The nightly cleanup deletes runs older than
     # -- this along with their logs. Code default when unset: 14.

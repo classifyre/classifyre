@@ -231,7 +231,7 @@ export const CAPABILITIES = [
   {
     id: 'data.export',
     scope: 'workspace',
-    description: 'Export data out of the workspace (CSV, archives).',
+    description: 'Export data out of the workspace (query results, CSV).',
   },
   {
     // The rows themselves, not what was found in them. Given on a whole

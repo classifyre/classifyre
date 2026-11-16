@@ -105,7 +105,7 @@ Highlight by [ Source ▾ | Detector ▾ | Hypothesis ▾ | Concept ▾ ]
 
 | Area | Change |
 |---|---|
-| Prisma | `enum CaseBoardItemKind` gains `TERM`. `refId` → `glossary_terms.id`. `@@unique([boardId, kind, refId])` already prevents duplicates. Plan dev rollouts for the enum (integration rule 18) |
+| Prisma | `enum CaseBoardItemKind` gains `TERM`. `refId` → `glossary_terms.id`. `@@unique([boardId, kind, refId])` already prevents duplicates. Plan dev rollouts for the enum (integration rule 17) |
 | `packages/schemas/src/case-board.ts` | `BOARD_ITEM_KINDS` gains `"TERM"`, and a new op: `{ type: "term.place", opId, itemId, termId, x?, y? }`. Replaying it for a removed TERM item restores the same row, as `thread.place` does. `item.delete` on a TERM item removes the card only; the term is untouched |
 | `CaseActivityType` | Gains `BOARD_TERM_PLACED`, `BOARD_TERM_REMOVED`, `MEANING_LINKED` and `MEANING_UNLINKED` (A8). Payloads carry `itemId` and `termKey` for *Show on board* |
 | Rendering | `packages/case-board/src/components/term-node.tsx` (new) |

@@ -48,7 +48,7 @@ export class DuplicateDetectionOffException extends ConflictException {
 
 /**
  * Duplicate detection's on/off switch, stored on the correlation config
- * singleton so it travels with a workspace export like the tuning does.
+ * singleton next to the tuning.
  *
  * Reads are cached per schema for a few seconds and a missing row means on:
  * every workspace had duplicate detection before the switch existed, and a

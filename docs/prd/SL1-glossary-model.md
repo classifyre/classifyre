@@ -457,7 +457,7 @@ model GlossaryActivity {
 
 Notes:
 - `GlossaryTerm.origin` keeps its `AgentMemoryOrigin` type. Changing it would touch `AgentMemory`. Pack and import provenance live in `packKey` and `sourceIri`.
-- Every table lives in the tenant schema (integration rule 1). The migration is new (rule 2) and must also run on the dev stack (rule 18: restart watch-mode pods after enum changes).
+- Every table lives in the tenant schema (integration rule 1). The migration is new (rule 2) and must also run on the dev stack (rule 17: restart watch-mode pods after enum changes).
 
 ## 7. API (REST)
 

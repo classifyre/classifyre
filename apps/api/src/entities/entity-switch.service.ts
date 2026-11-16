@@ -47,7 +47,7 @@ const NAME_TYPES: readonly NameLabelType[] = [
 
 /**
  * The Entities feature switch and its label configuration, on the
- * `entity_config` singleton so both travel with a workspace export.
+ * `entity_config` singleton, together.
  *
  * A missing row means on with the shipped labels: that is what a new workspace
  * gets, while the migration wrote an "off" row into every workspace that

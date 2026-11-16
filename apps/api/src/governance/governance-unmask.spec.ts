@@ -49,7 +49,7 @@ function column(input: {
 function service(input: {
   capabilities?: string[];
   unmaskAssets?: string[];
-  /** Roles the caller (user:ana) holds, as governanceRole rows. */
+  /** Roles the caller (user:zephyr) holds, as governanceRole rows. */
   holds?: { scopeType: 'ASSET' | 'SOURCE'; scopeId: string; role: string }[];
   state?: ReturnType<typeof column>;
   /** What the caller reads of table a-1 (quality rules). */
@@ -74,7 +74,7 @@ function service(input: {
                   .filter((h) => h.scopeId === where.scopeId)
                   .map((h) => ({
                     ...h,
-                    principalRef: 'user:ana',
+                    principalRef: 'user:zephyr',
                     dateOut: null,
                   })),
           ),
@@ -86,11 +86,11 @@ function service(input: {
     $transaction: jest.fn().mockRejectedValue(STOP),
   };
   const values: Record<string, unknown> = {
-    [CLS_PERSON]: { actorRef: 'user:ana', groupIds: ['g-1'] },
+    [CLS_PERSON]: { actorRef: 'user:zephyr', groupIds: ['g-1'] },
     [CLS_ORG_ID]: 'org-1',
   };
   const cls = { isActive: () => true, get: (key: string) => values[key] };
-  const actors = { current: () => ({ ref: 'user:ana', id: 'user:ana' }) };
+  const actors = { current: () => ({ ref: 'user:zephyr', id: 'user:zephyr' }) };
   const policy = {
     check: jest.fn((_actor: unknown, capability: string) => ({
       allow: caps.has(capability),
@@ -110,7 +110,7 @@ function service(input: {
   };
   const identity = {
     membership: {
-      members: jest.fn().mockResolvedValue([{ id: 'ana' }, { id: 'ben' }]),
+      members: jest.fn().mockResolvedValue([{ id: 'zephyr' }, { id: 'quill' }]),
       groups: jest.fn().mockResolvedValue([{ id: 'g-1' }, { id: 'g-2' }]),
     },
   };
@@ -227,8 +227,8 @@ describe('column access needs clear reading to show more', () => {
 
 describe('naming owners and stewards', () => {
   it.each([
-    ['themselves as steward', 'STEWARD', 'user:ana'],
-    ['themselves as owner', 'OWNER', 'user:ana'],
+    ['themselves as steward', 'STEWARD', 'user:zephyr'],
+    ['themselves as owner', 'OWNER', 'user:zephyr'],
     ['a group of theirs as steward', 'STEWARD', 'group:g-1'],
   ])('refuses an admin who does not unmask naming %s', async (_, role, ref) => {
     expect(
@@ -237,8 +237,8 @@ describe('naming owners and stewards', () => {
   });
 
   it.each([
-    ['someone else as steward', 'STEWARD', 'user:ben'],
-    ['someone else as owner', 'OWNER', 'user:ben'],
+    ['someone else as steward', 'STEWARD', 'user:quill'],
+    ['someone else as owner', 'OWNER', 'user:quill'],
     ['a group of theirs as custodian', 'CUSTODIAN', 'group:g-1'],
   ])('lets the same admin name %s', async (_, role, ref) => {
     expect(
@@ -251,7 +251,7 @@ describe('naming owners and stewards', () => {
       await outcome(() =>
         service({
           capabilities: ['asset.govern', 'data.unmask'],
-        }).assignAssetRole('a-1', 'STEWARD', 'user:ana'),
+        }).assignAssetRole('a-1', 'STEWARD', 'user:zephyr'),
       ),
     ).toBe('allowed');
   });

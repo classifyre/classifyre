@@ -6591,7 +6591,7 @@
       "title": "Settings — Workspace, Region & Harness Configuration",
       "description": "Configure this workspace: language and time defaults, instance version, AI providers, Harness autopilot, embedding, MCP servers and export/import. All settings are workspace-scoped.",
       "ogTitle": "Settings — Workspace Configuration | Classifyre",
-      "ogDescription": "Region, AI providers, harness, embedding and data transfer — workspace settings in one place."
+      "ogDescription": "Region, AI providers, harness, embedding and scan limits — workspace settings in one place."
     },
     "notifications": {
       "title": "Notifications — Alerts & System Signals",

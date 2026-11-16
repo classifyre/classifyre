@@ -69,6 +69,9 @@ async function prepareRegistry(client: PoolClient): Promise<void> {
   await client.query(REGISTRY_TABLE_DDL);
   await client.query(IAM_TABLES_DDL);
   await client.query(WORKER_QUEUE_STATE_DDL);
+  // Installation-wide scan limits lived here for one commit (0f2ac2df)
+  // before they moved to each workspace's settings; nothing reads it now.
+  await client.query('DROP TABLE IF EXISTS public.deployment_settings');
   await checkDatabaseKind(client);
 }
 

@@ -79,14 +79,14 @@ function service(input: {
     },
   };
   const values: Record<string, unknown> = {
-    [CLS_PERSON]: { actorRef: 'user:ana', groupIds: ['g-1'] },
+    [CLS_PERSON]: { actorRef: 'user:zephyr', groupIds: ['g-1'] },
     [CLS_CONNECTION_SCOPE]: undefined,
   };
   const cls = {
     isActive: () => true,
     get: (key: string) => values[key],
   };
-  const actors = { current: () => ({ ref: 'user:ana', id: 'user:ana' }) };
+  const actors = { current: () => ({ ref: 'user:zephyr', id: 'user:zephyr' }) };
   const caps = new Set(input.capabilities ?? ['data.query', 'asset.view']);
   const policy = {
     capabilities: jest.fn().mockResolvedValue(caps),
@@ -193,7 +193,7 @@ describe('QueryCatalogService column masks', () => {
     );
     expect(call?.[0].where).toMatchObject({
       role: { in: ['OWNER', 'STEWARD'] },
-      principalRef: { in: ['user:ana', 'group:g-1'] },
+      principalRef: { in: ['user:zephyr', 'group:g-1'] },
     });
   });
 });

@@ -193,7 +193,7 @@
     {
       "id": "data.export",
       "scope": "workspace",
-      "description": "Export data out of the workspace (CSV, archives)."
+      "description": "Export data out of the workspace (query results, CSV)."
     },
     {
       "id": "data.query",
