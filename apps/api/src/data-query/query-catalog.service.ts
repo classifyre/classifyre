@@ -13,6 +13,7 @@ import {
   effectiveColumnPolicy,
   toColumnMask,
   type ColumnMask,
+  type ColumnPolicy,
   type MaskedColumn,
 } from './column-masks';
 import { clearScopeFor, readsInClear, type ClearScope } from './clear-scope';
@@ -24,7 +25,10 @@ import {
   datasetColumnPolicy,
   parseDatasetColumns,
   stricterClassification,
-  type UpstreamColumn,
+  stricterPolicy,
+  type ColumnFloor,
+  type DatasetColumn,
+  type FloorInputs,
 } from './dataset-floor';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ClsService } from 'nestjs-cls';
@@ -362,17 +366,17 @@ export class QueryCatalogService {
     }
     // DQ §5.12: a shared dataset's columns inherit their inputs' strictest
     // classification as a floor; its own settings can only add to it.
-    const index = classificationIndex(derived, notes);
+    const index = floorIndex(derived, notes, (await this.tables()).tables);
     for (const dataset of datasets) {
       const floors = columnFloors(
         parseDatasetColumns(dataset.columns),
-        index.classify,
-        index.strictestOf(dataset.inputs),
+        index(dataset.inputs),
       );
-      for (const [column, { floor }] of floors) {
+      for (const [column, { floor, policy: floorPolicy }] of floors) {
         const note = noteOf.get(`${dataset.assetId}\u0000${column}`);
         const policy = datasetColumnPolicy({
           floor,
+          floorPolicy,
           access: note?.access,
           maskKind: note?.maskKind,
           classification: note?.classification,
@@ -388,31 +392,44 @@ export class QueryCatalogService {
    * strictest classification of the input columns each comes from, and
    * which ones. For governance and the dataset's pages.
    */
-  async datasetFloors(
-    assetId: string,
-  ): Promise<
-    Map<string, { floor: Classification | null; from: UpstreamColumn[] }>
-  > {
+  async datasetFloors(assetId: string): Promise<Map<string, ColumnFloor>> {
     const dataset = await this.prisma.sharedDataset.findUnique({
       where: { assetId },
       select: { inputs: true, columns: true },
     });
     if (!dataset) return new Map();
-    const [derived, notes] = await Promise.all([
+    return this.floorsOf(parseDatasetColumns(dataset.columns), dataset.inputs);
+  }
+
+  /** Floors for dataset columns over these inputs (also before saving one). */
+  async floorsOf(
+    columns: readonly DatasetColumn[],
+    inputIds: readonly string[],
+  ): Promise<Map<string, ColumnFloor>> {
+    const [derived, notes, cached] = await Promise.all([
       this.derivedClassifications(),
       this.prisma.assetColumnAnnotation.findMany({
         where: {
-          assetId: { in: dataset.inputs },
-          classification: { not: null },
+          assetId: { in: [...inputIds] },
+          OR: [
+            { access: { not: null } },
+            { maskKind: { not: null } },
+            { classification: { not: null } },
+          ],
         },
-        select: { assetId: true, columnName: true, classification: true },
+        select: {
+          assetId: true,
+          columnName: true,
+          access: true,
+          maskKind: true,
+          classification: true,
+        },
       }),
+      this.tables(),
     ]);
-    const index = classificationIndex(derived, notes);
     return columnFloors(
-      parseDatasetColumns(dataset.columns),
-      index.classify,
-      index.strictestOf(dataset.inputs),
+      columns,
+      floorIndex(derived, notes, cached.tables)(inputIds),
     );
   }
 
@@ -743,45 +760,84 @@ function columnsOf(metadata: Record<string, unknown>): MaskedColumn[] {
 }
 
 /**
- * Effective column classifications (a steward's, else what findings derive),
- * as lookups for a dataset's floor.
+ * How a dataset's inputs are looked up for its floor (§5.12): each column's
+ * effective classification (a steward's, else what findings derive), the
+ * policies stewards set, and which columns each input has. Column names
+ * are matched without case: lineage lowercases them, scans keep theirs.
  */
-function classificationIndex(
+function floorIndex(
   derived: Map<string, Map<string, Classification>>,
   notes: readonly {
     assetId: string;
     columnName: string;
     classification: string | null;
+    access?: string | null;
+    maskKind?: string | null;
   }[],
+  tables: readonly { assetId: string; columns: { name: string }[] }[],
 ) {
-  const set = new Map<string, string>();
+  const key = (assetId: string, column: string) =>
+    `${assetId}\u0000${column.toLowerCase()}`;
+  const classOf = new Map<string, string>();
+  const policyOf = new Map<string, ColumnPolicy>();
+  const columnsOf = new Map<string, Set<string>>();
+  const add = (assetId: string, column: string) => {
+    const set = columnsOf.get(assetId) ?? new Set<string>();
+    set.add(column.toLowerCase());
+    columnsOf.set(assetId, set);
+  };
+  for (const table of tables) {
+    for (const column of table.columns) add(table.assetId, column.name);
+  }
+  for (const [assetId, columns] of derived) {
+    for (const [column, value] of columns) {
+      add(assetId, column);
+      if (!classOf.has(key(assetId, column)))
+        classOf.set(key(assetId, column), value);
+    }
+  }
   for (const note of notes) {
-    if (note.classification) {
-      set.set(`${note.assetId}\u0000${note.columnName}`, note.classification);
+    add(note.assetId, note.columnName);
+    // A steward's classification wins over what findings derive.
+    if (note.classification)
+      classOf.set(key(note.assetId, note.columnName), note.classification);
+    if (note.access || note.maskKind) {
+      policyOf.set(
+        key(note.assetId, note.columnName),
+        effectiveColumnPolicy({
+          access: note.access,
+          maskKind: note.maskKind,
+          classification: null,
+        }),
+      );
     }
   }
   const classify = (assetId: string, column: string) =>
-    set.get(`${assetId}\u0000${column}`) ??
-    derived.get(assetId)?.get(column) ??
-    // Column names from lineage may differ in case from the scan's.
-    [...(derived.get(assetId) ?? [])].find(
-      ([name]) => name.toLowerCase() === column.toLowerCase(),
-    )?.[1] ??
-    null;
-  const strictestOf = (assetIds: readonly string[]) => {
-    let best: Classification | null = null;
+    classOf.get(key(assetId, column)) ?? null;
+  return (assetIds: readonly string[]): FloorInputs => {
+    let strictest: Classification | null = null;
+    let strictestPolicy: ColumnPolicy | null = null;
     for (const assetId of assetIds) {
-      const columns = new Set([
-        ...(derived.get(assetId)?.keys() ?? []),
-        ...notes
-          .filter((note) => note.assetId === assetId)
-          .map((note) => note.columnName),
-      ]);
-      for (const column of columns) {
-        best = stricterClassification(best, classify(assetId, column));
+      for (const column of columnsOf.get(assetId) ?? []) {
+        strictest = stricterClassification(
+          strictest,
+          classify(assetId, column),
+        );
+        const own = policyOf.get(key(assetId, column));
+        if (own)
+          strictestPolicy = strictestPolicy
+            ? stricterPolicy(strictestPolicy, own)
+            : own;
       }
     }
-    return best;
+    return {
+      classify,
+      strictest,
+      policyOf: (assetId, column) => policyOf.get(key(assetId, column)) ?? null,
+      strictestPolicy,
+      // An input whose columns are not known (not scanned yet) cannot say.
+      known: (assetId, column) =>
+        columnsOf.get(assetId)?.has(column.toLowerCase()) ?? false,
+    };
   };
-  return { classify, strictestOf };
 }

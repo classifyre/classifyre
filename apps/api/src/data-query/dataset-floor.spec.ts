@@ -78,12 +78,19 @@ describe('shared dataset floors (DQ §5.12)', () => {
   });
 
   it('gives each column the strictest classification of its sources', () => {
-    const floors = columnFloors(columns, classify, 'sensitive');
-    expect(floors.get('id')).toEqual({ floor: null, from: [] });
+    const floors = columnFloors(columns, { classify, strictest: 'sensitive' });
+    expect(floors.get('id')).toEqual({
+      floor: null,
+      policy: null,
+      from: [],
+      traced: true,
+    });
     expect(floors.get('email')?.floor).toBe('personal');
     expect(floors.get('contact')).toEqual({
       floor: 'sensitive',
+      policy: null,
       from: [{ assetId: 'cust', column: 'phone' }],
+      traced: true,
     });
     expect(floors.get('total')?.floor).toBe('confidential');
   });
@@ -95,14 +102,64 @@ describe('shared dataset floors (DQ §5.12)', () => {
       transform: 'CONSTANT',
     });
     expect(
-      columnFloors(columns, classify, 'sensitive').get('n')?.floor,
+      columnFloors(columns, { classify, strictest: 'sensitive' }).get('n')
+        ?.floor,
     ).toBeNull();
   });
 
   it('fails closed: an untraced column takes the strictest input', () => {
     expect(
-      columnFloors(columns, classify, 'sensitive').get('label')?.floor,
+      columnFloors(columns, { classify, strictest: 'sensitive' }).get('label')
+        ?.floor,
     ).toBe('sensitive');
+  });
+
+  it('treats a whole-row reference as untraced (it carries every column)', () => {
+    // SELECT c AS r FROM cust c: lineage names "c", which is no column.
+    const row = datasetColumns(
+      [{ name: 'r', type: 'STRUCT' }],
+      [
+        {
+          table: 'shop.public.cust',
+          fields: [{ downstream: 'r', upstreams: ['c'] }],
+        },
+      ],
+      () => 'cust',
+    );
+    const floors = columnFloors(row, {
+      classify,
+      strictest: 'sensitive',
+      known: (_assetId, column) => ['email', 'phone'].includes(column),
+    });
+    expect(floors.get('r')).toMatchObject({
+      floor: 'sensitive',
+      traced: false,
+    });
+  });
+
+  it('passes on a mask a steward set without classifying the column', () => {
+    const masked = {
+      action: 'mask' as const,
+      mask: 'redact' as const,
+      fromClassification: false,
+    };
+    const floors = columnFloors(columns, {
+      classify: () => null,
+      strictest: null,
+      policyOf: (_a, column) => (column === 'email' ? masked : null),
+      strictestPolicy: masked,
+    });
+    expect(floors.get('email')?.policy).toEqual(masked);
+    expect(
+      datasetColumnPolicy({
+        floor: null,
+        floorPolicy: masked,
+        access: 'clear',
+        maskKind: null,
+        classification: null,
+      }),
+    ).toMatchObject({ action: 'mask', mask: 'redact' });
+    expect(floors.get('label')?.policy).toEqual(masked);
   });
 
   it('lets the dataset be stricter, never looser', () => {

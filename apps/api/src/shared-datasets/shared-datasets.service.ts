@@ -49,10 +49,8 @@ import {
   sqlIdentifier,
 } from '../data-query/sql-names';
 import {
-  columnFloors,
   datasetColumns,
   parseDatasetColumns,
-  stricterClassification,
   type DatasetColumn,
   type DescribedLineage,
 } from '../data-query/dataset-floor';
@@ -259,7 +257,11 @@ export class SharedDatasetsService implements OnModuleInit {
       where: { type: AssetType.SHARED_DATASET },
       select: { id: true, sqlName: true },
     });
-    if (found) return { id: found.id, sqlName: found.sqlName ?? 'shared' };
+    if (found)
+      return {
+        id: found.id,
+        sqlName: found.sqlName ?? SHARED_DATASET_SQL_NAME,
+      };
     try {
       const created = await this.prisma.source.create({
         data: {
@@ -273,13 +275,19 @@ export class SharedDatasetsService implements OnModuleInit {
         select: { id: true, sqlName: true },
       });
       this.catalog.invalidate();
-      return { id: created.id, sqlName: created.sqlName ?? 'shared' };
+      return {
+        id: created.id,
+        sqlName: created.sqlName ?? SHARED_DATASET_SQL_NAME,
+      };
     } catch {
       const again = await this.prisma.source.findFirstOrThrow({
         where: { type: AssetType.SHARED_DATASET },
         select: { id: true, sqlName: true },
       });
-      return { id: again.id, sqlName: again.sqlName ?? 'shared' };
+      return {
+        id: again.id,
+        sqlName: again.sqlName ?? SHARED_DATASET_SQL_NAME,
+      };
     }
   }
 
@@ -1216,24 +1224,8 @@ export class SharedDatasetsService implements OnModuleInit {
     return datasetColumns(columns, lineage, (name) => bySql.get(name));
   }
 
-  private async floorsFor(columns: DatasetColumn[], inputIds: string[]) {
-    const classes = await this.catalog.classificationsOf(inputIds);
-    let strictest: Classification | null = null;
-    for (const map of classes.values()) {
-      for (const value of map.values()) {
-        strictest = stricterClassification(strictest, value);
-      }
-    }
-    return columnFloors(
-      columns,
-      (assetId, column) =>
-        classes.get(assetId)?.get(column) ??
-        [...(classes.get(assetId) ?? [])].find(
-          ([name]) => name.toLowerCase() === column.toLowerCase(),
-        )?.[1] ??
-        null,
-      strictest,
-    );
+  private floorsFor(columns: DatasetColumn[], inputIds: string[]) {
+    return this.catalog.floorsOf(columns, inputIds);
   }
 
   private columnView(

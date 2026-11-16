@@ -62,9 +62,19 @@ CREATE INDEX IF NOT EXISTS "shared_dataset_blocks_asset_id_idx" ON "shared_datas
 CREATE INDEX IF NOT EXISTS "shared_dataset_blocks_scope_type_scope_id_idx" ON "shared_dataset_blocks"("scope_type", "scope_id");
 
 -- `shared` is the built-in source's SQL name: a source that took it before
--- moves aside (its tables become `shared_source.<schema>.<table>`).
-UPDATE "sources" SET "sql_name" = 'shared_source'
- WHERE "sql_name" = 'shared' AND "type"::text <> 'SHARED_DATASET';
+-- moves aside (its tables become `shared_source.<schema>.<table>`), or to
+-- `shared_source_2`, … when a source already has that name (SQL names are
+-- unique, and one called "Shared source" gets exactly `shared_source`).
+UPDATE "sources" AS s
+   SET "sql_name" = (
+     SELECT c.candidate
+       FROM (SELECT 'shared_source' AS candidate, 1 AS n
+             UNION ALL
+             SELECT 'shared_source_' || g, g FROM generate_series(2, 999) AS g) AS c
+      WHERE NOT EXISTS (SELECT 1 FROM "sources" AS o WHERE o."sql_name" = c.candidate)
+      ORDER BY c.n
+      LIMIT 1)
+ WHERE s."sql_name" = 'shared' AND s."type"::text <> 'SHARED_DATASET';
 
 -- Every workspace has its one built-in source, always (§5.12).
 INSERT INTO "sources" ("id", "name", "description", "type", "config", "sql_name", "updated_at")

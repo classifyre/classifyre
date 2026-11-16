@@ -75,7 +75,10 @@ import {
 } from '../data-query/column-masks';
 import { clearScopeOf, readsInClear } from '../data-query/clear-scope';
 import { QueryCatalogService } from '../data-query/query-catalog.service';
-import { rankOf as rankOfClassification } from '../data-query/dataset-floor';
+import {
+  rankOf as rankOfClassification,
+  stricterPolicy,
+} from '../data-query/dataset-floor';
 import type {
   AssetGovernanceDto,
   GovernancePrincipalDto,
@@ -1732,11 +1735,14 @@ export class GovernanceService {
     // inputs give it (its floor), whoever asks: removing an inherited mask is
     // the input owner's call, not the dataset's.
     if (column.inherited) {
-      const floorPolicy = effectiveColumnPolicy({
+      const byClassification = effectiveColumnPolicy({
         access: null,
         maskKind: null,
         classification: column.inherited.floor,
       });
+      const floorPolicy = column.inherited.policy
+        ? stricterPolicy(byClassification, column.inherited.policy)
+        : byClassification;
       const lowered =
         nextClassification !== null &&
         nextClassification !== undefined &&

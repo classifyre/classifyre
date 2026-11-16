@@ -11,7 +11,6 @@ import { PrismaService } from '../prisma.service';
 import { QueryCatalogService } from '../data-query/query-catalog.service';
 import {
   datasetColumnPolicy,
-  parseDatasetColumns,
   stricterClassification,
 } from '../data-query/dataset-floor';
 import {
@@ -52,6 +51,8 @@ export interface ColumnState {
    */
   inherited?: {
     floor: Classification | null;
+    /** The inputs' own masks or hides, when stricter than the floor's. */
+    policy: ColumnPolicy | null;
     from: { assetId: string; table: string; column: string }[];
     traced: boolean;
   };
@@ -190,6 +191,7 @@ export class GovernanceColumnsService {
           maskKind: isMaskKind(note?.maskKind) ? note.maskKind : null,
           effectiveAccess: datasetColumnPolicy({
             floor: floor?.floor ?? null,
+            floorPolicy: floor?.policy ?? null,
             access: note?.access,
             maskKind: note?.maskKind,
             classification: own,
@@ -200,6 +202,7 @@ export class GovernanceColumnsService {
           updatedBy: note?.updatedBy ?? null,
           inherited: {
             floor: floor?.floor ?? null,
+            policy: floor?.policy ?? null,
             from: floor?.from ?? [],
             traced: floor?.traced ?? false,
           },
@@ -258,6 +261,7 @@ export class GovernanceColumnsService {
     string,
     {
       floor: Classification | null;
+      policy: ColumnPolicy | null;
       from: { assetId: string; table: string; column: string }[];
       traced: boolean;
     }
@@ -272,20 +276,18 @@ export class GovernanceColumnsService {
       this.catalog.tables(),
     ]);
     const sqlOf = new Map(tables.tables.map((t) => [t.assetId, t.sqlName]));
-    const traced = new Map(
-      parseDatasetColumns(dataset.columns).map((c) => [c.name, c.traced]),
-    );
     return new Map(
       [...floors].map(([name, value]) => [
         name,
         {
           floor: value.floor,
+          policy: value.policy,
           from: value.from.map((u) => ({
             assetId: u.assetId,
             table: sqlOf.get(u.assetId) ?? u.assetId,
             column: u.column,
           })),
-          traced: traced.get(name) ?? false,
+          traced: value.traced,
         },
       ]),
     );

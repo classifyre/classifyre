@@ -36,8 +36,9 @@ import { SharedDatasetsService } from './shared-datasets.service';
 
 /**
  * Shared datasets (docs/prd/DQ-data-query.md §5.12). Reading one is a query
- * like any other (query-runs); these routes keep its definition. Routes
- * need `workspace.view`; the service decides who may share (dataset.publish,
+ * like any other (query-runs); these routes keep its definition. Its SQL
+ * and versions need `asset.view`, like any asset's details (the SQL can
+ * hold literal values); the rest `workspace.view`, and the service decides who may share (dataset.publish,
  * or governing every input), change and promote (its owner and stewards),
  * and block (an input's owners and stewards).
  */
@@ -109,7 +110,7 @@ export class SharedDatasetsController {
   }
 
   @Get(':id')
-  @Requires('workspace.view')
+  @Requires('asset.view')
   @ApiOperation({ summary: 'One shared dataset (its asset id)' })
   @ApiOkResponse({ type: SharedDatasetDto })
   get(@Param('id', ParseUUIDPipe) id: string): Promise<SharedDatasetDto> {
@@ -130,7 +131,7 @@ export class SharedDatasetsController {
   }
 
   @Get(':id/versions')
-  @Requires('workspace.view')
+  @Requires('asset.view')
   @ApiOperation({ summary: 'Every saved version of its definition' })
   @ApiOkResponse({ type: [SharedDatasetVersionDto] })
   versions(

@@ -120,30 +120,70 @@ function strongerTransform(a: string | null, b: string | null) {
     : a;
 }
 
+/** What a dataset column inherits from its inputs. */
+export interface ColumnFloor {
+  floor: Classification | null;
+  /**
+   * The strictest of the input columns' own policies (a steward's mask or
+   * hide on a column nobody classified), or null when they add nothing to
+   * the classification.
+   */
+  policy: ColumnPolicy | null;
+  from: UpstreamColumn[];
+  /** False when lineage could not say where it comes from: fail closed. */
+  traced: boolean;
+}
+
+/** How a dataset's inputs are looked up while working out floors. */
+export interface FloorInputs {
+  /** An input column's effective classification. */
+  classify: (assetId: string, column: string) => string | null | undefined;
+  /** The strictest classification of all inputs. */
+  strictest: Classification | null;
+  /** An input column's own policy, when a steward set one. */
+  policyOf?: (assetId: string, column: string) => ColumnPolicy | null;
+  /** The strictest steward-set policy of all inputs. */
+  strictestPolicy?: ColumnPolicy | null;
+  /**
+   * Whether an input has the column (any case). Lineage names something that
+   * is not a column when the query uses a whole row (`SELECT t AS r FROM x t`,
+   * `to_json(t)`): that column carries every column, so it is untraced.
+   */
+  known?: (assetId: string, column: string) => boolean;
+}
+
 /**
- * Each output column's floor: the strictest classification of its upstream
- * columns, or of every input column when it was not traced. `classify` gives
- * an input column's effective classification; `inputMax` the strictest of
- * all the dataset's inputs.
+ * Each output column's floor: the strictest classification and steward
+ * policy of its upstream columns, or of every input when it was not traced
+ * or an upstream is not a column of its input.
  */
 export function columnFloors(
   columns: readonly DatasetColumn[],
-  classify: (assetId: string, column: string) => string | null | undefined,
-  inputMax: Classification | null,
-): Map<string, { floor: Classification | null; from: UpstreamColumn[] }> {
-  const out = new Map<
-    string,
-    { floor: Classification | null; from: UpstreamColumn[] }
-  >();
+  inputs: FloorInputs,
+): Map<string, ColumnFloor> {
+  const out = new Map<string, ColumnFloor>();
   for (const column of columns) {
-    if (!column.traced) {
-      out.set(column.name, { floor: inputMax, from: [] });
+    const traced =
+      column.traced &&
+      column.upstreams.every(
+        (u) => !inputs.known || inputs.known(u.assetId, u.column),
+      );
+    if (!traced) {
+      out.set(column.name, {
+        floor: inputs.strictest,
+        policy: inputs.strictestPolicy ?? null,
+        from: [],
+        traced: false,
+      });
       continue;
     }
     let floor: Classification | null = null;
+    let policy: ColumnPolicy | null = null;
     let from: UpstreamColumn[] = [];
     for (const upstream of column.upstreams) {
-      const value = classify(upstream.assetId, upstream.column) ?? null;
+      const own = inputs.policyOf?.(upstream.assetId, upstream.column) ?? null;
+      if (own) policy = policy ? stricterPolicy(policy, own) : own;
+      const value = inputs.classify(upstream.assetId, upstream.column) ?? null;
       const rank = rankOf(value);
       if (rank < 0) continue;
       if (rank > rankOf(floor)) {
@@ -153,7 +193,7 @@ export function columnFloors(
         from.push(upstream);
       }
     }
-    out.set(column.name, { floor, from });
+    out.set(column.name, { floor, policy, from, traced: true });
   }
   return out;
 }
@@ -165,6 +205,8 @@ export function columnFloors(
  */
 export function datasetColumnPolicy(input: {
   floor: string | null;
+  /** The inputs' own policies (a mask set without a classification). */
+  floorPolicy?: ColumnPolicy | null;
   access: string | null | undefined;
   maskKind: string | null | undefined;
   classification: string | null | undefined;
@@ -179,7 +221,10 @@ export function datasetColumnPolicy(input: {
     maskKind: input.maskKind,
     classification: stricterClassification(input.classification, input.floor),
   });
-  return stricterPolicy(own, floorPolicy);
+  const inherited = input.floorPolicy
+    ? stricterPolicy(floorPolicy, input.floorPolicy)
+    : floorPolicy;
+  return stricterPolicy(own, inherited);
 }
 
 /** Parse the `columns` JSON of a stored dataset (defensive: it is JSONB). */
