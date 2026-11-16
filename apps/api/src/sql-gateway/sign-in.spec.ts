@@ -10,7 +10,7 @@ import {
   refusalMessage,
   refusalReason,
 } from './sign-in';
-import { inCidr } from './sql-gateway.service';
+import { inCidr, isCidr } from './sql-gateway.service';
 
 const secret = Buffer.alloc(32, 7);
 
@@ -114,5 +114,39 @@ describe('inCidr', () => {
     expect(inCidr('2001:db8::1', '2001:db8::/32')).toBe(true);
     expect(inCidr('2001:db9::1', '2001:db8::/32')).toBe(false);
     expect(inCidr('10.0.0.1', '2001:db8::/32')).toBe(false);
+  });
+});
+
+describe('malformed CIDRs', () => {
+  it.each([
+    '10.0.0.0/',
+    'x/abc',
+    '10.0.0.0/33',
+    '10.0.0/8',
+    '300.1.1.1',
+    '',
+    '::1/129',
+    '1:2:3/64',
+  ])('treats %p as no network at all', (cidr) => {
+    expect(isCidr(cidr)).toBe(false);
+    expect(inCidr('10.0.0.1', cidr)).toBe(false);
+    expect(inCidr('2001:db8::1', cidr)).toBe(false);
+  });
+
+  it.each(['10.0.0.0/8', '10.1.2.3', '0.0.0.0/0', '2001:db8::/32', '::1'])(
+    'accepts %p',
+    (cidr) => expect(isCidr(cidr)).toBe(true),
+  );
+});
+
+describe('one sign-in at a time per key', () => {
+  it('refuses a second sign-in while the first holds a key', () => {
+    const lockout = new SignInLockout();
+    expect(lockout.begin(['u:ns:bi:1.2.3.4', 'ip:1.2.3.4'])).toBe(true);
+    expect(lockout.begin(['u:ns:bi:1.2.3.4', 'ip:1.2.3.4'])).toBe(false);
+    expect(lockout.begin(['u:ns:other:1.2.3.4', 'ip:1.2.3.4'])).toBe(false);
+    expect(lockout.begin(['u:ns:bi:5.6.7.8', 'ip:5.6.7.8'])).toBe(true);
+    lockout.end(['u:ns:bi:1.2.3.4', 'ip:1.2.3.4']);
+    expect(lockout.begin(['u:ns:bi:1.2.3.4', 'ip:1.2.3.4'])).toBe(true);
   });
 });

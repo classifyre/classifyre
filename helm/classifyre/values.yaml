@@ -736,8 +736,8 @@ sqlGateway:
   # -- With `proxyProtocol`: the networks of the proxies themselves (pod or
   # -- node CIDRs of Traefik, a load balancer). A PROXY header from anywhere
   # -- else is refused, so a client reaching the pod directly cannot claim
-  # -- another address. Empty: any peer may send one (only safe when nothing
-  # -- but the proxy can reach the gateway, e.g. a NetworkPolicy).
+  # -- another address. Required with `proxyProtocol`: the gateway does not
+  # -- start without it, and a malformed CIDR also stops it.
   trustedProxies: []
 
   # -- V8 heap cap (MB) of the gateway process. The catalogs live outside the

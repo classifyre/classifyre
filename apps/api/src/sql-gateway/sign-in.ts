@@ -81,6 +81,8 @@ export function refusalReason(
   return status;
 }
 
+const PRUNE_AT = 10_000;
+
 /**
  * Failed sign-ins per key (a user name, a client address): ten within 15
  * minutes lock the key for the rest of the window. In memory, per gateway
@@ -90,6 +92,7 @@ export function refusalReason(
 export class SignInLockout {
   private readonly failures = new Map<string, number[]>();
   private readonly reported = new Map<string, number>();
+  private readonly inFlight = new Set<string>();
 
   constructor(
     private readonly windowMs = 15 * 60_000,
@@ -113,6 +116,31 @@ export class SignInLockout {
 
   fail(key: string): void {
     this.failures.set(key, [...this.recent(key), this.now()]);
+    if (this.failures.size + this.reported.size > PRUNE_AT) this.prune();
+  }
+
+  /**
+   * Claims the keys for one sign-in; false while another sign-in holds one
+   * of them. Without it, N sign-ins started together all pass `isLocked`
+   * and get N guesses before the first failure is counted.
+   */
+  begin(keys: readonly string[]): boolean {
+    if (keys.some((key) => this.inFlight.has(key))) return false;
+    keys.forEach((key) => this.inFlight.add(key));
+    return true;
+  }
+
+  end(keys: readonly string[]): void {
+    keys.forEach((key) => this.inFlight.delete(key));
+  }
+
+  /** Drops keys whose window has passed (names tried once and never again). */
+  private prune(): void {
+    for (const key of [...this.failures.keys()]) this.recent(key);
+    const at = this.now();
+    for (const [key, last] of [...this.reported]) {
+      if (at - last >= this.windowMs) this.reported.delete(key);
+    }
   }
 
   /** True the first time a locked key is refused in its window: audit that one. */

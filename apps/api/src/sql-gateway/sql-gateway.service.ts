@@ -59,6 +59,7 @@ import {
   type DataResult,
   type DataRunner,
   PgSession,
+  SessionEscape,
 } from './pg-session';
 import { plainValue } from './pg-types';
 import { readProxyHeader } from './proxy-protocol';
@@ -83,6 +84,9 @@ const STARTUP_SETTINGS = new Set([
 ]);
 
 const SWEEP_MS = 30_000;
+/** Sockets that may be signing in at once, and how long each may take. */
+const MAX_SIGNING_IN = 64;
+const SIGN_IN_MS = 20_000;
 
 /** Error codes of query runs, as the SQLSTATE a PostgreSQL client expects. */
 const SQLSTATE: Record<string, string> = {
@@ -161,6 +165,7 @@ function readConfig(): Config | null {
 
 /** Whether an IPv4/IPv6 address is inside a CIDR (IPv4-mapped IPv6 counts as IPv4). */
 export function inCidr(address: string, cidr: string): boolean {
+  if (!isCidr(cidr)) return false;
   const ip = address.replace(/^::ffff:/, '');
   const [base, bitsText] = cidr.split('/');
   if (ip.includes(':') !== base.includes(':')) return false;
@@ -175,6 +180,38 @@ export function inCidr(address: string, cidr: string): boolean {
           .join('');
   const bits = Number(bitsText ?? (base.includes(':') ? 128 : 32));
   return toBits(ip).slice(0, bits) === toBits(base).slice(0, bits);
+}
+
+/**
+ * Whether `cidr` is an address with an optional prefix length in range. A
+ * malformed one (`10.0.0.0/`, `x/abc`) would otherwise compare zero bits and
+ * match every address, opening `allowedCidrs` and `trustedProxies` to all.
+ */
+export function isCidr(cidr: string): boolean {
+  const [base, bitsText, extra] = cidr.split('/');
+  if (extra !== undefined || !base) return false;
+  const v6 = base.includes(':');
+  if (v6) {
+    if (
+      !/^[0-9a-f:]+$/i.test(base) ||
+      (base.match(/::/g) ?? []).length > 1 ||
+      (!base.includes('::') && base.split(':').length !== 8)
+    )
+      return false;
+    const groups = expandV6(base);
+    if (groups.length !== 8 || groups.some((g) => !/^[0-9a-f]{1,4}$/i.test(g)))
+      return false;
+  } else {
+    const octets = base.split('.');
+    if (
+      octets.length !== 4 ||
+      octets.some((o) => !/^\d{1,3}$/.test(o) || Number(o) > 255)
+    )
+      return false;
+  }
+  if (bitsText === undefined) return true;
+  if (!/^\d{1,3}$/.test(bitsText)) return false;
+  return Number(bitsText) <= (v6 ? 128 : 32);
 }
 
 function expandV6(address: string): string[] {
@@ -236,7 +273,8 @@ class Incoming {
   async message(): Promise<{ type: string; body: Buffer }> {
     await this.need(5);
     const length = this.buffer.readInt32BE(1);
-    if (length < 4 || length > 1_000_000) throw new Error('Bad message.');
+    // Only sign-in messages are read here; SCRAM's are well under a kilobyte.
+    if (length < 4 || length > 16_384) throw new Error('Bad message.');
     await this.need(1 + length);
     const raw = Buffer.from(this.take(1 + length));
     return { type: String.fromCharCode(raw[0]), body: raw.subarray(5) };
@@ -283,6 +321,11 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
   private readonly host = new PgliteHost();
   private readonly live = new Map<number, Live>();
   private readonly lockout = new SignInLockout();
+  /** Sockets not signed in yet. */
+  private signingIn = 0;
+  /** Sessions signed in whose PGlite is starting: slot → connection id. */
+  private readonly opening = new Map<number, string>();
+  private nextSlot = 1;
   private secretKey: Buffer | null = null;
   private sweeper: NodeJS.Timeout | null = null;
 
@@ -304,6 +347,21 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
     if (!config.tls && !config.allowPlaintext) {
       this.logger.error(
         'SQL gateway not started: set SQL_GATEWAY_TLS_CERT_FILE and SQL_GATEWAY_TLS_KEY_FILE (or SQL_GATEWAY_ALLOW_PLAINTEXT for local development only).',
+      );
+      return;
+    }
+    const bad = [...config.allowedCidrs, ...config.trustedProxies].filter(
+      (cidr) => !isCidr(cidr),
+    );
+    if (bad.length) {
+      this.logger.error(
+        `SQL gateway not started: not a CIDR: ${bad.join(', ')} (SQL_GATEWAY_ALLOWED_CIDRS, SQL_GATEWAY_TRUSTED_PROXIES).`,
+      );
+      return;
+    }
+    if (config.proxyProtocol && !config.trustedProxies.length) {
+      this.logger.error(
+        'SQL gateway not started: SQL_GATEWAY_PROXY_PROTOCOL needs SQL_GATEWAY_TRUSTED_PROXIES, the networks of the proxies. Without it any client could claim any address.',
       );
       return;
     }
@@ -340,10 +398,42 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
   // ── Accepting ─────────────────────────────────────────────────────────
 
   private async accept(raw: Socket): Promise<void> {
+    raw.on('error', () => undefined);
+    // Before sign-in a socket costs memory and gives nothing back: there are
+    // at most MAX_SIGNING_IN of them, each with SIGN_IN_MS to finish.
+    if (this.signingIn >= MAX_SIGNING_IN) {
+      raw.destroy();
+      return;
+    }
+    this.signingIn += 1;
+    const deadline = setTimeout(() => raw.destroy(), SIGN_IN_MS);
+    deadline.unref();
+    const signedIn = () => {
+      clearTimeout(deadline);
+      this.signingIn -= 1;
+    };
+    let counted = true;
+    const once = () => {
+      if (counted) {
+        counted = false;
+        signedIn();
+      }
+    };
+    raw.once('close', once);
+    try {
+      await this.acceptSigningIn(raw, once);
+    } finally {
+      once();
+    }
+  }
+
+  private async acceptSigningIn(
+    raw: Socket,
+    signedIn: () => void,
+  ): Promise<void> {
     const config = this.config!;
     raw.setNoDelay(true);
     raw.setKeepAlive(true, 60_000);
-    raw.on('error', () => undefined);
     let socket: Socket = raw;
     let incoming = new Incoming(raw);
     let client = raw.remoteAddress ?? null;
@@ -353,10 +443,7 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
         // client reaching the pod could claim an address (and pass
         // allowedCidrs and the lockout).
         const peer = raw.remoteAddress ?? '';
-        if (
-          config.trustedProxies.length &&
-          !config.trustedProxies.some((cidr) => inCidr(peer, cidr))
-        ) {
+        if (!config.trustedProxies.some((cidr) => inCidr(peer, cidr))) {
           throw new Refusal('28000', 'Connect through the proxy.');
         }
         const proxied = await readProxyHeader(incoming);
@@ -427,6 +514,7 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
           incoming,
           parseStartupParameters(packet.subarray(8)),
           client,
+          signedIn,
         );
         return;
       }
@@ -474,21 +562,88 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
     incoming: Incoming,
     params: Record<string, string>,
     client: string | null,
+    signedIn: () => void,
   ): Promise<void> {
-    const config = this.config!;
     const username = (params.user ?? '').toLowerCase();
     const database = params.database ?? username;
     if (!username)
       throw new Refusal('28000', 'Give a user name: the SQL connection’s.');
     const ns = await this.registry.resolve(database).catch(() => null);
-    if (!ns)
-      throw new Refusal('3D000', `database "${database}" does not exist`);
     // User names are looked up without case: so is the lockout, or `Ana`,
-    // `ANA`, … would each get their own ten tries.
+    // `ANA`, … would each get their own ten tries. The name is locked per
+    // client address, so nobody can lock a BI tool out by failing on
+    // purpose from elsewhere; the address is locked on its own as well.
     const keys = [
-      `u:${ns.namespaceId}:${username.toLowerCase()}`,
+      `u:${ns?.namespaceId ?? `?${database}`}:${username}:${client ?? '-'}`,
       `ip:${client ?? '-'}`,
     ];
+    if (!this.lockout.begin(keys)) {
+      throw new Refusal(
+        '53300',
+        'Another sign-in from here is under way; try again in a moment.',
+      );
+    }
+    try {
+      if (!ns) {
+        // An unknown workspace is refused like a wrong password, after the
+        // same exchange: otherwise its error tells outsiders which exist.
+        await this.decoyExchange(socket, incoming, database, username);
+        keys.forEach((key) => this.lockout.fail(key));
+        throw new Refusal('28P01', refusalMessage(username, false, null));
+      }
+      await this.signInTo(
+        ns,
+        socket,
+        incoming,
+        params,
+        username,
+        client,
+        keys,
+        signedIn,
+      );
+    } finally {
+      this.lockout.end(keys);
+    }
+  }
+
+  /** A SCRAM exchange no password passes, for a workspace that does not exist. */
+  private async decoyExchange(
+    socket: Socket,
+    incoming: Incoming,
+    database: string,
+    username: string,
+  ): Promise<void> {
+    const exchange = new ScramExchange(
+      challengeVerifier(null, () =>
+        decoyVerifier(this.secret(), `unknown:${database}`, username),
+      ),
+    );
+    socket.write(authenticationSasl(['SCRAM-SHA-256']));
+    try {
+      const initial = await incoming.message();
+      if (initial.type !== 'p') return;
+      const sasl = parseSaslInitial(initial.body);
+      if (sasl.mechanism !== 'SCRAM-SHA-256') return;
+      socket.write(authenticationSaslContinue(exchange.start(sasl.data)));
+      const response = await incoming.message();
+      if (response.type === 'p')
+        exchange.finish(response.body.toString('utf8'));
+    } catch (error) {
+      if (!(error instanceof ScramError)) throw error;
+    }
+  }
+
+  private async signInTo(
+    ns: NonNullable<Awaited<ReturnType<NamespaceRegistryService['resolve']>>>,
+    socket: Socket,
+    incoming: Incoming,
+    params: Record<string, string>,
+    username: string,
+    client: string | null,
+    keys: string[],
+    signedIn: () => void,
+  ): Promise<void> {
+    const config = this.config!;
     const locked = keys.find((key) => this.lockout.isLocked(key));
     if (locked) {
       if (this.lockout.shouldReport(locked)) {
@@ -567,12 +722,15 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
       throw new Refusal('28P01', refusalMessage(username, proofOk, status));
     }
     const row = found.row;
-    const live = [...this.live.values()];
-    if (live.length >= config.maxSessions) {
+    // Counted before the session's PGlite starts (about a second): sign-ins
+    // racing each other would all pass a check of the live sessions alone.
+    const opening = [...this.opening.values()];
+    if (this.live.size + opening.length >= config.maxSessions) {
       throw new Refusal('53300', 'The SQL gateway is busy; try again shortly.');
     }
     if (
-      live.filter((l) => l.connectionId === row.id).length >=
+      [...this.live.values()].filter((l) => l.connectionId === row.id).length +
+        opening.filter((id) => id === row.id).length >=
       config.maxPerConnection
     ) {
       throw new Refusal(
@@ -580,6 +738,37 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
         `This SQL connection has ${config.maxPerConnection} sessions open already.`,
       );
     }
+    const slot = this.nextSlot++;
+    this.opening.set(slot, row.id);
+    try {
+      await this.openSession(
+        ns,
+        socket,
+        incoming,
+        params,
+        username,
+        client,
+        row,
+        signedIn,
+      );
+    } finally {
+      this.opening.delete(slot);
+    }
+  }
+
+  private async openSession(
+    ns: NonNullable<Awaited<ReturnType<NamespaceRegistryService['resolve']>>>,
+    socket: Socket,
+    incoming: Incoming,
+    params: Record<string, string>,
+    username: string,
+    client: string | null,
+    row: NonNullable<
+      Awaited<ReturnType<ConnectionSignInService['forSignIn']>>
+    >['row'],
+    signedIn: () => void,
+  ): Promise<void> {
+    const config = this.config!;
     const sub = row.personRef.replace(/^user:/, '');
     const principal = await this.identity.principalFor(sub, ns.namespaceId, {
       kind: 'sql',
@@ -591,12 +780,21 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
         'The person this SQL connection belongs to no longer has access to this workspace.',
       );
     }
+    if (
+      !(await this.inWorkspace(ns, () => this.connections.stillAllowed(row)))
+    ) {
+      throw new Refusal(
+        '28000',
+        'This SQL connection is for everything open, which its person may no longer have; make one for named sources or tables.',
+      );
+    }
     const principalState = {
       value: principal.principal,
       capabilities: principal.capabilities,
       at: Date.now(),
     };
     socket.write(authenticationOk());
+    signedIn();
 
     // The catalog: what the person may read through this connection right now.
     const scope = await this.inWorkspace(ns, () =>
@@ -632,6 +830,7 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
       /^(1|true|yes|on)$/i.test(process.env.SQL_GATEWAY_TRACE ?? '')
         ? (line) => this.logger.log(`sql ${pid}: ${line}`)
         : undefined,
+      row.username,
     );
     Object.assign(entry, {
       pid,
@@ -683,7 +882,13 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
       const handled = terminate >= 0 ? messages.slice(0, terminate) : messages;
       void session.receive(handled).catch((error: unknown) => {
         this.logger.warn(`SQL session ${pid}: ${String(error)}`);
-        void this.end(entry, 'XX000', 'The SQL gateway lost this session.');
+        void (error instanceof SessionEscape
+          ? this.end(
+              entry,
+              '42501',
+              'This session runs as its SQL connection; changing the session user is not allowed.',
+            )
+          : this.end(entry, 'XX000', 'The SQL gateway lost this session.'));
       });
       if (terminate >= 0) void session.receive([]).then(() => this.drop(entry));
     };

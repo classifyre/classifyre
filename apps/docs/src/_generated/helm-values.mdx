@@ -112,7 +112,7 @@
 | api.image.pullPolicy | string | `"IfNotPresent"` | API image pull policy. |
 | api.image.repository | string | `"classifyre/api"` | API container image repository. |
 | api.image.tag | string | `""` | API container image tag. Defaults to the chart appVersion when empty. |
-| api.internalApiKey | object | `{"autoGenerate":true,"existingSecret":"","secretKey":"CLASSIFYRE_INTERNAL_KEY","secretName":"","value":""}` | autopilot agents keep working on a demo instance. |
+| api.internalApiKey | object | `{"autoGenerate":true,"existingSecret":"","secretKey":"CLASSIFYRE_INTERNAL_KEY","secretName":"","value":""}` | autopilot agents keep working while nobody signed in can write. |
 | api.internalApiKey.autoGenerate | bool | `true` | Generated key is persisted via Kubernetes Secret lookup across upgrades. |
 | api.internalApiKey.existingSecret | string | `""` | When set, chart will not create or manage this secret. |
 | api.internalApiKey.secretKey | string | `"CLASSIFYRE_INTERNAL_KEY"` | Secret key name used for CLASSIFYRE_INTERNAL_KEY. |
@@ -273,7 +273,6 @@
 | iam.database.name | string | `"iam"` | Database name (shared mode). |
 | iam.database.poolMaxSize | int | `20` | Most connections the identity server opens (KC_DB_POOL_MAX_SIZE). Counts against PostgreSQL's `max_connections` next to the API's pools. |
 | iam.database.username | string | `"iam"` | Database role (shared mode). |
-| iam.enabled | bool | `true` | Turn sign-in and access management on. Off restores open access. |
 | iam.exposeAdminConsole | bool | `false` | Expose the identity server's own admin console and master realm: the web proxy forwards only the `classifyre` realm and static files unless this is on, which also forwards `/iam/admin` and `/iam/realms/master`. |
 | iam.extraEnv | list | `[]` | Extra environment variables for the identity server (`KC_*` options). |
 | iam.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy. |
@@ -373,6 +372,35 @@
 | serviceAccount.automount | bool | `true` | Mount service account token into API pods (required for Kubernetes CLI jobs). |
 | serviceAccount.create | bool | `true` | Create the API service account. |
 | serviceAccount.name | string | `""` | Existing service account name to use when `create=false`. |
+| sqlGateway.allowedCidrs | list | `[]` | `service.loadBalancerSourceRanges` for a LoadBalancer. |
+| sqlGateway.enabled | bool | `false` | audited with the connection. |
+| sqlGateway.idleMinutes | int | `30` | Minutes a session may sit idle before it is closed. |
+| sqlGateway.maxOldSpaceSizeMb | int | `1024` | JS heap (WebAssembly), so this stays small. |
+| sqlGateway.maxSessions | int | `16` | 150 MB per session on top of the process. |
+| sqlGateway.maxSessionsPerConnection | int | `4` | Sessions one SQL connection may have open at once. |
+| sqlGateway.port | int | `5432` | Port the gateway listens on inside the pod and on its Service. |
+| sqlGateway.proxyProtocol | bool | `false` | every connection comes through such a proxy. |
+| sqlGateway.publicHost | string | `""` | connection details; e.g. `sql.example.com`. |
+| sqlGateway.publicPort | int | `5432` | entrypoint's). |
+| sqlGateway.replicaCount | int | `1` | spread sessions (each holds an in-memory catalog of ~150 MB). |
+| sqlGateway.resources.limits.memory | string | `"4Gi"` |  |
+| sqlGateway.resources.requests.cpu | string | `"250m"` |  |
+| sqlGateway.resources.requests.memory | string | `"1Gi"` |  |
+| sqlGateway.service.annotations | object | `{}` |  |
+| sqlGateway.service.externalTrafficPolicy | string | `""` | `Local` keeps the client address for `allowedCidrs` without PROXY protocol. |
+| sqlGateway.service.loadBalancerSourceRanges | list | `[]` | For a LoadBalancer: the client networks it accepts. |
+| sqlGateway.service.nodePort | string | `nil` | Fixed node port for `NodePort`/`LoadBalancer`. |
+| sqlGateway.service.type | string | `"ClusterIP"` | reverse proxy is needed at all. |
+| sqlGateway.tls.allowPlaintext | bool | `false` | Development only: accept connections without TLS. |
+| sqlGateway.tls.certManager.enabled | bool | `false` | Let cert-manager issue the certificate for `publicHost`. |
+| sqlGateway.tls.certManager.issuerRef.kind | string | `"ClusterIssuer"` |  |
+| sqlGateway.tls.certManager.issuerRef.name | string | `""` |  |
+| sqlGateway.tls.existingSecret | string | `""` | the app, so clients can use `sslmode=verify-full`). |
+| sqlGateway.tls.extraSans | list | `[]` | `localhost` and the Service's names). |
+| sqlGateway.traefik.enabled | bool | `false` | entrypoint for it (e.g. `--entryPoints.postgres.address=:5432`). |
+| sqlGateway.traefik.entryPoints[0] | string | `"postgres"` |  |
+| sqlGateway.traefik.tls | string | `"none"` | the TLS stream through. TLS always ends at the gateway (TLS 1.3). |
+| sqlGateway.trustedProxies | list | `[]` | start without it, and a malformed CIDR also stops it. |
 | telemetry.deployEnv | string | `"production"` | Deployment environment tag attached to every span/metric/log. |
 | telemetry.enabled | bool | `false` | Opt out (already default): set enabled=false, or set TELEMETRY_DISABLED=1 / DO_NOT_TRACK=1 at runtime. |
 | telemetry.instanceId.configMapKey | string | `"instance-id"` | Key inside the ConfigMap that holds the UUID string. |

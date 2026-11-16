@@ -3,7 +3,12 @@ import { Client, type QueryConfig } from 'pg';
 import { catalogDdl } from './catalog-ddl';
 import { MessageReader, authenticationOk, readyForQuery } from './pg-protocol';
 import { PgliteHost, type PgliteSession } from './pglite-host';
-import { DataError, type DataRunner, PgSession } from './pg-session';
+import {
+  DataError,
+  type DataRunner,
+  PgSession,
+  SessionEscape,
+} from './pg-session';
 
 /**
  * A real PGlite session behind a test listener (trust sign-in), spoken to by
@@ -124,15 +129,22 @@ describe('PgSession over PGlite', () => {
         });
         const pg = await host.open('lab', ddl.sql);
         sessions.push(pg);
-        const session = new PgSession(pg, ddl.dataSchemas, runner, (b) =>
-          socket.write(b),
+        const session = new PgSession(
+          pg,
+          ddl.dataSchemas,
+          runner,
+          (b) => socket.write(b),
+          undefined,
+          'ana_bi',
         );
         await session.start({ TimeZone: 'UTC' });
         socket.write(Buffer.concat([authenticationOk(), readyForQuery('I')]));
         const reader = new MessageReader();
         const onData = (chunk: Buffer) => {
           const messages = reader.push(chunk).filter((m) => m.type !== 'X');
-          void session.receive(messages);
+          void session.receive(messages).catch((error: unknown) => {
+            if (error instanceof SessionEscape) socket.destroy();
+          });
         };
         socket.on('data', onData);
         for (const chunk of chunks) onData(chunk);
@@ -160,6 +172,33 @@ describe('PgSession over PGlite', () => {
     await client.connect();
     return client;
   };
+
+  it.each([
+    'SET SESSION AUTHORIZATION postgres',
+    "DO $$ BEGIN EXECUTE 'SET SESSION AUTHORIZATION ' || 'postgres'; END $$",
+    "SELECT set_config('session_authorization', 'postgres', false)",
+  ])(
+    'ends the session when it leaves its role: %s',
+    async (sql) => {
+      const client = await connect();
+      client.on('error', () => undefined);
+      await expect(client.query(sql)).rejects.toThrow();
+      await client.end().catch(() => undefined);
+    },
+    60_000,
+  );
+
+  it('keeps the catalog read-only for the connection', async () => {
+    const client = await connect();
+    await expect(
+      client.query(`CREATE TABLE public.x (id int)`),
+    ).rejects.toThrow(/permission denied/);
+    const who = await client.query(
+      `SELECT current_user AS u, current_setting('is_superuser') AS su`,
+    );
+    expect(who.rows[0]).toEqual({ u: 'ana_bi', su: 'off' });
+    await client.end();
+  }, 60_000);
 
   it('answers the catalog from PGlite, with governance notes', async () => {
     const client = await connect();

@@ -34,20 +34,24 @@ describe('scalarQueryProblem', () => {
 
   it('keeps a word ending in e before a quote apart from E-strings', () => {
     expect(
-      scalarQueryProblem("SELECT COUNT(*) FROM t WHERE type='x'"),
+      scalarQueryProblem("SELECT COUNT(*) FROM t WHERE name ILIKE'a%'"),
     ).toBeNull();
   });
 
   it('turns a breaking sql rule into an error, not SQL', () => {
-    const compiled = compileQuality('s.p.t', ['email'], [
-      {
-        id: 'r',
-        type: 'sql',
-        metric: 'custom',
-        columnName: null,
-        arguments: { query: 'SELECT 1) AS q_0, email FROM {object} --' },
-      },
-    ]);
+    const compiled = compileQuality(
+      's.p.t',
+      ['email'],
+      [
+        {
+          id: 'r',
+          type: 'sql',
+          metric: 'custom',
+          columnName: null,
+          arguments: { query: 'SELECT 1) AS q_0, email FROM {object} --' },
+        },
+      ],
+    );
     expect(compiled.errors.get('r')).toBeDefined();
     expect(compiled.sql).not.toContain('email');
   });

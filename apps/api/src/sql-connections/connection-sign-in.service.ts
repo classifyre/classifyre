@@ -10,6 +10,7 @@ import {
   connectionScopeOf,
   connectionStatus,
 } from './connection-scope-rules';
+import { ConnectionRightsService } from './connection-rights.service';
 
 const SIGN_IN_AUDIT_EVERY_MS = 3_600_000;
 
@@ -23,7 +24,21 @@ export class ConnectionSignInService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditTrailService,
+    private readonly rights: ConnectionRightsService,
   ) {}
+
+  /**
+   * A connection for everything open is allowed only while its person may
+   * have one (§5.7: an admin, or someone holding an owner, steward or
+   * custodian role). Checked at sign-in and before every statement, so a
+   * steward who steps down loses the wide connection with the role.
+   */
+  async stillAllowed(
+    row: Pick<ConnectionRow, 'scopeSourceIds' | 'scopeAssetIds' | 'personRef'>,
+  ): Promise<boolean> {
+    if (row.scopeSourceIds.length || row.scopeAssetIds.length) return true;
+    return this.rights.personMayConnectAll(row.personRef);
+  }
 
   /** The connection a user name signs in as, and its state. */
   async forSignIn(username: string) {
@@ -42,6 +57,7 @@ export class ConnectionSignInService {
       include: { blocks: true },
     });
     if (!row || connectionStatus(row) !== 'active') return null;
+    if (!(await this.stillAllowed(row))) return null;
     return row;
   }
 

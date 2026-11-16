@@ -58,7 +58,7 @@ export function scalarQueryProblem(query: string): string | null {
         /[eE]/.test(before) &&
         !/[A-Za-z0-9_]/.test(query[i - 2] ?? '')
       ) {
-        return 'Escaped strings (E\'…\') are not allowed in a sql rule.';
+        return "Escaped strings (E'…') are not allowed in a sql rule.";
       }
       let j = i + 1;
       for (; j < query.length; j += 1) {

@@ -34,6 +34,10 @@ REVOKE ALL ON SCHEMA classifyre FROM PUBLIC;
 
 const TEMPLATE_TTL_MS = 6 * 60 * 60 * 1000;
 
+/** How long one request to a session's PGlite may take before the worker is stopped. */
+const CATALOG_STATEMENT_MS =
+  (Number(process.env.SQL_GATEWAY_CATALOG_STATEMENT_SECONDS) || 30) * 1000;
+
 /** A session's PGlite, in its worker thread. */
 export class PgliteSession {
   private next = 1;
@@ -76,7 +80,26 @@ export class PgliteSession {
       return Promise.reject(new Error('The catalog worker stopped.'));
     const id = this.next++;
     return new Promise<Record<string, unknown>>((resolve, reject) => {
-      this.waiting.set(id, { resolve, reject });
+      // A catalog statement is answered from empty tables in well under a
+      // second; one still running after the limit is a client making PGlite
+      // work (a huge repeat(), a cross join of the catalog). The client sets
+      // statement_timeout itself, so the worker is stopped instead, which
+      // frees its memory and ends the session.
+      const timer = setTimeout(() => {
+        this.fail(new Error('A catalog statement ran too long.'));
+        void this.worker.terminate().catch(() => undefined);
+      }, CATALOG_STATEMENT_MS);
+      timer.unref();
+      this.waiting.set(id, {
+        resolve: (value) => {
+          clearTimeout(timer);
+          resolve(value);
+        },
+        reject: (error) => {
+          clearTimeout(timer);
+          reject(error);
+        },
+      });
       this.worker.postMessage({ id, ...request }, transfer);
     });
   }

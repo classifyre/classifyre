@@ -338,6 +338,10 @@ if [ "${SQL_GATEWAY_ENABLED}" = "true" ] && [ ! -s "${sql_tls}/tls.crt" ]; then
   chown -R 10001:10001 "${sql_tls}"
   log "Made a certificate authority and a certificate for ${SQL_GATEWAY_PUBLIC_HOST} in ${sql_tls} (SQL connections)."
 fi
+# The CA only ever signs the one certificate above. Its key is not kept: a
+# copy left on the volume could sign a certificate clients would trust
+# (they pin this CA). Without tls.crt both are made again, a new CA included.
+rm -f "${sql_tls}/ca.key"
 default SQL_GATEWAY_TLS_CERT_FILE "${sql_tls}/tls.crt"
 default SQL_GATEWAY_TLS_KEY_FILE "${sql_tls}/tls.key"
 [ -s "${sql_tls}/ca.crt" ] && default SQL_GATEWAY_TLS_CA_FILE "${sql_tls}/ca.crt"

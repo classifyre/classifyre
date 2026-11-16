@@ -44,6 +44,14 @@ export interface DataResult {
   truncated: boolean;
 }
 
+/**
+ * The session left the connection's role inside its PGlite (`RESET SESSION
+ * AUTHORIZATION`, `set_config('session_authorization', …)`): the catalog
+ * runs as the connection, read-only (§5.7), and the bootstrap superuser it
+ * was set up as must stay out of reach. The gateway ends the session.
+ */
+export class SessionEscape extends Error {}
+
 /** What a session needs from outside: running a data statement as a query job. */
 export interface DataRunner {
   run(
@@ -75,6 +83,8 @@ const READS = '__classifyre_reads';
 const FAIL = '__classifyre_fail';
 const PATH = '__classifyre_path';
 const PROBE = '__classifyre_probe';
+const WHO = '__classifyre_who';
+const WHO_PORTAL = '__classifyre_who_p';
 const DECODE = '__classifyre_decode';
 
 const NUMERIC_OIDS = new Set<number>([
@@ -156,7 +166,54 @@ export class PgSession {
     private readonly sendRaw: (bytes: Buffer) => void,
     /** Debugging only (`SQL_GATEWAY_TRACE`): message types, statements, errors — never values. */
     private readonly trace?: (line: string) => void,
+    /** The role the catalog runs as; any report of another ends the session. */
+    private readonly role?: string,
   ) {}
+
+  /**
+   * PGlite's reply to protocol messages. Whenever one finishes a request
+   * (ReadyForQuery), the session is asked who it runs as: PGlite signs in as
+   * its bootstrap superuser, so `SET SESSION AUTHORIZATION postgres` or
+   * `set_config('session_authorization', …)` would leave the connection's
+   * read-only role, and PGlite reports no ParameterStatus to notice it by.
+   * The client never sees that reply; the session ends.
+   */
+  private async raw(bytes: Buffer): Promise<Uint8Array> {
+    const reply = await this.pg.raw(bytes);
+    if (!this.role) return reply;
+    const ready = splitMessages(reply).find((m) => m.type === 'Z');
+    if (ready && ready.body[0] !== 'E'.charCodeAt(0)) await this.assertRole();
+    return reply;
+  }
+
+  private async assertRole(): Promise<void> {
+    const reply = splitMessages(
+      await this.pg.raw(
+        Buffer.concat([
+          frontend.bind(WHO_PORTAL, WHO, []),
+          frontend.execute(WHO_PORTAL),
+          frontend.close('P', WHO_PORTAL),
+          frontend.sync(),
+        ]),
+      ),
+    );
+    const row = reply.find((m) => m.type === 'D');
+    const values: string[] = [];
+    if (row) {
+      const reader = new BodyReader(row.body);
+      const count = reader.int16();
+      for (let i = 0; i < count; i += 1) {
+        const length = reader.int32();
+        values.push(length < 0 ? '' : reader.bytes(length).toString('utf8'));
+      }
+    }
+    const [user, superuser] = values;
+    if (user !== this.role || superuser !== 'off') {
+      throw new SessionEscape(
+        `session runs as ${user ?? '?'} (superuser ${superuser ?? '?'})`,
+      );
+    }
+  }
 
   private send(bytes: Buffer): void {
     if (this.trace) {
@@ -182,7 +239,7 @@ export class PgSession {
       .map(([key, value]) => `SET ${key} = ${quoteLiteral(value)};`)
       .join(' ');
     if (sets) await this.pg.exec(sets).catch(() => undefined);
-    await this.pg.raw(
+    await this.raw(
       Buffer.concat([
         frontend.parse(READS, 'SELECT classifyre.reads($1, $2)', [
           OID.text,
@@ -195,6 +252,10 @@ export class PgSession {
         frontend.parse(
           PATH,
           'SELECT array_to_json(current_schemas(false))::text',
+        ),
+        frontend.parse(
+          WHO,
+          "SELECT current_user::text, current_setting('is_superuser')",
         ),
         frontend.sync(),
       ]),
@@ -260,7 +321,7 @@ export class PgSession {
   /** To PGlite and back to the client; true when PGlite answered an error. */
   private async forward(bytes: Buffer, keepReady = true): Promise<boolean> {
     if (this.skipping && bytes[0] !== 'S'.charCodeAt(0)) return true;
-    const reply = await this.pg.raw(bytes);
+    const reply = await this.raw(bytes);
     let failed = false;
     const out: Buffer[] = [];
     for (const m of splitMessages(reply)) {
@@ -285,7 +346,7 @@ export class PgSession {
    */
   private async internal(...messages: Buffer[]): Promise<Message[]> {
     const reply = splitMessages(
-      await this.pg.raw(
+      await this.raw(
         Buffer.concat(
           this.inSimpleQuery ? [...messages, frontend.sync()] : messages,
         ),
@@ -447,7 +508,7 @@ export class PgSession {
   private async describe(message: Message): Promise<void> {
     if (this.skipping) return;
     const target = parseDescribe(message.body);
-    const reply = await this.pg.raw(message.raw);
+    const reply = await this.raw(message.raw);
     const messages = splitMessages(reply);
     if (target.kind === 'P') {
       const description = messages.find((m) => m.type === 'T');
