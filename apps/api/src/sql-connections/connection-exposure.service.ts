@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { ActorContextService } from '../identity/actor-context.service';
 import { AuditTrailService } from '../identity/audit-trail.service';
@@ -18,6 +22,12 @@ import type {
   DataConnectionReachableSourceDto,
   DataConnectionScopeItemDto,
 } from './data-connection.dto';
+
+/**
+ * Lifecycles in which a shared dataset no longer holds its tables open to SQL
+ * connections: deprecating (or retiring) it comes before closing them.
+ */
+const WINDING_DOWN = new Set(['DEPRECATED', 'RETIRED']);
 
 /**
  * What SQL connections may reach at all (docs/prd/DQ §5.7, opt-in): sources
@@ -77,7 +87,10 @@ export class ConnectionExposureService {
   /**
    * Opens or closes a table or source to SQL connections. Who governs it
    * decides: `asset.govern`, its owner or steward, or a manager. Closing a
-   * table its source opened is refused: close the source.
+   * table its source opened is refused: close the source. A table a draft or
+   * active shared dataset open to connections reads stays open until that
+   * dataset is deprecated, retired or closed itself; a dataset opens only once
+   * its tables are open (DQ §5.12).
    */
   async setExposure(
     type: 'asset' | 'source',
@@ -93,6 +106,12 @@ export class ConnectionExposureService {
       this.rights.refuse('asset.govern');
     }
     const before = await this.exposureOf(type, id, governed.sourceId);
+    if (open && !before.open && type === 'asset') {
+      await this.assertDatasetInputsOpen(id);
+    }
+    if (!open && before.open && !before.inheritedFromSource) {
+      await this.assertNoLiveDatasetReads(type, id);
+    }
     if (open) {
       await this.prisma.dataConnectionExposure.upsert({
         where: { scopeType_scopeId: { scopeType, scopeId: id } },
@@ -140,6 +159,105 @@ export class ConnectionExposureService {
       });
     }
     return after;
+  }
+
+  /**
+   * Closing a table, or a source with tables not opened on their own, is
+   * refused while a draft or active shared dataset open to SQL connections
+   * reads one of them: it would go on reading the table over connections.
+   */
+  private async assertNoLiveDatasetReads(
+    type: 'asset' | 'source',
+    id: string,
+  ): Promise<void> {
+    const datasets = await this.prisma.sharedDataset.findMany({
+      where: type === 'asset' ? { inputs: { has: id } } : undefined,
+      select: {
+        assetId: true,
+        domain: true,
+        name: true,
+        inputs: true,
+        asset: {
+          select: {
+            sourceId: true,
+            governance: { select: { status: true } },
+          },
+        },
+      },
+    });
+    const live = datasets.filter(
+      (d) => !WINDING_DOWN.has(d.asset.governance?.status ?? 'DRAFT'),
+    );
+    if (!live.length) return;
+    const open = await this.open();
+    let reading = live.filter(
+      (d) =>
+        open.assetIds.includes(d.assetId) ||
+        open.sourceIds.includes(d.asset.sourceId),
+    );
+    if (type === 'source' && reading.length) {
+      const closing = new Set(
+        (
+          await this.prisma.asset.findMany({
+            where: {
+              id: { in: [...new Set(reading.flatMap((d) => d.inputs))] },
+              sourceId: id,
+            },
+            select: { id: true },
+          })
+        )
+          .map((a) => a.id)
+          .filter((assetId) => !open.assetIds.includes(assetId)),
+      );
+      reading = reading.filter((d) => d.inputs.some((i) => closing.has(i)));
+    }
+    if (!reading.length) return;
+    const names = reading.map((d) => `shared.${d.domain}.${d.name}`);
+    throw new ConflictException({
+      statusCode: 409,
+      error: 'Conflict',
+      code: 'DATASETS_READ_TABLE',
+      message: `Shared datasets open to SQL connections read ${type === 'asset' ? 'this table' : 'tables of this source'}: ${names.join(', ')}. Deprecate or retire them, or close them to SQL connections, first.`,
+      datasets: reading.map((d) => ({
+        assetId: d.assetId,
+        sqlName: `shared.${d.domain}.${d.name}`,
+      })),
+    });
+  }
+
+  /** A shared dataset opens to SQL connections only once all its tables are open. */
+  private async assertDatasetInputsOpen(assetId: string): Promise<void> {
+    const dataset = await this.prisma.sharedDataset.findUnique({
+      where: { assetId },
+      select: { inputs: true },
+    });
+    if (!dataset?.inputs.length) return;
+    const [open, inputs] = await Promise.all([
+      this.open(),
+      this.prisma.asset.findMany({
+        where: { id: { in: dataset.inputs } },
+        select: { id: true, sourceId: true },
+      }),
+    ]);
+    const closedIds = dataset.inputs.filter((inputId) => {
+      const input = inputs.find((a) => a.id === inputId);
+      return !(
+        open.assetIds.includes(inputId) ||
+        (input && open.sourceIds.includes(input.sourceId))
+      );
+    });
+    if (!closedIds.length) return;
+    const names = await this.names({ sourceIds: [], assetIds: closedIds });
+    const list = closedIds.map((inputId) => {
+      const item = names.get(`asset:${inputId}`);
+      return item?.sqlName ?? item?.name ?? inputId;
+    });
+    throw new ConflictException({
+      statusCode: 409,
+      error: 'Conflict',
+      code: 'DATASET_INPUTS_CLOSED',
+      message: `Its tables must be open to SQL connections first: ${list.join(', ')}.`,
+    });
   }
 
   /** Everything open to SQL connections, for Settings. */

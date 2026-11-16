@@ -1,4 +1,5 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { ClsService } from 'nestjs-cls';
 import { PrismaService } from '../prisma.service';
 import { ActorContextService } from '../identity/actor-context.service';
 import { IDENTITY } from '../identity/identity.tokens';
@@ -11,6 +12,11 @@ import {
 } from './query-catalog.service';
 import { groupPrincipal, type DataPrincipal } from './data-principal';
 import { parseDatasetColumns } from './dataset-floor';
+import {
+  CLS_CONNECTION_SCOPE,
+  openAndUnblocked,
+  type ConnectionScope,
+} from './connection-scope';
 
 /** Why a shared dataset cannot be read right now (DQ §5.12). */
 export interface DatasetRefusal {
@@ -18,7 +24,8 @@ export interface DatasetRefusal {
     | 'dataset_not_found'
     | 'dataset_retired'
     | 'dataset_blocked'
-    | 'dataset_inputs_unavailable';
+    | 'dataset_inputs_unavailable'
+    | 'dataset_inputs_closed';
   message: string;
 }
 
@@ -48,6 +55,9 @@ export type UnavailableListener = (event: {
  * SQL and its inputs as its owning group may read them — the group's grants,
  * masks and row filters, worked out again on every read. A retired or
  * blocked dataset, or one whose group no longer reads an input, is refused.
+ * Over a SQL connection every input must itself be open to connections and
+ * not blocked for this one: a connection never reaches a table its owner
+ * kept closed, through a dataset or otherwise.
  */
 @Injectable()
 export class SharedDatasetResolver {
@@ -59,7 +69,15 @@ export class SharedDatasetResolver {
     private readonly catalog: QueryCatalogService,
     private readonly actors: ActorContextService,
     @Inject(IDENTITY) private readonly identity: IdentityService,
+    @Optional() private readonly cls?: ClsService,
   ) {}
+
+  /** The SQL connection this read comes through, if any. */
+  private connection(): ConnectionScope | undefined {
+    return this.cls?.isActive()
+      ? this.cls.get<ConnectionScope | undefined>(CLS_CONNECTION_SCOPE)
+      : undefined;
+  }
 
   onUnavailable(listener: UnavailableListener): void {
     this.listener = listener;
@@ -95,6 +113,7 @@ export class SharedDatasetResolver {
     });
     const byId = new Map(rows.map((row) => [row.assetId, row]));
     const groupCatalogs = new Map<string, QueryCatalog | null>();
+    const connection = this.connection();
     const out: ResolvedDataset[] = [];
     for (const assetId of assetIds) {
       const row = byId.get(assetId);
@@ -154,6 +173,18 @@ export class SharedDatasetResolver {
           refused: {
             code: 'dataset_inputs_unavailable',
             message: `${name} cannot be read: ${reason}`,
+          },
+        };
+      }
+      const closed = connection
+        ? inputs.filter(({ table }) => !openAndUnblocked(connection, table))
+        : [];
+      if (closed.length) {
+        const names = closed.map(({ table }) => table.sqlName).join(', ');
+        return {
+          refused: {
+            code: 'dataset_inputs_closed',
+            message: `${name} cannot be read over SQL connections: ${names} ${closed.length === 1 ? 'is' : 'are'} not open to them.`,
           },
         };
       }

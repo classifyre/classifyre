@@ -37,19 +37,30 @@ export function isOpenToConnections(
   );
 }
 
+/**
+ * Whether a table is open to SQL connections and not blocked for this one,
+ * whatever the connection names: what a shared dataset's input must be to be
+ * read over a connection (DQ §5.12), since the reader names the dataset, not
+ * its inputs.
+ */
+export function openAndUnblocked(
+  scope: ConnectionScope,
+  table: { assetId: string; sourceId: string },
+): boolean {
+  return (
+    isOpenToConnections(scope, table) &&
+    !scope.blockedAssetIds.includes(table.assetId) &&
+    !scope.blockedSourceIds.includes(table.sourceId)
+  );
+}
+
 /** Whether a table the person may read is also reachable through the connection. */
 export function connectionAllows(
   scope: ConnectionScope | undefined | null,
   table: { assetId: string; sourceId: string },
 ): boolean {
   if (!scope) return true;
-  if (!isOpenToConnections(scope, table)) return false;
-  if (
-    scope.blockedAssetIds.includes(table.assetId) ||
-    scope.blockedSourceIds.includes(table.sourceId)
-  ) {
-    return false;
-  }
+  if (!openAndUnblocked(scope, table)) return false;
   if (!scope.sourceIds.length && !scope.assetIds.length) return true;
   return (
     scope.sourceIds.includes(table.sourceId) ||

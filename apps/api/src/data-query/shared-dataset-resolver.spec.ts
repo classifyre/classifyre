@@ -37,6 +37,8 @@ function setup(options: {
   blocks?: { id: string }[];
   group?: 'missing' | 'reads' | 'lost';
   unavailableAt?: Date | null;
+  /** Read over a SQL connection with this scope. */
+  connection?: Record<string, string[]>;
 }) {
   const row = {
     assetId: 'ds',
@@ -78,6 +80,21 @@ function setup(options: {
     catalog as never,
     { workspaceId: () => 'ws' } as never,
     identity as never,
+    {
+      isActive: () => true,
+      get: () =>
+        options.connection
+          ? {
+              sourceIds: [],
+              assetIds: [],
+              blockedSourceIds: [],
+              blockedAssetIds: [],
+              openSourceIds: [],
+              openAssetIds: [],
+              ...options.connection,
+            }
+          : undefined,
+    } as never,
   );
   const told = jest.fn();
   resolver.onUnavailable(told);
@@ -160,6 +177,33 @@ describe('SharedDatasetResolver (DQ §5.12)', () => {
     expect(prisma.sharedDataset.update).toHaveBeenCalledWith({
       where: { assetId: 'ds' },
       data: { unavailableAt: null, unavailableWhy: null },
+    });
+  });
+
+  it('reads over a SQL connection when every input is open to connections', async () => {
+    const { resolver } = setup({
+      group: 'reads',
+      connection: { openSourceIds: ['src'] },
+    });
+    expect(await resolver.resolve(['ds'])).toHaveProperty('datasets');
+  });
+
+  it('refuses over a SQL connection when an input is closed or blocked', async () => {
+    const closed = setup({ group: 'reads', connection: {} });
+    expect(await closed.resolver.resolve(['ds'])).toMatchObject({
+      refused: {
+        code: 'dataset_inputs_closed',
+        message: expect.stringContaining('shop.public.orders'),
+      },
+    });
+    // Not an outage: the owner is not told.
+    expect(closed.told).not.toHaveBeenCalled();
+    const blocked = setup({
+      group: 'reads',
+      connection: { openAssetIds: ['orders'], blockedSourceIds: ['src'] },
+    });
+    expect(await blocked.resolver.resolve(['ds'])).toMatchObject({
+      refused: { code: 'dataset_inputs_closed' },
     });
   });
 });
