@@ -1718,8 +1718,21 @@ export class GovernanceService {
       maskKind: nextMaskKind,
       classification: nextClassification ?? column.derivedClassification,
     });
+    // A setting also counts by what it will show once the column is
+    // classified: `clear` or a weak mask set on a column nobody classified yet
+    // changes nothing today, but an explicit setting outranks the
+    // classification a later scan brings, so it would keep the column open.
+    const pinsOpen =
+      ('access' in body && body.access === 'clear') ||
+      ('maskKind' in body &&
+        isMaskKind(body.maskKind) &&
+        exposureOf({
+          action: 'mask',
+          mask: body.maskKind,
+          fromClassification: false,
+        }) > exposureOf({ action: 'mask', fromClassification: false }));
     if (
-      exposureOf(after) > exposureOf(column.effectiveAccess) &&
+      (exposureOf(after) > exposureOf(column.effectiveAccess) || pinsOpen) &&
       !(await this.callerReadsInClear(target))
     ) {
       throw new ForbiddenException({

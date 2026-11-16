@@ -175,6 +175,22 @@ describe('column access needs clear reading to show more', () => {
   });
 
   it.each([
+    ['clear on a column not classified yet', { access: 'clear' }],
+    ['last four on a column not classified yet', { maskKind: 'partial' }],
+  ])(
+    'refuses %s, which would outlast a later classification',
+    async (_, body) => {
+      const unclassified = column({});
+      expect(unclassified.effectiveAccess.action).toBe('clear');
+      expect(
+        await outcome(() =>
+          service({ state: unclassified }).updateColumn('a-1', 'email', body),
+        ),
+      ).toBe('UNMASK_REQUIRED');
+    },
+  );
+
+  it.each([
     ['hidden instead of masked', { access: 'hide' }],
     ['emptied instead of redacted', { maskKind: 'null' }],
     ['a higher classification', { classification: 'secret' }],

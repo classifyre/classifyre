@@ -65,6 +65,24 @@ QUERYABLE_SOURCE_TYPES = (
 )
 
 
+def _system_ca_bundle() -> str | None:
+    """The system's trusted roots as one PEM file, as the scan's TLS uses them."""
+    try:
+        import certifi
+
+        return str(certifi.where())
+    except ImportError:  # pragma: no cover - certifi ships with requests
+        pass
+    for path in (
+        "/etc/ssl/certs/ca-certificates.crt",
+        "/etc/pki/tls/certs/ca-bundle.crt",
+        "/etc/ssl/cert.pem",
+    ):
+        if Path(path).exists():
+            return path
+    return None
+
+
 class BindingError(RuntimeError):
     """A source could not be reached or a table location is not readable."""
 
@@ -284,31 +302,34 @@ class SourceBinding:
         return ".".join(quote_identifier(part) for part in (alias, database, table))
 
     def _mysql_tls_fields(self) -> list[str]:
-        """The secret's TLS fields, matching what the scan does with the source.
+        """The secret's TLS fields, never weaker than what the scan does.
 
-        The scan (``MySQLSource._build_ssl_kwargs``) verifies the certificate
-        only for *Verify CA* / *Verify identity*, against the source's CA when
-        it has one and the system roots otherwise; every other mode just
-        encrypts. DuckDB's own ``required`` is stricter than that (it demands
-        a trusted chain), so it is only used when the source supplies the CA
-        to check against; without one the scanner's default (``preferred``:
-        TLS whenever the server offers it) is what the scan effectively does.
+        The scan (``MySQLSource._build_ssl_kwargs``) always uses TLS unless
+        the mode is *Disabled*, and verifies the certificate for *Verify CA* /
+        *Verify identity* against the source's CA, else the system roots.
+        So *Required* is sent as ``required`` with or without a CA (the
+        scanner's default, ``preferred``, would fall back to plain text when
+        the server, or someone between, offers no TLS), and the verifying
+        modes always get a CA file: the source's, else the system bundle.
         The CA is a *file* to DuckDB, so the PEM is written to a private temp
         file kept until :meth:`close` — parallel scan threads reconnect.
         """
         mode = str(self._connection_option("ssl_mode") or "").upper()
         if mode == "DISABLED":
             return ["SSL_MODE 'disabled'"]
-        verifies = mode in ("VERIFY_CA", "VERIFY_IDENTITY")
-        ca_path = self._ca_file() if verifies or mode == "REQUIRED" else None
-        fields: list[str] = []
-        if verifies:
-            fields.append(f"SSL_MODE '{mode.lower()}'")
-        elif mode == "REQUIRED" and ca_path:
-            fields.append("SSL_MODE 'required'")
-        if ca_path and (verifies or mode == "REQUIRED"):
-            fields.append(f"SSL_CA {sql_literal(ca_path)}")
-        return fields
+        if mode in ("VERIFY_CA", "VERIFY_IDENTITY"):
+            ca_path = self._ca_file() or _system_ca_bundle()
+            fields = [f"SSL_MODE '{mode.lower()}'"]
+            if ca_path:
+                fields.append(f"SSL_CA {sql_literal(ca_path)}")
+            return fields
+        if mode == "REQUIRED":
+            ca_path = self._ca_file()
+            fields = ["SSL_MODE 'required'"]
+            if ca_path:
+                fields.append(f"SSL_CA {sql_literal(ca_path)}")
+            return fields
+        return []
 
     def _ca_file(self) -> str | None:
         """The source's CA certificate as a file path, or None without one."""

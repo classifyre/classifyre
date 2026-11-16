@@ -702,9 +702,12 @@ def test_mysql_verify_modes_hand_duckdb_the_sources_ca_as_a_file(
 def test_mysql_verify_without_a_ca_checks_against_the_system_roots(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    import certifi
+
     _, statements = _attach_mysql(monkeypatch, ssl_mode="VERIFY_CA")
     secret = statements[0]
-    assert "SSL_MODE 'verify_ca'" in secret and "SSL_CA" not in secret
+    assert "SSL_MODE 'verify_ca'" in secret
+    assert f"SSL_CA '{certifi.where()}'" in secret
 
 
 @pytest.mark.parametrize(
@@ -712,7 +715,9 @@ def test_mysql_verify_without_a_ca_checks_against_the_system_roots(
     [
         (None, None, [], ["SSL_MODE", "SSL_CA"]),
         ("PREFERRED", _PEM, [], ["SSL_MODE", "SSL_CA"]),  # the scan does not verify either
-        ("REQUIRED", None, [], ["SSL_MODE", "SSL_CA"]),  # DuckDB's own 'required' is stricter
+        # Required means TLS or nothing, as in the scan: never DuckDB's default
+        # 'preferred', which falls back to plain text.
+        ("REQUIRED", None, ["SSL_MODE 'required'"], ["SSL_CA"]),
         ("REQUIRED", _PEM, ["SSL_MODE 'required'", "SSL_CA"], []),
         ("DISABLED", _PEM, ["SSL_MODE 'disabled'"], ["SSL_CA"]),
     ],
