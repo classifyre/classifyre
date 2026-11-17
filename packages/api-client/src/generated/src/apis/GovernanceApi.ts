@@ -22,9 +22,10 @@ import type {
   AssetUsageDto,
   AssignGovernanceRoleDto,
   ContractImportResultDto,
+  GovernanceDashboardDto,
   GovernanceMeaningDto,
   GovernancePrincipalDto,
-  GovernanceSummaryDto,
+  GovernanceUsageDto,
   ImportContractDto,
   LinkGovernanceTermDto,
   MoveAssetColumnDto,
@@ -51,12 +52,14 @@ import {
     AssignGovernanceRoleDtoToJSON,
     ContractImportResultDtoFromJSON,
     ContractImportResultDtoToJSON,
+    GovernanceDashboardDtoFromJSON,
+    GovernanceDashboardDtoToJSON,
     GovernanceMeaningDtoFromJSON,
     GovernanceMeaningDtoToJSON,
     GovernancePrincipalDtoFromJSON,
     GovernancePrincipalDtoToJSON,
-    GovernanceSummaryDtoFromJSON,
-    GovernanceSummaryDtoToJSON,
+    GovernanceUsageDtoFromJSON,
+    GovernanceUsageDtoToJSON,
     ImportContractDtoFromJSON,
     ImportContractDtoToJSON,
     LinkGovernanceTermDtoFromJSON,
@@ -112,6 +115,12 @@ export interface GovernanceControllerAssignSourceRoleRequest {
 export interface GovernanceControllerCreateQualityRuleRequest {
     id: string;
     saveQualityRuleDto: SaveQualityRuleDto;
+}
+
+export interface GovernanceControllerDashboardRequest {
+    scope?: GovernanceControllerDashboardScopeEnum;
+    days?: string;
+    sourceId?: string;
 }
 
 export interface GovernanceControllerDismissSuggestionRequest {
@@ -176,10 +185,6 @@ export interface GovernanceControllerSourceGovernanceRequest {
     id: string;
 }
 
-export interface GovernanceControllerSummaryRequest {
-    days?: string;
-}
-
 export interface GovernanceControllerTestQualityRuleRequest {
     id: string;
     saveQualityRuleDto: SaveQualityRuleDto;
@@ -214,6 +219,14 @@ export interface GovernanceControllerUpdateQualityRuleRequest {
 export interface GovernanceControllerUsageRequest {
     id: string;
     days?: string;
+}
+
+export interface GovernanceControllerWorkspaceUsageRequest {
+    scope?: GovernanceControllerWorkspaceUsageScopeEnum;
+    days?: string;
+    sourceId?: string;
+    sort?: GovernanceControllerWorkspaceUsageSortEnum;
+    limit?: string;
 }
 
 /**
@@ -550,6 +563,47 @@ export class GovernanceApi extends runtime.BaseAPI {
      */
     async governanceControllerCreateQualityRule(requestParameters: GovernanceControllerCreateQualityRuleRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AssetQualityDto> {
         const response = await this.governanceControllerCreateQualityRuleRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * The Governance tab of the assets page: totals, quality over time, what needs someone, coverage per source
+     */
+    async governanceControllerDashboardRaw(requestParameters: GovernanceControllerDashboardRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GovernanceDashboardDto>> {
+        const queryParameters: any = {};
+
+        if (requestParameters['scope'] != null) {
+            queryParameters['scope'] = requestParameters['scope'];
+        }
+
+        if (requestParameters['days'] != null) {
+            queryParameters['days'] = requestParameters['days'];
+        }
+
+        if (requestParameters['sourceId'] != null) {
+            queryParameters['sourceId'] = requestParameters['sourceId'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/governance/dashboard`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => GovernanceDashboardDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * The Governance tab of the assets page: totals, quality over time, what needs someone, coverage per source
+     */
+    async governanceControllerDashboard(requestParameters: GovernanceControllerDashboardRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GovernanceDashboardDto> {
+        const response = await this.governanceControllerDashboardRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -1116,39 +1170,6 @@ export class GovernanceApi extends runtime.BaseAPI {
     }
 
     /**
-     * How far the workspace is governed: coverage per source, what to govern first, yours
-     */
-    async governanceControllerSummaryRaw(requestParameters: GovernanceControllerSummaryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GovernanceSummaryDto>> {
-        const queryParameters: any = {};
-
-        if (requestParameters['days'] != null) {
-            queryParameters['days'] = requestParameters['days'];
-        }
-
-        const headerParameters: runtime.HTTPHeaders = {};
-
-
-        let urlPath = `/governance/summary`;
-
-        const response = await this.request({
-            path: urlPath,
-            method: 'GET',
-            headers: headerParameters,
-            query: queryParameters,
-        }, initOverrides);
-
-        return new runtime.JSONApiResponse(response, (jsonValue) => GovernanceSummaryDtoFromJSON(jsonValue));
-    }
-
-    /**
-     * How far the workspace is governed: coverage per source, what to govern first, yours
-     */
-    async governanceControllerSummary(requestParameters: GovernanceControllerSummaryRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GovernanceSummaryDto> {
-        const response = await this.governanceControllerSummaryRaw(requestParameters, initOverrides);
-        return await response.value();
-    }
-
-    /**
      * Nothing is stored and no finding changes. Whole-table rules run their query and wait up to a minute. Needs the right to govern the asset.
      * Measure a quality rule now without saving it
      */
@@ -1485,8 +1506,65 @@ export class GovernanceApi extends runtime.BaseAPI {
         return await response.value();
     }
 
+    /**
+     * Table reads and exports per day and the top assets, against the period before (`rising`: where usage spiked)
+     */
+    async governanceControllerWorkspaceUsageRaw(requestParameters: GovernanceControllerWorkspaceUsageRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GovernanceUsageDto>> {
+        const queryParameters: any = {};
+
+        if (requestParameters['scope'] != null) {
+            queryParameters['scope'] = requestParameters['scope'];
+        }
+
+        if (requestParameters['days'] != null) {
+            queryParameters['days'] = requestParameters['days'];
+        }
+
+        if (requestParameters['sourceId'] != null) {
+            queryParameters['sourceId'] = requestParameters['sourceId'];
+        }
+
+        if (requestParameters['sort'] != null) {
+            queryParameters['sort'] = requestParameters['sort'];
+        }
+
+        if (requestParameters['limit'] != null) {
+            queryParameters['limit'] = requestParameters['limit'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/governance/usage`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => GovernanceUsageDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Table reads and exports per day and the top assets, against the period before (`rising`: where usage spiked)
+     */
+    async governanceControllerWorkspaceUsage(requestParameters: GovernanceControllerWorkspaceUsageRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GovernanceUsageDto> {
+        const response = await this.governanceControllerWorkspaceUsageRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
 }
 
+/**
+ * @export
+ */
+export const GovernanceControllerDashboardScopeEnum = {
+    Mine: 'mine',
+    All: 'all'
+} as const;
+export type GovernanceControllerDashboardScopeEnum = typeof GovernanceControllerDashboardScopeEnum[keyof typeof GovernanceControllerDashboardScopeEnum];
 /**
  * @export
  */
@@ -1495,3 +1573,19 @@ export const GovernanceControllerExportContractFormatEnum = {
     Json: 'json'
 } as const;
 export type GovernanceControllerExportContractFormatEnum = typeof GovernanceControllerExportContractFormatEnum[keyof typeof GovernanceControllerExportContractFormatEnum];
+/**
+ * @export
+ */
+export const GovernanceControllerWorkspaceUsageScopeEnum = {
+    Mine: 'mine',
+    All: 'all'
+} as const;
+export type GovernanceControllerWorkspaceUsageScopeEnum = typeof GovernanceControllerWorkspaceUsageScopeEnum[keyof typeof GovernanceControllerWorkspaceUsageScopeEnum];
+/**
+ * @export
+ */
+export const GovernanceControllerWorkspaceUsageSortEnum = {
+    Used: 'used',
+    Rising: 'rising'
+} as const;
+export type GovernanceControllerWorkspaceUsageSortEnum = typeof GovernanceControllerWorkspaceUsageSortEnum[keyof typeof GovernanceControllerWorkspaceUsageSortEnum];

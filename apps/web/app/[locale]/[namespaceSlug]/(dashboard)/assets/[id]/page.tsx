@@ -321,7 +321,7 @@ export default function AssetDetailPage() {
         </div>
         {isDataset ? (
           <Button size="sm" asChild>
-            <Link href={nsPath("/shared-datasets")}>
+            <Link href={nsPath("/assets?tab=shared")}>
               {t("sharedDatasets.allDatasets")}
             </Link>
           </Button>

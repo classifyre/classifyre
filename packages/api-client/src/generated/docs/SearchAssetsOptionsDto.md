@@ -8,6 +8,7 @@ Name | Type
 ------------ | -------------
 `excludeFindings` | boolean
 `includeAssetsWithoutFindings` | boolean
+`governanceDays` | number
 
 ## Example
 
@@ -18,6 +19,7 @@ import type { SearchAssetsOptionsDto } from '@workspace/api-client'
 const example = {
   "excludeFindings": null,
   "includeAssetsWithoutFindings": null,
+  "governanceDays": null,
 } satisfies SearchAssetsOptionsDto
 
 console.log(example)

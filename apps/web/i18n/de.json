@@ -177,7 +177,6 @@
     "findings": "Befunde",
     "assets": "Assets",
     "query": "SQL",
-    "sharedDatasets": "Geteilte Datensätze",
     "sources": "Quellen",
     "detectors": "Custom-Detektoren",
     "investigations": "Ermittlungen",
@@ -192,8 +191,7 @@
       "intelligence": "Erkenntnisse",
       "casework": "Fallarbeit",
       "pipeline": "Pipeline"
-    },
-    "governance": "Governance"
+    }
   },
   "glossary": {
     "title": "Entitäten & Glossar",
@@ -1692,10 +1690,6 @@
   },
   "assets": {
     "title": "Assets",
-    "totalAssets": "Assets gesamt",
-    "newAssets": "Neue Assets",
-    "updatedAssets": "Aktualisierte Assets",
-    "unchangedAssets": "Unveränderte Assets",
     "noVisualization": "Keine Assets zur Visualisierung",
     "noVisualizationHint": "Die Asset-Tabelle ist weiterhin unten für die direkte Suche verfügbar.",
     "loadingVisualizations": "Asset-Visualisierungen werden geladen...",
@@ -1863,6 +1857,103 @@
     "match": {
       "onPage": "Beste Übereinstimmung · Seite {{page}}",
       "inText": "Beste Übereinstimmung"
+    },
+    "tabs": {
+      "label": "Asset-Ansichten",
+      "governance": "Governance",
+      "governanceSub": "{{certified}} zertifiziert · {{failing}} mit Qualitätsfehlern",
+      "requestsWaiting": "{{count}} warten",
+      "raw": "Rohdaten-Assets",
+      "rawSub": "{{new}} neu · {{updated}} aktualisiert",
+      "shared": "Geteilte Assets",
+      "sharedSub": "{{certified}} zertifiziert"
+    },
+    "governance": {
+      "scope": {
+        "label": "Wessen Assets",
+        "mine": "Meine",
+        "all": "Alle",
+        "nothingYours": "Sie sind noch nirgends Owner oder Steward, daher sehen Sie alle Assets."
+      },
+      "period": "Zeitraum",
+      "days": "{{days}} Tage",
+      "kpi": {
+        "governed": "Verwaltet",
+        "governedHint": "{{percent}} % von {{assets}} Assets",
+        "certified": "Zertifiziert",
+        "certifiedHint": "{{percent}} % der verwalteten",
+        "failing": "Qualitätsfehler",
+        "failingHint": "Assets mit einer fehlschlagenden Regel",
+        "score": "Qualitätswert",
+        "scoreHint": "Bestandene Regeln, nach Schweregrad gewichtet"
+      },
+      "usage": {
+        "title": "Nutzung",
+        "lead": "Tabellenlesezugriffe und Exporte der letzten {{days}} Tage.",
+        "used": "Meistgenutzt",
+        "rising": "Steigend",
+        "totals": "{{reads}} Lesezugriffe · {{exports}} Exporte",
+        "change": "{{change}} gegenüber den {{days}} Tagen davor",
+        "fresh": "neu",
+        "topUsed": "Am meisten gelesen",
+        "topRising": "Nutzung am stärksten gestiegen gegenüber dem Zeitraum davor",
+        "readersShort": "{{count}} Leser",
+        "none": "In den letzten {{days}} Tagen hat niemand diese Assets gelesen.",
+        "noneRising": "Kein Asset wurde mehr gelesen als im Zeitraum davor."
+      },
+      "quality": {
+        "title": "Qualität",
+        "lead": "Alle Regelergebnisse der letzten {{days}} Tage und der Wert je Dimension aus den letzten Ergebnissen ihrer Regeln.",
+        "passed": "Bestanden",
+        "failed": "Fehlgeschlagen",
+        "results": "{{results}} Ergebnisse, {{failed}} fehlgeschlagen",
+        "dimensions": "Nach Dimension",
+        "none": "Noch keine Qualitätsregeln für diese Assets. Fügen Sie sie im Governance-Tab eines Assets hinzu."
+      },
+      "coverage": {
+        "title": "Abdeckung nach Quelle",
+        "lead": "Zertifizierte, verwaltete und herrenlose Assets je Quelle. Klicken Sie auf eine Quelle, um diesen Tab darauf einzugrenzen.",
+        "certified": "Zertifiziert",
+        "owned": "Verwaltet, nicht zertifiziert",
+        "ungoverned": "Ohne Owner",
+        "clear": "Alle Quellen"
+      },
+      "waiting": {
+        "title": "Wartet auf Sie",
+        "requests": "Zu entscheidende Zugriffsanfragen",
+        "noRequests": "Niemand wartet auf Ihre Entscheidung.",
+        "failing": "Qualitätsfehler",
+        "noFailing": "Hier schlägt keine Qualitätsregel fehl.",
+        "rulesFailing": "{{count}} fehlgeschlagen",
+        "unfinished": "Unvollständige Governance",
+        "noUnfinished": "Alles, wofür Sie verantwortlich sind, hat einen Steward, eine Beschreibung und ist zertifiziert.",
+        "governFirst": "Zuerst verwalten",
+        "noGovernFirst": "In den letzten {{days}} Tagen wurde kein Asset ohne Owner gelesen.",
+        "reads": "{{reads}} Lesezugriffe · {{readers}} Leser",
+        "seeAll": "Alle anzeigen"
+      },
+      "missing": {
+        "owner": "Kein Owner",
+        "steward": "Kein Steward",
+        "description": "Keine Beschreibung",
+        "meaning": "Kein Glossarbegriff",
+        "quality": "Qualität schlägt fehl",
+        "certification": "Nicht zertifiziert",
+        "certified": "Nicht zertifiziert",
+        "classification": "Klassifizierung nicht geprüft"
+      },
+      "table": {
+        "title": "Assets",
+        "empty": "Kein Asset entspricht diesem Bereich und Filter.",
+        "lifecycle": "Lebenszyklus",
+        "owner": "Owner",
+        "stewards": "Stewards",
+        "reads": "Lesezugriffe ({{days}} T.)",
+        "requests": "Anfragen",
+        "gaps": "Fehlt noch",
+        "complete": "Vollständig",
+        "range": "{{from}}–{{to}} von {{total}}"
+      }
     }
   },
   "detectors": {
@@ -7667,33 +7758,11 @@
         "dataset": "geteilte Datensätze"
       }
     },
-    "page": {
-      "title": "Governance",
-      "lead": "Wer für die Daten dieses Workspaces verantwortlich ist und was noch niemandem gehört.",
-      "totals": {
-        "assets": "Assets",
-        "owned": "Mit Owner",
-        "active": "Zertifiziert",
-        "ungoverned": "Ohne Verantwortliche"
-      },
-      "first": {
-        "title": "Zuerst steuern",
-        "description": "Tabellen ohne Owner, die in den letzten {{days}} Tagen gelesen wurden.",
-        "none": "In diesem Zeitraum wurde keine Tabelle ohne Owner gelesen.",
-        "asset": "Tabelle"
-      },
-      "mine": {
-        "title": "Ihre",
-        "description": "Wo Sie oder eine Ihrer Gruppen für Daten verantwortlich sind.",
-        "owned": "Owner von {{count}}",
-        "stewarded": "Steward von {{count}}",
-        "ungoverned": "Alle Assets ohne Verantwortliche"
-      },
-      "sources": {
-        "title": "Nach Quelle",
-        "description": "Assets mit Owner und zertifizierte Assets pro Quelle. Rollen einer Quelle zählen für ihre Assets."
-      },
-      "activity": "Letzte Änderungen"
+    "totals": {
+      "assets": "Assets",
+      "owned": "Mit Owner",
+      "active": "Zertifiziert",
+      "ungoverned": "Ohne Verantwortliche"
     },
     "tab": "Governance",
     "summary": {
@@ -8290,7 +8359,6 @@
       "retired": "Stillgelegt"
     },
     "page": {
-      "title": "Geteilte Datensätze",
       "lead": "Gespeicherte Abfragen, mit Gruppen als verwaltete Datensätze geteilt. Lesende brauchen keinen Zugriff auf die Tabellen dahinter; deren Masken und Klassifizierung gelten weiter.",
       "new": "Neuer geteilter Datensatz",
       "search": "Nach Name, Beschreibung oder Gruppe suchen",

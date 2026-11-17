@@ -94,6 +94,9 @@ describe('AssetService', () => {
     customDetector: {
       findMany: jest.fn(),
     },
+    governanceRole: {
+      findMany: jest.fn().mockResolvedValue([]),
+    },
     runnerAsset: {
       findMany: jest.fn(),
       findUnique: jest.fn(),
@@ -1067,6 +1070,26 @@ describe('AssetService', () => {
       expect(result.topAssetsByFindings[0].highestSeverity).toBe('CRITICAL');
       expect(result.topAssetsByFindings[1].highestSeverity).toBe('MEDIUM');
       expect(result.topSourcesByAssetVolume[0].assetCount).toBe(77);
+    });
+
+    it('applies the kind and governance filters the asset list applies', async () => {
+      mockPrismaService.$queryRaw.mockResolvedValue([{}]);
+      mockPrismaService.governanceRole.findMany.mockResolvedValueOnce([
+        { scopeType: 'SOURCE', scopeId: 'source-1' },
+      ]);
+
+      await service.searchAssetsCharts({
+        assets: { kind: 'raw', governance: 'governed' },
+      });
+
+      const query = mockPrismaService.$queryRaw.mock.calls.at(-1)?.[0] as {
+        sql: string;
+        values: unknown[];
+      };
+      expect(query.sql).toContain('a.source_type::text <>');
+      expect(query.values).toContain('SHARED_DATASET');
+      expect(query.sql).toContain('a.source_id = ANY(');
+      expect(query.values).toContainEqual(['source-1']);
     });
 
     it('should default missing datasets to empty arrays and zero totals', async () => {

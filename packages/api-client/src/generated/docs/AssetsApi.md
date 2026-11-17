@@ -8,6 +8,7 @@ All URIs are relative to *http://localhost*
 | [**assetsControllerGetReferencingFindings**](AssetsApi.md#assetscontrollergetreferencingfindings) | **GET** /assets/{id}/referencing-findings | Findings recorded on assets that point at this one |
 | [**searchAssetsControllerExportAssets**](AssetsApi.md#searchassetscontrollerexportassets) | **GET** /search/assets/export | Export assets (with findings) as CSV |
 | [**searchAssetsControllerExportFindings**](AssetsApi.md#searchassetscontrollerexportfindings) | **GET** /search/findings/export | Export findings as CSV |
+| [**searchAssetsControllerOverview**](AssetsApi.md#searchassetscontrolleroverview) | **GET** /search/assets/overview | The assets page cards |
 | [**searchAssetsControllerQuickSearch**](AssetsApi.md#searchassetscontrollerquicksearch) | **POST** /search/quick | Search as you type |
 | [**searchAssetsControllerSearchAssets**](AssetsApi.md#searchassetscontrollersearchassets) | **POST** /search/assets | Search assets with findings |
 | [**searchAssetsControllerSearchAssetsCharts**](AssetsApi.md#searchassetscontrollersearchassetscharts) | **POST** /search/assets/charts | Search assets charts overview |
@@ -340,6 +341,65 @@ No authorization required
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 | **200** | CSV stream of findings |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## searchAssetsControllerOverview
+
+> AssetsOverviewDto searchAssetsControllerOverview()
+
+The assets page cards
+
+Raw scanned assets, governed ones (and the access requests waiting for you), shared datasets — the numbers of the three tabs, in one cheap read.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  AssetsApi,
+} from '@workspace/api-client';
+import type { SearchAssetsControllerOverviewRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new AssetsApi();
+
+  try {
+    const data = await api.searchAssetsControllerOverview();
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+This endpoint does not need any parameter.
+
+### Return type
+
+[**AssetsOverviewDto**](AssetsOverviewDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 

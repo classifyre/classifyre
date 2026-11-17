@@ -84,6 +84,7 @@ All URIs are relative to *http://localhost*
 *AssetsApi* | [**assetsControllerGetReferencingFindings**](docs/AssetsApi.md#assetscontrollergetreferencingfindings) | **GET** /assets/{id}/referencing-findings | Findings recorded on assets that point at this one
 *AssetsApi* | [**searchAssetsControllerExportAssets**](docs/AssetsApi.md#searchassetscontrollerexportassets) | **GET** /search/assets/export | Export assets (with findings) as CSV
 *AssetsApi* | [**searchAssetsControllerExportFindings**](docs/AssetsApi.md#searchassetscontrollerexportfindings) | **GET** /search/findings/export | Export findings as CSV
+*AssetsApi* | [**searchAssetsControllerOverview**](docs/AssetsApi.md#searchassetscontrolleroverview) | **GET** /search/assets/overview | The assets page cards
 *AssetsApi* | [**searchAssetsControllerQuickSearch**](docs/AssetsApi.md#searchassetscontrollerquicksearch) | **POST** /search/quick | Search as you type
 *AssetsApi* | [**searchAssetsControllerSearchAssets**](docs/AssetsApi.md#searchassetscontrollersearchassets) | **POST** /search/assets | Search assets with findings
 *AssetsApi* | [**searchAssetsControllerSearchAssetsCharts**](docs/AssetsApi.md#searchassetscontrollersearchassetscharts) | **POST** /search/assets/charts | Search assets charts overview
@@ -337,6 +338,7 @@ All URIs are relative to *http://localhost*
 *GovernanceApi* | [**governanceControllerAssignAssetRole**](docs/GovernanceApi.md#governancecontrollerassignassetrole) | **POST** /assets/{id}/governance/roles | Make someone owner, steward or custodian of an asset
 *GovernanceApi* | [**governanceControllerAssignSourceRole**](docs/GovernanceApi.md#governancecontrollerassignsourcerole) | **POST** /sources/{id}/governance/roles | Make someone owner, steward or custodian of a source
 *GovernanceApi* | [**governanceControllerCreateQualityRule**](docs/GovernanceApi.md#governancecontrollercreatequalityrule) | **POST** /assets/{id}/quality/rules | Add a quality rule to an asset (and evaluate it at once)
+*GovernanceApi* | [**governanceControllerDashboard**](docs/GovernanceApi.md#governancecontrollerdashboard) | **GET** /governance/dashboard | The Governance tab of the assets page: totals, quality over time, what needs someone, coverage per source
 *GovernanceApi* | [**governanceControllerDismissSuggestion**](docs/GovernanceApi.md#governancecontrollerdismisssuggestion) | **POST** /assets/{id}/governance/meaning/suggestions/{suggestionId}/dismiss | Dismiss a suggested term for an asset
 *GovernanceApi* | [**governanceControllerExportContract**](docs/GovernanceApi.md#governancecontrollerexportcontract) | **GET** /assets/{id}/contract | The asset as an Open Data Contract Standard (v3.2) contract
 *GovernanceApi* | [**governanceControllerImportContract**](docs/GovernanceApi.md#governancecontrollerimportcontract) | **PUT** /assets/{id}/contract | Apply an ODCS contract (YAML or JSON text) to the asset
@@ -350,7 +352,6 @@ All URIs are relative to *http://localhost*
 *GovernanceApi* | [**governanceControllerRemoveSourceRole**](docs/GovernanceApi.md#governancecontrollerremovesourcerole) | **DELETE** /sources/{id}/governance/roles/{roleId} | End a role on a source (kept as history)
 *GovernanceApi* | [**governanceControllerRunQuality**](docs/GovernanceApi.md#governancecontrollerrunquality) | **POST** /assets/{id}/quality/run | Evaluate an asset\&#39;s quality rules now
 *GovernanceApi* | [**governanceControllerSourceGovernance**](docs/GovernanceApi.md#governancecontrollersourcegovernance) | **GET** /sources/{id}/governance | A source\&#39;s owners, stewards and custodians, and its coverage
-*GovernanceApi* | [**governanceControllerSummary**](docs/GovernanceApi.md#governancecontrollersummary) | **GET** /governance/summary | How far the workspace is governed: coverage per source, what to govern first, yours
 *GovernanceApi* | [**governanceControllerTestQualityRule**](docs/GovernanceApi.md#governancecontrollertestqualityrule) | **POST** /assets/{id}/quality/test | Measure a quality rule now without saving it
 *GovernanceApi* | [**governanceControllerUnlinkTerm**](docs/GovernanceApi.md#governancecontrollerunlinkterm) | **DELETE** /assets/{id}/governance/meaning/{termId} | Remove a term linked by hand
 *GovernanceApi* | [**governanceControllerUpdateAssetGovernance**](docs/GovernanceApi.md#governancecontrollerupdateassetgovernance) | **PUT** /assets/{id}/governance | Change an asset\&#39;s description, legal basis or lifecycle
@@ -358,6 +359,7 @@ All URIs are relative to *http://localhost*
 *GovernanceApi* | [**governanceControllerUpdateColumn**](docs/GovernanceApi.md#governancecontrollerupdatecolumn) | **PUT** /assets/{id}/columns/{name} | Describe, classify or confirm one column
 *GovernanceApi* | [**governanceControllerUpdateQualityRule**](docs/GovernanceApi.md#governancecontrollerupdatequalityrule) | **PUT** /quality-rules/{ruleId} | Change a quality rule (and evaluate it at once)
 *GovernanceApi* | [**governanceControllerUsage**](docs/GovernanceApi.md#governancecontrollerusage) | **GET** /assets/{id}/usage | Who read and exported a table, per day, over the last days
+*GovernanceApi* | [**governanceControllerWorkspaceUsage**](docs/GovernanceApi.md#governancecontrollerworkspaceusage) | **GET** /governance/usage | Table reads and exports per day and the top assets, against the period before (&#x60;rising&#x60;: where usage spiked)
 *GraphApi* | [**graphControllerColumnLineage**](docs/GraphApi.md#graphcontrollercolumnlineage) | **POST** /graph/lineage/column | Trace one column back through the transformations that produced it
 *GraphApi* | [**graphControllerCreateManualEdge**](docs/GraphApi.md#graphcontrollercreatemanualedge) | **POST** /graph/edges/manual | Create a manual edge between two entities (user-defined relation type)
 *GraphApi* | [**graphControllerDeleteEdge**](docs/GraphApi.md#graphcontrollerdeleteedge) | **DELETE** /graph/edges/{id} | Delete an edge
@@ -631,6 +633,10 @@ All URIs are relative to *http://localhost*
 - [AssetSeverityCountsResponseDto](docs/AssetSeverityCountsResponseDto.md)
 - [AssetSimilarityDto](docs/AssetSimilarityDto.md)
 - [AssetUsageDto](docs/AssetUsageDto.md)
+- [AssetsOverviewDto](docs/AssetsOverviewDto.md)
+- [AssetsOverviewGovernanceDto](docs/AssetsOverviewGovernanceDto.md)
+- [AssetsOverviewRawDto](docs/AssetsOverviewRawDto.md)
+- [AssetsOverviewSharedDto](docs/AssetsOverviewSharedDto.md)
 - [AssignGovernanceRoleDto](docs/AssignGovernanceRoleDto.md)
 - [AssistantCapabilityReportDto](docs/AssistantCapabilityReportDto.md)
 - [AssistantControllerRespond200Response](docs/AssistantControllerRespond200Response.md)
@@ -773,6 +779,10 @@ All URIs are relative to *http://localhost*
 - [CustomDetectorResponseDto](docs/CustomDetectorResponseDto.md)
 - [CustomDetectorResponseDtoSourcesUsingInner](docs/CustomDetectorResponseDtoSourcesUsingInner.md)
 - [CustomDetectorTrainingRunDto](docs/CustomDetectorTrainingRunDto.md)
+- [DashboardFailingAssetDto](docs/DashboardFailingAssetDto.md)
+- [DashboardIncompleteAssetDto](docs/DashboardIncompleteAssetDto.md)
+- [DashboardQualityDto](docs/DashboardQualityDto.md)
+- [DashboardTotalsDto](docs/DashboardTotalsDto.md)
 - [DataConnectionBlockDto](docs/DataConnectionBlockDto.md)
 - [DataConnectionDto](docs/DataConnectionDto.md)
 - [DataConnectionEndpointDto](docs/DataConnectionEndpointDto.md)
@@ -869,14 +879,13 @@ All URIs are relative to *http://localhost*
 - [GlossaryTermUsageDto](docs/GlossaryTermUsageDto.md)
 - [GovernFirstDto](docs/GovernFirstDto.md)
 - [GovernanceChecklistItemDto](docs/GovernanceChecklistItemDto.md)
+- [GovernanceDashboardDto](docs/GovernanceDashboardDto.md)
 - [GovernanceMeaningDto](docs/GovernanceMeaningDto.md)
 - [GovernanceMeaningSuggestionDto](docs/GovernanceMeaningSuggestionDto.md)
 - [GovernanceMeaningTermDto](docs/GovernanceMeaningTermDto.md)
-- [GovernanceMineDto](docs/GovernanceMineDto.md)
 - [GovernancePrincipalDto](docs/GovernancePrincipalDto.md)
 - [GovernanceRoleDto](docs/GovernanceRoleDto.md)
-- [GovernanceSummaryDto](docs/GovernanceSummaryDto.md)
-- [GovernanceTotalsDto](docs/GovernanceTotalsDto.md)
+- [GovernanceUsageDto](docs/GovernanceUsageDto.md)
 - [GrantDto](docs/GrantDto.md)
 - [GraphEdgeDto](docs/GraphEdgeDto.md)
 - [GraphNodeDto](docs/GraphNodeDto.md)
@@ -959,7 +968,9 @@ All URIs are relative to *http://localhost*
 - [PurgeSourceAssetsResponseDto](docs/PurgeSourceAssetsResponseDto.md)
 - [PutAssetChunksDto](docs/PutAssetChunksDto.md)
 - [PutBoardThumbnailDto](docs/PutBoardThumbnailDto.md)
+- [QualityDayDto](docs/QualityDayDto.md)
 - [QualityDimensionDto](docs/QualityDimensionDto.md)
+- [QualityDimensionScoreDto](docs/QualityDimensionScoreDto.md)
 - [QualityOptionColumnDto](docs/QualityOptionColumnDto.md)
 - [QualityOptionCountDto](docs/QualityOptionCountDto.md)
 - [QualityOptionsDto](docs/QualityOptionsDto.md)
@@ -1074,6 +1085,7 @@ All URIs are relative to *http://localhost*
 - [SavedQueryDto](docs/SavedQueryDto.md)
 - [ScanCacheEntryDto](docs/ScanCacheEntryDto.md)
 - [SearchAssetFindingDto](docs/SearchAssetFindingDto.md)
+- [SearchAssetGovernanceDetailDto](docs/SearchAssetGovernanceDetailDto.md)
 - [SearchAssetGovernanceDto](docs/SearchAssetGovernanceDto.md)
 - [SearchAssetItemDto](docs/SearchAssetItemDto.md)
 - [SearchAssetMatchDto](docs/SearchAssetMatchDto.md)
@@ -1232,6 +1244,7 @@ All URIs are relative to *http://localhost*
 - [UsageDayDto](docs/UsageDayDto.md)
 - [UsageFormatDto](docs/UsageFormatDto.md)
 - [UsageReaderDto](docs/UsageReaderDto.md)
+- [UsageTopAssetDto](docs/UsageTopAssetDto.md)
 - [ValueOccurrenceAssetDto](docs/ValueOccurrenceAssetDto.md)
 - [ValueOccurrencesResponseDto](docs/ValueOccurrencesResponseDto.md)
 - [WakeSupervisorDto](docs/WakeSupervisorDto.md)

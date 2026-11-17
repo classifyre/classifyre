@@ -1,4 +1,7 @@
 import { GovernanceService } from '../governance/governance.service';
+import { GovernanceInsightsService } from '../governance/governance-insights.service';
+import { AssetsOverviewDto } from '../governance/governance.dto';
+import { AccessRequestsService } from '../access-requests/access-requests.service';
 import { QualityService } from '../governance/quality.service';
 import {
   Controller,
@@ -25,6 +28,7 @@ import {
   ApiBody,
   ApiProduces,
   ApiQuery,
+  ApiOkResponse,
 } from '@nestjs/swagger';
 import type { FastifyReply } from 'fastify';
 import { AssetType } from '@prisma/client';
@@ -140,7 +144,28 @@ export class SearchAssetsController {
     private readonly exportQueryService: ExportQueryService,
     private readonly quickSearchService: QuickSearchService,
     private readonly governance: GovernanceService,
+    private readonly insights: GovernanceInsightsService,
+    private readonly accessRequests: AccessRequestsService,
   ) {}
+
+  @Get('assets/overview')
+  @ApiOperation({
+    summary: 'The assets page cards',
+    description:
+      'Raw scanned assets, governed ones (and the access requests waiting for you), shared datasets — the numbers of the three tabs, in one cheap read.',
+  })
+  @ApiOkResponse({ type: AssetsOverviewDto })
+  async overview(): Promise<AssetsOverviewDto> {
+    const [overview, requests] = await Promise.all([
+      this.insights.overview(),
+      // Only a signed-in person decides access requests.
+      this.accessRequests.list({ view: 'decide' }).catch(() => []),
+    ]);
+    return {
+      ...overview,
+      governance: { ...overview.governance, requestsForMe: requests.length },
+    };
+  }
 
   @Post('quick')
   @HttpCode(HttpStatus.OK)
@@ -225,6 +250,7 @@ export class SearchAssetsController {
     // Owner and lifecycle per row (GOV §5.7), one lookup for the page.
     const governance = await this.governance.summaries(
       result.items.map((item) => item.asset),
+      request.options?.governanceDays,
     );
     return {
       ...result,

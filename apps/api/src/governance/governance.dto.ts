@@ -566,26 +566,63 @@ export class AssetUsageDto {
   byChannel: UsageChannelDto[];
 }
 
-export class GovernanceTotalsDto {
-  @ApiProperty()
+export class DashboardTotalsDto {
+  @ApiProperty({ description: 'Live assets in scope.' })
   assets: number;
 
-  @ApiProperty()
-  owned: number;
+  @ApiProperty({
+    description: 'Of those, with an owner (theirs or their source’s).',
+  })
+  governed: number;
 
-  @ApiProperty()
-  active: number;
+  @ApiProperty({ description: 'Governed and certified (ACTIVE).' })
+  certified: number;
+
+  @ApiProperty({
+    description: 'With a failing quality rule (an open QUALITY finding).',
+  })
+  failing: number;
+
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description:
+      'Severity-weighted share of rules passing; null without results.',
+  })
+  score: number | null;
 }
 
-export class SourceCoverageDto extends GovernanceTotalsDto {
-  @ApiProperty()
-  sourceId: string;
+export class QualityDayDto {
+  @ApiProperty({ example: '2026-11-17' })
+  day: string;
 
   @ApiProperty()
-  name: string;
+  passed: number;
+
+  @ApiProperty()
+  failed: number;
 }
 
-export class GovernFirstDto {
+export class QualityDimensionScoreDto {
+  @ApiProperty({ example: 'completeness' })
+  dimension: string;
+
+  @ApiProperty()
+  rules: number;
+
+  @ApiProperty({ type: Number, nullable: true })
+  score: number | null;
+}
+
+export class DashboardQualityDto {
+  @ApiProperty({ type: [QualityDayDto] })
+  perDay: QualityDayDto[];
+
+  @ApiProperty({ type: [QualityDimensionScoreDto] })
+  dimensions: QualityDimensionScoreDto[];
+}
+
+export class DashboardAssetDto {
   @ApiProperty()
   assetId: string;
 
@@ -597,7 +634,26 @@ export class GovernFirstDto {
 
   @ApiProperty()
   sourceName: string;
+}
 
+export class DashboardFailingAssetDto extends DashboardAssetDto {
+  @ApiProperty({ description: 'Failing rules (open QUALITY findings).' })
+  failing: number;
+
+  @ApiProperty({ example: 'HIGH' })
+  severity: string;
+}
+
+export class DashboardIncompleteAssetDto extends DashboardAssetDto {
+  @ApiProperty({
+    type: [String],
+    enum: ['steward', 'description', 'certification'],
+    isArray: true,
+  })
+  missing: string[];
+}
+
+export class GovernFirstDto extends DashboardAssetDto {
   @ApiProperty()
   reads: number;
 
@@ -605,35 +661,153 @@ export class GovernFirstDto {
   readers: number;
 }
 
-export class GovernanceMineDto {
-  @ApiProperty({ description: 'Sources and assets you own.' })
+export class SourceCoverageDto {
+  @ApiProperty()
+  sourceId: string;
+
+  @ApiProperty()
+  name: string;
+
+  @ApiProperty()
+  assets: number;
+
+  @ApiProperty()
   owned: number;
 
-  @ApiProperty({
-    description: 'Sources and assets you or your groups steward.',
-  })
-  stewarded: number;
+  @ApiProperty()
+  certified: number;
 }
 
-export class GovernanceSummaryDto {
+export class GovernanceDashboardDto {
+  @ApiProperty({
+    enum: ['mine', 'all'],
+    description: '`mine` falls back to `all` when you answer for nothing.',
+  })
+  scope: 'mine' | 'all';
+
   @ApiProperty()
   days: number;
 
-  @ApiProperty({ type: GovernanceTotalsDto })
-  totals: GovernanceTotalsDto;
+  @ApiProperty({ type: DashboardTotalsDto })
+  totals: DashboardTotalsDto;
 
-  @ApiProperty({ type: [SourceCoverageDto] })
-  sources: SourceCoverageDto[];
+  @ApiProperty({ type: DashboardQualityDto })
+  quality: DashboardQualityDto;
+
+  @ApiProperty({
+    type: [DashboardFailingAssetDto],
+    description: 'Worst failing assets first (top 5).',
+  })
+  failing: DashboardFailingAssetDto[];
+
+  @ApiProperty({
+    type: [DashboardIncompleteAssetDto],
+    description:
+      'Governed assets missing a steward, a description or certification (top 5).',
+  })
+  incomplete: DashboardIncompleteAssetDto[];
+
+  @ApiProperty({
+    description: 'All governed assets in scope with something missing.',
+  })
+  incompleteCount: number;
 
   @ApiProperty({
     type: [GovernFirstDto],
     description:
-      'Ungoverned tables read most in the period: govern these first.',
+      'Ungoverned assets read most in the period: govern these first (top 5).',
   })
   governFirst: GovernFirstDto[];
 
-  @ApiProperty({ type: GovernanceMineDto })
-  mine: GovernanceMineDto;
+  @ApiProperty({ type: [SourceCoverageDto] })
+  coverage: SourceCoverageDto[];
+}
+
+export class UsageTopAssetDto extends DashboardAssetDto {
+  @ApiProperty()
+  reads: number;
+
+  @ApiProperty()
+  exports: number;
+
+  @ApiProperty()
+  readers: number;
+
+  @ApiProperty({ description: 'Reads and exports in the period before.' })
+  previous: number;
+}
+
+export class GovernanceUsageDto {
+  @ApiProperty({ enum: ['mine', 'all'] })
+  scope: 'mine' | 'all';
+
+  @ApiProperty()
+  days: number;
+
+  @ApiProperty({ enum: ['used', 'rising'] })
+  sort: 'used' | 'rising';
+
+  @ApiProperty()
+  reads: number;
+
+  @ApiProperty()
+  exports: number;
+
+  @ApiProperty({ description: 'Reads and exports in the period before.' })
+  previous: number;
+
+  @ApiProperty({ type: [UsageDayDto] })
+  perDay: UsageDayDto[];
+
+  @ApiProperty({ type: [UsageTopAssetDto] })
+  top: UsageTopAssetDto[];
+}
+
+export class AssetsOverviewRawDto {
+  @ApiProperty()
+  total: number;
+
+  @ApiProperty()
+  new: number;
+
+  @ApiProperty()
+  updated: number;
+}
+
+export class AssetsOverviewGovernanceDto {
+  @ApiProperty()
+  governed: number;
+
+  @ApiProperty()
+  ungoverned: number;
+
+  @ApiProperty()
+  certified: number;
+
+  @ApiProperty()
+  failing: number;
+
+  @ApiProperty({ description: 'Access requests waiting for your decision.' })
+  requestsForMe: number;
+}
+
+export class AssetsOverviewSharedDto {
+  @ApiProperty()
+  total: number;
+
+  @ApiProperty()
+  certified: number;
+}
+
+export class AssetsOverviewDto {
+  @ApiProperty({ type: AssetsOverviewRawDto })
+  raw: AssetsOverviewRawDto;
+
+  @ApiProperty({ type: AssetsOverviewGovernanceDto })
+  governance: AssetsOverviewGovernanceDto;
+
+  @ApiProperty({ type: AssetsOverviewSharedDto })
+  shared: AssetsOverviewSharedDto;
 }
 
 // ── Meaning ─────────────────────────────────────────────────────────────────

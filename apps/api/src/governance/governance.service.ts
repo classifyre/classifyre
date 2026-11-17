@@ -1897,24 +1897,11 @@ export class GovernanceService {
    * Owner and lifecycle of each asset on a page of search results (§5.7):
    * one query for the page's roles, one for its records.
    */
-  async summaries(assets: readonly { id: string; sourceId: string }[]): Promise<
-    Map<
-      string,
-      {
-        status: GovernanceStatus | null;
-        ownerRef: string | null;
-        quality: QualitySummary | null;
-      }
-    >
-  > {
-    const out = new Map<
-      string,
-      {
-        status: GovernanceStatus | null;
-        ownerRef: string | null;
-        quality: QualitySummary | null;
-      }
-    >();
+  async summaries(
+    assets: readonly { id: string; sourceId: string }[],
+    detailDays?: number,
+  ): Promise<Map<string, AssetGovernanceSummary>> {
+    const out = new Map<string, AssetGovernanceSummary>();
     if (!assets.length) return out;
     const assetIds = assets.map((asset) => asset.id);
     const sourceIds = [...new Set(assets.map((asset) => asset.sourceId))];
@@ -1932,10 +1919,13 @@ export class GovernanceService {
       }),
       this.prisma.assetGovernance.findMany({
         where: { assetId: { in: assetIds } },
-        select: { assetId: true, status: true },
+        select: { assetId: true, status: true, description: true },
       }),
       this.quality.summaries(assetIds),
     ]);
+    const details = detailDays
+      ? await this.details(assetIds, sourceIds, detailDays)
+      : null;
     const ownerOf = new Map(
       owners.map((row) => [
         `${row.scopeType}:${row.scopeId}`,
@@ -1943,22 +1933,164 @@ export class GovernanceService {
       ]),
     );
     const statusOf = new Map(records.map((row) => [row.assetId, row.status]));
+    const descriptionOf = new Map(
+      records.map((row) => [row.assetId, row.description]),
+    );
     for (const asset of assets) {
       const ownerRef =
         ownerOf.get(`ASSET:${asset.id}`) ??
         ownerOf.get(`SOURCE:${asset.sourceId}`) ??
         null;
+      const status = effectiveStatus(
+        statusOf.has(asset.id) ? { status: statusOf.get(asset.id)! } : null,
+        ownerRef !== null,
+      );
+      const assetQuality = quality.get(asset.id) ?? null;
       out.set(asset.id, {
         ownerRef,
-        quality: quality.get(asset.id) ?? null,
-        status: effectiveStatus(
-          statusOf.has(asset.id) ? { status: statusOf.get(asset.id)! } : null,
-          ownerRef !== null,
-        ),
+        quality: assetQuality,
+        status,
+        ...(details
+          ? {
+              detail: (() => {
+                const stewardRefs = [
+                  ...new Set([
+                    ...(details.stewards.get(`ASSET:${asset.id}`) ?? []),
+                    ...(details.stewards.get(`SOURCE:${asset.sourceId}`) ?? []),
+                  ]),
+                ];
+                const items = checklist({
+                  roles: [
+                    ...(ownerRef ? [{ role: 'OWNER' as const }] : []),
+                    ...(stewardRefs.length
+                      ? [{ role: 'STEWARD' as const }]
+                      : []),
+                  ] as unknown as EffectiveRole[],
+                  description: descriptionOf.get(asset.id),
+                  approvedTerms: details.terms.get(asset.id) ?? 0,
+                  status,
+                  qualityPassing: assetQuality
+                    ? assetQuality.failing === 0 && assetQuality.score !== null
+                    : undefined,
+                });
+                return {
+                  stewardRefs,
+                  missing: items
+                    .filter((item) => !item.done)
+                    .map((item) => item.key),
+                  pendingRequests: details.requests.get(asset.id) ?? 0,
+                  reads: details.reads.get(asset.id) ?? 0,
+                };
+              })(),
+            }
+          : {}),
       });
     }
     return out;
   }
+
+  /**
+   * What the assets table's Governance view adds per row, for one page of
+   * assets: stewards, linked terms, pending access requests, reads in the
+   * period. One query each, never one per row.
+   */
+  private async details(
+    assetIds: string[],
+    sourceIds: string[],
+    days: number,
+  ): Promise<{
+    stewards: Map<string, string[]>;
+    terms: Map<string, number>;
+    requests: Map<string, number>;
+    reads: Map<string, number>;
+  }> {
+    const since = new Date(
+      Date.now() - Math.min(Math.max(Math.trunc(days), 1), 365) * 86_400_000,
+    );
+    const [stewards, linked, byHand, requests, reads] = await Promise.all([
+      this.prisma.governanceRole.findMany({
+        where: {
+          role: 'STEWARD',
+          dateOut: null,
+          OR: [
+            { scopeType: 'ASSET', scopeId: { in: assetIds } },
+            { scopeType: 'SOURCE', scopeId: { in: sourceIds } },
+          ],
+        },
+        select: { scopeType: true, scopeId: true, principalRef: true },
+      }),
+      this.prisma.assetTerm.groupBy({
+        by: ['assetId'],
+        where: {
+          assetId: { in: assetIds },
+          goneAt: null,
+          term: { status: 'APPROVED' },
+        },
+        _count: { _all: true },
+      }),
+      this.prisma.glossaryReference.groupBy({
+        by: ['entityId'],
+        where: {
+          entityType: 'asset',
+          entityId: { in: assetIds },
+          role: 'ABOUT',
+          term: { status: 'APPROVED' },
+        },
+        _count: { _all: true },
+      }),
+      this.prisma.dataAccessRequest.groupBy({
+        by: ['scopeId'],
+        where: {
+          scopeType: 'ASSET',
+          scopeId: { in: assetIds },
+          status: 'PENDING',
+        },
+        _count: { _all: true },
+      }),
+      this.prisma.$queryRaw<{ entity_id: string; reads: bigint }[]>`
+        SELECT entity_id, count(*) AS reads
+          FROM audit_events
+         WHERE entity_type = 'asset'
+           AND entity_id = ANY(${assetIds}::text[])
+           AND (operation = 'query-runs.read-table'
+                OR operation LIKE 'query-runs.export-table.%')
+           AND occurred_at >= ${since}
+         GROUP BY entity_id`,
+    ]);
+    const stewardMap = new Map<string, string[]>();
+    for (const row of stewards) {
+      const key = `${row.scopeType}:${row.scopeId}`;
+      stewardMap.set(key, [...(stewardMap.get(key) ?? []), row.principalRef]);
+    }
+    const terms = new Map<string, number>();
+    for (const row of linked) terms.set(row.assetId, row._count._all);
+    for (const row of byHand) {
+      if (row.entityId)
+        terms.set(
+          row.entityId,
+          (terms.get(row.entityId) ?? 0) + row._count._all,
+        );
+    }
+    return {
+      stewards: stewardMap,
+      terms,
+      requests: new Map(requests.map((row) => [row.scopeId, row._count._all])),
+      reads: new Map(reads.map((row) => [row.entity_id, Number(row.reads)])),
+    };
+  }
+}
+
+export interface AssetGovernanceSummary {
+  status: GovernanceStatus | null;
+  ownerRef: string | null;
+  quality: QualitySummary | null;
+  /** With `governanceDays` on the search: the Governance view's columns. */
+  detail?: {
+    stewardRefs: string[];
+    missing: string[];
+    pendingRequests: number;
+    reads: number;
+  };
 }
 
 /** One line for a rule: what it measures and what it must be. */

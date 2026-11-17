@@ -6,6 +6,7 @@ import {
   IsBoolean,
   IsDate,
   IsEnum,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -92,6 +93,23 @@ export class SearchAssetsFiltersDto extends OmitType(QueryAssetsDto, [
   @IsOptional()
   @IsString()
   stewardRef?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Assets this person or group answers for — owns or stewards, on the asset or its source: `user:<id>`, `group:<id>`, or `me` (you and your groups).',
+  })
+  @IsOptional()
+  @IsString()
+  responsibleRef?: string;
+
+  @ApiPropertyOptional({
+    enum: ['raw', 'shared'],
+    description:
+      '`raw`: assets scanned from sources; `shared`: shared datasets (DQ §5.12). Both when omitted.',
+  })
+  @IsOptional()
+  @IsIn(['raw', 'shared'])
+  kind?: 'raw' | 'shared';
 }
 
 const normalizeToStringArray = (value: unknown, uppercase = false) => {
@@ -267,6 +285,19 @@ export class SearchAssetsOptionsDto {
   @Type(() => Boolean)
   @IsBoolean()
   includeAssetsWithoutFindings?: boolean = false;
+
+  @ApiPropertyOptional({
+    description:
+      'Add the Governance view per row (stewards, checklist gaps, pending access requests, reads over these days).',
+    minimum: 1,
+    maximum: 365,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(365)
+  governanceDays?: number;
 }
 
 export class SearchAssetsRequestDto {

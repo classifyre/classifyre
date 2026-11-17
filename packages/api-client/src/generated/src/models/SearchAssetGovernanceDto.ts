@@ -20,6 +20,13 @@ import {
     SearchAssetQualityDtoToJSON,
     SearchAssetQualityDtoToJSONTyped,
 } from './SearchAssetQualityDto';
+import type { SearchAssetGovernanceDetailDto } from './SearchAssetGovernanceDetailDto';
+import {
+    SearchAssetGovernanceDetailDtoFromJSON,
+    SearchAssetGovernanceDetailDtoFromJSONTyped,
+    SearchAssetGovernanceDetailDtoToJSON,
+    SearchAssetGovernanceDetailDtoToJSONTyped,
+} from './SearchAssetGovernanceDetailDto';
 
 /**
  * 
@@ -45,6 +52,12 @@ export interface SearchAssetGovernanceDto {
      * @memberof SearchAssetGovernanceDto
      */
     quality?: SearchAssetQualityDto | null;
+    /**
+     * Present when the search sets `options.governanceDays`.
+     * @type {SearchAssetGovernanceDetailDto}
+     * @memberof SearchAssetGovernanceDto
+     */
+    detail?: SearchAssetGovernanceDetailDto;
 }
 
 
@@ -80,6 +93,7 @@ export function SearchAssetGovernanceDtoFromJSONTyped(json: any, ignoreDiscrimin
         'status': json['status'] == null ? undefined : json['status'],
         'ownerRef': json['ownerRef'] == null ? undefined : json['ownerRef'],
         'quality': json['quality'] == null ? undefined : SearchAssetQualityDtoFromJSON(json['quality']),
+        'detail': json['detail'] == null ? undefined : SearchAssetGovernanceDetailDtoFromJSON(json['detail']),
     };
 }
 
@@ -97,6 +111,7 @@ export function SearchAssetGovernanceDtoToJSONTyped(value?: SearchAssetGovernanc
         'status': value['status'],
         'ownerRef': value['ownerRef'],
         'quality': SearchAssetQualityDtoToJSON(value['quality']),
+        'detail': SearchAssetGovernanceDetailDtoToJSON(value['detail']),
     };
 }
 

@@ -95,8 +95,8 @@ type AssetStatusFilterValue =
 type AssetsTableProps = {
   scope?: AssetsTableScope;
   initialPageSize?: number;
-  assetStatuses?: AssetStatusFilterValue[];
-  onAssetStatusesChange?: (values: AssetStatusFilterValue[]) => void;
+  /** `raw`: scanned assets only; `shared`: shared datasets only. */
+  kind?: "raw" | "shared";
 };
 
 type FilterDraft = {
@@ -254,6 +254,7 @@ function buildRequest({
   scope,
   assetStatuses,
   searchMode,
+  kind,
 }: {
   draft: FilterDraft;
   sort: SortDraft;
@@ -262,6 +263,7 @@ function buildRequest({
   scope?: AssetsTableScope;
   assetStatuses: AssetStatusFilterValue[];
   searchMode: SearchMode;
+  kind?: "raw" | "shared";
 }): SearchAssetsRequestInputDto {
   const assetsFilters: NonNullable<SearchAssetsRequestInputDto["assets"]> = {
     search: searchMode === "off" ? draft.search.trim() || undefined : undefined,
@@ -269,6 +271,7 @@ function buildRequest({
       scope?.sourceId || (draft.sourceId !== ALL ? draft.sourceId : undefined),
     runnerId: scope?.runnerId,
     status: assetStatuses.length > 0 ? assetStatuses : undefined,
+    kind,
     ...(draft.governance === "mine"
       ? { ownerRef: "me" }
       : draft.governance === "stewarding"
@@ -482,12 +485,20 @@ function FindingsSubTable({
 export function AssetsTable({
   scope,
   initialPageSize = 20,
-  assetStatuses = EMPTY_ASSET_STATUSES,
-  onAssetStatusesChange,
+  kind,
 }: AssetsTableProps) {
   const { t } = useTranslation();
   const router = useRouter();
   const { searchParams, setParams } = useUrlParams();
+  const [assetStatuses, setAssetStatuses] = useState<AssetStatusFilterValue[]>(
+    () => {
+      const known = Object.values(SearchAssetsFiltersDtoStatusEnum) as string[];
+      const picked = searchParams
+        .getAll("status")
+        .filter((value) => known.includes(value)) as AssetStatusFilterValue[];
+      return picked.length ? picked : EMPTY_ASSET_STATUSES;
+    },
+  );
 
   const [draft, setDraft] = useState<FilterDraft>(() => ({
     search: searchParams.get("q") ?? DEFAULT_DRAFT.search,
@@ -582,10 +593,11 @@ export function AssetsTable({
       findingSeverity:
         draft.findingSeverities.length > 0 ? draft.findingSeverities : null,
       governance: draft.governance !== ALL ? draft.governance : null,
+      status: assetStatuses.length > 0 ? assetStatuses : null,
       sortBy: sort.by !== DEFAULT_SORT.by ? sort.by : null,
       sortOrder: sort.order !== DEFAULT_SORT.order ? sort.order : null,
     });
-  }, [draft, sort, setParams]);
+  }, [draft, sort, assetStatuses, setParams]);
 
   useEffect(() => {
     let active = true;
@@ -616,7 +628,7 @@ export function AssetsTable({
 
   useEffect(() => {
     setPage(1);
-  }, [draft, pageSize, sortBy, sortOrder, searchMode]);
+  }, [draft, pageSize, sortBy, sortOrder, searchMode, assetStatuses]);
 
   useEffect(() => {
     let active = true;
@@ -641,6 +653,7 @@ export function AssetsTable({
           },
           assetStatuses,
           searchMode,
+          kind,
         });
 
         const response = await api.searchAssets(request);
@@ -683,6 +696,7 @@ export function AssetsTable({
     sortBy,
     sortOrder,
     searchMode,
+    kind,
   ]);
 
   const items = data?.items ?? [];
@@ -807,7 +821,7 @@ export function AssetsTable({
         <MultiSelect
           values={assetStatuses}
           onValuesChange={(values) =>
-            onAssetStatusesChange?.(values as AssetStatusFilterValue[])
+            setAssetStatuses(values as AssetStatusFilterValue[])
           }
         >
           <MultiSelectTrigger className="h-9 w-[170px] border-2 border-border rounded-[4px]">

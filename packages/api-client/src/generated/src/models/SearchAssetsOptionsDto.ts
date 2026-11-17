@@ -31,6 +31,12 @@ export interface SearchAssetsOptionsDto {
      * @memberof SearchAssetsOptionsDto
      */
     includeAssetsWithoutFindings?: boolean;
+    /**
+     * Add the Governance view per row (stewards, checklist gaps, pending access requests, reads over these days).
+     * @type {number}
+     * @memberof SearchAssetsOptionsDto
+     */
+    governanceDays?: number;
 }
 
 /**
@@ -52,6 +58,7 @@ export function SearchAssetsOptionsDtoFromJSONTyped(json: any, ignoreDiscriminat
         
         'excludeFindings': json['excludeFindings'] == null ? undefined : json['excludeFindings'],
         'includeAssetsWithoutFindings': json['includeAssetsWithoutFindings'] == null ? undefined : json['includeAssetsWithoutFindings'],
+        'governanceDays': json['governanceDays'] == null ? undefined : json['governanceDays'],
     };
 }
 
@@ -68,6 +75,7 @@ export function SearchAssetsOptionsDtoToJSONTyped(value?: SearchAssetsOptionsDto
         
         'excludeFindings': value['excludeFindings'],
         'includeAssetsWithoutFindings': value['includeAssetsWithoutFindings'],
+        'governanceDays': value['governanceDays'],
     };
 }
 

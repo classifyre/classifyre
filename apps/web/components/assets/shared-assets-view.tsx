@@ -27,11 +27,12 @@ import { DatasetBadges } from "@/components/shared-datasets/dataset-cards";
 import { GovernanceBadge } from "@/components/governance/governance-badge";
 
 /**
- * Shared datasets (docs/prd/DQ-data-query.md §5.12): every saved query shared
- * here, findable by everyone who sees assets; locked ones say so and lead to
- * *Request access* on their page.
+ * The Shared assets tab of the assets page (docs/prd/DQ-data-query.md
+ * §5.12): every saved query shared as a governed dataset, findable by
+ * everyone who sees assets; locked ones say so and lead to *Request access*
+ * on their page.
  */
-export default function SharedDatasetsPage() {
+export function SharedAssetsView() {
   const { t } = useTranslation();
   const nsPath = useNsPath();
   const datasets = useSharedDatasets();
@@ -47,21 +48,21 @@ export default function SharedDatasetsPage() {
   );
 
   return (
-    <div className="space-y-6" data-testid="shared-datasets-page">
+    <div className="space-y-4" data-testid="shared-datasets-page">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <Share2 className="h-7 w-7" aria-hidden />
-          <div>
-            <h1 className="font-serif text-3xl font-black uppercase tracking-[0.08em]">
-              {t("sharedDatasets.page.title")}
-            </h1>
-            <p className="text-muted-foreground">
-              {t("sharedDatasets.page.lead")}
-            </p>
-          </div>
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t("sharedDatasets.page.search")}
+            className="w-full sm:max-w-sm"
+          />
+          <p className="text-sm text-muted-foreground">
+            {t("sharedDatasets.page.lead")}
+          </p>
         </div>
         {options.data?.canShare && (
-          <Button asChild data-testid="new-shared-dataset">
+          <Button asChild data-testid="new-shared-dataset" className="shrink-0">
             <Link href={nsPath("/query")}>
               <Plus className="mr-1.5 h-4 w-4" />
               {t("sharedDatasets.page.new")}
@@ -69,13 +70,6 @@ export default function SharedDatasetsPage() {
           </Button>
         )}
       </div>
-
-      <Input
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        placeholder={t("sharedDatasets.page.search")}
-        className="max-w-sm"
-      />
 
       {datasets.loading && !datasets.data ? (
         <div className="flex justify-center py-10">

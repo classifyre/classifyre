@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { governanceAssetWhere } from './governance-filter';
+import { governanceAssetSql, governanceAssetWhere } from './governance-filter';
 import { columnsOf } from './governance-columns.service';
 import {
   canGovern,
@@ -356,5 +356,87 @@ describe('columnsOf', () => {
       { name: 'email', type: '' },
     ]);
     expect(columnsOf(null)).toEqual([]);
+  });
+});
+
+describe('governanceAssetSql (the charts and dashboard twin)', () => {
+  const db = {
+    governanceRole: {
+      findMany: jest.fn(({ where }: { where: Record<string, unknown> }) =>
+        Promise.resolve(
+          [
+            {
+              scopeType: 'ASSET',
+              scopeId: 'a1',
+              role: 'OWNER',
+              principalRef: 'user:alice',
+            },
+            {
+              scopeType: 'SOURCE',
+              scopeId: 's1',
+              role: 'OWNER',
+              principalRef: 'user:bob',
+            },
+          ].filter((r) => !where.role || r.role === where.role),
+        ),
+      ),
+    },
+  } as never;
+
+  it('is null without governance filters', async () => {
+    expect(await governanceAssetSql(db, {}, null)).toBeNull();
+  });
+
+  it('matches owned assets by asset or source, and negates for ungoverned', async () => {
+    const governed = await governanceAssetSql(
+      db,
+      { governance: 'governed' },
+      null,
+    );
+    expect(governed?.sql).toContain('a.id = ANY(');
+    expect(governed?.values).toEqual([['a1'], ['s1']]);
+    const ungoverned = await governanceAssetSql(
+      db,
+      { governance: 'ungoverned' },
+      null,
+    );
+    expect(ungoverned?.sql.startsWith('NOT (')).toBe(true);
+  });
+
+  it('reads failing from open QUALITY findings, on the alias asked for', async () => {
+    const failing = await governanceAssetSql(
+      db,
+      { governance: 'failing' },
+      null,
+      'fa',
+    );
+    expect(failing?.sql).toContain(
+      "qf.asset_id = fa.id AND qf.detector_type = 'QUALITY'",
+    );
+  });
+
+  it('reads responsible as owner or steward of the person and their groups', async () => {
+    const sql = await governanceAssetSql(
+      db,
+      { responsibleRef: 'me' },
+      { actorRef: 'user:alice', groupIds: ['g1'] },
+    );
+    expect(sql?.sql).toContain('a.source_id = ANY(');
+    const call = (
+      db as unknown as { governanceRole: { findMany: jest.Mock } }
+    ).governanceRole.findMany.mock.calls.at(-1)?.[0];
+    expect(call.where).toMatchObject({
+      role: { in: ['OWNER', 'STEWARD'] },
+      principalRef: { in: ['user:alice', 'group:g1'] },
+    });
+  });
+
+  it('rejects an unknown filter and `me` without a person', async () => {
+    await expect(
+      governanceAssetSql(db, { governance: 'nope' }, null),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      governanceAssetSql(db, { ownerRef: 'me' }, null),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 });

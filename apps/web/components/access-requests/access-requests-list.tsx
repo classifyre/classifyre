@@ -47,11 +47,14 @@ export function AccessRequestsList({
   filter,
   showTarget = false,
   emptyText,
+  onDecided,
 }: {
   filter: RequestsFilter;
   /** Name the table or source on each row (a workspace-wide list). */
   showTarget?: boolean;
   emptyText?: string;
+  /** After a request was approved or declined here. */
+  onDecided?: () => void;
 }) {
   const { t } = useTranslation();
   const [requests, setRequests] = React.useState<AccessRequestDto[] | null>(
@@ -113,6 +116,7 @@ export function AccessRequestsList({
           onDone={async () => {
             setDeciding(null);
             await load();
+            onDecided?.();
           }}
         />
       )}

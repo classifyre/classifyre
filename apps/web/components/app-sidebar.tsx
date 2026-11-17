@@ -38,9 +38,7 @@ import {
   Bot,
   ArrowLeft,
   TerminalSquare,
-  ShieldCheck,
   type LucideIcon,
-  Share2,
 } from "lucide-react";
 
 type NavItem = { titleKey: TranslationKey; href: string; icon: LucideIcon };
@@ -58,12 +56,6 @@ const NAV_GROUPS: NavGroup[] = [
       { titleKey: "nav.findings", href: "/findings", icon: SearchCheck },
       { titleKey: "nav.assets", href: "/assets", icon: FileText },
       { titleKey: "nav.query", href: "/query", icon: TerminalSquare },
-      {
-        titleKey: "nav.sharedDatasets",
-        href: "/shared-datasets",
-        icon: Share2,
-      },
-      { titleKey: "nav.governance", href: "/governance", icon: ShieldCheck },
     ],
   },
   {

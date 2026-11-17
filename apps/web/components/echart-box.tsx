@@ -1,16 +1,18 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type CSSProperties } from "react";
 import * as echarts from "echarts";
 import { cn } from "@workspace/ui/lib/utils";
 
 export function EChartBox({
   option,
   className,
+  style,
   onChartClick,
 }: {
   option: echarts.EChartsCoreOption;
   className?: string;
+  style?: CSSProperties;
   onChartClick?: (params: unknown) => void;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -63,6 +65,10 @@ export function EChartBox({
   }, [onChartClick]);
 
   return (
-    <div ref={containerRef} className={cn("h-[320px] w-full", className)} />
+    <div
+      ref={containerRef}
+      className={cn("h-[320px] w-full", className)}
+      style={style}
+    />
   );
 }

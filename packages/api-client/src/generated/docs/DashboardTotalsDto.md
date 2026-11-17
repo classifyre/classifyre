@@ -1,5 +1,5 @@
 
-# GovernanceTotalsDto
+# DashboardTotalsDto
 
 
 ## Properties
@@ -7,20 +7,24 @@
 Name | Type
 ------------ | -------------
 `assets` | number
-`owned` | number
-`active` | number
+`governed` | number
+`certified` | number
+`failing` | number
+`score` | number
 
 ## Example
 
 ```typescript
-import type { GovernanceTotalsDto } from '@workspace/api-client'
+import type { DashboardTotalsDto } from '@workspace/api-client'
 
 // TODO: Update the object below with actual values
 const example = {
   "assets": null,
-  "owned": null,
-  "active": null,
-} satisfies GovernanceTotalsDto
+  "governed": null,
+  "certified": null,
+  "failing": null,
+  "score": null,
+} satisfies DashboardTotalsDto
 
 console.log(example)
 
@@ -29,7 +33,7 @@ const exampleJSON: string = JSON.stringify(example)
 console.log(exampleJSON)
 
 // Parse the JSON string back to an object
-const exampleParsed = JSON.parse(exampleJSON) as GovernanceTotalsDto
+const exampleParsed = JSON.parse(exampleJSON) as DashboardTotalsDto
 console.log(exampleParsed)
 ```
 

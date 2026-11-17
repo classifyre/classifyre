@@ -6,11 +6,11 @@
 
 Name | Type
 ------------ | -------------
-`assets` | number
-`owned` | number
-`active` | number
 `sourceId` | string
 `name` | string
+`assets` | number
+`owned` | number
+`certified` | number
 
 ## Example
 
@@ -19,11 +19,11 @@ import type { SourceCoverageDto } from '@workspace/api-client'
 
 // TODO: Update the object below with actual values
 const example = {
-  "assets": null,
-  "owned": null,
-  "active": null,
   "sourceId": null,
   "name": null,
+  "assets": null,
+  "owned": null,
+  "certified": null,
 } satisfies SourceCoverageDto
 
 console.log(example)

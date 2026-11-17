@@ -1444,6 +1444,29 @@
         ]
       }
     },
+    "/search/assets/overview": {
+      "get": {
+        "description": "Raw scanned assets, governed ones (and the access requests waiting for you), shared datasets — the numbers of the three tabs, in one cheap read.",
+        "operationId": "SearchAssetsController_overview",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetsOverviewDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "The assets page cards",
+        "tags": [
+          "Assets"
+        ]
+      }
+    },
     "/search/quick": {
       "post": {
         "description": "A few assets (by name) and findings (by content, whole words and their prefixes) for pickers and palettes. Bounded and cheap on large workspaces: no totals, a per-query time budget, and `truncated` when that budget ran out.",
@@ -12503,15 +12526,35 @@
         ]
       }
     },
-    "/governance/summary": {
+    "/governance/dashboard": {
       "get": {
-        "operationId": "GovernanceController_summary",
+        "operationId": "GovernanceController_dashboard",
         "parameters": [
+          {
+            "name": "scope",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "mine",
+                "all"
+              ],
+              "type": "string"
+            }
+          },
           {
             "name": "days",
             "required": false,
             "in": "query",
             "description": "1–365, default 30",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sourceId",
+            "required": false,
+            "in": "query",
             "schema": {
               "type": "string"
             }
@@ -12523,13 +12566,86 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GovernanceSummaryDto"
+                  "$ref": "#/components/schemas/GovernanceDashboardDto"
                 }
               }
             }
           }
         },
-        "summary": "How far the workspace is governed: coverage per source, what to govern first, yours",
+        "summary": "The Governance tab of the assets page: totals, quality over time, what needs someone, coverage per source",
+        "tags": [
+          "Governance"
+        ]
+      }
+    },
+    "/governance/usage": {
+      "get": {
+        "operationId": "GovernanceController_workspaceUsage",
+        "parameters": [
+          {
+            "name": "scope",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "mine",
+                "all"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "days",
+            "required": false,
+            "in": "query",
+            "description": "1–365, default 30",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sourceId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "used",
+                "rising"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "1–50, default 10",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GovernanceUsageDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Table reads and exports per day and the top assets, against the period before (`rising`: where usage spiked)",
         "tags": [
           "Governance"
         ]
@@ -20477,6 +20593,87 @@
           "items"
         ]
       },
+      "AssetsOverviewRawDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number"
+          },
+          "new": {
+            "type": "number"
+          },
+          "updated": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "total",
+          "new",
+          "updated"
+        ]
+      },
+      "AssetsOverviewGovernanceDto": {
+        "type": "object",
+        "properties": {
+          "governed": {
+            "type": "number"
+          },
+          "ungoverned": {
+            "type": "number"
+          },
+          "certified": {
+            "type": "number"
+          },
+          "failing": {
+            "type": "number"
+          },
+          "requestsForMe": {
+            "type": "number",
+            "description": "Access requests waiting for your decision."
+          }
+        },
+        "required": [
+          "governed",
+          "ungoverned",
+          "certified",
+          "failing",
+          "requestsForMe"
+        ]
+      },
+      "AssetsOverviewSharedDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number"
+          },
+          "certified": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "total",
+          "certified"
+        ]
+      },
+      "AssetsOverviewDto": {
+        "type": "object",
+        "properties": {
+          "raw": {
+            "$ref": "#/components/schemas/AssetsOverviewRawDto"
+          },
+          "governance": {
+            "$ref": "#/components/schemas/AssetsOverviewGovernanceDto"
+          },
+          "shared": {
+            "$ref": "#/components/schemas/AssetsOverviewSharedDto"
+          }
+        },
+        "required": [
+          "raw",
+          "governance",
+          "shared"
+        ]
+      },
       "QuickSearchRequestDto": {
         "type": "object",
         "properties": {
@@ -20907,6 +21104,18 @@
           "stewardRef": {
             "type": "string",
             "description": "Assets this person or group stewards, on the asset or its source: `user:<id>`, `group:<id>`, or `me` (you and your groups)."
+          },
+          "responsibleRef": {
+            "type": "string",
+            "description": "Assets this person or group answers for — owns or stewards, on the asset or its source: `user:<id>`, `group:<id>`, or `me` (you and your groups)."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "raw",
+              "shared"
+            ],
+            "description": "`raw`: assets scanned from sources; `shared`: shared datasets (DQ §5.12). Both when omitted."
           }
         }
       },
@@ -21046,6 +21255,12 @@
             "type": "boolean",
             "description": "When true, include assets even if they have no findings matching findings filters",
             "default": false
+          },
+          "governanceDays": {
+            "type": "number",
+            "description": "Add the Governance view per row (stewards, checklist gaps, pending access requests, reads over these days).",
+            "minimum": 1,
+            "maximum": 365
           }
         }
       },
@@ -21452,6 +21667,39 @@
           "failing"
         ]
       },
+      "SearchAssetGovernanceDetailDto": {
+        "type": "object",
+        "properties": {
+          "stewardRefs": {
+            "description": "Stewards, the asset’s own and its source’s (`user:` or `group:`).",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "missing": {
+            "description": "Checklist items not done yet: owner, steward, description, meaning, quality, certified.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "pendingRequests": {
+            "type": "number",
+            "description": "Access requests on this asset waiting for a decision."
+          },
+          "reads": {
+            "type": "number",
+            "description": "Table reads and exports in the period asked for."
+          }
+        },
+        "required": [
+          "stewardRefs",
+          "missing",
+          "pendingRequests",
+          "reads"
+        ]
+      },
       "SearchAssetGovernanceDto": {
         "type": "object",
         "properties": {
@@ -21478,6 +21726,14 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/SearchAssetQualityDto"
+              }
+            ]
+          },
+          "detail": {
+            "description": "Present when the search sets `options.governanceDays`.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SearchAssetGovernanceDetailDto"
               }
             ]
           }
@@ -38830,50 +39086,167 @@
           "byChannel"
         ]
       },
-      "GovernanceTotalsDto": {
+      "DashboardTotalsDto": {
         "type": "object",
         "properties": {
           "assets": {
-            "type": "number"
+            "type": "number",
+            "description": "Live assets in scope."
           },
-          "owned": {
-            "type": "number"
+          "governed": {
+            "type": "number",
+            "description": "Of those, with an owner (theirs or their source’s)."
           },
-          "active": {
-            "type": "number"
+          "certified": {
+            "type": "number",
+            "description": "Governed and certified (ACTIVE)."
+          },
+          "failing": {
+            "type": "number",
+            "description": "With a failing quality rule (an open QUALITY finding)."
+          },
+          "score": {
+            "type": "number",
+            "nullable": true,
+            "description": "Severity-weighted share of rules passing; null without results."
           }
         },
         "required": [
           "assets",
-          "owned",
-          "active"
+          "governed",
+          "certified",
+          "failing",
+          "score"
         ]
       },
-      "SourceCoverageDto": {
+      "QualityDayDto": {
         "type": "object",
         "properties": {
-          "assets": {
+          "day": {
+            "type": "string",
+            "example": "2026-11-17"
+          },
+          "passed": {
             "type": "number"
           },
-          "owned": {
+          "failed": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "day",
+          "passed",
+          "failed"
+        ]
+      },
+      "QualityDimensionScoreDto": {
+        "type": "object",
+        "properties": {
+          "dimension": {
+            "type": "string",
+            "example": "completeness"
+          },
+          "rules": {
             "type": "number"
           },
-          "active": {
-            "type": "number"
+          "score": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "dimension",
+          "rules",
+          "score"
+        ]
+      },
+      "DashboardQualityDto": {
+        "type": "object",
+        "properties": {
+          "perDay": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QualityDayDto"
+            }
           },
-          "sourceId": {
+          "dimensions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QualityDimensionScoreDto"
+            }
+          }
+        },
+        "required": [
+          "perDay",
+          "dimensions"
+        ]
+      },
+      "DashboardFailingAssetDto": {
+        "type": "object",
+        "properties": {
+          "assetId": {
             "type": "string"
           },
           "name": {
             "type": "string"
+          },
+          "sourceId": {
+            "type": "string"
+          },
+          "sourceName": {
+            "type": "string"
+          },
+          "failing": {
+            "type": "number",
+            "description": "Failing rules (open QUALITY findings)."
+          },
+          "severity": {
+            "type": "string",
+            "example": "HIGH"
           }
         },
         "required": [
-          "assets",
-          "owned",
-          "active",
+          "assetId",
+          "name",
           "sourceId",
-          "name"
+          "sourceName",
+          "failing",
+          "severity"
+        ]
+      },
+      "DashboardIncompleteAssetDto": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sourceId": {
+            "type": "string"
+          },
+          "sourceName": {
+            "type": "string"
+          },
+          "missing": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "steward",
+                "description",
+                "certification"
+              ]
+            }
+          }
+        },
+        "required": [
+          "assetId",
+          "name",
+          "sourceId",
+          "sourceName",
+          "missing"
         ]
       },
       "GovernFirstDto": {
@@ -38907,55 +39280,189 @@
           "readers"
         ]
       },
-      "GovernanceMineDto": {
+      "SourceCoverageDto": {
         "type": "object",
         "properties": {
-          "owned": {
-            "type": "number",
-            "description": "Sources and assets you own."
+          "sourceId": {
+            "type": "string"
           },
-          "stewarded": {
-            "type": "number",
-            "description": "Sources and assets you or your groups steward."
+          "name": {
+            "type": "string"
+          },
+          "assets": {
+            "type": "number"
+          },
+          "owned": {
+            "type": "number"
+          },
+          "certified": {
+            "type": "number"
           }
         },
         "required": [
+          "sourceId",
+          "name",
+          "assets",
           "owned",
-          "stewarded"
+          "certified"
         ]
       },
-      "GovernanceSummaryDto": {
+      "GovernanceDashboardDto": {
         "type": "object",
         "properties": {
+          "scope": {
+            "type": "string",
+            "enum": [
+              "mine",
+              "all"
+            ],
+            "description": "`mine` falls back to `all` when you answer for nothing."
+          },
           "days": {
             "type": "number"
           },
           "totals": {
-            "$ref": "#/components/schemas/GovernanceTotalsDto"
+            "$ref": "#/components/schemas/DashboardTotalsDto"
           },
-          "sources": {
+          "quality": {
+            "$ref": "#/components/schemas/DashboardQualityDto"
+          },
+          "failing": {
+            "description": "Worst failing assets first (top 5).",
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/SourceCoverageDto"
+              "$ref": "#/components/schemas/DashboardFailingAssetDto"
             }
           },
+          "incomplete": {
+            "description": "Governed assets missing a steward, a description or certification (top 5).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardIncompleteAssetDto"
+            }
+          },
+          "incompleteCount": {
+            "type": "number",
+            "description": "All governed assets in scope with something missing."
+          },
           "governFirst": {
-            "description": "Ungoverned tables read most in the period: govern these first.",
+            "description": "Ungoverned assets read most in the period: govern these first (top 5).",
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/GovernFirstDto"
             }
           },
-          "mine": {
-            "$ref": "#/components/schemas/GovernanceMineDto"
+          "coverage": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceCoverageDto"
+            }
           }
         },
         "required": [
+          "scope",
           "days",
           "totals",
-          "sources",
+          "quality",
+          "failing",
+          "incomplete",
+          "incompleteCount",
           "governFirst",
-          "mine"
+          "coverage"
+        ]
+      },
+      "UsageTopAssetDto": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sourceId": {
+            "type": "string"
+          },
+          "sourceName": {
+            "type": "string"
+          },
+          "reads": {
+            "type": "number"
+          },
+          "exports": {
+            "type": "number"
+          },
+          "readers": {
+            "type": "number"
+          },
+          "previous": {
+            "type": "number",
+            "description": "Reads and exports in the period before."
+          }
+        },
+        "required": [
+          "assetId",
+          "name",
+          "sourceId",
+          "sourceName",
+          "reads",
+          "exports",
+          "readers",
+          "previous"
+        ]
+      },
+      "GovernanceUsageDto": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "string",
+            "enum": [
+              "mine",
+              "all"
+            ]
+          },
+          "days": {
+            "type": "number"
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "used",
+              "rising"
+            ]
+          },
+          "reads": {
+            "type": "number"
+          },
+          "exports": {
+            "type": "number"
+          },
+          "previous": {
+            "type": "number",
+            "description": "Reads and exports in the period before."
+          },
+          "perDay": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UsageDayDto"
+            }
+          },
+          "top": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UsageTopAssetDto"
+            }
+          }
+        },
+        "required": [
+          "scope",
+          "days",
+          "sort",
+          "reads",
+          "exports",
+          "previous",
+          "perDay",
+          "top"
         ]
       },
       "GovernanceRoleDto": {

@@ -8,7 +8,10 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
-import { governanceAssetWhere } from './governance/governance-filter';
+import {
+  governanceAssetSql,
+  governanceAssetWhere,
+} from './governance/governance-filter';
 import { clsPerson } from './governance/cls-person';
 import {
   Asset,
@@ -1424,6 +1427,17 @@ export class AssetService {
       };
     }
 
+    // Raw scanned assets or shared datasets (DQ §5.12).
+    const kind = (assetFilters as { kind?: unknown }).kind;
+    if (kind === 'raw') {
+      where.sourceType = {
+        ...(where.sourceType as object | undefined),
+        not: AssetType.SHARED_DATASET,
+      };
+    } else if (kind === 'shared') {
+      where.sourceType = AssetType.SHARED_DATASET;
+    }
+
     // Governance (GOV §5.6): owned or not, lifecycle, owner, steward.
     const governanceWhere = await governanceAssetWhere(
       this.prisma,
@@ -1737,6 +1751,24 @@ export class AssetService {
         Prisma.sql`a.source_type IN (${Prisma.join(sourceTypes)})`,
       );
     }
+
+    if (assetFilters.kind === 'raw') {
+      assetConditions.push(
+        Prisma.sql`a.source_type::text <> ${AssetType.SHARED_DATASET}`,
+      );
+    } else if (assetFilters.kind === 'shared') {
+      assetConditions.push(
+        Prisma.sql`a.source_type::text = ${AssetType.SHARED_DATASET}`,
+      );
+    }
+
+    // Governance (GOV §5.6), as the asset list applies it.
+    const governanceSql = await governanceAssetSql(
+      this.prisma,
+      assetFilters,
+      clsPerson(),
+    );
+    if (governanceSql) assetConditions.push(governanceSql);
 
     const findingConditions: Prisma.Sql[] = [];
 

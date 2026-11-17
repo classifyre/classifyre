@@ -177,7 +177,6 @@
     "findings": "Findings",
     "assets": "Assets",
     "query": "SQL",
-    "sharedDatasets": "Shared datasets",
     "sources": "Sources",
     "detectors": "Custom Detectors",
     "investigations": "Investigations",
@@ -192,8 +191,7 @@
       "intelligence": "Intelligence",
       "casework": "Casework",
       "pipeline": "Pipeline"
-    },
-    "governance": "Governance"
+    }
   },
   "glossary": {
     "title": "Entities & glossary",
@@ -1692,10 +1690,6 @@
   },
   "assets": {
     "title": "Assets",
-    "totalAssets": "Total Assets",
-    "newAssets": "New assets",
-    "updatedAssets": "Updated assets",
-    "unchangedAssets": "Unchanged assets",
     "noVisualization": "No assets for visualization",
     "noVisualizationHint": "Assets table is still available below for direct lookup.",
     "loadingVisualizations": "Loading assets visualizations...",
@@ -1863,6 +1857,103 @@
     "match": {
       "onPage": "Best match · page {{page}}",
       "inText": "Best match"
+    },
+    "tabs": {
+      "label": "Asset views",
+      "governance": "Governance",
+      "governanceSub": "{{certified}} certified · {{failing}} failing quality",
+      "requestsWaiting": "{{count}} waiting",
+      "raw": "Raw assets",
+      "rawSub": "{{new}} new · {{updated}} updated",
+      "shared": "Shared assets",
+      "sharedSub": "{{certified}} certified"
+    },
+    "governance": {
+      "scope": {
+        "label": "Whose assets",
+        "mine": "Mine",
+        "all": "All",
+        "nothingYours": "You own or steward nothing yet, so this shows all assets."
+      },
+      "period": "Period",
+      "days": "{{days}} days",
+      "kpi": {
+        "governed": "Governed",
+        "governedHint": "{{percent}}% of {{assets}} assets",
+        "certified": "Certified",
+        "certifiedHint": "{{percent}}% of governed",
+        "failing": "Failing quality",
+        "failingHint": "Assets with a failing rule",
+        "score": "Quality score",
+        "scoreHint": "Rules passing, weighted by severity"
+      },
+      "usage": {
+        "title": "Usage",
+        "lead": "Table reads and exports in the last {{days}} days.",
+        "used": "Most used",
+        "rising": "Rising",
+        "totals": "{{reads}} reads · {{exports}} exports",
+        "change": "{{change}} vs the {{days}} days before",
+        "fresh": "new",
+        "topUsed": "Read most",
+        "topRising": "Use grew most against the period before",
+        "readersShort": "{{count}} readers",
+        "none": "Nobody read these assets in the last {{days}} days.",
+        "noneRising": "No asset was read more than in the period before."
+      },
+      "quality": {
+        "title": "Quality",
+        "lead": "Every rule result of the last {{days}} days, and each dimension's score from its rules' latest results.",
+        "passed": "Passed",
+        "failed": "Failed",
+        "results": "{{results}} results, {{failed}} failed",
+        "dimensions": "By dimension",
+        "none": "No quality rules on these assets yet. Add them on an asset's Governance tab."
+      },
+      "coverage": {
+        "title": "Coverage by source",
+        "lead": "Certified, owned and unowned assets per source. Click a source to narrow this tab to it.",
+        "certified": "Certified",
+        "owned": "Owned, not certified",
+        "ungoverned": "Nobody's",
+        "clear": "All sources"
+      },
+      "waiting": {
+        "title": "Waiting on you",
+        "requests": "Access requests to decide",
+        "noRequests": "Nobody is waiting for your decision.",
+        "failing": "Failing quality",
+        "noFailing": "No quality rule fails here.",
+        "rulesFailing": "{{count}} failing",
+        "unfinished": "Unfinished governance",
+        "noUnfinished": "Everything you answer for has a steward, a description and is certified.",
+        "governFirst": "Govern these first",
+        "noGovernFirst": "No unowned asset was read in the last {{days}} days.",
+        "reads": "{{reads}} reads · {{readers}} readers",
+        "seeAll": "See all"
+      },
+      "missing": {
+        "owner": "No owner",
+        "steward": "No steward",
+        "description": "No description",
+        "meaning": "No glossary term",
+        "quality": "Quality failing",
+        "certification": "Not certified",
+        "certified": "Not certified",
+        "classification": "Classification not reviewed"
+      },
+      "table": {
+        "title": "Assets",
+        "empty": "No asset matches this scope and filter.",
+        "lifecycle": "Lifecycle",
+        "owner": "Owner",
+        "stewards": "Stewards",
+        "reads": "Reads ({{days}}d)",
+        "requests": "Requests",
+        "gaps": "Still missing",
+        "complete": "Complete",
+        "range": "{{from}}–{{to}} of {{total}}"
+      }
     }
   },
   "detectors": {
@@ -7667,33 +7758,11 @@
         "dataset": "shared datasets"
       }
     },
-    "page": {
-      "title": "Governance",
-      "lead": "Who answers for the data of this workspace, and what is still nobody's.",
-      "totals": {
-        "assets": "Assets",
-        "owned": "Owned",
-        "active": "Certified",
-        "ungoverned": "Ungoverned"
-      },
-      "first": {
-        "title": "Govern these first",
-        "description": "Tables without an owner that people read in the last {{days}} days.",
-        "none": "No ungoverned table was read in this period.",
-        "asset": "Table"
-      },
-      "mine": {
-        "title": "Yours",
-        "description": "Where you, or a group you are in, answer for data.",
-        "owned": "Owner of {{count}}",
-        "stewarded": "Steward of {{count}}",
-        "ungoverned": "All ungoverned assets"
-      },
-      "sources": {
-        "title": "By source",
-        "description": "Owned and certified assets per source. Roles set on a source count for its assets."
-      },
-      "activity": "Recent changes"
+    "totals": {
+      "assets": "Assets",
+      "owned": "Owned",
+      "active": "Certified",
+      "ungoverned": "Ungoverned"
     },
     "tab": "Governance",
     "summary": {
@@ -8290,7 +8359,6 @@
       "retired": "Retired"
     },
     "page": {
-      "title": "Shared datasets",
       "lead": "Saved queries shared with groups as governed datasets. Readers need no access to the tables behind them; the tables' masks and classification carry over.",
       "new": "New shared dataset",
       "search": "Search by name, description or group",

@@ -21,6 +21,18 @@ import { mapValues } from '../runtime';
 export interface SourceCoverageDto {
     /**
      * 
+     * @type {string}
+     * @memberof SourceCoverageDto
+     */
+    sourceId: string;
+    /**
+     * 
+     * @type {string}
+     * @memberof SourceCoverageDto
+     */
+    name: string;
+    /**
+     * 
      * @type {number}
      * @memberof SourceCoverageDto
      */
@@ -36,30 +48,18 @@ export interface SourceCoverageDto {
      * @type {number}
      * @memberof SourceCoverageDto
      */
-    active: number;
-    /**
-     * 
-     * @type {string}
-     * @memberof SourceCoverageDto
-     */
-    sourceId: string;
-    /**
-     * 
-     * @type {string}
-     * @memberof SourceCoverageDto
-     */
-    name: string;
+    certified: number;
 }
 
 /**
  * Check if a given object implements the SourceCoverageDto interface.
  */
 export function instanceOfSourceCoverageDto(value: object): value is SourceCoverageDto {
-    if (!('assets' in value) || value['assets'] === undefined) return false;
-    if (!('owned' in value) || value['owned'] === undefined) return false;
-    if (!('active' in value) || value['active'] === undefined) return false;
     if (!('sourceId' in value) || value['sourceId'] === undefined) return false;
     if (!('name' in value) || value['name'] === undefined) return false;
+    if (!('assets' in value) || value['assets'] === undefined) return false;
+    if (!('owned' in value) || value['owned'] === undefined) return false;
+    if (!('certified' in value) || value['certified'] === undefined) return false;
     return true;
 }
 
@@ -73,11 +73,11 @@ export function SourceCoverageDtoFromJSONTyped(json: any, ignoreDiscriminator: b
     }
     return {
         
-        'assets': json['assets'],
-        'owned': json['owned'],
-        'active': json['active'],
         'sourceId': json['sourceId'],
         'name': json['name'],
+        'assets': json['assets'],
+        'owned': json['owned'],
+        'certified': json['certified'],
     };
 }
 
@@ -92,11 +92,11 @@ export function SourceCoverageDtoToJSONTyped(value?: SourceCoverageDto | null, i
 
     return {
         
-        'assets': value['assets'],
-        'owned': value['owned'],
-        'active': value['active'],
         'sourceId': value['sourceId'],
         'name': value['name'],
+        'assets': value['assets'],
+        'owned': value['owned'],
+        'certified': value['certified'],
     };
 }
 

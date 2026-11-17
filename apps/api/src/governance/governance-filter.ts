@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import type { Prisma, PrismaClient } from '@prisma/client';
+import { Prisma, type PrismaClient } from '@prisma/client';
 import type { GovernancePerson } from './governance-rules';
 
 /**
@@ -28,6 +28,14 @@ export interface GovernanceSearch {
   governance?: unknown;
   ownerRef?: unknown;
   stewardRef?: unknown;
+  responsibleRef?: unknown;
+}
+
+/** `responsibleRef`: owners and stewards, on the asset or its source. */
+function responsibleRefOf(search: GovernanceSearch): string {
+  return typeof search.responsibleRef === 'string'
+    ? search.responsibleRef.trim()
+    : '';
 }
 
 type Db = Pick<PrismaClient, 'governanceRole'>;
@@ -212,6 +220,18 @@ export async function governanceAssetWhere(
     );
   }
 
+  const responsibleRef = responsibleRefOf(search);
+  if (responsibleRef) {
+    clauses.push(
+      either(
+        await openScopes(db, {
+          role: { in: ['OWNER', 'STEWARD'] },
+          principalRef: { in: refsFor(responsibleRef, person, true) },
+        }),
+      ),
+    );
+  }
+
   return clauses.length ? { AND: clauses } : null;
 }
 
@@ -245,6 +265,110 @@ export async function governedDataScope(
       ? person.groupIds.map((id) => `group:${id}`)
       : [];
   if (!refs.length) return { assetIds: [], sourceIds: [] };
+  return openScopes(db, {
+    role: { in: ['OWNER', 'STEWARD'] },
+    principalRef: { in: refs },
+  });
+}
+
+/**
+ * The raw-SQL twin of {@link governanceAssetWhere}, for the aggregate queries
+ * (`/search/assets/charts`, the governance dashboard): the same filters,
+ * over the asset row aliased `alias`. Null when none is set.
+ */
+export async function governanceAssetSql(
+  db: Db,
+  search: GovernanceSearch,
+  person: GovernancePerson | null,
+  alias = 'a',
+): Promise<Prisma.Sql | null> {
+  const a = Prisma.raw(alias);
+  const inScopes = (scopes: { assetIds: string[]; sourceIds: string[] }) =>
+    Prisma.sql`(${a}.id = ANY(${scopes.assetIds}::text[]) OR ${a}.source_id = ANY(${scopes.sourceIds}::text[]))`;
+  const clauses: Prisma.Sql[] = [];
+  const governance =
+    typeof search.governance === 'string'
+      ? search.governance.trim().toLowerCase()
+      : undefined;
+  const ownerRef =
+    typeof search.ownerRef === 'string' ? search.ownerRef.trim() : '';
+  const stewardRef =
+    typeof search.stewardRef === 'string' ? search.stewardRef.trim() : '';
+
+  if (governance) {
+    if (!(GOVERNANCE_FILTERS as readonly string[]).includes(governance)) {
+      throw new BadRequestException(
+        `governance is one of ${GOVERNANCE_FILTERS.join(', ')}; got ${governance}`,
+      );
+    }
+    if (governance === 'failing') {
+      clauses.push(
+        Prisma.sql`EXISTS (SELECT 1 FROM findings qf WHERE qf.asset_id = ${a}.id AND qf.detector_type = 'QUALITY' AND qf.status = 'OPEN')`,
+      );
+    } else {
+      const owned = await openScopes(db, { role: 'OWNER' });
+      if (governance === 'ungoverned') {
+        clauses.push(Prisma.sql`NOT ${inScopes(owned)}`);
+      } else {
+        clauses.push(inScopes(owned));
+        if (governance === 'draft') {
+          clauses.push(
+            Prisma.sql`COALESCE((SELECT g.status::text FROM asset_governance g WHERE g.asset_id = ${a}.id), 'DRAFT') = 'DRAFT'`,
+          );
+        } else if (governance !== 'governed') {
+          clauses.push(
+            Prisma.sql`EXISTS (SELECT 1 FROM asset_governance g WHERE g.asset_id = ${a}.id AND g.status::text = ${governance.toUpperCase()})`,
+          );
+        }
+      }
+    }
+  }
+
+  if (ownerRef) {
+    const refs = refsFor(ownerRef, person, false);
+    const [theirs, ownOwners] = await Promise.all([
+      openScopes(db, { role: 'OWNER', principalRef: { in: refs } }),
+      openScopes(db, { role: 'OWNER', scopeType: 'ASSET' }),
+    ]);
+    clauses.push(
+      Prisma.sql`(${a}.id = ANY(${theirs.assetIds}::text[]) OR (${a}.source_id = ANY(${theirs.sourceIds}::text[]) AND NOT ${a}.id = ANY(${ownOwners.assetIds}::text[])))`,
+    );
+  }
+
+  if (stewardRef) {
+    const refs = refsFor(stewardRef, person, true);
+    clauses.push(
+      inScopes(
+        await openScopes(db, { role: 'STEWARD', principalRef: { in: refs } }),
+      ),
+    );
+  }
+
+  const responsibleRef = responsibleRefOf(search);
+  if (responsibleRef) {
+    clauses.push(
+      inScopes(
+        await openScopes(db, {
+          role: { in: ['OWNER', 'STEWARD'] },
+          principalRef: { in: refsFor(responsibleRef, person, true) },
+        }),
+      ),
+    );
+  }
+
+  return clauses.length ? Prisma.join(clauses, ' AND ') : null;
+}
+
+/**
+ * The assets a person answers for (the dashboard's *Mine*): those they or a
+ * group of theirs own or steward, on the asset or its source.
+ */
+export async function answerableScopes(
+  db: Db,
+  person: GovernancePerson | null,
+): Promise<{ assetIds: string[]; sourceIds: string[] }> {
+  if (!person) return { assetIds: [], sourceIds: [] };
+  const refs = [person.actorRef, ...person.groupIds.map((id) => `group:${id}`)];
   return openScopes(db, {
     role: { in: ['OWNER', 'STEWARD'] },
     principalRef: { in: refs },

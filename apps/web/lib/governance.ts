@@ -8,7 +8,9 @@ import {
   type AssetColumnDto,
   type AssetColumnsDto,
   type AssetUsageDto,
-  type GovernanceSummaryDto,
+  type GovernanceDashboardDto,
+  type GovernanceUsageDto,
+  type AssetsOverviewDto,
   type AssetGovernanceDto,
   type GovernancePrincipalDto,
   type GovernanceRoleDto,
@@ -44,7 +46,9 @@ export type {
   AssetColumnDto,
   AssetColumnsDto,
   AssetUsageDto,
-  GovernanceSummaryDto,
+  GovernanceDashboardDto,
+  GovernanceUsageDto,
+  AssetsOverviewDto,
   AssetGovernanceDto,
   GovernancePrincipalDto,
   GovernanceRoleDto,
@@ -139,12 +143,56 @@ export function useAssetUsage(
   return useLoad<AssetUsageDto>(assetId && enabled ? load : null);
 }
 
-export function useGovernanceSummary() {
+export type DashboardScope = "mine" | "all";
+
+export interface DashboardFilters {
+  scope?: DashboardScope;
+  days: number;
+  sourceId?: string | null;
+}
+
+/** The assets page's three cards: raw, governed, shared (one cheap read). */
+export function useAssetsOverview(token = 0) {
   const load = useCallback(
-    () => api.governance.governanceControllerSummary({ days: "30" }),
-    [],
+    () => api.assets.searchAssetsControllerOverview(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [token],
   );
-  return useLoad<GovernanceSummaryDto>(load);
+  return useLoad<AssetsOverviewDto>(load);
+}
+
+/** The Governance tab: totals, quality, what needs someone, coverage. */
+export function useGovernanceDashboard(filters: DashboardFilters) {
+  const { scope, days, sourceId } = filters;
+  const load = useCallback(
+    () =>
+      api.governance.governanceControllerDashboard({
+        scope,
+        days: String(days),
+        sourceId: sourceId ?? undefined,
+      }),
+    [scope, days, sourceId],
+  );
+  return useLoad<GovernanceDashboardDto>(load);
+}
+
+/** Reads and exports per day and the top assets; `rising` is where usage spiked. */
+export function useGovernanceUsage(
+  filters: DashboardFilters & { sort: "used" | "rising" },
+) {
+  const { scope, days, sourceId, sort } = filters;
+  const load = useCallback(
+    () =>
+      api.governance.governanceControllerWorkspaceUsage({
+        scope,
+        days: String(days),
+        sourceId: sourceId ?? undefined,
+        sort,
+        limit: "10",
+      }),
+    [scope, days, sourceId, sort],
+  );
+  return useLoad<GovernanceUsageDto>(load);
 }
 
 export function useAssetQuality(assetId: string | null | undefined) {

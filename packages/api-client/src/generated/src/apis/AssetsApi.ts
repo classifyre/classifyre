@@ -17,6 +17,7 @@ import * as runtime from '../runtime';
 import type {
   AssetListItemDto,
   AssetListResponseDto,
+  AssetsOverviewDto,
   BulkIngestAssetsDto,
   FinalizeIngestRunDto,
   QuickSearchRequestDto,
@@ -38,6 +39,8 @@ import {
     AssetListItemDtoToJSON,
     AssetListResponseDtoFromJSON,
     AssetListResponseDtoToJSON,
+    AssetsOverviewDtoFromJSON,
+    AssetsOverviewDtoToJSON,
     BulkIngestAssetsDtoFromJSON,
     BulkIngestAssetsDtoToJSON,
     FinalizeIngestRunDtoFromJSON,
@@ -370,6 +373,37 @@ export class AssetsApi extends runtime.BaseAPI {
      */
     async searchAssetsControllerExportFindings(requestParameters: SearchAssetsControllerExportFindingsRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob> {
         const response = await this.searchAssetsControllerExportFindingsRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Raw scanned assets, governed ones (and the access requests waiting for you), shared datasets — the numbers of the three tabs, in one cheap read.
+     * The assets page cards
+     */
+    async searchAssetsControllerOverviewRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AssetsOverviewDto>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/search/assets/overview`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => AssetsOverviewDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Raw scanned assets, governed ones (and the access requests waiting for you), shared datasets — the numbers of the three tabs, in one cheap read.
+     * The assets page cards
+     */
+    async searchAssetsControllerOverview(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AssetsOverviewDto> {
+        const response = await this.searchAssetsControllerOverviewRaw(initOverrides);
         return await response.value();
     }
 

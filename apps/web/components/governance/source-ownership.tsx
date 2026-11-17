@@ -62,14 +62,14 @@ export function SourceGovernanceView({
         />
         <CoverageTile
           icon={RoleIconOwner}
-          label={t("governance.page.totals.owned")}
+          label={t("governance.totals.owned")}
           value={owned}
           of={assets}
           href={list("governed")}
         />
         <CoverageTile
           icon={BadgeCheck}
-          label={t("governance.page.totals.active")}
+          label={t("governance.totals.active")}
           value={active}
           of={assets}
           href={list("active")}
@@ -77,7 +77,7 @@ export function SourceGovernanceView({
         />
         <CoverageTile
           icon={CircleDashed}
-          label={t("governance.page.totals.ungoverned")}
+          label={t("governance.totals.ungoverned")}
           value={assets - owned}
           of={assets}
           href={list("ungoverned")}
@@ -145,12 +145,12 @@ export function SourceGovernanceView({
         </CardHeader>
         <CardContent className="space-y-4">
           <Bar
-            label={t("governance.page.totals.owned")}
+            label={t("governance.totals.owned")}
             value={owned}
             of={assets}
           />
           <Bar
-            label={t("governance.page.totals.active")}
+            label={t("governance.totals.active")}
             value={active}
             of={assets}
           />

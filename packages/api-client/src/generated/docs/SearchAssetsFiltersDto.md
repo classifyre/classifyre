@@ -18,6 +18,8 @@ Name | Type
 `governance` | string
 `ownerRef` | string
 `stewardRef` | string
+`responsibleRef` | string
+`kind` | string
 
 ## Example
 
@@ -38,6 +40,8 @@ const example = {
   "governance": null,
   "ownerRef": null,
   "stewardRef": null,
+  "responsibleRef": null,
+  "kind": null,
 } satisfies SearchAssetsFiltersDto
 
 console.log(example)

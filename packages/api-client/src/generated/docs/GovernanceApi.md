@@ -12,6 +12,7 @@ All URIs are relative to *http://localhost*
 | [**governanceControllerAssignAssetRole**](GovernanceApi.md#governancecontrollerassignassetrole) | **POST** /assets/{id}/governance/roles | Make someone owner, steward or custodian of an asset |
 | [**governanceControllerAssignSourceRole**](GovernanceApi.md#governancecontrollerassignsourcerole) | **POST** /sources/{id}/governance/roles | Make someone owner, steward or custodian of a source |
 | [**governanceControllerCreateQualityRule**](GovernanceApi.md#governancecontrollercreatequalityrule) | **POST** /assets/{id}/quality/rules | Add a quality rule to an asset (and evaluate it at once) |
+| [**governanceControllerDashboard**](GovernanceApi.md#governancecontrollerdashboard) | **GET** /governance/dashboard | The Governance tab of the assets page: totals, quality over time, what needs someone, coverage per source |
 | [**governanceControllerDismissSuggestion**](GovernanceApi.md#governancecontrollerdismisssuggestion) | **POST** /assets/{id}/governance/meaning/suggestions/{suggestionId}/dismiss | Dismiss a suggested term for an asset |
 | [**governanceControllerExportContract**](GovernanceApi.md#governancecontrollerexportcontract) | **GET** /assets/{id}/contract | The asset as an Open Data Contract Standard (v3.2) contract |
 | [**governanceControllerImportContract**](GovernanceApi.md#governancecontrollerimportcontract) | **PUT** /assets/{id}/contract | Apply an ODCS contract (YAML or JSON text) to the asset |
@@ -25,7 +26,6 @@ All URIs are relative to *http://localhost*
 | [**governanceControllerRemoveSourceRole**](GovernanceApi.md#governancecontrollerremovesourcerole) | **DELETE** /sources/{id}/governance/roles/{roleId} | End a role on a source (kept as history) |
 | [**governanceControllerRunQuality**](GovernanceApi.md#governancecontrollerrunquality) | **POST** /assets/{id}/quality/run | Evaluate an asset\&#39;s quality rules now |
 | [**governanceControllerSourceGovernance**](GovernanceApi.md#governancecontrollersourcegovernance) | **GET** /sources/{id}/governance | A source\&#39;s owners, stewards and custodians, and its coverage |
-| [**governanceControllerSummary**](GovernanceApi.md#governancecontrollersummary) | **GET** /governance/summary | How far the workspace is governed: coverage per source, what to govern first, yours |
 | [**governanceControllerTestQualityRule**](GovernanceApi.md#governancecontrollertestqualityrule) | **POST** /assets/{id}/quality/test | Measure a quality rule now without saving it |
 | [**governanceControllerUnlinkTerm**](GovernanceApi.md#governancecontrollerunlinkterm) | **DELETE** /assets/{id}/governance/meaning/{termId} | Remove a term linked by hand |
 | [**governanceControllerUpdateAssetGovernance**](GovernanceApi.md#governancecontrollerupdateassetgovernance) | **PUT** /assets/{id}/governance | Change an asset\&#39;s description, legal basis or lifecycle |
@@ -33,6 +33,7 @@ All URIs are relative to *http://localhost*
 | [**governanceControllerUpdateColumn**](GovernanceApi.md#governancecontrollerupdatecolumn) | **PUT** /assets/{id}/columns/{name} | Describe, classify or confirm one column |
 | [**governanceControllerUpdateQualityRule**](GovernanceApi.md#governancecontrollerupdatequalityrule) | **PUT** /quality-rules/{ruleId} | Change a quality rule (and evaluate it at once) |
 | [**governanceControllerUsage**](GovernanceApi.md#governancecontrollerusage) | **GET** /assets/{id}/usage | Who read and exported a table, per day, over the last days |
+| [**governanceControllerWorkspaceUsage**](GovernanceApi.md#governancecontrollerworkspaceusage) | **GET** /governance/usage | Table reads and exports per day and the top assets, against the period before (&#x60;rising&#x60;: where usage spiked) |
 
 
 
@@ -560,6 +561,77 @@ No authorization required
 ### HTTP request headers
 
 - **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## governanceControllerDashboard
+
+> GovernanceDashboardDto governanceControllerDashboard(scope, days, sourceId)
+
+The Governance tab of the assets page: totals, quality over time, what needs someone, coverage per source
+
+### Example
+
+```ts
+import {
+  Configuration,
+  GovernanceApi,
+} from '@workspace/api-client';
+import type { GovernanceControllerDashboardRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new GovernanceApi();
+
+  const body = {
+    // 'mine' | 'all' (optional)
+    scope: scope_example,
+    // string | 1–365, default 30 (optional)
+    days: days_example,
+    // string (optional)
+    sourceId: sourceId_example,
+  } satisfies GovernanceControllerDashboardRequest;
+
+  try {
+    const data = await api.governanceControllerDashboard(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **scope** | `mine`, `all` |  | [Optional] [Defaults to `undefined`] [Enum: mine, all] |
+| **days** | `string` | 1–365, default 30 | [Optional] [Defaults to `undefined`] |
+| **sourceId** | `string` |  | [Optional] [Defaults to `undefined`] |
+
+### Return type
+
+[**GovernanceDashboardDto**](GovernanceDashboardDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
 - **Accept**: `application/json`
 
 
@@ -1454,71 +1526,6 @@ No authorization required
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
 
-## governanceControllerSummary
-
-> GovernanceSummaryDto governanceControllerSummary(days)
-
-How far the workspace is governed: coverage per source, what to govern first, yours
-
-### Example
-
-```ts
-import {
-  Configuration,
-  GovernanceApi,
-} from '@workspace/api-client';
-import type { GovernanceControllerSummaryRequest } from '@workspace/api-client';
-
-async function example() {
-  console.log("🚀 Testing @workspace/api-client SDK...");
-  const api = new GovernanceApi();
-
-  const body = {
-    // string | 1–365, default 30 (optional)
-    days: days_example,
-  } satisfies GovernanceControllerSummaryRequest;
-
-  try {
-    const data = await api.governanceControllerSummary(body);
-    console.log(data);
-  } catch (error) {
-    console.error(error);
-  }
-}
-
-// Run the test
-example().catch(console.error);
-```
-
-### Parameters
-
-
-| Name | Type | Description  | Notes |
-|------------- | ------------- | ------------- | -------------|
-| **days** | `string` | 1–365, default 30 | [Optional] [Defaults to `undefined`] |
-
-### Return type
-
-[**GovernanceSummaryDto**](GovernanceSummaryDto.md)
-
-### Authorization
-
-No authorization required
-
-### HTTP request headers
-
-- **Content-Type**: Not defined
-- **Accept**: `application/json`
-
-
-### HTTP response details
-| Status code | Description | Response headers |
-|-------------|-------------|------------------|
-| **200** |  |  -  |
-
-[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
-
-
 ## governanceControllerTestQualityRule
 
 > QualityTestResultDto governanceControllerTestQualityRule(id, saveQualityRuleDto)
@@ -1987,6 +1994,83 @@ example().catch(console.error);
 ### Return type
 
 [**AssetUsageDto**](AssetUsageDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## governanceControllerWorkspaceUsage
+
+> GovernanceUsageDto governanceControllerWorkspaceUsage(scope, days, sourceId, sort, limit)
+
+Table reads and exports per day and the top assets, against the period before (&#x60;rising&#x60;: where usage spiked)
+
+### Example
+
+```ts
+import {
+  Configuration,
+  GovernanceApi,
+} from '@workspace/api-client';
+import type { GovernanceControllerWorkspaceUsageRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new GovernanceApi();
+
+  const body = {
+    // 'mine' | 'all' (optional)
+    scope: scope_example,
+    // string | 1–365, default 30 (optional)
+    days: days_example,
+    // string (optional)
+    sourceId: sourceId_example,
+    // 'used' | 'rising' (optional)
+    sort: sort_example,
+    // string | 1–50, default 10 (optional)
+    limit: limit_example,
+  } satisfies GovernanceControllerWorkspaceUsageRequest;
+
+  try {
+    const data = await api.governanceControllerWorkspaceUsage(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **scope** | `mine`, `all` |  | [Optional] [Defaults to `undefined`] [Enum: mine, all] |
+| **days** | `string` | 1–365, default 30 | [Optional] [Defaults to `undefined`] |
+| **sourceId** | `string` |  | [Optional] [Defaults to `undefined`] |
+| **sort** | `used`, `rising` |  | [Optional] [Defaults to `undefined`] [Enum: used, rising] |
+| **limit** | `string` | 1–50, default 10 | [Optional] [Defaults to `undefined`] |
+
+### Return type
+
+[**GovernanceUsageDto**](GovernanceUsageDto.md)
 
 ### Authorization
 

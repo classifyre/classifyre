@@ -31,7 +31,8 @@ import {
   LinkGovernanceTermDto,
   AssetColumnsDto,
   AssetUsageDto,
-  GovernanceSummaryDto,
+  GovernanceDashboardDto,
+  GovernanceUsageDto,
   MoveAssetColumnDto,
   UpdateAssetColumnDto,
   AssetGovernanceDto,
@@ -354,16 +355,54 @@ export class GovernanceController {
     return this.insights.usage(id, Number(days ?? 30));
   }
 
-  @Get('governance/summary')
+  @Get('governance/dashboard')
   @Requires('asset.view')
   @ApiOperation({
     summary:
-      'How far the workspace is governed: coverage per source, what to govern first, yours',
+      'The Governance tab of the assets page: totals, quality over time, what needs someone, coverage per source',
   })
+  @ApiQuery({ name: 'scope', required: false, enum: ['mine', 'all'] })
   @ApiQuery({ name: 'days', required: false, description: '1–365, default 30' })
-  @ApiOkResponse({ type: GovernanceSummaryDto })
-  summary(@Query('days') days?: string): Promise<GovernanceSummaryDto> {
-    return this.insights.summary(this.governance.person(), Number(days ?? 30));
+  @ApiQuery({ name: 'sourceId', required: false })
+  @ApiOkResponse({ type: GovernanceDashboardDto })
+  dashboard(
+    @Query('scope') scope?: string,
+    @Query('days') days?: string,
+    @Query('sourceId') sourceId?: string,
+  ): Promise<GovernanceDashboardDto> {
+    return this.insights.dashboard(this.governance.person(), {
+      scope,
+      days,
+      sourceId,
+    });
+  }
+
+  @Get('governance/usage')
+  @Requires('asset.view')
+  @ApiOperation({
+    summary:
+      'Table reads and exports per day and the top assets, against the period before (`rising`: where usage spiked)',
+  })
+  @ApiQuery({ name: 'scope', required: false, enum: ['mine', 'all'] })
+  @ApiQuery({ name: 'days', required: false, description: '1–365, default 30' })
+  @ApiQuery({ name: 'sourceId', required: false })
+  @ApiQuery({ name: 'sort', required: false, enum: ['used', 'rising'] })
+  @ApiQuery({ name: 'limit', required: false, description: '1–50, default 10' })
+  @ApiOkResponse({ type: GovernanceUsageDto })
+  workspaceUsage(
+    @Query('scope') scope?: string,
+    @Query('days') days?: string,
+    @Query('sourceId') sourceId?: string,
+    @Query('sort') sort?: string,
+    @Query('limit') limit?: string,
+  ): Promise<GovernanceUsageDto> {
+    return this.insights.workspaceUsage(this.governance.person(), {
+      scope,
+      days,
+      sourceId,
+      sort,
+      limit,
+    });
   }
 
   @Get('assets/:id/governance')

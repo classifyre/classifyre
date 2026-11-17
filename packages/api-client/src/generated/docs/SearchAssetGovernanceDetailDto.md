@@ -1,24 +1,28 @@
 
-# GovernanceMineDto
+# SearchAssetGovernanceDetailDto
 
 
 ## Properties
 
 Name | Type
 ------------ | -------------
-`owned` | number
-`stewarded` | number
+`stewardRefs` | Array&lt;string&gt;
+`missing` | Array&lt;string&gt;
+`pendingRequests` | number
+`reads` | number
 
 ## Example
 
 ```typescript
-import type { GovernanceMineDto } from '@workspace/api-client'
+import type { SearchAssetGovernanceDetailDto } from '@workspace/api-client'
 
 // TODO: Update the object below with actual values
 const example = {
-  "owned": null,
-  "stewarded": null,
-} satisfies GovernanceMineDto
+  "stewardRefs": null,
+  "missing": null,
+  "pendingRequests": null,
+  "reads": null,
+} satisfies SearchAssetGovernanceDetailDto
 
 console.log(example)
 
@@ -27,7 +31,7 @@ const exampleJSON: string = JSON.stringify(example)
 console.log(exampleJSON)
 
 // Parse the JSON string back to an object
-const exampleParsed = JSON.parse(exampleJSON) as GovernanceMineDto
+const exampleParsed = JSON.parse(exampleJSON) as SearchAssetGovernanceDetailDto
 console.log(exampleParsed)
 ```
 

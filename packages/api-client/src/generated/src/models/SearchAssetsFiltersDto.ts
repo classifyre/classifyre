@@ -91,6 +91,18 @@ export interface SearchAssetsFiltersDto {
      * @memberof SearchAssetsFiltersDto
      */
     stewardRef?: string;
+    /**
+     * Assets this person or group answers for — owns or stewards, on the asset or its source: `user:<id>`, `group:<id>`, or `me` (you and your groups).
+     * @type {string}
+     * @memberof SearchAssetsFiltersDto
+     */
+    responsibleRef?: string;
+    /**
+     * `raw`: assets scanned from sources; `shared`: shared datasets (DQ §5.12). Both when omitted.
+     * @type {string}
+     * @memberof SearchAssetsFiltersDto
+     */
+    kind?: SearchAssetsFiltersDtoKindEnum;
 }
 
 
@@ -189,6 +201,15 @@ export const SearchAssetsFiltersDtoGovernanceEnum = {
 } as const;
 export type SearchAssetsFiltersDtoGovernanceEnum = typeof SearchAssetsFiltersDtoGovernanceEnum[keyof typeof SearchAssetsFiltersDtoGovernanceEnum];
 
+/**
+ * @export
+ */
+export const SearchAssetsFiltersDtoKindEnum = {
+    Raw: 'raw',
+    Shared: 'shared'
+} as const;
+export type SearchAssetsFiltersDtoKindEnum = typeof SearchAssetsFiltersDtoKindEnum[keyof typeof SearchAssetsFiltersDtoKindEnum];
+
 
 /**
  * Check if a given object implements the SearchAssetsFiltersDto interface.
@@ -219,6 +240,8 @@ export function SearchAssetsFiltersDtoFromJSONTyped(json: any, ignoreDiscriminat
         'governance': json['governance'] == null ? undefined : json['governance'],
         'ownerRef': json['ownerRef'] == null ? undefined : json['ownerRef'],
         'stewardRef': json['stewardRef'] == null ? undefined : json['stewardRef'],
+        'responsibleRef': json['responsibleRef'] == null ? undefined : json['responsibleRef'],
+        'kind': json['kind'] == null ? undefined : json['kind'],
     };
 }
 
@@ -245,6 +268,8 @@ export function SearchAssetsFiltersDtoToJSONTyped(value?: SearchAssetsFiltersDto
         'governance': value['governance'],
         'ownerRef': value['ownerRef'],
         'stewardRef': value['stewardRef'],
+        'responsibleRef': value['responsibleRef'],
+        'kind': value['kind'],
     };
 }
 

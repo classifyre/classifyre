@@ -9,6 +9,7 @@ Name | Type
 `status` | string
 `ownerRef` | string
 `quality` | [SearchAssetQualityDto](SearchAssetQualityDto.md)
+`detail` | [SearchAssetGovernanceDetailDto](SearchAssetGovernanceDetailDto.md)
 
 ## Example
 
@@ -20,6 +21,7 @@ const example = {
   "status": null,
   "ownerRef": null,
   "quality": null,
+  "detail": null,
 } satisfies SearchAssetGovernanceDto
 
 console.log(example)

@@ -1,30 +1,36 @@
 
-# GovernanceSummaryDto
+# GovernanceUsageDto
 
 
 ## Properties
 
 Name | Type
 ------------ | -------------
+`scope` | string
 `days` | number
-`totals` | [GovernanceTotalsDto](GovernanceTotalsDto.md)
-`sources` | [Array&lt;SourceCoverageDto&gt;](SourceCoverageDto.md)
-`governFirst` | [Array&lt;GovernFirstDto&gt;](GovernFirstDto.md)
-`mine` | [GovernanceMineDto](GovernanceMineDto.md)
+`sort` | string
+`reads` | number
+`exports` | number
+`previous` | number
+`perDay` | [Array&lt;UsageDayDto&gt;](UsageDayDto.md)
+`top` | [Array&lt;UsageTopAssetDto&gt;](UsageTopAssetDto.md)
 
 ## Example
 
 ```typescript
-import type { GovernanceSummaryDto } from '@workspace/api-client'
+import type { GovernanceUsageDto } from '@workspace/api-client'
 
 // TODO: Update the object below with actual values
 const example = {
+  "scope": null,
   "days": null,
-  "totals": null,
-  "sources": null,
-  "governFirst": null,
-  "mine": null,
-} satisfies GovernanceSummaryDto
+  "sort": null,
+  "reads": null,
+  "exports": null,
+  "previous": null,
+  "perDay": null,
+  "top": null,
+} satisfies GovernanceUsageDto
 
 console.log(example)
 
@@ -33,7 +39,7 @@ const exampleJSON: string = JSON.stringify(example)
 console.log(exampleJSON)
 
 // Parse the JSON string back to an object
-const exampleParsed = JSON.parse(exampleJSON) as GovernanceSummaryDto
+const exampleParsed = JSON.parse(exampleJSON) as GovernanceUsageDto
 console.log(exampleParsed)
 ```
 

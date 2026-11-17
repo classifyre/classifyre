@@ -54,6 +54,32 @@ export class SearchAssetQualityDto {
   score: number | null;
 }
 
+export class SearchAssetGovernanceDetailDto {
+  @ApiProperty({
+    type: [String],
+    description:
+      'Stewards, the asset’s own and its source’s (`user:` or `group:`).',
+  })
+  stewardRefs: string[];
+
+  @ApiProperty({
+    type: [String],
+    description:
+      'Checklist items not done yet: owner, steward, description, meaning, quality, certified.',
+  })
+  missing: string[];
+
+  @ApiProperty({
+    description: 'Access requests on this asset waiting for a decision.',
+  })
+  pendingRequests: number;
+
+  @ApiProperty({
+    description: 'Table reads and exports in the period asked for.',
+  })
+  reads: number;
+}
+
 export class SearchAssetGovernanceDto {
   @ApiPropertyOptional({
     enum: ['DRAFT', 'ACTIVE', 'DEPRECATED', 'RETIRED'],
@@ -74,6 +100,12 @@ export class SearchAssetGovernanceDto {
     description: 'Quality rules and their latest results; null without rules.',
   })
   quality?: SearchAssetQualityDto | null;
+
+  @ApiPropertyOptional({
+    type: SearchAssetGovernanceDetailDto,
+    description: 'Present when the search sets `options.governanceDays`.',
+  })
+  detail?: SearchAssetGovernanceDetailDto;
 }
 
 export class SearchAssetItemDto {
