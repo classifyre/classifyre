@@ -248,6 +248,9 @@ RUN set -eux; \
     # root-owned cache directories behind in the real one.
     HOME=/tmp/soffice-build-check soffice --version; \
     rm -rf /tmp/soffice-build-check; \
+    # pyodbc (group `odbc`, installed in cli-builder) loads libodbc.so.2 from the
+    # unixodbc package above; fail the build if the two ever drift apart.
+    /app/apps/cli/.venv/bin/python -c "import pyodbc; print(pyodbc.drivers())"; \
     git --version; \
     ssh -V
 RUN chown -R 10001:10001 /app /home/classifyre

@@ -86,6 +86,11 @@ kubectl wait \
   deployment/ingress-nginx-controller \
   --timeout=5m
 
+# CLI Jobs run classifyre/cli:dev-local (values-dev.yaml): the published image
+# plus unixODBC, which it predates. Loaded here so a fresh cluster can run an
+# ODBC scan; safe to repeat, and re-run the script it calls to refresh it.
+PULL=missing "${repo_root}/scripts/dev/build-cli-dev-image.sh"
+
 echo "k3d cluster ready: k3d-classifyre"
 echo "Ingress: http://classifyre.localhost:8080"
 echo "Source: ${repo_root} -> /var/lib/classifyre/source"
