@@ -6,7 +6,7 @@ import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslation } from "@/hooks/use-translation";
 import { QueryExplorer } from "@/components/data-query/query-explorer";
-import { Lock } from "lucide-react";
+import { Lock, TerminalSquare } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { useTenant } from "@/hooks/use-tenant";
 import {
@@ -95,6 +95,18 @@ function QueryPageContent() {
 
   return (
     <div className="-mx-4 -mb-4 flex min-h-[calc(100vh-10rem)] min-w-0 flex-col">
+      <div className="flex flex-wrap items-start gap-3 px-4 pb-2 pt-1">
+        <TerminalSquare className="mt-1 size-7 shrink-0" aria-hidden />
+        <div className="min-w-0 flex-1">
+          <h1 className="font-serif text-3xl font-black uppercase tracking-[0.08em]">
+            {t("dataQuery.title")}
+          </h1>
+          <p className="max-w-3xl text-sm text-muted-foreground">
+            {t("dataQuery.subtitle")}
+          </p>
+        </div>
+        <ConnectToolButton />
+      </div>
       {failed && (
         <p className="px-3 pt-2 text-sm text-destructive">
           {t("dataQuery.catalogFailed")}
@@ -140,9 +152,6 @@ function QueryPageContent() {
           />
         </section>
         <section className="w-full min-w-0 shrink-0 overflow-x-clip px-2 py-2 xl:w-80 xl:border-l">
-          <div className="mb-2 flex justify-end">
-            <ConnectToolButton />
-          </div>
           <QueryExplorer
             catalog={catalog}
             history={history}

@@ -624,6 +624,24 @@ describe('AssetService', () => {
       expect(result.items[0].findings[0].confidence).toBe(0.91);
     });
 
+    it('narrows to the asked asset ids, with the other filters', async () => {
+      mockPrismaService.asset.findMany.mockResolvedValue([]);
+      mockPrismaService.asset.count.mockResolvedValue(0);
+
+      await service.searchAssets({
+        assets: { ids: ['a1', 'a2', 'a1', ''], sourceId: 'source-1' },
+      });
+
+      expect(mockPrismaService.asset.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            id: { in: ['a1', 'a2'] },
+            sourceId: 'source-1',
+          }),
+        }),
+      );
+    });
+
     it('should skip findings query when paginated assets list is empty', async () => {
       mockPrismaService.asset.findMany.mockResolvedValue([]);
       mockPrismaService.asset.count.mockResolvedValue(0);

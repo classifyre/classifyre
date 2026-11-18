@@ -20,6 +20,7 @@ Name | Type
 `stewardRef` | string
 `responsibleRef` | string
 `kind` | string
+`ids` | Array&lt;string&gt;
 
 ## Example
 
@@ -42,6 +43,7 @@ const example = {
   "stewardRef": null,
   "responsibleRef": null,
   "kind": null,
+  "ids": null,
 } satisfies SearchAssetsFiltersDto
 
 console.log(example)

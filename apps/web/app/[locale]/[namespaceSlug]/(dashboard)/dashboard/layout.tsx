@@ -11,9 +11,9 @@ export async function generateMetadata({
   const { locale, namespaceSlug } = await params;
   if (!isLocale(locale)) return {};
   return {
-    ...(await sectionMetadata(locale, "seo.discovery", {
+    ...(await sectionMetadata(locale, "seo.dashboard", {
       namespaceSlug,
-      path: "/discovery",
+      path: "/dashboard",
     })),
   };
 }

@@ -1,19 +1,28 @@
 "use client";
 
 import { nsPath } from "@/lib/ns-path";
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useRouter } from "next/navigation";
 import { formatDate, formatRelative, formatShortUTC } from "@/lib/date";
 import {
   ArrowDown,
   ArrowUp,
-  BrainCircuit,
   ChevronsUpDown,
   ChevronDown,
   ChevronRight,
+  Compass,
   Filter,
   Loader2,
-  Search,
+  Lock,
+  Plus,
+  X,
 } from "lucide-react";
 import {
   api,
@@ -31,10 +40,12 @@ import {
   type SearchAssetsResponseDto,
   type SearchAssetsSortBy,
   type SearchAssetsSortOrder,
+  type SharedDatasetSummaryDto,
   type SourceListItem,
 } from "@workspace/api-client";
 import {
   Button,
+  Checkbox,
   EmptyState,
   Pagination,
   PaginationContent,
@@ -68,6 +79,7 @@ import {
   TooltipTrigger,
   type StatusTone,
 } from "@workspace/ui/components";
+import { cn } from "@workspace/ui/lib/utils";
 import { getSourceIcon } from "../lib/source-type-icon";
 import { AssetKindBadge } from "./asset-kind-badge";
 import { CsvExportButton, filtersToSearchParams } from "./csv-export-button";
@@ -83,6 +95,9 @@ import { AssetFilterBar } from "@/components/asset-filter-bar";
 import { GovernanceBadge } from "@/components/governance/governance-badge";
 import { QualityChip } from "@/components/governance/quality-chip";
 import { ActorChip } from "@/components/actor-chip";
+import { DatasetBadges } from "@/components/shared-datasets/dataset-cards";
+import type { ExploreViewName } from "@/lib/explore";
+import { EXPLORE_MAX_SEEDS } from "@/lib/explore";
 
 type AssetsTableScope = {
   sourceId?: string;
@@ -97,7 +112,47 @@ type AssetsTableProps = {
   initialPageSize?: number;
   /** `raw`: scanned assets only; `shared`: shared datasets only. */
   kind?: "raw" | "shared";
+  /**
+   * The governance filter when the URL names none, kept out of the URL. Set,
+   * the list is that filter's own (the Governed tab): *All* and *Ungoverned*
+   * are not offered.
+   */
+  defaultGovernance?: (typeof GOVERNANCE_FILTER_VALUES)[number];
+  /** Which columns and filters show: the assets page's tabs each need others. */
+  preset?: AssetsTablePreset;
+  /**
+   * List these assets, in this order, instead of everything (the Explore
+   * tab's starting points); each may say why it is there.
+   */
+  pinned?: PinnedAssets | null;
+  /** Explore one row (or a pair it stands for), or several picked together. */
+  onExplore?: (assetIds: string[], view: ExploreViewName | null) => void;
+  /** Add the picked rows to what the map already shows. */
+  onAddToMap?: (assetIds: string[]) => void;
+  /**
+   * Only these assets, with the usual paging and sorting (the Shared tab's
+   * availability and promoted filters, worked out from the datasets list).
+   * null: no such restriction.
+   */
+  onlyIds?: string[] | null;
+  /** Assets drawn on the map right now: their rows are marked. */
+  onMap?: ReadonlySet<string>;
+  /** First in the filter bar (the Explore tab's "Start from"). */
+  toolbar?: ReactNode;
 };
+
+/** Why a pinned asset is listed, and what exploring its row opens. */
+export interface PinnedReason {
+  label: ReactNode;
+  /** The row's asset alone, or the pair it belongs to. */
+  ids: string[];
+  view: ExploreViewName | null;
+}
+
+export interface PinnedAssets {
+  ids: string[];
+  reasons: Map<string, PinnedReason>;
+}
 
 type FilterDraft = {
   search: string;
@@ -124,6 +179,94 @@ const GOVERNANCE_FILTER_VALUES = [
   "mine",
   "stewarding",
 ] as const;
+
+export type AssetsTableColumn =
+  | "source"
+  | "governance"
+  | "quality"
+  | "sourceType"
+  | "assetType"
+  | "status"
+  | "detectors"
+  | "topFindings"
+  | "severity"
+  | "statusMix"
+  | "lastScanned"
+  | "updated";
+
+export type AssetsTableControl =
+  | "searchMode"
+  | "source"
+  | "severity"
+  | "detectors"
+  | "assetStatus"
+  | "governance"
+  | "export";
+
+const EVERY_COLUMN: readonly AssetsTableColumn[] = [
+  "source",
+  "governance",
+  "quality",
+  "sourceType",
+  "assetType",
+  "status",
+  "detectors",
+  "topFindings",
+  "severity",
+  "statusMix",
+  "lastScanned",
+  "updated",
+];
+const EVERY_CONTROL: readonly AssetsTableControl[] = [
+  "searchMode",
+  "source",
+  "severity",
+  "detectors",
+  "assetStatus",
+  "governance",
+  "export",
+];
+
+/**
+ * What each list shows. The scanned list is about findings; the governed one
+ * about who answers for an asset and how good it is; a shared dataset has no
+ * source, scan or findings worth a column; the explore list, what an asset
+ * is and how serious it looks — enough to pick where to start.
+ */
+export const ASSETS_TABLE_PRESETS = {
+  all: { columns: EVERY_COLUMN, controls: EVERY_CONTROL },
+  governed: {
+    columns: [
+      "source",
+      "governance",
+      "quality",
+      "assetType",
+      "severity",
+      "lastScanned",
+      "updated",
+    ],
+    controls: ["searchMode", "source", "governance", "export"],
+  },
+  shared: {
+    columns: ["governance", "quality", "status", "updated"],
+    controls: ["searchMode", "governance"],
+    // A shared dataset is always owned: what is left to pick is its lifecycle.
+    governance: ["draft", "active", "deprecated", "retired"],
+  },
+  explore: {
+    columns: ["source", "governance", "assetType", "severity", "lastScanned"],
+    controls: ["searchMode", "source", "governance"],
+  },
+} satisfies Record<
+  string,
+  {
+    columns: readonly AssetsTableColumn[];
+    controls: readonly AssetsTableControl[];
+    /** The governance filter's choices, when not all of them make sense. */
+    governance?: readonly (typeof GOVERNANCE_FILTER_VALUES)[number][];
+  }
+>;
+export type AssetsTablePreset = keyof typeof ASSETS_TABLE_PRESETS;
 
 type SortDraft = {
   by: SearchAssetsSortBy;
@@ -255,6 +398,8 @@ function buildRequest({
   assetStatuses,
   searchMode,
   kind,
+  responsibleMe = false,
+  ids,
 }: {
   draft: FilterDraft;
   sort: SortDraft;
@@ -264,6 +409,10 @@ function buildRequest({
   assetStatuses: AssetStatusFilterValue[];
   searchMode: SearchMode;
   kind?: "raw" | "shared";
+  /** The dashboard's *Mine*: assets the person owns or stewards. */
+  responsibleMe?: boolean;
+  /** Only these assets. */
+  ids?: string[];
 }): SearchAssetsRequestInputDto {
   const assetsFilters: NonNullable<SearchAssetsRequestInputDto["assets"]> = {
     search: searchMode === "off" ? draft.search.trim() || undefined : undefined,
@@ -272,6 +421,8 @@ function buildRequest({
     runnerId: scope?.runnerId,
     status: assetStatuses.length > 0 ? assetStatuses : undefined,
     kind,
+    responsibleRef: responsibleMe ? "me" : undefined,
+    ids: ids?.length ? ids : undefined,
     ...(draft.governance === "mine"
       ? { ownerRef: "me" }
       : draft.governance === "stewarding"
@@ -486,7 +637,38 @@ export function AssetsTable({
   scope,
   initialPageSize = 20,
   kind,
+  defaultGovernance,
+  preset = "all",
+  pinned = null,
+  onExplore,
+  onAddToMap,
+  onlyIds = null,
+  onMap,
+  toolbar,
 }: AssetsTableProps) {
+  const governanceDefault: string = defaultGovernance ?? ALL;
+  const presetConfig: {
+    columns: readonly AssetsTableColumn[];
+    controls: readonly AssetsTableControl[];
+    governance?: readonly string[];
+  } = ASSETS_TABLE_PRESETS[preset];
+  const { columns, controls } = presetConfig;
+  const lifecycleOnly = presetConfig.governance;
+  const show = (column: AssetsTableColumn) =>
+    (columns as readonly string[]).includes(column);
+  const has = (control: AssetsTableControl) =>
+    (controls as readonly string[]).includes(control);
+  // A stable key for the pinned list, so a new Map with the same ids refetches nothing.
+  const pinnedKey = pinned ? pinned.ids.join(",") : null;
+  const onlyKey = onlyIds ? onlyIds.join(",") : null;
+  // Rows picked to explore together.
+  const [picked, setPicked] = useState<string[]>([]);
+  const togglePicked = (id: string) =>
+    setPicked((current) =>
+      current.includes(id)
+        ? current.filter((x) => x !== id)
+        : [...current, id].slice(-EXPLORE_MAX_SEEDS),
+    );
   const { t } = useTranslation();
   const router = useRouter();
   const { searchParams, setParams } = useUrlParams();
@@ -498,6 +680,11 @@ export function AssetsTable({
         .filter((value) => known.includes(value)) as AssetStatusFilterValue[];
       return picked.length ? picked : EMPTY_ASSET_STATUSES;
     },
+  );
+
+  // Set by the dashboard's links under *Mine*; cleared with the chip.
+  const [responsibleMe, setResponsibleMe] = useState(
+    () => searchParams.get("responsible") === "me",
   );
 
   const [draft, setDraft] = useState<FilterDraft>(() => ({
@@ -513,7 +700,7 @@ export function AssetsTable({
       searchParams.get("governance") ?? "",
     )
       ? (searchParams.get("governance") as string)
-      : ALL,
+      : governanceDefault,
   }));
   const [sort, setSort] = useState<SortDraft>(() => {
     const by = searchParams.get("sortBy") as SearchAssetsSortBy | null;
@@ -592,12 +779,14 @@ export function AssetsTable({
       detector: draft.detectorTypes.length > 0 ? draft.detectorTypes : null,
       findingSeverity:
         draft.findingSeverities.length > 0 ? draft.findingSeverities : null,
-      governance: draft.governance !== ALL ? draft.governance : null,
+      governance:
+        draft.governance !== governanceDefault ? draft.governance : null,
       status: assetStatuses.length > 0 ? assetStatuses : null,
+      responsible: responsibleMe ? "me" : null,
       sortBy: sort.by !== DEFAULT_SORT.by ? sort.by : null,
       sortOrder: sort.order !== DEFAULT_SORT.order ? sort.order : null,
     });
-  }, [draft, sort, assetStatuses, setParams]);
+  }, [draft, sort, assetStatuses, responsibleMe, governanceDefault, setParams]);
 
   useEffect(() => {
     let active = true;
@@ -628,17 +817,41 @@ export function AssetsTable({
 
   useEffect(() => {
     setPage(1);
-  }, [draft, pageSize, sortBy, sortOrder, searchMode, assetStatuses]);
+  }, [
+    draft,
+    pageSize,
+    sortBy,
+    sortOrder,
+    searchMode,
+    assetStatuses,
+    responsibleMe,
+    pinnedKey,
+    onlyKey,
+  ]);
 
   useEffect(() => {
     let active = true;
 
     const run = async () => {
       try {
+        // Nothing worth starting from: nothing to ask for (an empty id list
+        // would not narrow the search at all).
+        const pinnedIds =
+          pinnedKey === null ? null : pinnedKey.split(",").filter(Boolean);
+        const onlyList =
+          onlyKey === null ? null : onlyKey.split(",").filter(Boolean);
+        if (
+          (pinnedIds && pinnedIds.length === 0) ||
+          (onlyList && onlyList.length === 0)
+        ) {
+          setError(null);
+          setData({ items: [], total: 0, skip: 0, limit: resolvedPageSize });
+          return;
+        }
         setIsLoading(true);
         setError(null);
 
-        const skip = (page - 1) * resolvedPageSize;
+        const skip = pinnedIds ? 0 : (page - 1) * resolvedPageSize;
         const request = buildRequest({
           draft,
           sort: {
@@ -646,7 +859,7 @@ export function AssetsTable({
             order: sortOrder,
           },
           skip,
-          limit: resolvedPageSize,
+          limit: pinnedIds ? pinnedIds.length : resolvedPageSize,
           scope: {
             sourceId: scopedSourceId,
             runnerId: scopedRunnerId,
@@ -654,11 +867,20 @@ export function AssetsTable({
           assetStatuses,
           searchMode,
           kind,
+          responsibleMe,
+          ids: pinnedIds ?? onlyList ?? undefined,
         });
 
         const response = await api.searchAssets(request);
 
         if (!active) return;
+        if (pinnedIds) {
+          // In the order they are worth starting from, not the sort's.
+          const rank = new Map(pinnedIds.map((id, index) => [id, index]));
+          response.items = [...response.items].sort(
+            (a, b) => (rank.get(a.asset.id) ?? 0) - (rank.get(b.asset.id) ?? 0),
+          );
+        }
         setData(response);
       } catch (loadError) {
         if (!active) return;
@@ -697,11 +919,44 @@ export function AssetsTable({
     sortOrder,
     searchMode,
     kind,
+    responsibleMe,
+    pinnedKey,
+    onlyKey,
   ]);
 
   const items = data?.items ?? [];
   const total = data?.total ?? 0;
+
+  // A shared dataset's own labels (promoted, blocked, locked for you) come
+  // from the datasets list, read once the page shows one.
+  const showsShared = items.some(
+    (item) => item.asset.sourceType === "SHARED_DATASET",
+  );
+  const [datasets, setDatasets] = useState<Map<
+    string,
+    SharedDatasetSummaryDto
+  > | null>(null);
+  useEffect(() => {
+    if (!showsShared || datasets) return;
+    let active = true;
+    api.sharedDatasets
+      .sharedDatasetsControllerList()
+      .then((list) => {
+        if (active) setDatasets(new Map(list.map((row) => [row.assetId, row])));
+      })
+      .catch(() => {
+        if (active) setDatasets(new Map());
+      });
+    return () => {
+      active = false;
+    };
+  }, [showsShared, datasets]);
   const hasRows = items.length > 0;
+  // The header box picks the rows shown, as many as a map holds.
+  const pickable = items
+    .map((item) => item.asset.id)
+    .slice(0, EXPLORE_MAX_SEEDS);
+  const pickedOnPage = pickable.filter((id) => picked.includes(id)).length;
   const showInitialLoading = isLoading && data === null;
 
   const totalPages = Math.max(
@@ -759,7 +1014,9 @@ export function AssetsTable({
       <AssetFilterBar
         search={searchInput}
         onSearchChange={setSearchInput}
-        sources={scopedSourceId ? undefined : sourceOptions}
+        sources={scopedSourceId || !has("source") ? undefined : sourceOptions}
+        showSeverity={has("severity")}
+        showDetectors={has("detectors")}
         sourceId={draft.sourceId}
         onSourceChange={(value) =>
           setDraft((previous) => ({
@@ -781,97 +1038,93 @@ export function AssetsTable({
             detectorTypes: values as FilterDraft["detectorTypes"],
           }))
         }
-        afterSearch={
-          <div className="flex h-9 overflow-hidden rounded-[4px] border-2 border-border">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  type="button"
-                  variant={searchMode === "hybrid" ? "default" : "ghost"}
-                  size="sm"
-                  className="h-full rounded-none px-2.5"
-                  onClick={() => setSearchMode("hybrid")}
-                >
-                  <BrainCircuit className="h-3.5 w-3.5" />
-                  Semantic
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                Hybrid extracted-text and filename ranking
-              </TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  type="button"
-                  variant={searchMode === "off" ? "default" : "ghost"}
-                  size="sm"
-                  className="h-full rounded-none border-l border-border px-2.5"
-                  onClick={() => setSearchMode("off")}
-                >
-                  <Search className="h-3.5 w-3.5" />
-                  Exact
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Exact asset-name matching</TooltipContent>
-            </Tooltip>
-          </div>
-        }
+        searchMode={has("searchMode") ? searchMode : undefined}
+        onSearchModeChange={setSearchMode}
       >
-        <MultiSelect
-          values={assetStatuses}
-          onValuesChange={(values) =>
-            setAssetStatuses(values as AssetStatusFilterValue[])
-          }
-        >
-          <MultiSelectTrigger className="h-9 w-[170px] border-2 border-border rounded-[4px]">
-            <MultiSelectValue placeholder={t("assets.assetStatus")} />
-          </MultiSelectTrigger>
-          <MultiSelectContent
-            search={{
-              placeholder: t("assets.searchStatuses"),
-              emptyMessage: t("assets.noStatusesFound"),
-            }}
+        {toolbar}
+        {has("assetStatus") && (
+          <MultiSelect
+            values={assetStatuses}
+            onValuesChange={(values) =>
+              setAssetStatuses(values as AssetStatusFilterValue[])
+            }
           >
-            <MultiSelectGroup>
-              {assetStatusOptions.map((status) => (
-                <MultiSelectItem key={status} value={status}>
-                  <span className="inline-flex items-center gap-2">
-                    <span
-                      className="h-2 w-2 rounded-full"
-                      style={{
-                        backgroundColor: `var(--${status === "NEW" ? "chart-4" : status === "UPDATED" ? "accent-ink" : "muted-foreground"})`,
-                      }}
-                    />
-                    {formatEnumLabel(status)}
-                  </span>
-                </MultiSelectItem>
-              ))}
-            </MultiSelectGroup>
-          </MultiSelectContent>
-        </MultiSelect>
+            <MultiSelectTrigger className="h-9 w-[170px] border-2 border-border rounded-[4px]">
+              <MultiSelectValue placeholder={t("assets.assetStatus")} />
+            </MultiSelectTrigger>
+            <MultiSelectContent
+              search={{
+                placeholder: t("assets.searchStatuses"),
+                emptyMessage: t("assets.noStatusesFound"),
+              }}
+            >
+              <MultiSelectGroup>
+                {assetStatusOptions.map((status) => (
+                  <MultiSelectItem key={status} value={status}>
+                    <span className="inline-flex items-center gap-2">
+                      <span
+                        className="h-2 w-2 rounded-full"
+                        style={{
+                          backgroundColor: `var(--${status === "NEW" ? "chart-4" : status === "UPDATED" ? "accent-ink" : "muted-foreground"})`,
+                        }}
+                      />
+                      {formatEnumLabel(status)}
+                    </span>
+                  </MultiSelectItem>
+                ))}
+              </MultiSelectGroup>
+            </MultiSelectContent>
+          </MultiSelect>
+        )}
 
-        <Select
-          value={draft.governance}
-          onValueChange={(value) =>
-            setDraft((current) => ({ ...current, governance: value }))
-          }
-        >
-          <SelectTrigger
-            className="h-9 w-[190px] border-2 border-border rounded-[4px]"
-            data-testid="governance-filter"
+        {has("governance") && (
+          <Select
+            value={draft.governance}
+            onValueChange={(value) =>
+              setDraft((current) => ({ ...current, governance: value }))
+            }
           >
-            <SelectValue placeholder={t("governance.filter.label")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>{t("governance.filter.all")}</SelectItem>
-            {GOVERNANCE_FILTER_VALUES.map((value) => (
-              <SelectItem key={value} value={value}>
-                {t(`governance.filter.${value}` as TranslationKey)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+            <SelectTrigger
+              className="h-9 w-[190px] border-2 border-border rounded-[4px]"
+              data-testid="governance-filter"
+            >
+              <SelectValue placeholder={t("governance.filter.label")} />
+            </SelectTrigger>
+            <SelectContent>
+              {!defaultGovernance && (
+                <SelectItem value={ALL}>
+                  {lifecycleOnly
+                    ? t("governance.filter.anyLifecycle")
+                    : t("governance.filter.all")}
+                </SelectItem>
+              )}
+              {GOVERNANCE_FILTER_VALUES.filter(
+                (value) =>
+                  (!defaultGovernance || value !== "ungoverned") &&
+                  (!lifecycleOnly || lifecycleOnly.includes(value)),
+              ).map((value) => (
+                <SelectItem key={value} value={value}>
+                  {t(`governance.filter.${value}` as TranslationKey)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
+        {responsibleMe && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-9 gap-1.5 rounded-[4px] border-2 border-foreground"
+            onClick={() => setResponsibleMe(false)}
+            aria-label={t("assets.responsibleMeClear")}
+            data-testid="responsible-me-filter"
+          >
+            {t("assets.responsibleMe")}
+            <X className="h-3.5 w-3.5" aria-hidden />
+          </Button>
+        )}
 
         <div className="ml-auto flex items-center gap-2">
           {isFilterLoading ? (
@@ -880,35 +1133,86 @@ export function AssetsTable({
               {t("common.sources")}
             </span>
           ) : null}
-          <CsvExportButton
-            exportPath="search/assets/export"
-            total={total}
-            entityLabel="asset findings"
-            buildQuery={() => {
-              const request = buildRequest({
-                draft,
-                sort,
-                skip: 0,
-                limit: 0,
-                scope,
-                assetStatuses,
-                searchMode: "off",
-              });
-              return filtersToSearchParams({
-                asset_search: request.assets?.search,
-                asset_sourceId: request.assets?.sourceId,
-                asset_status: request.assets?.status,
-                finding_detectorType: request.findings?.detectorType,
-                finding_severity: request.findings?.severity,
-                finding_includeResolved: request.findings?.includeResolved,
-                excludeFindings: request.options?.excludeFindings,
-                includeAssetsWithoutFindings:
-                  request.options?.includeAssetsWithoutFindings,
-              });
-            }}
-          />
+          {has("export") && (
+            <CsvExportButton
+              exportPath="search/assets/export"
+              total={total}
+              entityLabel="asset findings"
+              buildQuery={() => {
+                const request = buildRequest({
+                  draft,
+                  sort,
+                  skip: 0,
+                  limit: 0,
+                  scope,
+                  assetStatuses,
+                  searchMode: "off",
+                });
+                return filtersToSearchParams({
+                  asset_search: request.assets?.search,
+                  asset_sourceId: request.assets?.sourceId,
+                  asset_status: request.assets?.status,
+                  finding_detectorType: request.findings?.detectorType,
+                  finding_severity: request.findings?.severity,
+                  finding_includeResolved: request.findings?.includeResolved,
+                  excludeFindings: request.options?.excludeFindings,
+                  includeAssetsWithoutFindings:
+                    request.options?.includeAssetsWithoutFindings,
+                });
+              }}
+            />
+          )}
         </div>
       </AssetFilterBar>
+
+      {onExplore && picked.length > 0 && (
+        <div
+          className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[4px] border-2 border-accent/30 bg-background px-4 py-2.5"
+          data-testid="explore-picked-bar"
+        >
+          <span className="font-mono text-xs text-accent-ink">
+            {t("assets.explore.picked", { count: picked.length })}
+          </span>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="ml-auto h-8 font-mono text-xs uppercase tracking-[0.08em]"
+            onClick={() => setPicked([])}
+          >
+            {t("assets.explore.clearPicked")}
+          </Button>
+          {onAddToMap && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1.5 rounded-[4px] border-2 font-mono text-xs font-bold uppercase tracking-[0.08em]"
+              onClick={() => {
+                onAddToMap(picked);
+                setPicked([]);
+              }}
+              data-testid="explore-picked-add"
+            >
+              <Plus className="h-3.5 w-3.5" aria-hidden />
+              {t("assets.explore.addToMap", { count: picked.length })}
+            </Button>
+          )}
+          <Button
+            type="button"
+            size="sm"
+            className="h-8 gap-1.5 rounded-[4px] border-0 bg-accent font-mono text-xs font-bold uppercase tracking-[0.08em] text-accent-foreground hover:bg-accent/90"
+            onClick={() => {
+              onExplore(picked, null);
+              setPicked([]);
+            }}
+            data-testid="explore-picked"
+          >
+            <Compass className="h-3.5 w-3.5" aria-hidden />
+            {t("assets.explore.together", { count: picked.length })}
+          </Button>
+        </div>
+      )}
 
       {searchMode === "hybrid" && draft.search.trim() ? (
         <FeatureOffNotice
@@ -941,109 +1245,165 @@ export function AssetsTable({
             <Table>
               <TableHeader className="sticky top-0 z-20 bg-white/95 dark:bg-white/95 dark:bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 dark:supports-[backdrop-filter]:bg-card/80">
                 <TableRow>
-                  <TableHead className="w-8 bg-white/95 dark:bg-card/95" />
+                  <TableHead
+                    className={cn(
+                      "bg-white/95 dark:bg-card/95",
+                      onExplore ? "w-[104px]" : "w-8",
+                    )}
+                  >
+                    {onExplore && (
+                      <Checkbox
+                        checked={
+                          pickedOnPage === 0
+                            ? false
+                            : pickedOnPage === pickable.length
+                              ? true
+                              : "indeterminate"
+                        }
+                        onCheckedChange={() =>
+                          setPicked((current) =>
+                            pickedOnPage === pickable.length
+                              ? current.filter((id) => !pickable.includes(id))
+                              : [
+                                  ...current,
+                                  ...pickable.filter(
+                                    (id) => !current.includes(id),
+                                  ),
+                                ].slice(0, EXPLORE_MAX_SEEDS),
+                          )
+                        }
+                        aria-label={t("assets.explore.pickAll")}
+                        className="ml-2"
+                        data-testid="explore-pick-all"
+                      />
+                    )}
+                  </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
                     {renderSortableHead(
                       t("assets.columns.asset"),
                       SearchAssetsSortByEnum.Name,
                     )}
                   </TableHead>
-                  <TableHead className="bg-white/95 dark:bg-card/95">
-                    {renderSortableHead(
-                      t("common.source"),
-                      SearchAssetsSortByEnum.SourceId,
-                    )}
-                  </TableHead>
-                  <TableHead className="bg-white/95 dark:bg-card/95">
-                    {t("governance.column")}
-                  </TableHead>
-                  <TableHead className="bg-white/95 dark:bg-card/95">
-                    {t("governance.qualityColumn")}
-                  </TableHead>
-                  <TableHead className="bg-white/95 dark:bg-card/95">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                          {t("assets.columns.sourceType")}
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        {t("assets.columns.sourceTypeDesc")}
-                      </TooltipContent>
-                    </Tooltip>
-                  </TableHead>
-                  <TableHead className="bg-white/95 dark:bg-card/95">
-                    {renderSortableHead(
-                      t("assets.columns.assetType"),
-                      SearchAssetsSortByEnum.AssetType,
-                    )}
-                  </TableHead>
-                  <TableHead className="bg-white/95 dark:bg-card/95">
-                    {renderSortableHead(
-                      t("common.status"),
-                      SearchAssetsSortByEnum.Status,
-                    )}
-                  </TableHead>
-                  <TableHead className="bg-white/95 dark:bg-card/95">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                          {t("assets.columns.detectors")}
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        {t("assets.columns.detectorsDesc")}
-                      </TooltipContent>
-                    </Tooltip>
-                  </TableHead>
-                  <TableHead className="bg-white/95 dark:bg-card/95">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                          {t("assets.columns.topFindings")}
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        {t("assets.columns.topFindingsDesc")}
-                      </TooltipContent>
-                    </Tooltip>
-                  </TableHead>
-                  <TableHead className="bg-white/95 dark:bg-card/95">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                          {t("common.severity")}
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        {t("assets.columns.severityDesc")}
-                      </TooltipContent>
-                    </Tooltip>
-                  </TableHead>
-                  <TableHead className="bg-white/95 dark:bg-card/95">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                          {t("assets.columns.statusMix")}
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        {t("assets.columns.statusMixDesc")}
-                      </TooltipContent>
-                    </Tooltip>
-                  </TableHead>
-                  <TableHead className="bg-white/95 dark:bg-card/95">
-                    {renderSortableHead(
-                      t("assets.columns.lastScanned"),
-                      SearchAssetsSortByEnum.LastScannedAt,
-                    )}
-                  </TableHead>
-                  <TableHead className="bg-white/95 dark:bg-card/95">
-                    {renderSortableHead(
-                      t("common.updated"),
-                      SearchAssetsSortByEnum.UpdatedAt,
-                    )}
-                  </TableHead>
+                  {show("source") && (
+                    <TableHead className="bg-white/95 dark:bg-card/95">
+                      {renderSortableHead(
+                        t("common.source"),
+                        SearchAssetsSortByEnum.SourceId,
+                      )}
+                    </TableHead>
+                  )}
+                  {show("governance") && (
+                    <TableHead className="bg-white/95 dark:bg-card/95">
+                      {t("governance.column")}
+                    </TableHead>
+                  )}
+                  {show("quality") && (
+                    <TableHead className="bg-white/95 dark:bg-card/95">
+                      {t("governance.qualityColumn")}
+                    </TableHead>
+                  )}
+                  {show("sourceType") && (
+                    <TableHead className="bg-white/95 dark:bg-card/95">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                            {t("assets.columns.sourceType")}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {t("assets.columns.sourceTypeDesc")}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TableHead>
+                  )}
+                  {show("assetType") && (
+                    <TableHead className="bg-white/95 dark:bg-card/95">
+                      {renderSortableHead(
+                        t("assets.columns.assetType"),
+                        SearchAssetsSortByEnum.AssetType,
+                      )}
+                    </TableHead>
+                  )}
+                  {show("status") && (
+                    <TableHead className="bg-white/95 dark:bg-card/95">
+                      {renderSortableHead(
+                        t("common.status"),
+                        SearchAssetsSortByEnum.Status,
+                      )}
+                    </TableHead>
+                  )}
+                  {show("detectors") && (
+                    <TableHead className="bg-white/95 dark:bg-card/95">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                            {t("assets.columns.detectors")}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {t("assets.columns.detectorsDesc")}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TableHead>
+                  )}
+                  {show("topFindings") && (
+                    <TableHead className="bg-white/95 dark:bg-card/95">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                            {t("assets.columns.topFindings")}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {t("assets.columns.topFindingsDesc")}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TableHead>
+                  )}
+                  {show("severity") && (
+                    <TableHead className="bg-white/95 dark:bg-card/95">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                            {t("common.severity")}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {t("assets.columns.severityDesc")}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TableHead>
+                  )}
+                  {show("statusMix") && (
+                    <TableHead className="bg-white/95 dark:bg-card/95">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                            {t("assets.columns.statusMix")}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {t("assets.columns.statusMixDesc")}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TableHead>
+                  )}
+                  {show("lastScanned") && (
+                    <TableHead className="bg-white/95 dark:bg-card/95">
+                      {renderSortableHead(
+                        t("assets.columns.lastScanned"),
+                        SearchAssetsSortByEnum.LastScannedAt,
+                      )}
+                    </TableHead>
+                  )}
+                  {show("updated") && (
+                    <TableHead className="bg-white/95 dark:bg-card/95">
+                      {renderSortableHead(
+                        t("common.updated"),
+                        SearchAssetsSortByEnum.UpdatedAt,
+                      )}
+                    </TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1054,6 +1414,9 @@ export function AssetsTable({
                   const sourceName =
                     sourceIndex.get(asset.sourceId) || "Unknown source";
                   const SourceTypeIcon = getSourceIcon(asset.sourceType);
+                  const dataset = datasets?.get(asset.id);
+                  const reason = pinned?.reasons.get(asset.id);
+                  const mapped = onMap?.has(asset.id) ?? false;
                   const isExpanded = expandedAssetId === asset.id;
                   const canExpand = canExpandFindings;
 
@@ -1066,26 +1429,75 @@ export function AssetsTable({
 
                   return (
                     <Fragment key={asset.id}>
-                      <TableRow data-testid="asset-row">
+                      <TableRow
+                        data-testid="asset-row"
+                        data-on-map={mapped || undefined}
+                      >
                         <TableCell className="py-2">
-                          {canExpand ? (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 w-7 p-0"
-                              onClick={() =>
-                                setExpandedAssetId((previous) =>
-                                  previous === asset.id ? null : asset.id,
-                                )
-                              }
-                            >
-                              {isExpanded ? (
-                                <ChevronDown className="h-3.5 w-3.5" />
-                              ) : (
-                                <ChevronRight className="h-3.5 w-3.5" />
-                              )}
-                            </Button>
-                          ) : null}
+                          <div className="flex items-center gap-1">
+                            {onExplore && (
+                              <Checkbox
+                                checked={picked.includes(asset.id)}
+                                onCheckedChange={() => togglePicked(asset.id)}
+                                aria-label={t("assets.explore.pick", {
+                                  name: assetName,
+                                })}
+                                className="mr-1"
+                              />
+                            )}
+                            {canExpand ? (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0"
+                                onClick={() =>
+                                  setExpandedAssetId((previous) =>
+                                    previous === asset.id ? null : asset.id,
+                                  )
+                                }
+                              >
+                                {isExpanded ? (
+                                  <ChevronDown className="h-3.5 w-3.5" />
+                                ) : (
+                                  <ChevronRight className="h-3.5 w-3.5" />
+                                )}
+                              </Button>
+                            ) : null}
+                            {onExplore && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 w-7 rounded-[4px] border-2 p-0"
+                                    onClick={() =>
+                                      onExplore(
+                                        reason?.ids ?? [asset.id],
+                                        reason?.view ?? null,
+                                      )
+                                    }
+                                    aria-label={t("assets.explore.one", {
+                                      name: assetName,
+                                    })}
+                                    data-testid="asset-explore"
+                                  >
+                                    <Compass
+                                      className="h-3.5 w-3.5"
+                                      aria-hidden
+                                    />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  {reason && reason.ids.length > 1
+                                    ? t("assets.explore.pair")
+                                    : t("assets.explore.one", {
+                                        name: assetName,
+                                      })}
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
+                          </div>
                         </TableCell>
 
                         <TableCell className="max-w-[320px]">
@@ -1101,6 +1513,14 @@ export function AssetsTable({
                                   }
                                   data-testid="asset-name"
                                 >
+                                  {dataset && !dataset.canQuery && (
+                                    <Lock
+                                      className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+                                      aria-label={t(
+                                        "sharedDatasets.page.locked",
+                                      )}
+                                    />
+                                  )}
                                   <span className="truncate text-sm font-medium inline-block max-w-[280px]">
                                     {assetName}
                                   </span>
@@ -1114,6 +1534,31 @@ export function AssetsTable({
                               <p className="truncate text-xs text-muted-foreground max-w-[280px]">
                                 {asset.externalUrl}
                               </p>
+                            )}
+                            {(reason || mapped) && (
+                              <div
+                                className="mt-1 flex flex-wrap items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground"
+                                data-testid="asset-explore-reason"
+                              >
+                                {mapped && (
+                                  <span className="inline-flex items-center gap-1 rounded-[3px] bg-accent px-1.5 py-px font-semibold text-accent-foreground">
+                                    <Compass className="h-3 w-3" aria-hidden />
+                                    {t("assets.explore.onMap")}
+                                  </span>
+                                )}
+                                {reason?.label}
+                              </div>
+                            )}
+                            {dataset && (
+                              <div
+                                className="mt-1 flex flex-wrap items-center gap-1"
+                                data-testid="asset-dataset-badges"
+                              >
+                                <DatasetBadges dataset={dataset} />
+                                <span className="truncate text-[11px] text-muted-foreground">
+                                  {dataset.owningGroup.name}
+                                </span>
+                              </div>
                             )}
                             {item.match?.text ? (
                               <p
@@ -1134,171 +1579,200 @@ export function AssetsTable({
                           </div>
                         </TableCell>
 
-                        <TableCell>
-                          <div className="flex items-center gap-1.5">
-                            <SourceTypeIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                            <Button
-                              variant="link"
-                              size="sm"
-                              className="h-auto justify-start p-0 text-left text-sm"
-                              onClick={() =>
-                                router.push(
-                                  nsPath(`/sources/${asset.sourceId}`),
-                                )
-                              }
-                            >
-                              {sourceName}
-                            </Button>
-                          </div>
-                        </TableCell>
-
-                        <TableCell>
-                          <div className="flex flex-col items-start gap-1">
-                            <GovernanceBadge
-                              status={item.governance?.status ?? null}
-                            />
-                            {item.governance?.ownerRef && (
-                              <ActorChip actorRef={item.governance.ownerRef} />
-                            )}
-                          </div>
-                        </TableCell>
-
-                        <TableCell data-testid="asset-quality-cell">
-                          {item.governance?.quality?.rules ? (
-                            <QualityChip quality={item.governance.quality} />
-                          ) : (
-                            <span className="text-xs text-muted-foreground">
-                              —
-                            </span>
-                          )}
-                        </TableCell>
-
-                        <TableCell>
-                          <ToneBadge tone="neutral">
-                            {formatEnumLabel(asset.sourceType)}
-                          </ToneBadge>
-                        </TableCell>
-
-                        <TableCell>
-                          <AssetKindBadge kind={asset.assetType} />
-                        </TableCell>
-
-                        <TableCell>
-                          <ToneBadge
-                            tone={ASSET_STATUS_TONE[asset.status] ?? "idle"}
-                          >
-                            {t(
-                              `sources.asset${asset.status.charAt(0) + asset.status.slice(1).toLowerCase()}` as TranslationKey,
-                            )}
-                          </ToneBadge>
-                        </TableCell>
-
-                        <TableCell>
-                          <DetectorSummaryBadges
-                            items={topDetectors.map((entry) => ({
-                              detector: String(entry.detector),
-                              count: entry.count,
-                            }))}
-                            maxVisible={3}
-                          />
-                        </TableCell>
-
-                        <TableCell>
-                          <TopFindingsBadges
-                            items={topFindingTypes}
-                            maxVisible={2}
-                          />
-                        </TableCell>
-
-                        <TableCell>
-                          {highestSeverity ? (
-                            <div className="flex items-center gap-2">
-                              <SeverityBadge
-                                severity={
-                                  highestSeverity.toLowerCase() as
-                                    | "critical"
-                                    | "high"
-                                    | "medium"
-                                    | "low"
-                                    | "info"
+                        {show("source") && (
+                          <TableCell>
+                            <div className="flex items-center gap-1.5">
+                              <SourceTypeIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                              <Button
+                                variant="link"
+                                size="sm"
+                                className="h-auto justify-start p-0 text-left text-sm"
+                                onClick={() =>
+                                  router.push(
+                                    nsPath(`/sources/${asset.sourceId}`),
+                                  )
                                 }
                               >
-                                {t(
-                                  `findings.severityLabels.${highestSeverity.toUpperCase()}` as TranslationKey,
-                                )}
-                              </SeverityBadge>
-                              <span className="text-xs text-muted-foreground">
-                                {totalFindings}
-                              </span>
+                                {sourceName}
+                              </Button>
                             </div>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">
-                              —
-                            </span>
-                          )}
-                        </TableCell>
+                          </TableCell>
+                        )}
 
-                        <TableCell>
-                          {statusCounts.length === 0 ? (
-                            <span className="text-xs text-muted-foreground">
-                              —
-                            </span>
-                          ) : (
-                            <div className="flex flex-wrap gap-1.5">
-                              {statusCounts.slice(0, 2).map((entry) => (
-                                <StatusBadge
-                                  key={entry.status}
-                                  status={toStatusBadgeValue(entry.status)}
-                                >
-                                  {t(
-                                    `findings.statusLabels.${entry.status}` as TranslationKey,
-                                  )}{" "}
-                                  · {entry.count}
-                                </StatusBadge>
-                              ))}
-                              {statusCounts.length > 2 && (
-                                <ToneBadge tone="neutral">
-                                  +{statusCounts.length - 2}
-                                </ToneBadge>
+                        {show("governance") && (
+                          <TableCell>
+                            <div className="flex flex-col items-start gap-1">
+                              <GovernanceBadge
+                                status={item.governance?.status ?? null}
+                              />
+                              {item.governance?.ownerRef && (
+                                <ActorChip
+                                  actorRef={item.governance.ownerRef}
+                                />
                               )}
                             </div>
-                          )}
-                        </TableCell>
+                          </TableCell>
+                        )}
 
-                        <TableCell>
-                          <div className="text-xs">
-                            {formatDate(asset.lastScannedAt)}
-                          </div>
-                          <div className="text-[11px] text-muted-foreground">
-                            {formatRelative(asset.lastScannedAt)}
-                            {formatShortUTC(asset.lastScannedAt) && (
-                              <span className="text-muted-foreground/50">
-                                {" "}
-                                · {formatShortUTC(asset.lastScannedAt)}
+                        {show("quality") && (
+                          <TableCell data-testid="asset-quality-cell">
+                            {item.governance?.quality?.rules ? (
+                              <QualityChip quality={item.governance.quality} />
+                            ) : (
+                              <span className="text-xs text-muted-foreground">
+                                —
                               </span>
                             )}
-                          </div>
-                        </TableCell>
+                          </TableCell>
+                        )}
 
-                        <TableCell>
-                          <div className="text-xs">
-                            {formatDate(asset.updatedAt)}
-                          </div>
-                          <div className="text-[11px] text-muted-foreground">
-                            {formatRelative(asset.updatedAt)}
-                            {formatShortUTC(asset.updatedAt) && (
-                              <span className="text-muted-foreground/50">
-                                {" "}
-                                · {formatShortUTC(asset.updatedAt)}
+                        {show("sourceType") && (
+                          <TableCell>
+                            <ToneBadge tone="neutral">
+                              {formatEnumLabel(asset.sourceType)}
+                            </ToneBadge>
+                          </TableCell>
+                        )}
+
+                        {show("assetType") && (
+                          <TableCell>
+                            <AssetKindBadge kind={asset.assetType} />
+                          </TableCell>
+                        )}
+
+                        {show("status") && (
+                          <TableCell>
+                            <ToneBadge
+                              tone={ASSET_STATUS_TONE[asset.status] ?? "idle"}
+                            >
+                              {t(
+                                `sources.asset${asset.status.charAt(0) + asset.status.slice(1).toLowerCase()}` as TranslationKey,
+                              )}
+                            </ToneBadge>
+                          </TableCell>
+                        )}
+
+                        {show("detectors") && (
+                          <TableCell>
+                            <DetectorSummaryBadges
+                              items={topDetectors.map((entry) => ({
+                                detector: String(entry.detector),
+                                count: entry.count,
+                              }))}
+                              maxVisible={3}
+                            />
+                          </TableCell>
+                        )}
+
+                        {show("topFindings") && (
+                          <TableCell>
+                            <TopFindingsBadges
+                              items={topFindingTypes}
+                              maxVisible={2}
+                            />
+                          </TableCell>
+                        )}
+
+                        {show("severity") && (
+                          <TableCell>
+                            {highestSeverity ? (
+                              <div className="flex items-center gap-2">
+                                <SeverityBadge
+                                  severity={
+                                    highestSeverity.toLowerCase() as
+                                      | "critical"
+                                      | "high"
+                                      | "medium"
+                                      | "low"
+                                      | "info"
+                                  }
+                                >
+                                  {t(
+                                    `findings.severityLabels.${highestSeverity.toUpperCase()}` as TranslationKey,
+                                  )}
+                                </SeverityBadge>
+                                <span className="text-xs text-muted-foreground">
+                                  {totalFindings}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">
+                                —
                               </span>
                             )}
-                          </div>
-                        </TableCell>
+                          </TableCell>
+                        )}
+
+                        {show("statusMix") && (
+                          <TableCell>
+                            {statusCounts.length === 0 ? (
+                              <span className="text-xs text-muted-foreground">
+                                —
+                              </span>
+                            ) : (
+                              <div className="flex flex-wrap gap-1.5">
+                                {statusCounts.slice(0, 2).map((entry) => (
+                                  <StatusBadge
+                                    key={entry.status}
+                                    status={toStatusBadgeValue(entry.status)}
+                                  >
+                                    {t(
+                                      `findings.statusLabels.${entry.status}` as TranslationKey,
+                                    )}{" "}
+                                    · {entry.count}
+                                  </StatusBadge>
+                                ))}
+                                {statusCounts.length > 2 && (
+                                  <ToneBadge tone="neutral">
+                                    +{statusCounts.length - 2}
+                                  </ToneBadge>
+                                )}
+                              </div>
+                            )}
+                          </TableCell>
+                        )}
+
+                        {show("lastScanned") && (
+                          <TableCell>
+                            <div className="text-xs">
+                              {formatDate(asset.lastScannedAt)}
+                            </div>
+                            <div className="text-[11px] text-muted-foreground">
+                              {formatRelative(asset.lastScannedAt)}
+                              {formatShortUTC(asset.lastScannedAt) && (
+                                <span className="text-muted-foreground/50">
+                                  {" "}
+                                  · {formatShortUTC(asset.lastScannedAt)}
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
+                        )}
+
+                        {show("updated") && (
+                          <TableCell>
+                            <div className="text-xs">
+                              {formatDate(asset.updatedAt)}
+                            </div>
+                            <div className="text-[11px] text-muted-foreground">
+                              {formatRelative(asset.updatedAt)}
+                              {formatShortUTC(asset.updatedAt) && (
+                                <span className="text-muted-foreground/50">
+                                  {" "}
+                                  · {formatShortUTC(asset.updatedAt)}
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
+                        )}
                       </TableRow>
 
                       {isExpanded && canExpand && (
                         <TableRow>
-                          <TableCell colSpan={15} className="p-0 bg-muted/15">
+                          <TableCell
+                            colSpan={columns.length + 2}
+                            className="p-0 bg-muted/15"
+                          >
                             <FindingsSubTable
                               findings={item.findings}
                               onFindingClick={(findingId) =>
@@ -1346,7 +1820,7 @@ export function AssetsTable({
           </Select>
         </div>
 
-        {totalPages > 1 && (
+        {!pinned && totalPages > 1 && (
           <Pagination>
             <PaginationContent>
               <PaginationItem>

@@ -110,6 +110,17 @@ export class SearchAssetsFiltersDto extends OmitType(QueryAssetsDto, [
   @IsOptional()
   @IsIn(['raw', 'shared'])
   kind?: 'raw' | 'shared';
+
+  @ApiPropertyOptional({
+    type: [String],
+    description:
+      'Only these assets (ids), with the other filters. The assets page asks for the ones worth exploring from this way.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(200)
+  @IsString({ each: true })
+  ids?: string[];
 }
 
 const normalizeToStringArray = (value: unknown, uppercase = false) => {

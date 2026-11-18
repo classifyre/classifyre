@@ -39,6 +39,7 @@ export const ASSET_FILTER_KEYS = [
   'stewardRef',
   'responsibleRef',
   'kind',
+  'ids',
 ] as const;
 
 const KNOWN_SECTIONS = new Set<string>(ASSET_SEARCH_SECTIONS);

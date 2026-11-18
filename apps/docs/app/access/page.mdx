@@ -186,7 +186,7 @@ Public means **read-only** for everyone who has no grant on it:
     **History** (`activity.view`);
   - **no settings** — not even the page; only how dates and language are
     shown (`settings.view`);
-  - **no SQL** — the SQL page shows them what it can do, with an example
+  - **no SQL** — the Query data page shows them what it can do, with an example
     query, but nothing runs: no tables to query, no runs, nothing saved;
   - **no source configuration** — they see a source's name, type and scans,
     never its connection, sampling, detectors or code;
@@ -256,7 +256,7 @@ came from the web app, the API or an agent through MCP. Each entry says:
 
 Reading is not recorded, with one exception: reading **table rows with SQL**.
 Each table a query or an export read is recorded once, with who ran it, so a
-table's, a source's and the SQL page's **Activity** show who read what (see
+table's, a source's and the Query data page's **Activity** show who read what (see
 [SQL over your tables](/data-query#giving-access-where-the-data-is)). The work
 scans report back is not recorded either.
 The author is always the signed-in person (or the person an MCP token belongs
@@ -272,7 +272,7 @@ to): a request cannot name someone else.
 - **For the tenant.** **Tenant access → Activity** lists every grant given or
   removed and every workspace created or deleted, and what operators did to
   the tenant.
-- **For data.** A table's or a source's **Data** tab, and the **SQL** page,
+- **For data.** A table's or a source's **Data** tab, and the **Query data** page,
   have an **Activity** tab of their own: reads and exports of those tables and
   the data access given or removed on them.
 - **Through the API.** `GET /<workspace>/audit-events`, filtered by item

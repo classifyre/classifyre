@@ -103,6 +103,12 @@ export interface SearchAssetsFiltersDto {
      * @memberof SearchAssetsFiltersDto
      */
     kind?: SearchAssetsFiltersDtoKindEnum;
+    /**
+     * Only these assets (ids), with the other filters. The assets page asks for the ones worth exploring from this way.
+     * @type {Array<string>}
+     * @memberof SearchAssetsFiltersDto
+     */
+    ids?: Array<string>;
 }
 
 
@@ -242,6 +248,7 @@ export function SearchAssetsFiltersDtoFromJSONTyped(json: any, ignoreDiscriminat
         'stewardRef': json['stewardRef'] == null ? undefined : json['stewardRef'],
         'responsibleRef': json['responsibleRef'] == null ? undefined : json['responsibleRef'],
         'kind': json['kind'] == null ? undefined : json['kind'],
+        'ids': json['ids'] == null ? undefined : json['ids'],
     };
 }
 
@@ -270,6 +277,7 @@ export function SearchAssetsFiltersDtoToJSONTyped(value?: SearchAssetsFiltersDto
         'stewardRef': value['stewardRef'],
         'responsibleRef': value['responsibleRef'],
         'kind': value['kind'],
+        'ids': value['ids'],
     };
 }
 

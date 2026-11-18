@@ -1291,6 +1291,19 @@ export class AssetService {
     };
   }
 
+  /** `ids` of the asset filters: distinct, non-empty, at most 200; null when unset. */
+  private assetIdsFilter(assetFilters: { ids?: unknown }): string[] | null {
+    if (!Array.isArray(assetFilters.ids)) return null;
+    const ids = [
+      ...new Set(
+        assetFilters.ids.filter(
+          (id): id is string => typeof id === 'string' && id.trim() !== '',
+        ),
+      ),
+    ].slice(0, 200);
+    return ids.length ? ids : null;
+  }
+
   async searchAssets(params: SearchAssetsRequestDto): Promise<{
     items: Array<{
       asset: NormalizedAsset;
@@ -1365,6 +1378,10 @@ export class AssetService {
     if (typeof runnerId === 'string' && runnerId.trim()) {
       where.runnerId = runnerId.trim();
     }
+
+    // Only these assets: the assets page's starting points to explore.
+    const ids = this.assetIdsFilter(assetFilters);
+    if (ids) where.id = { in: ids };
 
     const normalizedAssetStatuses = this.normalizeEnumArray(
       assetStatus,
@@ -1751,6 +1768,9 @@ export class AssetService {
         Prisma.sql`a.source_type IN (${Prisma.join(sourceTypes)})`,
       );
     }
+
+    const ids = this.assetIdsFilter(assetFilters);
+    if (ids) assetConditions.push(Prisma.sql`a.id = ANY(${ids}::text[])`);
 
     if (assetFilters.kind === 'raw') {
       assetConditions.push(

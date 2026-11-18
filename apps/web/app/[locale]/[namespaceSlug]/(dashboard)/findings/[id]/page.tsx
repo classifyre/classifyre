@@ -280,7 +280,7 @@ export default function FindingDetailPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <DetailBackButton fallbackHref="/discovery" />
+          <DetailBackButton fallbackHref="/dashboard" />
           <div>
             <h1 className="font-serif text-3xl font-black uppercase tracking-[0.08em]">
               {t("findings.detail.notAvailable")}
@@ -296,7 +296,7 @@ export default function FindingDetailPage() {
           description={t("findings.detail.tryAgain")}
           action={{
             label: t("findings.detail.backToDiscovery"),
-            onClick: () => router.push(nsPath("/discovery")),
+            onClick: () => router.push(nsPath("/dashboard")),
           }}
           secondaryAction={{
             label: t("findings.detail.goBack"),
@@ -349,7 +349,7 @@ export default function FindingDetailPage() {
     <div className={wrapperClass}>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
-          <DetailBackButton fallbackHref="/discovery" />
+          <DetailBackButton fallbackHref="/dashboard" />
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="font-serif text-3xl font-black uppercase tracking-[0.08em]">

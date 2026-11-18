@@ -12572,7 +12572,7 @@
             }
           }
         },
-        "summary": "The Governance tab of the assets page: totals, quality over time, what needs someone, coverage per source",
+        "summary": "The dashboard: totals, quality over time, what needs someone, coverage per source",
         "tags": [
           "Governance"
         ]
@@ -12629,6 +12629,37 @@
             "in": "query",
             "description": "1–50, default 10",
             "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "description": "`raw`: scanned assets only; `shared`: shared datasets only",
+            "schema": {
+              "enum": [
+                "raw",
+                "shared"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "governance",
+            "required": false,
+            "in": "query",
+            "description": "Only assets matching this governance filter, as the asset search reads it",
+            "schema": {
+              "enum": [
+                "ungoverned",
+                "governed",
+                "draft",
+                "active",
+                "deprecated",
+                "retired",
+                "failing"
+              ],
               "type": "string"
             }
           }
@@ -21116,6 +21147,13 @@
               "shared"
             ],
             "description": "`raw`: assets scanned from sources; `shared`: shared datasets (DQ §5.12). Both when omitted."
+          },
+          "ids": {
+            "description": "Only these assets (ids), with the other filters. The assets page asks for the ones worth exploring from this way.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },

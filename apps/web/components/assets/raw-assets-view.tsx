@@ -17,7 +17,7 @@ import { AssetsTable } from "@/components/assets-table";
 import { EChartBox } from "@/components/echart-box";
 import { useTranslation } from "@/hooks/use-translation";
 import { useChartTheme } from "@/hooks/use-chart-theme";
-import { clickedIndex } from "./chart-click";
+import { clickedIndex } from "@/lib/chart-click";
 
 const EMPTY: SearchAssetsChartsResponseDto = {
   totals: {
@@ -230,7 +230,7 @@ export function RawAssetsView({ statsToken }: { statsToken: number }) {
       )}
 
       <Suspense>
-        <AssetsTable kind="raw" />
+        <AssetsTable kind="raw" preset="all" />
       </Suspense>
     </div>
   );

@@ -1,147 +1,333 @@
 "use client";
 
-import * as React from "react";
+import { Suspense, useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { Lock, Plus, Share2 } from "lucide-react";
+import { Loader2, Lock, Megaphone, Share2 } from "lucide-react";
+import type { SharedDatasetSummaryDto } from "@workspace/api-client";
 import {
   Button,
-  Card,
-  CardContent,
-  EmptyState,
-  Input,
-  Spinner,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@workspace/ui/components";
-import { useTranslation } from "@/hooks/use-translation";
-import { useNsPath } from "@/lib/ns-path";
+import { cn } from "@workspace/ui/lib/utils";
+import { AssetsTable } from "@/components/assets-table";
 import {
-  useSharedDatasetOptions,
-  useSharedDatasets,
-} from "@/lib/shared-datasets";
-import { DatasetBadges } from "@/components/shared-datasets/dataset-cards";
-import { GovernanceBadge } from "@/components/governance/governance-badge";
+  CardFootnote,
+  FootnoteDot,
+  PanelCard,
+  microLabelClass,
+  panelHeadingClass,
+  tileActiveClass,
+} from "@/components/panel-card";
+import {
+  UsageChartCard,
+  type UsageSort,
+} from "@/components/dashboard/usage-chart-card";
+import {
+  HATCH,
+  RailLegend,
+  SegmentRail,
+  type RailSegment,
+} from "@/components/dashboard/segment-rail";
+import { useTranslation } from "@/hooks/use-translation";
+import { useGovernanceUsage } from "@/lib/governance";
+import { useSharedDatasets } from "@/lib/shared-datasets";
+import { useUrlParams } from "@/lib/url-filters";
+
+const DAYS = 30;
+const ANY = "ANY";
+/** Whether a dataset can be read now (`?state=`). */
+export const DATASET_STATES = [
+  "live",
+  "blocked",
+  "unavailable",
+  "retired",
+] as const;
+type DatasetState = (typeof DATASET_STATES)[number];
 
 /**
- * The Shared assets tab of the assets page (docs/prd/DQ-data-query.md
- * §5.12): every saved query shared as a governed dataset, findable by
- * everyone who sees assets; locked ones say so and lead to *Request access*
- * on their page.
+ * The Shared tab's own filters, which the asset search does not know — a
+ * dataset's availability (`?state=`) and whether it is promoted
+ * (`?promoted=1`) — read from the URL so the status card's links set them.
+ */
+function useDatasetFilters() {
+  const { searchParams, setParams } = useUrlParams();
+  const pathname = usePathname();
+  const raw = searchParams.get("state");
+  const state = (DATASET_STATES as readonly string[]).includes(raw ?? "")
+    ? (raw as DatasetState)
+    : null;
+  const promoted = searchParams.get("promoted") === "1";
+  /** This page with one filter changed, the rest kept. */
+  const hrefWith = (key: "state" | "promoted", value: string | null) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value) params.set(key, value);
+    else params.delete(key);
+    return `${pathname}?${params.toString()}`;
+  };
+  return { state, promoted, setParams, hrefWith };
+}
+
+/**
+ * The Shared tab (docs/prd/DQ-data-query.md §5.12): saved queries shared as
+ * governed datasets — how much they are read, where they stand, and the same
+ * asset list as the other tabs, each row labelled as a dataset.
  */
 export function SharedAssetsView() {
+  const [sort, setSort] = useState<UsageSort>("used");
+  const usage = useGovernanceUsage({
+    scope: "all",
+    days: DAYS,
+    sort,
+    kind: "shared",
+  });
   const { t } = useTranslation();
-  const nsPath = useNsPath();
   const datasets = useSharedDatasets();
-  const options = useSharedDatasetOptions();
-  const [search, setSearch] = React.useState("");
-  const needle = search.trim().toLowerCase();
-  const rows = (datasets.data ?? []).filter(
-    (row) =>
-      !needle ||
-      row.sqlName.includes(needle) ||
-      (row.description ?? "").toLowerCase().includes(needle) ||
-      row.owningGroup.name.toLowerCase().includes(needle),
-  );
+  const filters = useDatasetFilters();
+  // The datasets these filters leave, as asset ids for the list; while the
+  // datasets load, none (rather than every one, unfiltered).
+  const onlyIds = useMemo(() => {
+    if (!filters.state && !filters.promoted) return null;
+    return (datasets.data ?? [])
+      .filter(
+        (row) =>
+          (!filters.state || row.state === filters.state) &&
+          (!filters.promoted || row.promoted),
+      )
+      .map((row) => row.assetId);
+  }, [datasets.data, filters.state, filters.promoted]);
 
   return (
-    <div className="space-y-4" data-testid="shared-datasets-page">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={t("sharedDatasets.page.search")}
-            className="w-full sm:max-w-sm"
-          />
-          <p className="text-sm text-muted-foreground">
-            {t("sharedDatasets.page.lead")}
-          </p>
-        </div>
-        {options.data?.canShare && (
-          <Button asChild data-testid="new-shared-dataset" className="shrink-0">
-            <Link href={nsPath("/query")}>
-              <Plus className="mr-1.5 h-4 w-4" />
-              {t("sharedDatasets.page.new")}
-            </Link>
-          </Button>
-        )}
+    <div className="space-y-6" data-testid="shared-assets-view">
+      <div className="grid gap-4 xl:grid-cols-2">
+        <UsageChartCard
+          usage={usage.data}
+          loading={usage.loading}
+          days={DAYS}
+          sort={sort}
+          onSortChange={setSort}
+        />
+        <SharedStatusCard
+          rows={datasets.data}
+          loading={datasets.loading}
+          hrefWith={filters.hrefWith}
+        />
       </div>
 
-      {datasets.loading && !datasets.data ? (
-        <div className="flex justify-center py-10">
-          <Spinner />
+      <Suspense>
+        <AssetsTable
+          kind="shared"
+          preset="shared"
+          onlyIds={onlyIds}
+          toolbar={
+            <>
+              <Select
+                value={filters.state ?? ANY}
+                onValueChange={(value) =>
+                  filters.setParams({ state: value === ANY ? null : value })
+                }
+              >
+                <SelectTrigger
+                  className="h-9 w-[190px] rounded-[4px] border-2 border-border"
+                  data-testid="dataset-state-filter"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ANY}>
+                    {t("assets.sharedFilter.anyAvailability")}
+                  </SelectItem>
+                  {DATASET_STATES.map((state) => (
+                    <SelectItem key={state} value={state}>
+                      {t(`sharedDatasets.state.${state}`)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                aria-pressed={filters.promoted}
+                onClick={() =>
+                  filters.setParams({ promoted: filters.promoted ? null : "1" })
+                }
+                className={cn(
+                  "h-9 gap-1.5 rounded-[4px] border-2",
+                  filters.promoted && tileActiveClass,
+                  filters.promoted &&
+                    "hover:bg-foreground/90 hover:text-accent dark:hover:bg-background/90",
+                )}
+                data-testid="dataset-promoted-filter"
+              >
+                <Megaphone className="h-3.5 w-3.5" aria-hidden />
+                {t("assets.sharedFilter.promoted")}
+              </Button>
+            </>
+          }
+        />
+      </Suspense>
+    </div>
+  );
+}
+
+const count = (
+  rows: SharedDatasetSummaryDto[],
+  test: (row: SharedDatasetSummaryDto) => boolean,
+) => rows.filter(test).length;
+
+/**
+ * Where the shared datasets stand, as two rails: their lifecycle (certified,
+ * draft, deprecated, retired) and whether they can be read now (live,
+ * blocked, unreadable, retired) — and how many are promoted, or locked for
+ * whoever is looking.
+ */
+function SharedStatusCard({
+  rows: loaded,
+  loading,
+  hrefWith,
+}: {
+  rows: SharedDatasetSummaryDto[] | null;
+  loading: boolean;
+  hrefWith: (key: "state" | "promoted", value: string | null) => string;
+}) {
+  const { t } = useTranslation();
+  const rows = loaded ?? [];
+
+  const lifecycle: RailSegment[] = [
+    {
+      key: "active",
+      label: t("governance.status.ACTIVE"),
+      count: count(rows, (row) => row.lifecycle === "ACTIVE"),
+      className: "bg-accent text-accent-foreground",
+    },
+    {
+      key: "draft",
+      label: t("governance.status.DRAFT"),
+      count: count(rows, (row) => !row.lifecycle || row.lifecycle === "DRAFT"),
+      className: "bg-foreground text-background",
+    },
+    {
+      key: "deprecated",
+      label: t("governance.status.DEPRECATED"),
+      count: count(rows, (row) => row.lifecycle === "DEPRECATED"),
+      className: "bg-muted-foreground text-background",
+    },
+    {
+      key: "retired",
+      label: t("governance.status.RETIRED"),
+      count: count(rows, (row) => row.lifecycle === "RETIRED"),
+      className: "bg-card text-foreground",
+      style: HATCH,
+      chip: true,
+    },
+  ];
+  const availability: RailSegment[] = [
+    {
+      key: "live",
+      href: hrefWith("state", "live"),
+      label: t("sharedDatasets.state.live"),
+      count: count(rows, (row) => row.state === "live"),
+      className: "bg-accent text-accent-foreground",
+    },
+    {
+      key: "blocked",
+      href: hrefWith("state", "blocked"),
+      label: t("sharedDatasets.state.blocked"),
+      count: count(rows, (row) => row.state === "blocked"),
+      className: "bg-destructive text-destructive-foreground",
+    },
+    {
+      key: "unavailable",
+      href: hrefWith("state", "unavailable"),
+      label: t("sharedDatasets.state.unavailable"),
+      count: count(rows, (row) => row.state === "unavailable"),
+      className: "bg-card text-destructive",
+      style: {
+        backgroundImage:
+          "repeating-linear-gradient(135deg, transparent 0 5px, color-mix(in srgb, var(--destructive) 35%, transparent) 5px 7px)",
+      },
+      chip: true,
+    },
+    {
+      key: "retired",
+      href: hrefWith("state", "retired"),
+      label: t("sharedDatasets.state.retired"),
+      count: count(rows, (row) => row.state === "retired"),
+      className: "bg-card text-foreground",
+      style: HATCH,
+      chip: true,
+    },
+  ];
+  const promoted = count(rows, (row) => row.promoted);
+  const locked = count(rows, (row) => !row.canQuery);
+
+  return (
+    <PanelCard className="flex flex-col">
+      <div className="mb-4 min-w-0" data-testid="shared-status">
+        <h3 className={panelHeadingClass}>{t("assets.sharedStatus.title")}</h3>
+        <p className={microLabelClass}>
+          {t("assets.sharedStatus.lead", { count: rows.length })}
+        </p>
+      </div>
+
+      {loading && !loaded ? (
+        <div className="flex h-[200px] items-center justify-center text-muted-foreground">
+          <Loader2 className="size-5 animate-spin" />
         </div>
       ) : rows.length === 0 ? (
-        <EmptyState
-          icon={Share2}
-          title={t("sharedDatasets.page.emptyTitle")}
-          description={t("sharedDatasets.page.emptyLead")}
-        />
+        <div className="flex h-[200px] flex-col items-center justify-center gap-2 rounded-[4px] border-2 border-dashed border-border/40 px-4 text-center text-sm text-muted-foreground">
+          <Share2 className="size-6" aria-hidden />
+          {t("sharedDatasets.page.emptyLead")}
+        </div>
       ) : (
-        <Card>
-          <CardContent className="overflow-x-auto p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("sharedDatasets.page.dataset")}</TableHead>
-                  <TableHead>{t("sharedDatasets.overview.owner")}</TableHead>
-                  <TableHead>
-                    {t("sharedDatasets.overview.owningGroup")}
-                  </TableHead>
-                  <TableHead>{t("sharedDatasets.page.trust")}</TableHead>
-                  <TableHead className="text-right">
-                    {t("sharedDatasets.page.inputs")}
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((row) => (
-                  <TableRow key={row.assetId} data-testid="shared-dataset-row">
-                    <TableCell className="max-w-md">
-                      <Link
-                        href={nsPath(`/assets/${row.assetId}`)}
-                        className="flex items-center gap-1.5 font-mono text-sm hover:underline"
-                      >
-                        {!row.canQuery && (
-                          <Lock
-                            className="h-3.5 w-3.5 text-muted-foreground"
-                            aria-label={t("sharedDatasets.page.locked")}
-                          />
-                        )}
-                        {row.sqlName}
-                      </Link>
-                      {row.description && (
-                        <p className="line-clamp-2 text-xs text-muted-foreground">
-                          {row.description}
-                        </p>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {row.owner?.name ?? "—"}
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {row.owningGroup.name}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <GovernanceBadge status={row.lifecycle} />
-                        <DatasetBadges dataset={row} />
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {row.inputCount}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+        <div className="flex flex-col gap-6">
+          <section className="space-y-2">
+            <p className={microLabelClass}>
+              {t("assets.sharedStatus.lifecycle")}
+            </p>
+            <SegmentRail
+              segments={lifecycle}
+              label={t("assets.sharedStatus.lifecycle")}
+              testId="shared-lifecycle-rail"
+            />
+            <RailLegend segments={lifecycle} />
+          </section>
+          <section className="space-y-2">
+            <p className={microLabelClass}>
+              {t("assets.sharedStatus.availability")}
+            </p>
+            <SegmentRail
+              segments={availability}
+              label={t("assets.sharedStatus.availability")}
+              testId="shared-availability-rail"
+            />
+            <RailLegend segments={availability} />
+          </section>
+        </div>
       )}
-    </div>
+
+      {rows.length > 0 && (
+        <CardFootnote className="mt-auto pt-2">
+          <Link
+            href={hrefWith("promoted", "1")}
+            className="inline-flex items-center gap-1 hover:text-foreground"
+            data-testid="shared-status-promoted"
+          >
+            <Megaphone className="h-3 w-3" aria-hidden />
+            {t("assets.sharedStatus.promoted", { count: promoted })}
+          </Link>
+          <FootnoteDot />
+          <span className="inline-flex items-center gap-1">
+            <Lock className="h-3 w-3" aria-hidden />
+            {t("assets.sharedStatus.locked", { count: locked })}
+          </span>
+        </CardFootnote>
+      )}
+    </PanelCard>
   );
 }

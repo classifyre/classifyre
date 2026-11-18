@@ -86,3 +86,24 @@ export function FootnoteDot({ tone = "muted" }: { tone?: "muted" | "inverted" })
     </span>
   );
 }
+
+/**
+ * A card that is also a choice (a filter, a tab), the same everywhere. Not
+ * chosen, it is a plain card. Chosen, it goes dark in both themes, like the
+ * dashboard's Incoming panel, with the accent for its text. Not a grey wash:
+ * grey reads as disabled, not as picked.
+ */
+export const tileActiveClass =
+  "border-accent/30 bg-foreground text-accent dark:bg-background";
+/** The same card, not chosen. */
+export const tileIdleClass =
+  "border-border bg-card text-foreground transition-colors hover:bg-secondary/40";
+/** The quieter text on a tile (its label, a line under the number). */
+export const tileMutedText = (active: boolean) =>
+  active ? "text-accent/70" : "text-muted-foreground";
+/**
+ * A tile's icon: inverted while the tile is not chosen (black on a light
+ * page, white on a dark one), the accent once it is.
+ */
+export const tileIconClass = (active: boolean) =>
+  active ? "bg-accent text-accent-foreground" : "bg-foreground text-background";

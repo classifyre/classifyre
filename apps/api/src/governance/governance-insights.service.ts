@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
-import { answerableScopes } from './governance-filter';
+import { answerableScopes, governanceAssetSql } from './governance-filter';
 import { qualityScore } from './quality-rules';
 import { assetResource } from '../identity/audit-resources';
 import { personOf } from '../identity/actor-ref';
@@ -485,7 +485,14 @@ export class GovernanceInsightsService {
    */
   async workspaceUsage(
     person: GovernancePerson | null,
-    query: DashboardQuery & { sort?: unknown; limit?: unknown },
+    query: DashboardQuery & {
+      sort?: unknown;
+      limit?: unknown;
+      /** `raw`: scanned assets; `shared`: shared datasets (the assets page tabs). */
+      kind?: unknown;
+      /** As the asset search reads it: `governed`, `ungoverned`, a lifecycle, `failing`. */
+      governance?: unknown;
+    },
   ): Promise<GovernanceUsage> {
     const days = span(query.days);
     const sort = query.sort === 'rising' ? 'rising' : 'used';
@@ -495,7 +502,24 @@ export class GovernanceInsightsService {
     );
     const since = new Date(Date.now() - days * 86_400_000);
     const before = new Date(Date.now() - 2 * days * 86_400_000);
-    const { scope, where } = await this.scopeSql(person, query);
+    const scoped = await this.scopeSql(person, query);
+    const { scope } = scoped;
+    const clauses: Prisma.Sql[] = [scoped.where];
+    if (query.kind === 'shared') {
+      clauses.push(Prisma.sql`a.source_type::text = 'SHARED_DATASET'`);
+    } else if (query.kind === 'raw') {
+      clauses.push(Prisma.sql`a.source_type::text <> 'SHARED_DATASET'`);
+    }
+    if (typeof query.governance === 'string' && query.governance.trim()) {
+      const governance = await governanceAssetSql(
+        this.prisma,
+        { governance: query.governance },
+        person,
+        'a',
+      );
+      if (governance) clauses.push(governance);
+    }
+    const where = Prisma.join(clauses, ' AND ');
     const events = Prisma.sql`
       events AS (
         SELECT e.entity_id AS asset_id, e.occurred_at, e.actor,

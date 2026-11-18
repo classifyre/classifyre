@@ -12,7 +12,7 @@ All URIs are relative to *http://localhost*
 | [**governanceControllerAssignAssetRole**](GovernanceApi.md#governancecontrollerassignassetrole) | **POST** /assets/{id}/governance/roles | Make someone owner, steward or custodian of an asset |
 | [**governanceControllerAssignSourceRole**](GovernanceApi.md#governancecontrollerassignsourcerole) | **POST** /sources/{id}/governance/roles | Make someone owner, steward or custodian of a source |
 | [**governanceControllerCreateQualityRule**](GovernanceApi.md#governancecontrollercreatequalityrule) | **POST** /assets/{id}/quality/rules | Add a quality rule to an asset (and evaluate it at once) |
-| [**governanceControllerDashboard**](GovernanceApi.md#governancecontrollerdashboard) | **GET** /governance/dashboard | The Governance tab of the assets page: totals, quality over time, what needs someone, coverage per source |
+| [**governanceControllerDashboard**](GovernanceApi.md#governancecontrollerdashboard) | **GET** /governance/dashboard | The dashboard: totals, quality over time, what needs someone, coverage per source |
 | [**governanceControllerDismissSuggestion**](GovernanceApi.md#governancecontrollerdismisssuggestion) | **POST** /assets/{id}/governance/meaning/suggestions/{suggestionId}/dismiss | Dismiss a suggested term for an asset |
 | [**governanceControllerExportContract**](GovernanceApi.md#governancecontrollerexportcontract) | **GET** /assets/{id}/contract | The asset as an Open Data Contract Standard (v3.2) contract |
 | [**governanceControllerImportContract**](GovernanceApi.md#governancecontrollerimportcontract) | **PUT** /assets/{id}/contract | Apply an ODCS contract (YAML or JSON text) to the asset |
@@ -576,7 +576,7 @@ No authorization required
 
 > GovernanceDashboardDto governanceControllerDashboard(scope, days, sourceId)
 
-The Governance tab of the assets page: totals, quality over time, what needs someone, coverage per source
+The dashboard: totals, quality over time, what needs someone, coverage per source
 
 ### Example
 
@@ -2015,7 +2015,7 @@ No authorization required
 
 ## governanceControllerWorkspaceUsage
 
-> GovernanceUsageDto governanceControllerWorkspaceUsage(scope, days, sourceId, sort, limit)
+> GovernanceUsageDto governanceControllerWorkspaceUsage(scope, days, sourceId, sort, limit, kind, governance)
 
 Table reads and exports per day and the top assets, against the period before (&#x60;rising&#x60;: where usage spiked)
 
@@ -2043,6 +2043,10 @@ async function example() {
     sort: sort_example,
     // string | 1–50, default 10 (optional)
     limit: limit_example,
+    // 'raw' | 'shared' | `raw`: scanned assets only; `shared`: shared datasets only (optional)
+    kind: kind_example,
+    // 'ungoverned' | 'governed' | 'draft' | 'active' | 'deprecated' | 'retired' | 'failing' | Only assets matching this governance filter, as the asset search reads it (optional)
+    governance: governance_example,
   } satisfies GovernanceControllerWorkspaceUsageRequest;
 
   try {
@@ -2067,6 +2071,8 @@ example().catch(console.error);
 | **sourceId** | `string` |  | [Optional] [Defaults to `undefined`] |
 | **sort** | `used`, `rising` |  | [Optional] [Defaults to `undefined`] [Enum: used, rising] |
 | **limit** | `string` | 1–50, default 10 | [Optional] [Defaults to `undefined`] |
+| **kind** | `raw`, `shared` | &#x60;raw&#x60;: scanned assets only; &#x60;shared&#x60;: shared datasets only | [Optional] [Defaults to `undefined`] [Enum: raw, shared] |
+| **governance** | `ungoverned`, `governed`, `draft`, `active`, `deprecated`, `retired`, `failing` | Only assets matching this governance filter, as the asset search reads it | [Optional] [Defaults to `undefined`] [Enum: ungoverned, governed, draft, active, deprecated, retired, failing] |
 
 ### Return type
 

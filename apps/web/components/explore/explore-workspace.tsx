@@ -98,11 +98,26 @@ type Level = { view: ExploreView; label: string };
  * from the source's most connected assets), and diving into a neighbour
  * keeps the way back out as a trail.
  */
-function useViewState(mode: ExploreMode, assetId?: string, rootKey?: string) {
+function useViewState(
+  mode: ExploreMode,
+  assetId?: string,
+  rootKey?: string,
+  embedded?: { defaultSeeds: string[] | undefined },
+) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const fromUrl = React.useMemo(() => readExploreView(new URLSearchParams(searchParams.toString())), [searchParams]);
+  const isEmbedded = !!embedded;
+  const defaultSeeds = embedded?.defaultSeeds;
+  const fromUrl = React.useMemo(() => {
+    const read = readExploreView(new URLSearchParams(searchParams.toString()));
+    if (!isEmbedded) return read;
+    // Inside the assets page the search box is the asset list's (`q`), and
+    // with nothing asked for the map starts from the most connected assets.
+    return { ...read, q: "", seeds: read.seeds.length || read.saved ? read.seeds : (defaultSeeds ?? []) };
+  }, [searchParams, isEmbedded, defaultSeeds]);
+  // Embedded on the default seeds: they stay out of the address until a start is asked for.
+  const onDefaults = isEmbedded && !searchParams.get("seeds") && !searchParams.get("saved");
   const root = React.useCallback((): ExploreView => ({ ...EMPTY_VIEW, seeds: assetId ? [assetId] : [] }), [assetId]);
   const [local, setLocal] = React.useState<ExploreView>(root);
   const [trail, setTrail] = React.useState<Level[]>([]);
@@ -118,12 +133,20 @@ function useViewState(mode: ExploreMode, assetId?: string, rootKey?: string) {
         setLocal((current) => ({ ...current, ...next }));
         return;
       }
-      const query = exploreViewQuery({ ...fromUrl, ...next });
-      const url = query ? `${pathname}?${query}` : pathname;
+      const query = exploreViewQuery({ ...fromUrl, ...(onDefaults ? { seeds: [] } : {}), ...next });
+      // Embedded, the view shares the address with the page's own keys (the
+      // tab, the asset list's filters): only its own keys change.
+      const params = new URLSearchParams(isEmbedded ? searchParams.toString() : "");
+      for (const key of EXPLORE_URL_KEYS) params.delete(key);
+      new URLSearchParams(query).forEach((value, key) => {
+        if (!isEmbedded || key !== "q") params.set(key, value);
+      });
+      const merged = params.toString();
+      const url = merged ? `${pathname}?${merged}` : pathname;
       if (how === "push") router.push(url, { scroll: false });
       else router.replace(url, { scroll: false });
     },
-    [fromUrl, mode, pathname, router],
+    [fromUrl, isEmbedded, mode, onDefaults, pathname, router, searchParams],
   );
   // Diving in keeps how far, which way and which connections; the view is picked again.
   const diveIn = React.useCallback(
@@ -145,6 +168,9 @@ function useViewState(mode: ExploreMode, assetId?: string, rootKey?: string) {
   );
   return { view, go, trail, diveIn, diveOut };
 }
+
+/** The address keys an Explore view is kept in. */
+export const EXPLORE_URL_KEYS = ["seeds", "view", "kinds", "depth", "direction", "scope", "q", "saved"] as const;
 
 const samePositions = (a: Positions, b: Positions) => {
   const ka = Object.keys(a);
@@ -176,6 +202,8 @@ export function ExploreWorkspace({
   termId,
   duplicates,
   rootLabel,
+  embedded = false,
+  defaultSeeds,
 }: {
   mode?: ExploreMode;
   assetId?: string;
@@ -188,6 +216,14 @@ export function ExploreWorkspace({
   duplicates?: ExploreDuplicatesFilterDto;
   /** What the trail calls the level a dive starts from. */
   rootLabel?: string;
+  /**
+   * The page view inside another page (the assets page's Explore tab): a
+   * framed map, the view kept in the address beside the page's own keys,
+   * and no start page of its own — the asset list below is where to start.
+   */
+  embedded?: boolean;
+  /** Embedded: what the map shows when nothing is asked for; undefined while loading. */
+  defaultSeeds?: string[];
 }) {
   const { t } = useTranslation();
   const router = useRouter();
@@ -195,10 +231,13 @@ export function ExploreWorkspace({
   const onSource = mode === "source";
   const rootRef = React.useRef<HTMLDivElement>(null);
   const noRef = React.useRef<HTMLDivElement>(null);
-  useFullBleedHeight(onPage ? rootRef : noRef);
+  useFullBleedHeight(onPage && !embedded ? rootRef : noRef);
   const duplicatesKey = duplicates ? JSON.stringify(duplicates) : "";
   const rootKey = `${sourceId ?? ""}|${termId ?? ""}|${duplicatesKey}`;
-  const { view, go, trail, diveIn, diveOut } = useViewState(mode, assetId, rootKey);
+  const { view, go, trail, diveIn, diveOut } = useViewState(mode, assetId, rootKey, embedded ? { defaultSeeds } : undefined);
+  const searchParamsNow = useSearchParams();
+  // Embedded with nothing asked for, the map shows the most connected assets.
+  const startedFromDefault = embedded && !searchParamsNow.get("seeds") && !view.saved;
   // The level a source, a term or duplicate review is explored from: no assets asked for.
   const atRoot = !view.seeds.length && ((onSource && !!sourceId) || (mode === "term" && !!termId) || mode === "duplicates");
 
@@ -400,12 +439,13 @@ export function ExploreWorkspace({
     [drawer, onCanvas.hits, query],
   );
   React.useEffect(() => {
-    if (!onPage) return;
+    // Embedded, `q` is the asset list's: the Find panel keeps its own.
+    if (!onPage || embedded) return;
     const timer = window.setTimeout(() => {
       if (query !== view.q) go({ q: query }, "replace");
     }, 600);
     return () => window.clearTimeout(timer);
-  }, [go, onPage, query, view.q]);
+  }, [embedded, go, onPage, query, view.q]);
 
   // Linking: pull a line from one asset's edge to another's.
   const [linkPair, setLinkPair] = React.useState<{ from: string; to: string } | null>(null);
@@ -503,7 +543,9 @@ export function ExploreWorkspace({
   const seedsShown = graph?.assets.filter((a) => a.side === "seed") ?? [];
   const title = savedView
     ? savedView.name
-    : seedsShown.length
+    : startedFromDefault && seedsShown.length
+      ? t("assets.explore.mapTitle")
+      : seedsShown.length
       ? seedsShown.length > 1
         ? t("explore.titleMany", { name: seedsShown[0]!.label, count: seedsShown.length - 1 })
         : seedsShown[0]!.label
@@ -565,7 +607,9 @@ export function ExploreWorkspace({
   }, [atRoot, data, graph, kinds, mode, t, view.kinds, view.scope, view.view, viewCounts]);
 
   const actions = onPage ? (
-    !empty && (
+    <>
+      {embedded && <SavedViewsMenu current={view.saved} onOpen={(id) => go({ saved: id })} />}
+      {!empty && (
       <>
         <Button
           size="sm"
@@ -612,7 +656,8 @@ export function ExploreWorkspace({
           </DropdownMenuContent>
         </DropdownMenu>
       </>
-    )
+      )}
+    </>
   ) : null;
 
   const details =
@@ -652,7 +697,11 @@ export function ExploreWorkspace({
         // The canvas is the page's main thing wherever it is drawn: like the
         // case board, a screen tall, no box around it (a rule above and below
         // only). It keeps to its page's width; pages pad differently.
-        onPage ? "-mx-4 -mt-2 -mb-4 min-h-[480px]" : "h-[calc(100dvh-7rem)] min-h-[560px] border-y-2 border-border",
+        embedded
+          ? "panel-card h-[min(76vh,820px)] min-h-[520px] rounded-[10px] border-2 border-foreground"
+          : onPage
+            ? "-mx-4 -mt-2 -mb-4 min-h-[480px]"
+            : "h-[calc(100dvh-7rem)] min-h-[560px] border-y-2 border-border",
       )}
       data-testid="explore"
     >
@@ -687,7 +736,15 @@ export function ExploreWorkspace({
 
       <div className="relative flex min-h-0 flex-1">
         <div className="relative min-w-0 flex-1">
-          {empty ? (
+          {empty && embedded ? (
+            defaultSeeds === undefined ? (
+              <div className="flex h-full items-center justify-center">
+                <Loader2 className="size-5 animate-spin text-muted-foreground" aria-label={t("explore.loading")} />
+              </div>
+            ) : (
+              <EmptyState icon={Compass} title={t("assets.explore.emptyTitle")} description={t("assets.explore.emptyHint")} />
+            )
+          ) : empty ? (
             <div className="h-full overflow-y-auto p-4 sm:p-6">
               <div className="mx-auto max-w-5xl">
                 <ExploreHome
@@ -890,5 +947,51 @@ export function ExploreWorkspace({
         onSave={saveAs}
       />
     </div>
+  );
+}
+
+/**
+ * The saved views, from the top bar: inside the assets page the map has no
+ * start page to list them on.
+ */
+function SavedViewsMenu({ current, onOpen }: { current: string | null; onOpen: (id: string) => void }) {
+  const { t } = useTranslation();
+  const [views, setViews] = React.useState<ExploreViewDto[] | null>(null);
+  const load = React.useCallback(() => {
+    api.explore
+      .exploreControllerListViews()
+      .then(setViews)
+      .catch(() => setViews([]));
+  }, []);
+  return (
+    <DropdownMenu modal={false} onOpenChange={(open) => open && load()}>
+      <DropdownMenuTrigger asChild>
+        <Button size="sm" variant="outline" className="h-9 gap-1.5 rounded-[4px] border-2" data-testid="explore-saved-views">
+          <Bookmark className="size-3.5" aria-hidden />
+          {t("explore.home.savedViews")}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-72">
+        {views === null ? (
+          <div className="flex justify-center p-3">
+            <Loader2 className="size-4 animate-spin text-muted-foreground" aria-label={t("explore.loading")} />
+          </div>
+        ) : views.length === 0 ? (
+          <p className="p-3 text-xs text-muted-foreground">{t("assets.explore.noSavedViews")}</p>
+        ) : (
+          views.map((v) => (
+            <DropdownMenuItem key={v.id} onSelect={() => onOpen(v.id)} className={cn(v.id === current && "font-semibold")}>
+              {v.id === current ? <BookmarkCheck className="size-4" /> : <Bookmark className="size-4" />}
+              <span className="min-w-0 flex-1">
+                <span className="block truncate">{v.name}</span>
+                <span className="block truncate text-[11px] text-muted-foreground">
+                  {v.seeds.map((seed) => seed.name).join(", ") || t("explore.home.viewGone")}
+                </span>
+              </span>
+            </DropdownMenuItem>
+          ))
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

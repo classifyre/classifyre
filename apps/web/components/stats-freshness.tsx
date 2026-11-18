@@ -45,10 +45,10 @@ export function StatsFreshness({
   // but the first rollup build is still pending, which is worth saying.
   const label =
     source === "live" || !isBuilt
-      ? t("discovery.stats.building")
+      ? t("dashboard.stats.building")
       : at
-        ? t("discovery.stats.updated", { when: formatRelative(at) })
-        : t("discovery.stats.never");
+        ? t("dashboard.stats.updated", { when: formatRelative(at) })
+        : t("dashboard.stats.never");
 
   return (
     <div className="flex items-center gap-1">
@@ -60,8 +60,8 @@ export function StatsFreshness({
         </TooltipTrigger>
         <TooltipContent side="top" className="max-w-[280px]">
           {source === "live" || !isBuilt
-            ? t("discovery.stats.buildingHint")
-            : t("discovery.stats.updatedHint")}
+            ? t("dashboard.stats.buildingHint")
+            : t("dashboard.stats.updatedHint")}
           {at && (
             <div className="text-muted-foreground/70 mt-1">{formatDate(at)}</div>
           )}
@@ -76,14 +76,14 @@ export function StatsFreshness({
             className="h-7 w-7 p-0 rounded-[4px]"
             onClick={() => void onRefresh()}
             disabled={isRefreshing}
-            aria-label={t("discovery.stats.refresh")}
+            aria-label={t("dashboard.stats.refresh")}
           >
             <RefreshCw
               className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`}
             />
           </Button>
         </TooltipTrigger>
-        <TooltipContent>{t("discovery.stats.refresh")}</TooltipContent>
+        <TooltipContent>{t("dashboard.stats.refresh")}</TooltipContent>
       </Tooltip>
     </div>
   );

@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { GovernanceInsightsService } from './governance-insights.service';
 
 /**
@@ -201,6 +202,57 @@ describe('GovernanceInsightsService.workspaceUsage', () => {
     expect(result.days).toBe(365);
     const top = prisma.$queryRaw.mock.calls[1] as unknown[];
     expect(top).toContain(50);
+  });
+
+  /** The SQL text of a `$queryRaw` tagged-template call, nested parts inlined. */
+  const sqlOf = (call: unknown[]) => {
+    const [strings, ...values] = call as [TemplateStringsArray, ...unknown[]];
+    return Prisma.sql(strings, ...values).sql;
+  };
+
+  it('narrows to shared datasets or scanned assets (the assets page tabs)', async () => {
+    const shared = service([[], []]);
+    await shared.insights.workspaceUsage(null, { kind: 'shared' });
+    expect(sqlOf(shared.prisma.$queryRaw.mock.calls[0])).toContain(
+      "a.source_type::text = 'SHARED_DATASET'",
+    );
+
+    const raw = service([[], []]);
+    await raw.insights.workspaceUsage(null, { kind: 'raw' });
+    expect(sqlOf(raw.prisma.$queryRaw.mock.calls[0])).toContain(
+      "a.source_type::text <> 'SHARED_DATASET'",
+    );
+
+    const any = service([[], []]);
+    await any.insights.workspaceUsage(null, { kind: 'other' });
+    expect(sqlOf(any.prisma.$queryRaw.mock.calls[0])).not.toContain(
+      'SHARED_DATASET',
+    );
+  });
+
+  it('narrows by governance as the asset search does', async () => {
+    const { insights, prisma } = service(
+      [[], []],
+      [{ scopeType: 'SOURCE', scopeId: 's1' }],
+    );
+    await insights.workspaceUsage(null, { governance: 'governed' });
+    expect(prisma.governanceRole.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ role: 'OWNER' }),
+      }),
+    );
+    const call = prisma.$queryRaw.mock.calls[0] as unknown[];
+    expect(sqlOf(call)).toContain('a.source_id = ANY(');
+    expect(Prisma.sql(...(call as [TemplateStringsArray])).values).toEqual(
+      expect.arrayContaining([['s1']]),
+    );
+  });
+
+  it('refuses a governance filter the asset search does not know', async () => {
+    const { insights } = service([[], []]);
+    await expect(
+      insights.workspaceUsage(null, { governance: 'shiny' }),
+    ).rejects.toThrow(/governance is one of/);
   });
 });
 

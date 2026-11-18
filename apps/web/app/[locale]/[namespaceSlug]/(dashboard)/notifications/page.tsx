@@ -56,6 +56,12 @@ import {
 import { formatRelative, formatShortUTC } from "@/lib/date";
 import { useNotificationsWebSocket } from "@/hooks/use-notifications-websocket";
 import { useTranslation } from "@/hooks/use-translation";
+import {
+  tileActiveClass,
+  tileIdleClass,
+  tileIconClass,
+  tileMutedText,
+} from "@/components/panel-card";
 import { useMe } from "@/hooks/use-me";
 import { ActorName } from "@/components/actor-chip";
 
@@ -806,31 +812,35 @@ function QuickFilterCard({
   return (
     <button
       type="button"
+      aria-pressed={active}
       className="group text-left transition-transform hover:-translate-y-px focus-visible:outline-none"
       onClick={onClick}
     >
       <Card
         className={cn(
           "rounded-[6px] border-2",
-          active
-            ? "overflow-hidden border-accent/30 bg-background"
-            : "border-border bg-card transition-all group-hover:bg-secondary/40",
+          active ? cn("overflow-hidden", tileActiveClass) : tileIdleClass,
         )}
       >
         <CardContent className="p-4">
           <div className="flex items-center justify-between gap-2">
             <p
               className={cn(
-                "text-[11px] font-mono uppercase tracking-[0.16em]"
+                "text-[11px] font-mono uppercase tracking-[0.16em]",
+                tileMutedText(active),
               )}
             >
               {label}
             </p>
-            <Icon
+            <span
               className={cn(
-                "h-3.5 w-3.5"
+                "flex size-6 shrink-0 items-center justify-center rounded-[4px]",
+                tileIconClass(active),
               )}
-            />
+              aria-hidden
+            >
+              <Icon className="h-3.5 w-3.5" />
+            </span>
           </div>
           <p
             className="mt-1 text-3xl font-black"

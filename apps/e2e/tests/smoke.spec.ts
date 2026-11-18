@@ -428,10 +428,10 @@ test.describe.serial("smoke with sign-in", () => {
       expect(read.config).toEqual({ type: "LOCAL_FOLDER" });
       // A public workspace never sends a visitor to sign in by itself, even
       // though pages ask for things closed to them (settings, activity, …).
-      await visitorPage.goto(`/${SLUG}/discovery/`);
+      await visitorPage.goto(`/${SLUG}/dashboard/`);
       await expect(visitorPage.getByTestId("sign-in")).toBeVisible({ timeout: 60_000 });
       await visitorPage.waitForTimeout(3_000);
-      expect(new URL(visitorPage.url()).pathname).toContain(`/${SLUG}/discovery`);
+      expect(new URL(visitorPage.url()).pathname).toContain(`/${SLUG}/dashboard`);
       // SQL shows what it can do, and runs nothing for them.
       await visitorPage.goto(`/${SLUG}/query/`);
       await expect(visitorPage.getByTestId("query-teaser")).toBeVisible({ timeout: 60_000 });
