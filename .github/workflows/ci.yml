@@ -87,8 +87,25 @@ jobs:
             bun install --frozen-lockfile
           fi
 
+      # openapi-generator-cli downloads its jar from Maven Central at first use, and
+      # Central rate-limits shared runner IPs (HTTP 429), which fails codegen and then
+      # everything that depends on it. Cache the jar so most runs never hit Central.
+      - name: Restore the OpenAPI generator jar
+        id: openapi-jar
+        uses: actions/cache/restore@v4
+        with:
+          path: node_modules/.bun/@openapitools+openapi-generator-cli@*/node_modules/@openapitools/openapi-generator-cli/versions
+          key: openapi-generator-jar-${{ runner.os }}-${{ hashFiles('packages/api-client/openapitools.json') }}
+
       - name: Generate code
         run: bun run codegen
+
+      - name: Save the OpenAPI generator jar
+        if: always() && steps.openapi-jar.outputs.cache-hit != 'true' && hashFiles('node_modules/.bun/@openapitools+openapi-generator-cli@*/node_modules/@openapitools/openapi-generator-cli/versions/*.jar') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: node_modules/.bun/@openapitools+openapi-generator-cli@*/node_modules/@openapitools/openapi-generator-cli/versions
+          key: ${{ steps.openapi-jar.outputs.cache-primary-key }}
 
       - name: Generate docs artifacts
         run: bun run docs:generate
