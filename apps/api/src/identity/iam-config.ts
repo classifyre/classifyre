@@ -2,9 +2,14 @@
  * Sign-in configuration, from the environment the Helm chart sets
  * (`classifyre.iam.env` in helm/classifyre/templates/_helpers.tpl).
  */
+/** `appOrigin` value that accepts cookie writes from any origin (development only). */
+export const ANY_APP_ORIGIN = '*';
+
 export interface IamConfig {
   /** The token issuer, at the public URL browsers use. */
   issuerUrl: string;
+  /** Development only: tokens from this realm under any host are accepted. */
+  anyIssuerHost?: boolean;
   /** The same realm at the in-cluster URL, for keys and admin lookups. */
   internalRealmUrl: string;
   /** `<internal>/admin/realms/<realm>`. */
@@ -54,8 +59,18 @@ export function readIamConfig(env: NodeJS.ProcessEnv = process.env): IamConfig {
   };
   const realm = required('IAM_REALM');
   const internal = required('IAM_INTERNAL_URL').replace(/\/+$/, '');
+  const anyIssuerHost = env.IAM_ISSUER_ANY_HOST === 'true';
+  // It widens three checks at once (issuer host, cookie-write origin, and with
+  // the chart the identity server's own host), so a production process must
+  // not start with it, whatever the chart's values say.
+  if (anyIssuerHost && env.NODE_ENV === 'production') {
+    throw new Error(
+      'IAM_ISSUER_ANY_HOST is for development only (iam.dynamicHostname) and must not be set when NODE_ENV=production.',
+    );
+  }
   return {
     issuerUrl: required('IAM_ISSUER_URL').replace(/\/+$/, ''),
+    anyIssuerHost,
     internalRealmUrl: `${internal}/realms/${realm}`,
     adminUrl: `${internal}/admin/realms/${realm}`,
     realm,
@@ -63,7 +78,9 @@ export function readIamConfig(env: NodeJS.ProcessEnv = process.env): IamConfig {
     apiClientId: required('IAM_API_CLIENT_ID'),
     apiClientSecret: required('IAM_API_CLIENT_SECRET'),
     bootstrapTenantAlias: env.IAM_BOOTSTRAP_TENANT?.trim() || 'default',
-    appOrigin: originOf(env.IAM_APP_URL),
+    // Development only (`iam.dynamicHostname`): the app is opened by several
+    // addresses, so any origin counts as the app's own (see ANY_APP_ORIGIN).
+    appOrigin: anyIssuerHost ? ANY_APP_ORIGIN : originOf(env.IAM_APP_URL),
   };
 }
 

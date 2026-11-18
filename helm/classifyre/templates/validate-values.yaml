@@ -31,6 +31,14 @@
 {{- /* Production reminder: when postgres.mode=external, set postgres.connection.sslMode to
      "require" or "verify-full". The default "disable" is intentional for embedded/local installs. */ -}}
 
+{{- /* iam.dynamicHostname widens the token issuer, the cookie-write origin check
+     and the identity server's hostname to whatever address the browser used:
+     a development convenience, never a production setting. The API refuses to
+     start with it under NODE_ENV=production as well. */ -}}
+{{- if and .Values.iam.dynamicHostname (ne (toString (.Values.api.env.NODE_ENV | default "")) "development") -}}
+{{- fail "iam.dynamicHostname is for development only: it needs api.env.NODE_ENV=development. Never enable it in production" -}}
+{{- end -}}
+
 {{- if hasKey .Values.iam "enabled" -}}
 {{- fail "iam.enabled is gone: sign-in is always on. Remove it from your values" -}}
 {{- end -}}

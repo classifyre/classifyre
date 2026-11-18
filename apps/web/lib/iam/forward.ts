@@ -90,7 +90,14 @@ export async function forwardIamRequest(
   headers.set("x-forwarded-proto", request.nextUrl.protocol.replace(":", ""));
   // Keycloak builds redirects and the discovery document from the incoming
   // request; without the prefix it would answer with in-cluster URLs.
-  headers.set("x-forwarded-prefix", "/iam");
+  // Not with a dynamic hostname (dev, `iam.dynamicHostname`, which the chart
+  // also signals to this app as IAM_ISSUER_ANY_HOST): the identity server then
+  // adds the prefix to its own relative path, doubling it.
+  if (process.env.IAM_ISSUER_ANY_HOST === "true") {
+    headers.delete("x-forwarded-prefix");
+  } else {
+    headers.set("x-forwarded-prefix", "/iam");
+  }
 
   const hasBody = request.method !== "GET" && request.method !== "HEAD";
   const body = hasBody ? await request.arrayBuffer() : undefined;

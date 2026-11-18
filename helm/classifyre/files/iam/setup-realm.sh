@@ -186,9 +186,22 @@ fi
 
 echo "client classifyre-web"
 WEB_ID=$(find_id clients clientId classifyre-web)
+WEB_EXISTED=true
 if [ -z "$WEB_ID" ]; then
+  WEB_EXISTED=false
   "$KC" create clients -r "$R" -s clientId=classifyre-web
   WEB_ID=$(find_id clients clientId classifyre-web)
+fi
+# Development (iam.dynamicHostname): the app is opened by addresses that change
+# (LAN IPs), which `scripts/dev/web-iam.sh` registers on the client. Leave
+# them alone on an existing client instead of resetting them to the app URL.
+WEB_URLS=(
+  -s "redirectUris=[\"$IAM_APP_URL/auth/callback\"]"
+  -s "webOrigins=[\"$IAM_APP_URL\"]"
+  -s "attributes.\"post.logout.redirect.uris\"=$IAM_APP_URL/*"
+)
+if [ "${IAM_KEEP_CLIENT_URLS:-}" = "true" ] && [ "$WEB_EXISTED" = "true" ]; then
+  WEB_URLS=()
 fi
 "$KC" update "clients/$WEB_ID" -r "$R" \
   -s name=Classifyre \
@@ -200,10 +213,8 @@ fi
   -s serviceAccountsEnabled=false \
   -s fullScopeAllowed=false \
   -s "rootUrl=$IAM_APP_URL" \
-  -s "redirectUris=[\"$IAM_APP_URL/auth/callback\"]" \
-  -s "webOrigins=[\"$IAM_APP_URL\"]" \
-  -s 'attributes."pkce.code.challenge.method"=S256' \
-  -s "attributes.\"post.logout.redirect.uris\"=$IAM_APP_URL/*"
+  ${WEB_URLS[@]+"${WEB_URLS[@]}"} \
+  -s 'attributes."pkce.code.challenge.method"=S256'
 "$KC" update "clients/$WEB_ID/default-client-scopes/$SCOPE_ID" -r "$R" >/dev/null
 if [ -n "$ORG_SCOPE_ID" ]; then
   "$KC" update "clients/$WEB_ID/optional-client-scopes/$ORG_SCOPE_ID" -r "$R" >/dev/null 2>&1 || true

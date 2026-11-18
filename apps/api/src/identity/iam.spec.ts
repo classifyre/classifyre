@@ -1,5 +1,6 @@
 import { generateKeyPairSync, sign, type KeyObject } from 'crypto';
-import { assertIamAllowed, readIamConfig } from './iam-config';
+import { ANY_APP_ORIGIN, assertIamAllowed, readIamConfig } from './iam-config';
+import { isCrossOriginCookieWrite } from './signed-in-request';
 import {
   canCreateWorkspaceFor,
   capabilitiesInWorkspace,
@@ -167,6 +168,52 @@ describe('JwtVerifier', () => {
       failing.verify(signToken(current.privateKey, 'k1', claims)),
     ).rejects.not.toBeInstanceOf(InvalidTokenError);
   });
+
+  describe('with anyIssuerHost (development)', () => {
+    const anyHost = new JwtVerifier({
+      jwksUrl: 'http://iam/certs',
+      issuer: ISSUER,
+      anyIssuerHost: true,
+      audience: 'classifyre-api',
+      fetchImpl,
+    });
+    const verifyIssuer = (iss: string, verifier_ = anyHost) =>
+      verifier_.verify(signToken(current.privateKey, 'k1', { ...claims, iss }));
+
+    it('accepts the same realm under another host', async () => {
+      await expect(
+        verifyIssuer('https://192.168.1.20:3000/iam/realms/classifyre'),
+      ).resolves.toMatchObject({ sub: 'u1' });
+    });
+
+    it.each([
+      ['another realm path', 'https://classifyre.example/iam/realms/other'],
+      ['another scheme', 'http://classifyre.example/iam/realms/classifyre'],
+      ['a non-URL issuer', 'not a url'],
+    ])('still refuses %s', async (_label, iss) => {
+      await expect(verifyIssuer(iss)).rejects.toBeInstanceOf(InvalidTokenError);
+    });
+
+    it('still checks the signature', async () => {
+      await expect(
+        anyHost.verify(
+          signToken(rotated.privateKey, 'k1', {
+            ...claims,
+            iss: 'https://other-host.example/iam/realms/classifyre',
+          }),
+        ),
+      ).rejects.toThrow('Bad signature');
+    });
+
+    it('is off by default', async () => {
+      await expect(
+        verifyIssuer(
+          'https://other-host.example/iam/realms/classifyre',
+          verifier,
+        ),
+      ).rejects.toBeInstanceOf(InvalidTokenError);
+    });
+  });
 });
 
 describe('request tokens and tenants', () => {
@@ -285,6 +332,50 @@ describe('sign-in configuration', () => {
       appOrigin: 'https://classifyre.example',
       bootstrapTenantAlias: 'default',
     });
+  });
+
+  it('accepts any app origin and issuer host only in development', () => {
+    expect(
+      readIamConfig({ ...env, IAM_ISSUER_ANY_HOST: 'true' }),
+    ).toMatchObject({ anyIssuerHost: true, appOrigin: ANY_APP_ORIGIN });
+    expect(
+      readIamConfig({
+        ...env,
+        IAM_ISSUER_ANY_HOST: 'true',
+        NODE_ENV: 'development',
+      }),
+    ).toMatchObject({ anyIssuerHost: true });
+    expect(() =>
+      readIamConfig({
+        ...env,
+        IAM_ISSUER_ANY_HOST: 'true',
+        NODE_ENV: 'production',
+      }),
+    ).toThrow(/development only/);
+    expect(readIamConfig(env)).toMatchObject({ anyIssuerHost: false });
+  });
+
+  it('lets a cookie write from any origin through only with the development origin', () => {
+    const cookie = { via: 'cookie' } as const;
+    expect(
+      isCrossOriginCookieWrite(
+        cookie,
+        'POST',
+        'http://evil.example',
+        ANY_APP_ORIGIN,
+      ),
+    ).toBe(false);
+    expect(
+      isCrossOriginCookieWrite(
+        cookie,
+        'POST',
+        'http://evil.example',
+        'https://classifyre.example',
+      ),
+    ).toBe(true);
+    expect(
+      isCrossOriginCookieWrite(cookie, 'POST', 'http://evil.example', null),
+    ).toBe(true);
   });
 
   it('starts in the all-in-one Docker image too', () => {
@@ -566,10 +657,14 @@ describe('IdentityService', () => {
   it("stops a suspended tenant's MCP agents too", async () => {
     tenantStatus = 'suspended';
     expect(
-      await service({ enabled: true, orgs: ['acme'] }).principalFor('u1', 'ws-ledger', {
-        kind: 'mcp',
-        id: 'tok',
-      }),
+      await service({ enabled: true, orgs: ['acme'] }).principalFor(
+        'u1',
+        'ws-ledger',
+        {
+          kind: 'mcp',
+          id: 'tok',
+        },
+      ),
     ).toBeNull();
   });
 

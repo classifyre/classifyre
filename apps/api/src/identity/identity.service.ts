@@ -150,6 +150,7 @@ export class IdentityService {
       new JwtVerifier({
         jwksUrl: `${config.internalRealmUrl}/protocol/openid-connect/certs`,
         issuer: config.issuerUrl,
+        anyIssuerHost: config.anyIssuerHost,
         audience: config.audience,
       });
   }

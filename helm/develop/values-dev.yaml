@@ -364,9 +364,13 @@ api:
   cliJobs:
     enabled: true
     image:
+      # Published cli:latest plus unixODBC, built and loaded into k3d by
+      # scripts/dev/build-cli-dev-image.sh (run it once per cluster, and again
+      # after pulling a newer cli:latest). IfNotPresent so the node uses the
+      # loaded image instead of pulling docker.io's.
       repository: classifyre/cli
-      tag: latest
-      pullPolicy: Always
+      tag: dev-local
+      pullPolicy: IfNotPresent
     workDir: /app/apps/cli
     cleanupPolicy: failed
     backoffLimit: 0
@@ -404,11 +408,29 @@ api:
       - name: schemas-development-source
         mountPath: /app/packages/schemas/src
         readOnly: true
+      # The dependency manifest travels with the source: the image's copy is
+      # only as new as the last published build, so a source that needs a
+      # group added since (`uv sync --group odbc`) would fail with "Group is
+      # not defined in the project's dependency-groups table".
+      - name: cli-development-pyproject
+        mountPath: /app/apps/cli/pyproject.toml
+        readOnly: true
+      - name: cli-development-lock
+        mountPath: /app/apps/cli/uv.lock
+        readOnly: true
     extraVolumes:
       - name: cli-development-source
         hostPath:
           path: /var/lib/classifyre/source/apps/cli/src
           type: Directory
+      - name: cli-development-pyproject
+        hostPath:
+          path: /var/lib/classifyre/source/apps/cli/pyproject.toml
+          type: File
+      - name: cli-development-lock
+        hostPath:
+          path: /var/lib/classifyre/source/apps/cli/uv.lock
+          type: File
       - name: schemas-development-source
         hostPath:
           path: /var/lib/classifyre/source/packages/schemas/src
@@ -637,6 +659,8 @@ objectStorage:
 # and the issuer in tokens is the host the browser actually sees.
 iam:
   appUrl: http://localhost:3000
+  # Lets `bun run web-iam:dev:lan` sign in from the LAN IP.
+  dynamicHostname: true
   # People who have not signed in read the public workspaces of the first
   # tenant (`default`), read-only (docs/prd/IAM step 8h).
   # As in production: through the app only the realm's identity console

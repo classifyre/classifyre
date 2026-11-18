@@ -1137,6 +1137,8 @@ iam:
     tag: "26.8.1"
     # -- Image pull policy.
     pullPolicy: IfNotPresent
+  # -- Development only: derive the identity server's public host from each request instead of `appUrl`, so the app can be opened by LAN IP. Tokens then carry whatever host the browser used; never enable in production.
+  dynamicHostname: false
   # -- Replicas. More than one forms a cluster over the headless service; minor upgrades still stop all of them.
   replicas: 1
   # -- Path the identity server is served under: the web app proxies it there, the same way it proxies `/api`. Always on the web app's own host — there is no separate public URL to configure.

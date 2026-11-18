@@ -70,6 +70,21 @@ the cluster:
 ./scripts/dev/web-iam.sh
 ```
 
+Live updates (scan progress, notifications, the case board) are Socket.IO
+connections. The browser opens them on the web app's own address, and the
+app forwards `/socket.io` to the API (`next.config.mjs`), as it does for `/api`
+and `/iam`, so one address works from any device or hostname.
+
+To open the app from another device on the same wifi, run
+`bun run web-iam:dev:lan` instead (or `LAN=1 ./scripts/dev/web-iam.sh`). It
+serves on all interfaces under this machine's Bonjour name (`mac.local`, else
+its LAN IP; override with `LAN_HOST=`), and registers that name and the IP as
+redirect URIs on the identity client at every start. This relies on
+`iam.dynamicHostname` in the dev values: the identity server and the API then
+accept whichever host the browser used. It is for development only: the chart
+refuses it unless `api.env.NODE_ENV` is `development`, and the API refuses to
+start with it under `NODE_ENV=production`.
+
 The `iam` database and the `classifyre-iam` Secret both outlive the release
 (the identity server keeps the admin password it was first started with, so
 the two must match). Workspaces made on an older dev stack without sign-in
@@ -101,9 +116,12 @@ that older releases silently mis-handle.
 `create-cluster.sh` is a one-time setup: it creates the `k3d-classifyre`
 cluster, mounts this checkout into the k3d node at
 `/var/lib/classifyre/source`, disables Traefik, installs ingress-nginx, and
-pre-creates the container-owned dependency caches. It is idempotent, but it
-refuses to continue if an existing cluster was created without _this_ checkout
-mounted — delete and recreate in that case.
+pre-creates the container-owned dependency caches, and builds and loads
+`classifyre/cli:dev-local` (the published CLI image plus unixODBC, which it
+predates). It pulls `classifyre/cli:latest` only if this machine has none; run
+`./scripts/dev/build-cli-dev-image.sh` to pull a newer one and reload it. It is
+idempotent, but it refuses to continue if an existing cluster was created
+without _this_ checkout mounted — delete and recreate in that case.
 
 `start.sh` runs `skaffold dev --profile dev --cleanup=false`. Ctrl-C stops
 watching but leaves the release and the Postgres PVC running, so your data

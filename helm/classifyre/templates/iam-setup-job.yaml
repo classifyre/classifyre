@@ -50,6 +50,10 @@ spec:
               value: {{ .Values.iam.realm | quote }}
             - name: IAM_APP_URL
               value: {{ include "classifyre.iam.appUrl" . | quote }}
+            {{- if .Values.iam.dynamicHostname }}
+            - name: IAM_KEEP_CLIENT_URLS
+              value: "true"
+            {{- end }}
             - name: IAM_ACCESS_TOKEN_LIFESPAN
               value: {{ .Values.iam.accessTokenLifespanSeconds | quote }}
             - name: IAM_TENANT_ALIAS

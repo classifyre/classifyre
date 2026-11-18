@@ -47,10 +47,31 @@ export class JwtVerifier {
     private readonly options: {
       jwksUrl: string;
       issuer: string;
+      /**
+       * Development only (`iam.dynamicHostname`): accept the realm under any
+       * host, since tokens carry whichever address the browser used. The
+       * signature is still checked against the realm's keys.
+       */
+      anyIssuerHost?: boolean;
       audience: string;
       fetchImpl?: typeof fetch;
     },
   ) {}
+
+  private issuerMatches(iss: unknown): boolean {
+    if (iss === this.options.issuer) return true;
+    if (!this.options.anyIssuerHost || typeof iss !== 'string') return false;
+    try {
+      const expected = new URL(this.options.issuer);
+      const actual = new URL(iss);
+      return (
+        actual.protocol === expected.protocol &&
+        actual.pathname === expected.pathname
+      );
+    } catch {
+      return false;
+    }
+  }
 
   async verify(token: string): Promise<VerifiedClaims> {
     const parts = token.split('.');
@@ -88,7 +109,7 @@ export class JwtVerifier {
     if (typeof claims.nbf === 'number' && claims.nbf - CLOCK_SKEW_S > now) {
       throw new InvalidTokenError('Token not yet valid');
     }
-    if (claims.iss !== this.options.issuer) {
+    if (!this.issuerMatches(claims.iss)) {
       throw new InvalidTokenError('Token from another issuer');
     }
     const audience = claims.aud;

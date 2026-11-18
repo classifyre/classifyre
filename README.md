@@ -59,7 +59,18 @@ Run the production Helm chart locally on k3d with Skaffold:
 ./scripts/dev/start.sh
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+The first start takes several minutes (image pulls, dependency install, and the
+identity server's one-time setup). The web app is not deployed in the cluster;
+in a second terminal run it on your machine against the stack:
+
+```bash
+./scripts/dev/web-iam.sh
+```
+
+Then open [http://localhost:3000](http://localhost:3000). The API is on
+<http://localhost:8811>. To open the app from another device on the same wifi,
+run `bun run web-iam:dev:lan` instead. Details:
+[`scripts/dev/README.md`](scripts/dev/README.md).
 
 ### Or just run the image
 

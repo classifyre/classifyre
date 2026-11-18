@@ -875,6 +875,10 @@ password
 {{- define "classifyre.iam.env" -}}
 - name: IAM_ISSUER_URL
   value: {{ include "classifyre.iam.issuerUrl" . | quote }}
+{{- if .Values.iam.dynamicHostname }}
+- name: IAM_ISSUER_ANY_HOST
+  value: "true"
+{{- end }}
 - name: IAM_INTERNAL_URL
   value: {{ include "classifyre.iam.internalUrl" . | quote }}
 - name: IAM_SERVICE_URL

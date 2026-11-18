@@ -115,10 +115,19 @@ spec:
               value: {{ include "classifyre.iam.path" . | quote }}
             # Browsers and token issuers use the public URL; the API reaches
             # the server in-cluster, and backchannel URLs follow the request.
+            {{- if .Values.iam.dynamicHostname }}
+            # Dev only: the host follows each request (X-Forwarded-Host from
+            # the web app's /iam proxy), so the app can be opened by LAN IP.
+            - name: KC_HOSTNAME_STRICT
+              value: "false"
+            {{- else }}
             - name: KC_HOSTNAME
               value: {{ include "classifyre.iam.publicUrl" . | quote }}
+            {{- end }}
+            # Keycloak refuses a dynamic backchannel without a fixed hostname;
+            # with a dynamic hostname every URL already follows the request.
             - name: KC_HOSTNAME_BACKCHANNEL_DYNAMIC
-              value: "true"
+              value: {{ if .Values.iam.dynamicHostname }}"false"{{ else }}"true"{{ end }}
             - name: KC_PROXY_HEADERS
               value: xforwarded
             - name: KC_HEALTH_ENABLED

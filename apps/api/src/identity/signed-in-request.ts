@@ -4,6 +4,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { AuthenticationError, type Principal } from './identity.service';
+import { ANY_APP_ORIGIN } from './iam-config';
 
 /** Methods that change something; a cookie may only send these same-origin. */
 export const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
@@ -21,6 +22,8 @@ export function isCrossOriginCookieWrite(
 ): boolean {
   if (principal.via !== 'cookie') return false;
   if (!UNSAFE_METHODS.has(method.toUpperCase())) return false;
+  // Development only (`iam.dynamicHostname`): the app has no single origin.
+  if (appOrigin === ANY_APP_ORIGIN) return false;
   return !appOrigin || origin !== appOrigin;
 }
 
