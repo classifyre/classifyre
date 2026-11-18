@@ -4,7 +4,7 @@ import * as React from "react";
 import { io, type Socket } from "socket.io-client";
 import { toast } from "sonner";
 import { useNamespace } from "@/components/namespace-provider";
-import { getWebSocketUrl } from "@/hooks/use-notifications-websocket";
+import { getWebSocketUrl } from "@/lib/websocket-url";
 import { useTranslation } from "@/hooks/use-translation";
 import { useBoardStore } from "../store/board-context";
 

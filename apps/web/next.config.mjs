@@ -11,6 +11,19 @@ const LOCALES = ["en", "de"];
 const DEFAULT_LOCALE = "en";
 const LOCALE_ALTERNATION = LOCALES.join("|");
 
+// Where `/socket.io` is forwarded (see the rewrites below); mirrors
+// `apiBaseUrls()` in lib/api-upstream.ts, first absolute candidate wins.
+const apiUpstream = (
+  [
+    process.env.INTERNAL_API_URL,
+    process.env.API_URL,
+    process.env.NEXT_PUBLIC_API_URL,
+  ]
+    .map((value) => value?.trim())
+    .find((value) => value && /^https?:\/\//i.test(value)) ||
+  "http://127.0.0.1:8811"
+).replace(/\/+$/, "");
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
@@ -18,12 +31,25 @@ const nextConfig = {
   // server per build folder, so it needs a folder of its own.
   distDir: process.env.NEXT_DIST_DIR || ".next",
   trailingSlash: true,
+  // Next treats `socket.io` as a file name (a dot and an extension) and 308s
+  // `/socket.io/` to `/socket.io` before rewrites run; a WebSocket upgrade
+  // cannot follow a redirect, so Socket.IO would never connect. Pages are
+  // unaffected: they still resolve with or without the slash, and the app's
+  // own links keep the slash.
+  skipTrailingSlashRedirect: true,
   outputFileTracingRoot: path.join(__dirname, "../../"),
   transpilePackages: ["@workspace/ui", "@workspace/case-board"],
   typescript: {
     ignoreBuildErrors: process.env.NEXT_IGNORE_BUILD_ERRORS === "1",
   },
-  allowedDevOrigins: ["127.0.0.1", "localhost", "classifyre.localhost"],
+  allowedDevOrigins: [
+    "127.0.0.1",
+    "localhost",
+    "classifyre.localhost",
+    ...(process.env.NEXT_ALLOWED_DEV_ORIGIN
+      ? process.env.NEXT_ALLOWED_DEV_ORIGIN.split(",")
+      : []),
+  ],
     // The documentation site (apps/docs) is a static export copied into
     // `public/docs` by `bun run docs:bundle`, so every page of it is a
     // directory holding an `index.html`. Next's public-file handler only serves
@@ -61,6 +87,20 @@ const nextConfig = {
         // that merely starts with those letters and a workspace named
         // `england` 404s.
         beforeFiles: [
+          // Socket.IO (runners, notifications, case board) is served by the
+          // API; the browser connects to this app's own origin and Next
+          // forwards the upgrade, as it does for `/api`. Same upstream order
+          // as `lib/api-upstream.ts`. Placed ahead of the locale rule with
+          // `socket.io/` excluded from it, like `api/` and `mcp/`. Both
+          // spellings: the Socket.IO client asks for `/socket.io/`.
+          {
+            source: "/socket.io",
+            destination: `${apiUpstream}/socket.io/`,
+          },
+          {
+            source: "/socket.io/",
+            destination: `${apiUpstream}/socket.io/`,
+          },
           { source: "/", destination: `/${DEFAULT_LOCALE}` },
           // Namespace-scoped MCP endpoint, served through this frontend in two
           // shapes: `/mcp/<namespace>` (collision-proof) and the canonical
@@ -95,7 +135,7 @@ const nextConfig = {
             destination: "/api/:namespace/mcp/:path*",
           },
           {
-            source: `/:path((?!(?:${LOCALE_ALTERNATION})(?:/|$)|api/|auth/|iam/|mcp/|_next/|sitemap/|sitemap\\.xml|robots\\.txt|manifest\\.json|classifyre-cfg|classifyre-usr/|favicon\\.ico|icon0\\.svg|icon1\\.png|apple-icon\\.png|docs/.|[^/]+\\.[a-zA-Z0-9]+$).*)`,
+            source: `/:path((?!(?:${LOCALE_ALTERNATION})(?:/|$)|api/|auth/|iam/|mcp/|socket\\.io/|_next/|sitemap/|sitemap\\.xml|robots\\.txt|manifest\\.json|classifyre-cfg|classifyre-usr/|favicon\\.ico|icon0\\.svg|icon1\\.png|apple-icon\\.png|docs/.|[^/]+\\.[a-zA-Z0-9]+$).*)`,
             destination: `/${DEFAULT_LOCALE}/:path`,
           },
         ],

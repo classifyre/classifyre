@@ -5,26 +5,7 @@ import { io, type Socket } from "socket.io-client";
 import type { RunnerDto, RunnerLogEntryDto } from "@workspace/api-client";
 import { parseRunnerSocketPayload } from "@/lib/runner-ws-merge";
 import { useNamespace } from "@/components/namespace-provider";
-
-const getWebSocketUrl = () => {
-  if (process.env.NEXT_PUBLIC_WS_URL) {
-    return process.env.NEXT_PUBLIC_WS_URL;
-  }
-
-  if (process.env.NODE_ENV === "development") {
-    return "http://localhost:8000";
-  }
-
-  if (typeof window !== "undefined") {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-    if (apiUrl && !apiUrl.startsWith("/")) {
-      return apiUrl;
-    }
-    return window.location.origin;
-  }
-
-  return "http://localhost:8000";
-};
+import { getWebSocketUrl } from "@/lib/websocket-url";
 
 const WS_URL = getWebSocketUrl();
 

@@ -3,26 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
 import { useNamespace } from "@/components/namespace-provider";
-
-export const getWebSocketUrl = () => {
-  if (process.env.NEXT_PUBLIC_WS_URL) {
-    return process.env.NEXT_PUBLIC_WS_URL;
-  }
-
-  if (typeof window !== "undefined") {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-    if (apiUrl) {
-      if (apiUrl.startsWith("/")) {
-        return window.location.origin;
-      }
-      return apiUrl;
-    }
-
-    return window.location.origin;
-  }
-
-  return "http://localhost:8000";
-};
+import { getWebSocketUrl } from "@/lib/websocket-url";
 
 const WS_URL = getWebSocketUrl();
 
