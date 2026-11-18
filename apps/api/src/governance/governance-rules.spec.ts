@@ -270,6 +270,32 @@ describe('governanceAssetWhere (GOV §5.6)', () => {
     });
   });
 
+  it('narrows the governed to those failing quality, in both forms', async () => {
+    const where = await governanceAssetWhere(
+      db,
+      { governance: 'governed', quality: 'failing' },
+      null,
+    );
+    expect(where).toEqual({
+      AND: expect.arrayContaining([
+        {
+          findings: { some: { detectorType: 'QUALITY', status: 'OPEN' } },
+        },
+      ]),
+    });
+    expect((where as { AND: unknown[] }).AND).toHaveLength(2);
+    const sql = await governanceAssetSql(
+      db,
+      { governance: 'governed', quality: 'failing' },
+      null,
+    );
+    expect(sql?.sql).toContain("qf.detector_type = 'QUALITY'");
+    expect(sql?.sql).toContain('a.source_id = ANY(');
+    await expect(
+      governanceAssetWhere(db, { quality: 'passing' }, null),
+    ).rejects.toThrow(/quality is failing/);
+  });
+
   it('refuses unknown values and `me` without a person', async () => {
     await expect(
       governanceAssetWhere(db, { governance: 'owned' }, null),

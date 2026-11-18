@@ -6,9 +6,7 @@ import type { GovernanceDashboardDto } from "@workspace/api-client";
 import { FINDING_SEVERITY_COLOR_BY_LEVEL } from "@workspace/ui/lib/finding-severity";
 import { CardFootnote, PanelCard } from "@/components/panel-card";
 import { useTranslation } from "@/hooks/use-translation";
-import { useNsPath } from "@/lib/ns-path";
-import type { DashboardScope } from "@/lib/governance";
-import { assetsHref } from "@/lib/dashboard-links";
+import type { AssetsLink } from "@/lib/dashboard-links";
 import type { TranslationKey } from "@/i18n";
 
 const SEVERITY_RANK = ["critical", "high", "medium", "low", "info"] as const;
@@ -29,15 +27,12 @@ const NOTHING = "#111827";
  */
 export function QualityBriefCard({
   dashboard,
-  scope,
-  sourceId,
+  link,
 }: {
   dashboard: GovernanceDashboardDto | null;
-  scope: DashboardScope;
-  sourceId: string | null;
+  link: AssetsLink;
 }) {
   const { t } = useTranslation();
-  const nsPath = useNsPath();
   const totals = dashboard?.totals;
   const score = totals?.score ?? null;
   const failing = totals?.failing ?? 0;
@@ -118,7 +113,7 @@ export function QualityBriefCard({
       <CardFootnote tone="inverted">
         {failing > 0 ? (
           <Link
-            href={nsPath(assetsHref("failing", scope, sourceId))}
+            href={link("failing")}
             className="group/fail inline-flex items-center gap-1 text-white/90 hover:text-white"
             data-testid="quality-failing"
           >

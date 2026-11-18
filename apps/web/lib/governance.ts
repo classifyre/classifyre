@@ -16,6 +16,7 @@ import {
   type GovernanceRoleDto,
   type SourceGovernanceDto,
 } from "@workspace/api-client";
+import type { AssetKind } from "@/lib/dashboard-links";
 
 /**
  * Governed data assets in the web app (docs/prd/GOV-governed-data-assets.md).
@@ -183,7 +184,7 @@ export function useGovernanceDashboard(filters: DashboardFilters) {
 export function useGovernanceUsage(
   filters: DashboardFilters & {
     sort: "used" | "rising";
-    kind?: "raw" | "shared";
+    kind?: AssetKind;
     governance?: "governed";
   },
 ) {

@@ -1704,6 +1704,8 @@
     "allSources": "All sources",
     "responsibleMe": "Only assets I answer for",
     "responsibleMeClear": "Show all assets, not only those I answer for",
+    "qualityFailing": "Failing quality",
+    "qualityFailingClear": "Show governed assets whatever their quality",
     "detectorTypes": "Detector types",
     "assetStatus": "Asset status",
     "noAssets": "No assets found",
@@ -3365,9 +3367,6 @@
       "all": "Every asset in this workspace",
       "governed": "assets governed",
       "rail": "Governance coverage",
-      "certified": "Certified",
-      "notCertified": "Not certified yet",
-      "ungoverned": "Ungoverned",
       "governedShare": "{{percent}}% governed",
       "certifiedShare": "{{percent}}% of governed certified",
       "empty": "No assets yet. Add a source and run a scan to see what there is to govern."
@@ -3377,13 +3376,13 @@
       "score": "Quality score",
       "noScore": "No score yet",
       "none": "No quality rules on these assets yet.",
-      "failing": "{{count}} assets failing a rule",
+      "failing": "{{count}} governed assets failing a rule",
       "allPassing": "Every rule passes",
       "howTo": "Add rules on an asset's Governance tab"
     },
     "incoming": {
       "label": "Incoming",
-      "requests": "Access requests waiting for you",
+      "requests": "Access requests waiting for you now",
       "readsToday": "Reads today",
       "readsPeriod": "Reads in {{days}} days",
       "exports": "{{count}} exports",
@@ -3457,7 +3456,6 @@
   "explore": {
     "title": "Explore",
     "titleMany": "{{name}} and {{count}} more",
-    "cardTitle": "Explore connections",
     "ledger": "What is on the canvas",
     "spotlightClear": "Show everything again",
     "inCases": "In cases",
@@ -3744,11 +3742,6 @@
     "zoomSelection": "Zoom to selection",
     "minimap": "Mini-map",
     "backTo": "Back to {{name}}"
-  },
-  "casework": {
-    "title": "Casework",
-    "subtitle": "Cases and inquiry watches in flight",
-    "viewAll": "View all"
   },
   "breadcrumb": {
     "home": "Home",
@@ -6527,12 +6520,6 @@
       "ogTitle": "Dashboard | Classifyre",
       "ogDescription": "Governed and ungoverned assets, quality, usage and access requests — for the assets you answer for or the whole workspace."
     },
-    "explore": {
-      "title": "Explore — Connections, Lineage & Look-alikes",
-      "description": "Start from a search and follow what an asset is connected to: lineage, duplicates, shared values, shared glossary concepts and likeness by meaning — every link with its reason, and links you draw yourself.",
-      "ogTitle": "Explore connections | Classifyre",
-      "ogDescription": "Search, then follow lineage, duplicates, shared concepts and look-alikes — each link with its reason."
-    },
     "query": {
       "title": "Query data — SQL over your tables",
       "description": "Query the rows of the database, lakehouse and file tables you have access to with standard SQL, and join tables across sources.",
@@ -7178,7 +7165,7 @@
         "update": "Governance details edited",
         "status": {
           "draft": "Set to draft",
-          "active": "Certified (active)",
+          "active": "Certified",
           "deprecated": "Deprecated",
           "retired": "Retired"
         },
@@ -8373,7 +8360,6 @@
       "retired": "Retired"
     },
     "page": {
-      "emptyTitle": "No shared datasets yet",
       "emptyLead": "Write a query on the Query data page and choose Share as dataset.",
       "locked": "You cannot read it yet: open it to request access"
     },

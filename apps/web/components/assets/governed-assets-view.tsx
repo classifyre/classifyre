@@ -7,6 +7,7 @@ import {
   type UsageSort,
 } from "@/components/dashboard/usage-chart-card";
 import { useGovernanceUsage } from "@/lib/governance";
+import { useUrlParams } from "@/lib/url-filters";
 
 const DAYS = 30;
 
@@ -17,8 +18,12 @@ const DAYS = 30;
  */
 export function GovernedAssetsView() {
   const [sort, setSort] = useState<UsageSort>("used");
+  // The charts follow the list's scope: yours (from the dashboard's *Mine*)
+  // and the source picked, both kept in the address.
+  const { searchParams } = useUrlParams();
   const usage = useGovernanceUsage({
-    scope: "all",
+    scope: searchParams.get("responsible") === "me" ? "mine" : "all",
+    sourceId: searchParams.get("source"),
     days: DAYS,
     sort,
     governance: "governed",

@@ -121,6 +121,32 @@ export class SearchAssetsFiltersDto extends OmitType(QueryAssetsDto, [
   @ArrayMaxSize(200)
   @IsString({ each: true })
   ids?: string[];
+
+  @ApiPropertyOptional({
+    enum: ['failing'],
+    description:
+      '`failing`: assets with a failing quality rule, whatever their governance. Combines with `governance` (e.g. governed and failing).',
+  })
+  @IsOptional()
+  @IsIn(['failing'])
+  quality?: 'failing';
+
+  @ApiPropertyOptional({
+    enum: ['live', 'blocked', 'unavailable', 'retired'],
+    description:
+      'Shared datasets that can be read now (`live`), are blocked, cannot be read (an input is missing), or are retired.',
+  })
+  @IsOptional()
+  @IsIn(['live', 'blocked', 'unavailable', 'retired'])
+  datasetState?: 'live' | 'blocked' | 'unavailable' | 'retired';
+
+  @ApiPropertyOptional({
+    description: 'Shared datasets promoted (true) or not (false).',
+  })
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  promoted?: boolean;
 }
 
 const normalizeToStringArray = (value: unknown, uppercase = false) => {

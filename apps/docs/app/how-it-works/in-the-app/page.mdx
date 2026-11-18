@@ -1,6 +1,6 @@
 ---
 title: A Tour of the App
-description: Every screen in the Classifyre app, what it is for, and where to learn more — Discovery, Sources, Scans, Assets, Findings, Duplicate Review, Investigations, Glossary, and beyond.
+description: Every screen in the Classifyre app, what it is for, and where to learn more — Dashboard, Sources, Scans, Assets, Query data, Findings, Duplicate Review, Investigations, Glossary, and beyond.
 ---
 
 # A Tour of the App
@@ -39,20 +39,28 @@ assets you own or steward, *All* the whole workspace; pick 7, 30 or 90 days and
 a source. It has three cards across the top:
 
 - **Governance brief** — how many assets are governed, out of how many, and one
-  bar that splits them into certified, not certified yet, and ungoverned.
-- **Quality** — the quality score and each dimension's score. The card takes the
-  colour of the most severe failing rule, the same scale findings use; it turns
-  green when every rule passes.
-- **Incoming** — access requests waiting for you, and how often your data was
-  read today and over the period.
+  bar that splits them by lifecycle (certified, draft, deprecated, retired) and
+  the ungoverned rest.
+- **Quality** — the quality score and each dimension's score, and how many
+  governed assets fail a quality rule. The card takes the colour of the most
+  severe failing rule, the same scale findings use; it turns green when every
+  rule passes.
+- **Incoming** — access requests waiting for you right now (whatever the period
+  or source), and how often your data was read today and over the period.
 
 Below them: usage over the period, with the assets read most or whose use grew
 most; what waits on you (access requests to approve or decline in place,
 failing quality, unfinished governance, and the unowned assets read most, each
 shown only when there is something in it); and quality results per day.
 
-Every number opens the matching assets on the Assets page, with the same
-filter. Findings and scans have their own pages in the sidebar.
+Every count of assets opens those assets on the Assets page, with the same
+filter: each part of the governance bar, the failing assets, the assets to
+govern first. The Incoming request count leads to the requests to decide, on
+the same page.
+
+Findings and scans have their own summaries: the **Findings** page opens on
+counts by priority and a trend over time, the **Scans** page on counts by
+status. Both are in the sidebar.
 
 ## Explore
 
@@ -108,8 +116,9 @@ the same asset list, showing the columns and filters that matter there:
   detector or governance, and see which assets carry the most findings and
   which sources hold the most assets.
 - **Governed assets** — every asset someone owns, scanned or shared: how often
-  they were read over the last 30 days and which were read most. Narrow the
-  list to a lifecycle, to failing quality, or to your own.
+  they were read over the last 30 days and which were read most (for your own
+  assets and one source, when the list is narrowed to them). Narrow the list to
+  a lifecycle, to failing quality, or to your own.
 - **Shared assets** — saved queries shared as governed datasets: how often they
   were read, and where they stand (their lifecycle, and whether they can be
   read now). Each row carries its dataset labels: promoted, blocked, or locked

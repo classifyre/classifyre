@@ -9,6 +9,9 @@ Name | Type
 `assets` | number
 `governed` | number
 `certified` | number
+`draft` | number
+`deprecated` | number
+`retired` | number
 `failing` | number
 `score` | number
 
@@ -22,6 +25,9 @@ const example = {
   "assets": null,
   "governed": null,
   "certified": null,
+  "draft": null,
+  "deprecated": null,
+  "retired": null,
   "failing": null,
   "score": null,
 } satisfies DashboardTotalsDto

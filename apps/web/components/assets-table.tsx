@@ -40,6 +40,7 @@ import {
   type SearchAssetsResponseDto,
   type SearchAssetsSortBy,
   type SearchAssetsSortOrder,
+  type SearchAssetsFiltersDtoDatasetStateEnum,
   type SharedDatasetSummaryDto,
   type SourceListItem,
 } from "@workspace/api-client";
@@ -98,6 +99,7 @@ import { ActorChip } from "@/components/actor-chip";
 import { DatasetBadges } from "@/components/shared-datasets/dataset-cards";
 import type { ExploreViewName } from "@/lib/explore";
 import { EXPLORE_MAX_SEEDS } from "@/lib/explore";
+import type { AssetKind } from "@/lib/dashboard-links";
 
 type AssetsTableScope = {
   sourceId?: string;
@@ -111,7 +113,7 @@ type AssetsTableProps = {
   scope?: AssetsTableScope;
   initialPageSize?: number;
   /** `raw`: scanned assets only; `shared`: shared datasets only. */
-  kind?: "raw" | "shared";
+  kind?: AssetKind;
   /**
    * The governance filter when the URL names none, kept out of the URL. Set,
    * the list is that filter's own (the Governed tab): *All* and *Ungoverned*
@@ -130,11 +132,13 @@ type AssetsTableProps = {
   /** Add the picked rows to what the map already shows. */
   onAddToMap?: (assetIds: string[]) => void;
   /**
-   * Only these assets, with the usual paging and sorting (the Shared tab's
-   * availability and promoted filters, worked out from the datasets list).
-   * null: no such restriction.
+   * The Shared tab's own filters, sent with the others: whether a dataset can
+   * be read now, and whether it is promoted.
    */
-  onlyIds?: string[] | null;
+  datasetFilters?: {
+    datasetState?: SearchAssetsFiltersDtoDatasetStateEnum;
+    promoted?: boolean;
+  };
   /** Assets drawn on the map right now: their rows are marked. */
   onMap?: ReadonlySet<string>;
   /** First in the filter bar (the Explore tab's "Start from"). */
@@ -399,6 +403,8 @@ function buildRequest({
   searchMode,
   kind,
   responsibleMe = false,
+  qualityFailing = false,
+  datasetFilters,
   ids,
 }: {
   draft: FilterDraft;
@@ -408,9 +414,12 @@ function buildRequest({
   scope?: AssetsTableScope;
   assetStatuses: AssetStatusFilterValue[];
   searchMode: SearchMode;
-  kind?: "raw" | "shared";
+  kind?: AssetKind;
   /** The dashboard's *Mine*: assets the person owns or stewards. */
   responsibleMe?: boolean;
+  /** Only assets with a failing quality rule (`?quality=failing`). */
+  qualityFailing?: boolean;
+  datasetFilters?: AssetsTableProps["datasetFilters"];
   /** Only these assets. */
   ids?: string[];
 }): SearchAssetsRequestInputDto {
@@ -422,6 +431,9 @@ function buildRequest({
     status: assetStatuses.length > 0 ? assetStatuses : undefined,
     kind,
     responsibleRef: responsibleMe ? "me" : undefined,
+    quality: qualityFailing ? "failing" : undefined,
+    datasetState: datasetFilters?.datasetState,
+    promoted: datasetFilters?.promoted,
     ids: ids?.length ? ids : undefined,
     ...(draft.governance === "mine"
       ? { ownerRef: "me" }
@@ -642,7 +654,7 @@ export function AssetsTable({
   pinned = null,
   onExplore,
   onAddToMap,
-  onlyIds = null,
+  datasetFilters,
   onMap,
   toolbar,
 }: AssetsTableProps) {
@@ -660,7 +672,8 @@ export function AssetsTable({
     (controls as readonly string[]).includes(control);
   // A stable key for the pinned list, so a new Map with the same ids refetches nothing.
   const pinnedKey = pinned ? pinned.ids.join(",") : null;
-  const onlyKey = onlyIds ? onlyIds.join(",") : null;
+  // A stable key for the dataset filters, so a new object refetches nothing.
+  const datasetKey = JSON.stringify(datasetFilters ?? {});
   // Rows picked to explore together.
   const [picked, setPicked] = useState<string[]>([]);
   const togglePicked = (id: string) =>
@@ -683,6 +696,10 @@ export function AssetsTable({
   );
 
   // Set by the dashboard's links under *Mine*; cleared with the chip.
+  // Set by the dashboard's failing-quality links; cleared with its chip.
+  const [qualityFailing, setQualityFailing] = useState(
+    () => searchParams.get("quality") === "failing",
+  );
   const [responsibleMe, setResponsibleMe] = useState(
     () => searchParams.get("responsible") === "me",
   );
@@ -783,10 +800,19 @@ export function AssetsTable({
         draft.governance !== governanceDefault ? draft.governance : null,
       status: assetStatuses.length > 0 ? assetStatuses : null,
       responsible: responsibleMe ? "me" : null,
+      quality: qualityFailing ? "failing" : null,
       sortBy: sort.by !== DEFAULT_SORT.by ? sort.by : null,
       sortOrder: sort.order !== DEFAULT_SORT.order ? sort.order : null,
     });
-  }, [draft, sort, assetStatuses, responsibleMe, governanceDefault, setParams]);
+  }, [
+    draft,
+    sort,
+    assetStatuses,
+    responsibleMe,
+    qualityFailing,
+    governanceDefault,
+    setParams,
+  ]);
 
   useEffect(() => {
     let active = true;
@@ -825,8 +851,9 @@ export function AssetsTable({
     searchMode,
     assetStatuses,
     responsibleMe,
+    qualityFailing,
     pinnedKey,
-    onlyKey,
+    datasetKey,
   ]);
 
   useEffect(() => {
@@ -838,12 +865,7 @@ export function AssetsTable({
         // would not narrow the search at all).
         const pinnedIds =
           pinnedKey === null ? null : pinnedKey.split(",").filter(Boolean);
-        const onlyList =
-          onlyKey === null ? null : onlyKey.split(",").filter(Boolean);
-        if (
-          (pinnedIds && pinnedIds.length === 0) ||
-          (onlyList && onlyList.length === 0)
-        ) {
+        if (pinnedIds && pinnedIds.length === 0) {
           setError(null);
           setData({ items: [], total: 0, skip: 0, limit: resolvedPageSize });
           return;
@@ -868,7 +890,11 @@ export function AssetsTable({
           searchMode,
           kind,
           responsibleMe,
-          ids: pinnedIds ?? onlyList ?? undefined,
+          qualityFailing,
+          datasetFilters: JSON.parse(
+            datasetKey,
+          ) as AssetsTableProps["datasetFilters"],
+          ids: pinnedIds ?? undefined,
         });
 
         const response = await api.searchAssets(request);
@@ -920,8 +946,9 @@ export function AssetsTable({
     searchMode,
     kind,
     responsibleMe,
+    qualityFailing,
     pinnedKey,
-    onlyKey,
+    datasetKey,
   ]);
 
   const items = data?.items ?? [];
@@ -1109,6 +1136,21 @@ export function AssetsTable({
               ))}
             </SelectContent>
           </Select>
+        )}
+
+        {qualityFailing && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-9 gap-1.5 rounded-[4px] border-2 border-foreground"
+            onClick={() => setQualityFailing(false)}
+            aria-label={t("assets.qualityFailingClear")}
+            data-testid="quality-failing-filter"
+          >
+            {t("assets.qualityFailing")}
+            <X className="h-3.5 w-3.5" aria-hidden />
+          </Button>
         )}
 
         {responsibleMe && (

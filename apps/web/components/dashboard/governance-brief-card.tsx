@@ -5,11 +5,10 @@ import { ShieldCheck } from "lucide-react";
 import type { DashboardTotalsDto } from "@workspace/api-client";
 import { CardFootnote, FootnoteDot, PanelCard } from "@/components/panel-card";
 import { useTranslation } from "@/hooks/use-translation";
-import { useNsPath } from "@/lib/ns-path";
 import type { DashboardScope } from "@/lib/governance";
-import { assetsHref, type AssetsDrill } from "@/lib/dashboard-links";
+import type { AssetsLink } from "@/lib/dashboard-links";
 import {
-  HATCH,
+  LIFECYCLE_LOOK,
   RailLegend,
   SegmentRail,
   type RailSegment,
@@ -19,24 +18,20 @@ import {
  * The hero of the dashboard: how much of the data someone answers for.
  *
  * One number (governed) over the whole (assets), and one rail that splits the
- * whole three ways — certified, governed but not certified yet, ungoverned —
- * so the next job reads off its longest hatched or dark stretch. Every part of
- * the rail, and every count under it, opens those assets.
+ * whole by lifecycle — certified, draft, deprecated, retired — and the
+ * ungoverned rest, so the next job reads off its longest stretch. Every part
+ * of the rail, and every count under it, opens exactly those assets.
  */
 export function GovernanceBriefCard({
   totals,
   scope,
-  sourceId,
+  link,
 }: {
   totals: DashboardTotalsDto | undefined;
   scope: DashboardScope;
-  sourceId: string | null;
+  link: AssetsLink;
 }) {
   const { t } = useTranslation();
-  const nsPath = useNsPath();
-  const href = (drill: AssetsDrill | null) =>
-    nsPath(assetsHref(drill, scope, sourceId));
-
   const assets = totals?.assets ?? 0;
   const governed = totals?.governed ?? 0;
   const certified = totals?.certified ?? 0;
@@ -46,26 +41,38 @@ export function GovernanceBriefCard({
   const segments: RailSegment[] = [
     {
       key: "certified",
-      label: t("dashboard.brief.certified"),
-      href: href("active"),
+      label: t("governance.status.ACTIVE"),
+      href: link("active"),
       count: certified,
-      className: "bg-accent text-accent-foreground",
+      ...LIFECYCLE_LOOK.ACTIVE,
     },
     {
-      key: "notCertified",
-      label: t("dashboard.brief.notCertified"),
-      href: href("draft"),
-      count: Math.max(0, governed - certified),
-      className: "bg-foreground text-background",
+      key: "draft",
+      label: t("governance.status.DRAFT"),
+      href: link("draft"),
+      count: totals?.draft ?? 0,
+      ...LIFECYCLE_LOOK.DRAFT,
+    },
+    {
+      key: "deprecated",
+      label: t("governance.status.DEPRECATED"),
+      href: link("deprecated"),
+      count: totals?.deprecated ?? 0,
+      ...LIFECYCLE_LOOK.DEPRECATED,
+    },
+    {
+      key: "retired",
+      label: t("governance.status.RETIRED"),
+      href: link("retired"),
+      count: totals?.retired ?? 0,
+      ...LIFECYCLE_LOOK.RETIRED,
     },
     {
       key: "ungoverned",
-      label: t("dashboard.brief.ungoverned"),
-      href: href("ungoverned"),
+      label: t("governance.status.UNGOVERNED"),
+      href: link("ungoverned"),
       count: Math.max(0, assets - governed),
-      className: "bg-card text-foreground",
-      style: HATCH,
-      chip: true,
+      ...LIFECYCLE_LOOK.UNGOVERNED,
     },
   ];
 
@@ -86,7 +93,7 @@ export function GovernanceBriefCard({
       </div>
 
       <Link
-        href={href("governed")}
+        href={link("governed")}
         className="group block w-fit"
         data-testid="brief-governed"
       >
@@ -118,7 +125,11 @@ export function GovernanceBriefCard({
             testId="governance-rail"
           />
         )}
-        <RailLegend segments={segments} testIdPrefix="brief" />
+        <RailLegend
+          segments={segments}
+          testIdPrefix="brief"
+          columns="grid-cols-3 sm:grid-cols-5"
+        />
       </div>
 
       <CardFootnote>

@@ -579,7 +579,22 @@ export class DashboardTotalsDto {
   certified: number;
 
   @ApiProperty({
-    description: 'With a failing quality rule (an open QUALITY finding).',
+    description: 'Governed and DRAFT (or no lifecycle set yet).',
+  })
+  draft: number;
+
+  @ApiProperty({ description: 'Governed and DEPRECATED.' })
+  deprecated: number;
+
+  @ApiProperty({
+    description:
+      'Governed and RETIRED. certified + draft + deprecated + retired = governed.',
+  })
+  retired: number;
+
+  @ApiProperty({
+    description:
+      'Governed, with a failing quality rule (an open QUALITY finding).',
   })
   failing: number;
 

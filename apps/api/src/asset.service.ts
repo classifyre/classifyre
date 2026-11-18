@@ -64,6 +64,10 @@ import {
 } from './embedding/embedding-text';
 import { chooseMatch, type AssetMatch } from './embedding/chunk-lexical';
 import { fuseHybridRanks } from './embedding/hybrid-rank';
+import {
+  datasetAssetSql,
+  datasetAssetWhere,
+} from './utils/shared-dataset-filter';
 import { EmbeddingService } from './embedding/embedding.service';
 import { QueryEmbeddingService } from './embedding/query-embedding.service';
 import { EmbeddingQueueService } from './embedding/embedding-queue.service';
@@ -1455,6 +1459,19 @@ export class AssetService {
       where.sourceType = AssetType.SHARED_DATASET;
     }
 
+    // A shared dataset's availability and whether it is promoted (DQ §5.12).
+    const datasetWhere = datasetAssetWhere(assetFilters);
+    if (datasetWhere) {
+      where.AND = [
+        ...(Array.isArray(where.AND)
+          ? where.AND
+          : where.AND
+            ? [where.AND]
+            : []),
+        datasetWhere,
+      ];
+    }
+
     // Governance (GOV §5.6): owned or not, lifecycle, owner, steward.
     const governanceWhere = await governanceAssetWhere(
       this.prisma,
@@ -1781,6 +1798,9 @@ export class AssetService {
         Prisma.sql`a.source_type::text = ${AssetType.SHARED_DATASET}`,
       );
     }
+
+    const datasetSql = datasetAssetSql(assetFilters);
+    if (datasetSql) assetConditions.push(datasetSql);
 
     // Governance (GOV §5.6), as the asset list applies it.
     const governanceSql = await governanceAssetSql(

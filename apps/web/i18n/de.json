@@ -1704,6 +1704,8 @@
     "allSources": "Alle Quellen",
     "responsibleMe": "Nur meine Assets",
     "responsibleMeClear": "Alle Assets zeigen, nicht nur meine",
+    "qualityFailing": "Qualitätsfehler",
+    "qualityFailingClear": "Verwaltete Assets unabhängig von ihrer Qualität zeigen",
     "detectorTypes": "Erkennungstypen",
     "assetStatus": "Asset-Status",
     "noAssets": "Keine Assets gefunden",
@@ -3365,9 +3367,6 @@
       "all": "Alle Assets in diesem Workspace",
       "governed": "Assets verwaltet",
       "rail": "Governance-Abdeckung",
-      "certified": "Zertifiziert",
-      "notCertified": "Noch nicht zertifiziert",
-      "ungoverned": "Ohne Owner",
       "governedShare": "{{percent}} % verwaltet",
       "certifiedShare": "{{percent}} % der verwalteten zertifiziert",
       "empty": "Noch keine Assets. Fügen Sie eine Quelle hinzu und starten Sie einen Scan, um zu sehen, was es zu verwalten gibt."
@@ -3377,13 +3376,13 @@
       "score": "Qualitätswert",
       "noScore": "Noch kein Wert",
       "none": "Noch keine Qualitätsregeln für diese Assets.",
-      "failing": "{{count}} Assets mit fehlschlagender Regel",
+      "failing": "{{count}} verwaltete Assets mit fehlschlagender Regel",
       "allPassing": "Alle Regeln bestehen",
       "howTo": "Regeln im Governance-Tab eines Assets hinzufügen"
     },
     "incoming": {
       "label": "Eingehend",
-      "requests": "Zugriffsanfragen warten auf Sie",
+      "requests": "Zugriffsanfragen, die jetzt auf Sie warten",
       "readsToday": "Lesezugriffe heute",
       "readsPeriod": "Lesezugriffe in {{days}} Tagen",
       "exports": "{{count}} Exporte",
@@ -3457,7 +3456,6 @@
   "explore": {
     "title": "Erkunden",
     "titleMany": "{{name}} und {{count}} weitere",
-    "cardTitle": "Verbindungen erkunden",
     "ledger": "Was auf der Fläche ist",
     "spotlightClear": "Wieder alles zeigen",
     "inCases": "In Fällen",
@@ -3744,11 +3742,6 @@
     "zoomSelection": "Auf Auswahl zoomen",
     "minimap": "Übersichtskarte",
     "backTo": "Zurück zu {{name}}"
-  },
-  "casework": {
-    "title": "Fallarbeit",
-    "subtitle": "Laufende Fälle und Anfrage-Beobachtungen",
-    "viewAll": "Alle anzeigen"
   },
   "breadcrumb": {
     "home": "Startseite",
@@ -6527,12 +6520,6 @@
       "ogTitle": "Dashboard — Governance & Qualität | Classifyre",
       "ogDescription": "Verwaltete und herrenlose Assets, Qualität, Nutzung und Zugriffsanfragen — für Ihre Assets oder den ganzen Workspace."
     },
-    "explore": {
-      "title": "Erkunden — Verbindungen, Herkunft & Ähnliches",
-      "description": "Beginnen Sie mit einer Suche und folgen Sie, womit ein Asset verbunden ist: Herkunft, Duplikate, gemeinsame Werte, gemeinsame Glossarbegriffe und inhaltliche Ähnlichkeit — jede Verbindung mit ihrem Grund, dazu Verbindungen, die Sie selbst ziehen.",
-      "ogTitle": "Verbindungen erkunden | Classifyre",
-      "ogDescription": "Suchen, dann Herkunft, Duplikaten, gemeinsamen Begriffen und Ähnlichem folgen — jede Verbindung mit ihrem Grund."
-    },
     "query": {
       "title": "Daten abfragen — SQL über Ihre Tabellen",
       "description": "Fragen Sie die Zeilen der Datenbank-, Lakehouse- und Dateitabellen, auf die Sie Zugriff haben, mit Standard-SQL ab und verknüpfen Sie Tabellen über Quellen hinweg.",
@@ -7178,7 +7165,7 @@
         "update": "Governance-Angaben bearbeitet",
         "status": {
           "draft": "Auf Entwurf gesetzt",
-          "active": "Zertifiziert (aktiv)",
+          "active": "Zertifiziert",
           "deprecated": "Als veraltet markiert",
           "retired": "Außer Betrieb genommen"
         },
@@ -8373,7 +8360,6 @@
       "retired": "Stillgelegt"
     },
     "page": {
-      "emptyTitle": "Noch keine geteilten Datensätze",
       "emptyLead": "Schreiben Sie auf der Seite Daten abfragen eine Abfrage und wählen Sie Als Datensatz teilen.",
       "locked": "Sie können ihn noch nicht lesen: öffnen Sie ihn, um Zugriff anzufragen"
     },

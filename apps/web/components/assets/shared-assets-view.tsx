@@ -29,6 +29,7 @@ import {
 } from "@/components/dashboard/usage-chart-card";
 import {
   HATCH,
+  LIFECYCLE_LOOK,
   RailLegend,
   SegmentRail,
   type RailSegment,
@@ -88,18 +89,14 @@ export function SharedAssetsView() {
   const { t } = useTranslation();
   const datasets = useSharedDatasets();
   const filters = useDatasetFilters();
-  // The datasets these filters leave, as asset ids for the list; while the
-  // datasets load, none (rather than every one, unfiltered).
-  const onlyIds = useMemo(() => {
-    if (!filters.state && !filters.promoted) return null;
-    return (datasets.data ?? [])
-      .filter(
-        (row) =>
-          (!filters.state || row.state === filters.state) &&
-          (!filters.promoted || row.promoted),
-      )
-      .map((row) => row.assetId);
-  }, [datasets.data, filters.state, filters.promoted]);
+  // Sent with the list's other filters: the search works them out itself.
+  const datasetFilters = useMemo(
+    () => ({
+      datasetState: filters.state ?? undefined,
+      promoted: filters.promoted ? true : undefined,
+    }),
+    [filters.state, filters.promoted],
+  );
 
   return (
     <div className="space-y-6" data-testid="shared-assets-view">
@@ -122,7 +119,7 @@ export function SharedAssetsView() {
         <AssetsTable
           kind="shared"
           preset="shared"
-          onlyIds={onlyIds}
+          datasetFilters={datasetFilters}
           toolbar={
             <>
               <Select
@@ -203,27 +200,25 @@ function SharedStatusCard({
       key: "active",
       label: t("governance.status.ACTIVE"),
       count: count(rows, (row) => row.lifecycle === "ACTIVE"),
-      className: "bg-accent text-accent-foreground",
+      ...LIFECYCLE_LOOK.ACTIVE,
     },
     {
       key: "draft",
       label: t("governance.status.DRAFT"),
       count: count(rows, (row) => !row.lifecycle || row.lifecycle === "DRAFT"),
-      className: "bg-foreground text-background",
+      ...LIFECYCLE_LOOK.DRAFT,
     },
     {
       key: "deprecated",
       label: t("governance.status.DEPRECATED"),
       count: count(rows, (row) => row.lifecycle === "DEPRECATED"),
-      className: "bg-muted-foreground text-background",
+      ...LIFECYCLE_LOOK.DEPRECATED,
     },
     {
       key: "retired",
       label: t("governance.status.RETIRED"),
       count: count(rows, (row) => row.lifecycle === "RETIRED"),
-      className: "bg-card text-foreground",
-      style: HATCH,
-      chip: true,
+      ...LIFECYCLE_LOOK.RETIRED,
     },
   ];
   const availability: RailSegment[] = [

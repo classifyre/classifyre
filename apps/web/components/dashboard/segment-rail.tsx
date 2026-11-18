@@ -10,6 +10,27 @@ export const HATCH: CSSProperties = {
     "repeating-linear-gradient(135deg, transparent 0 5px, color-mix(in srgb, var(--foreground) 22%, transparent) 5px 7px)",
 };
 
+/**
+ * How a governed lifecycle looks on a rail, the same wherever one is drawn
+ * (the dashboard's governance brief, the shared datasets' status): certified
+ * in the accent, draft dark, deprecated grey, retired pale. Ungoverned is the
+ * hatch, apart from all four.
+ */
+export const LIFECYCLE_LOOK: Record<
+  "ACTIVE" | "DRAFT" | "DEPRECATED" | "RETIRED" | "UNGOVERNED",
+  Pick<RailSegment, "className" | "style" | "chip">
+> = {
+  ACTIVE: { className: "bg-accent text-accent-foreground" },
+  DRAFT: { className: "bg-foreground text-background" },
+  DEPRECATED: { className: "bg-muted-foreground text-background" },
+  RETIRED: { className: "bg-muted text-foreground" },
+  UNGOVERNED: {
+    className: "bg-card text-foreground",
+    style: HATCH,
+    chip: true,
+  },
+};
+
 export type RailSegment = {
   key: string;
   label: string;
@@ -113,17 +134,24 @@ export function RailLegend({
   segments,
   testIdPrefix,
   className,
+  columns,
 }: {
   segments: RailSegment[];
   testIdPrefix?: string;
   className?: string;
+  /** Grid columns as classes (wrapping on narrow screens); one row by default. */
+  columns?: string;
 }) {
   return (
     <div
-      className={cn("grid gap-2", className)}
-      style={{
-        gridTemplateColumns: `repeat(${segments.length}, minmax(0, 1fr))`,
-      }}
+      className={cn("grid gap-2", columns, className)}
+      style={
+        columns
+          ? undefined
+          : {
+              gridTemplateColumns: `repeat(${segments.length}, minmax(0, 1fr))`,
+            }
+      }
     >
       {segments.map((segment) => {
         const body: ReactNode = (

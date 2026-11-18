@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { answerableScopes, governanceAssetSql } from './governance-filter';
@@ -52,7 +52,13 @@ export interface GovernanceDashboard {
   totals: {
     assets: number;
     governed: number;
+    /** Governed and ACTIVE: certified. */
     certified: number;
+    /** Governed, by the rest of the lifecycle: certified + these = governed. */
+    draft: number;
+    deprecated: number;
+    retired: number;
+    /** Governed assets with a failing quality rule. */
     failing: number;
     score: number | null;
   };
@@ -241,8 +247,8 @@ export class GovernanceInsightsService {
   }
 
   /**
-   * The Governance tab of the assets page (GOV §5.7): what is governed, how
-   * good it is, what needs someone, for the person's own assets or all.
+   * The dashboard (GOV §5.7): what is governed, how good it is, what needs
+   * someone, for the person's own assets or all.
    */
   async dashboard(
     person: GovernancePerson | null,
@@ -279,6 +285,9 @@ export class GovernanceInsightsService {
             assets: bigint;
             owned: bigint;
             certified: bigint;
+            draft: bigint;
+            deprecated: bigint;
+            retired: bigint;
             failing: bigint;
           }[]
         >`
@@ -287,7 +296,10 @@ export class GovernanceInsightsService {
                  count(l.id) AS assets,
                  count(l.id) FILTER (WHERE l.owned) AS owned,
                  count(l.id) FILTER (WHERE l.owned AND g.status = 'ACTIVE') AS certified,
-                 count(f.asset_id) AS failing
+                 count(l.id) FILTER (WHERE l.owned AND COALESCE(g.status::text, 'DRAFT') = 'DRAFT') AS draft,
+                 count(l.id) FILTER (WHERE l.owned AND g.status = 'DEPRECATED') AS deprecated,
+                 count(l.id) FILTER (WHERE l.owned AND g.status = 'RETIRED') AS retired,
+                 count(f.asset_id) FILTER (WHERE l.owned) AS failing
             FROM scoped l
             JOIN sources s ON s.id = l.source_id
             LEFT JOIN asset_governance g ON g.asset_id = l.id
@@ -310,6 +322,7 @@ export class GovernanceInsightsService {
             FROM scoped l
             JOIN failing f ON f.asset_id = l.id
             JOIN sources s ON s.id = l.source_id
+           WHERE l.owned
            ORDER BY f.rank DESC, f.failing DESC, l.name
            LIMIT 5`,
         this.prisma.$queryRaw<
@@ -436,6 +449,12 @@ export class GovernanceInsightsService {
         assets: coverageRows.reduce((sum, row) => sum + row.assets, 0),
         governed: coverageRows.reduce((sum, row) => sum + row.owned, 0),
         certified: coverageRows.reduce((sum, row) => sum + row.certified, 0),
+        draft: coverage.reduce((sum, row) => sum + Number(row.draft), 0),
+        deprecated: coverage.reduce(
+          (sum, row) => sum + Number(row.deprecated),
+          0,
+        ),
+        retired: coverage.reduce((sum, row) => sum + Number(row.retired), 0),
         failing: coverage.reduce((sum, row) => sum + Number(row.failing), 0),
         score: qualityScore(latest),
       },
@@ -502,6 +521,15 @@ export class GovernanceInsightsService {
     );
     const since = new Date(Date.now() - days * 86_400_000);
     const before = new Date(Date.now() - 2 * days * 86_400_000);
+    if (
+      query.kind !== undefined &&
+      query.kind !== 'raw' &&
+      query.kind !== 'shared'
+    ) {
+      throw new BadRequestException(
+        `kind is raw or shared; got ${JSON.stringify(query.kind)}`,
+      );
+    }
     const scoped = await this.scopeSql(person, query);
     const { scope } = scoped;
     const clauses: Prisma.Sql[] = [scoped.where];

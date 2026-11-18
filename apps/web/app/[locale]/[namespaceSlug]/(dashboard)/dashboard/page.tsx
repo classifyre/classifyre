@@ -30,6 +30,8 @@ import {
 } from "@/components/dashboard/usage-chart-card";
 import { QualityTrendCard } from "@/components/dashboard/quality-trend-card";
 import { WaitingOnYouCard } from "@/components/dashboard/waiting-on-you-card";
+import { assetsHref, type AssetsLink } from "@/lib/dashboard-links";
+import { useNsPath } from "@/lib/ns-path";
 
 const PERIODS = [7, 30, 90] as const;
 const ALL_SOURCES = "ALL";
@@ -101,6 +103,10 @@ export default function DashboardPage() {
   const data = dashboard.data;
   // Mine falls back to all for someone who answers for nothing.
   const effectiveScope: DashboardScope = data?.scope ?? scope;
+  const nsPath = useNsPath();
+  // Every card's links carry the scope and source shown.
+  const link: AssetsLink = (drill) =>
+    nsPath(assetsHref(drill, effectiveScope, sourceId));
 
   const showRequests = () =>
     document
@@ -225,13 +231,9 @@ export default function DashboardPage() {
         <GovernanceBriefCard
           totals={data?.totals}
           scope={effectiveScope}
-          sourceId={sourceId}
+          link={link}
         />
-        <QualityBriefCard
-          dashboard={data}
-          scope={effectiveScope}
-          sourceId={sourceId}
-        />
+        <QualityBriefCard dashboard={data} link={link} />
         <IncomingCard
           requestsForMe={overview.data?.governance.requestsForMe}
           usage={usage.data}
@@ -250,7 +252,7 @@ export default function DashboardPage() {
         <WaitingOnYouCard
           dashboard={data}
           scope={effectiveScope}
-          sourceId={sourceId}
+          link={link}
           requestsForMe={overview.data?.governance.requestsForMe}
           onDecided={() => {
             void dashboard.reload();

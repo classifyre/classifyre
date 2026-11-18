@@ -16,7 +16,7 @@ import { cn } from "@workspace/ui/lib/utils";
 import { useTranslation } from "@/hooks/use-translation";
 import { useNsPath } from "@/lib/ns-path";
 import type { DashboardScope } from "@/lib/governance";
-import { assetsHref, type AssetsDrill } from "@/lib/dashboard-links";
+import type { AssetsLink } from "@/lib/dashboard-links";
 import type { TranslationKey } from "@/i18n";
 import { AccessRequestsList } from "@/components/access-requests/access-requests-list";
 import {
@@ -34,14 +34,14 @@ import {
 export function WaitingOnYouCard({
   dashboard,
   scope,
-  sourceId,
+  link,
   requestsForMe,
   onDecided,
   className,
 }: {
   dashboard: GovernanceDashboardDto | null;
   scope: DashboardScope;
-  sourceId: string | null;
+  link: AssetsLink;
   /** Access requests waiting for this person; the section shows only then. */
   requestsForMe: number | undefined;
   onDecided: () => void;
@@ -51,8 +51,6 @@ export function WaitingOnYouCard({
   const nsPath = useNsPath();
   const assetHref = (assetId: string) =>
     nsPath(`/assets/${assetId}?tab=governance`);
-  const listHref = (drill: AssetsDrill) =>
-    nsPath(assetsHref(drill, scope, sourceId));
 
   // Only what needs someone: a section with nothing in it is not shown.
   const hasRequests = (requestsForMe ?? 0) > 0;
@@ -116,9 +114,7 @@ export function WaitingOnYouCard({
             }
             title={t("dashboard.waiting.failing")}
             count={dashboard?.totals.failing}
-            seeAllHref={
-              dashboard?.totals.failing ? listHref("failing") : undefined
-            }
+            seeAllHref={dashboard?.totals.failing ? link("failing") : undefined}
           >
             <ul
               className="divide-y divide-border/20"
@@ -195,7 +191,7 @@ export function WaitingOnYouCard({
           <Section
             icon={<Flame className="size-4" aria-hidden />}
             title={t("dashboard.waiting.governFirst")}
-            seeAllHref={listHref("ungoverned")}
+            seeAllHref={link("ungoverned")}
           >
             <ul
               className="divide-y divide-border/20"

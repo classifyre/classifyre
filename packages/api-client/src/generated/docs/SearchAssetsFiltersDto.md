@@ -21,6 +21,9 @@ Name | Type
 `responsibleRef` | string
 `kind` | string
 `ids` | Array&lt;string&gt;
+`quality` | string
+`datasetState` | string
+`promoted` | boolean
 
 ## Example
 
@@ -44,6 +47,9 @@ const example = {
   "responsibleRef": null,
   "kind": null,
   "ids": null,
+  "quality": null,
+  "datasetState": null,
+  "promoted": null,
 } satisfies SearchAssetsFiltersDto
 
 console.log(example)

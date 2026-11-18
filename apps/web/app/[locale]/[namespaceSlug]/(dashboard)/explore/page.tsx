@@ -1,32 +1,15 @@
 "use client";
 
-import * as React from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useNamespace } from "@/components/namespace-provider";
+import { NamespaceRedirect } from "@/components/namespace-redirect";
+
+const EXPLORE_TAB = { tab: "explore" };
 
 /**
  * Explore lives on the assets page now, as its Explore tab. Links and
  * bookmarks to /explore land there with the same view (`seeds`, `view`,
- * `saved`, …); a search there becomes the asset list's.
+ * `saved`, …). Its search (`q`) was the way to find where to start, which is
+ * now the asset list's search: it lands there.
  */
-function ExploreRedirect() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const { nsHref } = useNamespace();
-
-  React.useEffect(() => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("tab", "explore");
-    router.replace(`${nsHref("/assets")}?${params.toString()}`);
-  }, [nsHref, router, searchParams]);
-
-  return null;
-}
-
 export default function ExplorePage() {
-  return (
-    <React.Suspense>
-      <ExploreRedirect />
-    </React.Suspense>
-  );
+  return <NamespaceRedirect to="/assets" keepQuery set={EXPLORE_TAB} />;
 }

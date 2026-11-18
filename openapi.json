@@ -21154,6 +21154,27 @@
             "items": {
               "type": "string"
             }
+          },
+          "quality": {
+            "type": "string",
+            "enum": [
+              "failing"
+            ],
+            "description": "`failing`: assets with a failing quality rule, whatever their governance. Combines with `governance` (e.g. governed and failing)."
+          },
+          "datasetState": {
+            "type": "string",
+            "enum": [
+              "live",
+              "blocked",
+              "unavailable",
+              "retired"
+            ],
+            "description": "Shared datasets that can be read now (`live`), are blocked, cannot be read (an input is missing), or are retired."
+          },
+          "promoted": {
+            "type": "boolean",
+            "description": "Shared datasets promoted (true) or not (false)."
           }
         }
       },
@@ -39139,9 +39160,21 @@
             "type": "number",
             "description": "Governed and certified (ACTIVE)."
           },
+          "draft": {
+            "type": "number",
+            "description": "Governed and DRAFT (or no lifecycle set yet)."
+          },
+          "deprecated": {
+            "type": "number",
+            "description": "Governed and DEPRECATED."
+          },
+          "retired": {
+            "type": "number",
+            "description": "Governed and RETIRED. certified + draft + deprecated + retired = governed."
+          },
           "failing": {
             "type": "number",
-            "description": "With a failing quality rule (an open QUALITY finding)."
+            "description": "Governed, with a failing quality rule (an open QUALITY finding)."
           },
           "score": {
             "type": "number",
@@ -39153,6 +39186,9 @@
           "assets",
           "governed",
           "certified",
+          "draft",
+          "deprecated",
+          "retired",
           "failing",
           "score"
         ]

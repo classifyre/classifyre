@@ -109,6 +109,24 @@ export interface SearchAssetsFiltersDto {
      * @memberof SearchAssetsFiltersDto
      */
     ids?: Array<string>;
+    /**
+     * `failing`: assets with a failing quality rule, whatever their governance. Combines with `governance` (e.g. governed and failing).
+     * @type {string}
+     * @memberof SearchAssetsFiltersDto
+     */
+    quality?: SearchAssetsFiltersDtoQualityEnum;
+    /**
+     * Shared datasets that can be read now (`live`), are blocked, cannot be read (an input is missing), or are retired.
+     * @type {string}
+     * @memberof SearchAssetsFiltersDto
+     */
+    datasetState?: SearchAssetsFiltersDtoDatasetStateEnum;
+    /**
+     * Shared datasets promoted (true) or not (false).
+     * @type {boolean}
+     * @memberof SearchAssetsFiltersDto
+     */
+    promoted?: boolean;
 }
 
 
@@ -216,6 +234,25 @@ export const SearchAssetsFiltersDtoKindEnum = {
 } as const;
 export type SearchAssetsFiltersDtoKindEnum = typeof SearchAssetsFiltersDtoKindEnum[keyof typeof SearchAssetsFiltersDtoKindEnum];
 
+/**
+ * @export
+ */
+export const SearchAssetsFiltersDtoQualityEnum = {
+    Failing: 'failing'
+} as const;
+export type SearchAssetsFiltersDtoQualityEnum = typeof SearchAssetsFiltersDtoQualityEnum[keyof typeof SearchAssetsFiltersDtoQualityEnum];
+
+/**
+ * @export
+ */
+export const SearchAssetsFiltersDtoDatasetStateEnum = {
+    Live: 'live',
+    Blocked: 'blocked',
+    Unavailable: 'unavailable',
+    Retired: 'retired'
+} as const;
+export type SearchAssetsFiltersDtoDatasetStateEnum = typeof SearchAssetsFiltersDtoDatasetStateEnum[keyof typeof SearchAssetsFiltersDtoDatasetStateEnum];
+
 
 /**
  * Check if a given object implements the SearchAssetsFiltersDto interface.
@@ -249,6 +286,9 @@ export function SearchAssetsFiltersDtoFromJSONTyped(json: any, ignoreDiscriminat
         'responsibleRef': json['responsibleRef'] == null ? undefined : json['responsibleRef'],
         'kind': json['kind'] == null ? undefined : json['kind'],
         'ids': json['ids'] == null ? undefined : json['ids'],
+        'quality': json['quality'] == null ? undefined : json['quality'],
+        'datasetState': json['datasetState'] == null ? undefined : json['datasetState'],
+        'promoted': json['promoted'] == null ? undefined : json['promoted'],
     };
 }
 
@@ -278,6 +318,9 @@ export function SearchAssetsFiltersDtoToJSONTyped(value?: SearchAssetsFiltersDto
         'responsibleRef': value['responsibleRef'],
         'kind': value['kind'],
         'ids': value['ids'],
+        'quality': value['quality'],
+        'datasetState': value['datasetState'],
+        'promoted': value['promoted'],
     };
 }
 

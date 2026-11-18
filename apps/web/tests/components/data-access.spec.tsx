@@ -73,11 +73,13 @@ async function mockApi(page: CtPage) {
 
 const ADMIN = ["workspace.view", "access.view", "access.manage", "activity.view"];
 
-/** The shared dialog with its role and target fixed: only group and date to pick. */
+/**
+ * The shared dialog with its target fixed: the role is a data reader, plain by
+ * default or unmasked (DQ phase 3), and only the group and date are left to pick.
+ */
 async function giveInFixedDialog(page: CtPage, until: string) {
   const dialog = page.getByTestId("give-access-dialog");
-  await expect(dialog.getByTestId("give-access-role")).toBeDisabled();
-  await expect(dialog.getByTestId("give-access-role")).toHaveValue("Data reader");
+  await expect(dialog.getByTestId("give-access-role")).toHaveText("Data reader");
   await dialog.getByTestId("give-access-group").click();
   await page.getByRole("option", { name: "/sales" }).click();
   await dialog.getByTestId("give-access-until").fill(until);
