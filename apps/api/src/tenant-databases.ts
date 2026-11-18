@@ -1,7 +1,7 @@
 import { createHmac } from 'node:crypto';
 import { Client, type Pool } from 'pg';
 import { assertDatabaseKind, databaseKindDdl } from './database-kind';
-import { withDatabase } from './database-mode';
+import { isDatabaseAlreadyExists, withDatabase } from './database-mode';
 import { publicConnectionString } from './registry/namespace-registry.sql';
 
 /**
@@ -148,7 +148,7 @@ export async function provisionTenantDatabase(
     try {
       await control.query(`CREATE DATABASE "${name}" OWNER "${name}"`);
     } catch (error) {
-      if ((error as { code?: string }).code !== '42P04') throw error;
+      if (!isDatabaseAlreadyExists(error)) throw error;
     }
   }
   await control.query(

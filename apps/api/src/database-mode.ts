@@ -26,6 +26,17 @@ export function controlDatabaseName(
   return name;
 }
 
+/**
+ * Whether `CREATE DATABASE` failed because the database is already there.
+ * 42P04 is the plain case. 23505: two pods ran `CREATE DATABASE` at the same
+ * moment and Postgres reports the loser as a unique violation on
+ * `pg_database_datname_index`, not as 42P04.
+ */
+export function isDatabaseAlreadyExists(error: unknown): boolean {
+  const code = (error as { code?: string } | null)?.code;
+  return code === '42P04' || code === '23505';
+}
+
 /** The URL with another database name, same server and credentials. */
 export function withDatabase(url: string, database: string): string {
   const next = new URL(url);
@@ -99,7 +110,7 @@ export async function ensureControlDatabase(
         await maintenance.query(`CREATE DATABASE "${name}"`);
       } catch (error) {
         // Another pod created it first.
-        if ((error as { code?: string }).code !== '42P04') throw error;
+        if (!isDatabaseAlreadyExists(error)) throw error;
       }
     }
     // Tenant roles log in to their own database only (docs/prd/TEN R7):
