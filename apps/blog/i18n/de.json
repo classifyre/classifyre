@@ -14,8 +14,8 @@
     "githubLabel": "Classifyre auf GitHub"
   },
   "footer": {
-    "tagline": "Ermittlungsplattform",
-    "blurb": "Die Open-Source-Ermittlungsplattform für Ihre Daten. Classifyre scannt die Systeme, die Sie bereits betreiben, erkennt Secrets, PII und die von Ihnen definierten Signale und bearbeitet die Befunde wie ein Ermittler — stehende Anfragen, gereihte Beweise, Fälle und ein KI-Autopilot zwischen den Scans.",
+    "tagline": "Open-Source-Data-Governance",
+    "blurb": "Open-Source-Data-Governance zum Selbstbetrieb. Classifyre findet personenbezogene Daten und Secrets in den Systemen, die Sie bereits betreiben, maskiert sie automatisch und lässt Ihr Team alles mit SQL, Excel und Power BI abfragen. Jeder Lesezugriff wird protokolliert.",
     "navHeading": "Navigation",
     "navHome": "Start",
     "navGet": "Classifyre holen",
@@ -30,7 +30,8 @@
     "cookieSettings": "Cookie-Einstellungen",
     "contact": "Kontakt",
     "madeIn": "Made in Austria",
-    "baselineTagline": "Jedes Leck hinterlässt eine Spur"
+    "baselineTagline": "Maskiert, bis jemand es sehen darf",
+    "topicsHeading": "Data Governance"
   },
   "cookie": {
     "message": "Wir nutzen Analyse-Cookies nur, um zu sehen, welche Seiten gelesen werden — sonst nichts. Keine Werbung, kein Profiling, keine verkauften Daten. Lehnen Sie ab, funktioniert die Seite genau gleich.",
@@ -159,10 +160,10 @@
   },
   "site": {
     "title": "Classifyre",
-    "description": "Daten über Datenbanken, Lakehouses, Kollaborationstools, Analysesysteme und öffentliche Inhalte hinweg erkennen, klassifizieren und labeln.",
-    "websiteDescription": "Daten über Datenbanken, Lakehouses, Kollaborationstools, Analysesysteme und öffentliche Inhalte hinweg erkennen, klassifizieren und labeln.",
+    "description": "Open-Source-Data-Governance: personenbezogene Daten und Secrets finden, automatisch maskieren und sicher mit SQL, Excel und Power BI abfragen. On-Premises, made in Austria.",
+    "websiteDescription": "Open-Source-Data-Governance: personenbezogene Daten und Secrets finden, automatisch maskieren und sicher mit SQL, Excel und Power BI abfragen. On-Premises, made in Austria.",
     "blogDescription": "Produkt-Updates, Engineering-Notizen, Deployment-Anleitungen und Detektor-Designs von Classifyre.",
-    "orgDescription": "Open-Source-Plattform zur Datenerkennung, Klassifizierung und Labelung für moderne Quellsysteme, gebaut in Österreich."
+    "orgDescription": "Classifyre entwickelt Open-Source-Data-Governance: Datenklassifizierung, Datenmaskierung und sicheren Datenzugriff, selbst betrieben. Gebaut in Österreich."
   },
   "findingTags": [
     "geleakte E-Mail",
@@ -181,8 +182,8 @@
     "doppelter Lieferant"
   ],
   "closingBoard": {
-    "exhibitA": "Beweisstück A",
-    "confirmed": "Bestätigt"
+    "exhibitA": "Standardmäßig maskiert",
+    "confirmed": "Jeder Zugriff protokolliert"
   },
   "caseGraph": {
     "ariaLabel": "Fall-Graph für Fall 42, ein Geheimleck per E-Mail: Absender- und Auswirkungs-Hypothesen, verknüpft mit E-Mail-, Identitäts-, Markierungs- und Duplikat-Befunden, mit Analysten-Link und Autopilot-Zuordnung",
@@ -195,5 +196,25 @@
     "hypothesis2": "HYPOTHESE 2",
     "hypothesis2Text": "214 Datensätze geleakt",
     "autopilot": "PER AUTOPILOT"
-  }
+  },
+  "governanceTags": [
+    "iceberg-tabellen via s3",
+    "delta-tabelle verbunden",
+    "iban gefunden 0,99",
+    "aws-schlüssel gefunden",
+    "svnr erkannt",
+    "spalte maskiert",
+    "secret ausgeblendet",
+    "owner: finanzen",
+    "steward benannt",
+    "zugriff 90 tage",
+    "zeilenfilter: graz",
+    "geteilte tabelle",
+    "orders + customers",
+    "power bi via odbc",
+    "excel verbunden",
+    "zugriff protokolliert",
+    "export protokolliert",
+    "mcp-zugriff protokolliert"
+  ]
 }

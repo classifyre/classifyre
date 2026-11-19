@@ -39,7 +39,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Classifyre — Made in Austria, offen gebaut",
     description:
-      "Eine österreichische, europäische Open-Source-Ermittlungsplattform unter Apache-2.0. Ihre Daten müssen Ihre Infrastruktur — oder den Kontinent — nie verlassen.",
+      "Österreichische, europäische Open-Source-Data-Governance unter Apache-2.0. Ihre Daten müssen Ihre Infrastruktur — oder den Kontinent — nie verlassen.",
     type: "website",
   },
 };

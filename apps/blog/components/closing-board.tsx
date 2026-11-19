@@ -3,7 +3,7 @@
 import * as React from "react";
 
 import { useCyclingTags } from "@/components/finding-tags";
-import { translate, translateList } from "@/i18n";
+import { translateList } from "@/i18n";
 import type { Locale } from "@/lib/locale";
 
 /**
@@ -12,7 +12,8 @@ import type { Locale } from "@/lib/locale";
  * panel.
  *
  * The pins breathe on a staggered loop and the classification labels rotate
- * through fresh findings every few seconds, so the panel feels alive
+ * through the steps data takes through Classifyre (connected, found,
+ * masked, granted, shared, connected to BI, logged) every few seconds, so the panel feels alive
  * without any pointer interaction (the lime spotlight that used to follow
  * the pointer is gone on purpose). Everything is decorative and
  * pointer-transparent; the CTAs stay clickable.
@@ -55,14 +56,14 @@ const THREADS: readonly (readonly [number, number])[] = [
 ];
 
 export function ClosingBoard({ locale = "en" }: { locale?: Locale }) {
-  const tags = useCyclingTags(TAGGED.length, translateList(locale, "findingTags"));
+  const tags = useCyclingTags(TAGGED.length, translateList(locale, "governanceTags"));
 
   return (
     <div aria-hidden="true" className="cl-net pointer-events-none absolute inset-0">
       <svg
         viewBox="0 0 1000 520"
         preserveAspectRatio="xMidYMid slice"
-        className="cl-net-svg absolute inset-0 h-full w-full"
+        className="cl-net-svg absolute inset-x-0 top-0 h-full max-h-[820px] w-full"
       >
         {THREADS.flatMap(([from, to], index) => {
           const a = PINS[from];
@@ -116,13 +117,6 @@ export function ClosingBoard({ locale = "en" }: { locale?: Locale }) {
           );
         })}
       </svg>
-      {/* Exhibit stamps, pinned to the corners of the file. */}
-      <span className="cl-exhibit left-6 top-6 hidden -rotate-6 md:block">
-        {translate(locale, "closingBoard.exhibitA")}
-      </span>
-      <span className="cl-exhibit bottom-6 right-6 hidden rotate-3 md:block">
-        {translate(locale, "closingBoard.confirmed")}
-      </span>
     </div>
   );
 }

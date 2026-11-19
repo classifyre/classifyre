@@ -91,7 +91,7 @@ const en: SourcesCopy = {
     titleBHighlight: "already own.",
     lede: {
       count: "connectors",
-      tail: "across databases, warehouses and lakehouses, streaming, object storage, collaboration tools, analytics, and public content, all feeding one evidence stream.",
+      tail: "across databases, warehouses and lakehouses, streaming, object storage, collaboration tools, analytics, and public content. Every one is scanned for personal data and secrets; tables in PostgreSQL, MySQL, Databricks, ODBC sources, Delta, Iceberg and files in buckets can also be queried with SQL, masks applied.",
     },
     micro: "{count} connectors · straight from the schema",
     ctaCatalog: "Browse the catalog",

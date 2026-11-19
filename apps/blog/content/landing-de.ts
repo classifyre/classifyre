@@ -1,148 +1,18 @@
 import type { LandingCopy } from "./landing";
 
-import { docs } from "@/lib/site";
+import { docs, routes } from "@/lib/site";
 
 /**
  * German landing-page copy: a full translation of `en` in `./landing.ts`,
  * type-checked against `LandingCopy` so a missing string fails the build.
- * Links reuse the same shared URL constants as the English copy.
+ *
+ * Wording: Datenmaskierung, Datenklassifizierung, DSGVO-konform,
+ * Datensouveränität, On-Premises. Maskierung ist keine Anonymisierung; die
+ * gehashte Maske ist Pseudonymisierung.
  */
 
-/* ── Hero ───────────────────────────────────────────────────────────────── */
-
-const deHero = {
-  /** Small stamps above the headline. */
-  chips: ["Open-Source-Ermittlungsplattform"],
-  titleA: "Der Spur folgen.",
-  /** Rendered as `titleBLead` + an accent block with `titleBHighlight`. */
-  titleBLead: "Fall",
-  titleBHighlight: "schließen.",
-  lede: "Classifyre liest die Systeme, die Sie bereits betreiben, findet die von Ihnen definierten Signale, und verfolgt sie dann über Quellen hinweg, wie ein Detektiv, während ein KI-Autopilot die Laufarbeit zwischen den Scans übernimmt.",
-  ctaPrimary: "Auf Ihrer Maschine betreiben",
-  ctaSecondary: "Live-Showcase ausprobieren",
-  micro: "Keine Anmeldung. Ein Docker-Befehl. Ihre Daten bleiben bei Ihnen.",
-  /** The pinned case file beside the headline. */
-  exhibit: {
-    tab: "Fallakte · 042",
-    stamp: "Fall eröffnet",
-    subject: "Beweisstück A: der Ermittler",
-    status: "Im Dienst",
-  },
-} as const;
-/** Alt text for the hand-inked investigator drawings. */
-const deMascots = {
-  questioning:
-    "Der Classifyre-Ermittler im Trenchcoat kratzt sich am Kopf über ein unbeantwortbares Fragezeichen",
-  lookingAround:
-    "Der Classifyre-Ermittler schaut sich um und sucht die Spur",
-  lookingAtYou: "Der Classifyre-Ermittler sieht Sie direkt an",
-  hiddenGem:
-    "Der Classifyre-Ermittler hält eine Lupe über einen verborgenen Fund",
-} as const;
-
-
-/* ── Install strip ──────────────────────────────────────────────────────── */
-
-const deInstall = {
-  marker: "Hier starten",
-  title: "Ein Befehl heute Nacht. Derselbe Kern in beliebiger Größe.",
-  lede: "Das All-in-one-Image enthält Datenbank, UI und Scan-Worker; alles bleibt auf Ihrer Maschine. Das Helm-Chart betreibt denselben Kern auf Kubernetes, wenn Ihr Bestand wächst.",
-  dockerLabel: "All-in-one-Image · kostenlos · keine Anmeldung",
-  dockerTitle: "Dort betreiben, wo Sie arbeiten",
-  dockerCta: "Setup & Konfiguration",
-  helmLabel: "Helm-Chart · skaliert beliebig",
-  helmTitle: "Oder auf Kubernetes betreiben",
-  helmCopy:
-    "Ephemere Scan-Worker skalieren zwischen den Läufen auf null und fächern so weit auf, wie Ihr Bestand reicht. Ihr Cluster, Ihre Daten.",
-  helmCtaDocs: "Helm-Chart-Doku",
-  helmCtaRepo: "Chart-README auf GitHub",
-} as const;
-
-/* ── Problem / tension ──────────────────────────────────────────────────── */
-
-const deTension = {
-  marker: "Das Problem",
-  title: "Jedes System hält einen Fakt. Keines hält die Geschichte.",
-  lede: "Eine Sendung ging an die falsche Adresse. Das ERP kennt die Bestellung, das Support-Tool kennt die Beschwerde, der Rechnungslauf kennt das Geld. Jedes für sich ist Rauschen. Zusammen sind sie ein Fall, und heute kann sie niemand zusammensetzen.",
-  /** Margin notes: the three ways the story stays buried. */
-  notes: [
-    {
-      label: "Feldnotiz 01",
-      title: "Exporte gehen nicht auf",
-      body: "Zeilen verlieren ihre Verknüpfungen, sobald sie die Datenbank verlassen. Sechs CSVs später sind die Beziehungen weg, und jede Frage beginnt die Prüfung bei null.",
-    },
-    {
-      label: "Feldnotiz 02",
-      title: "Befundtabellen enden in der Sackgasse",
-      body: "Ein Scanner listet 4.000 Secrets auf und hört auf. Das Sortieren bleibt Ihre Aufgabe, und jeder Rescan fügt still ein paar hundert weitere hinzu.",
-    },
-    {
-      label: "Feldnotiz 03",
-      title: "Niemand weiß, woher man es wusste",
-      body: "Wenn eine Aufsichtsbehörde, ein Gericht oder ein CFO fragt, was Sie wann wussten, ist „das Modell hat das gesagt“ keine Antwort. Beweise ohne Lineage sind ein Gerücht.",
-    },
-  ],
-  kicker:
-    "Es hat jedes Mal dieselbe Form: jemand im Unternehmen, der eine Tabelle weiterleitet, um zu helfen, eine Gegenpartei drei Scheinfirmen tief, ein Betrugsmuster über fünf Fachsysteme verteilt. Verstreute Fakten. Eine Geschichte.",
-  figureCaption:
-    "Abb. 01: sechs Systeme, eine Geschichte, keine Verbindung zwischen den Fakten",
-} as const;
-
-/* ── Method / solution ──────────────────────────────────────────────────── */
-
-const deMethod = {
-  marker: "Die Methode",
-  title: "Ein Faden durch jedes System.",
-  lede: "Classifyre ist weniger ein Business-Intelligence-Werkzeug als eine operative Datenschicht: Es verbindet die Systeme, die Sie bereits betreiben, modelliert die realen Entitäten und Beziehungen darin und hält einen Faden vom ersten Treffer bis zum geschlossenen Fall.",
-  stages: [
-    {
-      no: "01",
-      word: "Lesen",
-      title: "Die Systeme lesen, die Sie bereits betreiben",
-      body: "Datenbanken, Lakehouses, Kollaborationstools, Storage, Streams und öffentliche Register. Scans nehmen Assets nach Zeitplan auf, und alles Gefundene landet in einem Beweisstrom.",
-      href: "/de/sources/",
-      linkLabel: "Quellenkatalog ansehen",
-    },
-    {
-      no: "02",
-      word: "Signal",
-      title: "Definieren, was zählt (in Ihren Worten)",
-      body: "Regex und Regeln für die deterministischen Dinge, Entitätsklassifizierung mit Ihren Labels, jedes Hugging-Face-Modell, oder ein Prompt, der zum Detektor wird. Mitgelieferte Packs decken PII, Secrets, Code-Security und Inhaltsqualität ab, ab dem ersten Scan.",
-      href: docs.detectors,
-      linkLabel: "Detektor-Packs ansehen",
-    },
-    {
-      no: "03",
-      word: "Verfolgen",
-      title: "Über Quellen hinweg verfolgen",
-      body: "Fingerprints verbinden denselben Fakt, wo immer er auftaucht. Near-Duplicates kommen nach Ursache gruppiert, und Lineage hält den Faden vom ersten bis zum letzten Treffer zusammen.",
-      href: docs.duplicates,
-      linkLabel: "So funktionieren Fingerprints und Duplikate",
-    },
-    {
-      no: "04",
-      word: "Ablegen",
-      title: "Aus Befunden einen Fall machen",
-      body: "Stehende Anfragen matchen weiter frische Beweise. Befunde werden von 0 bis 1 gereiht, mit aufgeschriebenen Gründen. Ein Fall sammelt die Beweise, die konkurrierenden Hypothesen, einen Owner und einen Audit-Trail, den Sie übergeben können.",
-      href: docs.cases,
-      linkLabel: "So funktionieren Fälle",
-    },
-    {
-      no: "05",
-      word: "Arbeiten",
-      title: "Die Laufarbeit dem Autopiloten überlassen",
-      body: "Zwischen den Scans wachen fünf Agenten der Reihe nach auf: Anfragen matchen, Fälle eröffnen, tote Quellen wecken, den fehlenden Detektor entwerfen, Memory konsolidieren. Observe-only einschalten, und alles bleibt ein Vorschlag.",
-      href: docs.autopilot,
-      linkLabel: "So funktioniert der Autopilot",
-    },
-  ],
-} as const;
-
-
-/* ── Interactive demo ───────────────────────────────────────────────────── */
-
 const deDemo = {
-  marker: "Akte öffnen",
+  marker: "Wenn etwas abfließt",
   title: "Das ist der Teil, den die meisten Werkzeuge Ihnen überlassen.",
   tabs: {
     caseBoard: "Fall 042",
@@ -250,154 +120,413 @@ const deDemo = {
   cta: "Die echte Sache ansehen",
 } as const;
 
-
-
-/* ── Sectors ────────────────────────────────────────────────────────────── */
-
-const deSectors = {
-  marker: "Wo es landet",
-  title: "Die Akten sehen anders aus. Die Methode ist dieselbe.",
-  lede: "Classifyre liest, worauf Ihr Betrieb läuft; der Sektor entscheidet nur, welche Signale Sie zuerst definieren.",
-  columns: {
-    sector: "Sektor",
-    data: "Typische Daten",
-    finds: "Was verfolgt wird",
-  },
-  rows: [
-    {
-      sector: "Finanzen · KYC · AML",
-      data: "Kundenstamm, Transaktionen, Sanktionen, Kontonetzwerke",
-      finds: "Geschichtete Gegenparteien, ein sanktionierter Name unter neuem Namen wieder aufgetaucht",
-    },
-    {
-      sector: "Betrieb im Gesundheitswesen",
-      data: "Aufnahmen, Verlegungen, OP-Pläne, Personal, Bestand",
-      finds: "Kapazitätslecks, Wartelisten-Muster, Bestandsdrift",
-    },
-    {
-      sector: "Energie · Versorger",
-      data: "SCADA, Sensoren, GIS, Wartung, Marktdaten",
-      finds: "Sensor-Drift vor Ausfällen, stille Ausfälle, Vertragsanomalien",
-    },
-    {
-      sector: "Lieferkette · Logistik",
-      data: "ERP-Bestellungen, Bestand, Sendungen, Lieferantendaten",
-      finds: "Sendungen an die falsche Adresse, Geisterbestand, Lieferanten-Überschneidungen",
-    },
-    {
-      sector: "Transportwesen",
-      data: "Wartungslogs, technische Aufzeichnungen, Bodenbetrieb",
-      finds: "Zurückgestellte Mängel, Teileherkunft, nicht erfasste Arbeiten",
-    },
-    {
-      sector: "Telekommunikation",
-      data: "Netzwerktopologie, Telemetrie, Incidents, Außendienst",
-      finds: "Routen-Missbrauch, SLA-Verletzungen, bevor die Beschwerden kommen",
-    },
-    {
-      sector: "Handel · POS · SKU",
-      data: "Verkäufe, Aktionen, Bestand, Retouren, Wettbewerbspreise",
-      finds: "Schwund, Aktions-Missbrauch, Retourenbetrug",
-    },
-    {
-      sector: "Strafverfolgung · Zivilermittlung",
-      data: "Fallakten, Personen und Organisationen, Finanz- und Reisedaten",
-      finds: "Eine Entität unter drei Namen, ein Faden durch fünf Fachsysteme",
-    },
-    {
-      sector: "Behörden · öffentlicher Sektor",
-      data: "Vergabe, Register, Korrespondenz, Förderungen",
-      finds: "Nicht deklarierte Interessen, Ausschreibungsmuster, geleakte Dokumente",
-    },
-    {
-      sector: "Interne Revision · Compliance",
-      data: "Zugriffslogs, Verträge, Spesen, Kommunikation",
-      finds: "Der Leak, der Interessenkonflikt, die Kontrolle, die nicht mehr funktioniert",
-    },
-  ],
-  footnote:
-    "Die Datenschemata der Sektoren stammen aus der veröffentlichten Caseliteratur operativer Datenplattformen; die im Kategorie-Kontext genannten Ergebniszahlen sind Palantirs veröffentlichte Ergebnisse, als Marktkontext angeführt, nicht als Classifyre-Ergebnisse.",
-} as const;
-
-
-/* ── Conversion ─────────────────────────────────────────────────────────── */
-
-const deConvert = {
-  marker: "Sie sind dran",
-  title: "Eröffnen Sie Ihren ersten Fall heute Nacht.",
-  lede: "Richten Sie es auf ein System, das Sie bereits betreiben, und sehen Sie, was der Ermittler findet. Alles, was Sie aufbauen, tragen Sie mit, wenn Sie mit Helm remote gehen.",
-  paths: [
-    {
-      label: "Heute Nacht, auf Ihrer Maschine",
-      text: "Ein Docker-Befehl. Quellen, Befunde und Fälle bleiben lokal.",
-    },
-    {
-      label: "Skaliert, auf Kubernetes",
-      text: "Derselbe Kern als Helm-Chart: Scan-Worker skalieren zwischen den Läufen auf null.",
-    },
-    {
-      label: "Wenn es zur Infrastruktur wird",
-      text: "Enterprise ergänzt SSO, Rollen, Autorisierung pro Workspace, abgestimmte Modelle und unsere Engineers. Bis dahin brauchen Sie nur das hier.",
-    },
-  ],
-  ctaPrimary: "Setup & Konfiguration",
-  ctaSecondary: "Live-Showcase ausprobieren",
-  ctaEnterprise: "Sprechen Sie mit uns über Enterprise",
-  ctaBlog: "Feldnotizen lesen",
-} as const;
-
-/* ── FAQ ────────────────────────────────────────────────────────────────── */
-
-const deFaq = {
-  marker: "Klare Antworten",
-  title: "Fragen, die Menschen wirklich stellen.",
-  lede: "",
-  items: [
-    {
-      q: "Was ist eine Ermittlungsplattform?",
-      a: "Sie ist die Schicht zwischen den Systemen, die Sie betreiben, und einer Entscheidung, die Sie verteidigen müssen. Classifyre liest diese Systeme, findet die von Ihnen definierten Signale, verfolgt sie über Quellen hinweg und macht aus den Beweisen Fälle mit Hypothesen, Ownern und Audit-Trail, statt Sie mit einer Befundtabelle und viel Glück zurückzulassen.",
-    },
-    {
-      q: "Ist Classifyre wirklich kostenlos und Open Source?",
-      a: "Der Open-Source-Kern ist kostenlos betreibbar und kostenlos lesbar: Source-Connectors, Detektor-Packs, eigene Detektion, Ranking, Duplikate, Fälle und der KI-Autopilot stecken alle darin. Die Enterprise-Edition ergänzt Governance und Services: SSO, Rollen, Autorisierung pro Workspace, auf Ihre Terminologie abgestimmte Detektion und unsere Engineers für Rollout und Support.",
-    },
-    {
-      q: "Worin unterscheidet sich Classifyre von Palantir Foundry oder Gotham?",
-      a: "Es ist dieselbe Produktkategorie: eine operative Datenschicht über fragmentierte Quellsysteme, mit Fällen und KI obendrauf. Palantir hat die Kategorie im großen Maßstab bewiesen, geschlossen. Classifyre ist Open Source, selbst gehostet, aus der EU und so dimensioniert, dass ein Team ohne Programmoffice starten kann.",
-    },
-    {
-      q: "Welche Datenquellen kann es lesen?",
-      a: "Operative Datenbanken, Lakehouses, Kollaborationstools, Object Storage, Streams und öffentliche Inhalte; jeder Connector ist ein dokumentierter Quellentyp, und der Katalog wächst in der Öffentlichkeit. Fehlt eine Quelle, werden eigene Quellen unterstützt, und das Enterprise-Team baut sie gemeinsam mit Ihnen.",
-    },
-    {
-      q: "Läuft es auf Kubernetes?",
-      a: "Ja. Der schnellste Start ist ein einzelnes All-in-one-Docker-Image, das auf macOS, Windows und Linux läuft; derselbe Kern erscheint als Helm-Chart, wo Scan-Worker als ephemere Jobs laufen, die zwischen den Läufen auf null skalieren. Alles, was Sie lokal aufbauen, tragen Sie mit.",
-    },
-    {
-      q: "Wohin gehen meine Daten? Verlässt etwas unsere Infrastruktur?",
-      a: "Nirgendwohin. Classifyre läuft innerhalb Ihres Bestands und speichert alles in Ihrer eigenen PostgreSQL-Datenbank und Ihrem Storage. KI-Funktionen laufen gegen Provider, die Sie konfigurieren (auch Modelle, die Sie selbst hosten) und der Autopilot lässt sich auf Observe-only umstellen.",
-    },
-    {
-      q: "Was bringt die Enterprise-Edition?",
-      a: "Zuerst Governance: SSO, Rollen und Autorisierung pro Workspace, damit eine Instanz mehrere Teams oder Fälle ohne Überschneidung bedienen kann. Dann auf Ihre Terminologie abgestimmte Detektion, eigene Detektoren und Quellen für die Daten Ihrer Branche, Mehrsprachen-Tuning, Architektur-Reviews, Upgrade-Hilfe und Support mit SLA.",
-    },
-    {
-      q: "Brauche ich Data Scientists, um es zu benutzen?",
-      a: "Nein. Mitgelieferte Detektor-Packs greifen beim ersten Scan, eigene Detektion beginnt bei Regex, und der Autopilot entwirft Detektoren für Sie. Data Engineers und Scientists bekommen Tiefe (Schemas, Modelle, einen MCP-Endpunkt, um das ganze Produkt vom eigenen KI-Client aus zu steuern) ohne dass das die Eintrittsgebühr ist.",
-    },
-  ],
-} as const;
-
 const de: LandingCopy = {
-  hero: deHero,
-  install: deInstall,
-  tension: deTension,
-  method: deMethod,
-  mascots: deMascots,
+  hero: {
+    chips: ["Open-Source-Data-Governance-Plattform"],
+    titleA: "Finden. Schützen.",
+    titleBLead: "",
+    titleBHighlight: "Nutzen.",
+    lede: "Classifyre findet personenbezogene Daten und Secrets in den Systemen, die Sie bereits betreiben, maskiert sie automatisch und lässt Ihr Team alles mit SQL, Excel und Power BI abfragen. Jeder Lesezugriff wird protokolliert. Nichts verlässt Ihre Server.",
+    ctaPrimary: "Auf Ihrem Rechner starten",
+    ctaSecondary: "Live-Showcase ansehen",
+    micro: "Keine Anmeldung. Ein Docker-Befehl. Ihre Daten bleiben bei Ihnen.",
+  },
+
+  sheet: {
+    readAs: "Lesen als",
+    personas: {
+      analyst: "Analystin",
+      steward: "Klartext-Leser",
+    },
+    notes: {
+      analyst:
+        "Personenbezogene Spalten sind in der Abfrage maskiert. Die Token-Spalte ist ausgeblendet.",
+      steward:
+        "Klartext-Lesen für diese Tabelle bis 30. Juni freigegeben. Dieser Zugriff ist protokolliert.",
+    },
+    hidden: "1 Spalte ausgeblendet",
+    tags: {
+      name: "Person · 0,97",
+      iban: "IBAN · 0,99",
+      email: "E-Mail · 0,98",
+      token: "Secret · 0,96",
+    },
+    masks: {
+      redact: "geschwärzt",
+      partial: "letzte vier",
+      hash: "gehasht",
+      hidden: "ausgeblendet",
+    },
+    replay: "Nochmal",
+  },
+
+  path: {
+    label: "Der Weg der Daten durch Classifyre",
+    steps: [
+      { verb: "Verbinden", examples: ["Iceberg-Tabellen via S3", "PostgreSQL · crm", "Delta in Databricks", "Confluence-Wiki"] },
+      { verb: "Erkennen", examples: ["IBAN gefunden · 0,99", "AWS-Schlüssel · 0,96", "SVNR gefunden · 0,93", "E-Mail gefunden · 0,98"] },
+      { verb: "Verwalten", examples: ["Owner: Finanzen", "Spalte maskiert", "Secret ausgeblendet", "Steward benannt"] },
+      { verb: "Freigeben", examples: ["Analysten · 90 Tage", "Klartext · Finanzen", "Zeilenfilter · Graz", "Anfrage genehmigt"] },
+      { verb: "Teilen", examples: ["orders + customers", "Geteilt, Masken bleiben", "Join mit lake.orders", "Parquet-Export"] },
+      { verb: "BI anbinden", examples: ["Power BI via ODBC", "Excel · eigener Login", "Tableau · nur TLS", "DBeaver · JDBC"] },
+      { verb: "Protokollieren", examples: ["Lena liest · Power BI", "Tom liest · SQL-Seite", "Agent liest · MCP", "Jakob exportiert · Excel"] },
+    ],
+  },
+
+  mascots: {
+    questioning:
+      "Der Classifyre-Ermittler im Trenchcoat kratzt sich am Kopf über ein unbeantwortbares Fragezeichen",
+    lookingAround: "Der Classifyre-Ermittler schaut sich um und sucht die Spur",
+    lookingAtYou: "Der Classifyre-Ermittler sieht Sie direkt an",
+    hiddenGem:
+      "Der Classifyre-Ermittler hält eine Lupe über einen verborgenen Fund",
+  },
+
+  install: {
+    marker: "Hier starten",
+    title: "Heute Abend ein Befehl. Derselbe Kern im großen Maßstab.",
+    lede: "Das All-in-one-Image enthält Datenbank, Oberfläche und Scan-Worker; alles bleibt auf Ihrem Rechner. Das Helm-Chart betreibt denselben Kern auf Kubernetes, wenn die Umgebung wächst.",
+    dockerLabel: "All-in-one-Image · kostenlos · ohne Anmeldung",
+    dockerTitle: "Dort betreiben, wo Sie schon arbeiten",
+    dockerCta: "Einrichtung & Konfiguration",
+    helmLabel: "Helm-Chart · skaliert beliebig",
+    helmTitle: "Oder auf Kubernetes betreiben",
+    helmCopy:
+      "Kurzlebige Scan- und Abfrage-Worker skalieren zwischen den Läufen auf null und so weit, wie Ihre Umgebung reicht. Ihr Cluster, Ihre Daten.",
+    helmCtaDocs: "Helm-Chart-Dokumentation",
+    helmCtaRepo: "Chart-README auf GitHub",
+  },
+
+  tension: {
+    marker: "Das Problem",
+    title: "Ihre Daten sind wertvoll. Und voller personenbezogener Daten.",
+    lede: "Jedes Team will die Zahlen. Jede Tabelle, die sie enthält, enthält auch Namen, Konten, Adressen und das eine oder andere Passwort. Also wird Zugriff zur Verhandlung, und die Verhandlung endet in einer Tabellenkalkulation.",
+    notes: [
+      {
+        label: "Feldnotiz 01",
+        title: "Wer darf diese Spalte sehen?",
+        body: "Die Finanzabteilung will die Kundendatenbank. Welche ihrer 212 Tabellen enthalten personenbezogene Daten? Niemand weiß es, also wartet das Ticket, oder alle bekommen alles.",
+      },
+      {
+        label: "Feldnotiz 02",
+        title: "Schick mir einfach den Export",
+        body: "Daten gehen per CSV und geteiltem Datenbankpasswort hinaus. Sechs Kopien später weiß niemand, wo die Kundenliste liegt oder wer sie noch hat.",
+      },
+      {
+        label: "Feldnotiz 03",
+        title: "Weisen Sie es der Prüferin nach",
+        body: "Wer hat im letzten Quartal die Gehaltstabellen gelesen, mit welchem Werkzeug? Ohne Protokoll jedes Zugriffs lautet die ehrliche Antwort: Wir wissen es nicht.",
+      },
+    ],
+    kicker:
+      "Es ist jedes Mal dasselbe Muster: nützliche Daten weggesperrt, weil niemand sagen kann, was darin personenbezogen ist, oder ganz herausgegeben, weil niemand Zeit hatte, Nein zu sagen. Standardmäßig maskiert, bewusst freigegeben, jeder Zugriff protokolliert: Das ist der Ausweg.",
+    figureCaption:
+      "Abb. 01: sechs Systeme, überall personenbezogene Daten, keine Linie, wer was sehen darf",
+    nodes: ["CRM", "HR", "BUCKET", "WIKI", "LAKE", "BI"],
+  },
+
+  journey: {
+    marker: "So funktioniert es",
+    tape: "Liest 40+ Systeme direkt an der Quelle · nie kopiert",
+    tapeLink: "Zum Quellenkatalog",
+    title: "Von der Rohtabelle zum geteilten Datensatz.",
+    lede: "Folgen Sie den Daten durch Classifyre: gefunden, wo sie liegen, direkt abgefragt, verwaltet, in den Werkzeugen genutzt, die Ihr Team schon hat, maskiert für alle, die sie nicht sehen sollen, und bewusst geteilt.",
+    stages: [
+      {
+        id: "discover",
+        step: "Verbinden & erkennen",
+        title: "Personenbezogene Daten und Secrets dort finden, wo sie liegen",
+        body: [
+          "Verbinden Sie Datenbanken, Lakehouses, Buckets und SaaS-Werkzeuge; Classifyre liest sie direkt an der Quelle, nichts wird in ein weiteres Data Warehouse kopiert. Mitgelieferte Detektoren suchen nach 41 Arten personenbezogener Daten, darunter österreichische, deutsche und Schweizer Kennungen, und 27 Arten von Secrets. Eigene Detektoren per Regex, Modell oder Prompt.",
+          "Jeder Fund hat einen Score und eine schriftliche Begründung, also kann die Datenschutzbeauftragte ihn prüfen und das Security-Team das Aufräumen priorisieren. Die so entstandene Klassifizierung ist das, dem die Masken später folgen.",
+        ],
+        facts: ["40+ Quelltypen", "41 PII-Arten · 27 Secret-Muster", "Score und Begründung bei jedem Fund"],
+        href: docs.detectors,
+        linkLabel: "Detektor-Pakete ansehen",
+        media: "discover",
+        caption: "Personenbezogene Daten in drei Quellen gefunden, mit Begründung gewichtet.",
+      },
+      {
+        id: "query",
+        step: "Über Quellen abfragen",
+        title: "Jedes System mit einer SQL-Abfrage befragen",
+        body: [
+          "Stellen Sie Fragen über die Systeme, die Sie schon haben: PostgreSQL, MySQL, Databricks sowie Delta-, Iceberg- und Parquet-Dateien in S3, Azure oder Google Cloud Storage. Bis zu acht Quellen in einer Abfrage verknüpfen. Jede Abfrage läuft neben den Daten; nichts wird vorher zentral geladen.",
+          "Ergebnisse landen dort, wo Menschen arbeiten: auf der SQL-Seite, als Export nach Excel, CSV und Parquet bis zu einer Million Zeilen, oder direkt im BI-Werkzeug.",
+        ],
+        facts: ["Bis zu 8 Quellen pro Abfrage", "Delta · Iceberg · Parquet · CSV", "Exporte bis 1 Mio. Zeilen"],
+        href: docs.dataQuery,
+        linkLabel: "Daten abfragen",
+        media: "query",
+        caption: "Eine PostgreSQL-Tabelle mit Parquet-Dateien in einem Bucket verknüpft.",
+      },
+      {
+        id: "govern",
+        step: "Governance",
+        title: "Governance: Owner, Vertrag und Verlauf für jede Tabelle",
+        body: [
+          "Eine verwaltete Tabelle hat einen Owner, Stewards und einen Custodian, eine Klassifizierung für jede Spalte und einen Status von Entwurf bis zertifiziert. Qualitätsregeln prüfen sie nach Zeitplan: fehlende Werte, ungültige IBANs, Duplikate, Zeilenzahlen oder beliebiges SQL. Die Vereinbarung lässt sich als ODCS-Datenvertrag exportieren.",
+          "Die Nutzung zeigt, wer die Tabelle mit welchem Werkzeug liest; die Aktivität zeigt jeden Zugriff und jede Änderung, alter Wert neben neuem. Wenn die Prüferin fragt, steht die Antwort schon da.",
+        ],
+        facts: ["Owner, Stewards, Custodians", "Qualitätsregeln nach Zeitplan", "ODCS-Datenverträge", "Jeder Zugriff und jede Änderung protokolliert"],
+        href: docs.governance,
+        linkLabel: "Verwaltete Assets",
+        media: "govern",
+        caption: "Owner, Steward und Custodian zugewiesen, Zugriff gesetzt, eine Qualitätsregel ausgeführt, die Tabelle zertifiziert, der Vertrag exportiert.",
+      },
+      {
+        id: "bi",
+        step: "Power BI & Excel",
+        title: "Power BI und Excel ohne geteiltes Passwort anbinden",
+        body: [
+          "Classifyre antwortet wie eine PostgreSQL-Datenbank. Jede Person legt ihre eigene SQL-Verbindung an, verschlüsselt und befristet, und verbindet Power BI, Excel, Tableau oder DBeaver damit. Kein Dienstkonto mit dem Schlüssel zu allem, kein Passwort in einer Berichtsdatei.",
+          "Die Verbindung trägt die Rechte der Person: die Tabellen, die sie abfragen darf, die Zeilen ihrer Gruppe, die Masken auf jeder personenbezogenen Spalte. Widerrufen, und der Bericht stoppt.",
+        ],
+        facts: ["Eine persönliche Verbindung pro Werkzeug", "Nur TLS, befristet, widerrufbar", "Das Protokoll nennt das Werkzeug"],
+        href: docs.sqlConnections,
+        linkLabel: "SQL-Verbindungen",
+        media: "bi",
+        caption: "Eine persönliche Verbindung, genutzt aus einem BI-Bericht, weiterhin maskiert.",
+      },
+      {
+        id: "mask",
+        step: "Maskieren pro Person",
+        title: "Maskiert für die eine Person, Klartext für die andere",
+        body: [
+          "Personenbezogene Spalten sind standardmäßig maskiert: geschwärzt, letzte vier, gehasht und trotzdem verknüpfbar, oder ausgeblendet. Masken greifen in der Abfrage, also kommt kein WHERE und kein JOIN an ihnen vorbei. Nur eine Gruppe mit Data reader, unmasked liest Klartext, für eine Quelle oder eine Tabelle, mit Ablaufdatum. Admins haben das standardmäßig nicht.",
+          "Die gehashte Maske ist Pseudonymisierung im Sinne der DSGVO, keine Anonymisierung: Gleiche Werte ergeben denselben Hash, also können Analysten Personen verknüpfen und zählen, ohne zu lesen, wer sie sind. Unten läuft es: dieselben Abfragen, von einer Analystin und einem Data Steward der Finanzabteilung.",
+        ],
+        facts: ["Standardmäßig maskiert", "Geschwärzt · letzte vier · gehasht · ausgeblendet", "Pseudonymisierung, keine Anonymisierung", "Klartext ist eine eigene Freigabe"],
+        href: docs.masking,
+        linkLabel: "So funktioniert die Maskierung",
+        media: "readers",
+        caption: "",
+      },
+      {
+        id: "share",
+        step: "Teilen",
+        title: "Einen Datensatz teilen, der Ihre Quellen verknüpft",
+        body: [
+          "Verknüpfen Sie Tabellen aus verschiedenen Systemen zu einem geteilten Datensatz (Kunden aus dem CRM, Bestellungen aus dem Lake, Rechnungen aus der Finanz) und geben Sie ihn den Gruppen, die ihn brauchen. Ein geteilter Datensatz ist eine verwaltete, gespeicherte Abfrage, keine Kopie: Er liest die Quellen live, und die Masken jeder Eingangstabelle reisen mit, als Untergrenze, die nur steigen kann.",
+          "Das empfangende Team fragt ihn ab wie jede Tabelle, auf der SQL-Seite, in Excel oder in Power BI, und jeder Zugriff ist protokolliert.",
+        ],
+        facts: ["Joins über Quellen", "Masken reisen mit", "Freigabe pro Gruppe, mit Ablaufdatum"],
+        href: docs.sharedDatasets,
+        linkLabel: "Geteilte Datasets",
+        media: "share",
+        caption: "Drei Quellen zu einem Datensatz verknüpft, mit einer Gruppe geteilt, Masken behalten.",
+      },
+    ],
+  },
+
+  readers: {
+    readers: {
+      masked: { name: "Lena, Analystin", role: "Data reader" },
+      clear: { name: "Tom, Data Steward Finanzen", role: "Data reader, unmasked" },
+    },
+    rowsLabel: (n: number) => (n === 1 ? "1 Zeile" : `${n} Zeilen`),
+    variants: [
+      {
+        id: "select",
+        label: "SELECT",
+        note: "Dieselben Zeilen, andere Zellen. Lena sieht die letzten vier Ziffern; Tom liest das Konto im Klartext.",
+      },
+      {
+        id: "where",
+        label: "WHERE",
+        note: "Ein Filter auf den Klartext findet für Lena nichts: Er läuft auf dem maskierten Wert, nicht daran vorbei.",
+      },
+      {
+        id: "join",
+        label: "JOIN",
+        note: "Die gehashte E-Mail joint trotzdem: Gleiche Werte ergeben denselben Hash, also verknüpft Lena Tabellen, ohne eine Adresse zu lesen.",
+      },
+      {
+        id: "group",
+        label: "GROUP BY",
+        note: "Zählen funktioniert auf maskierten Spalten. Die Antwort ist brauchbar; die Person dahinter bleibt verdeckt.",
+      },
+    ],
+    caption:
+      "Maskierte Daten zu lesen ist eine eigene Freigabe, mit Ablaufdatum, und sie ist protokolliert.",
+    link: "So funktioniert die Maskierung",
+  },
+
   demo: deDemo,
-  sectors: deSectors,
-  convert: deConvert,
-  faq: deFaq,
+
+  sectors: {
+    marker: "Wo es ankommt",
+    title: "Die Daten sehen anders aus. Die Regeln sind dieselben.",
+    lede: "Classifyre liest, worauf die Organisation läuft; die Branche entscheidet nur, welche Spalten personenbezogen sind und wer sie im Klartext liest.",
+    columns: {
+      sector: "Branche",
+      data: "Typische Daten",
+      finds: "Was sich ändert",
+    },
+    rows: [
+      {
+        sector: "Öffentliche Hand · Länder · Städte",
+        data: "Register, Akten, Statistik, Beschaffung",
+        finds: "Bezirke fragen ihre eigenen Zeilen ab, personenbezogene Spalten kommen maskiert, die DSB liest das Protokoll",
+      },
+      {
+        sector: "Gesundheit · Spitäler",
+        data: "Aufnahmen, Laborwerte, Dienstpläne, Abrechnung",
+        finds: "Analysten zählen Patienten, ohne zu lesen, wer sie sind",
+      },
+      {
+        sector: "Banken · KYC",
+        data: "Kundenstamm, Transaktionen, Konten",
+        finds: "IBANs als letzte vier, gehashte IDs, die trotzdem joinen, ein Protokoll für die Aufsicht",
+      },
+      {
+        sector: "Versicherungen",
+        data: "Schäden, Polizzen, Gesundheitsangaben",
+        finds: "Aktuare bekommen die Tabellen, nicht die Versicherten",
+      },
+      {
+        sector: "BI · Analytics-Teams",
+        data: "Warehouses, Lakehouses, Delta- und Iceberg-Tabellen",
+        finds: "Power BI und Excel über persönliche Verbindungen statt eines geteilten Passworts",
+      },
+      {
+        sector: "Security-Teams",
+        data: "Git, Wikis, Tickets, Buckets, Logs",
+        finds: "Schlüssel und Tokens gefunden, begründet gewichtet, zuerst aufgeräumt",
+      },
+      {
+        sector: "Revision · Compliance",
+        data: "Zugriffsprotokolle, Gehälter, Verträge",
+        finds: "Wer welche Tabelle mit welchem Werkzeug wann gelesen hat: ein Filter",
+      },
+      {
+        sector: "Vorfallbearbeitung",
+        data: "Mail, Laufwerke, Datenbanken",
+        finds: "Ein Fingerabdruck über Systeme, bearbeitet als Fall",
+      },
+    ],
+    footnote:
+      "Jede Zeile ist ein Einstieg, kein eigenes Produkt: darunter liegen dieselben Masken, Freigaben und dasselbe Zugriffsprotokoll.",
+    links: [
+      { label: "Immuta-Alternative", href: "/immuta-alternative" },
+      { label: "Unity-Catalog-Alternative", href: "/unity-catalog-alternative" },
+      { label: "Zu den Fallakten", href: routes.blog + "/cases" },
+    ],
+  },
+
+  editions: {
+    marker: "Open Source und Enterprise",
+    title: "Alles ist Open Source. Enterprise ist auf Ihre Organisation zugeschnitten.",
+    lede: "Betreiben Sie es selbst oder mit Ihren Beratern: Jede Funktion ist im Open-Source-Repository. Behalten Sie Ihre ETL-Werkzeuge, Pipelines und Datenprodukte, wie sie sind. Classifyre baut sie nicht; es verwaltet, was sie erzeugen.",
+    oss: {
+      title: "Open Source",
+      sub: "Jede Funktion · für immer kostenlos",
+      items: [
+        "40+ Quell-Konnektoren",
+        "Erkennung von PII und Secrets, eigene Detektoren",
+        "Spaltenmasken: geschwärzt, letzte vier, gehasht, leer, ausgeblendet",
+        "Owner, Stewards, Qualitätsregeln, ODCS-Verträge",
+        "Freigaben pro Gruppe, Quelle und Tabelle, mit Ablaufdatum",
+        "SQL-Seite, Exporte, geteilte Datasets",
+        "PostgreSQL-Endpunkt für Power BI, Excel, Tableau",
+        "Protokoll jedes Lesezugriffs",
+        "SSO, Rollen, Mandanten und Workspaces",
+        "Fälle, Anfragen, Lineage, Autopilot",
+      ],
+    },
+    ent: {
+      title: "Enterprise",
+      sub: "Auf Ihre Organisation zugeschnitten",
+      items: [
+        {
+          title: "Ihr Stack bleibt",
+          body: "Ihre ETL-Jobs, dbt-Modelle, Spark-Pipelines und Datenprodukte bleiben, wo sie sind. Classifyre liest, was sie erzeugen, und verwaltet es: Owner, Masken, Qualität, Zugriff. Auch in Open Source.",
+        },
+        {
+          title: "So, wie Sie arbeiten",
+          body: "Rollen auf Ihre Gruppen abgebildet, ein Zugriffsmodell, das Ihre Datenschutzbeauftragte unterschreiben kann, Detektoren und Modelle für Ihre Fachsprache und Dokumente, OpenShift, wenn das Ihre Plattform ist.",
+        },
+        {
+          title: "Ihr Team, Ihr Integrator oder wir",
+          body: "Führen Sie es selbst ein, mit Ihren Beratern oder mit unseren Ingenieuren. Ein Pilot zum Festpreis ist da, wenn Sie schneller starten wollen; niemand muss auf uns warten.",
+        },
+        {
+          title: "Support und SLA",
+          body: "Betreute Releases und Sicherheitspatches, ein benannter Kontakt und veröffentlichte Reaktionszeiten, wenn jemand Verantwortung tragen muss.",
+        },
+      ],
+    },
+    ctaPilot: "Über Enterprise sprechen",
+    ctaCompare: "Open Source und Enterprise vergleichen",
+  },
+
+  convert: {
+    marker: "Ihr Zug",
+    title: "Öffnen Sie Ihre Daten sicher, noch heute Abend.",
+    lede: "Richten Sie es auf eine Datenbank, die Sie bereits betreiben. Am Morgen wissen Sie, welche Spalten personenbezogene Daten enthalten, und Ihr Team kann den Rest abfragen. Alles, was Sie einrichten, kommt mit auf Kubernetes.",
+    paths: [
+      {
+        label: "Heute Abend, auf Ihrem Rechner",
+        text: "Ein Docker-Befehl. Quellen, Masken und das Zugriffsprotokoll bleiben lokal.",
+      },
+      {
+        label: "Im großen Maßstab, auf Kubernetes",
+        text: "Derselbe Kern als Helm-Chart: Worker skalieren zwischen den Läufen auf null.",
+      },
+      {
+        label: "Wenn es Infrastruktur wird",
+        text: "Ihr Team oder Ihr Integrator betreibt es. Enterprise schneidet es auf Ihre Organisation zu, bringt OpenShift und ein SLA. Jede Funktion ist schon Open Source.",
+      },
+    ],
+    ctaPrimary: "Einrichtung & Konfiguration",
+    ctaSecondary: "Live-Showcase ansehen",
+    ctaEnterprise: "Über Enterprise sprechen",
+    ctaBlog: "Die Feldnotizen lesen",
+  },
+
+  faq: {
+    marker: "Klare Antworten",
+    title: "Fragen, die wirklich gestellt werden.",
+    lede: "",
+    items: [
+      {
+        q: "Was ist Classifyre?",
+        a: "Open-Source-Data-Governance, die Sie selbst betreiben. Classifyre liest die Systeme, die Sie haben, findet personenbezogene Daten und Secrets darin, maskiert diese Spalten automatisch und lässt Menschen die Tabellen mit SQL, Exporten, Excel und Power BI abfragen. Jeder Lesezugriff wird protokolliert: wer, welche Tabelle, welches Werkzeug, wann.",
+      },
+      {
+        q: "Ist wirklich alles Open Source, auch SSO und Rollen?",
+        a: "Ja. Jede Funktion steht unter Apache-2.0: Konnektoren, Erkennung, Maskierung, Freigaben, Zeilenfilter, der SQL-Endpunkt, das Zugriffsprotokoll, SSO, Rollen, Mandanten und Workspaces. Es gibt keine Enterprise-Version mit zusätzlichem Code. Enterprise ist dasselbe Produkt, auf Ihre Organisation zugeschnitten, mit Support und SLA; die Einführung selbst oder mit Ihrem Integrator ist immer möglich.",
+      },
+      {
+        q: "Ersetzt Classifyre unsere ETL- oder Datenprodukt-Werkzeuge?",
+        a: "Nein. Behalten Sie Ihre ETL-Werkzeuge, Pipelines, dbt-Modelle und Datenprodukte. Classifyre baut und bewegt keine Daten: Es liest, was diese Werkzeuge erzeugen, direkt an der Quelle, und verwaltet es mit Klassifizierung, Ownern, Masken, Qualitätsregeln und Zugriff, jeder Lesezugriff protokolliert. Das funktioniert genauso in Open Source.",
+      },
+      {
+        q: "Was unterscheidet Classifyre von Immuta, Unity Catalog oder Trino?",
+        a: "Immuta ist ein kommerzielles Produkt, das Zugriffsrichtlinien in Cloud-Datenplattformen wie Snowflake und Databricks durchsetzt. Unity Catalog ist die Governance-Schicht von Databricks. Trino föderiert Abfragen und überlässt Ihnen das Finden und Maskieren personenbezogener Daten. Classifyre erledigt alle drei Aufgaben in einem selbst betriebenen Open-Source-Produkt, über 40+ Systeme.",
+      },
+      {
+        q: "Funktioniert es mit Power BI und Excel?",
+        a: "Ja. Classifyre antwortet wie eine PostgreSQL-Datenbank. Power BI, Excel, Tableau, DBeaver und jeder JDBC- oder ODBC-Client verbinden sich mit einer persönlichen, verschlüsselten Verbindung, die abläuft und widerrufen werden kann. Masken und Zeilenfilter gelten dort genau wie in der App, und jeder Zugriff wird mit dem Namen des Werkzeugs protokolliert.",
+      },
+      {
+        q: "Ist Maskierung dasselbe wie Anonymisierung?",
+        a: "Nein. Maskierung verbirgt Werte vor Personen, die sie nicht sehen dürfen; die Daten selbst bleiben unverändert, und die Berechtigten können sie weiterhin lesen. Die gehashte Maske ist Pseudonymisierung im Sinne der DSGVO: Gleiche Werte ergeben denselben Hash, Tabellen lassen sich also verknüpfen, aber der Wert ist nicht lesbar.",
+      },
+      {
+        q: "Wohin gehen meine Daten? Verlässt etwas unsere Infrastruktur?",
+        a: "Nirgendwohin. Classifyre läuft in Ihrem Netz und speichert alles in Ihrer eigenen PostgreSQL-Datenbank und Ihrem Speicher. Abfragen laufen dort, wo die Daten liegen. Es läuft offline, und KI-Funktionen nutzen nur die Anbieter, die Sie konfigurieren, auch selbst betriebene Modelle.",
+      },
+      {
+        q: "Läuft es auf Kubernetes und OpenShift?",
+        a: "Am schnellsten starten Sie mit einem Docker-Image auf macOS, Windows oder Linux. Derselbe Kern kommt als Helm-Chart für Kubernetes, wo Worker als Jobs laufen und zwischen den Läufen auf null skalieren. Installation und Betreuung auf OpenShift sind Teil von Enterprise.",
+      },
+      {
+        q: "Ist es noch ein Ermittlungswerkzeug?",
+        a: "Ja, für den Tag, an dem etwas abfließt. Fälle, stehende Anfragen, Fingerabdrücke über Quellen und der Autopilot sind alle noch da und Open Source. Governance ist, was Sie jeden Tag betreiben; die Ermittlung ist, was Sie öffnen, wenn es darauf ankommt.",
+      },
+    ],
+  },
 };
 
 export default de;

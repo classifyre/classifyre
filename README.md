@@ -3,16 +3,16 @@
 
 # Classifyre
 
-## Open-Source Investigation Platform
+## Open-Source Data Governance
 
-**Detect. Investigate. Resolve.**
+**Find it. Protect it. Use it.**
 
 [![CI](https://img.shields.io/github/actions/workflow/status/classifyre/classifyre/ci.yml?branch=develop&style=flat-square&label=CI&logo=github)](https://github.com/classifyre/classifyre/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/classifyre/classifyre?sort=semver&style=flat-square&label=release)](https://github.com/classifyre/classifyre/releases/latest)
 [![License](https://img.shields.io/github/license/classifyre/classifyre?style=flat-square)](LICENSE)
 [![Docs](https://img.shields.io/badge/docs-classifyre.com-1f6feb?style=flat-square)](https://docs.classifyre.com/)
 
-Classifyre turns the data scattered across the systems you already run into **investigations you can act on**. Connect a source, let detectors surface the evidence, and work the results like an analyst — standing questions, duplicate detection, cases, and hypotheses — with an **AI autopilot** doing the legwork in between.
+Classifyre finds personal data and secrets across the systems you already run, **masks them automatically**, and lets your team query everything with SQL, Excel and Power BI. Every read is logged. Nothing leaves your servers. All of it is Apache-2.0, including SSO, roles and masking; when something leaks, cases and an AI autopilot help you investigate it.
 
 [Documentation](https://docs.classifyre.com/) · [Live Showcase](https://showcase.classifyre.com/)
 

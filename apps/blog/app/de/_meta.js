@@ -18,6 +18,10 @@ export default {
     type: "menu",
     title: "Produkt",
     items: {
+      how: {
+        title: "So funktioniert es",
+        href: "/de/#how-it-works",
+      },
       get: {
         title: "Classifyre holen",
         href: "/de/get",
@@ -83,6 +87,16 @@ export default {
   "made-in-europe": {
     type: "page",
     title: "Made in Austria",
+    display: "hidden",
+  },
+  "immuta-alternative": {
+    type: "page",
+    title: "Immuta-Alternative",
+    display: "hidden",
+  },
+  "unity-catalog-alternative": {
+    type: "page",
+    title: "Unity-Catalog-Alternative",
     display: "hidden",
   },
   // Reachable from the footer only — a legal page does not belong in the
