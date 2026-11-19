@@ -1,1 +1,0 @@
-The Assets page has tabs over the same asset list, each showing the columns and filters that matter there: Raw assets, Governed assets (with how often they are read and which are read most) and Shared assets (with their usage and status, each dataset labelled in the list, and filters for whether a dataset can be read now and whether it is promoted).

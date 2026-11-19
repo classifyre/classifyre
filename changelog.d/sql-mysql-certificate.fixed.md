@@ -1,1 +1,0 @@
-SQL queries now work on MySQL sources set to verify the server's certificate (Verify CA, Verify identity): the query checks it against the source's CA like a scan does. MySQL passwords with spaces, quotes or backslashes also connect correctly.

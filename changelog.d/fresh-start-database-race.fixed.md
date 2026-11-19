@@ -1,1 +1,0 @@
-A first start on an empty database no longer leaves the worker stuck: when the API and the worker both created the database at the same moment, the one that lost the race failed and never became ready.

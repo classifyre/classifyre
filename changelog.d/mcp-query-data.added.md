@@ -1,1 +1,0 @@
-AI agents connected over MCP can now read tables for you: the new Data tool group lists the tables you may query and runs a SELECT (`query_data`), through your own access, masked columns, row filters and limits, with every table read recorded in Activity as yours.

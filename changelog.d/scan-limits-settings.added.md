@@ -1,1 +1,0 @@
-Settings → General now has Scan limits for each workspace: scans running at once, automatic scans at once, and runs kept per source. Values saved there replace the Helm chart and all-in-one image settings for that workspace, apart from the installation-wide ceiling on scans running at once; leaving a field empty follows the chart or image again.

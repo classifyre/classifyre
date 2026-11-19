@@ -1,1 +1,0 @@
-SQLite is no longer a source of its own, and existing SQLite sources are removed along with their assets and findings. SQLite files in a bucket, a mounted folder or an upload are still read, table by table.
