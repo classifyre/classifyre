@@ -1,14 +1,15 @@
 "use client";
 
-import { Suspense } from "react";
-import { ExploreWorkspace } from "@/components/explore/explore-workspace";
+import { NamespaceRedirect } from "@/components/namespace-redirect";
 
+const EXPLORE_TAB = { tab: "explore" };
+
+/**
+ * Explore lives on the assets page now, as its Explore tab. Links and
+ * bookmarks to /explore land there with the same view (`seeds`, `view`,
+ * `saved`, …). Its search (`q`) was the way to find where to start, which is
+ * now the asset list's search: it lands there.
+ */
 export default function ExplorePage() {
-  // The view lives in the address (useSearchParams), which a static export
-  // only has in the browser.
-  return (
-    <Suspense>
-      <ExploreWorkspace />
-    </Suspense>
-  );
+  return <NamespaceRedirect to="/assets" keepQuery set={EXPLORE_TAB} />;
 }

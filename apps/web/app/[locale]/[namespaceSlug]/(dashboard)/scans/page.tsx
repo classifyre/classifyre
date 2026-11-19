@@ -31,6 +31,12 @@ import { EChartBox } from "@/components/echart-box";
 import { RunnersTable } from "@/components/runners-table";
 
 import { useTranslation } from "@/hooks/use-translation";
+import { cn } from "@workspace/ui/lib/utils";
+import {
+  tileActiveClass,
+  tileIdleClass,
+  tileMutedText,
+} from "@/components/panel-card";
 
 type StatusPanelKey = "TOTAL" | SearchRunnersStatus;
 
@@ -414,23 +420,22 @@ function ScansContent() {
                 <button
                   key={panel.key}
                   type="button"
+                  aria-pressed={isActive}
                   className="group text-left cursor-pointer transition-transform hover:-translate-y-px focus-visible:outline-none"
                   onClick={() => selectStatusPanel(panel.key)}
                 >
                   <Card
-                    className={
-                      isActive
-                        ? "overflow-hidden border-2 border-accent/30 bg-background rounded-[6px]"
-                        : "border-2 border-border rounded-[6px] transition-all group-hover:bg-secondary/40"
-                    }
+                    className={cn(
+                      "overflow-hidden rounded-[6px] border-2",
+                      isActive ? tileActiveClass : tileIdleClass,
+                    )}
                   >
                     <CardContent className="p-4">
                       <p
-                        className={
-                          isActive
-                            ? "text-[11px] font-mono uppercase tracking-[0.16em]"
-                            : "text-[11px] font-mono uppercase tracking-[0.16em] text-muted-foreground"
-                        }
+                        className={cn(
+                          "text-[11px] font-mono uppercase tracking-[0.16em]",
+                          tileMutedText(isActive),
+                        )}
                       >
                         {panel.label}
                       </p>

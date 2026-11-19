@@ -7,7 +7,7 @@ import { useOptionalNamespace } from "@/components/namespace-provider";
 import { stripLocalePrefix } from "@/lib/locale-detection";
 
 const ROUTE_TITLE_KEYS: Record<string, string> = {
-  "/discovery": "discovery.title",
+  "/dashboard": "dashboard.title",
   "/findings": "findings.title",
   "/assets": "assets.title",
   "/sources": "sources.title",

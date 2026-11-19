@@ -2,7 +2,7 @@
 /* eslint-disable */
 /**
  * Classifyre API
- * Metadata ingestion and detection API for unstructured data sources. Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, Dremio, Trino/Starburst, ODBC, Amazon Athena, Google BigQuery, Amazon Redshift, Iceberg REST catalogs, DuckLake, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk, Notion, Email, and YouTube sources. Built-in detectors for secrets, PII, toxic content, image classification, broken links, and security threats.
+ * Open-source data governance API: scans data sources for personal data and secrets, masks classified columns, and serves governed reads. Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, Dremio, Trino/Starburst, ODBC, Amazon Athena, Google BigQuery, Amazon Redshift, Iceberg REST catalogs, DuckLake, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk, Notion, Email, and YouTube sources. Built-in detectors for secrets, PII, toxic content, image classification, broken links, and security threats.
  *
  * The version of the OpenAPI document: 1.0.0
  * Contact: support@example.com
@@ -103,6 +103,30 @@ export interface SearchAssetsFiltersDto {
      * @memberof SearchAssetsFiltersDto
      */
     kind?: SearchAssetsFiltersDtoKindEnum;
+    /**
+     * Only these assets (ids), with the other filters. The assets page asks for the ones worth exploring from this way.
+     * @type {Array<string>}
+     * @memberof SearchAssetsFiltersDto
+     */
+    ids?: Array<string>;
+    /**
+     * `failing`: assets with a failing quality rule, whatever their governance. Combines with `governance` (e.g. governed and failing).
+     * @type {string}
+     * @memberof SearchAssetsFiltersDto
+     */
+    quality?: SearchAssetsFiltersDtoQualityEnum;
+    /**
+     * Shared datasets that can be read now (`live`), are blocked, cannot be read (an input is missing), or are retired.
+     * @type {string}
+     * @memberof SearchAssetsFiltersDto
+     */
+    datasetState?: SearchAssetsFiltersDtoDatasetStateEnum;
+    /**
+     * Shared datasets promoted (true) or not (false).
+     * @type {boolean}
+     * @memberof SearchAssetsFiltersDto
+     */
+    promoted?: boolean;
 }
 
 
@@ -210,6 +234,25 @@ export const SearchAssetsFiltersDtoKindEnum = {
 } as const;
 export type SearchAssetsFiltersDtoKindEnum = typeof SearchAssetsFiltersDtoKindEnum[keyof typeof SearchAssetsFiltersDtoKindEnum];
 
+/**
+ * @export
+ */
+export const SearchAssetsFiltersDtoQualityEnum = {
+    Failing: 'failing'
+} as const;
+export type SearchAssetsFiltersDtoQualityEnum = typeof SearchAssetsFiltersDtoQualityEnum[keyof typeof SearchAssetsFiltersDtoQualityEnum];
+
+/**
+ * @export
+ */
+export const SearchAssetsFiltersDtoDatasetStateEnum = {
+    Live: 'live',
+    Blocked: 'blocked',
+    Unavailable: 'unavailable',
+    Retired: 'retired'
+} as const;
+export type SearchAssetsFiltersDtoDatasetStateEnum = typeof SearchAssetsFiltersDtoDatasetStateEnum[keyof typeof SearchAssetsFiltersDtoDatasetStateEnum];
+
 
 /**
  * Check if a given object implements the SearchAssetsFiltersDto interface.
@@ -242,6 +285,10 @@ export function SearchAssetsFiltersDtoFromJSONTyped(json: any, ignoreDiscriminat
         'stewardRef': json['stewardRef'] == null ? undefined : json['stewardRef'],
         'responsibleRef': json['responsibleRef'] == null ? undefined : json['responsibleRef'],
         'kind': json['kind'] == null ? undefined : json['kind'],
+        'ids': json['ids'] == null ? undefined : json['ids'],
+        'quality': json['quality'] == null ? undefined : json['quality'],
+        'datasetState': json['datasetState'] == null ? undefined : json['datasetState'],
+        'promoted': json['promoted'] == null ? undefined : json['promoted'],
     };
 }
 
@@ -270,6 +317,10 @@ export function SearchAssetsFiltersDtoToJSONTyped(value?: SearchAssetsFiltersDto
         'stewardRef': value['stewardRef'],
         'responsibleRef': value['responsibleRef'],
         'kind': value['kind'],
+        'ids': value['ids'],
+        'quality': value['quality'],
+        'datasetState': value['datasetState'],
+        'promoted': value['promoted'],
     };
 }
 

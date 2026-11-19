@@ -2,7 +2,7 @@
 /* eslint-disable */
 /**
  * Classifyre API
- * Metadata ingestion and detection API for unstructured data sources. Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, Dremio, Trino/Starburst, ODBC, Amazon Athena, Google BigQuery, Amazon Redshift, Iceberg REST catalogs, DuckLake, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk, Notion, Email, and YouTube sources. Built-in detectors for secrets, PII, toxic content, image classification, broken links, and security threats.
+ * Open-source data governance API: scans data sources for personal data and secrets, masks classified columns, and serves governed reads. Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, Dremio, Trino/Starburst, ODBC, Amazon Athena, Google BigQuery, Amazon Redshift, Iceberg REST catalogs, DuckLake, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk, Notion, Email, and YouTube sources. Built-in detectors for secrets, PII, toxic content, image classification, broken links, and security threats.
  *
  * The version of the OpenAPI document: 1.0.0
  * Contact: support@example.com
@@ -227,6 +227,8 @@ export interface GovernanceControllerWorkspaceUsageRequest {
     sourceId?: string;
     sort?: GovernanceControllerWorkspaceUsageSortEnum;
     limit?: string;
+    kind?: GovernanceControllerWorkspaceUsageKindEnum;
+    governance?: GovernanceControllerWorkspaceUsageGovernanceEnum;
 }
 
 /**
@@ -567,7 +569,7 @@ export class GovernanceApi extends runtime.BaseAPI {
     }
 
     /**
-     * The Governance tab of the assets page: totals, quality over time, what needs someone, coverage per source
+     * The dashboard: totals, quality over time, what needs someone, coverage per source
      */
     async governanceControllerDashboardRaw(requestParameters: GovernanceControllerDashboardRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GovernanceDashboardDto>> {
         const queryParameters: any = {};
@@ -600,7 +602,7 @@ export class GovernanceApi extends runtime.BaseAPI {
     }
 
     /**
-     * The Governance tab of the assets page: totals, quality over time, what needs someone, coverage per source
+     * The dashboard: totals, quality over time, what needs someone, coverage per source
      */
     async governanceControllerDashboard(requestParameters: GovernanceControllerDashboardRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GovernanceDashboardDto> {
         const response = await this.governanceControllerDashboardRaw(requestParameters, initOverrides);
@@ -1532,6 +1534,14 @@ export class GovernanceApi extends runtime.BaseAPI {
             queryParameters['limit'] = requestParameters['limit'];
         }
 
+        if (requestParameters['kind'] != null) {
+            queryParameters['kind'] = requestParameters['kind'];
+        }
+
+        if (requestParameters['governance'] != null) {
+            queryParameters['governance'] = requestParameters['governance'];
+        }
+
         const headerParameters: runtime.HTTPHeaders = {};
 
 
@@ -1589,3 +1599,24 @@ export const GovernanceControllerWorkspaceUsageSortEnum = {
     Rising: 'rising'
 } as const;
 export type GovernanceControllerWorkspaceUsageSortEnum = typeof GovernanceControllerWorkspaceUsageSortEnum[keyof typeof GovernanceControllerWorkspaceUsageSortEnum];
+/**
+ * @export
+ */
+export const GovernanceControllerWorkspaceUsageKindEnum = {
+    Raw: 'raw',
+    Shared: 'shared'
+} as const;
+export type GovernanceControllerWorkspaceUsageKindEnum = typeof GovernanceControllerWorkspaceUsageKindEnum[keyof typeof GovernanceControllerWorkspaceUsageKindEnum];
+/**
+ * @export
+ */
+export const GovernanceControllerWorkspaceUsageGovernanceEnum = {
+    Ungoverned: 'ungoverned',
+    Governed: 'governed',
+    Draft: 'draft',
+    Active: 'active',
+    Deprecated: 'deprecated',
+    Retired: 'retired',
+    Failing: 'failing'
+} as const;
+export type GovernanceControllerWorkspaceUsageGovernanceEnum = typeof GovernanceControllerWorkspaceUsageGovernanceEnum[keyof typeof GovernanceControllerWorkspaceUsageGovernanceEnum];

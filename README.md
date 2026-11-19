@@ -22,31 +22,53 @@ Classifyre finds personal data and secrets across the systems you already run, *
 
 ## What Classifyre does
 
-It's more than a scanner. Detection is the first step; the value is in turning raw findings into resolved investigations.
+Detection is the first step. The value is in what happens next: classified data is masked by default, people get governed access through the tools they already use, and every read is on record.
 
-| Capability             | What it means                                                                                                                                                                            | Docs                                                                          |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| **Sources**            | Connect databases, lakehouses, storage, collaboration tools, and content platforms — no data migration. Choose sampling while image OCR and audio/video transcription run automatically. | [Sources](https://docs.classifyre.com/sources/)                               |
-| **Detectors**          | Ready-made packs (secrets, PII, security) plus custom detectors you build — from a regex to an LLM, across text and images.                                                              | [Detectors](https://docs.classifyre.com/detectors/)                           |
-| **Findings**           | Every signal a detector raises, with severity, confidence, and a lifecycle tracked across scans.                                                                                         | [Findings](https://docs.classifyre.com/detectors/findings/)                   |
-| **Inquiries**          | Saved questions that keep surfacing matching findings, scan after scan.                                                                                                                  | [Inquiries](https://docs.classifyre.com/flow/investigations/inquiry/)         |
-| **Fingerprints**       | Deterministic duplicate and similarity detection that links the same entity across systems into clusters.                                                                                | [Fingerprints](https://docs.classifyre.com/flow/investigations/fingerprints/) |
-| **Cases & hypotheses** | Workspaces that collect evidence, weigh competing explanations, and reach a conclusion.                                                                                                  | [Cases](https://docs.classifyre.com/flow/investigations/cases/)               |
-| **Autopilot**          | AI agents that open inquiries, maintain fingerprints, build cases, and draft hypotheses after every scan — explaining every move.                                                        | [Autopilot](https://docs.classifyre.com/flow/investigations/autopilot/)       |
+| Capability                | What it means                                                                                                                                                                                                                      | Docs                                                                       |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| **Sources**               | Connect databases, lakehouses, storage, collaboration tools, and content platforms — no data migration. Choose sampling while image OCR and audio/video transcription run automatically.                                           | [Sources](https://docs.classifyre.com/sources/)                            |
+| **Detectors**             | Ready-made packs (secrets, PII, security) plus custom detectors you build — from a regex to an LLM, across text and images.                                                                                                        | [Detectors](https://docs.classifyre.com/detectors/)                        |
+| **Findings**              | Every signal a detector raises, with severity, confidence, and a lifecycle tracked across scans.                                                                                                                                   | [Findings](https://docs.classifyre.com/detectors/findings/)                |
+| **Masking & access**      | Classified columns are masked by default (redacted, last four, hashed, empty, or hidden). Masks apply inside the query, so `WHERE`, `JOIN` and `GROUP BY` cannot see past them. Grants, row filters and access requests per group. | [Query data & masking](https://docs.classifyre.com/data-query/)            |
+| **SQL, Excel & Power BI** | A SQL page, exports, and a PostgreSQL-protocol endpoint for Power BI, Excel, Tableau and DBeaver, plus AI agents over MCP — all through the same masks.                                                                            | [SQL connections](https://docs.classifyre.com/sql-connections/)            |
+| **Shared datasets**       | Governed saved queries shared with groups, so a team works from one reviewed dataset across sources.                                                                                                                               | [Shared datasets](https://docs.classifyre.com/data-query/#shared-datasets) |
+| **Roles & SSO**           | Single sign-on, roles, groups and workspaces. All open source, none of it behind a paid tier.                                                                                                                                      | [Roles](https://docs.classifyre.com/access/roles/)                         |
+| **Activity log**          | Every read, per table and person, with the channel used.                                                                                                                                                                           | [Access](https://docs.classifyre.com/access/)                              |
+
+### When something leaks
+
+Findings also feed an investigation layer for the cases that need a human to dig in:
+
+| Capability             | What it means                                                                                                                     | Docs                                                                          |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| **Inquiries**          | Saved questions that keep surfacing matching findings, scan after scan.                                                           | [Inquiries](https://docs.classifyre.com/flow/investigations/inquiry/)         |
+| **Fingerprints**       | Deterministic duplicate and similarity detection that links the same entity across systems into clusters.                         | [Fingerprints](https://docs.classifyre.com/flow/investigations/fingerprints/) |
+| **Cases & hypotheses** | Workspaces that collect evidence, weigh competing explanations, and reach a conclusion.                                           | [Cases](https://docs.classifyre.com/flow/investigations/cases/)               |
+| **Autopilot**          | AI agents that open inquiries, maintain fingerprints, build cases, and draft hypotheses after every scan — explaining every move. | [Autopilot](https://docs.classifyre.com/flow/investigations/autopilot/)       |
 
 ## How it all connects
 
-```
-Sources → Assets → Detectors → Findings ─┬─→ Inquiries ─────┐
-                                          └─→ Fingerprints ──┴─→ Cases & Hypotheses
-                                                  ▲                      ▲
-                                                  └──── Autopilot (AI agents) ────┘
+```mermaid
+flowchart LR
+    A[Sources] --> B[Assets]
+    B --> C[Detectors]
+    C --> D[Findings]
+
+    D --> E[Masks and grants]
+    E --> F["SQL · Excel · Power BI · MCP"]
+    F --> G[Activity log]
+
+    D -.->|when something leaks| H["Inquiries · Fingerprints · Cases"]
+    I[Autopilot] -.-> H
 ```
 
-A scan ingests a source into **assets**, **detectors** raise **findings**,
-**inquiries** and **fingerprints** organise those findings, and **cases** turn
-them into investigations — with **Autopilot** running the whole right-hand side
-for you. The end-to-end journey is documented in [Flow](https://docs.classifyre.com/flow/).
+1. **Scan.** A scan ingests each source into **assets**, and **detectors** raise **findings** on them.
+2. **Protect.** Findings decide which columns are **masked**. Access is granted per group.
+3. **Use.** People read the data through the SQL page, exports, a PostgreSQL endpoint or MCP, always through the masks.
+4. **Audit.** **Every read is logged**, per table and person.
+5. **Investigate (optional).** When something does leak, **inquiries**, **fingerprints** and **cases** turn findings into an investigation, with **Autopilot** doing the legwork.
+
+The end-to-end journey is documented in [Flow](https://docs.classifyre.com/flow/).
 
 ---
 

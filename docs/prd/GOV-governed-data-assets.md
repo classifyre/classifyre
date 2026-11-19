@@ -392,13 +392,20 @@ Routes are under `/<ws>`. Writes need `asset.govern` on the asset or source; rea
 - Owner and governance columns.
 - Filters *Ungoverned*, *Owned by me*, *Stewarded by me*, *Failing quality*.
 
-**Governance page** (`/<ws>/governance`, sidebar under Meaning):
+**Dashboard** (`/<ws>/dashboard`, the page a workspace opens on; it replaced the
+Governance page and, later, the assets page's Governance tab — see the build
+notes of 2026-11-18):
 
-- Coverage per source.
-- *Govern these first*: ungoverned tables by reads in 30 days.
-- Failing rules by severity.
-- *Mine*: assets I own or steward.
-- The new top-level route prefix goes into the negative lookahead in `next.config.mjs`.
+- *Mine* (assets I own or steward) or *All*, over 7, 30 or 90 days, one source or all.
+- A governance brief: governed of all, split by lifecycle and the ungoverned rest.
+- Quality: score, per dimension, governed assets failing a rule.
+- Usage, with the assets read most or rising.
+- *Waiting on you*: access requests, failing quality, unfinished governance, and
+  *Govern these first* (ungoverned tables by reads).
+- Every count of assets opens the assets list (`/<ws>/assets`) with the same filter.
+
+Coverage per source is still computed by `GET governance/dashboard` but not
+drawn: the governance brief and the assets list's source filter answer it.
 
 All strings are in `i18n/en.json` and `de.json`.
 
@@ -465,7 +472,7 @@ All strings are in `i18n/en.json` and `de.json`.
 - **Columns**: `asset_column_annotations` (migration `20261112150000_asset_column_annotations`), keyed `(asset_id, column_name)`, term FK `ON DELETE SET NULL`. `GovernanceColumnsService.state` joins `metadata.columns` with the annotations and with open findings grouped by `metadata->>'tabular_column_name'`; findings without a column are counted (`findingsWithoutColumn`, older scans and free-text PII). Routes: `GET assets/:id/columns`, `PUT assets/:id/columns/:name` (business name, description, term, CDE, classification, `reviewClassification`), `POST …/:name/move` (a removed column's annotations to the column it became; refused when the target has some), `DELETE …/:name`; writes need the same rights as G-1 and are audited `governance.column.update|move|remove`.
 - **Classification**: `public, internal, confidential, personal, sensitive, secret`. Derived: SECRETS → secret; PII national ids, card and account numbers (`CREDIT_CARD`, `IBAN_CODE`, `US_SSN`, …) → sensitive; other PII → personal; other detectors classify nothing. A steward's value wins and counts as reviewed; *Confirm* reviews the derived one. The checklist gains *Column classification reviewed* for assets with columns: done when every column findings classify has been reviewed.
 - **Usage** (`GET assets/:id/usage?days=30`, needs `activity.view`): reads and exports per day, distinct readers, top five, export formats, from `audit_events` tagged `asset:<id>` with `query-runs.read-table` / `query-runs.export-table.*`.
-- **Governance page** (`/<ws>/governance`, sidebar under Intelligence; `GET governance/summary`): totals, coverage per source (owned = own or source owner), *Govern these first* (ungoverned assets by reads in 30 days, top 10), *Yours* (links to the assets list filtered `mine` / `stewarding`), and the governance activity (`resource=governance`).
+- **Governance page** (superseded 2026-11-18 by the dashboard; `/<ws>/governance`, sidebar under Intelligence; `GET governance/summary`): totals, coverage per source (owned = own or source owner), *Govern these first* (ungoverned assets by reads in 30 days, top 10), *Yours* (links to the assets list filtered `mine` / `stewarding`), and the governance activity (`resource=governance`).
 - **MCP**: `get_asset_governance` (governance + columns) and `set_asset_owner` in the `assets` group. `set_asset_owner` needs `asset.govern`: a token's tools are filtered by role capabilities, so an owner or steward without the role governs over REST only. MCP requests now carry the tenant's organization (`CLS_ORG_ID`) so people can be checked and named.
 - The metadata card hides its column list when the columns card shows them.
 - **Smoke, 2026-11-12** (skaffold dev stack, `admin`, `lakehouse-lab`): `delta_orders` lists `id` and `email`; `email` classified *Personal data* from its PII finding, marked to review; 11 open findings name no column (older scans). Business names, a critical-data-element flag and *Save and confirm* from the dialog → the checklist's *Column classification reviewed* turns done. Usage shows the real 4 reads by 2 people with the top readers. The Governance page shows 34 assets, 1 owned and certified, coverage per source, ten ungoverned tables read in 30 days (`orders` 6 reads first), and the governance activity. Refused: an unknown classification (400), a column the table does not have (404). Not verified live: the MCP tools (unit-tested registration and capability), moving a removed column (no renamed column on the dev stack).
@@ -515,3 +522,9 @@ All strings are in `i18n/en.json` and `de.json`.
 - **Quality shows where assets are listed**: search results carry `governance.quality {rules, failing, score}`; the assets table has a *Quality* column with a chip (red with the failing count, lime at 100, amber below) and a *Failing quality* governance filter (`governance=failing`: assets with an open QUALITY finding); the asset header shows the same chip, a click opens the Governance tab.
 - **Source Governance tab** has no stepper: five coverage tiles (assets, owned, certified, ungoverned, failing quality — `SourceGovernanceCoverageDto` gains `checked` and `failing`) linking to the filtered assets list, the shared ownership card, and coverage bars.
 - **Smoke, 2026-11-12** (skaffold dev stack, `admin`, `lakehouse-lab` `delta_orders`): adding *Tests Bla* as a second steward recorded `steward: bla → bla, Tests Bla`, shown in History as *Steward added*. A new *Column values → Only allowed values* check on `email` with a pattern was test-run twice before saving (0 of 11 rows invalid, passing, 13 s; with a pattern no row matches, 11 rows, failing, and the finding text it would raise) and saved as *Only valid email*, recorded as `rule only-valid-email: — → Only valid email: invalidValues on email mustBe 0 (MEDIUM)`; the test runs created no rule. Test runs through the API: findings (PII in `email`, 1, failing), scan facts (5.5 h, passing), SQL (`{object}`/`{property}` resolved, 0 of 11, passing). Options listed 2 columns, 12 open PII findings by type and column, the SQL name and 11 rows. `governance=failing` listed the two assets with failing checks, the Quality column showing *Quality 81 · 1 failing*; the source tab showed 4 assets, 2 owned, 2 certified, 2 ungoverned, 2 of 2 checked failing.
+
+### Dashboard and asset tabs, 2026-11-18
+
+- **The dashboard** (`/<ws>/dashboard`) replaces the Overview as the start page (`/discovery` and the namespace root redirect there) and takes the assets page's Governance tab: a governance brief (governed of all; a rail by lifecycle — certified, draft, deprecated, retired — and ungoverned, each part opening exactly those assets), quality coloured by its worst failing rule, Incoming (access requests waiting now, reads), usage, *Waiting on you* (only the sections with something in them) and quality over time. `GET governance/dashboard` totals gain `draft`, `deprecated`, `retired`, and `failing` counts governed assets only, as the governed list shows them.
+- **The assets page** has four tabs over the one `AssetsTable`, each with its own columns and filters (`ASSETS_TABLE_PRESETS`): Raw, Governed (usage and read most, `GET governance/usage?governance=governed`), Shared (`kind=shared`; lifecycle, availability and promoted) and Explore (the Explore canvas as a map over the assets worth starting from). `/explore` redirects to the Explore tab.
+- **Asset search** gains `ids`, `quality=failing` (combines with `governance`, so the Governed tab narrows to its failing assets), `datasetState` (`live`, `blocked`, `unavailable`, `retired`, as the shared datasets list works them out) and `promoted`. Workspace usage gains `kind` and `governance`.

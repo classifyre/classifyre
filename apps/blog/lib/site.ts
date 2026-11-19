@@ -86,10 +86,13 @@ export const routes = {
   home: "/",
   get: "/get",
   sources: "/sources",
+  // Page removed; kept so the commented-out landing section still compiles.
   editions: "/open-source-vs-enterprise",
   madeInEurope: "/made-in-europe",
   blog: "/blog",
   privacy: "/privacy",
+  imprint: "/impressum",
+  releaseNotes: "/release-notes",
 } as const;
 
 export { helmChartRef };

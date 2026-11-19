@@ -172,11 +172,11 @@
     "upgradeFootnote": "Beide Optionen sind kostenlos und Open Source. Ihre Dokumente bleiben auf Ihrem Rechner oder in Ihrem eigenen Cluster."
   },
   "nav": {
-    "overview": "Übersicht",
+    "dashboard": "Dashboard",
     "explore": "Erkunden",
     "findings": "Befunde",
     "assets": "Assets",
-    "query": "SQL",
+    "query": "Daten abfragen",
     "sources": "Quellen",
     "detectors": "Custom-Detektoren",
     "investigations": "Ermittlungen",
@@ -704,7 +704,14 @@
     "remove": "Entfernen",
     "more": "Mehr",
     "openedAgo": "Geöffnet {{when}}",
-    "recentlyOpened": "Zuletzt geöffnet"
+    "recentlyOpened": "Zuletzt geöffnet",
+    "searchMode": {
+      "label": "Wie die Suche trifft",
+      "semantic": "Semantisch",
+      "semanticHint": "Nach Bedeutung und nach den exakten Wörtern",
+      "exact": "Exakt",
+      "exactHint": "Nur die exakten Wörter"
+    }
   },
   "settings": {
     "title": "Einstellungen",
@@ -1695,6 +1702,10 @@
     "loadingVisualizations": "Asset-Visualisierungen werden geladen...",
     "search": "Assets suchen",
     "allSources": "Alle Quellen",
+    "responsibleMe": "Nur meine Assets",
+    "responsibleMeClear": "Alle Assets zeigen, nicht nur meine",
+    "qualityFailing": "Qualitätsfehler",
+    "qualityFailingClear": "Verwaltete Assets unabhängig von ihrer Qualität zeigen",
     "detectorTypes": "Erkennungstypen",
     "assetStatus": "Asset-Status",
     "noAssets": "Keine Assets gefunden",
@@ -1860,100 +1871,55 @@
     },
     "tabs": {
       "label": "Asset-Ansichten",
-      "governance": "Governance",
-      "governanceSub": "{{certified}} zertifiziert · {{failing}} mit Qualitätsfehlern",
-      "requestsWaiting": "{{count}} warten",
       "raw": "Rohdaten-Assets",
       "rawSub": "{{new}} neu · {{updated}} aktualisiert",
+      "governed": "Verwaltete Assets",
+      "governedSub": "{{certified}} zertifiziert · {{failing}} mit Qualitätsfehlern",
       "shared": "Geteilte Assets",
       "sharedSub": "{{certified}} zertifiziert"
     },
-    "governance": {
-      "scope": {
-        "label": "Wessen Assets",
-        "mine": "Meine",
-        "all": "Alle",
-        "nothingYours": "Sie sind noch nirgends Owner oder Steward, daher sehen Sie alle Assets."
+    "sharedStatus": {
+      "title": "Status",
+      "lead": "{{count}} geteilte Datensätze",
+      "lifecycle": "Lebenszyklus",
+      "availability": "Jetzt lesbar",
+      "promoted": "{{count}} hervorgehoben",
+      "locked": "{{count}} für Sie gesperrt"
+    },
+    "sharedFilter": {
+      "anyAvailability": "Jede Verfügbarkeit",
+      "promoted": "Hervorgehoben"
+    },
+    "explore": {
+      "tab": "Erkunden",
+      "tabSub": "Gespeicherte Ansichten · von jedem Asset aus starten",
+      "mapTitle": "Am stärksten verbundene Assets",
+      "emptyTitle": "Noch ist nichts verbunden",
+      "emptyHint": "Klicken Sie unten bei einem Asset auf den Kompass, um zu zeichnen, womit es verbunden ist.",
+      "noSavedViews": "Noch keine gespeicherten Ansichten. Speichern Sie eine Ansicht auf der Karte, um sie zu behalten.",
+      "startFrom": "Starten bei",
+      "start": {
+        "lineage": "Meiste Herkunft",
+        "critical": "Am kritischsten",
+        "duplicates": "Duplikate",
+        "links": "Gezeichnete Verknüpfungen",
+        "all": "Alle Assets"
       },
-      "period": "Zeitraum",
-      "days": "{{days}} Tage",
-      "kpi": {
-        "governed": "Verwaltet",
-        "governedHint": "{{percent}} % von {{assets}} Assets",
-        "certified": "Zertifiziert",
-        "certifiedHint": "{{percent}} % der verwalteten",
-        "failing": "Qualitätsfehler",
-        "failingHint": "Assets mit einer fehlschlagenden Regel",
-        "score": "Qualitätswert",
-        "scoreHint": "Bestandene Regeln, nach Schweregrad gewichtet"
+      "reason": {
+        "critical": "{{critical}} kritisch · {{high}} hoch",
+        "duplicate": "Kopie von {{name}} · {{pairs}}",
+        "linkTo": "Verknüpft mit {{name}}",
+        "linkFrom": "Verknüpft von {{name}}"
       },
-      "usage": {
-        "title": "Nutzung",
-        "lead": "Tabellenlesezugriffe und Exporte der letzten {{days}} Tage.",
-        "used": "Meistgenutzt",
-        "rising": "Steigend",
-        "totals": "{{reads}} Lesezugriffe · {{exports}} Exporte",
-        "change": "{{change}} gegenüber den {{days}} Tagen davor",
-        "fresh": "neu",
-        "topUsed": "Am meisten gelesen",
-        "topRising": "Nutzung am stärksten gestiegen gegenüber dem Zeitraum davor",
-        "readersShort": "{{count}} Leser",
-        "none": "In den letzten {{days}} Tagen hat niemand diese Assets gelesen.",
-        "noneRising": "Kein Asset wurde mehr gelesen als im Zeitraum davor."
-      },
-      "quality": {
-        "title": "Qualität",
-        "lead": "Alle Regelergebnisse der letzten {{days}} Tage und der Wert je Dimension aus den letzten Ergebnissen ihrer Regeln.",
-        "passed": "Bestanden",
-        "failed": "Fehlgeschlagen",
-        "results": "{{results}} Ergebnisse, {{failed}} fehlgeschlagen",
-        "dimensions": "Nach Dimension",
-        "none": "Noch keine Qualitätsregeln für diese Assets. Fügen Sie sie im Governance-Tab eines Assets hinzu."
-      },
-      "coverage": {
-        "title": "Abdeckung nach Quelle",
-        "lead": "Zertifizierte, verwaltete und herrenlose Assets je Quelle. Klicken Sie auf eine Quelle, um diesen Tab darauf einzugrenzen.",
-        "certified": "Zertifiziert",
-        "owned": "Verwaltet, nicht zertifiziert",
-        "ungoverned": "Ohne Owner",
-        "clear": "Alle Quellen"
-      },
-      "waiting": {
-        "title": "Wartet auf Sie",
-        "requests": "Zu entscheidende Zugriffsanfragen",
-        "noRequests": "Niemand wartet auf Ihre Entscheidung.",
-        "failing": "Qualitätsfehler",
-        "noFailing": "Hier schlägt keine Qualitätsregel fehl.",
-        "rulesFailing": "{{count}} fehlgeschlagen",
-        "unfinished": "Unvollständige Governance",
-        "noUnfinished": "Alles, wofür Sie verantwortlich sind, hat einen Steward, eine Beschreibung und ist zertifiziert.",
-        "governFirst": "Zuerst verwalten",
-        "noGovernFirst": "In den letzten {{days}} Tagen wurde kein Asset ohne Owner gelesen.",
-        "reads": "{{reads}} Lesezugriffe · {{readers}} Leser",
-        "seeAll": "Alle anzeigen"
-      },
-      "missing": {
-        "owner": "Kein Owner",
-        "steward": "Kein Steward",
-        "description": "Keine Beschreibung",
-        "meaning": "Kein Glossarbegriff",
-        "quality": "Qualität schlägt fehl",
-        "certification": "Nicht zertifiziert",
-        "certified": "Nicht zertifiziert",
-        "classification": "Klassifizierung nicht geprüft"
-      },
-      "table": {
-        "title": "Assets",
-        "empty": "Kein Asset entspricht diesem Bereich und Filter.",
-        "lifecycle": "Lebenszyklus",
-        "owner": "Owner",
-        "stewards": "Stewards",
-        "reads": "Lesezugriffe ({{days}} T.)",
-        "requests": "Anfragen",
-        "gaps": "Fehlt noch",
-        "complete": "Vollständig",
-        "range": "{{from}}–{{to}} von {{total}}"
-      }
+      "picked": "{{count}} ausgewählt",
+      "clearPicked": "Leeren",
+      "together": "{{count}} gemeinsam erkunden",
+      "pick": "{{name}} zum gemeinsamen Erkunden auswählen",
+      "one": "{{name}} erkunden",
+      "pair": "Das Paar erkunden",
+      "onMap": "Auf der Karte",
+      "addToMap": "{{count}} zur Karte hinzufügen",
+      "pickAll": "Die angezeigten Zeilen auswählen"
     }
   },
   "detectors": {
@@ -3379,7 +3345,6 @@
     "tokenCostsDesc": "Wird zur Kostenschätzung von Autopilot-Läufen und für die Verbrauchs-Diagramme genutzt."
   },
   "csvExport": {
-    "label": "CSV herunterladen",
     "title": "Nach CSV exportieren",
     "cancel": "Abbrechen",
     "download": "Herunterladen",
@@ -3392,46 +3357,93 @@
   "validation": {
     "configValidationFailed": "Konfiguration hat die Schema-Validierung nicht bestanden"
   },
-  "discovery": {
-    "title": "Übersicht",
-    "securityBrief": "Befundübersicht",
-    "allFindingsWithDays": "Alle Befunde · letzte {{days}} Tage",
-    "findingsToReview": "Zu prüfende Befunde",
-    "open": "offen",
-    "resolved": "erledigt",
-    "falsePositive": "nicht relevant",
-    "ignored": "zurückgestellt",
-    "whatNeedsAttention": "Was Aufmerksamkeit erfordert",
-    "incoming": "Eingehend",
-    "newToday": "heute neu",
-    "thisWeek": "diese Woche",
-    "thisMonth": "diesen Monat",
-    "basedOnTimestamps": "Gezählt nach Erkennungszeitpunkt",
-    "whereRiskClusters": "Aktivste Assets",
-    "viewAll": "Alle anzeigen",
-    "findingsLabel": "Befunde",
-    "assetsLabel": "Assets",
-    "updatedLabel": "aktualisiert",
-    "newLabel": "neu",
-    "resolvedLabel": "erledigt",
-    "firstScan": "Ersten Scan starten, um zu sehen, was Ihre Quellen enthalten.",
-    "startScan": "Scan starten",
-    "recentScans": "Letzte Scans",
-    "lastRuns": "Letzte {{count}} Läufe",
-    "runningCount": "{{count}} laufend",
-    "allScans": "Alle Scans",
-    "noScansYet": "Noch keine Scans",
-    "criticalFindings": "Kritische Befunde",
-    "highFindings": "Hohe Befunde",
-    "mediumFindings": "Mittlere Befunde",
-    "lowFindings": "Niedrige Befunde",
-    "infoFindings": "Routine-Befunde",
-    "noFindings": "Keine Befunde",
-    "requireReview": "{{count}} · zuerst ansehen",
-    "noFindingsInWindow": "Keine Befunde im gewählten Zeitraum",
-    "currentHighest": "Höchste Stufe: {{level}} · {{count}} offen",
+  "dashboard": {
+    "title": "Dashboard",
+    "loadError": "Das Dashboard konnte nicht geladen werden. Prüfen Sie die Verbindung und versuchen Sie es erneut.",
     "retry": "Erneut versuchen",
-    "errorPrefix": "Fehler: {{message}}",
+    "brief": {
+      "label": "Governance-Überblick",
+      "mine": "Assets, für die Sie Owner oder Steward sind",
+      "all": "Alle Assets in diesem Workspace",
+      "governed": "Assets verwaltet",
+      "rail": "Governance-Abdeckung",
+      "governedShare": "{{percent}} % verwaltet",
+      "certifiedShare": "{{percent}} % der verwalteten zertifiziert",
+      "empty": "Noch keine Assets. Fügen Sie eine Quelle hinzu und starten Sie einen Scan, um zu sehen, was es zu verwalten gibt."
+    },
+    "qualityBrief": {
+      "label": "Qualität",
+      "score": "Qualitätswert",
+      "noScore": "Noch kein Wert",
+      "none": "Noch keine Qualitätsregeln für diese Assets.",
+      "failing": "{{count}} verwaltete Assets mit fehlschlagender Regel",
+      "allPassing": "Alle Regeln bestehen",
+      "howTo": "Regeln im Governance-Tab eines Assets hinzufügen"
+    },
+    "incoming": {
+      "label": "Eingehend",
+      "requests": "Zugriffsanfragen, die jetzt auf Sie warten",
+      "readsToday": "Lesezugriffe heute",
+      "readsPeriod": "Lesezugriffe in {{days}} Tagen",
+      "exports": "{{count}} Exporte",
+      "change": "{{change}} gegenüber den {{days}} Tagen davor"
+    },
+    "scope": {
+      "label": "Wessen Assets",
+      "mine": "Meine",
+      "all": "Alle",
+      "nothingYours": "Sie sind noch nirgends Owner oder Steward, daher sehen Sie alle Assets."
+    },
+    "period": "Zeitraum",
+    "days": "{{days}} Tage",
+    "usage": {
+      "title": "Nutzung",
+      "lead": "Tabellenlesezugriffe und Exporte der letzten {{days}} Tage.",
+      "used": "Meistgenutzt",
+      "rising": "Steigend",
+      "change": "{{change}} gegenüber den {{days}} Tagen davor",
+      "fresh": "neu",
+      "topUsed": "Am meisten gelesen",
+      "topRising": "Nutzung am stärksten gestiegen gegenüber dem Zeitraum davor",
+      "readersShort": "{{count}} Leser",
+      "none": "In den letzten {{days}} Tagen hat niemand diese Assets gelesen.",
+      "noneRising": "Kein Asset wurde mehr gelesen als im Zeitraum davor.",
+      "readsCount": "{{count}} Lesezugriffe",
+      "exportsCount": "{{count}} Exporte"
+    },
+    "quality": {
+      "title": "Qualität im Verlauf",
+      "lead": "Alle Ergebnisse der Qualitätsregeln der letzten {{days}} Tage.",
+      "passed": "Bestanden",
+      "failed": "Fehlgeschlagen",
+      "passedCount": "{{count}} bestanden",
+      "failedCount": "{{count}} fehlgeschlagen",
+      "none": "In den letzten {{days}} Tagen lief keine Qualitätsregel auf diesen Assets."
+    },
+    "waiting": {
+      "title": "Wartet auf Sie",
+      "leadMine": "Für die Assets, für die Sie verantwortlich sind",
+      "leadAll": "Im gesamten Workspace",
+      "allClear": "Gerade wartet nichts auf Sie.",
+      "requests": "Zu entscheidende Zugriffsanfragen",
+      "noRequests": "Niemand wartet auf Ihre Entscheidung.",
+      "failing": "Qualitätsfehler",
+      "rulesFailing": "{{count}} fehlgeschlagen",
+      "unfinished": "Unvollständige Governance",
+      "governFirst": "Zuerst verwalten",
+      "reads": "{{reads}} Lesezugriffe · {{readers}} Leser",
+      "seeAll": "Alle anzeigen"
+    },
+    "missing": {
+      "owner": "Kein Owner",
+      "steward": "Kein Steward",
+      "description": "Keine Beschreibung",
+      "meaning": "Kein Glossarbegriff",
+      "quality": "Qualität schlägt fehl",
+      "certification": "Nicht zertifiziert",
+      "certified": "Nicht zertifiziert",
+      "classification": "Klassifizierung nicht geprüft"
+    },
     "stats": {
       "building": "Index wird erstellt…",
       "buildingHint": "Diese Zahlen wurden direkt aus allen Befunden gezählt – exakt, aber langsam. Eine Neuberechnung des vorab aggregierten Index läuft im Hintergrund; danach lädt diese Seite sofort.",
@@ -3444,7 +3456,6 @@
   "explore": {
     "title": "Erkunden",
     "titleMany": "{{name}} und {{count}} weitere",
-    "cardTitle": "Verbindungen erkunden",
     "ledger": "Was auf der Fläche ist",
     "spotlightClear": "Wieder alles zeigen",
     "inCases": "In Fällen",
@@ -3731,11 +3742,6 @@
     "zoomSelection": "Auf Auswahl zoomen",
     "minimap": "Übersichtskarte",
     "backTo": "Zurück zu {{name}}"
-  },
-  "casework": {
-    "title": "Fallarbeit",
-    "subtitle": "Laufende Fälle und Anfrage-Beobachtungen",
-    "viewAll": "Alle anzeigen"
   },
   "breadcrumb": {
     "home": "Startseite",
@@ -6508,22 +6514,16 @@
       "ogTitle": "Arbeitsbereiche — isolierte Fallakten | Classifyre",
       "ogDescription": "Jeder Arbeitsbereich hat eigene Quellen, Scans und Funde — wählen Sie einen aus oder legen Sie eine neue Fallakte an."
     },
-    "discovery": {
-      "title": "Übersicht — Sicherheitslage & Zustand des Arbeitsbereichs",
-      "description": "Die Sicherheitslage des Arbeitsbereichs: offene und erledigte Funde, Risikocluster nach Asset und Quelle, jüngste Scanläufe und Verteilung der Erledigungen — Ihr Ausgangspunkt nach jedem Scan.",
-      "ogTitle": "Übersicht — Sicherheitslage | Classifyre",
-      "ogDescription": "Offene Funde, Risikocluster, jüngste Scans und Erledigungen — der Zustand dieses Arbeitsbereichs auf einen Blick."
-    },
-    "explore": {
-      "title": "Erkunden — Verbindungen, Herkunft & Ähnliches",
-      "description": "Beginnen Sie mit einer Suche und folgen Sie, womit ein Asset verbunden ist: Herkunft, Duplikate, gemeinsame Werte, gemeinsame Glossarbegriffe und inhaltliche Ähnlichkeit — jede Verbindung mit ihrem Grund, dazu Verbindungen, die Sie selbst ziehen.",
-      "ogTitle": "Verbindungen erkunden | Classifyre",
-      "ogDescription": "Suchen, dann Herkunft, Duplikaten, gemeinsamen Begriffen und Ähnlichem folgen — jede Verbindung mit ihrem Grund."
+    "dashboard": {
+      "title": "Dashboard — Governance, Qualität & Nutzung",
+      "description": "Hier beginnt die Arbeit: wie viel Ihrer Daten verwaltet und zertifiziert ist, wie die Qualität hält, wer sie anfragt und liest und was auf Sie wartet.",
+      "ogTitle": "Dashboard — Governance & Qualität | Classifyre",
+      "ogDescription": "Verwaltete und herrenlose Assets, Qualität, Nutzung und Zugriffsanfragen — für Ihre Assets oder den ganzen Workspace."
     },
     "query": {
-      "title": "SQL — Tabellen abfragen",
+      "title": "Daten abfragen — SQL über Ihre Tabellen",
       "description": "Fragen Sie die Zeilen der Datenbank-, Lakehouse- und Dateitabellen, auf die Sie Zugriff haben, mit Standard-SQL ab und verknüpfen Sie Tabellen über Quellen hinweg.",
-      "ogTitle": "SQL über Ihre Tabellen | Classifyre",
+      "ogTitle": "Daten abfragen | Classifyre",
       "ogDescription": "Standard-SQL über die Tabellen, die Sie lesen dürfen, quellenübergreifend verknüpft."
     },
     "findings": {
@@ -7165,7 +7165,7 @@
         "update": "Governance-Angaben bearbeitet",
         "status": {
           "draft": "Auf Entwurf gesetzt",
-          "active": "Zertifiziert (aktiv)",
+          "active": "Zertifiziert",
           "deprecated": "Als veraltet markiert",
           "retired": "Außer Betrieb genommen"
         },
@@ -7402,7 +7402,7 @@
     "signOut": "Abmelden"
   },
   "dataQuery": {
-    "title": "SQL",
+    "title": "Daten abfragen",
     "subtitle": "Fragen Sie die Zeilen der Tabellen, auf die Sie Zugriff haben, mit Standard-SQL ab. Eine Abfrage kann Tabellen verschiedener Quellen verknüpfen.",
     "run": "Ausführen",
     "cancel": "Abbrechen",
@@ -7439,7 +7439,7 @@
     "noTables": "Noch keine Tabellen zum Abfragen. Scannen Sie zuerst eine Datenbank-, Lakehouse- oder Bucket-Quelle.",
     "partialAccess": "Sie dürfen hier {{count}} Tabellen abfragen, die mit dem Abspielzeichen. Die anderen brauchen eine Datenleser-Freigabe.",
     "openInQuery": "In SQL öffnen",
-    "openInQueryHint": "Diese Abfrage auf der SQL-Seite öffnen",
+    "openInQueryHint": "Diese Abfrage auf der Seite Daten abfragen öffnen",
     "assetTab": "Daten",
     "assetLockedTitle": "Kein Datenzugriff",
     "assetLocked": "Sie sehen diese Tabelle, aber nicht ihre Zeilen. Fragen Sie mit „Zugriff anfragen“ beim Eigentümer an, oder ein Admin des Arbeitsbereichs gibt Ihrer Gruppe die Rolle Datenleser für diese Tabelle oder ihre Quelle.",
@@ -7686,6 +7686,7 @@
     "filter": {
       "label": "Governance",
       "all": "Jede Governance",
+      "anyLifecycle": "Jeder Lebenszyklus",
       "ungoverned": "Ohne Verantwortliche",
       "governed": "Mit Owner",
       "draft": "Entwurf",
@@ -8359,14 +8360,7 @@
       "retired": "Stillgelegt"
     },
     "page": {
-      "lead": "Gespeicherte Abfragen, mit Gruppen als verwaltete Datensätze geteilt. Lesende brauchen keinen Zugriff auf die Tabellen dahinter; deren Masken und Klassifizierung gelten weiter.",
-      "new": "Neuer geteilter Datensatz",
-      "search": "Nach Name, Beschreibung oder Gruppe suchen",
-      "emptyTitle": "Noch keine geteilten Datensätze",
-      "emptyLead": "Schreiben Sie auf der SQL-Seite eine Abfrage und wählen Sie Als Datensatz teilen.",
-      "dataset": "Datensatz",
-      "trust": "Status",
-      "inputs": "Tabellen",
+      "emptyLead": "Schreiben Sie auf der Seite Daten abfragen eine Abfrage und wählen Sie Als Datensatz teilen.",
       "locked": "Sie können ihn noch nicht lesen: öffnen Sie ihn, um Zugriff anzufragen"
     },
     "share": {
@@ -8430,7 +8424,7 @@
       "title": "Definition",
       "lead": "Das SQL, das jedes Lesen live über seine Tabellen ausführt, so wie die besitzende Gruppe sie liest.",
       "query": "Abfragen",
-      "edit": "Auf der SQL-Seite bearbeiten",
+      "edit": "Auf der Seite Daten abfragen bearbeiten",
       "versions": "Versionen",
       "versionsLead": "Jede Änderung von SQL, Beschreibung oder besitzender Gruppe ist eine Version.",
       "version": "Version {{version}}"

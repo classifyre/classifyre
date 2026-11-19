@@ -482,12 +482,6 @@ export function GetPage({ locale }: { locale: Locale }) {
                 <p className="mt-3 max-w-4xl text-base leading-8 sm:text-lg sm:leading-9">
                   {copy.which.enterpriseNote}
                 </p>
-                <a
-                  href={localized(routes.editions)}
-                  className="mt-5 inline-flex items-center border-2 border-accent bg-accent px-5 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-black transition-colors hover:border-foreground hover:bg-foreground hover:text-background"
-                >
-                  {copy.which.enterpriseCta}
-                </a>
               </div>
             </Enter>
           </div>

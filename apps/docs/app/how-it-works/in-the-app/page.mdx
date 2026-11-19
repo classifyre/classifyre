@@ -1,6 +1,6 @@
 ---
 title: A Tour of the App
-description: Every screen in the Classifyre app, what it is for, and where to learn more — Discovery, Sources, Scans, Assets, Findings, Duplicate Review, Investigations, Glossary, and beyond.
+description: Every screen in the Classifyre app, what it is for, and where to learn more — Dashboard, Sources, Scans, Assets, Query data, Findings, Duplicate Review, Investigations, Glossary, and beyond.
 ---
 
 # A Tour of the App
@@ -31,26 +31,36 @@ Learn more: **[Workspaces](/how-it-works/workspaces/)** — what is isolated, ho
 addressing works, how categories and links are organised, and what governance
 the enterprise offering adds.
 
-## Discovery
+## Dashboard
 
-**Your at-a-glance overview.** Discovery (*Overview* in the sidebar) is the
-landing dashboard, in three rows:
+**Where your work starts.** The Dashboard is the page a workspace opens on. It
+is about the data you answer for, not about findings or scans. *Mine* shows the
+assets you own or steward, *All* the whole workspace; pick 7, 30 or 90 days and
+a source. It has three cards across the top:
 
-- **The brief** — total findings over the last 7, 30, or 90 days, what needs
-  attention broken down by priority, and what has arrived today, this week and
-  this month. Review state (open, resolved, not relevant, set aside) is a single
-  muted line: it is bookkeeping, not the headline.
-- **Casework and recent scans** — the cases and inquiries in flight, how many
-  matches appeared since you last looked, and the last ten runs.
-- **Explore connections** — a search box, your saved views, and the assets worth
-  starting from (most critical, most lineage, biggest duplicate patterns, links
-  people drew), each one a way into [Explore](/how-it-works/explore/#explore-on-the-overview).
+- **Governance brief** — how many assets are governed, out of how many, and one
+  bar that splits them by lifecycle (certified, draft, deprecated, retired) and
+  the ungoverned rest.
+- **Quality** — the quality score and each dimension's score, and how many
+  governed assets fail a quality rule. The card takes the colour of the most
+  severe failing rule, the same scale findings use; it turns green when every
+  rule passes.
+- **Incoming** — access requests waiting for you right now (whatever the period
+  or source), and how often your data was read today and over the period.
 
-Use it to answer *"what is going on?"* in ten seconds, then click any number to
-jump straight to the filtered detail view behind it.
+Below them: usage over the period, with the assets read most or whose use grew
+most; what waits on you (access requests to approve or decline in place,
+failing quality, unfinished governance, and the unowned assets read most, each
+shown only when there is something in it); and quality results per day.
 
-> Priority counts, review counts, cases and top assets are all clickable —
-> Discovery is a launchpad, not just a report.
+Every count of assets opens those assets on the Assets page, with the same
+filter: each part of the governance bar, the failing assets, the assets to
+govern first. The Incoming request count leads to the requests to decide, on
+the same page.
+
+Findings and scans have their own summaries: the **Findings** page opens on
+counts by priority and a trend over time, the **Scans** page on counts by
+status. Both are in the sidebar.
 
 ## Explore
 
@@ -66,7 +76,7 @@ downstream or both, as far as it goes; badges show what is already in a case or
 answers a watch. Send what you found to a case, and draw the links the data does
 not know about (they survive every re-scan).
 
-The Explore card on the Overview opens the same canvas on a page of its own,
+The **Explore** tab of the Assets page opens the same canvas as a map of its own,
 starting from a search, your saved views, or a table of the assets worth
 starting from; a view there can be saved with a name and the layout you gave it.
 
@@ -99,26 +109,43 @@ repeat scans do.
 
 **Everything your scans have found.** Every document, page, file, or record a
 scan registers becomes an asset with metadata — owner, location, when it last
-changed. The Assets screen has three tabs, each a card with its count:
+changed. The Assets screen has four tabs, each a card with its count, and each
+the same asset list, showing the columns and filters that matter there:
 
-- **Governance** — where owners, stewards and business readers start work:
-  access requests waiting for their decision (approve or decline in place),
-  assets failing quality, governance still unfinished on their assets (no
-  steward, no description, not certified), usage over the period with the
-  assets read most or whose use grew most, quality results per day and per
-  dimension, and coverage per source. *Mine* shows what you own or steward,
-  *All* the whole workspace; pick 7, 30 or 90 days and a source. Every number
-  leads to the assets behind it.
 - **Raw assets** — everything your scans registered: filter by status, source,
-  detector or governance, and see which assets carry the most findings.
-- **Shared assets** — saved queries shared as governed datasets.
+  detector or governance, and see which assets carry the most findings and
+  which sources hold the most assets.
+- **Governed assets** — every asset someone owns, scanned or shared: how often
+  they were read over the last 30 days and which were read most (for your own
+  assets and one source, when the list is narrowed to them). Narrow the list to
+  a lifecycle, to failing quality, or to your own.
+- **Shared assets** — saved queries shared as governed datasets: how often they
+  were read, and where they stand (their lifecycle, and whether they can be
+  read now). Each row carries its dataset labels: promoted, blocked, or locked
+  for you. Filter the list by lifecycle, by whether a dataset can be read now,
+  or to the promoted ones; the status card's counts set those filters too.
+- **Explore** — a map of what is connected, starting from the most connected
+  assets, and under it the assets worth starting from: most lineage, most
+  critical, duplicates, drawn links. A row's compass draws it on the map. See
+  [Explore on the Assets page](/how-it-works/explore/#explore-on-the-assets-page).
 
+The [Dashboard](#dashboard)'s numbers open these lists already filtered.
 The tab you pick stays in the address, so a link or a refresh opens it again.
 Each asset's page has its findings and a **Connections** tab: Explore's canvas
 starting from that asset, with its lineage, duplicates, shared values and
 concepts.
 
 Learn more: **[Assets & Metadata](/sources/assets-and-metadata/)**.
+
+## Query data
+
+**The rows themselves, with SQL.** The Query data page queries the tables you
+may read, and joins tables of different sources in one query: the editor, and
+beside it your tables, history and saved queries. A query can be saved, or
+shared with a group as a governed dataset. **Connect a tool**, at the top
+right, lets Power BI, Excel or DBeaver read the same tables.
+
+Learn more: **[Query data with SQL](/data-query/)**.
 
 ## Findings
 

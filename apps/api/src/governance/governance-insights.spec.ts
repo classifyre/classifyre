@@ -1,7 +1,8 @@
+import { Prisma } from '@prisma/client';
 import { GovernanceInsightsService } from './governance-insights.service';
 
 /**
- * The Governance tab of the assets page (GOV §5.7): the raw SQL runs on the
+ * The dashboard (GOV §5.7) and the usage behind it: the raw SQL runs on the
  * dev stack; here, what the service makes of its rows.
  */
 function service(rows: unknown[][], roles: unknown[] = []) {
@@ -28,6 +29,9 @@ describe('GovernanceInsightsService.dashboard', () => {
       assets: 10n,
       owned: 6n,
       certified: 2n,
+      draft: 3n,
+      deprecated: 1n,
+      retired: 0n,
       failing: 1n,
     },
     {
@@ -36,6 +40,9 @@ describe('GovernanceInsightsService.dashboard', () => {
       assets: 4n,
       owned: 0n,
       certified: 0n,
+      draft: 0n,
+      deprecated: 0n,
+      retired: 0n,
       failing: 0n,
     },
   ];
@@ -103,6 +110,26 @@ describe('GovernanceInsightsService.dashboard', () => {
     );
   });
 
+  it('counts failing quality and lists it on governed assets only', async () => {
+    const { insights, prisma } = service([
+      coverage,
+      failing,
+      incomplete,
+      [],
+      latest,
+      perDay,
+    ]);
+    await insights.dashboard(null, { days: 30 });
+    const sqlOf = (call: unknown[]) => {
+      const [strings, ...values] = call as [TemplateStringsArray, ...unknown[]];
+      return Prisma.sql(strings, ...values).sql;
+    };
+    expect(sqlOf(prisma.$queryRaw.mock.calls[0])).toContain(
+      'count(f.asset_id) FILTER (WHERE l.owned) AS failing',
+    );
+    expect(sqlOf(prisma.$queryRaw.mock.calls[1])).toContain('WHERE l.owned');
+  });
+
   it('adds up totals, names the worst severity and the gaps', async () => {
     const { insights } = service([
       coverage,
@@ -117,6 +144,9 @@ describe('GovernanceInsightsService.dashboard', () => {
       assets: 14,
       governed: 6,
       certified: 2,
+      draft: 3,
+      deprecated: 1,
+      retired: 0,
       failing: 1,
       score: 80, // HIGH 4 passed of HIGH 4 + LOW 1
     });
@@ -201,6 +231,64 @@ describe('GovernanceInsightsService.workspaceUsage', () => {
     expect(result.days).toBe(365);
     const top = prisma.$queryRaw.mock.calls[1] as unknown[];
     expect(top).toContain(50);
+  });
+
+  /** The SQL text of a `$queryRaw` tagged-template call, nested parts inlined. */
+  const sqlOf = (call: unknown[]) => {
+    const [strings, ...values] = call as [TemplateStringsArray, ...unknown[]];
+    return Prisma.sql(strings, ...values).sql;
+  };
+
+  it('narrows to shared datasets or scanned assets (the assets page tabs)', async () => {
+    const shared = service([[], []]);
+    await shared.insights.workspaceUsage(null, { kind: 'shared' });
+    expect(sqlOf(shared.prisma.$queryRaw.mock.calls[0])).toContain(
+      "a.source_type::text = 'SHARED_DATASET'",
+    );
+
+    const raw = service([[], []]);
+    await raw.insights.workspaceUsage(null, { kind: 'raw' });
+    expect(sqlOf(raw.prisma.$queryRaw.mock.calls[0])).toContain(
+      "a.source_type::text <> 'SHARED_DATASET'",
+    );
+
+    const any = service([[], []]);
+    await any.insights.workspaceUsage(null, {});
+    expect(sqlOf(any.prisma.$queryRaw.mock.calls[0])).not.toContain(
+      'SHARED_DATASET',
+    );
+  });
+
+  it('narrows by governance as the asset search does', async () => {
+    const { insights, prisma } = service(
+      [[], []],
+      [{ scopeType: 'SOURCE', scopeId: 's1' }],
+    );
+    await insights.workspaceUsage(null, { governance: 'governed' });
+    expect(prisma.governanceRole.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ role: 'OWNER' }),
+      }),
+    );
+    const call = prisma.$queryRaw.mock.calls[0] as unknown[];
+    expect(sqlOf(call)).toContain('a.source_id = ANY(');
+    expect(Prisma.sql(...(call as [TemplateStringsArray])).values).toEqual(
+      expect.arrayContaining([['s1']]),
+    );
+  });
+
+  it('refuses a kind other than raw or shared', async () => {
+    const { insights } = service([[], []]);
+    await expect(
+      insights.workspaceUsage(null, { kind: 'other' }),
+    ).rejects.toThrow(/kind is raw or shared/);
+  });
+
+  it('refuses a governance filter the asset search does not know', async () => {
+    const { insights } = service([[], []]);
+    await expect(
+      insights.workspaceUsage(null, { governance: 'shiny' }),
+    ).rejects.toThrow(/governance is one of/);
   });
 });
 

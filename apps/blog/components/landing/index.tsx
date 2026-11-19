@@ -5,7 +5,7 @@ import { Convert } from "@/components/landing/convert";
 import { Faq } from "@/components/landing/faq";
 import { Hero } from "@/components/landing/hero";
 import { Journey } from "@/components/landing/journey";
-import { OpenSourceEnterprise } from "@/components/landing/open-source-enterprise";
+// import { OpenSourceEnterprise } from "@/components/landing/open-source-enterprise";
 import { Sectors } from "@/components/landing/sectors";
 import { SourcesTape } from "@/components/landing/sources-tape";
 import { Tension } from "@/components/landing/tension";
@@ -34,7 +34,7 @@ export function LandingPage({ locale }: { locale: Locale }) {
         <Journey locale={locale} />
         <CaseDemo locale={locale} />
         <Sectors locale={locale} />
-        <OpenSourceEnterprise locale={locale} />
+        {/* <OpenSourceEnterprise locale={locale} /> */}
         <Convert locale={locale} />
         <Faq locale={locale} />
       </main>

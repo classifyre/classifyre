@@ -8,7 +8,7 @@ import { Callout, Steps, Tabs } from "nextra/components"
 
 # SQL connections
 
-The [SQL](/data-query) page and the Data tabs run queries in the app. A **SQL connection** lets the tools you already use do the same: Power BI, Excel, Tableau, DBeaver, Metabase, `psql`, and anything with a PostgreSQL JDBC or ODBC driver. Classifyre answers as a PostgreSQL database: the workspace is the database, each source schema is a schema, each table you may query is a table.
+The [Query data](/data-query) page and the Data tabs run queries in the app. A **SQL connection** lets the tools you already use do the same: Power BI, Excel, Tableau, DBeaver, Metabase, `psql`, and anything with a PostgreSQL JDBC or ODBC driver. Classifyre answers as a PostgreSQL database: the workspace is the database, each source schema is a schema, each table you may query is a table.
 
 - **Nothing is reachable until it is opened.** A source or table is reachable through SQL connections only after its owner, a steward or an admin opens it on its **Governance** tab (opening a source opens all its tables). Opening gives nobody access: people still need the right to query it.
 - **It names what it is for.** Like *Give access*, a connection is for a whole source or for single tables — chosen from what is open and what you may query. Only admins and people who answer for data (owners, stewards, custodians) may make or give one for everything open.
@@ -76,7 +76,7 @@ Driver={PostgreSQL Unicode};Server=sql.example.com;Port=5432;Database=finance;Ui
 
 ### Naming tables
 
-A table you see on the SQL page as `source.schema.table` is the PostgreSQL table `"source.schema".table` — the quotes are needed because of the dot. Tools quote names for you; when writing SQL by hand, set the search path once:
+A table you see on the Query data page as `source.schema.table` is the PostgreSQL table `"source.schema".table` — the quotes are needed because of the dot. Tools quote names for you; when writing SQL by hand, set the search path once:
 
 ```sql
 SET search_path = "lake_finance.ledger";
@@ -87,7 +87,7 @@ Without quotes, PostgreSQL reads `source.schema.table` as *database.schema.table
 
 ## What happens to a query
 
-Catalog queries — the schemas, tables and columns tools read to show you what is there — are answered at once from a PostgreSQL catalog made for your session. A query that reads your tables runs as a SQL job, exactly like one from the SQL page: the same SQL gate (one read-only statement, only the tables you may read), the same time limit, recorded per table.
+Catalog queries — the schemas, tables and columns tools read to show you what is there — are answered at once from a PostgreSQL catalog made for your session. A query that reads your tables runs as a SQL job, exactly like one from the Query data page: the same SQL gate (one read-only statement, only the tables you may read), the same time limit, recorded per table.
 
 - **Rows.** A result has at most the workspace's row limit (Settings → General, 10,000 by default), or its export limit if you may export (`data.export`). More is refused with an error, never cut silently: add a filter or a `LIMIT`.
 - **Read only.** Writes, temporary tables in your sources and settings that change data are refused.

@@ -16,10 +16,8 @@ Classifyre is one product with every feature open source, including SSO, roles, 
 ## Pages
 
 - [Home](https://classifyre.com/): overview
-- [How it works](https://classifyre.com/#how-it-works): connect and detect, query across sources, govern, Power BI and Excel, masking per person, shared datasets
 - [Immuta alternative](https://classifyre.com/immuta-alternative/)
 - [Unity Catalog alternative](https://classifyre.com/unity-catalog-alternative/)
-- [Open source and Enterprise](https://classifyre.com/open-source-vs-enterprise/)
 - [German site](https://classifyre.com/de/)
 
 ## Docs

@@ -624,6 +624,46 @@ describe('AssetService', () => {
       expect(result.items[0].findings[0].confidence).toBe(0.91);
     });
 
+    it('narrows to promoted shared datasets', async () => {
+      mockPrismaService.asset.findMany.mockResolvedValue([]);
+      mockPrismaService.asset.count.mockResolvedValue(0);
+
+      await service.searchAssets({ assets: { promoted: true } });
+
+      expect(mockPrismaService.asset.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            AND: expect.arrayContaining([
+              {
+                AND: [
+                  { sharedDataset: { isNot: null } },
+                  { sharedDataset: { promotedAt: { not: null } } },
+                ],
+              },
+            ]),
+          }),
+        }),
+      );
+    });
+
+    it('narrows to the asked asset ids, with the other filters', async () => {
+      mockPrismaService.asset.findMany.mockResolvedValue([]);
+      mockPrismaService.asset.count.mockResolvedValue(0);
+
+      await service.searchAssets({
+        assets: { ids: ['a1', 'a2', 'a1', ''], sourceId: 'source-1' },
+      });
+
+      expect(mockPrismaService.asset.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            id: { in: ['a1', 'a2'] },
+            sourceId: 'source-1',
+          }),
+        }),
+      );
+    });
+
     it('should skip findings query when paginated assets list is empty', async () => {
       mockPrismaService.asset.findMany.mockResolvedValue([]);
       mockPrismaService.asset.count.mockResolvedValue(0);
@@ -1090,6 +1130,23 @@ describe('AssetService', () => {
       expect(query.values).toContain('SHARED_DATASET');
       expect(query.sql).toContain('a.source_id = ANY(');
       expect(query.values).toContainEqual(['source-1']);
+    });
+
+    it('applies the ids and shared dataset filters the asset list applies', async () => {
+      mockPrismaService.$queryRaw.mockResolvedValue([{}]);
+
+      await service.searchAssetsCharts({
+        assets: { ids: ['a1', 'a2', 'a1'], datasetState: 'live' },
+      });
+
+      const query = mockPrismaService.$queryRaw.mock.calls.at(-1)?.[0] as {
+        sql: string;
+        values: unknown[];
+      };
+      expect(query.sql).toContain('a.id = ANY(');
+      expect(query.values).toContainEqual(['a1', 'a2']);
+      expect(query.sql).toContain('FROM shared_datasets sd');
+      expect(query.sql).toContain('sd.unavailable_at IS NULL');
     });
 
     it('should default missing datasets to empty arrays and zero totals', async () => {

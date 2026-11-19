@@ -172,11 +172,11 @@
     "upgradeFootnote": "Both options are free and open source. Your documents stay on your machine or in your own cluster."
   },
   "nav": {
-    "overview": "Overview",
+    "dashboard": "Dashboard",
     "explore": "Explore",
     "findings": "Findings",
     "assets": "Assets",
-    "query": "SQL",
+    "query": "Query data",
     "sources": "Sources",
     "detectors": "Custom Detectors",
     "investigations": "Investigations",
@@ -704,7 +704,14 @@
     "remove": "Remove",
     "more": "More",
     "openedAgo": "Opened {{when}}",
-    "recentlyOpened": "Recently opened"
+    "recentlyOpened": "Recently opened",
+    "searchMode": {
+      "label": "How the search matches",
+      "semantic": "Semantic",
+      "semanticHint": "By meaning and by the exact words",
+      "exact": "Exact",
+      "exactHint": "The exact words only"
+    }
   },
   "settings": {
     "title": "Settings",
@@ -1695,6 +1702,10 @@
     "loadingVisualizations": "Loading assets visualizations...",
     "search": "Search assets",
     "allSources": "All sources",
+    "responsibleMe": "Only assets I answer for",
+    "responsibleMeClear": "Show all assets, not only those I answer for",
+    "qualityFailing": "Failing quality",
+    "qualityFailingClear": "Show governed assets whatever their quality",
     "detectorTypes": "Detector types",
     "assetStatus": "Asset status",
     "noAssets": "No assets found",
@@ -1860,100 +1871,55 @@
     },
     "tabs": {
       "label": "Asset views",
-      "governance": "Governance",
-      "governanceSub": "{{certified}} certified · {{failing}} failing quality",
-      "requestsWaiting": "{{count}} waiting",
       "raw": "Raw assets",
       "rawSub": "{{new}} new · {{updated}} updated",
+      "governed": "Governed assets",
+      "governedSub": "{{certified}} certified · {{failing}} failing quality",
       "shared": "Shared assets",
       "sharedSub": "{{certified}} certified"
     },
-    "governance": {
-      "scope": {
-        "label": "Whose assets",
-        "mine": "Mine",
-        "all": "All",
-        "nothingYours": "You own or steward nothing yet, so this shows all assets."
+    "sharedStatus": {
+      "title": "Status",
+      "lead": "{{count}} shared datasets",
+      "lifecycle": "Lifecycle",
+      "availability": "Can be read now",
+      "promoted": "{{count}} promoted",
+      "locked": "{{count}} locked for you"
+    },
+    "sharedFilter": {
+      "anyAvailability": "Any availability",
+      "promoted": "Promoted"
+    },
+    "explore": {
+      "tab": "Explore",
+      "tabSub": "Saved views · start from any asset",
+      "mapTitle": "Most connected assets",
+      "emptyTitle": "Nothing is connected yet",
+      "emptyHint": "Press the compass on an asset below to draw what it is connected to.",
+      "noSavedViews": "No saved views yet. Save a view from the map to keep it.",
+      "startFrom": "Start from",
+      "start": {
+        "lineage": "Most lineage",
+        "critical": "Most critical",
+        "duplicates": "Duplicates",
+        "links": "Drawn links",
+        "all": "Every asset"
       },
-      "period": "Period",
-      "days": "{{days}} days",
-      "kpi": {
-        "governed": "Governed",
-        "governedHint": "{{percent}}% of {{assets}} assets",
-        "certified": "Certified",
-        "certifiedHint": "{{percent}}% of governed",
-        "failing": "Failing quality",
-        "failingHint": "Assets with a failing rule",
-        "score": "Quality score",
-        "scoreHint": "Rules passing, weighted by severity"
+      "reason": {
+        "critical": "{{critical}} critical · {{high}} high",
+        "duplicate": "Copy of {{name}} · {{pairs}}",
+        "linkTo": "Linked to {{name}}",
+        "linkFrom": "Linked from {{name}}"
       },
-      "usage": {
-        "title": "Usage",
-        "lead": "Table reads and exports in the last {{days}} days.",
-        "used": "Most used",
-        "rising": "Rising",
-        "totals": "{{reads}} reads · {{exports}} exports",
-        "change": "{{change}} vs the {{days}} days before",
-        "fresh": "new",
-        "topUsed": "Read most",
-        "topRising": "Use grew most against the period before",
-        "readersShort": "{{count}} readers",
-        "none": "Nobody read these assets in the last {{days}} days.",
-        "noneRising": "No asset was read more than in the period before."
-      },
-      "quality": {
-        "title": "Quality",
-        "lead": "Every rule result of the last {{days}} days, and each dimension's score from its rules' latest results.",
-        "passed": "Passed",
-        "failed": "Failed",
-        "results": "{{results}} results, {{failed}} failed",
-        "dimensions": "By dimension",
-        "none": "No quality rules on these assets yet. Add them on an asset's Governance tab."
-      },
-      "coverage": {
-        "title": "Coverage by source",
-        "lead": "Certified, owned and unowned assets per source. Click a source to narrow this tab to it.",
-        "certified": "Certified",
-        "owned": "Owned, not certified",
-        "ungoverned": "Nobody's",
-        "clear": "All sources"
-      },
-      "waiting": {
-        "title": "Waiting on you",
-        "requests": "Access requests to decide",
-        "noRequests": "Nobody is waiting for your decision.",
-        "failing": "Failing quality",
-        "noFailing": "No quality rule fails here.",
-        "rulesFailing": "{{count}} failing",
-        "unfinished": "Unfinished governance",
-        "noUnfinished": "Everything you answer for has a steward, a description and is certified.",
-        "governFirst": "Govern these first",
-        "noGovernFirst": "No unowned asset was read in the last {{days}} days.",
-        "reads": "{{reads}} reads · {{readers}} readers",
-        "seeAll": "See all"
-      },
-      "missing": {
-        "owner": "No owner",
-        "steward": "No steward",
-        "description": "No description",
-        "meaning": "No glossary term",
-        "quality": "Quality failing",
-        "certification": "Not certified",
-        "certified": "Not certified",
-        "classification": "Classification not reviewed"
-      },
-      "table": {
-        "title": "Assets",
-        "empty": "No asset matches this scope and filter.",
-        "lifecycle": "Lifecycle",
-        "owner": "Owner",
-        "stewards": "Stewards",
-        "reads": "Reads ({{days}}d)",
-        "requests": "Requests",
-        "gaps": "Still missing",
-        "complete": "Complete",
-        "range": "{{from}}–{{to}} of {{total}}"
-      }
+      "picked": "{{count}} picked",
+      "clearPicked": "Clear",
+      "together": "Explore {{count}} together",
+      "pick": "Pick {{name}} to explore together",
+      "one": "Explore {{name}}",
+      "pair": "Explore the pair",
+      "onMap": "On the map",
+      "addToMap": "Add {{count}} to the map",
+      "pickAll": "Pick the rows shown"
     }
   },
   "detectors": {
@@ -3379,7 +3345,6 @@
     "tokenCostsDesc": "Used to estimate autopilot run costs and power the harness usage charts."
   },
   "csvExport": {
-    "label": "Download CSV",
     "title": "Export to CSV",
     "cancel": "Cancel",
     "download": "Download",
@@ -3392,46 +3357,93 @@
   "validation": {
     "configValidationFailed": "Configuration failed schema validation"
   },
-  "discovery": {
-    "title": "Overview",
-    "securityBrief": "Findings Brief",
-    "allFindingsWithDays": "All findings · last {{days}} days",
-    "findingsToReview": "Findings to review",
-    "open": "open",
-    "resolved": "resolved",
-    "falsePositive": "not relevant",
-    "ignored": "set aside",
-    "whatNeedsAttention": "What needs attention",
-    "incoming": "Incoming",
-    "newToday": "new today",
-    "thisWeek": "this week",
-    "thisMonth": "this month",
-    "basedOnTimestamps": "Counted from detection timestamps",
-    "whereRiskClusters": "Busiest assets",
-    "viewAll": "View all",
-    "findingsLabel": "findings",
-    "assetsLabel": "assets",
-    "updatedLabel": "updated",
-    "newLabel": "new",
-    "resolvedLabel": "resolved",
-    "firstScan": "Run your first scan to see what your sources contain.",
-    "startScan": "Start a scan",
-    "recentScans": "Recent Scans",
-    "lastRuns": "Last {{count}} runs",
-    "runningCount": "{{count}} running",
-    "allScans": "All scans",
-    "noScansYet": "No scans yet",
-    "criticalFindings": "Critical findings",
-    "highFindings": "High findings",
-    "mediumFindings": "Medium findings",
-    "lowFindings": "Low findings",
-    "infoFindings": "Routine findings",
-    "noFindings": "No findings",
-    "requireReview": "{{count}} · worth looking at first",
-    "noFindingsInWindow": "No findings in selected window",
-    "currentHighest": "Highest present: {{level}} · {{count}} open",
-    "retry": "Retry",
-    "errorPrefix": "Error: {{message}}",
+  "dashboard": {
+    "title": "Dashboard",
+    "loadError": "The dashboard could not be loaded. Check your connection and try again.",
+    "retry": "Try again",
+    "brief": {
+      "label": "Governance brief",
+      "mine": "Assets you own or steward",
+      "all": "Every asset in this workspace",
+      "governed": "assets governed",
+      "rail": "Governance coverage",
+      "governedShare": "{{percent}}% governed",
+      "certifiedShare": "{{percent}}% of governed certified",
+      "empty": "No assets yet. Add a source and run a scan to see what there is to govern."
+    },
+    "qualityBrief": {
+      "label": "Quality",
+      "score": "Quality score",
+      "noScore": "No score yet",
+      "none": "No quality rules on these assets yet.",
+      "failing": "{{count}} governed assets failing a rule",
+      "allPassing": "Every rule passes",
+      "howTo": "Add rules on an asset's Governance tab"
+    },
+    "incoming": {
+      "label": "Incoming",
+      "requests": "Access requests waiting for you now",
+      "readsToday": "Reads today",
+      "readsPeriod": "Reads in {{days}} days",
+      "exports": "{{count}} exports",
+      "change": "{{change}} vs the {{days}} days before"
+    },
+    "scope": {
+      "label": "Whose assets",
+      "mine": "Mine",
+      "all": "All",
+      "nothingYours": "You own or steward nothing yet, so this shows all assets."
+    },
+    "period": "Period",
+    "days": "{{days}} days",
+    "usage": {
+      "title": "Usage",
+      "lead": "Table reads and exports in the last {{days}} days.",
+      "used": "Most used",
+      "rising": "Rising",
+      "change": "{{change}} vs the {{days}} days before",
+      "fresh": "new",
+      "topUsed": "Read most",
+      "topRising": "Use grew most against the period before",
+      "readersShort": "{{count}} readers",
+      "none": "Nobody read these assets in the last {{days}} days.",
+      "noneRising": "No asset was read more than in the period before.",
+      "readsCount": "{{count}} reads",
+      "exportsCount": "{{count}} exports"
+    },
+    "quality": {
+      "title": "Quality over time",
+      "lead": "Every quality rule result of the last {{days}} days.",
+      "passed": "Passed",
+      "failed": "Failed",
+      "passedCount": "{{count}} passed",
+      "failedCount": "{{count}} failed",
+      "none": "No quality rule ran on these assets in the last {{days}} days."
+    },
+    "waiting": {
+      "title": "Waiting on you",
+      "leadMine": "On the assets you answer for",
+      "leadAll": "Across the workspace",
+      "allClear": "Nothing waits on you right now.",
+      "requests": "Access requests to decide",
+      "noRequests": "Nobody is waiting for your decision.",
+      "failing": "Failing quality",
+      "rulesFailing": "{{count}} failing",
+      "unfinished": "Unfinished governance",
+      "governFirst": "Govern these first",
+      "reads": "{{reads}} reads · {{readers}} readers",
+      "seeAll": "See all"
+    },
+    "missing": {
+      "owner": "No owner",
+      "steward": "No steward",
+      "description": "No description",
+      "meaning": "No glossary term",
+      "quality": "Quality failing",
+      "certification": "Not certified",
+      "certified": "Not certified",
+      "classification": "Classification not reviewed"
+    },
     "stats": {
       "building": "Building index…",
       "buildingHint": "These figures were counted directly from every finding, which is exact but slow. A background rebuild of the pre-aggregated index is queued; once it lands this page loads instantly.",
@@ -3444,7 +3456,6 @@
   "explore": {
     "title": "Explore",
     "titleMany": "{{name}} and {{count}} more",
-    "cardTitle": "Explore connections",
     "ledger": "What is on the canvas",
     "spotlightClear": "Show everything again",
     "inCases": "In cases",
@@ -3731,11 +3742,6 @@
     "zoomSelection": "Zoom to selection",
     "minimap": "Mini-map",
     "backTo": "Back to {{name}}"
-  },
-  "casework": {
-    "title": "Casework",
-    "subtitle": "Cases and inquiry watches in flight",
-    "viewAll": "View all"
   },
   "breadcrumb": {
     "home": "Home",
@@ -6508,22 +6514,16 @@
       "ogTitle": "Workspaces — Isolated Case Files | Classifyre",
       "ogDescription": "Every workspace has its own sources, scans and findings — pick one to continue, or open a fresh case file."
     },
-    "discovery": {
-      "title": "Overview — Security Brief & Workspace Health",
-      "description": "The workspace security brief: open vs resolved findings, risk clusters by asset and source, recent scan runs and resolution mix — your starting point after every scan.",
-      "ogTitle": "Overview — Security Brief | Classifyre",
-      "ogDescription": "Open findings, risk clusters, recent scans and resolution — the health of this workspace at a glance."
-    },
-    "explore": {
-      "title": "Explore — Connections, Lineage & Look-alikes",
-      "description": "Start from a search and follow what an asset is connected to: lineage, duplicates, shared values, shared glossary concepts and likeness by meaning — every link with its reason, and links you draw yourself.",
-      "ogTitle": "Explore connections | Classifyre",
-      "ogDescription": "Search, then follow lineage, duplicates, shared concepts and look-alikes — each link with its reason."
+    "dashboard": {
+      "title": "Dashboard — Governance, Quality & Usage",
+      "description": "Where work starts: how much of your data is governed and certified, how its quality holds, who asks for it and reads it, and what waits on you.",
+      "ogTitle": "Dashboard | Classifyre",
+      "ogDescription": "Governed and ungoverned assets, quality, usage and access requests — for the assets you answer for or the whole workspace."
     },
     "query": {
-      "title": "SQL — Query Your Tables",
+      "title": "Query data — SQL over your tables",
       "description": "Query the rows of the database, lakehouse and file tables you have access to with standard SQL, and join tables across sources.",
-      "ogTitle": "SQL over your tables | Classifyre",
+      "ogTitle": "Query data | Classifyre",
       "ogDescription": "Standard SQL over the tables you may read, joined across sources."
     },
     "findings": {
@@ -7165,7 +7165,7 @@
         "update": "Governance details edited",
         "status": {
           "draft": "Set to draft",
-          "active": "Certified (active)",
+          "active": "Certified",
           "deprecated": "Deprecated",
           "retired": "Retired"
         },
@@ -7402,7 +7402,7 @@
     "signOut": "Sign out"
   },
   "dataQuery": {
-    "title": "SQL",
+    "title": "Query data",
     "subtitle": "Query the rows of the tables you have access to with standard SQL. A query can join tables of different sources.",
     "run": "Run",
     "cancel": "Cancel",
@@ -7439,7 +7439,7 @@
     "noTables": "No tables to query yet. Scan a database, lakehouse or bucket source first.",
     "partialAccess": "You can query {{count}} tables here, the ones with a play mark. The others need a data-reader grant.",
     "openInQuery": "Open in SQL",
-    "openInQueryHint": "Open this query in the SQL page",
+    "openInQueryHint": "Open this query on the Query data page",
     "assetTab": "Data",
     "assetLockedTitle": "No data access",
     "assetLocked": "You can see this table but not its rows. Ask its owner for access with Request access, or a workspace admin can give your group the Data reader role on this table or its source.",
@@ -7686,6 +7686,7 @@
     "filter": {
       "label": "Governance",
       "all": "Any governance",
+      "anyLifecycle": "Any lifecycle",
       "ungoverned": "Ungoverned",
       "governed": "Governed",
       "draft": "Draft",
@@ -8359,14 +8360,7 @@
       "retired": "Retired"
     },
     "page": {
-      "lead": "Saved queries shared with groups as governed datasets. Readers need no access to the tables behind them; the tables' masks and classification carry over.",
-      "new": "New shared dataset",
-      "search": "Search by name, description or group",
-      "emptyTitle": "No shared datasets yet",
-      "emptyLead": "Write a query on the SQL page and choose Share as dataset.",
-      "dataset": "Dataset",
-      "trust": "Status",
-      "inputs": "Tables",
+      "emptyLead": "Write a query on the Query data page and choose Share as dataset.",
       "locked": "You cannot read it yet: open it to request access"
     },
     "share": {
@@ -8430,7 +8424,7 @@
       "title": "Definition",
       "lead": "The SQL every read runs, live, over its tables as its owning group reads them.",
       "query": "Query it",
-      "edit": "Edit on the SQL page",
+      "edit": "Edit on the Query data page",
       "versions": "Versions",
       "versionsLead": "Every change of the SQL, description or owning group is a version.",
       "version": "Version {{version}}"

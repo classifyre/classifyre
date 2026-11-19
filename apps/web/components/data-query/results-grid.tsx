@@ -1,14 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ArrowDown, ArrowUp, ChevronsUpDown, Download, Search } from "lucide-react";
-import { Button } from "@workspace/ui/components/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@workspace/ui/components/dropdown-menu";
+import { ArrowDown, ArrowUp, ChevronsUpDown, Search } from "lucide-react";
 import { Input } from "@workspace/ui/components/input";
 import {
   Pagination,
@@ -44,6 +37,7 @@ import { cn } from "@workspace/ui/lib/utils";
 import { useCan } from "@/hooks/use-me";
 import { useTranslation } from "@/hooks/use-translation";
 import type { ExportFormat } from "@/lib/data-query";
+import { ExportMenu } from "@/components/export-menu";
 import type { QueryRows } from "@/lib/data-query";
 
 const PAGE_SIZE_OPTIONS = [50, 100, 200, 500];
@@ -182,33 +176,11 @@ export function ResultsGrid({
               {t("dataQuery.columns", { count: result.columns.length })}
             </span>
             {canExport && showExport && onExport && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-2"
-                    data-testid="export-query"
-                  >
-                    <Download className="h-4 w-4" />
-                    {t("dataQuery.export.button")}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem data-testid="export-xlsx" onSelect={() => onExport("xlsx")}>
-                    {t("dataQuery.export.xlsx")}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem data-testid="export-csv" onSelect={() => onExport("csv")}>
-                    {t("dataQuery.export.csv")}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    data-testid="export-parquet"
-                    onSelect={() => onExport("parquet")}
-                  >
-                    {t("dataQuery.export.parquet")}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <ExportMenu
+                formats={["xlsx", "csv", "parquet"]}
+                onExport={onExport}
+                testId="export-query"
+              />
             )}
           </div>
         </div>

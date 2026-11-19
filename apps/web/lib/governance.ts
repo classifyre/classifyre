@@ -16,6 +16,7 @@ import {
   type GovernanceRoleDto,
   type SourceGovernanceDto,
 } from "@workspace/api-client";
+import type { AssetKind } from "@/lib/dashboard-links";
 
 /**
  * Governed data assets in the web app (docs/prd/GOV-governed-data-assets.md).
@@ -161,7 +162,7 @@ export function useAssetsOverview(token = 0) {
   return useLoad<AssetsOverviewDto>(load);
 }
 
-/** The Governance tab: totals, quality, what needs someone, coverage. */
+/** The dashboard: totals, quality, what needs someone, coverage. */
 export function useGovernanceDashboard(filters: DashboardFilters) {
   const { scope, days, sourceId } = filters;
   const load = useCallback(
@@ -176,11 +177,18 @@ export function useGovernanceDashboard(filters: DashboardFilters) {
   return useLoad<GovernanceDashboardDto>(load);
 }
 
-/** Reads and exports per day and the top assets; `rising` is where usage spiked. */
+/**
+ * Reads and exports per day and the top assets; `rising` is where usage
+ * spiked. `kind` and `governance` narrow it as the assets page's tabs do.
+ */
 export function useGovernanceUsage(
-  filters: DashboardFilters & { sort: "used" | "rising" },
+  filters: DashboardFilters & {
+    sort: "used" | "rising";
+    kind?: AssetKind;
+    governance?: "governed";
+  },
 ) {
-  const { scope, days, sourceId, sort } = filters;
+  const { scope, days, sourceId, sort, kind, governance } = filters;
   const load = useCallback(
     () =>
       api.governance.governanceControllerWorkspaceUsage({
@@ -189,8 +197,10 @@ export function useGovernanceUsage(
         sourceId: sourceId ?? undefined,
         sort,
         limit: "10",
+        kind,
+        governance,
       }),
-    [scope, days, sourceId, sort],
+    [scope, days, sourceId, sort, kind, governance],
   );
   return useLoad<GovernanceUsageDto>(load);
 }

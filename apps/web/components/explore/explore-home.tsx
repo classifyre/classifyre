@@ -52,7 +52,7 @@ interface Row {
 }
 
 /** Assets with open critical and high findings, the most critical first. */
-function useCriticalAssets(limit: number) {
+export function useCriticalAssets(limit: number) {
   const [items, setItems] = React.useState<SearchAssetItemDto[] | null>(null);
   React.useEffect(() => {
     let live = true;

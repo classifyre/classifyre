@@ -13,6 +13,7 @@ import {
   softwareVersion,
   softwareVersionLabel,
 } from "@workspace/ui/lib/software-version";
+import { releaseNotesUrl } from "@workspace/ui/lib/site-links";
 import { useTranslation } from "@/hooks/use-translation";
 
 interface GithubRelease {
@@ -114,7 +115,7 @@ export function VersionSidebarNotifier() {
             size="sm"
             className="mt-1 w-full border-2 border-border"
           >
-            <a href={release.html_url} target="_blank" rel="noreferrer">
+            <a href={releaseNotesUrl(release.tag_name)} target="_blank" rel="noreferrer">
               {t("settings.version.viewReleaseNotes")}
               <ArrowUpRight className="h-3.5 w-3.5" />
             </a>
@@ -186,7 +187,7 @@ export function VersionSettingsSection() {
                 size="sm"
                 className="w-full border-2 border-border"
               >
-                <a href={release.html_url} target="_blank" rel="noreferrer">
+                <a href={releaseNotesUrl(release.tag_name)} target="_blank" rel="noreferrer">
                   {t("settings.version.viewReleaseNotes")}
                   <ArrowUpRight className="h-3.5 w-3.5" />
                 </a>

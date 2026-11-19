@@ -45,15 +45,14 @@ type NavItem = { titleKey: TranslationKey; href: string; icon: LucideIcon };
 type NavGroup = { labelKey: TranslationKey; items: NavItem[] };
 
 // Grouped by what the operator is doing, not by data model:
-//   Intelligence — what the platform found for you.
-//   Casework     — what you are actively working on.
+//   Intelligence — where you start, and what the data is.
+//   Casework     — what the platform found and you are working on.
 //   Pipeline     — what feeds and shapes the two above.
 const NAV_GROUPS: NavGroup[] = [
   {
     labelKey: "nav.group.intelligence",
     items: [
-      { titleKey: "nav.overview", href: "/discovery", icon: LayoutDashboard },
-      { titleKey: "nav.findings", href: "/findings", icon: SearchCheck },
+      { titleKey: "nav.dashboard", href: "/dashboard", icon: LayoutDashboard },
       { titleKey: "nav.assets", href: "/assets", icon: FileText },
       { titleKey: "nav.query", href: "/query", icon: TerminalSquare },
     ],
@@ -66,6 +65,7 @@ const NAV_GROUPS: NavGroup[] = [
         href: "/investigations",
         icon: Search,
       },
+      { titleKey: "nav.findings", href: "/findings", icon: SearchCheck },
       {
         titleKey: "nav.fingerprints",
         href: "/duplicates",

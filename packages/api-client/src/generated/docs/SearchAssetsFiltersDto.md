@@ -20,6 +20,10 @@ Name | Type
 `stewardRef` | string
 `responsibleRef` | string
 `kind` | string
+`ids` | Array&lt;string&gt;
+`quality` | string
+`datasetState` | string
+`promoted` | boolean
 
 ## Example
 
@@ -42,6 +46,10 @@ const example = {
   "stewardRef": null,
   "responsibleRef": null,
   "kind": null,
+  "ids": null,
+  "quality": null,
+  "datasetState": null,
+  "promoted": null,
 } satisfies SearchAssetsFiltersDto
 
 console.log(example)

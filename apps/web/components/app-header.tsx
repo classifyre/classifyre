@@ -78,6 +78,7 @@ function pageLabel(segment: string, previous: string | undefined, t: T): string 
     duplicates: t("nav.fingerprints"),
     glossary: t("glossary.title"),
     explore: t("nav.explore"),
+    query: t("nav.query"),
   };
   if (segment === "new") {
     if (previous === "providers") return t("breadcrumb.newProvider");

@@ -1,11 +1,17 @@
 # Classifyre — all-in-one Docker image
 
-The whole product in one container: the web UI, the API, the background worker,
-the Python scan workers, and a PostgreSQL database. One `docker run`, no
+Open-source data governance in one container. Classifyre finds personal data
+and secrets across the systems you already run, masks them automatically inside
+the query, and lets people read everything with SQL, Excel and Power BI, with
+every read logged. Everything is Apache-2.0, including sign-in, roles and
+masking.
+
+The container holds the whole product: the web UI, the API, the background
+worker, the Python scan workers, and a PostgreSQL database. One `docker run`, no
 dependencies to provision, nothing to connect.
 
 This is the fastest way to try Classifyre on real data, and it is a reasonable
-way to run it for a single investigator. For a team, or for anything that has to
+way to run it for one person or a small team. For a larger team, or for anything that has to
 survive a machine dying, use the [Helm chart](../helm/classifyre) instead — it
 runs the same code as separate, independently scalable workloads.
 
@@ -44,8 +50,14 @@ the container, and there is no telemetry you have not opted into.
 
 1. **Add a source** — a folder you mounted, an S3 bucket, Confluence, Jira, a
    Git repository, a database. Sources live under *Sources → New*.
-2. **Turn on detectors** — these decide what counts as a finding.
-3. **Run a scan**, then work the findings into cases.
+2. **Turn on detectors** — these decide what counts as personal data or a
+   secret, and so which columns get masked.
+3. **Run a scan**, then open the **SQL** page: classified columns come back
+   masked until someone is granted the unmasked role.
+4. **Connect Power BI, Excel or DBeaver** through a SQL connection
+   ([below](#connecting-power-bi-excel-and-other-sql-clients)), and check the
+   activity log to see who read what.
+5. If something does leak, work the findings into **cases**.
 
 ---
 
@@ -83,12 +95,31 @@ They are supervised by [s6-overlay](https://github.com/just-containers/s6-overla
 which restarts anything that dies and makes `docker stop` and `docker restart`
 behave the way you expect.
 
-Only port 3000 is reachable. Postgres binds to loopback inside the container's
+Only port 3000 is reachable (plus the SQL gateway, if you publish it). Postgres binds to loopback inside the container's
 own network namespace and is not exposed, deliberately.
 
 The Python scan workers are not a service: the API starts one process per scan
 and it exits when the scan does — the same lifecycle the Helm chart gets from
 Kubernetes Jobs.
+
+---
+
+## Connecting Power BI, Excel and other SQL clients
+
+The API also runs a SQL gateway: BI tools, `psql`, JDBC and ODBC clients connect
+with a **SQL connection** made in the app, and read through the same masks and
+grants as the SQL page. Every read lands in the activity log.
+
+The bundled PostgreSQL already holds 5432 inside the container, so the gateway
+listens on **5433**. Publish it when you start the container:
+
+```bash
+-p 5432:5433
+```
+
+The connection is always TLS. Without a mounted certificate, the container makes
+a CA and a certificate for the address in `CLASSIFYRE_URL` once, keeps them
+beside the data, and the app offers the CA for download.
 
 ---
 
@@ -177,7 +208,7 @@ search and duplicate detection work offline out of the box.
 | `EMBEDDING_ALLOW_REMOTE_MODELS` | `false` | `true` lets it download a different local model at runtime. |
 | `EMBEDDING_BATCH_SIZE` | *autotuned* | Lower it if embedding is starving your scans. |
 
-> **AI providers** (for LLM detectors and the investigation autopilot) are *not*
+> **AI providers** (for LLM detectors and the Autopilot) are *not*
 > environment variables. They are per-workspace settings, configured in the UI
 > under **Settings → AI providers**, and their API keys are encrypted at rest.
 

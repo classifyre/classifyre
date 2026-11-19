@@ -90,7 +90,7 @@ const NAV: {
   {
     label: T("nav.group.intelligence"),
     items: [
-      { id: "discovery", title: T("nav.overview"), icon: LayoutDashboard },
+      { id: "discovery", title: T("nav.dashboard"), icon: LayoutDashboard },
       { id: "findings", title: T("nav.findings"), icon: SearchCheck },
       { id: "assets", title: T("nav.assets"), icon: FileText },
     ],

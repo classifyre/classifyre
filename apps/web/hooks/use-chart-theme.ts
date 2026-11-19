@@ -9,6 +9,8 @@ export type ChartTheme = {
   foreground: string;
   /** Good news (passing, certified): the accent, readable on this theme. */
   positive: string;
+  /** The brand accent itself (acid green): fills, never text. */
+  accent: string;
   /** Bad news (failing): the destructive red. */
   negative: string;
   /** A neutral second series (exports, owned): the sky chart colour. */
@@ -23,6 +25,7 @@ const DEFAULT_THEME: ChartTheme = {
   dark: false,
   foreground: "#0a0a0a",
   positive: "#4d6b00",
+  accent: "#b7ff00",
   negative: "#ff2b2b",
   info: "#0ea5e9",
   quiet: "#7c7c7c",
@@ -39,6 +42,7 @@ function resolveChartTheme(): ChartTheme {
     dark: document.documentElement.classList.contains("dark"),
     foreground: read("--foreground", DEFAULT_THEME.foreground),
     positive: read("--accent-ink", DEFAULT_THEME.positive),
+    accent: read("--accent", DEFAULT_THEME.accent),
     negative: read("--chart-2", DEFAULT_THEME.negative),
     info: read("--chart-4", DEFAULT_THEME.info),
     quiet: read("--chart-5", DEFAULT_THEME.quiet),

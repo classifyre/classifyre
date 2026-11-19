@@ -338,7 +338,7 @@ All URIs are relative to *http://localhost*
 *GovernanceApi* | [**governanceControllerAssignAssetRole**](docs/GovernanceApi.md#governancecontrollerassignassetrole) | **POST** /assets/{id}/governance/roles | Make someone owner, steward or custodian of an asset
 *GovernanceApi* | [**governanceControllerAssignSourceRole**](docs/GovernanceApi.md#governancecontrollerassignsourcerole) | **POST** /sources/{id}/governance/roles | Make someone owner, steward or custodian of a source
 *GovernanceApi* | [**governanceControllerCreateQualityRule**](docs/GovernanceApi.md#governancecontrollercreatequalityrule) | **POST** /assets/{id}/quality/rules | Add a quality rule to an asset (and evaluate it at once)
-*GovernanceApi* | [**governanceControllerDashboard**](docs/GovernanceApi.md#governancecontrollerdashboard) | **GET** /governance/dashboard | The Governance tab of the assets page: totals, quality over time, what needs someone, coverage per source
+*GovernanceApi* | [**governanceControllerDashboard**](docs/GovernanceApi.md#governancecontrollerdashboard) | **GET** /governance/dashboard | The dashboard: totals, quality over time, what needs someone, coverage per source
 *GovernanceApi* | [**governanceControllerDismissSuggestion**](docs/GovernanceApi.md#governancecontrollerdismisssuggestion) | **POST** /assets/{id}/governance/meaning/suggestions/{suggestionId}/dismiss | Dismiss a suggested term for an asset
 *GovernanceApi* | [**governanceControllerExportContract**](docs/GovernanceApi.md#governancecontrollerexportcontract) | **GET** /assets/{id}/contract | The asset as an Open Data Contract Standard (v3.2) contract
 *GovernanceApi* | [**governanceControllerImportContract**](docs/GovernanceApi.md#governancecontrollerimportcontract) | **PUT** /assets/{id}/contract | Apply an ODCS contract (YAML or JSON text) to the asset
@@ -1281,7 +1281,7 @@ The generated npm module supports the following:
   * CommonJS
   * ES6 module system
 
-For more information, please visit [https://github.com/unstructured/classifyre](https://github.com/unstructured/classifyre)
+For more information, please visit [https://github.com/classifyre/classifyre](https://github.com/classifyre/classifyre)
 
 ## Development
 

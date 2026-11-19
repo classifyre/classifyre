@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@workspace/ui/components/dialog";
 import { useTranslation } from "@/hooks/use-translation";
+import { ExportMenu } from "@/components/export-menu";
 import type { TranslationKey } from "@/i18n";
 import { getNamespacedApiBaseUrl } from "@workspace/api-client";
 
@@ -56,8 +57,6 @@ export interface CsvExportButtonProps {
   buildQuery: () => URLSearchParams;
   /** Number of rows that match the current filters (shown in the dialog). */
   total: number;
-  /** Button label. */
-  label?: string;
   /** Disables the trigger (e.g. while the table is still loading). */
   disabled?: boolean;
   /** Dialog title. */
@@ -67,7 +66,7 @@ export interface CsvExportButtonProps {
 }
 
 /**
- * Reusable "Download CSV" control. Opens a confirmation dialog showing how many
+ * The asset and finding lists' Export (CSV). Opens a confirmation dialog showing how many
  * rows will be exported, then triggers a native browser download by pointing an
  * anchor at the streaming export endpoint — nothing is buffered in JS memory.
  */
@@ -75,7 +74,6 @@ export function CsvExportButton({
   exportPath,
   buildQuery,
   total,
-  label,
   disabled = false,
   title,
   entityLabel = "rows",
@@ -100,16 +98,13 @@ export function CsvExportButton({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <Button
-        variant="outline"
-        size="sm"
+      {/* The same Export as the SQL results; these lists write CSV. */}
+      <ExportMenu
+        formats={["csv"]}
+        onExport={() => setOpen(true)}
         disabled={disabled}
-        onClick={() => setOpen(true)}
-        className="gap-2"
-      >
-        <Download className="h-4 w-4" />
-        {label ?? t("csvExport.label" as TranslationKey)}
-      </Button>
+        testId="export-list"
+      />
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{title ?? t("csvExport.title" as TranslationKey)}</DialogTitle>

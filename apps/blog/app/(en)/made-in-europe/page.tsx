@@ -408,13 +408,6 @@ export default function MadeInEuropePage() {
                   Browse the repository
                 </a>
               </Button>
-              <Button
-                asChild
-                variant="secondary"
-                className="border-2 border-white/20 bg-white/10 text-white hover:bg-white/16"
-              >
-                <a href={routes.editions}>Open source vs Enterprise</a>
-              </Button>
               <a
                 href={showcaseUrl}
                 target="_blank"

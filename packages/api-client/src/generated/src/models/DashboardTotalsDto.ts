@@ -2,7 +2,7 @@
 /* eslint-disable */
 /**
  * Classifyre API
- * Metadata ingestion and detection API for unstructured data sources. Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, Dremio, Trino/Starburst, ODBC, Amazon Athena, Google BigQuery, Amazon Redshift, Iceberg REST catalogs, DuckLake, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk, Notion, Email, and YouTube sources. Built-in detectors for secrets, PII, toxic content, image classification, broken links, and security threats.
+ * Open-source data governance API: scans data sources for personal data and secrets, masks classified columns, and serves governed reads. Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, Dremio, Trino/Starburst, ODBC, Amazon Athena, Google BigQuery, Amazon Redshift, Iceberg REST catalogs, DuckLake, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk, Notion, Email, and YouTube sources. Built-in detectors for secrets, PII, toxic content, image classification, broken links, and security threats.
  *
  * The version of the OpenAPI document: 1.0.0
  * Contact: support@example.com
@@ -38,7 +38,25 @@ export interface DashboardTotalsDto {
      */
     certified: number;
     /**
-     * With a failing quality rule (an open QUALITY finding).
+     * Governed and DRAFT (or no lifecycle set yet).
+     * @type {number}
+     * @memberof DashboardTotalsDto
+     */
+    draft: number;
+    /**
+     * Governed and DEPRECATED.
+     * @type {number}
+     * @memberof DashboardTotalsDto
+     */
+    deprecated: number;
+    /**
+     * Governed and RETIRED. certified + draft + deprecated + retired = governed.
+     * @type {number}
+     * @memberof DashboardTotalsDto
+     */
+    retired: number;
+    /**
+     * Governed, with a failing quality rule (an open QUALITY finding).
      * @type {number}
      * @memberof DashboardTotalsDto
      */
@@ -58,6 +76,9 @@ export function instanceOfDashboardTotalsDto(value: object): value is DashboardT
     if (!('assets' in value) || value['assets'] === undefined) return false;
     if (!('governed' in value) || value['governed'] === undefined) return false;
     if (!('certified' in value) || value['certified'] === undefined) return false;
+    if (!('draft' in value) || value['draft'] === undefined) return false;
+    if (!('deprecated' in value) || value['deprecated'] === undefined) return false;
+    if (!('retired' in value) || value['retired'] === undefined) return false;
     if (!('failing' in value) || value['failing'] === undefined) return false;
     if (!('score' in value) || value['score'] === undefined) return false;
     return true;
@@ -76,6 +97,9 @@ export function DashboardTotalsDtoFromJSONTyped(json: any, ignoreDiscriminator: 
         'assets': json['assets'],
         'governed': json['governed'],
         'certified': json['certified'],
+        'draft': json['draft'],
+        'deprecated': json['deprecated'],
+        'retired': json['retired'],
         'failing': json['failing'],
         'score': json['score'],
     };
@@ -95,6 +119,9 @@ export function DashboardTotalsDtoToJSONTyped(value?: DashboardTotalsDto | null,
         'assets': value['assets'],
         'governed': value['governed'],
         'certified': value['certified'],
+        'draft': value['draft'],
+        'deprecated': value['deprecated'],
+        'retired': value['retired'],
         'failing': value['failing'],
         'score': value['score'],
     };

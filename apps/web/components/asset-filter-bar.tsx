@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { Search } from "lucide-react";
 import {
   api,
   SearchFindingsFiltersDtoDetectorTypeEnum,
@@ -10,7 +9,6 @@ import {
 } from "@workspace/api-client";
 import { FINDING_SEVERITY_COLOR_BY_ENUM } from "@workspace/ui/lib/finding-severity";
 import {
-  Input,
   MultiSelect,
   MultiSelectContent,
   MultiSelectGroup,
@@ -25,6 +23,7 @@ import {
 } from "@workspace/ui/components";
 import { cn } from "@workspace/ui/lib/utils";
 import { useTranslation } from "@/hooks/use-translation";
+import { SearchInput } from "@/components/search-input";
 
 /** The "no source filter" value of the source select. */
 export const ALL_SOURCES = "ALL";
@@ -90,6 +89,10 @@ export function AssetFilterBar({
   afterSearch,
   children,
   autoFocus = false,
+  showSeverity = true,
+  showDetectors = true,
+  searchMode,
+  onSearchModeChange,
 }: {
   search: string;
   onSearchChange: (value: string) => void;
@@ -108,21 +111,30 @@ export function AssetFilterBar({
   /** Controls after the shared filters (the table's status filter, export). */
   children?: React.ReactNode;
   autoFocus?: boolean;
+  /** Off where findings are not the point (the governed or shared lists). */
+  showSeverity?: boolean;
+  showDetectors?: boolean;
+  /**
+   * How the search box matches, picked inside the box: `hybrid` by meaning
+   * and words (in the text and the name), `off` by the exact name. Omit to
+   * hide the picker.
+   */
+  searchMode?: "hybrid" | "off";
+  onSearchModeChange?: (mode: "hybrid" | "off") => void;
 }) {
   const { t } = useTranslation();
   const control = compact ? "h-9 w-full" : undefined;
   return (
     <div className={cn("flex gap-2", compact ? "flex-col" : "flex-wrap items-center")}>
-      <div className={cn("relative", compact ? "w-full" : "min-w-[240px] flex-[1.6]")}>
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          value={search}
-          onChange={(event) => onSearchChange(event.target.value)}
-          placeholder={searchPlaceholder ?? t("assets.search")}
-          className="h-9 pl-9 border-2 border-border rounded-[4px]"
-          autoFocus={autoFocus}
-        />
-      </div>
+      <SearchInput
+        value={search}
+        onChange={onSearchChange}
+        placeholder={searchPlaceholder ?? t("assets.search")}
+        mode={searchMode}
+        onModeChange={onSearchModeChange}
+        autoFocus={autoFocus}
+        className={compact ? "w-full" : "min-w-[240px] flex-[1.6]"}
+      />
 
       {afterSearch}
 
@@ -143,6 +155,7 @@ export function AssetFilterBar({
           </Select>
         )}
 
+        {showSeverity && (
         <MultiSelect values={severities} onValuesChange={onSeveritiesChange}>
           <MultiSelectTrigger className={cn("h-9 border-2 border-border rounded-[4px]", control ?? "w-[180px]")}>
             <MultiSelectValue placeholder={t("common.severity")} />
@@ -168,7 +181,9 @@ export function AssetFilterBar({
             </MultiSelectGroup>
           </MultiSelectContent>
         </MultiSelect>
+        )}
 
+        {showDetectors && (
         <MultiSelect values={detectorTypes} onValuesChange={onDetectorTypesChange}>
           <MultiSelectTrigger className={cn("h-9 border-2 border-border rounded-[4px]", control ?? "w-[220px]")}>
             <MultiSelectValue placeholder={t("assets.detectorTypes")} />
@@ -188,6 +203,7 @@ export function AssetFilterBar({
             </MultiSelectGroup>
           </MultiSelectContent>
         </MultiSelect>
+        )}
       </div>
 
       {children}

@@ -43,6 +43,7 @@ import {
   AssetRowsDto,
   UpdateAssetRowsDto,
 } from './governance.dto';
+import { GOVERNANCE_FILTERS } from './governance-filter';
 import { GovernanceInsightsService } from './governance-insights.service';
 import { GovernanceService } from './governance.service';
 import { GovernanceRowsService } from './governance-rows.service';
@@ -359,7 +360,7 @@ export class GovernanceController {
   @Requires('asset.view')
   @ApiOperation({
     summary:
-      'The Governance tab of the assets page: totals, quality over time, what needs someone, coverage per source',
+      'The dashboard: totals, quality over time, what needs someone, coverage per source',
   })
   @ApiQuery({ name: 'scope', required: false, enum: ['mine', 'all'] })
   @ApiQuery({ name: 'days', required: false, description: '1–365, default 30' })
@@ -388,6 +389,19 @@ export class GovernanceController {
   @ApiQuery({ name: 'sourceId', required: false })
   @ApiQuery({ name: 'sort', required: false, enum: ['used', 'rising'] })
   @ApiQuery({ name: 'limit', required: false, description: '1–50, default 10' })
+  @ApiQuery({
+    name: 'kind',
+    required: false,
+    enum: ['raw', 'shared'],
+    description: '`raw`: scanned assets only; `shared`: shared datasets only',
+  })
+  @ApiQuery({
+    name: 'governance',
+    required: false,
+    enum: GOVERNANCE_FILTERS,
+    description:
+      'Only assets matching this governance filter, as the asset search reads it',
+  })
   @ApiOkResponse({ type: GovernanceUsageDto })
   workspaceUsage(
     @Query('scope') scope?: string,
@@ -395,6 +409,8 @@ export class GovernanceController {
     @Query('sourceId') sourceId?: string,
     @Query('sort') sort?: string,
     @Query('limit') limit?: string,
+    @Query('kind') kind?: string,
+    @Query('governance') governance?: string,
   ): Promise<GovernanceUsageDto> {
     return this.insights.workspaceUsage(this.governance.person(), {
       scope,
@@ -402,6 +418,8 @@ export class GovernanceController {
       sourceId,
       sort,
       limit,
+      kind,
+      governance,
     });
   }
 

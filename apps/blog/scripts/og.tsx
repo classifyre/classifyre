@@ -20,16 +20,6 @@ const KICKER = { en: "Open-source data governance", de: "Open-Source-Data-Govern
 const cards: { name: string; title: string; kicker: string }[] = [
   { name: ogImageName("en", "home"), title: "Find it. Protect it.\nUse it.", kicker: KICKER.en },
   { name: ogImageName("de", "home"), title: "Finden. Schützen.\nNutzen.", kicker: KICKER.de },
-  {
-    name: ogImageName("en", "editions"),
-    title: "All of it is open source",
-    kicker: "Open source and Enterprise",
-  },
-  {
-    name: ogImageName("de", "editions"),
-    title: "Alles ist Open Source",
-    kicker: "Open Source und Enterprise",
-  },
 ];
 
 for (const locale of ["en", "de"] as const) {

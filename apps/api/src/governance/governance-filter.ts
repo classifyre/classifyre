@@ -29,6 +29,24 @@ export interface GovernanceSearch {
   ownerRef?: unknown;
   stewardRef?: unknown;
   responsibleRef?: unknown;
+  /**
+   * `failing`: a failing quality rule, whatever the governance — so the
+   * governed list can be narrowed to its failing assets (`governance` and
+   * `quality` together).
+   */
+  quality?: unknown;
+}
+
+/** `quality`: `failing`, or nothing; anything else is refused. */
+function qualityOf(search: GovernanceSearch): 'failing' | null {
+  const value = search.quality;
+  if (value === undefined || value === null || value === '') return null;
+  if (value !== 'failing') {
+    throw new BadRequestException(
+      `quality is failing; got ${JSON.stringify(value)}`,
+    );
+  }
+  return 'failing';
 }
 
 /** `responsibleRef`: owners and stewards, on the asset or its source. */
@@ -220,6 +238,12 @@ export async function governanceAssetWhere(
     );
   }
 
+  if (qualityOf(search)) {
+    clauses.push({
+      findings: { some: { detectorType: 'QUALITY', status: 'OPEN' } },
+    });
+  }
+
   const responsibleRef = responsibleRefOf(search);
   if (responsibleRef) {
     clauses.push(
@@ -341,6 +365,12 @@ export async function governanceAssetSql(
       inScopes(
         await openScopes(db, { role: 'STEWARD', principalRef: { in: refs } }),
       ),
+    );
+  }
+
+  if (qualityOf(search)) {
+    clauses.push(
+      Prisma.sql`EXISTS (SELECT 1 FROM findings qf WHERE qf.asset_id = ${a}.id AND qf.detector_type = 'QUALITY' AND qf.status = 'OPEN')`,
     );
   }
 

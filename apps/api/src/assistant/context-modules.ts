@@ -38,7 +38,7 @@ const NAVIGATION_MAP = [
   '  /sources — source list; /sources/new — create a source; /sources/{id}/edit — edit a source',
   '  /detectors — custom detector list; /detectors/new — create a detector; /detectors/{id} — detector detail (test, train, tune)',
   '  /fingerprints — correlation / duplicates graph and tuning panel',
-  '  /discovery — findings discovery dashboard',
+  '  /dashboard — governance dashboard: governed vs ungoverned, quality, usage, what waits on you',
   '  /investigations — case list; /investigations/{id} — case detail (threads, hypotheses, graph)',
   '  /investigations/cases/new — create a case',
   '  /investigations/inquiries/new — create an inquiry; /investigations/inquiries/{id} — inquiry detail and matches',

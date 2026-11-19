@@ -12572,7 +12572,7 @@
             }
           }
         },
-        "summary": "The Governance tab of the assets page: totals, quality over time, what needs someone, coverage per source",
+        "summary": "The dashboard: totals, quality over time, what needs someone, coverage per source",
         "tags": [
           "Governance"
         ]
@@ -12629,6 +12629,37 @@
             "in": "query",
             "description": "1–50, default 10",
             "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "description": "`raw`: scanned assets only; `shared`: shared datasets only",
+            "schema": {
+              "enum": [
+                "raw",
+                "shared"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "governance",
+            "required": false,
+            "in": "query",
+            "description": "Only assets matching this governance filter, as the asset search reads it",
+            "schema": {
+              "enum": [
+                "ungoverned",
+                "governed",
+                "draft",
+                "active",
+                "deprecated",
+                "retired",
+                "failing"
+              ],
               "type": "string"
             }
           }
@@ -19299,11 +19330,11 @@
   },
   "info": {
     "title": "Classifyre API",
-    "description": "Metadata ingestion and detection API for unstructured data sources. Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, Dremio, Trino/Starburst, ODBC, Amazon Athena, Google BigQuery, Amazon Redshift, Iceberg REST catalogs, DuckLake, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk, Notion, Email, and YouTube sources. Built-in detectors for secrets, PII, toxic content, image classification, broken links, and security threats.",
+    "description": "Open-source data governance API: scans data sources for personal data and secrets, masks classified columns, and serves governed reads. Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, Dremio, Trino/Starburst, ODBC, Amazon Athena, Google BigQuery, Amazon Redshift, Iceberg REST catalogs, DuckLake, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk, Notion, Email, and YouTube sources. Built-in detectors for secrets, PII, toxic content, image classification, broken links, and security threats.",
     "version": "1.0.0",
     "contact": {
       "name": "Classifyre Team",
-      "url": "https://github.com/unstructured/classifyre",
+      "url": "https://github.com/classifyre/classifyre",
       "email": "support@example.com"
     },
     "license": {
@@ -21116,6 +21147,34 @@
               "shared"
             ],
             "description": "`raw`: assets scanned from sources; `shared`: shared datasets (DQ §5.12). Both when omitted."
+          },
+          "ids": {
+            "description": "Only these assets (ids), with the other filters. The assets page asks for the ones worth exploring from this way.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "quality": {
+            "type": "string",
+            "enum": [
+              "failing"
+            ],
+            "description": "`failing`: assets with a failing quality rule, whatever their governance. Combines with `governance` (e.g. governed and failing)."
+          },
+          "datasetState": {
+            "type": "string",
+            "enum": [
+              "live",
+              "blocked",
+              "unavailable",
+              "retired"
+            ],
+            "description": "Shared datasets that can be read now (`live`), are blocked, cannot be read (an input is missing), or are retired."
+          },
+          "promoted": {
+            "type": "boolean",
+            "description": "Shared datasets promoted (true) or not (false)."
           }
         }
       },
@@ -39101,9 +39160,21 @@
             "type": "number",
             "description": "Governed and certified (ACTIVE)."
           },
+          "draft": {
+            "type": "number",
+            "description": "Governed and DRAFT (or no lifecycle set yet)."
+          },
+          "deprecated": {
+            "type": "number",
+            "description": "Governed and DEPRECATED."
+          },
+          "retired": {
+            "type": "number",
+            "description": "Governed and RETIRED. certified + draft + deprecated + retired = governed."
+          },
           "failing": {
             "type": "number",
-            "description": "With a failing quality rule (an open QUALITY finding)."
+            "description": "Governed, with a failing quality rule (an open QUALITY finding)."
           },
           "score": {
             "type": "number",
@@ -39115,6 +39186,9 @@
           "assets",
           "governed",
           "certified",
+          "draft",
+          "deprecated",
+          "retired",
           "failing",
           "score"
         ]

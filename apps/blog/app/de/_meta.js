@@ -18,10 +18,6 @@ export default {
     type: "menu",
     title: "Produkt",
     items: {
-      how: {
-        title: "So funktioniert es",
-        href: "/de/#how-it-works",
-      },
       get: {
         title: "Classifyre holen",
         href: "/de/get",
@@ -30,10 +26,6 @@ export default {
         title: "Quellen",
         href: "/de/sources",
       },
-      editions: {
-        title: "Open Source vs. Enterprise",
-        href: "/de/open-source-vs-enterprise",
-      }
     },
   },
   journal: {
@@ -79,11 +71,6 @@ export default {
     title: "Quellen",
     display: "hidden",
   },
-  "open-source-vs-enterprise": {
-    type: "page",
-    title: "Open Source vs. Enterprise",
-    display: "hidden",
-  },
   "made-in-europe": {
     type: "page",
     title: "Made in Austria",
@@ -104,6 +91,16 @@ export default {
   privacy: {
     type: "page",
     title: "Datenschutz- & Cookie-Richtlinie",
+    display: "hidden",
+  },
+  impressum: {
+    type: "page",
+    title: "Impressum",
+    display: "hidden",
+  },
+  "release-notes": {
+    type: "page",
+    title: "Release Notes",
     display: "hidden",
   },
 };

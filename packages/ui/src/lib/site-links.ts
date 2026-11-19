@@ -30,6 +30,16 @@ export const contactEmail = "contact@classifyre.com";
 export const releasesLatestUrl = `${repositoryUrl}/releases/latest`;
 
 /**
+ * The release notes page on the marketing site, optionally deep-linked to one
+ * version (`#0.8.0`; a leading `v`, as in a git tag, is accepted).
+ */
+export function releaseNotesUrl(version?: string): string {
+  const base = `${marketingSiteUrl}/release-notes/`;
+  const clean = version?.replace(/^v/, "");
+  return clean ? `${base}#${clean}` : base;
+}
+
+/**
  * The all-in-one image, quoted verbatim in `docker run` lines. One image with
  * the whole product inside it — see docker/README.md.
  */
@@ -51,8 +61,9 @@ export const marketingPaths = {
   home: "/",
   get: "/get/",
   sources: "/sources/",
-  editions: "/open-source-vs-enterprise/",
   madeInEurope: "/made-in-europe/",
   blog: "/blog/",
   privacy: "/privacy/",
+  imprint: "/impressum/",
+  releaseNotes: "/release-notes/",
 } as const;

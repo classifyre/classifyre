@@ -9,14 +9,7 @@ import {
   formatShortUTC,
   formatDateUTC,
 } from "@/lib/date";
-import {
-  ArrowUpRight,
-  BrainCircuit,
-  ListFilter,
-  Filter,
-  Loader2,
-  Search,
-} from "lucide-react";
+import { ArrowUpRight, ListFilter, Filter, Loader2 } from "lucide-react";
 import {
   api,
   SearchFindingsFiltersInputDtoDetectorTypeEnum,
@@ -33,7 +26,6 @@ import {
   Button,
   Checkbox,
   EmptyState,
-  Input,
   MultiSelect,
   MultiSelectContent,
   MultiSelectGroup,
@@ -65,6 +57,7 @@ import { toFindingStatusBadgeValue } from "../lib/finding-status-badge";
 import { useTranslation } from "@/hooks/use-translation";
 import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 import { FeatureOffNotice } from "@/components/feature-off-notice";
+import { SearchInput, type SearchMode } from "@/components/search-input";
 import type { TranslationKey } from "@/i18n";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -107,7 +100,6 @@ type RankedFindingsResponse = Omit<SearchFindingsResponseDto, "findings"> & {
   findings: RankedFinding[];
 };
 
-type SearchMode = "hybrid" | "off";
 type RankingMode = "importance" | "newest" | "severity";
 
 // Selection is either explicit IDs or a filter snapshot (select-all mode).
@@ -684,50 +676,14 @@ export function FindingsTable({
     <div className="space-y-5">
       {/* ── Filter bar ── */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[240px] flex-[1.6]">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder={t("findings.search")}
-            className="h-9 pl-9 border-2 border-border rounded-[4px]"
-          />
-        </div>
-
-        <div className="flex h-9 overflow-hidden rounded-[4px] border-2 border-border">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                type="button"
-                variant={searchMode === "hybrid" ? "default" : "ghost"}
-                size="sm"
-                className="h-full rounded-none px-2.5"
-                onClick={() => setSearchMode("hybrid")}
-              >
-                <BrainCircuit className="h-3.5 w-3.5" />
-                Semantic
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              Hybrid semantic and exact text ranking
-            </TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                type="button"
-                variant={searchMode === "off" ? "default" : "ghost"}
-                size="sm"
-                className="h-full rounded-none border-l border-border px-2.5"
-                onClick={() => setSearchMode("off")}
-              >
-                <Search className="h-3.5 w-3.5" />
-                Exact
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Exact field and full-text matching</TooltipContent>
-          </Tooltip>
-        </div>
+        <SearchInput
+          value={searchInput}
+          onChange={setSearchInput}
+          placeholder={t("findings.search")}
+          mode={searchMode}
+          onModeChange={setSearchMode}
+          className="min-w-[240px] flex-[1.6]"
+        />
 
         <Select
           value={rankingMode}
