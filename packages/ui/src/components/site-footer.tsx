@@ -96,6 +96,8 @@ export interface SiteFooterCopy {
   navGithub: string;
   legalHeading: string;
   privacy: string;
+  imprint: string;
+  releaseNotes: string;
   cookieSettings: string;
   contact: string;
   baselineTagline: string;
@@ -116,6 +118,8 @@ const DEFAULT_COPY: SiteFooterCopy = {
   navGithub: "GitHub",
   legalHeading: "Legal & contact",
   privacy: "Privacy & cookie policy",
+  imprint: "Legal notice",
+  releaseNotes: "Release notes",
   cookieSettings: "Cookie settings",
   contact: "Contact",
   baselineTagline: "Masked until someone is allowed to see it",
@@ -160,6 +164,10 @@ export function SiteFooter({
       href: marketing(marketingPaths.editions),
     },
     { label: text.navBlog, href: marketing(marketingPaths.blog) },
+    {
+      label: text.releaseNotes,
+      href: marketing(marketingPaths.releaseNotes),
+    },
     { label: text.navDocumentation, href: `${docsSiteUrl}/`, external: true },
     { label: text.navShowcase, href: showcaseHref, external: true },
     { label: text.navGithub, href: repositoryUrl, external: true },
@@ -253,6 +261,14 @@ export function SiteFooter({
                 className="text-[13px] leading-6 text-white/70 decoration-accent decoration-2 underline-offset-4 transition-colors hover:text-accent hover:underline"
               >
                 {text.privacy}
+              </a>
+            </li>
+            <li>
+              <a
+                href={marketing(marketingPaths.imprint)}
+                className="text-[13px] leading-6 text-white/70 decoration-accent decoration-2 underline-offset-4 transition-colors hover:text-accent hover:underline"
+              >
+                {text.imprint}
               </a>
             </li>
             <li>

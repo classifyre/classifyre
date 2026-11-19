@@ -90,6 +90,8 @@ export const routes = {
   madeInEurope: "/made-in-europe",
   blog: "/blog",
   privacy: "/privacy",
+  imprint: "/impressum",
+  releaseNotes: "/release-notes",
 } as const;
 
 export { helmChartRef };

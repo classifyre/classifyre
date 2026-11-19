@@ -106,4 +106,14 @@ export default {
     title: "Datenschutz- & Cookie-Richtlinie",
     display: "hidden",
   },
+  impressum: {
+    type: "page",
+    title: "Impressum",
+    display: "hidden",
+  },
+  "release-notes": {
+    type: "page",
+    title: "Release Notes",
+    display: "hidden",
+  },
 };

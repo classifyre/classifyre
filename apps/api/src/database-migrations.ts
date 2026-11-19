@@ -2,7 +2,7 @@ import { Logger } from '@nestjs/common';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Pool, type PoolClient } from 'pg';
+import { Client, Pool, type PoolClient } from 'pg';
 import {
   REGISTRY_TABLE_DDL,
   publicConnectionString,
@@ -148,8 +148,57 @@ function resolvePrismaCliPath(schemaPath: string): string {
   ]);
 }
 
+function localMigrationNames(schemaPath: string): string[] {
+  return fs
+    .readdirSync(path.join(path.dirname(schemaPath), 'migrations'), {
+      withFileTypes: true,
+    })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name);
+}
+
 /**
- * Run `prisma migrate deploy` against a single Postgres schema.
+ * Whether `_prisma_migrations` in `schema` already lists every migration this
+ * build ships, each finished and not rolled back. Starting `prisma migrate
+ * deploy` costs seconds even when it has nothing to apply, and every process
+ * does it for every workspace, one after another under the migration lock, so
+ * a boot over dozens of workspaces outlasted the startup probe.
+ *
+ * Only a definite "yes" skips Prisma. An unfinished or rolled-back row (a
+ * failed migration Prisma should report), a missing table, or any error
+ * (unreachable database, no permission) all leave the work to Prisma, which
+ * fails the way it always did.
+ */
+async function schemaIsCurrent(
+  databaseUrl: string,
+  schema: string,
+  localMigrations: string[],
+): Promise<boolean> {
+  const client = new Client({ connectionString: databaseUrl });
+  try {
+    await client.connect();
+    const { rows } = await client.query<{
+      migration_name: string;
+      finished_at: Date | null;
+      rolled_back_at: Date | null;
+    }>(
+      `SELECT migration_name, finished_at, rolled_back_at FROM "${schema.replace(/"/g, '""')}"._prisma_migrations`,
+    );
+    if (rows.some((row) => !row.finished_at || row.rolled_back_at)) {
+      return false;
+    }
+    const applied = new Set(rows.map((row) => row.migration_name));
+    return localMigrations.every((name) => applied.has(name));
+  } catch {
+    return false;
+  } finally {
+    await client.end().catch(() => undefined);
+  }
+}
+
+/**
+ * Run `prisma migrate deploy` against a single Postgres schema, unless the
+ * schema already has every migration (see `schemaIsCurrent`).
  *
  * When `schema` is provided, the database URL is rewritten with `?schema=<schema>`
  * so Prisma tracks state in an independent `_prisma_migrations` table inside
@@ -171,6 +220,20 @@ export async function deployForSchema(
   const schemaPath = resolveSchemaPath();
   const prismaCliPath = resolvePrismaCliPath(schemaPath);
   const apiDir = path.dirname(path.dirname(schemaPath));
+
+  if (
+    schema &&
+    (await schemaIsCurrent(
+      databaseUrl,
+      schema,
+      localMigrationNames(schemaPath),
+    ))
+  ) {
+    logger.log(
+      `Database migrations are up to date for schema '${schema}' (nothing pending)`,
+    );
+    return;
+  }
 
   if (schema) {
     const url = new URL(databaseUrl);

@@ -107,4 +107,14 @@ export default {
     title: "Privacy & cookie policy",
     display: "hidden",
   },
+  impressum: {
+    type: "page",
+    title: "Legal notice",
+    display: "hidden",
+  },
+  "release-notes": {
+    type: "page",
+    title: "Release notes",
+    display: "hidden",
+  },
 };
