@@ -68,7 +68,7 @@ function LinkList({ links }: { links: readonly FooterLink[] }) {
 function ColumnHead({ children }: { children: ReactNode }) {
   return (
     <div className="mb-5 flex items-center gap-3">
-      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-white/45">
+      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-white/60">
         {children}
       </span>
       <span aria-hidden="true" className="h-px flex-1 bg-white/12" />
@@ -102,9 +102,9 @@ export interface SiteFooterCopy {
 }
 
 const DEFAULT_COPY: SiteFooterCopy = {
-  tagline: "Investigation Platform",
+  tagline: "Open-source data governance",
   blurb:
-    "The open-source investigation platform for your data. Classifyre scans the systems you already run, detects secrets, PII, and the signals you define, then works the findings like a detective — standing inquiries, ranked evidence, cases, and an AI autopilot between scans.",
+    "Open-source data governance you run yourself. Classifyre finds personal data and secrets across the systems you already run, masks them automatically, and lets your team query everything with SQL, Excel and Power BI. Every read is logged.",
   navHeading: "Navigate",
   navHome: "Home",
   navGet: "Get Classifyre",
@@ -118,7 +118,7 @@ const DEFAULT_COPY: SiteFooterCopy = {
   privacy: "Privacy & cookie policy",
   cookieSettings: "Cookie settings",
   contact: "Contact",
-  baselineTagline: "Every leak leaves a trail",
+  baselineTagline: "Masked until someone is allowed to see it",
 };
 
 export function SiteFooter({
@@ -127,6 +127,7 @@ export function SiteFooter({
   className,
   copy,
   showcaseHref = `${showcaseSiteUrl}/`,
+  topics,
 }: {
   /** Prefix for marketing routes. Empty on the marketing site itself. */
   origin?: string;
@@ -139,6 +140,11 @@ export function SiteFooter({
    * (e.g. the `/de` showcase). Defaults to the unprefixed showcase.
    */
   showcaseHref?: string;
+  /**
+   * An extra column of links, used by the marketing site for its topic
+   * pages (data masking, PII discovery, …). Hrefs are used as given.
+   */
+  topics?: { heading: string; links: readonly { label: string; href: string }[] };
 }) {
   const marketing = (path: string) => `${origin}${path}`;
   const text = { ...DEFAULT_COPY, ...copy };
@@ -166,7 +172,14 @@ export function SiteFooter({
         className,
       )}
     >
-      <div className="mx-auto grid w-full max-w-7xl gap-10 px-6 py-12 lg:grid-cols-[1.5fr_1fr_1fr] lg:gap-14 lg:px-10 lg:py-16">
+      <div
+        className={cn(
+          "mx-auto grid w-full max-w-7xl gap-10 px-6 py-12 lg:gap-14 lg:px-10 lg:py-16",
+          topics
+            ? "sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr]"
+            : "lg:grid-cols-[1.5fr_1fr_1fr]",
+        )}
+      >
         {/* ── Identity ─────────────────────────────────────────────── */}
         <div className="max-w-md">
           <a
@@ -212,10 +225,17 @@ export function SiteFooter({
             ))}
           </ul>
 
-          <p className="mt-6 font-mono text-[10px] uppercase tracking-[0.18em] text-white/40">
+          <p className="mt-6 font-mono text-[10px] uppercase tracking-[0.18em] text-white/60">
             Docker · Kubernetes · Apache-2.0
           </p>
         </div>
+
+        {topics ? (
+          <nav aria-label={topics.heading}>
+            <ColumnHead>{topics.heading}</ColumnHead>
+            <LinkList links={topics.links} />
+          </nav>
+        ) : null}
 
         {/* ── Navigation, mirroring the header ─────────────────────── */}
         <nav aria-label="Footer">
@@ -257,12 +277,12 @@ export function SiteFooter({
 
       {/* ── Baseline ───────────────────────────────────────────────── */}
       <div className="border-t-2 border-white/20">
-        <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-6 py-5 font-mono text-[10px] uppercase tracking-[0.16em] text-white/45 sm:flex-row sm:items-center sm:justify-between lg:px-10">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-6 py-5 font-mono text-[10px] uppercase tracking-[0.16em] text-white/60 sm:flex-row sm:items-center sm:justify-between lg:px-10">
           <span>
             © {new Date().getFullYear()} Classifyre · Apache-2.0 · v
             {softwareVersionLabel}
           </span>
-          <span className="text-white/35">{text.baselineTagline}</span>
+          <span className="text-white/60">{text.baselineTagline}</span>
         </div>
       </div>
     </div>

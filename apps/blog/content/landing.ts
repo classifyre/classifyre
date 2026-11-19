@@ -1,10 +1,7 @@
 import type { Locale } from "@/lib/locale";
 
 import de from "./landing-de";
-import {
-  docs,
-  routes,
-} from "@/lib/site";
+import { docs, routes } from "@/lib/site";
 
 /**
  * Landing-page copy, one typed object per locale.
@@ -15,28 +12,55 @@ import {
  * instead of silently falling back. Links point at shared URL constants
  * (`@/lib/site`) so the two locales cannot drift apart on destinations,
  * only on words.
+ *
+ * Word rules: masking is never called anonymisation (the hashed mask is
+ * pseudonymisation); no "AI-powered", "zero trust", "DSPM" or "data
+ * platform"; investigation is one use case, not the promise.
  */
 
 /* ── Hero ───────────────────────────────────────────────────────────────── */
 
 const enHero = {
   /** Small stamps above the headline. */
-  chips: ["Open-source investigation platform"],
-  titleA: "Follow the evidence.",
+  chips: ["Open-source data governance platform"],
+  titleA: "Find it. Protect it.",
   /** Rendered as `titleBLead` + an accent block with `titleBHighlight`. */
-  titleBLead: "Close the",
-  titleBHighlight: "case.",
-  lede: "Classifyre reads the systems you already run, finds the signals you define, then follows them across sources, like a detective, with an AI autopilot doing the legwork between scans.",
+  titleBLead: "",
+  titleBHighlight: "Use it.",
+  lede: "Classifyre finds personal data and secrets across the systems you already run, masks them automatically, and lets your team query everything with SQL, Excel and Power BI. Every read is logged. Nothing leaves your servers.",
   ctaPrimary: "Run it on your machine",
   ctaSecondary: "Walk the live showcase",
   micro: "No signup. One Docker command. Your data stays with you.",
-  /** The pinned case file beside the headline. */
-  exhibit: {
-    tab: "Case file · 042",
-    stamp: "Case open",
-    subject: "Exhibit A: the investigator",
-    status: "On duty",
+} as const;
+
+/* ── The redaction sheet (hero) ─────────────────────────────────────────── */
+
+const enSheet = {
+  readAs: "Read as",
+  personas: {
+    analyst: "Analyst",
+    steward: "Unmasked reader",
   },
+  notes: {
+    analyst:
+      "Personal columns are masked inside the query. The token column is hidden.",
+    steward:
+      "Clear reading granted on this table until 30 June. This read is on record.",
+  },
+  hidden: "1 column hidden",
+  tags: {
+    name: "Person · 0.97",
+    iban: "IBAN · 0.99",
+    email: "Email · 0.98",
+    token: "Secret · 0.96",
+  },
+  masks: {
+    redact: "redacted",
+    partial: "last four",
+    hash: "hashed",
+    hidden: "hidden",
+  },
+  replay: "Replay",
 } as const;
 
 /** Alt text for the hand-inked investigator drawings. */
@@ -45,10 +69,24 @@ const enMascots = {
     "The Classifyre investigator in a trench coat, scratching his head over an unanswerable question mark",
   lookingAround:
     "The Classifyre investigator glancing around, searching for the trail",
-  lookingAtYou:
-    "The Classifyre investigator looking straight at you",
+  lookingAtYou: "The Classifyre investigator looking straight at you",
   hiddenGem:
     "The Classifyre investigator holding a magnifying glass over a hidden gem",
+} as const;
+
+/* ── The governance path (hero band) ────────────────────────────────── */
+
+const enPath = {
+  label: "The path data takes through Classifyre",
+  steps: [
+    { verb: "Connect", examples: ["Iceberg tables via S3", "PostgreSQL · crm", "Delta in Databricks", "Confluence wiki"] },
+    { verb: "Detect", examples: ["IBAN found · 0.99", "AWS key found · 0.96", "AT SVNR found · 0.93", "Email found · 0.98"] },
+    { verb: "Govern", examples: ["Owner: Finance", "Column masked", "Secret hidden", "Steward named"] },
+    { verb: "Grant", examples: ["Analysts · 90 days", "Clear reading · Finance", "Row filter · Graz", "Request approved"] },
+    { verb: "Share", examples: ["orders + customers", "Shared table, masks kept", "Joined with lake.orders", "Parquet export"] },
+    { verb: "Connect BI", examples: ["Power BI via ODBC", "Excel · own login", "Tableau · TLS only", "DBeaver · JDBC"] },
+    { verb: "Log", examples: ["Lena read · Power BI", "Tom read · SQL page", "Agent read · MCP", "Jakob export · Excel"] },
+  ],
 } as const;
 
 /* ── Install strip ──────────────────────────────────────────────────────── */
@@ -63,7 +101,7 @@ const enInstall = {
   helmLabel: "Helm chart · scales to any size",
   helmTitle: "Or run it on Kubernetes",
   helmCopy:
-    "Ephemeral scan workers scale to zero between runs and fan out as far as your estate goes. Your cluster, your data.",
+    "Ephemeral scan and query workers scale to zero between runs and fan out as far as your estate goes. Your cluster, your data.",
   helmCtaDocs: "Helm chart docs",
   helmCtaRepo: "Chart README on GitHub",
 } as const;
@@ -72,86 +110,168 @@ const enInstall = {
 
 const enTension = {
   marker: "The problem",
-  title: "Every system holds a fact. None of them holds the story.",
-  lede: "A shipment went to the wrong address. The ERP knows the order, the support tool knows the complaint, the invoice run knows the money. On its own each is noise. Together they are a case, and today nobody can put them together.",
-  /** Margin notes: the three ways the story stays buried. */
+  title: "Your data is useful. It is also full of personal data.",
+  lede: "Every team wants the numbers. Every table that holds them also holds names, accounts, addresses and the odd password. So access becomes a negotiation, and the negotiation ends in a spreadsheet.",
+  /** Margin notes: the three ways access goes wrong. */
   notes: [
     {
       label: "Field note 01",
-      title: "Exports don't add up",
-      body: "Rows lose their joins the moment they leave the database. Six CSVs later the relationships are gone and every question starts the review from zero.",
+      title: "Who can see this column?",
+      body: "Finance asks for the customer database. Which of its 212 tables hold personal data? Nobody knows, so the ticket waits, or everyone gets everything.",
     },
     {
       label: "Field note 02",
-      title: "Findings tables dead-end",
-      body: "A scanner lists 4,000 secrets and stops. Sorting them is still your job, and every rescan quietly adds a few hundred more.",
+      title: "Just send me the export",
+      body: "Data leaves by CSV and shared database passwords. Six copies later nobody can say where the customer list lives, or who still has it.",
     },
     {
       label: "Field note 03",
-      title: "Nobody can say how they knew",
-      body: "When a regulator, a court or a CFO asks what you knew and when, “the model said so” is not an answer. Evidence without lineage is a rumour.",
+      title: "Prove it to the auditor",
+      body: "Who read the payroll tables last quarter, with which tool? Without a log of every read, the honest answer is: we don't know.",
     },
   ],
   kicker:
-    "It is the same shape every time: someone inside the company leaking a spreadsheet to help it, a counterparty three shell companies deep, a fraud pattern spread across five record systems. Scattered facts. One story.",
-  figureCaption:
-    "Fig. 01: six systems, one story, no line between the facts",
+    "It is the same shape every time: useful data locked away because nobody can say what is personal in it, or handed out whole because nobody had time to say no. Masked by default, granted on purpose, every read on record: that is the way out.",
+  figureCaption: "Fig. 01: six systems, personal data in all of them, no line between who may see what",
+  /** The six systems on the board. */
+  nodes: ["CRM", "HR", "BUCKET", "WIKI", "LAKE", "BI"],
 } as const;
 
-/* ── Method / solution ──────────────────────────────────────────────────── */
+/* ── How it works: the journey ──────────────────────────────────────── */
 
-const enMethod = {
-  marker: "The method",
-  title: "One thread through every system.",
-  lede: "Classifyre is less a business-intelligence tool than an operational data layer: it connects the systems you already run, models the real-world entities and relationships inside them, and keeps one thread from the first hit to the closed case.",
+const enJourney = {
+  marker: "How it works",
+  tape: "Reads 40+ systems in place · never copied",
+  tapeLink: "Browse the source catalogue",
+  title: "From a raw table to a shared dataset.",
+  lede: "Follow the data through Classifyre: found where it lives, queried in place, governed, used in the tools your team already has, masked for the people who should not see it, and shared on purpose.",
   stages: [
     {
-      no: "01",
-      word: "Read",
-      title: "Read the systems you already run",
-      body: "Databases, lakehouses, collaboration tools, storage, streams and public registers. Scans ingest assets on a schedule and everything found lands in one evidence stream.",
-      href: "/sources/",
-      linkLabel: "Browse the source catalogue",
-    },
-    {
-      no: "02",
-      word: "Signal",
-      title: "Define what matters, in your own words",
-      body: "Regex and rules for the deterministic things, entity classification with your labels, any Hugging Face model, or a prompt that becomes a detector. Built-in packs cover PII, secrets, code security and content quality from the first scan.",
+      id: "discover",
+      step: "Connect & detect",
+      title: "Find personal data and secrets where they live",
+      body: [
+        "Connect databases, lakehouses, buckets and SaaS tools; Classifyre reads them in place, so nothing is copied into another warehouse. Built-in detectors look for 41 kinds of personal data, including Austrian, German and Swiss identifiers, and 27 kinds of secrets. Add your own with a regex, a model or a prompt.",
+        "Every finding comes with a score and a written reason, so a data protection officer can check it and a security team can rank the cleanup. The classification it produces is what the masks follow later.",
+      ],
+      facts: ["40+ source types", "41 PII entities · 27 secret patterns", "A score and a reason on every finding"],
       href: docs.detectors,
       linkLabel: "See the detector packs",
+      media: "discover",
+      caption: "Personal data found across three sources, ranked with reasons.",
     },
     {
-      no: "03",
-      word: "Follow",
-      title: "Follow it across sources",
-      body: "Fingerprints tie the same fact together wherever it appears. Near-duplicates arrive grouped by cause, and lineage keeps the thread intact from the first hit to the last.",
-      href: docs.duplicates,
-      linkLabel: "How fingerprints and duplicates work",
+      id: "query",
+      step: "Query across sources",
+      title: "Query every system with one SQL statement",
+      body: [
+        "Ask questions across the systems you already have: PostgreSQL, MySQL, Databricks, and Delta, Iceberg and Parquet files in S3, Azure or Google Cloud Storage. Join up to eight sources in one query. Each query runs next to the data; nothing is loaded into a central store first.",
+        "Results go where people work: the SQL page, exports to Excel, CSV and Parquet up to a million rows, or straight into a BI tool.",
+      ],
+      facts: ["Up to 8 sources in one query", "Delta · Iceberg · Parquet · CSV", "Exports up to 1M rows"],
+      href: docs.dataQuery,
+      linkLabel: "Query data",
+      media: "query",
+      caption: "A PostgreSQL table joined with Parquet files in a bucket.",
     },
     {
-      no: "04",
-      word: "File",
-      title: "Turn findings into a case",
-      body: "Standing inquiries keep matching fresh evidence. Findings are ranked 0–1 with written reasons. A case collects the evidence, the competing hypotheses, an owner and an audit trail you can hand over.",
-      href: docs.cases,
-      linkLabel: "How cases work",
+      id: "govern",
+      step: "Governance",
+      title: "Governance: an owner, a contract and a history for every table",
+      body: [
+        "A governed table has an owner, stewards and a custodian, a classification for every column, and a status from draft to certified. Quality rules check it on a schedule: missing values, invalid IBANs, duplicates, row counts or any SQL you write. The agreement exports as an ODCS data contract.",
+        "Usage shows who reads the table and through which tool; Activity shows every read and every change, old value next to new. When the auditor asks, the answer is already written down.",
+      ],
+      facts: ["Owners, stewards, custodians", "Quality rules on a schedule", "ODCS data contracts", "Every read and change on record"],
+      href: docs.governance,
+      linkLabel: "Governed assets",
+      media: "govern",
+      caption: "Owner, steward and custodian assigned, access set, a quality rule run, the table certified, the contract exported.",
     },
     {
-      no: "05",
-      word: "Work",
-      title: "Let the autopilot do the legwork",
-      body: "Between scans, five agents wake in sequence: matching inquiries, opening cases, waking dead sources, drafting the detector you were missing, consolidating memory. Flip observe-only and everything stays a proposal.",
-      href: docs.autopilot,
-      linkLabel: "How the autopilot works",
+      id: "bi",
+      step: "Power BI & Excel",
+      title: "Connect Power BI and Excel without a shared password",
+      body: [
+        "Classifyre answers as a PostgreSQL database. Each person creates their own SQL connection, encrypted and expiring, and points Power BI, Excel, Tableau or DBeaver at it. No service account with the keys to everything, no password inside a report file.",
+        "The connection carries the person's own rights: the tables they may query, the rows their group may see, the masks on every personal column. Revoke it and the report stops.",
+      ],
+      facts: ["A personal connection per tool", "TLS only, expiring, revocable", "The read log names the tool"],
+      href: docs.sqlConnections,
+      linkLabel: "SQL connections",
+      media: "bi",
+      caption: "A personal connection, used from a BI report, still masked.",
+    },
+    {
+      id: "mask",
+      step: "Mask per person",
+      title: "Masked for one person, clear for another",
+      body: [
+        "Personal columns are masked by default: redacted, last four, hashed so tables still join, or hidden. Masks apply inside the query, so a WHERE or a JOIN can't reach past them. Only a group granted Data reader, unmasked reads the clear values, for a source or a single table, with an end date. Admins don't get it by default.",
+        "The hashed mask is pseudonymisation in the sense of the GDPR, not anonymisation: equal values hash the same, so analysts can join and count people without reading who they are. Watch it below: the same queries, run by an analyst and by a finance steward.",
+      ],
+      facts: ["Masked by default", "Redacted · last four · hashed · hidden", "Pseudonymisation, not anonymisation", "Clear reading is its own grant"],
+      href: docs.masking,
+      linkLabel: "How masking works",
+      media: "readers",
+      caption: "",
+    },
+    {
+      id: "share",
+      step: "Share",
+      title: "Share a dataset that joins your sources",
+      body: [
+        "Join tables from different systems into a shared dataset (customers from the CRM, orders from the lake, invoices from finance) and give it to the groups that need it. A shared dataset is a governed, saved query, not a copy: it reads the sources live, and the masks of every input table travel with it as a floor that can only be raised.",
+        "The receiving team queries it like any table, on the SQL page, in Excel or in Power BI, and every read is on record.",
+      ],
+      facts: ["Joins across sources", "Masks travel with the data", "Granted per group, with an end date"],
+      href: docs.sharedDatasets,
+      linkLabel: "Shared datasets",
+      media: "share",
+      caption: "Three sources joined into one dataset, shared with a group, masks kept.",
     },
   ],
 } as const;
 
-/* ── Interactive demo ───────────────────────────────────────────────────── */
+/* ── The differentiator ─────────────────────────────────────────────────── */
+
+const enReaders = {
+  readers: {
+    masked: { name: "Lena, analyst", role: "Data reader" },
+    clear: { name: "Tom, finance steward", role: "Data reader, unmasked" },
+  },
+  rowsLabel: (n: number) => (n === 1 ? "1 row" : `${n} rows`),
+  variants: [
+    {
+      id: "select",
+      label: "SELECT",
+      note: "Same rows, different cells. Lena sees the last four digits; Tom reads the account in clear.",
+    },
+    {
+      id: "where",
+      label: "WHERE",
+      note: "Filtering on the clear value finds nothing for Lena: the filter runs on the masked value, not around it.",
+    },
+    {
+      id: "join",
+      label: "JOIN",
+      note: "The hashed email still joins: equal values hash the same, so Lena matches tables without reading a single address.",
+    },
+    {
+      id: "group",
+      label: "GROUP BY",
+      note: "Counts work on masked columns. The answer is useful; the person behind it stays covered.",
+    },
+  ],
+  caption:
+    "Reading masked data is a grant of its own, with an end date, and it is on record.",
+  link: "How masking works",
+} as const;
+
+/* ── Interactive demo (cases) ───────────────────────────────────────────── */
 
 const enDemo = {
-  marker: "Open the file",
+  marker: "When something leaks",
   title: "This is the part most tools leave to you.",
   tabs: {
     caseBoard: "Case 042",
@@ -247,98 +367,139 @@ const enDemo = {
   cta: "Walk the real thing",
 } as const;
 
-
-
 /* ── Sectors ────────────────────────────────────────────────────────────── */
 
 const enSectors = {
   marker: "Where it lands",
-  title: "The files look different. The method is the same.",
-  lede: "Classifyre reads whatever the operation runs on; the sector only decides which signals you define first.",
+  title: "The data looks different. The rules are the same.",
+  lede: "Classifyre reads whatever the organisation runs on; the sector only decides which columns are personal and who reads them in clear.",
   columns: {
     sector: "Sector",
     data: "Typical data",
-    finds: "What gets followed",
+    finds: "What changes",
   },
   rows: [
     {
-      sector: "Finance · KYC · AML",
-      data: "Customer master, transactions, sanctions, account networks",
-      finds: "Layered counterparties, a sanctioned name resurfacing under a new one",
+      sector: "Public sector · Länder · cities",
+      data: "Registers, case files, statistics, procurement",
+      finds: "Districts query their own rows, personal columns arrive masked, the DPO reads the log",
     },
     {
-      sector: "Healthcare operations",
-      data: "Admissions, transfers, theatre schedules, staffing, inventory",
-      finds: "Capacity leaks, waitlist patterns, inventory drift",
+      sector: "Healthcare · hospitals",
+      data: "Admissions, lab results, staffing, billing",
+      finds: "Analysts count patients without reading who they are",
     },
     {
-      sector: "Energy · utilities",
-      data: "SCADA, sensors, GIS, maintenance, market data",
-      finds: "Sensor drift before failure, silent outages, contract anomalies",
+      sector: "Banking · KYC",
+      data: "Customer master, transactions, accounts",
+      finds: "IBANs as last four, hashed IDs that still join, a read log for the regulator",
     },
     {
-      sector: "Supply chain · logistics",
-      data: "ERP orders, inventory, shipments, supplier records",
-      finds: "Shipments to the wrong address, ghost inventory, supplier overlap",
+      sector: "Insurance",
+      data: "Claims, policies, health declarations",
+      finds: "Actuaries get the tables, not the policyholders",
     },
     {
-      sector: "Transportation",
-      data: "Maintenance logs, engineering records, ground operations",
-      finds: "Deferred defects, parts provenance, unlogged work",
+      sector: "BI · analytics teams",
+      data: "Warehouses, lakehouses, Delta and Iceberg tables",
+      finds: "Power BI and Excel on personal connections instead of one shared password",
     },
     {
-      sector: "Telecommunications",
-      data: "Network topology, telemetry, incidents, field work",
-      finds: "Route abuse, SLA breaches before the complaints arrive",
-    },
-    {
-      sector: "Retail · POS · SKU",
-      data: "Sales, promotions, inventory, returns, competitor prices",
-      finds: "Shrink, promotion abuse, return fraud",
-    },
-    {
-      sector: "Law enforcement · civil investigation",
-      data: "Case records, persons and entities, financial and travel records",
-      finds: "One entity under three names, one thread across five record systems",
-    },
-    {
-      sector: "Government · public sector",
-      data: "Procurement, registers, correspondence, grants",
-      finds: "Undeclared interests, tender patterns, leaked documents",
+      sector: "Security teams",
+      data: "Git, wikis, tickets, buckets, logs",
+      finds: "Keys and tokens found, ranked with reasons, cleaned up first",
     },
     {
       sector: "Internal audit · compliance",
-      data: "Access logs, contracts, expenses, communications",
-      finds: "The leak, the conflict of interest, the control that stopped working",
+      data: "Access logs, payroll, contracts",
+      finds: "Who read which table, through which tool, and when: one filter",
+    },
+    {
+      sector: "Incident response",
+      data: "Mail, drives, databases",
+      finds: "One fingerprint across systems, worked as a case",
     },
   ],
   footnote:
-    "Sector data shapes from the published case literature of operational data platforms; outcome figures cited in the category context above are Palantir's published results, used to describe the market, not to claim Classifyre's.",
+    "Each row is a starting point, not a separate product: the same masks, grants and read log underneath.",
+  links: [
+    { label: "Immuta alternative", href: "/immuta-alternative" },
+    { label: "Unity Catalog alternative", href: "/unity-catalog-alternative" },
+    { label: "Read the case files", href: routes.blog + "/cases" },
+  ],
+} as const;
+
+/* ── Open source and Enterprise ─────────────────────────────────────────── */
+
+const enEditions = {
+  marker: "Open source and Enterprise",
+  title: "All of it is open source. Enterprise is tailored to your organisation.",
+  lede: "Run it yourself or with your consultants: every feature is in the open-source repository. Keep your ETL tools, pipelines and data products as they are. Classifyre doesn't build them; it governs what they produce.",
+  oss: {
+    title: "Open source",
+    sub: "Every feature · free forever",
+    items: [
+      "40+ source connectors",
+      "PII and secret detection, custom detectors",
+      "Column masks: redacted, last four, hashed, empty, hidden",
+      "Owners, stewards, quality rules, ODCS contracts",
+      "Grants per group, source and table, with end dates",
+      "SQL page, exports, shared datasets",
+      "PostgreSQL endpoint for Power BI, Excel, Tableau",
+      "Audit of every read",
+      "SSO, roles, tenants and workspaces",
+      "Cases, inquiries, lineage, autopilot",
+    ],
+  },
+  ent: {
+    title: "Enterprise",
+    sub: "Tailored to your organisation",
+    items: [
+      {
+        title: "Your stack stays",
+        body: "Your ETL jobs, dbt models, Spark pipelines and data products stay where they are. Classifyre reads what they produce and governs it: owners, masks, quality, access. In open source too.",
+      },
+      {
+        title: "Shaped to how you work",
+        body: "Roles mapped to your groups, an access model your data protection officer can sign, detectors and models tuned to your terminology and documents, OpenShift if that is your platform.",
+      },
+      {
+        title: "Your team, your integrator, or us",
+        body: "Roll it out yourself, with your consultants, or with our engineers. A fixed-price pilot is there if you want a head start; nobody has to wait for us.",
+      },
+      {
+        title: "Support and SLA",
+        body: "Supported releases and security patches, a named contact and published response times, for when someone has to be accountable.",
+      },
+    ],
+  },
+  ctaPilot: "Talk to us about Enterprise",
+  ctaCompare: "Compare open source and Enterprise",
 } as const;
 
 /* ── Conversion ─────────────────────────────────────────────────────────── */
 
 const enConvert = {
   marker: "Your move",
-  title: "Open your first case tonight.",
-  lede: "Point it at one system you already run and see what the investigator finds. Everything you build carries over when you go remote with Helm.",
+  title: "Open your data safely tonight.",
+  lede: "Point it at one database you already run. By the morning you know which columns hold personal data, and your team can query the rest. Everything you set up carries over when you go to Kubernetes.",
   paths: [
     {
       label: "Tonight, on your machine",
-      text: "One Docker command. Sources, findings and cases stay local.",
+      text: "One Docker command. Sources, masks and the read log stay local.",
     },
     {
       label: "At scale, on Kubernetes",
-      text: "The same core as a Helm chart: scan workers scale to zero between runs.",
+      text: "The same core as a Helm chart: workers scale to zero between runs.",
     },
     {
       label: "When it becomes infrastructure",
-      text: "Enterprise adds SSO, roles, per-workspace authorization, tuned models and our engineers. Until then, this is all you need.",
+      text: "Your team or your integrator runs it. Enterprise tailors it to your organisation, adds OpenShift and an SLA. Every feature is already open source.",
     },
   ],
   ctaPrimary: "Setup & configuration",
   ctaSecondary: "Walk the live showcase",
-  ctaEnterprise: "Talk to us about enterprise",
+  ctaEnterprise: "Talk to us about Enterprise",
   ctaBlog: "Read the field notes",
 } as const;
 
@@ -350,36 +511,40 @@ const enFaq = {
   lede: "",
   items: [
     {
-      q: "What is an investigation platform?",
-      a: "It is the layer between the systems you run and a decision you have to defend. Classifyre reads those systems, finds the signals you define, follows them across sources, and turns the evidence into cases with hypotheses, owners and an audit trail, instead of leaving you with a findings table and good luck.",
+      q: "What is Classifyre?",
+      a: "Open-source data governance you run yourself. It reads the systems you already have, finds personal data and secrets in them, masks those columns automatically, and lets people query the tables with SQL, exports, Excel and Power BI. Every read is recorded: who, which table, which tool, when.",
     },
     {
-      q: "Is Classifyre really free and open source?",
-      a: "The open-source core is free to run and free to read: source connectors, detector packs, custom detection, ranking, duplicates, cases and the AI autopilot are all in it. The enterprise edition adds governance and services: SSO, roles, per-workspace authorization, detection tuned to your terminology, and our engineers for rollout and support.",
+      q: "Is everything really open source, including SSO and roles?",
+      a: "Yes. Every feature is Apache-2.0: connectors, detection, masking, grants, row filters, the SQL endpoint, the read audit, SSO, roles, tenants and workspaces. There is no enterprise build with extra code. Enterprise is the same product tailored to your organisation, with support and an SLA; rolling it out yourself or with your integrator is always an option.",
     },
     {
-      q: "How is Classifyre different from Palantir Foundry or Gotham?",
-      a: "It is the same category of product: an operational data layer over fragmented source systems, with cases and AI on top. Palantir proved the category at scale, closed. Classifyre is open source, self-hosted, made in the EU, and sized so a team can start without a programme office.",
+      q: "Does Classifyre replace our ETL or data-product tools?",
+      a: "No. Keep your ETL tools, pipelines, dbt models and data products. Classifyre doesn't build or move data: it reads what those tools produce, in place, and governs it with classification, owners, masks, quality rules and access, every read on record. That works the same in open source.",
     },
     {
-      q: "Which data sources can it read?",
-      a: "Operational databases, lakehouses, collaboration tools, object storage, streams and public content; each connector is a documented source type, and the catalogue grows in the open. If a source is missing, custom sources are supported and the enterprise team builds them with you.",
+      q: "How is this different from Immuta, Unity Catalog or Trino?",
+      a: "Immuta is a commercial product that enforces access policies inside cloud data platforms such as Snowflake and Databricks. Unity Catalog is the governance layer of Databricks. Trino federates queries and leaves finding and masking personal data to you. Classifyre does the three jobs in one self-hosted, open-source product: it finds the personal data, masks it inside the query, and serves the result to SQL, Excel and Power BI across 40+ systems.",
     },
     {
-      q: "Does it run on Kubernetes?",
-      a: "Yes. The quickest start is a single all-in-one Docker image that runs on macOS, Windows and Linux; the same core ships as a Helm chart, where scan workers run as ephemeral jobs that scale to zero between runs. Everything you build locally carries over.",
+      q: "Does it work with Power BI and Excel?",
+      a: "Yes. Classifyre answers as a PostgreSQL database. Power BI, Excel, Tableau, DBeaver and any JDBC or ODBC client connect with a personal, encrypted connection that expires and can be revoked. Masks and row filters apply there exactly as in the app, and every read is recorded with the tool's name.",
+    },
+    {
+      q: "Is masking the same as anonymisation?",
+      a: "No. Masking hides values from people who are not allowed to see them; the data itself is unchanged and the right people can still read it. The hashed mask is pseudonymisation in the sense of the GDPR: equal values hash the same, so tables still join, but the value can't be read.",
     },
     {
       q: "Where does my data go? Does anything leave our infrastructure?",
-      a: "Nowhere. Classifyre runs inside your estate and stores everything in your own PostgreSQL database and storage. AI features run against providers you configure (including models you host yourself) and the autopilot can be switched to observe-only.",
+      a: "Nowhere. Classifyre runs inside your network and keeps everything in your own PostgreSQL database and storage. Queries run where the data is. It runs offline, and AI features use only the providers you configure, including models you host yourself.",
     },
     {
-      q: "What does the enterprise edition add?",
-      a: "Governance first: SSO, roles and per-workspace authorization, so one instance can serve several teams or cases without crossover. Then detection tuned to your terminology, custom detectors and sources for your industry's data, multilanguage tuning, architecture reviews, upgrade assistance and SLA-backed support.",
+      q: "Does it run on Kubernetes and OpenShift?",
+      a: "The quickest start is one Docker image on macOS, Windows or Linux. The same core ships as a Helm chart for Kubernetes, where workers run as jobs that scale to zero between runs. OpenShift installation and support are part of Enterprise.",
     },
     {
-      q: "Do I need data scientists to use it?",
-      a: "No. Built-in detector packs work on the first scan, custom detection starts at regex, and the autopilot drafts detectors for you. Data engineers and scientists get depth (schemas, models, an MCP endpoint to drive the whole product from their own AI client) without that being the entry fee.",
+      q: "Is it still an investigation tool?",
+      a: "Yes, for the day something leaks. Cases, standing inquiries, fingerprints across sources and the autopilot are all still there and open source. Governance is what you run every day; the investigation is what you open when it matters.",
     },
   ],
 } as const;
@@ -388,142 +553,36 @@ const enFaq = {
 
 export const en = {
   hero: enHero,
+  sheet: enSheet,
+  path: enPath,
   mascots: enMascots,
   install: enInstall,
   tension: enTension,
-  method: enMethod,
+  journey: enJourney,
+  readers: enReaders,
   demo: enDemo,
   sectors: enSectors,
+  editions: enEditions,
   convert: enConvert,
   faq: enFaq,
 } as const;
 
-export type LandingCopy = {
-  hero: {
-    chips: readonly string[];
-    titleA: string;
-    titleBLead: string;
-    titleBHighlight: string;
-    lede: string;
-    ctaPrimary: string;
-    ctaSecondary: string;
-    micro: string;
-    exhibit: {
-      tab: string;
-      stamp: string;
-      subject: string;
-      status: string;
-    };
-  };
-  mascots: {
-    questioning: string;
-    lookingAround: string;
-    lookingAtYou: string;
-    hiddenGem: string;
-  };
-  install: {
-    marker: string;
-    title: string;
-    lede: string;
-    dockerLabel: string;
-    dockerTitle: string;
-    dockerCta: string;
-    helmLabel: string;
-    helmTitle: string;
-    helmCopy: string;
-    helmCtaDocs: string;
-    helmCtaRepo: string;
-  };
-  tension: {
-    marker: string;
-    title: string;
-    lede: string;
-    notes: readonly { label: string; title: string; body: string }[];
-    kicker: string;
-    figureCaption?: string;
-  };
-  method: {
-    marker: string;
-    title: string;
-    lede: string;
-    stages: readonly {
-      no: string;
-      word: string;
-      title: string;
-      body: string;
-      href: string;
-      linkLabel: string;
-    }[];
-  };
-  demo: {
-    marker: string;
-    title: string;
-    tabs: {
-      caseBoard: string;
-      queue: string;
-      autopilot: string;
-    };
-    caseBoard: {
-      label: string;
-      figcaption: string;
-      exhibits: readonly { tag: string; text: string }[];
-    };
-    queue: {
-      label: string;
-      columns: {
-        finding: string;
-        where: string;
-        score: string;
-        reason: string;
-      };
-      rows: readonly {
-        finding: string;
-        where: string;
-        score: string;
-        reason: string;
-      }[];
-      footnote: string;
-    };
-    autopilot: {
-      label: string;
-      rows: readonly { time: string; agent: string; text: string }[];
-      footnote: string;
-    };
-    cta: string;
-  };
-  sectors: {
-    marker: string;
-    title: string;
-    lede: string;
-    columns: {
-      sector: string;
-      data: string;
-      finds: string;
-    };
-    rows: readonly {
-      sector: string;
-      data: string;
-      finds: string;
-    }[];
-    footnote: string;
-  };
-  convert: {
-    marker: string;
-    title: string;
-    lede: string;
-    paths: readonly { label: string; text: string }[];
-    ctaPrimary: string;
-    ctaSecondary: string;
-    ctaEnterprise: string;
-    ctaBlog: string;
-  };
-  faq: {
-    marker: string;
-    title: string;
-    lede: string;
-    items: readonly { q: string; a: string }[];
-  };
-};
+type Widen<T> = T extends string
+  ? string
+  : T extends (...args: infer A) => infer R
+    ? (...args: A) => R
+    : T extends readonly (infer U)[]
+      ? readonly Widen<U>[]
+      : T extends object
+        ? { [K in keyof T]: Widen<T[K]> }
+        : T;
+
+/**
+ * The shape every locale must fill: the English copy with its literal
+ * strings widened, so a translation is checked for completeness, not for
+ * matching English words.
+ */
+export type LandingCopy = Widen<typeof en>;
 
 export const landingCopy: Record<Locale, LandingCopy> = {
   en,

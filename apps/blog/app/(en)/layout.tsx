@@ -16,6 +16,7 @@ import {blogFontClassName} from "@/components/blog-fonts";
 import {LocaleRedirect, LocaleRedirectHeadScript} from "@/components/locale-redirect";
 import {SiteNav} from "@/components/site-nav";
 import {routes} from "@/lib/site";
+import {topicLinks} from "@/content/topics";
 import {GoogleAnalytics} from "../google-analytics";
 import {PostHogProvider} from "../providers";
 
@@ -27,21 +28,24 @@ const siteUrl = normalizeSiteUrl(
     process.env.NEXT_PUBLIC_BLOG_SITE_URL ?? "https://blog.classifyre.local",
 );
 
+const siteDescription =
+    "Open-source data governance: find personal data and secrets, mask them automatically, and query everything safely with SQL, Excel and Power BI. Self-hosted, made in Austria.";
+
 export const metadata: Metadata = {
     metadataBase: new URL(siteUrl),
     title: {
         default: "Classifyre",
         template: "%s | Classifyre",
     },
-    description:
-        "Detect, classify, and label data across databases, lakehouses, collaboration tools, analytics systems, and public content.",
+    description: siteDescription,
     keywords: [
-        "data classification",
-        "data labeling",
-        "data detection",
+        "data governance",
         "open source data governance",
-        "custom detectors",
-        "kubernetes deployment",
+        "data masking",
+        "PII discovery",
+        "data classification",
+        "data access governance",
+        "self-hosted",
     ],
     alternates: {
         canonical: "/",
@@ -65,16 +69,14 @@ export const metadata: Metadata = {
     openGraph: {
         type: "website",
         title: "Classifyre",
-        description:
-            "Detect, classify, and label data across databases, lakehouses, collaboration tools, analytics systems, and public content.",
+        description: siteDescription,
         url: siteUrl,
         siteName: "Classifyre",
     },
     twitter: {
         card: "summary_large_image",
         title: "Classifyre",
-        description:
-            "Detect, classify, and label data across databases, lakehouses, collaboration tools, analytics systems, and public content.",
+        description: siteDescription,
     },
 };
 
@@ -96,7 +98,7 @@ const navbar = (
                 <div className="grid flex-1 text-left text-sm leading-tight">
                     <span className="truncate font-serif font-bold">Classifyre</span>
                     <span className="truncate font-mono text-[10px] text-muted-foreground">
-            Investigation Platform
+            Open-source data governance
 </span>
                 </div>
             </div>
@@ -109,7 +111,7 @@ const navbar = (
 
 const footer = (
     <Footer className="classifyre-site-footer">
-        <SiteFooter/>
+        <SiteFooter topics={{heading: "Data governance", links: topicLinks("en")}}/>
     </Footer>
 );
 

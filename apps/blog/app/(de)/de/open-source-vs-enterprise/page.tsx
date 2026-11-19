@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 
+import { ogImage } from "@/lib/og-image";
+
 import { EditionsPage } from "@/components/editions";
 
 import "../../../landing.css";
@@ -12,7 +14,7 @@ import "../../../landing.css";
 export const metadata: Metadata = {
   title: "Open Source vs. Enterprise: Gleiche Engine, anderer Raum",
   description:
-    "Ein schlichter Vergleich von Classifyres Open-Source-Kern und dem Enterprise-Layer. Jede Detektions-, Ermittlungs- und Deployment-Funktion ist Open Source; Enterprise legt SSO, Rollen, Autorisierung pro Workspace, abgestimmte Modelle und Support mit SLA drauf.",
+    "Jede Classifyre-Funktion ist Open Source, auch SSO, Rollen, Maskierung und das Power-BI-Gateway. Enterprise sind Pilot, Umsetzung, SLA und Anpassung durch unsere Ingenieure.",
   alternates: {
     canonical: "/de/open-source-vs-enterprise/",
     languages: {
@@ -22,10 +24,11 @@ export const metadata: Metadata = {
     },
   },
   openGraph: {
-    title: "Classifyre: Open Source vs. Enterprise",
+    title: "Classifyre: alles ist Open Source. Enterprise sind wir, in Ihrem Projekt.",
     description:
-      "Detektion, Ermittlungen, Autopilot und beide Runtimes sind Open Source. Enterprise legt die Governance-Schicht und unsere Engineers drauf.",
+      "SSO, Rollen, Maskierung und das SQL-Gateway stehen unter Apache-2.0. Enterprise sind ein Pilot zum Festpreis, Umsetzung, ein SLA mit benannten Ingenieuren und Anpassung.",
     type: "website",
+    images: [ogImage("de", "editions", "Classifyre: alles ist Open Source")],
   },
 };
 

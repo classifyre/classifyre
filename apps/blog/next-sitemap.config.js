@@ -6,6 +6,18 @@ import matter from "gray-matter";
 
 const DEFAULT_LOCALE = "en";
 
+/** Topic pages carry the German term in their German URL; same pairs as
+ *  `lib/locale.ts` reads (`/data-masking` ↔ `/de/datenmaskierung`). */
+const TOPIC_SLUGS = JSON.parse(
+  fs.readFileSync(path.join(process.cwd(), "lib", "topic-slugs.json"), "utf8"),
+);
+
+function translateTopicRest(rest, target) {
+  const segment = rest.replace(/^\/+|\/+$/g, "");
+  const pair = TOPIC_SLUGS.find((entry) => entry.en === segment || entry.de === segment);
+  return pair ? `/${pair[target]}` : rest;
+}
+
 function normalizeRoute(route) {
   if (!route) return "/";
   return route.endsWith("/") && route !== "/" ? route.slice(0, -1) : route;
@@ -25,7 +37,8 @@ function splitLocale(route) {
 function alternateRoute(route) {
   const { locale, rest } = splitLocale(route);
   const target = locale === "de" ? DEFAULT_LOCALE : "de";
-  const suffix = rest === "/" ? "" : rest;
+  const translated = translateTopicRest(rest, target);
+  const suffix = translated === "/" ? "" : translated;
   return target === DEFAULT_LOCALE ? suffix || "/" : `/de${suffix}`;
 }
 
@@ -158,6 +171,9 @@ const config = {
       priority = 0.8;
       changefreq = "weekly";
       lastmod = getBlogPostDate(route);
+    } else if (TOPIC_SLUGS.some((entry) => rest === `/${entry.en}` || rest === `/${entry.de}`)) {
+      priority = 0.9;
+      changefreq = "weekly";
     } else if (normalized === "/rss.xml") {
       priority = 0.4;
       changefreq = "daily";

@@ -14,8 +14,8 @@
     "githubLabel": "Classifyre on GitHub"
   },
   "footer": {
-    "tagline": "Investigation Platform",
-    "blurb": "The open-source investigation platform for your data. Classifyre scans the systems you already run, detects secrets, PII, and the signals you define, then works the findings like a detective — standing inquiries, ranked evidence, cases, and an AI autopilot between scans.",
+    "tagline": "Open-source data governance",
+    "blurb": "Open-source data governance you run yourself. Classifyre finds personal data and secrets across the systems you already run, masks them automatically, and lets your team query everything with SQL, Excel and Power BI. Every read is logged.",
     "navHeading": "Navigate",
     "navHome": "Home",
     "navGet": "Get Classifyre",
@@ -30,7 +30,8 @@
     "cookieSettings": "Cookie settings",
     "contact": "Contact",
     "madeIn": "Made in Austria",
-    "baselineTagline": "Every leak leaves a trail"
+    "baselineTagline": "Masked until someone is allowed to see it",
+    "topicsHeading": "Data governance"
   },
   "cookie": {
     "message": "We use analytics cookies to see which pages get read, nothing else. No ads, no profiling, no data sold. Decline and the site works exactly the same.",
@@ -159,10 +160,10 @@
   },
   "site": {
     "title": "Classifyre",
-    "description": "Detect, classify, and label data across databases, lakehouses, collaboration tools, analytics systems, and public content.",
-    "websiteDescription": "Detect, classify, and label data across databases, lakehouses, collaboration tools, analytics systems, and public content.",
+    "description": "Open-source data governance: find personal data and secrets, mask them automatically, and query everything safely with SQL, Excel and Power BI. Self-hosted, made in Austria.",
+    "websiteDescription": "Open-source data governance: find personal data and secrets, mask them automatically, and query everything safely with SQL, Excel and Power BI. Self-hosted, made in Austria.",
     "blogDescription": "Product updates, engineering notes, deployment guidance, and detector design write-ups from Classifyre.",
-    "orgDescription": "Open-source data detection, classification, and labeling platform for modern source systems, built in Austria."
+    "orgDescription": "Classifyre builds open-source data governance: data classification, data masking and safe data access, self-hosted. Built in Austria."
   },
   "findingTags": [
     "leaked email",
@@ -181,8 +182,8 @@
     "duplicate vendor"
   ],
   "closingBoard": {
-    "exhibitA": "Exhibit A",
-    "confirmed": "Confirmed"
+    "exhibitA": "Masked by default",
+    "confirmed": "Every read on record"
   },
   "caseGraph": {
     "ariaLabel": "Case graph for case 42, a classified leak via email: sender-traced and impact hypotheses pinned to email, identity, classification-tag, and duplicate findings, with an analyst link and autopilot attribution",
@@ -195,5 +196,25 @@
     "hypothesis2": "HYPOTHESIS 2",
     "hypothesis2Text": "214 records exposed",
     "autopilot": "BY AUTOPILOT"
-  }
+  },
+  "governanceTags": [
+    "iceberg tables via s3",
+    "delta table connected",
+    "iban found 0.99",
+    "aws key found",
+    "svnr detected",
+    "column masked",
+    "secret hidden",
+    "owner: finance",
+    "steward named",
+    "access 90 days",
+    "row filter: graz",
+    "shared table joined",
+    "orders + customers",
+    "power bi via odbc",
+    "excel connected",
+    "read logged",
+    "export logged",
+    "mcp read logged"
+  ]
 }

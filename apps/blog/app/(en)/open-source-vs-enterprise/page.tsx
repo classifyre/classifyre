@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 
+import { ogImage } from "@/lib/og-image";
+
 import { EditionsPage } from "@/components/editions";
 
 import "../../landing.css";
@@ -13,7 +15,7 @@ import "../../landing.css";
 export const metadata: Metadata = {
   title: "Open Source vs Enterprise: Same Engine, Different Room",
   description:
-    "A plain comparison of Classifyre's open-source core and the enterprise layer. Every detection, investigation and deployment feature is open source; enterprise adds SSO, roles, per-workspace authorization, tuned models and SLA-backed support.",
+    "Every Classifyre feature is open source, including SSO, roles, masking and the Power BI gateway. Enterprise is a pilot, implementation, an SLA and tailoring by our engineers.",
   alternates: {
     canonical: "/open-source-vs-enterprise/",
     languages: {
@@ -23,10 +25,11 @@ export const metadata: Metadata = {
     },
   },
   openGraph: {
-    title: "Classifyre: Open Source vs Enterprise",
+    title: "Classifyre: all of it is open source. Enterprise is us, on your project.",
     description:
-      "Detection, investigations, autopilot and both runtimes are open source. Enterprise adds the governance layer and our engineers.",
+      "SSO, roles, masking and the SQL gateway are Apache-2.0. Enterprise is a fixed-price pilot, implementation, an SLA with named engineers and tailoring.",
     type: "website",
+    images: [ogImage("en", "editions", "Classifyre: all of it is open source")],
   },
 };
 

@@ -16,7 +16,7 @@ const de: SourcesCopy = {
     titleBHighlight: "bereits besitzen.",
     lede: {
       count: "Konnektoren",
-      tail: "über Datenbanken, Warehouses und Lakehouses, Streaming, Object Storage, Kollaborationstools, Analytics und öffentliche Inhalte; alle speisen einen Beweisstrom.",
+      tail: "über Datenbanken, Warehouses und Lakehouses, Streaming, Object Storage, Kollaborationstools, Analytics und öffentliche Inhalte. Jede wird nach personenbezogenen Daten und Secrets durchsucht; Tabellen in PostgreSQL, MySQL, Databricks, ODBC-Quellen, Delta, Iceberg und Dateien in Buckets lassen sich zudem mit SQL abfragen, Masken inklusive.",
     },
     micro: "{count} Konnektoren · direkt aus dem Schema",
     ctaCatalog: "Katalog durchstöbern",

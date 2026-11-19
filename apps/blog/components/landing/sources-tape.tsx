@@ -14,23 +14,19 @@ import { SourceMarquee } from "@/components/source-showcase";
  */
 export function SourcesTape({ locale }: { locale: Locale }) {
   const copy = getLandingCopy(locale);
-  const stage = copy.method.stages[0];
-  if (!stage) return null;
 
   return (
     <div className="cl-bleed border-y-2 border-foreground/80 bg-background">
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-10">
         <div className="flex flex-wrap items-center justify-between gap-3 pt-6">
           <Micro className="text-accent-ink dark:text-accent">
-            {stage.title}
+            {copy.journey.tape}
           </Micro>
           <a
             href={`${withLocalePrefix(locale, routes.sources)}/`}
-            target="_blank"
-            rel="noreferrer"
             className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
           >
-            {stage.linkLabel} →
+            {copy.journey.tapeLink} →
           </a>
         </div>
         <SourceMarquee />

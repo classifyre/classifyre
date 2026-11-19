@@ -3,11 +3,11 @@
 
 # Classifyre All-in-One
 
-**Open-source investigation platform in a single Docker image — connect a source, detect leaked secrets, PII and security risks, and work findings into cases.**
+**Open-source data governance in a single Docker image — find personal data and secrets, mask them automatically, and query everything with SQL, Excel and Power BI.**
 
 </div>
 
-Classifyre turns the data scattered across the systems you already run — file shares, Confluence, Jira, SharePoint, S3, Git repositories, databases — into **investigations you can act on**. Detectors surface the evidence (leaked secrets and API keys, PII, security misconfigurations), and you work the results like an analyst: standing inquiries, duplicate detection, cases and hypotheses, with an AI autopilot doing the legwork in between.
+Classifyre finds personal data and secrets across the systems you already run — databases, lakehouses, file shares, Confluence, Jira, SharePoint, S3, Git — **masks them automatically**, and lets your team query everything with SQL, Excel and Power BI. Every read is logged; nothing leaves your servers. Detectors surface the evidence (leaked secrets and API keys, PII, security misconfigurations), and you work the results like an analyst: standing inquiries, duplicate detection, cases and hypotheses, with an AI autopilot doing the legwork in between.
 
 This `classifyre/all-in-one` image is the fastest way to try Classifyre: the web UI, the API, the background worker, the Python scan workers, and a PostgreSQL database with pgvector — all in one container. One `docker run`, no dependencies to provision, nothing to connect. Ideal for local scanning, evaluations, and rapid prototyping.
 

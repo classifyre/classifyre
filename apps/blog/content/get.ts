@@ -251,7 +251,7 @@ const enWhich = {
     "It has to sit inside your existing cluster and network.",
   ],
   enterpriseNote:
-    "Wondering what the enterprise layer adds on top of either runtime? It is SSO, roles, and per-workspace authorization, not features held back from the open-source core.",
+    "Wondering what Enterprise adds on top of either runtime? No features: SSO, roles and masking are all open source. Enterprise is the same product tailored to your organisation, with support and an SLA; you or your integrator can run it without us.",
   enterpriseCta: "Open source vs Enterprise",
 } as const;
 

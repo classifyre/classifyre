@@ -17,6 +17,7 @@
     "web-iam:dev": "./scripts/dev/web-iam.sh",
     "web-iam:dev:lan": "LAN=1 ./scripts/dev/web-iam.sh",
     "blog:dev": "turbo dev --filter=@classifyre/blog",
+    "blog:dev:lan": "bun run --cwd apps/blog dev --hostname 0.0.0.0",
     "studio": "bun run --cwd apps/studio studio",
     "studio:render": "bun run --cwd apps/studio render",
     "lint": "turbo lint --filter=!@workspace/devops",

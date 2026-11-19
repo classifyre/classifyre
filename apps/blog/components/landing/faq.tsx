@@ -20,26 +20,33 @@ import {
  * is, what it costs, where the data lives, how it differs from the incumbents.
  * The same Q&A ships as FAQPage structured data in the page's JSON-LD.
  */
-export function Faq({ locale }: { locale: Locale }) {
-  const copy = getLandingCopy(locale);
-
+export function FaqList({
+  id,
+  mark,
+  title,
+  lede,
+  items,
+  locale,
+}: {
+  id: string;
+  mark: string;
+  title: string;
+  lede?: string;
+  items: readonly { q: string; a: string }[];
+  locale: Locale;
+}) {
   return (
     <LandingSection className="py-20 lg:py-28">
       <div className="grid gap-12 lg:grid-cols-12 lg:gap-10">
         <div className="lg:col-span-4">
           <div className="lg:sticky lg:top-24">
-            <LandingHead
-              id="faq-title"
-              mark={copy.faq.marker}
-              title={copy.faq.title}
-              lede={copy.faq.lede || undefined}
-            />
+            <LandingHead id={id} mark={mark} title={title} lede={lede || undefined} />
           </div>
         </div>
 
         <div className="lg:col-span-8">
           <Accordion type="single" collapsible className="w-full">
-            {copy.faq.items.map((item, index) => (
+            {items.map((item, index) => (
               <AccordionItem
                 key={item.q}
                 value={`faq-${index}`}
@@ -67,5 +74,19 @@ export function Faq({ locale }: { locale: Locale }) {
         </div>
       </div>
     </LandingSection>
+  );
+}
+
+export function Faq({ locale }: { locale: Locale }) {
+  const copy = getLandingCopy(locale);
+  return (
+    <FaqList
+      id="faq-title"
+      mark={copy.faq.marker}
+      title={copy.faq.title}
+      lede={copy.faq.lede}
+      items={copy.faq.items}
+      locale={locale}
+    />
   );
 }

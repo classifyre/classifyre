@@ -3,11 +3,11 @@
 
 # Classifyre Web
 
-**Frontend of the open-source Classifyre investigation platform — work findings, inquiries, duplicates and cases in the browser.**
+**Frontend of Classifyre, open-source data governance — find personal data, mask it, grant access and query it in the browser.**
 
 </div>
 
-Classifyre turns the data scattered across the systems you already run — file shares, Confluence, Jira, SharePoint, S3, Git repositories, databases — into **investigations you can act on**. This `classifyre/web` image is the investigator-facing Next.js UI: browse findings, manage standing inquiries, review duplicate clusters, build cases and hypotheses, configure sources, detectors and AI providers. The bundled documentation is served alongside the app.
+Classifyre finds personal data and secrets across the systems you already run — databases, lakehouses, file shares, Confluence, Jira, SharePoint, S3, Git — **masks them automatically**, and lets your team query everything with SQL, Excel and Power BI. Every read is logged; nothing leaves your servers. This `classifyre/web` image is the investigator-facing Next.js UI: browse findings, manage standing inquiries, review duplicate clusters, build cases and hypotheses, configure sources, detectors and AI providers. The bundled documentation is served alongside the app.
 
 It is one of three service images — with [`classifyre/api`](https://hub.docker.com/r/classifyre/api) (backend) and [`classifyre/cli`](https://hub.docker.com/r/classifyre/cli) (scan jobs) — composed into the [`classifyre/all-in-one`](https://hub.docker.com/r/classifyre/all-in-one) image and deployed separately by the [`classifyre/classifyre-core`](https://hub.docker.com/r/classifyre/classifyre-core) Helm chart.
 
