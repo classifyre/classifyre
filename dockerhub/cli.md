@@ -3,11 +3,11 @@
 
 # Classifyre CLI
 
-**Scan worker of the open-source Classifyre investigation platform — source extraction, text/OCR/transcription and detector execution.**
+**Scan worker of Classifyre, open-source data governance — source extraction, text/OCR/transcription and detector execution.**
 
 </div>
 
-Classifyre turns the data scattered across the systems you already run — file shares, Confluence, Jira, SharePoint, S3, Git repositories, databases — into **investigations you can act on**. This `classifyre/cli` image (Python) does the heavy lifting of every scan: it extracts content from sources (including image OCR, audio/video transcription and legacy Office conversion via LibreOffice), runs detector packs (secrets, PII, security, plus custom detectors) and streams findings back to the API in batches.
+Classifyre finds personal data and secrets across the systems you already run — databases, lakehouses, file shares, Confluence, Jira, SharePoint, S3, Git — **masks them automatically**, and lets your team query everything with SQL, Excel and Power BI. Every read is logged; nothing leaves your servers. This `classifyre/cli` image (Python) does the heavy lifting of every scan: it extracts content from sources (including image OCR, audio/video transcription and legacy Office conversion via LibreOffice), runs detector packs (secrets, PII, security, plus custom detectors) and streams findings back to the API in batches.
 
 It is one of three service images — with [`classifyre/api`](https://hub.docker.com/r/classifyre/api) (backend) and [`classifyre/web`](https://hub.docker.com/r/classifyre/web) (frontend) — composed into the [`classifyre/all-in-one`](https://hub.docker.com/r/classifyre/all-in-one) image and run as ephemeral Kubernetes Jobs by the [`classifyre/classifyre-core`](https://hub.docker.com/r/classifyre/classifyre-core) Helm chart.
 

@@ -153,7 +153,7 @@ const deWhich = {
     "Es muss in Ihrem bestehenden Cluster und Netz sitzen.",
   ],
   enterpriseNote:
-    "Fragen Sie sich, was der Enterprise-Layer auf beide Runtimes noch drauflegt? Es sind SSO, Rollen und Autorisierung pro Workspace, keine Features, die dem Open-Source-Kern vorenthalten werden.",
+    "Fragen Sie sich, was Enterprise auf beide Runtimes noch drauflegt? Keine Funktionen: SSO, Rollen und Maskierung sind Open Source. Enterprise ist dasselbe Produkt, auf Ihre Organisation zugeschnitten, mit Support und SLA; Sie oder Ihr Integrator können es auch ohne uns betreiben.",
   enterpriseCta: "Open Source vs. Enterprise",
 } as const;
 

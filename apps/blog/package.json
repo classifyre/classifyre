@@ -5,6 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --webpack --port 3003",
+    "prebuild": "bun scripts/og.tsx",
     "build": "next build --webpack",
     "postbuild": "next-sitemap --config next-sitemap.config.js",
     "start": "next start",

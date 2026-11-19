@@ -219,7 +219,7 @@ export function EditionsPage({ locale }: { locale: Locale }) {
                     {copy.hero.ctaPrimary}
                   </a>
                   <a
-                    href={`mailto:${enterpriseContactEmail}`}
+                    href={`mailto:${enterpriseContactEmail}?subject=Classifyre%20pilot`}
                     className="inline-flex items-center border-2 border-white/25 px-5 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-white transition-colors hover:border-accent hover:text-accent"
                   >
                     {copy.hero.ctaSecondary}
@@ -297,7 +297,7 @@ export function EditionsPage({ locale }: { locale: Locale }) {
                   action={
                     <div className="flex flex-wrap items-center gap-3">
                       <a
-                        href={`mailto:${enterpriseContactEmail}`}
+                        href={`mailto:${enterpriseContactEmail}?subject=Classifyre%20pilot`}
                         className="inline-flex items-center border-2 border-accent bg-accent px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-black transition-colors hover:border-white hover:bg-white"
                       >
                         {copy.editions.governed.ctaPrimary}
@@ -492,7 +492,7 @@ export function EditionsPage({ locale }: { locale: Locale }) {
                 {copy.comparison.workspaceNote}
               </p>
               <a
-                href={docs.workspaces}
+                href={docs.roles}
                 target="_blank"
                 rel="noreferrer"
                 className="mt-4 inline-block font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-accent-ink underline-offset-4 hover:underline dark:text-accent"
@@ -500,6 +500,31 @@ export function EditionsPage({ locale }: { locale: Locale }) {
                 {copy.comparison.workspaceCta} →
               </a>
             </div>
+          </div>
+        </LandingSection>
+
+        {/* ── For larger estates ──────────────────────────────────────── */}
+        <LandingSection className="pb-20 lg:pb-28" width="wide">
+          <div className="border-t-2 border-foreground/80 pt-12">
+            <h2
+              id="extras-title"
+              className="font-hero text-[clamp(2.2rem,4.6vw,3.6rem)] uppercase leading-[0.92]"
+            >
+              {copy.extras.title}
+            </h2>
+            <p className="mt-4 max-w-[42rem] text-[17px] leading-[1.65] text-muted-foreground">
+              {copy.extras.lede}
+            </p>
+            <dl className="mt-10 grid gap-x-10 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
+              {copy.extras.items.map((item) => (
+                <div key={item.title} className="border-t border-foreground/30 pt-4">
+                  <dt className="text-[17px] font-semibold">{item.title}</dt>
+                  <dd className="mt-2 text-[15px] leading-[1.6] text-muted-foreground">
+                    {item.body}
+                  </dd>
+                </div>
+              ))}
+            </dl>
           </div>
         </LandingSection>
 
@@ -530,7 +555,7 @@ export function EditionsPage({ locale }: { locale: Locale }) {
                 {copy.closing.ctaPrimary}
               </a>
               <a
-                href={`mailto:${enterpriseContactEmail}`}
+                href={`mailto:${enterpriseContactEmail}?subject=Classifyre%20pilot`}
                 className="inline-flex items-center border-2 border-white/25 px-5 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-white transition-colors hover:border-accent hover:text-accent"
               >
                 {copy.closing.ctaSecondary}

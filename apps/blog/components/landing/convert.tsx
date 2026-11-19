@@ -23,7 +23,7 @@ import {
 } from "@/components/landing/motifs";
 
 /**
- * Conversion: "open your first case tonight" on the string-board backdrop.
+ * Conversion: "open your data safely tonight" on the governance board.
  * Three honest paths (laptop, cluster, enterprise) and no form anywhere.
  * The enterprise line is deliberately the quietest thing in the section.
  */
@@ -139,7 +139,7 @@ export function Convert({ locale }: { locale: Locale }) {
                 {copy.convert.ctaSecondary}
               </a>
               <a
-                href={`mailto:${enterpriseContactEmail}`}
+                href={`mailto:${enterpriseContactEmail}?subject=Classifyre%20pilot`}
                 className="group mt-2 flex items-center gap-2"
               >
                 <Pin solid={false} />

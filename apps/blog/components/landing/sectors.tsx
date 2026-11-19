@@ -1,5 +1,6 @@
 import { getLandingCopy } from "@/content/landing";
 import type { Locale } from "@/lib/locale";
+import { withLocalePrefix } from "@/lib/locale";
 import { Mascot } from "@/components/mascot";
 import {
   LandingHead,
@@ -8,8 +9,8 @@ import {
 } from "@/components/landing/motifs";
 
 /**
- * Sectors: the page's index. Same method everywhere, so the sector only
- * decides which signals get defined first, set as a paper index with three
+ * Sectors: the page's index. Same rules everywhere, so the sector only
+ * decides which columns are personal and who reads them in clear, set as a paper index with three
  * columns and hairline rules, not as ten cards. The investigator watches
  * from the right margin while you scan the list.
  */
@@ -78,6 +79,18 @@ export function Sectors({ locale }: { locale: Locale }) {
             {copy.sectors.footnote}
           </Micro>
         </p>
+
+        <nav aria-label={copy.sectors.marker} className="mt-6 flex flex-wrap gap-x-6 gap-y-2">
+          {copy.sectors.links.map((link) => (
+            <a
+              key={link.href}
+              href={`${withLocalePrefix(locale, link.href)}/`}
+              className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-accent-ink underline-offset-4 hover:underline dark:text-accent"
+            >
+              {link.label} →
+            </a>
+          ))}
+        </nav>
       </div>
     </LandingSection>
   );

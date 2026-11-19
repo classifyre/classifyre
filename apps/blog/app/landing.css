@@ -348,3 +348,341 @@ body {
     animation: none;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   The redaction desk: the governance language.
+
+   Lime means one thing on these pages: someone is allowed to see this.
+   A black bar on paper is a masked value. Base styles are always the
+   final, masked state; keyframes only animate *into* it, so no-JS and
+   reduced-motion readers land on the same picture.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── The sheet ──────────────────────────────────────────────────── */
+
+/* When the reader switches, the change sweeps across the sheet cell by
+   cell, the way the marker went over it the first time. */
+.cl-sheet:not([data-intro]) .cl-v-clear,
+.cl-sheet:not([data-intro]) .cl-v-mask,
+.cl-sheet:not([data-intro]) .cl-bar {
+  transition-delay: var(--cl-stagger, 0ms);
+}
+
+.cl-cell {
+  position: relative;
+  display: inline-grid;
+}
+
+.cl-v-clear,
+.cl-v-mask {
+  grid-area: 1 / 1;
+  transition:
+    opacity 0.35s ease,
+    visibility 0.35s;
+}
+
+/* Masked (the default reader). */
+.cl-v-clear {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.cl-v-mask {
+  opacity: 1;
+  visibility: visible;
+  color: #0a0a0a;
+}
+
+.cl-cell-hash .cl-v-mask {
+  color: rgb(10 10 10 / 0.62);
+}
+
+.cl-bar {
+  position: absolute;
+  inset: 0.05em -0.2em;
+  background: #0a0a0a;
+  transform-origin: left center;
+  transform: scaleX(1);
+  transition: transform 0.4s cubic-bezier(0.7, 0, 0.2, 1);
+}
+
+/* A hidden column folds away: present in the markup, gone from the result. */
+.cl-col-hidden {
+  transition: padding 0.4s ease;
+}
+
+.cl-sheet:not([data-persona="steward"]) .cl-col-hidden {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.cl-col-hidden > .cl-fold,
+.cl-col-hidden > .cl-cell {
+  display: block;
+  overflow: hidden;
+  max-width: 0;
+  opacity: 0;
+  transition:
+    max-width 0.45s ease,
+    opacity 0.3s ease;
+}
+
+.cl-col-hidden > .cl-cell {
+  display: grid;
+}
+
+/* Cleared: the unmasked reader. Bars lift, lime goes under the value. */
+.cl-sheet[data-persona="steward"] .cl-v-clear {
+  opacity: 1;
+  visibility: visible;
+  background: var(--color-accent);
+  margin: 0 -3px;
+  padding: 0 3px;
+}
+
+.cl-sheet[data-persona="steward"] .cl-v-mask {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.cl-sheet[data-persona="steward"] .cl-bar {
+  transform: scaleX(0);
+  transform-origin: right center;
+}
+
+.cl-sheet[data-persona="steward"] .cl-col-hidden > .cl-fold,
+.cl-sheet[data-persona="steward"] .cl-col-hidden > .cl-cell {
+  max-width: 24ch;
+  opacity: 1;
+}
+
+.cl-sheet[data-persona="steward"] .cl-mask-kind {
+  text-decoration: line-through;
+}
+
+.cl-sheet[data-persona="steward"] .cl-hidden-note {
+  display: none;
+}
+
+/* ── The intro: print, tag, sweep ───────────────────────────────── */
+
+.cl-sheet[data-intro] .cl-row {
+  animation: cl-print 0.35s ease backwards;
+  animation-delay: var(--cl-delay, 0ms);
+}
+
+.cl-sheet[data-intro] .cl-tag {
+  animation: cl-tag-drop 0.4s cubic-bezier(0.2, 1.3, 0.4, 1) backwards;
+  animation-delay: var(--cl-delay, 0ms);
+}
+
+.cl-sheet[data-intro] .cl-mask-kind {
+  animation: cl-show 0.3s ease backwards;
+  animation-delay: 1500ms;
+}
+
+.cl-sheet[data-intro] .cl-v-clear {
+  animation: cl-unredact-out 0.25s ease backwards;
+  animation-delay: var(--cl-delay, 0ms);
+}
+
+.cl-sheet[data-intro] .cl-v-mask {
+  animation: cl-show 0.25s ease backwards;
+  animation-delay: var(--cl-delay, 0ms);
+}
+
+.cl-sheet[data-intro] .cl-bar {
+  animation: cl-sweep 0.38s cubic-bezier(0.7, 0, 0.2, 1) backwards;
+  animation-delay: var(--cl-delay, 0ms);
+}
+
+.cl-sheet[data-intro] .cl-col-hidden > .cl-fold,
+.cl-sheet[data-intro] .cl-col-hidden > .cl-cell {
+  animation: cl-fold 0.5s ease backwards;
+  animation-delay: 2700ms;
+}
+
+.cl-sheet[data-intro] .cl-hidden-note {
+  animation: cl-show 0.3s ease backwards;
+  animation-delay: 3000ms;
+}
+
+@keyframes cl-print {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes cl-tag-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes cl-show {
+  from {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+/* The clear value is on the paper until the marker reaches it. */
+@keyframes cl-unredact-out {
+  from {
+    opacity: 1;
+    visibility: visible;
+  }
+}
+
+@keyframes cl-sweep {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@keyframes cl-fold {
+  from {
+    max-width: 24ch;
+    opacity: 1;
+  }
+}
+
+/* ── Reduced motion for the desk ────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .cl-sheet[data-intro] *,
+  .cl-sheet[data-intro] .cl-row {
+    animation: none !important;
+  }
+
+  .cl-v-clear,
+  .cl-v-mask,
+  .cl-bar,
+  .cl-col-hidden,
+  .cl-col-hidden > .cl-fold,
+  .cl-col-hidden > .cl-cell {
+    transition: none;
+  }
+}
+
+/* ── The governance path band ───────────────────────────────────── */
+
+.cl-path-line {
+  height: 2px;
+  background-image: linear-gradient(90deg, rgb(183 255 0 / 0.45) 50%, transparent 50%);
+  background-size: 10px 2px;
+  animation: cl-path-drift 1.2s linear infinite;
+}
+
+@keyframes cl-path-drift {
+  to {
+    background-position: 10px 0;
+  }
+}
+
+.cl-path-pulse {
+  left: 7%;
+  width: 8px;
+  height: 8px;
+  background: var(--color-accent);
+  box-shadow: 0 0 14px 4px rgb(183 255 0 / 0.55);
+  animation: cl-path-run var(--cl-dur, 7.7s) linear infinite;
+}
+
+@keyframes cl-path-run {
+  from {
+    left: 7%;
+  }
+  to {
+    left: 93%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cl-path-line,
+  .cl-path-pulse {
+    animation: none;
+  }
+}
+
+/* ── Masked and cleared values in static tables ─────────────────── */
+
+/* Lime under a value: cleared for this reader. */
+.cl-cleared {
+  background: var(--color-accent);
+  margin: 0 -3px;
+  padding: 0 3px;
+}
+
+/* An inline redaction bar. */
+.cl-redacted {
+  display: inline-block;
+  min-width: 4ch;
+  height: 0.95em;
+  vertical-align: -0.1em;
+  background: currentColor;
+}
+
+/* ── The journey thread ─────────────────────────────────────────── */
+
+/* The pulse riding the tip of the filled thread. */
+.cl-thread-fill::after {
+  content: "";
+  position: absolute;
+  bottom: -4px;
+  left: -3px;
+  width: 8px;
+  height: 8px;
+  background: var(--color-accent);
+  box-shadow: 0 0 14px 4px rgb(183 255 0 / 0.55);
+}
+
+/* Usage bars grow in when their tab opens. */
+.cl-grow {
+  animation: cl-grow 0.7s cubic-bezier(0.6, 0, 0.2, 1) backwards;
+  animation-delay: var(--cl-delay, 0ms);
+  transform-origin: left center;
+}
+
+@keyframes cl-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cl-grow {
+    animation: none;
+  }
+}
+
+/* ── Self-running demos ─────────────────────────────────────────── */
+
+.cl-caret {
+  animation: cl-caret 1s steps(1) infinite;
+}
+
+@keyframes cl-caret {
+  50% {
+    opacity: 0;
+  }
+}
+
+.cl-spin {
+  animation: cl-spin 0.8s linear infinite;
+}
+
+@keyframes cl-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cl-caret,
+  .cl-spin {
+    animation: none;
+  }
+}

@@ -9,21 +9,21 @@ import {
 } from "@/components/landing/motifs";
 
 /**
- * The problem, told as a scene rather than a list of pains: six systems, one
- * story, and no line between the facts. The "unlinked board" is the hero
+ * The problem, told as a scene rather than a list of pains: six systems,
+ * personal data in all of them, and no line saying who may see what. The "unlinked board" is the hero
  * motif's dark twin: same pins and dashes, except here the threads stop
  * short of each other and the question stays open.
  */
 
 /** Scattered systems around the one who cannot answer: a board before the
     strings, with the investigator stuck in the middle of it. */
-const NODES: readonly { x: number; y: number; label: string; w: number }[] = [
-  { x: 20, y: 26, label: "ERP", w: 92 },
-  { x: 20, y: 150, label: "DRIVE", w: 104 },
-  { x: 28, y: 274, label: "CRM", w: 92 },
-  { x: 488, y: 26, label: "MAIL", w: 104 },
-  { x: 500, y: 150, label: "LOGS", w: 96 },
-  { x: 452, y: 274, label: "REGISTER", w: 132 },
+const NODES: readonly { x: number; y: number; w: number }[] = [
+  { x: 20, y: 26, w: 104 },
+  { x: 20, y: 150, w: 104 },
+  { x: 28, y: 274, w: 104 },
+  { x: 488, y: 26, w: 116 },
+  { x: 500, y: 150, w: 104 },
+  { x: 452, y: 274, w: 132 },
 ];
 
 /** Threads that aim at the middle and give up just short of it. */
@@ -39,9 +39,11 @@ const BROKEN: readonly string[] = [
 function UnlinkedBoard({
   caption,
   mascotAlt,
+  labels,
 }: {
   caption: string;
   mascotAlt: string;
+  labels: readonly string[];
 }) {
   return (
     <figure>
@@ -66,8 +68,8 @@ function UnlinkedBoard({
                 />
               ))}
             </g>
-            {NODES.map((node) => (
-              <g key={node.label}>
+            {NODES.map((node, index) => (
+              <g key={index}>
                 <rect
                   x={node.x}
                   y={node.y}
@@ -89,7 +91,7 @@ function UnlinkedBoard({
                   fill="currentColor"
                   fillOpacity="0.75"
                 >
-                  {node.label}
+                  {labels[index]}
                 </text>
               </g>
             ))}
@@ -130,6 +132,7 @@ export function Tension({ locale }: { locale: Locale }) {
                 "Fig. 01: six systems, one story, no line between the facts"
               }
               mascotAlt={copy.mascots.questioning}
+              labels={copy.tension.nodes}
             />
           </div>
 

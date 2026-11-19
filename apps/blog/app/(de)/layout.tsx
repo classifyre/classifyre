@@ -17,6 +17,7 @@ import {blogFontClassName} from "@/components/blog-fonts";
 import {LocaleRedirect, LocaleRedirectHeadScript} from "@/components/locale-redirect";
 import {SiteNav} from "@/components/site-nav";
 import {showcaseUrlFor} from "@/lib/site";
+import {topicLinks} from "@/content/topics";
 import {GoogleAnalytics} from "../google-analytics";
 import {PostHogProvider} from "../providers";
 
@@ -99,7 +100,12 @@ const navbar = (
 
 const footer = (
     <Footer className="classifyre-site-footer">
-        <SiteFooter origin="/de" copy={deTranslations.footer} showcaseHref={showcaseUrlFor("de")}/>
+        <SiteFooter
+            origin="/de"
+            copy={deTranslations.footer}
+            showcaseHref={showcaseUrlFor("de")}
+            topics={{heading: deTranslations.footer.topicsHeading, links: topicLinks("de")}}
+        />
     </Footer>
 );
 

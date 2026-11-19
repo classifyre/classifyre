@@ -1,0 +1,31 @@
+# Classifyre
+
+> Open-source data governance you run yourself. Classifyre finds personal data and secrets across 40+ systems, masks them automatically inside the query, and lets people query everything with SQL, Excel and Power BI. Every read is logged. Apache-2.0, self-hosted, made in Austria.
+
+Classifyre is one product with every feature open source, including SSO, roles, tenants, masking and the SQL gateway. Enterprise is services: a fixed-price pilot, implementation, an SLA subscription and tailoring.
+
+## What it does
+
+- Finds personal data (41 entity types, including Austrian, German and Swiss identifiers) and secrets (27 patterns) in databases, lakehouses, object storage, wikis, tickets, mail and Git; custom detectors by regex, model or prompt.
+- Masks classified columns by default: redacted (****), last four (••••1234), hashed (joins and counts still work; pseudonymisation, not anonymisation), empty, or hidden. Masks apply inside the query, so WHERE, JOIN and GROUP BY cannot see past them.
+- Grants Data reader or Data reader, unmasked to groups per workspace, source or table, with end dates; row filters per group; access requests decided by owners and stewards.
+- Serves the tables to the SQL page, exports (Excel, CSV, Parquet), a PostgreSQL-protocol endpoint for Power BI, Excel, Tableau and DBeaver, and AI agents over MCP, all through the same masks.
+- Records every read per table and person, with the channel used.
+- Runs as one Docker image or a Helm chart on Kubernetes; OpenShift with Enterprise support. Runs offline.
+
+## Pages
+
+- [Home](https://classifyre.com/): overview
+- [How it works](https://classifyre.com/#how-it-works): connect and detect, query across sources, govern, Power BI and Excel, masking per person, shared datasets
+- [Immuta alternative](https://classifyre.com/immuta-alternative/)
+- [Unity Catalog alternative](https://classifyre.com/unity-catalog-alternative/)
+- [Open source and Enterprise](https://classifyre.com/open-source-vs-enterprise/)
+- [German site](https://classifyre.com/de/)
+
+## Docs
+
+- [Documentation](https://docs.classifyre.com/)
+- [Query data and masking](https://docs.classifyre.com/data-query/)
+- [SQL connections](https://docs.classifyre.com/sql-connections/)
+- [Roles](https://docs.classifyre.com/access/roles/)
+- [Source code](https://github.com/classifyre/classifyre)

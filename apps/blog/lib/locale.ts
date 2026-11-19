@@ -2,8 +2,11 @@
  * Locale routing for the blog, mirroring `apps/web/lib/locale-detection.ts`.
  *
  * English is the default locale and is served **unprefixed** (`/sources`);
- * German lives under `/de` (`/de/quellen` → actually `/de/sources`, slugs are
- * not translated, only content). Keeping the default unprefixed means every
+ * German lives under `/de`. Slugs are not translated (`/sources` ↔
+ * `/de/sources`), except the topic pages, which answer one search term each
+ * and may carry the German term in the URL (`/some-topic` ↔
+ * `/de/ein-thema`); `topic-slugs.json` holds those pairs and is shared
+ * with `next-sitemap.config.js`. Keeping the default unprefixed means every
  * URL that shipped before locale routing keeps working.
  *
  * Server never redirects: one URL always renders one language, which keeps
@@ -11,6 +14,8 @@
  * redirect (`components/locale-redirect.tsx`) only ever touches unprefixed
  * URLs — a `/de/…` URL is an explicit language choice and must never switch.
  */
+
+import topicSlugs from "./topic-slugs.json";
 
 export const LOCALES = ["en", "de"] as const;
 export type Locale = (typeof LOCALES)[number];
@@ -51,8 +56,24 @@ export function stripLocalePrefix(pathname: string): {
 export function withLocalePrefix(locale: Locale, path: string): string {
   if (!path.startsWith("/")) return path;
   const { rest } = stripLocalePrefix(path);
-  const suffix = rest === "/" ? "" : rest;
+  const translated = translateTopicSlug(rest, locale);
+  const suffix = translated === "/" ? "" : translated;
   return locale === DEFAULT_LOCALE ? suffix || "/" : `/de${suffix}`;
+}
+
+/**
+ * A topic page's path in `target` locale, from the pairs in
+ * `topic-slugs.json`. Any other path is returned unchanged.
+ */
+export function translateTopicSlug(rest: string, target: Locale): string {
+  const segment = rest.replace(/^\/+|\/+$/g, "");
+  if (!segment || segment.includes("/")) return rest;
+  const pair = topicSlugs.find(
+    (entry) => entry.en === segment || entry.de === segment,
+  );
+  if (!pair) return rest;
+  const trailing = rest.endsWith("/") ? "/" : "";
+  return `/${pair[target]}${trailing}`;
 }
 
 /** The same page in the other language. Used by the language switcher. */

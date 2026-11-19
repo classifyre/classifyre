@@ -3,11 +3,11 @@
 
 # Classifyre API
 
-**Backend service of the open-source Classifyre investigation platform — REST API, scan orchestration, findings, cases and AI autopilot.**
+**Backend service of Classifyre, open-source data governance — REST API, scan orchestration, masking, access control, the read audit and the SQL gateway.**
 
 </div>
 
-Classifyre turns the data scattered across the systems you already run — file shares, Confluence, Jira, SharePoint, S3, Git repositories, databases — into **investigations you can act on**: detectors raise findings (leaked secrets, PII, security risks), and analysts work them through inquiries, duplicates, cases and hypotheses.
+Classifyre finds personal data and secrets across the systems you already run — databases, lakehouses, file shares, Confluence, Jira, SharePoint, S3, Git — **masks them automatically**, and lets your team query everything with SQL, Excel and Power BI. Every read is logged; nothing leaves your servers.
 
 This `classifyre/api` image is the Classifyre backend (NestJS): it serves the REST API and WebSockets, orchestrates scans, runs the background job queues (pg-boss) and semantic embeddings, and spawns scan workers. It is one of three service images — together with [`classifyre/web`](https://hub.docker.com/r/classifyre/web) (frontend) and [`classifyre/cli`](https://hub.docker.com/r/classifyre/cli) (scan jobs) — composed into the [`classifyre/all-in-one`](https://hub.docker.com/r/classifyre/all-in-one) image and deployed separately by the [`classifyre/classifyre-core`](https://hub.docker.com/r/classifyre/classifyre-core) Helm chart.
 

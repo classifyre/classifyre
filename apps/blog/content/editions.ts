@@ -83,6 +83,11 @@ export type EditionsCopy = {
     workspaceNote: string;
     workspaceCta: string;
   };
+  extras: {
+    title: string;
+    lede: string;
+    items: readonly { title: string; body: string }[];
+  };
   closing: {
     titleLead: string;
     titleHighlight: string;
@@ -95,83 +100,82 @@ export type EditionsCopy = {
 
 const en: EditionsCopy = {
   hero: {
-    mark: "Open source vs enterprise",
+    mark: "Open source and Enterprise",
     titleA: "Same engine.",
     titleBLead: "Different",
     titleBHighlight: "room.",
-    lede: "The open-source core is the whole product, not a funnel into a paid one. Enterprise sells the governance layer, tuning and people, the things a large organisation cannot self-serve.",
-    ctaPrimary: "Get the core",
-    ctaSecondary: "Start the conversation",
+    lede: "Every feature is open source, including SSO, roles and masking. Run it yourself or with your integrator. Enterprise is the same product tailored to your organisation, with support and an SLA behind it.",
+    ctaPrimary: "Get Classifyre",
+    ctaSecondary: "Book a pilot call",
   },
   editions: {
     mark: "At a glance",
-    title: "Two editions. One engine.",
-    lede: "Detecting, investigating and deploying are open source in full. Enterprise adds the lock on the cabinet and the engineers who know your domain.",
+    title: "One product. Two ways to run it.",
+    lede: "The open-source repository is the whole product. Keep your ETL tools, pipelines and data products; Classifyre governs what they produce, in either edition. Enterprise adds tailoring and someone accountable, never a feature behind a licence key.",
     core: {
-      eyebrow: "Open source · free forever",
-      title: "Core",
-      body: "Everything that detects, investigates and deploys. Run it on a laptop or across a cluster, for as long as you like, no seat count, no expiry.",
+      eyebrow: "Open source, free forever",
+      title: "Open source",
+      body: "Every connector, detector, mask, grant and log line, under Apache-2.0. Run it on a laptop or across a cluster, for as long as you like, with no seat count and no expiry.",
       points: [
-        "Every connector, detector pack and custom-detector tier",
-        "Inquiries, fingerprints, cases and the AI autopilot",
-        "The Docker image and the Helm chart, both fully featured",
-        "Workspace isolation is in the core and always on",
+        "PII and secret discovery across 40+ source types",
+        "Column masks, grants, row filters and access requests",
+        "SQL, exports and a PostgreSQL endpoint for Power BI and Excel",
+        "SSO, roles, tenants, workspaces and the audit of every read",
       ],
       ctaPrimary: "Get it",
       ctaSecondary: "Read the source",
     },
     governed: {
-      eyebrow: "Enterprise · a partnership",
-      title: "Governed",
-      body: "The core plus the lock on the cabinet, and engineers who learn your domain. Our people work with your team from the first pilot instead of handing over a licence key.",
+      eyebrow: "Enterprise, tailored to your organisation",
+      title: "Enterprise",
+      body: "The same code, shaped to how your organisation works: your identity provider and groups, your access model, your terminology and models. Rolled out by your team, your integrator or ours, and supported when it matters.",
       points: [
-        "SSO, roles and per-workspace authorization",
-        "Models tuned on your terminology and your languages",
-        "Detectors and sources built for your industry's data",
-        "Architecture reviews, OpenShift, SLA-backed support",
+        "Your ETL and data products stay; Classifyre governs what they produce",
+        "Governance tailored to your organisation",
+        "Detection models tuned to your data, on your hardware",
+        "OpenShift support and an SLA",
       ],
-      ctaPrimary: "Start the conversation",
+      ctaPrimary: "Book a pilot call",
     },
   },
   mascots: {
-    lookingAtYou:
-      "The Classifyre investigator looking straight at you",
+    lookingAtYou: "The Classifyre investigator looking straight at you",
     hiddenGem:
       "The Classifyre investigator holding a magnifying glass over a hidden gem",
   },
   engagement: {
-    marker: "How we work",
-    title: "A partnership, not a licence key.",
-    lede: "Our engineers work with your team from the first pilot. We learn how your business names things and tune Classifyre to how your company actually works.",
+    marker: "What you can buy",
+    title: "Pilot, rollout support, subscription.",
+    lede: "You don't need us to run it: many teams roll it out alone or with their integrator. When you want help, it is priced per environment, not per seat: self-service is the point, so more readers should never cost more.",
     steps: [
       {
         no: "01",
         title: "Pilot",
-        body: "We pick one real investigation together and run it on your data, inside your estate.",
+        body: "4 to 6 weeks, fixed scope, fixed price. One workspace, 3 to 5 sources, detection tuned on your data, masking on, one BI connection, and a findings and access report.",
       },
       {
         no: "02",
-        title: "Architecture review",
-        body: "Your cluster, your identity provider, your database. The deployment is reviewed before it becomes infrastructure.",
+        title: "Rollout support",
+        body: "For your team or your integrator, as much or as little as you need: SSO and group mapping (Entra ID, Keycloak, LDAP), the access model, connectors and network, Kubernetes or OpenShift install, training for admins and stewards.",
       },
       {
         no: "03",
-        title: "Tuned detection",
-        body: "Models and detectors tuned on your terminology and your industry's data, built by our engineers together with yours.",
+        title: "Subscription with SLA",
+        body: "Supported releases and security patches, published business-hours response times, a named engineer, upgrade help, a quarterly health check and a say in the roadmap.",
       },
       {
         no: "04",
-        title: "Rollout and support",
-        body: "Upgrade assistance, OpenShift, SLA-backed support and named engineers who know your cases.",
+        title: "Tailoring",
+        body: "Detectors and models for your terminology and German-language documents, Austrian identifiers, industry sources, custom masks, investigation cases and reports for your auditors.",
       },
     ],
   },
   comparison: {
     mark: "Line by line",
     title: "The whole comparison",
-    lede: "Four of the five groups below are identical between editions.",
+    lede: "Every feature row is ticked on both sides. The difference is people.",
     caption:
-      "Feature comparison between the Classifyre open-source core and the enterprise edition",
+      "Comparison between Classifyre open source and Classifyre Enterprise",
     columns: {
       capability: "Capability",
       oss: "Open source",
@@ -181,7 +185,7 @@ const en: EditionsCopy = {
     excluded: "Not included",
     groups: [
       {
-        group: "Detection",
+        group: "Discovery",
         summary: "Identical. The engine is the open-source project.",
         rows: [
           {
@@ -191,68 +195,83 @@ const en: EditionsCopy = {
             ent: true,
           },
           {
-            capability: "Built-in detector packs",
-            detail: "PII, secrets, code security, threats, content quality",
+            capability: "PII and secret detectors",
+            detail: "41 PII entities, including EU identifiers; 27 secret patterns",
             oss: true,
             ent: true,
           },
           {
             capability: "Custom detectors",
-            detail: "Regex, entity classification, Hugging Face models, any LLM",
+            detail: "Regex, entity models, Hugging Face models, any LLM",
             oss: true,
             ent: "Built with you",
           },
           {
-            capability: "Semantic ranking",
-            detail: "Importance 0–1 with written reasons, not just severity",
-            oss: true,
-            ent: "Calibrated to your corpus",
-          },
-          {
-            capability: "Detection tuned to your terminology",
-            detail: "Models trained so a term means what it means at your company",
-            oss: false,
-            ent: true,
-          },
-          {
-            capability: "Multilanguage detection tuning",
+            capability: "Models tuned to your terminology",
+            detail: "Deployed on your hardware, for your languages and documents",
             oss: false,
             ent: true,
           },
         ],
       },
       {
-        group: "Investigation",
-        summary: "Identical. Cases are the product, in both editions.",
+        group: "Protection and access",
+        summary: "Identical. Governance is in the core, not behind a key.",
         rows: [
           {
-            capability: "Findings, inquiries and fingerprints",
+            capability: "Column masks",
+            detail: "Redacted, last four, hashed, empty, hidden; masked by default",
             oss: true,
             ent: true,
           },
           {
-            capability: "Cases, hypotheses and evidence trails",
+            capability: "Grants, row filters and access requests",
+            detail: "Per group, source and table, with end dates",
+            oss: true,
+            ent: true,
+          },
+          { capability: "Single sign-on (SSO) and roles", oss: true, ent: true },
+          {
+            capability: "Tenants and per-workspace authorization",
             oss: true,
             ent: true,
           },
           {
-            capability: "AI investigation autopilot",
-            detail: "Five agents working the investigation between scans",
+            capability: "Audit of every read",
+            detail: "Who, which table, which tool, when",
             oss: true,
-            ent: "Tuned to your workflows",
+            ent: "Connected to your SIEM",
           },
           {
-            capability: "In-app assistant and MCP server",
-            detail: "Drive the whole product from your own AI client",
+            capability: "Governance blueprint",
+            detail: "A written access model your DPO can sign",
+            oss: false,
+            ent: true,
+          },
+        ],
+      },
+      {
+        group: "Use",
+        summary: "Identical.",
+        rows: [
+          { capability: "SQL page, exports, shared datasets", oss: true, ent: true },
+          {
+            capability: "PostgreSQL endpoint",
+            detail: "Power BI, Excel, Tableau, DBeaver",
             oss: true,
             ent: true,
           },
-          { capability: "Notifications and data export", oss: true, ent: true },
+          {
+            capability: "Cases, inquiries, lineage and autopilot",
+            oss: true,
+            ent: "Cases built for your incidents",
+          },
+          { capability: "MCP endpoint for AI agents", oss: true, ent: true },
         ],
       },
       {
         group: "Deployment",
-        summary: "Identical. No runtime is held back.",
+        summary: "No runtime is held back; OpenShift comes with us.",
         rows: [
           {
             capability: "All-in-one Docker image",
@@ -260,35 +279,10 @@ const en: EditionsCopy = {
             oss: true,
             ent: true,
           },
-          {
-            capability: "Helm chart on Kubernetes",
-            detail: "Scales as far as the estate demands",
-            oss: true,
-            ent: true,
-          },
-          {
-            capability: "Workspace isolation",
-            detail: "Own schema, evidence, AI memory and endpoint per workspace",
-            oss: true,
-            ent: true,
-          },
+          { capability: "Helm chart on Kubernetes", oss: true, ent: true },
           {
             capability: "OpenShift",
-            detail: "With upgrade assistance from our engineers",
-            oss: false,
-            ent: true,
-          },
-        ],
-      },
-      {
-        group: "Governance",
-        summary: "The real difference: the lock on the cabinet.",
-        rows: [
-          { capability: "Single sign-on (SSO)", oss: false, ent: true },
-          { capability: "Roles and permissions", oss: false, ent: true },
-          {
-            capability: "Per-workspace authorization",
-            detail: "An auditor opens the audit workspace and nothing else",
+            detail: "Installation and support by our engineers",
             oss: false,
             ent: true,
           },
@@ -296,38 +290,72 @@ const en: EditionsCopy = {
       },
       {
         group: "People",
-        summary: "What you get besides software.",
+        summary: "What you pay for.",
         rows: [
           {
             capability: "Support",
             oss: "GitHub issues",
-            ent: "SLA-backed, named engineers",
+            ent: "SLA, named engineer",
           },
           {
             capability: "Onboarding",
             oss: "Docs and the showcase",
-            ent: "Guided pilot, architecture review",
+            ent: "Pilot and implementation",
           },
           {
             capability: "Roadmap influence",
-            oss: "Open issues and PRs",
-            ent: "Direct, on your industry's data",
+            oss: "Open issues and pull requests",
+            ent: "A seat at the table",
           },
-          { capability: "Price", oss: "Free, forever", ent: "Talk to us" },
+          {
+            capability: "Price",
+            oss: "Free, forever",
+            ent: "Per environment, not per seat",
+          },
         ],
       },
     ],
     workspaceNote:
-      "Workspace isolation lives in the open-source core and is always on; a workspace has its own database schema, evidence, AI memory and endpoint. Enterprise does not add the wall; it adds the authorization that decides who may open which drawer.",
-    workspaceCta: "How workspaces work",
+      "SSO, roles, tenants and per-workspace authorization used to be enterprise features. They are open source now, because a governance tool whose access control is a paid add-on is not one you can trust in procurement.",
+    workspaceCta: "Roles in the docs",
+  },
+  extras: {
+    title: "For larger estates",
+    lede: "What public bodies, banks and hospitals usually ask for next. Each is part of a subscription or a fixed-price work package.",
+    items: [
+      {
+        title: "Audit log to your SIEM",
+        body: "Every read and every change delivered to Splunk, Elastic or Sentinel.",
+      },
+      {
+        title: "Long-term support releases",
+        body: "A release line with backported security fixes, for change windows measured in quarters.",
+      },
+      {
+        title: "Air-gapped installation",
+        body: "Signed images, a software bill of materials and an offline bundle for networks without internet.",
+      },
+      {
+        title: "Compliance documentation",
+        body: "Records of processing, privacy-by-design evidence and control mappings your auditors can use. Documentation, not a certificate.",
+      },
+      {
+        title: "Procurement-ready contracts",
+        body: "A pilot sized for direct award, standard public-sector contract templates, and an integrator as prime contractor where needed.",
+      },
+      {
+        title: "Training",
+        body: "For admins, stewards and data protection officers: who decides what, and how to read the log.",
+      },
+    ],
   },
   closing: {
     titleLead: "Start free.",
-    titleHighlight: "Call us later.",
-    lede: "Almost everyone starts on the open-source core and stays there. The conversation is worth having when SSO, roles and a tuned model start mattering more than the scan itself.",
-    ctaPrimary: "Get the free core",
-    ctaSecondary: "Talk about enterprise",
-    ctaTertiary: "Or poke at the live showcase first",
+    titleHighlight: "Call us for the rest.",
+    lede: "Most teams start on the open-source image and run it themselves or with their integrator. Talk to us when you want it tailored to your organisation, or someone accountable behind it.",
+    ctaPrimary: "Get Classifyre",
+    ctaSecondary: "Book a pilot call",
+    ctaTertiary: "Or walk the live showcase first",
   },
 };
 

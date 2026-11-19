@@ -69,6 +69,16 @@ export const docs = {
   aiProviders: "https://docs.classifyre.com/settings/ai-providers/",
   mcpServer: "https://docs.classifyre.com/settings/mcp-server/",
   dataExport: "https://docs.classifyre.com/data-export/",
+  dataQuery: "https://docs.classifyre.com/data-query/",
+  masking: "https://docs.classifyre.com/data-query/#masked-and-hidden-columns",
+  rowFilters: "https://docs.classifyre.com/data-query/#filtered-rows",
+  whoMayQuery: "https://docs.classifyre.com/data-query/#who-may-query-what",
+  sharedDatasets: "https://docs.classifyre.com/data-query/#shared-datasets",
+  sqlConnections: "https://docs.classifyre.com/sql-connections/",
+  roles: "https://docs.classifyre.com/access/roles/",
+  lakehouse: "https://docs.classifyre.com/sources/lakehouse/",
+  lineage: "https://docs.classifyre.com/sources/lineage/",
+  governance: "https://docs.classifyre.com/sources/assets-and-metadata/",
 } as const;
 
 /** Marketing routes that live on this site rather than the docs site. */
