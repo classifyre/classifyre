@@ -30,7 +30,7 @@
     },
     {
       "name": "boto3",
-      "version": "1.44.0",
+      "version": "1.44.6",
       "modules": [
         "boto3"
       ],
@@ -48,7 +48,7 @@
     },
     {
       "name": "confluent-kafka",
-      "version": "2.16.1",
+      "version": "2.16.2",
       "modules": [
         "confluent_kafka"
       ],
@@ -75,7 +75,7 @@
     },
     {
       "name": "dropbox",
-      "version": "12.2.4",
+      "version": "12.2.5",
       "modules": [
         "dropbox"
       ],
@@ -93,7 +93,7 @@
     },
     {
       "name": "email-validator",
-      "version": "2.3.0",
+      "version": "2.4.0",
       "modules": [
         "email_validator"
       ],
@@ -190,7 +190,7 @@
     },
     {
       "name": "litellm",
-      "version": "1.109.0",
+      "version": "1.110.1",
       "modules": [
         "litellm"
       ],
@@ -324,7 +324,7 @@
     },
     {
       "name": "pydantic",
-      "version": "2.14.3",
+      "version": "2.14.4",
       "modules": [
         "pydantic"
       ],
@@ -341,7 +341,7 @@
     },
     {
       "name": "pylance",
-      "version": "14.0.2",
+      "version": "14.0.3",
       "modules": [
         "lance"
       ],
@@ -350,7 +350,7 @@
     },
     {
       "name": "pymongo",
-      "version": "4.19.0",
+      "version": "4.20.0",
       "modules": [
         "pymongo"
       ],
@@ -439,7 +439,7 @@
     },
     {
       "name": "slack-sdk",
-      "version": "3.46.0",
+      "version": "3.47.0",
       "modules": [
         "slack_sdk"
       ],
@@ -457,7 +457,7 @@
     },
     {
       "name": "sqlglot",
-      "version": "30.31.0",
+      "version": "30.33.0",
       "modules": [
         "sqlglot"
       ],
