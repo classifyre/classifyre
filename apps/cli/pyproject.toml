@@ -1,7 +1,7 @@
 [project]
 name = "classifyre-cli"
 version = "0.8.1.dev0"
-description = "Classifyre CLI — scan and classify unstructured data sources"
+description = "Classifyre CLI — scan data sources for personal data and secrets"
 readme = "README.md"
 # Upper bound is load-bearing: onnxruntime publishes no cp315 wheels (notably
 # linux/aarch64, which required-environments forces uv to resolve), so an
@@ -10,7 +10,7 @@ readme = "README.md"
 # onnxruntime ships cp315 wheels for all required-environments platforms.
 requires-python = ">=3.12,<3.15"
 license = { text = "MIT" }
-keywords = ["data", "metadata", "ingestion", "unstructured", "pii", "secrets"]
+keywords = ["data", "governance", "masking", "pii", "secrets"]
 dependencies = [
     "classifyre-schemas",
     "jsonschema>=4.26.0",

@@ -1281,7 +1281,7 @@ The generated npm module supports the following:
   * CommonJS
   * ES6 module system
 
-For more information, please visit [https://github.com/unstructured/classifyre](https://github.com/unstructured/classifyre)
+For more information, please visit [https://github.com/classifyre/classifyre](https://github.com/classifyre/classifyre)
 
 ## Development
 

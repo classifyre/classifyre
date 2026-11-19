@@ -17,26 +17,26 @@ const PIPELINE: Array<{
   {
     step: "02",
     name: "Scan",
-    blurb: "Each run registers every document and file as an asset.",
+    blurb: "Each run registers every table, document and file as an asset.",
     href: "/flow/",
   },
   {
     step: "03",
     name: "Detect",
-    blurb: "Detectors read every asset and raise findings worth a look.",
+    blurb: "Detectors read every asset and flag personal data and secrets.",
     href: "/detectors/",
   },
   {
     step: "04",
-    name: "Connect the dots",
-    blurb: "Inquiries keep watch; duplicate review finds the same thing twice.",
-    href: "/investigations/",
+    name: "Mask & grant",
+    blurb: "Classified columns are masked by default; groups get the access they need.",
+    href: "/data-query/",
   },
   {
     step: "05",
-    name: "Resolve",
-    blurb: "Cases collect evidence, weigh hypotheses, and reach a conclusion.",
-    href: "/investigations/cases/",
+    name: "Query",
+    blurb: "SQL, Excel, Power BI and AI agents read through the masks. Every read is logged.",
+    href: "/sql-connections/",
   },
 ];
 
@@ -74,15 +74,15 @@ const START_HERE: Array<{
     ],
   },
   {
-    label: "Working results",
-    title: "Investigate",
+    label: "Using the data",
+    title: "Govern it",
     blurb:
-      "Findings are the start, not the answer. Watch them with inquiries, work the duplicates they reveal, and close them as cases.",
+      "Findings decide what is masked. Grant access per group, give people SQL, Excel and Power BI, and see who read what. If something leaks, investigate it.",
     links: [
-      { text: "Investigations overview", href: "/investigations/" },
-      { text: "Duplicate review", href: "/duplicates/" },
-      { text: "Cases & hypotheses", href: "/investigations/cases/" },
-      { text: "Put it on Autopilot", href: "/investigations/autopilot/" },
+      { text: "Query data & masking", href: "/data-query/" },
+      { text: "SQL connections", href: "/sql-connections/" },
+      { text: "Roles & access", href: "/access/" },
+      { text: "Investigate a leak", href: "/investigations/" },
     ],
   },
 ];
@@ -117,7 +117,7 @@ const DIRECTORY: Array<{ name: string; blurb: string; href: string }> = [
   },
   {
     name: "Investigations",
-    blurb: "Inquiries, cases, hypotheses — and the AI autopilot.",
+    blurb: "When something leaks: inquiries, cases, hypotheses — and the AI autopilot.",
     href: "/investigations/",
   },
   {
@@ -154,19 +154,19 @@ export function DocsHome() {
           className="text-[17vw] leading-[0.88] uppercase sm:text-7xl md:text-8xl"
           style={{ fontFamily: "var(--font-hero)" }}
         >
-          Scattered data
+          Find it.
           <br />
-          in.{" "}
+          Protect it.{" "}
           <span className="bg-accent px-2 text-accent-foreground">
-            Closed cases
-          </span>{" "}
-          out.
+            Use it.
+          </span>
         </h1>
         <p className="mt-6 max-w-2xl text-lg leading-7 text-muted-foreground">
-          Classifyre reads the systems you already run, raises the findings
-          worth a human&apos;s time, and gives you a structured place to work
-          them — with an AI autopilot doing the legwork between scans. These
-          docs explain how the application works, section by section.
+          Classifyre finds personal data and secrets across the systems you
+          already run, masks them automatically, and lets your team query
+          everything with SQL, Excel and Power BI. Every read is logged, and
+          all of it is open source. These docs explain how the application
+          works, section by section.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <a
@@ -205,7 +205,7 @@ export function DocsHome() {
           id="pipeline-heading"
           className="mb-5 font-mono text-[11px] font-bold uppercase tracking-[0.22em] text-muted-foreground"
         >
-          Then: one pipeline, five steps
+          Then: one path, five steps
         </h2>
         <ol className="grid grid-cols-1 border-2 border-border sm:grid-cols-2 lg:grid-cols-5">
           {PIPELINE.map((stage, i) => (

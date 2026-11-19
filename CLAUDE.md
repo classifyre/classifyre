@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is **Classifyre**, a monorepo-based metadata ingestion system for unstructured data sources (Confluence, Jira, SharePoint, etc.). The project uses a **plugin architecture** pattern with three main applications:
+This is **Classifyre**, a monorepo-based open-source data governance platform: it scans data sources (databases, lakehouses, storage, Confluence, Jira, etc.) for personal data and secrets, masks classified columns inside the query, serves governed reads over SQL, exports, a PostgreSQL-protocol gateway and MCP, and logs every read. Investigation (inquiries, cases, Autopilot) is a use case on top, not the headline. The project uses a **plugin architecture** pattern with three main applications:
 
 1. **Web App** (`apps/web`) - Next.js 16 frontend with React 19
 2. **API** (`apps/api`) - NestJS backend with Fastify adapter

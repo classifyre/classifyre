@@ -65,7 +65,7 @@ async function generateSpec() {
   const config = new DocumentBuilder()
     .setTitle('Classifyre API')
     .setDescription(
-      'Metadata ingestion and detection API for unstructured data sources. ' +
+      'Open-source data governance API: scans data sources for personal data and secrets, masks classified columns, and serves governed reads. ' +
         'Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, Dremio, Trino/Starburst, ODBC, Amazon Athena, Google BigQuery, Amazon Redshift, Iceberg REST catalogs, DuckLake, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk, Notion, Email, and YouTube sources. ' +
         'Built-in detectors for secrets, PII, toxic content, image classification, broken links, and security threats.',
     )
@@ -81,7 +81,7 @@ async function generateSpec() {
     )
     .setContact(
       'Classifyre Team',
-      'https://github.com/unstructured/classifyre',
+      'https://github.com/classifyre/classifyre',
       'support@example.com',
     )
     .setLicense('MIT', 'https://opensource.org/licenses/MIT')

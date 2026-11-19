@@ -18,10 +18,6 @@ export default {
     type: "menu",
     title: "Produkt",
     items: {
-      how: {
-        title: "So funktioniert es",
-        href: "/de/#how-it-works",
-      },
       get: {
         title: "Classifyre holen",
         href: "/de/get",
@@ -30,10 +26,6 @@ export default {
         title: "Quellen",
         href: "/de/sources",
       },
-      editions: {
-        title: "Open Source vs. Enterprise",
-        href: "/de/open-source-vs-enterprise",
-      }
     },
   },
   journal: {
@@ -77,11 +69,6 @@ export default {
   sources: {
     type: "page",
     title: "Quellen",
-    display: "hidden",
-  },
-  "open-source-vs-enterprise": {
-    type: "page",
-    title: "Open Source vs. Enterprise",
     display: "hidden",
   },
   "made-in-europe": {

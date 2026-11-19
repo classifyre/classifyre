@@ -159,10 +159,6 @@ export function SiteFooter({
     { label: text.navHome, href: marketing(marketingPaths.home) },
     { label: text.navGet, href: marketing(marketingPaths.get) },
     { label: text.navSources, href: marketing(marketingPaths.sources) },
-    {
-      label: text.navEditions,
-      href: marketing(marketingPaths.editions),
-    },
     { label: text.navBlog, href: marketing(marketingPaths.blog) },
     {
       label: text.releaseNotes,

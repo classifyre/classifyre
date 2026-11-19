@@ -1,6 +1,6 @@
 apiVersion: v2
 name: classifyre-core
-description: Production-ready Helm chart for Classifyre — web, api, and Kubernetes CLI jobs
+description: Production-ready Helm chart for Classifyre, open-source data governance — web, api, SQL gateway, and Kubernetes CLI jobs
 type: application
 version: 0.8.1-SNAPSHOT
 appVersion: "0.8.1-SNAPSHOT"
@@ -9,6 +9,8 @@ keywords:
   - nestjs
   - nextjs
   - kubernetes
-home: https://github.com/unstructured/classifyre
+  - data-governance
+  - data-masking
+home: https://github.com/classifyre/classifyre
 maintainers:
   - name: Classifyre Team

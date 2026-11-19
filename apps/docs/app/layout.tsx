@@ -198,13 +198,14 @@ export const metadata: Metadata = {
     template: "%s | Classifyre Docs",
   },
   description:
-    "Documentation for the Classifyre platform: how the app works, section by section — sources, detectors, scans, investigations, and the AI autopilot.",
+    "Documentation for Classifyre, open-source data governance: find personal data and secrets, mask them automatically, query everything with SQL, Excel and Power BI, and keep every read on record.",
   keywords: [
     "classifyre",
     "documentation",
-    "platform engineering",
-    "security scanning",
-    "software architecture",
+    "data governance",
+    "data masking",
+    "PII detection",
+    "open source",
   ],
   // No site-wide canonical: every page inherits this object, and a canonical
   // here told search engines that each page was a copy of the home page. A
@@ -225,7 +226,7 @@ export const metadata: Metadata = {
     type: "website",
     title: "Classifyre Docs",
     description:
-      "Documentation for the Classifyre platform: how the app works, section by section — sources, detectors, scans, investigations, and the AI autopilot.",
+      "Documentation for Classifyre, open-source data governance: find personal data and secrets, mask them automatically, query everything with SQL, Excel and Power BI, and keep every read on record.",
     url: docsSiteUrl,
     siteName: "Classifyre Docs",
   },
@@ -233,7 +234,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Classifyre Docs",
     description:
-      "Documentation for the Classifyre platform: how the app works, section by section — sources, detectors, scans, investigations, and the AI autopilot.",
+      "Documentation for Classifyre, open-source data governance: find personal data and secrets, mask them automatically, query everything with SQL, Excel and Power BI, and keep every read on record.",
   },
 };
 

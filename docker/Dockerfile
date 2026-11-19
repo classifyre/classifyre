@@ -2,7 +2,7 @@
 #
 # Classifyre all-in-one — the whole product in one container.
 #
-# For trying Classifyre out on a laptop, and for small single-investigator
+# For trying Classifyre out on a laptop, and for small single-host
 # installs. It is NOT the production path: for that, use the Helm chart, which
 # runs this same code as separate api / worker / web / CLI-Job workloads.
 #

@@ -259,7 +259,6 @@ function Coordinate({
 
 export default function MadeInEuropePageDe() {
   const getHref = `${withLocalePrefix("de", routes.get)}/`;
-  const editionsHref = `${withLocalePrefix("de", routes.editions)}/`;
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 sm:px-6 lg:px-8">
@@ -420,13 +419,6 @@ export default function MadeInEuropePageDe() {
                 <a href={repoUrl} target="_blank" rel="noreferrer">
                   Repository durchstöbern
                 </a>
-              </Button>
-              <Button
-                asChild
-                variant="secondary"
-                className="border-2 border-white/20 bg-white/10 text-white hover:bg-white/16"
-              >
-                <a href={editionsHref}>Open Source vs. Enterprise</a>
               </Button>
               <a
                 href={showcaseUrlFor("de")}
