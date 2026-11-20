@@ -36,6 +36,17 @@ export const metadata: Metadata = {
         template: "%s | Classifyre",
     },
     description: deTranslations.site.description,
+    keywords: [
+        "Berechtigungskonzept",
+        "Datenzugriff steuern",
+        "Zugriffssteuerung",
+        "Data Governance Open Source",
+        "Datenmaskierung",
+        "Pseudonymisierung",
+        "Protokollierung",
+        "Datensouveränität",
+        "On-Premises",
+    ],
     alternates: {
         canonical: "/de/",
         languages: {

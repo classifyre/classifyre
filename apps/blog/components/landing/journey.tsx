@@ -8,7 +8,7 @@ import {
   GitMerge,
   type LucideIcon,
   ShieldCheck,
-  Table2,
+  Users,
 } from "lucide-react";
 
 import { cn } from "@workspace/ui/lib/utils";
@@ -23,26 +23,27 @@ import { Mascot } from "@/components/mascot";
 /**
  * How it works, as one thread running down the page.
  *
- * Six stations, in the order data actually moves through Classifyre:
- * connect and detect, query across sources, govern, connect a BI tool, mask
- * per person, share a dataset. The thread fills as the reader scrolls and a
+ * Six stations, in the order the story is told everywhere: connect and
+ * classify, access follows the organisation, masked by default, data
+ * products on top, the tools people already use, and the proof (owners,
+ * contracts, every read on record). The thread fills as the reader scrolls and a
  * lime pulse rides its tip; each station's node lights up when the thread
  * reaches it, the way the hero's path band lights its stations in turn.
  *
  * Every station is readable on its own: a plain-language explanation (this
  * is the text search engines and buyers read), a few facts, a link into the
  * docs, and next to it the thing itself, playing on its own: the scan, the
- * query typed and run, the table being governed, the Power BI connection,
- * the two readers, the dataset being shared.
+ * directory groups getting their grants, the two readers, the dataset being
+ * shared, the Power BI connection, the table being governed.
  */
 
 const ICONS: Record<string, LucideIcon> = {
   discover: Database,
-  query: Table2,
-  govern: ShieldCheck,
-  bi: BarChart3,
+  access: Users,
   mask: EyeOff,
   share: GitMerge,
+  bi: BarChart3,
+  govern: ShieldCheck,
 };
 
 export function Journey({ locale }: { locale: Locale }) {

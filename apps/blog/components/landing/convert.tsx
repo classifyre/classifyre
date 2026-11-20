@@ -6,9 +6,10 @@ import {
 
 import { getLandingCopy } from "@/content/landing";
 import type { Locale } from "@/lib/locale";
+import { withLocalePrefix } from "@/lib/locale";
 import {
   docs,
-  enterpriseContactEmail,
+  contactEmail,
   helmInstallCommand,
   repoUrl,
   routes,
@@ -23,9 +24,10 @@ import {
 } from "@/components/landing/motifs";
 
 /**
- * Conversion: "open your data safely tonight" on the governance board.
- * Three honest paths (laptop, cluster, enterprise) and no form anywhere.
- * The enterprise line is deliberately the quietest thing in the section.
+ * Conversion: "start with one department and one source" on the governance
+ * board. Three honest paths (a pilot, the laptop, the cluster) and no form
+ * anywhere: the buyer writes to plan a pilot, the engineer copies the
+ * Docker command on the left.
  */
 export function Convert({ locale }: { locale: Locale }) {
   const copy = getLandingCopy(locale);
@@ -125,29 +127,31 @@ export function Convert({ locale }: { locale: Locale }) {
 
             <div className="flex flex-col gap-3">
               <a
-                href={routes.get}
+                href={`mailto:${contactEmail}?subject=${encodeURIComponent(
+                  locale === "de" ? "Classifyre-Pilot" : "Classifyre pilot",
+                )}`}
                 className="inline-flex w-fit items-center border-2 border-accent bg-accent px-5 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-black transition-colors hover:border-white hover:bg-white"
               >
                 {copy.convert.ctaPrimary}
               </a>
               <a
-                href={showcase}
-                target="_blank"
-                rel="noreferrer"
+                href={`${withLocalePrefix(locale, routes.get)}/`}
                 className="inline-flex w-fit items-center border-2 border-white/25 px-5 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-white transition-colors hover:border-accent hover:text-accent"
               >
                 {copy.convert.ctaSecondary}
               </a>
               <a
-                href={`mailto:${enterpriseContactEmail}?subject=Classifyre%20pilot`}
+                href={showcase}
+                target="_blank"
+                rel="noreferrer"
                 className="group mt-2 flex items-center gap-2"
               >
                 <Pin solid={false} />
                 <Micro className="text-white/55 transition-colors group-hover:text-accent">
-                  {copy.convert.ctaEnterprise} →
+                  {copy.convert.ctaShowcase} →
                 </Micro>
               </a>
-              <a href={routes.blog} className="group flex items-center gap-2">
+              <a href={`${withLocalePrefix(locale, routes.blog)}/`} className="group flex items-center gap-2">
                 <Pin solid={false} />
                 <Micro className="text-white/55 transition-colors group-hover:text-accent">
                   {copy.convert.ctaBlog} →

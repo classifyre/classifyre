@@ -4,7 +4,7 @@ description: Scan an IMAP mailbox — Gmail, Outlook/Microsoft 365, Fastmail or 
 ---
 
 import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
-import { LineageNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
+import { LineageNote, QueryNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
 
 # Email
 
@@ -50,6 +50,14 @@ Scope the scan by:
 ## Lineage
 
 <LineageNote />
+
+## Query data & SQL connections
+
+<QueryNote support="none">
+  Messages and attachments are documents, not tables, so there is nothing SQL
+  could read. Use your mail search, or land the data in a bucket as Parquet or
+  Delta.
+</QueryNote>
 
 ## Worth knowing
 

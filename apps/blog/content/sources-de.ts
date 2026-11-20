@@ -11,12 +11,12 @@ import { docs } from "@/lib/site";
 const de: SourcesCopy = {
   hero: {
     mark: "Quellen",
-    titleA: "Scannen Sie die Systeme,",
+    titleA: "Steuern Sie die Systeme,",
     titleBLead: "die Sie",
-    titleBHighlight: "bereits besitzen.",
+    titleBHighlight: "schon betreiben.",
     lede: {
       count: "Konnektoren",
-      tail: "über Datenbanken, Warehouses und Lakehouses, Streaming, Object Storage, Kollaborationstools, Analytics und öffentliche Inhalte. Jede wird nach personenbezogenen Daten und Secrets durchsucht; Tabellen in PostgreSQL, MySQL, Databricks, ODBC-Quellen, Delta, Iceberg und Dateien in Buckets lassen sich zudem mit SQL abfragen, Masken inklusive.",
+      tail: "über Datenbanken, Warehouses und Lakehouses, Streaming, Object Storage, Kollaborationstools, Analytics und öffentliche Inhalte, alle direkt an der Quelle gelesen. Jede wird nach personenbezogenen Daten und Secrets klassifiziert; Tabellen in PostgreSQL, MySQL, Databricks, ODBC-Quellen, Delta, Iceberg und Dateien in Buckets stehen zudem für SQL, Excel und Power BI bereit, mit denselben Freigaben, Zeilenfiltern und Masken.",
     },
     micro: "{count} Konnektoren · direkt aus dem Schema",
     ctaCatalog: "Katalog durchstöbern",
@@ -30,7 +30,7 @@ const de: SourcesCopy = {
   },
   categories: {
     marker: "Nach Kategorie",
-    title: "Woher die Beweise kommen",
+    title: "Wo Ihre Daten liegen",
     lede: "Konnektoren sind gruppiert nach dem, was sie sind, nicht nach Hersteller. Zählungen kommen direkt aus dem Schema, diese Seite kann also nie von dem abweichen, was das Produkt wirklich unterstützt.",
     label: "Kategorie",
     shortLabel: "Konnektoren",
@@ -59,19 +59,19 @@ const de: SourcesCopy = {
         hrefLabel: "Sampling",
       },
       {
-        title: "Quellenübergreifende Fingerprints",
-        body: "Derselbe Wert in zwei verschiedenen Systemen wird per Identität verlinkt, wo die meisten echten Ermittlungen tatsächlich beginnen.",
-        href: docs.howItWorks,
-        hrefLabel: "So funktioniert es",
+        title: "Ein Regelwerk für den Zugriff",
+        body: "Freigaben pro Gruppe, Zeilenfilter, Masken und das Zugriffsprotokoll funktionieren gleich, egal aus welchem System eine Tabelle kommt. Das Berechtigungskonzept wird einmal umgesetzt, nicht pro Datenbank.",
+        href: docs.whoMayQuery,
+        hrefLabel: "Wer was abfragen darf",
       },
     ],
   },
   closing: {
     titleLead: "Fehlt der eine,",
     titleHighlight: "den Sie brauchen?",
-    body: "Konnektoren sind Plugins, und das Projekt ist Open Source, die Antwort ist also entweder ein Pull Request oder ein Gespräch. Enterprise-Kunden bekommen Quellen für die Systeme ihrer Branche, gebaut von unseren Engineers.",
+    body: "Konnektoren sind Plugins, und das Projekt ist Open Source, die Antwort ist also entweder ein Pull Request oder ein Gespräch. Wenn Sie einen Konnektor für die Systeme Ihrer Branche brauchen oder Hilfe bei Einrichtung und Anpassung, kontaktieren Sie uns.",
     ctaPrimary: "Konnektor anfragen",
-    ctaSecondary: "Mit uns über Enterprise sprechen",
+    ctaSecondary: "Hilfe anfragen",
   },
   mascots: {
     hiddenGem:

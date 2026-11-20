@@ -20,7 +20,7 @@ import {
 } from "@/lib/seo";
 import {
   docs,
-  enterpriseContactEmail,
+  contactEmail,
   helmInstallCommand,
   routes,
   softwareVersion,
@@ -54,7 +54,7 @@ export function TopicPage({ locale, id }: { locale: Locale; id: TopicId }) {
   const siteUrl = siteOrigin();
   const home = withLocalePrefix(locale, routes.home);
   const homeHref = home === "/" ? "/" : `${home}/`;
-  const pilot = `mailto:${enterpriseContactEmail}?subject=Classifyre%20pilot`;
+  const pilot = `mailto:${contactEmail}?subject=Classifyre%20pilot`;
 
   return (
     <>

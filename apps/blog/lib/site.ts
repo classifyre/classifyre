@@ -18,7 +18,7 @@ import type { Locale } from "@/lib/locale";
 export { releasesLatestUrl };
 export const repoUrl = "https://github.com/classifyre/classifyre";
 export const showcaseUrl = "https://showcase.classifyre.com/";
-export const enterpriseContactEmail = "contact@classifyre.com";
+export const contactEmail = "contact@classifyre.com";
 
 /**
  * Showcase link for a locale. The showcase is the web app, which serves
@@ -76,6 +76,9 @@ export const docs = {
   sharedDatasets: "https://docs.classifyre.com/data-query/#shared-datasets",
   sqlConnections: "https://docs.classifyre.com/sql-connections/",
   roles: "https://docs.classifyre.com/access/roles/",
+  access: "https://docs.classifyre.com/access/",
+  organizing: "https://docs.classifyre.com/access/organizing/",
+  directory: "https://docs.classifyre.com/access/operations/#connecting-a-company-directory",
   lakehouse: "https://docs.classifyre.com/sources/lakehouse/",
   lineage: "https://docs.classifyre.com/sources/lineage/",
   governance: "https://docs.classifyre.com/sources/assets-and-metadata/",
@@ -86,13 +89,13 @@ export const routes = {
   home: "/",
   get: "/get",
   sources: "/sources",
-  // Page removed; kept so the commented-out landing section still compiles.
-  editions: "/open-source-vs-enterprise",
+  support: "/support",
   madeInEurope: "/made-in-europe",
   blog: "/blog",
   privacy: "/privacy",
   imprint: "/impressum",
   releaseNotes: "/release-notes",
+  incidentResponse: "/use-cases/incident-response",
 } as const;
 
 export { helmChartRef };

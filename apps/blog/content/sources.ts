@@ -86,12 +86,12 @@ export type SourcesCopy = {
 const en: SourcesCopy = {
   hero: {
     mark: "Sources",
-    titleA: "Scan the systems",
+    titleA: "Govern the systems",
     titleBLead: "you",
-    titleBHighlight: "already own.",
+    titleBHighlight: "already run.",
     lede: {
       count: "connectors",
-      tail: "across databases, warehouses and lakehouses, streaming, object storage, collaboration tools, analytics, and public content. Every one is scanned for personal data and secrets; tables in PostgreSQL, MySQL, Databricks, ODBC sources, Delta, Iceberg and files in buckets can also be queried with SQL, masks applied.",
+      tail: "across databases, warehouses and lakehouses, streaming, object storage, collaboration tools, analytics, and public content, all read in place. Every one is classified for personal data and secrets; tables in PostgreSQL, MySQL, Databricks, ODBC sources, Delta, Iceberg and files in buckets are also served to SQL, Excel and Power BI through the same grants, row filters and masks.",
     },
     micro: "{count} connectors · straight from the schema",
     ctaCatalog: "Browse the catalog",
@@ -105,7 +105,7 @@ const en: SourcesCopy = {
   },
   categories: {
     marker: "By category",
-    title: "Where the evidence comes from",
+    title: "Where your data lives",
     lede: "Connectors are grouped by what they are, not by vendor. Counts come straight from the schema, so this page can never drift from what the product actually supports.",
     label: "Category",
     shortLabel: "Connectors",
@@ -134,19 +134,19 @@ const en: SourcesCopy = {
         hrefLabel: "Sampling",
       },
       {
-        title: "Cross-source fingerprints",
-        body: "The same value showing up in two different systems gets linked by identity, which is where most real investigations actually begin.",
-        href: docs.howItWorks,
-        hrefLabel: "How it works",
+        title: "One set of access rules",
+        body: "Grants per group, row filters, masks and the read log work the same whichever system a table comes from, so the access concept is written once, not per database.",
+        href: docs.whoMayQuery,
+        hrefLabel: "Who may query what",
       },
     ],
   },
   closing: {
     titleLead: "Missing the one",
     titleHighlight: "you need?",
-    body: "Connectors are plugins, and the project is open source, so the answer is either a pull request or a conversation. Enterprise customers get sources built for their industry's systems by our engineers.",
+    body: "Connectors are plugins, and the project is open source, so the answer is either a pull request or a conversation. If you need a connector for your industry's systems, or help with setup and tailoring, contact us.",
     ctaPrimary: "Request a connector",
-    ctaSecondary: "Talk to us about enterprise",
+    ctaSecondary: "Contact us for help",
   },
   mascots: {
     hiddenGem:

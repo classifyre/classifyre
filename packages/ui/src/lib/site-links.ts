@@ -61,6 +61,7 @@ export const marketingPaths = {
   home: "/",
   get: "/get/",
   sources: "/sources/",
+  support: "/support/",
   madeInEurope: "/made-in-europe/",
   blog: "/blog/",
   privacy: "/privacy/",

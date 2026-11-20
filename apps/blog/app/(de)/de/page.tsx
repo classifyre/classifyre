@@ -19,44 +19,50 @@ import "../../landing.css";
  */
 
 const description =
-  "Personenbezogene Daten in 40+ Systemen finden, automatisch maskieren und alles mit SQL und Power BI abfragen. DSGVO-konform, On-Premises, Open Source aus Österreich.";
+  "Classifyre setzt Ihr Berechtigungskonzept auf 40+ Systemen durch: Zugriff nach Rolle, Maskierung, Protokollierung. Open Source, im eigenen Rechenzentrum.";
+
+const ogTitle = "Classifyre: Ihr Berechtigungskonzept, bei jeder Abfrage durchgesetzt.";
+const ogDescription =
+  "Ein kontrollierter Zugang zu allen Daten. Zugriff nach Organisationsstruktur, maskierte personenbezogene Daten, lückenlose Protokollierung, alles on-prem.";
 
 export const metadata: Metadata = {
   title: {
-    absolute: "Classifyre: Open-Source-Data-Governance, On-Premises",
+    absolute: "Classifyre: Datenzugriff steuern, Open Source, On-Premises",
   },
   description,
   keywords: [
-    "Data Governance",
-    "Open Source Data Governance",
-    "Datenklassifizierung",
+    "Berechtigungskonzept",
+    "Berechtigungskonzept umsetzen",
+    "Datenzugriff steuern",
+    "Zugriffssteuerung",
+    "Rollen- und Rechtekonzept",
+    "Need-to-know-Prinzip",
+    "Data Governance Plattform Open Source",
     "Datenmaskierung",
-    "dynamische Datenmaskierung",
-    "personenbezogene Daten finden",
-    "DSGVO-konform",
+    "Pseudonymisierung",
+    "Zeilenfilter",
+    "Protokollierung",
     "Datensouveränität",
     "On-Premises",
-    "Pseudonymisierung",
-    "Zugriffsprotokoll",
+    "DSGVO",
   ],
   alternates: {
     canonical: "/de/",
     languages: { en: "/", de: "/de/", "x-default": "/" },
   },
   openGraph: {
-    title: "Classifyre: Finden. Schützen. Nutzen.",
-    description:
-      "Open-Source-Data-Governance: personenbezogene Daten finden, in der Abfrage maskieren und mit SQL, Excel und Power BI nutzen. Jeder Zugriff protokolliert. Nichts verlässt Ihre Server.",
+    title: ogTitle,
+    description: ogDescription,
     type: "website",
-    images: [ogImage("de", "home", "Classifyre: Finden. Schützen. Nutzen.")],
+    images: [ogImage("de", "home", ogTitle)],
     locale: "de_AT",
     alternateLocale: ["de_DE", "en_US"],
   },
   twitter: {
     card: "summary_large_image",
-    images: [ogImage("de", "home", "Classifyre: Finden. Schützen. Nutzen.").url],
-    title: "Classifyre: Finden. Schützen. Nutzen.",
-    description,
+    images: [ogImage("de", "home", ogTitle).url],
+    title: ogTitle,
+    description: ogDescription,
   },
 };
 

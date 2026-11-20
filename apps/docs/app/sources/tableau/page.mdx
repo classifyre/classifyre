@@ -4,7 +4,7 @@ description: Scan Tableau workbooks and published data sources — personal acce
 ---
 
 import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
-import { LineageNote, SharedSettingsNote } from "@/components/source-notes";
+import { LineageNote, QueryNote, SharedSettingsNote } from "@/components/source-notes";
 
 # Tableau
 
@@ -54,6 +54,13 @@ hops in a lineage path.
 See [Lineage & Relationships](/sources/lineage/).
 
 </LineageNote>
+
+## Query data & SQL connections
+
+<QueryNote support="none">
+  Workbooks and published data sources describe BI content; they are not row
+  tables, so there is nothing SQL could read.
+</QueryNote>
 
 ## Worth knowing
 

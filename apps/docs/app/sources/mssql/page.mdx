@@ -5,7 +5,7 @@ description: Scan Microsoft SQL Server tables and views — extraction, metadata
 ---
 
 import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
-import { SqlSourceNotes, LineageNote, SharedSettingsNote } from "@/components/source-notes";
+import { SqlSourceNotes, LineageNote, QueryNote, SharedSettingsNote } from "@/components/source-notes";
 
 # Microsoft SQL Server
 
@@ -64,6 +64,14 @@ take table lineage without paying for a query-history sweep. See
 [Lineage & Relationships](/sources/lineage/).
 
 </LineageNote>
+
+## Query data & SQL connections
+
+<QueryNote support="none">
+  SQL Server has no DuckDB connector. Its ODBC driver is the way in: scan it
+  through an ODBC source instead — the same tables under the same names,
+  queryable.
+</QueryNote>
 
 ## Worth knowing
 

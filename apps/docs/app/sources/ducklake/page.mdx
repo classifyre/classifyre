@@ -4,7 +4,7 @@ description: Scan DuckLake tables — catalog in Postgres, MySQL, SQLite or Duck
 ---
 
 import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
-import { SqlSourceNotes, SharedSettingsNote } from "@/components/source-notes";
+import { SqlSourceNotes, QueryNote, SharedSettingsNote } from "@/components/source-notes";
 
 # DuckLake
 
@@ -39,6 +39,10 @@ renamed column reads as one column.
 ## Metadata on every asset
 
 <SourceMetadata type="DUCKLAKE" />
+
+## Query data & SQL connections
+
+<QueryNote support="catalog" />
 
 ## Worth knowing
 

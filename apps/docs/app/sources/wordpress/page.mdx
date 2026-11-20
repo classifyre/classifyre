@@ -4,7 +4,7 @@ description: Scan WordPress posts and pages through the REST API — including d
 ---
 
 import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
-import { LineageNote, SharedSettingsNote } from "@/components/source-notes";
+import { LineageNote, QueryNote, SharedSettingsNote } from "@/components/source-notes";
 
 # WordPress
 
@@ -41,6 +41,14 @@ assets.
 ## Lineage
 
 <LineageNote />
+
+## Query data & SQL connections
+
+<QueryNote support="none">
+  Posts, pages and comments are content, not tables, so there is nothing SQL
+  could read. Use WordPress search, or land the data in a bucket as Parquet or
+  Delta.
+</QueryNote>
 
 ## Worth knowing
 

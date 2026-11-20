@@ -152,37 +152,6 @@ html.login-pf,
   color: rgb(255 255 255 / 0.6);
 }
 
-/* Exhibit stamps pinned to the corners of the file, as on the landing. */
-.pf-v5-c-login::before,
-.pf-v5-c-login::after {
-  position: fixed;
-  border: 2px solid rgb(255 255 255 / 0.22);
-  padding: 0.3rem 0.7rem;
-  font-family: var(--cl-font-mono);
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.22em;
-  color: rgb(255 255 255 / 0.35);
-  pointer-events: none;
-}
-
-@media (min-width: 768px) {
-  .pf-v5-c-login::before {
-    content: "Exhibit A" / "";
-    top: 1.5rem;
-    left: 1.5rem;
-    transform: rotate(-6deg);
-  }
-
-  .pf-v5-c-login::after {
-    content: "Classifyre" / "";
-    right: 1.5rem;
-    bottom: 1.5rem;
-    transform: rotate(3deg);
-  }
-}
-
 /* The language switch in the card's corner: case-file microtype, like the labels. */
 .pf-v5-c-login__main-header-utilities .pf-v5-c-form-control {
   --pf-v5-c-form-control--BackgroundColor: transparent;

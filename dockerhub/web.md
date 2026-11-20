@@ -3,11 +3,11 @@
 
 # Classifyre Web
 
-**Frontend of Classifyre, open-source data governance — find personal data, mask it, grant access and query it in the browser.**
+**Frontend of Classifyre, open-source data access governance — grant access by group, mask personal data and query it in the browser.**
 
 </div>
 
-Classifyre finds personal data and secrets across the systems you already run — databases, lakehouses, file shares, Confluence, Jira, SharePoint, S3, Git — **masks them automatically**, and lets your team query everything with SQL, Excel and Power BI. Every read is logged; nothing leaves your servers. This `classifyre/web` image is the investigator-facing Next.js UI: browse findings, manage standing inquiries, review duplicate clusters, build cases and hypotheses, configure sources, detectors and AI providers. The bundled documentation is served alongside the app.
+Classifyre is open-source data access governance you run yourself: one governed way into the systems you already run (databases, lakehouses, file shares, Confluence, Jira, SharePoint, S3, Git). Departments, roles and groups from your directory decide who sees which tables, rows and columns; personal data is **masked inside the query** until someone is cleared to see it; people use the result in SQL, Excel, Power BI and AI agents. Every read is logged; nothing leaves your servers. This `classifyre/web` image is the Next.js UI: connect and classify sources, manage groups, grants, row filters and masks, query data and share datasets, review the read log, and, when something leaks, work findings into inquiries, duplicate clusters and cases. The bundled documentation is served alongside the app.
 
 It is one of three service images — with [`classifyre/api`](https://hub.docker.com/r/classifyre/api) (backend) and [`classifyre/cli`](https://hub.docker.com/r/classifyre/cli) (scan jobs) — composed into the [`classifyre/all-in-one`](https://hub.docker.com/r/classifyre/all-in-one) image and deployed separately by the [`classifyre/classifyre-core`](https://hub.docker.com/r/classifyre/classifyre-core) Helm chart.
 

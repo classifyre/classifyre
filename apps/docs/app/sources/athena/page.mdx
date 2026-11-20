@@ -4,7 +4,7 @@ description: Scan the tables in the AWS Glue Data Catalog through Amazon Athena 
 ---
 
 import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
-import { SqlSourceNotes, LineageNote, SharedSettingsNote } from "@/components/source-notes";
+import { SqlSourceNotes, LineageNote, QueryNote, SharedSettingsNote } from "@/components/source-notes";
 
 # Amazon Athena
 
@@ -47,6 +47,14 @@ Views and the tables they read are recorded as lineage, from the SQL Athena
 stores with each view. See [Lineage & Relationships](/sources/lineage/).
 
 </LineageNote>
+
+## Query data & SQL connections
+
+<QueryNote support="none">
+  DuckDB has no built-in connector for Athena. Athena ships an ODBC driver, so
+  an ODBC source can read — and query — it instead; otherwise land the data in
+  a bucket as Parquet or Delta.
+</QueryNote>
 
 ## Worth knowing
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { SAMPLE_ROWS, maskValue } from "@/content/sample-data";
+import { maskValue, sampleRows } from "@/content/sample-data";
 import type { Locale } from "@/lib/locale";
 import {
   Caret,
@@ -29,7 +29,7 @@ const L = {
     ],
     create: "Create connection",
     created: "Created",
-    string: "Server=sql.example.at:5432;Database=finance;User=lena_power_bi;SSL=verify-full",
+    string: "Server=sql.example.com:5432;Database=finance;User=lena_power_bi;SSL=verify-full",
     report: "Customers report · via SQL connection Power BI",
     log: "09:14 · Lena read crm.customers via SQL connection Power BI",
   },
@@ -48,12 +48,8 @@ const L = {
   },
 } as const;
 
-const BARS = [
-  { city: "Graz", value: 0.82 },
-  { city: "Linz", value: 0.46 },
-  { city: "Wien", value: 0.95 },
-  { city: "Salzburg", value: 0.58 },
-];
+/** Bar heights, one per sample row's city. */
+const BAR_VALUES = [0.82, 0.46, 0.95, 0.58];
 
 export function BiDemo({ locale, caption }: { locale: Locale; caption?: string }) {
   const l = L[locale];
@@ -101,7 +97,7 @@ export function BiDemo({ locale, caption }: { locale: Locale; caption?: string }
         <div className="min-w-0 border-2 border-[#0a0a0a] p-3" style={{ opacity: 0.25 + 0.75 * step(t, reportAt, 300) }}>
           <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#0a0a0a]/60">{l.report}</div>
           <div className="mt-3 flex h-[92px] items-end gap-3">
-            {BARS.map((bar, i) => (
+            {sampleRows(locale).map((row, i) => ({ city: row.city, value: BAR_VALUES[i] ?? 0.5 })).map((bar, i) => (
               <div key={bar.city} className="flex flex-1 flex-col items-center gap-1">
                 <div
                   className="w-full bg-[#0a0a0a]"
@@ -113,7 +109,7 @@ export function BiDemo({ locale, caption }: { locale: Locale; caption?: string }
           </div>
           <table className="mt-3 w-full border-collapse font-mono text-[11.5px]">
             <tbody>
-              {SAMPLE_ROWS.slice(0, 3).map((row, i) => (
+              {sampleRows(locale).slice(0, 3).map((row, i) => (
                 <tr
                   key={row.email}
                   className="border-t border-[#0a0a0a]/10"

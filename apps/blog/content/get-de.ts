@@ -57,7 +57,7 @@ const deDocker = {
 
 const deFirstRun = {
   marker: "Erster Lauf",
-  title: "In vier Schritten zum ersten Befund",
+  title: "In vier Schritten zum kontrollierten Zugriff auf eine Quelle",
   lede: "Nichts hier braucht eine Konfigurationsdatei. Jeder Schritt passiert in der App, und jeder hat eine Seite in der Doku, wenn Sie ins Detail wollen.",
   action: { label: "App-Tour", href: docs.inTheApp },
   steps: [
@@ -75,17 +75,17 @@ const deFirstRun = {
     },
     {
       step: "03",
-      title: "Detektoren einschalten",
-      body: "Aktivieren Sie die Built-in-Packs, die Sie interessieren: PII, Secrets, Security, Moderation, Qualität. Sie greifen beim ersten Scan, ganz ohne Modell-Setup.",
+      title: "Klassifizieren",
+      body: "Aktivieren Sie die Built-in-Packs, die Sie interessieren: PII, Secrets, Qualität. Sie greifen beim ersten Scan, ganz ohne Modell-Setup, und die entstehende Klassifizierung entscheidet, welche Spalten maskiert werden.",
       href: docs.preBuiltDetectors,
       hrefLabel: "Vorgefertigte Detektoren",
     },
     {
       step: "04",
-      title: "Scannen, Fall eröffnen",
-      body: "Befunde landen nach Wichtigkeit gereiht. Gruppieren Sie sie in Anfragen und Fälle, oder binden Sie einen KI-Anbieter an und lassen Sie den Autopiloten sie zwischen den Scans bearbeiten.",
-      href: docs.aiProviders,
-      hrefLabel: "KI-Anbieter",
+      title: "Einer Gruppe kontrollierten Zugriff geben",
+      body: "Geben Sie einer Gruppe Data reader auf die Quelle und setzen Sie einen Zeilenfilter, wenn sie nur ihre Zeilen sehen soll. Personenbezogene Spalten kommen maskiert an. Fragen Sie auf der SQL-Seite oder aus Power BI ab und sehen Sie den Zugriff im Protokoll.",
+      href: docs.whoMayQuery,
+      hrefLabel: "Wer was abfragen darf",
     },
   ],
 } as const;
@@ -152,9 +152,9 @@ const deWhich = {
     "Der Bestand ist groß genug, um auffächernde Worker zu brauchen.",
     "Es muss in Ihrem bestehenden Cluster und Netz sitzen.",
   ],
-  enterpriseNote:
-    "Fragen Sie sich, was Enterprise auf beide Runtimes noch drauflegt? Keine Funktionen: SSO, Rollen und Maskierung sind Open Source. Enterprise ist dasselbe Produkt, auf Ihre Organisation zugeschnitten, mit Support und SLA; Sie oder Ihr Integrator können es auch ohne uns betreiben.",
-  enterpriseCta: "Open Source vs. Enterprise",
+  supportNote:
+    "Kein separater Enterprise-Build, keine gesperrten Funktionen: SSO, Rollen und Maskierung sind Open Source. Wenn Sie Hilfe bei Einführung, Installation, einem Konnektor für Ihre Systeme oder Anpassung brauchen, kontaktieren Sie uns — Sie oder Ihr Integrator können auch alles selbst betreiben.",
+  supportCta: "So funktioniert Support",
 } as const;
 
 const deClosing = {

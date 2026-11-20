@@ -154,19 +154,19 @@ export function DocsHome() {
           className="text-[17vw] leading-[0.88] uppercase sm:text-7xl md:text-8xl"
           style={{ fontFamily: "var(--font-hero)" }}
         >
-          Find it.
+          Your access rules,
           <br />
-          Protect it.{" "}
+          enforced on{" "}
           <span className="bg-accent px-2 text-accent-foreground">
-            Use it.
+            every query.
           </span>
         </h1>
         <p className="mt-6 max-w-2xl text-lg leading-7 text-muted-foreground">
-          Classifyre finds personal data and secrets across the systems you
-          already run, masks them automatically, and lets your team query
-          everything with SQL, Excel and Power BI. Every read is logged, and
-          all of it is open source. These docs explain how the application
-          works, section by section.
+          Classifyre is the one governed way into your organisation&apos;s
+          data: access follows your departments, roles and rules, personal
+          data stays masked until someone is cleared for it, and every read is
+          on record, on your own servers. All of it is open source. These docs
+          explain how the application works, section by section.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <a

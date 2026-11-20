@@ -4,7 +4,7 @@ description: Scan Databricks Unity Catalog tables, notebooks and Delta Live Tabl
 ---
 
 import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
-import { SqlSourceNotes, LineageNote, SharedSettingsNote } from "@/components/source-notes";
+import { SqlSourceNotes, LineageNote, QueryNote, SharedSettingsNote } from "@/components/source-notes";
 
 # Databricks
 
@@ -85,6 +85,10 @@ The scanning identity needs two grants on top of what it reads:
 See [Lineage & Relationships](/sources/lineage/).
 
 </LineageNote>
+
+## Query data & SQL connections
+
+<QueryNote support="databricks" />
 
 ## Worth knowing
 

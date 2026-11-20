@@ -4,11 +4,11 @@ import * as React from "react";
 import {
   BarChart3,
   Database,
+  EyeOff,
   FileSearch,
   GitMerge,
-  KeyRound,
   ScrollText,
-  ShieldCheck,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 
@@ -20,7 +20,8 @@ import { Micro } from "@/components/landing/motifs";
 
 /**
  * The path data takes through Classifyre, as a thread with seven stations:
- * connect, detect, govern, grant, share, connect BI, log.
+ * connect, classify, organise (groups and grants), mask, build (data
+ * products), use (BI, Excel, agents), log.
  *
  * A lime pulse runs along the thread; the station it reaches lights up, and
  * on every lap each station moves on to its next example (another source,
@@ -32,8 +33,8 @@ import { Micro } from "@/components/landing/motifs";
 const ICONS: readonly LucideIcon[] = [
   Database,
   FileSearch,
-  ShieldCheck,
-  KeyRound,
+  Users,
+  EyeOff,
   GitMerge,
   BarChart3,
   ScrollText,

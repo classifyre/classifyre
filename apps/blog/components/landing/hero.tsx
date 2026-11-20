@@ -3,7 +3,13 @@ import { DockerRunBlock } from "@workspace/ui/components";
 import { getLandingCopy } from "@/content/landing";
 import type { Locale } from "@/lib/locale";
 import { withLocalePrefix } from "@/lib/locale";
-import { docs, routes, showcaseUrlFor, softwareVersion } from "@/lib/site";
+import {
+  docs,
+  contactEmail,
+  routes,
+  showcaseUrlFor,
+  softwareVersion,
+} from "@/lib/site";
 import { ClosingBoard } from "@/components/closing-board";
 import { ExhibitMark, Micro, Pin } from "@/components/landing/motifs";
 import { GovernancePath } from "@/components/landing/governance-path";
@@ -18,12 +24,19 @@ import { RedactionSheet } from "@/components/landing/redaction-sheet";
  * takes through Classifyre (connected, found, governed, granted, shared,
  * connected to BI, logged), with a pulse travelling it.
  *
+ * Two readers, two buttons: the buyer plans a pilot mapped onto their own
+ * organisation, the engineer jumps to the Docker command. The showcase is a
+ * quiet text link, and the proof line sits under all of it.
+ *
  * The bottom edge is the install strip, so the page answers "how do I run
  * it" before the first scroll ends. No signup, no form.
  */
 export function Hero({ locale }: { locale: Locale }) {
   const copy = getLandingCopy(locale);
   const showcase = showcaseUrlFor(locale);
+  const pilot = `mailto:${contactEmail}?subject=${encodeURIComponent(
+    locale === "de" ? "Classifyre-Pilot" : "Classifyre pilot",
+  )}`;
 
   return (
     <section
@@ -44,7 +57,8 @@ export function Hero({ locale }: { locale: Locale }) {
 
             <h1
               id="hero-title"
-              className="font-hero text-[clamp(3.4rem,8vw,6.4rem)] uppercase leading-[0.86] tracking-[0.01em] text-white"
+              lang={locale}
+              className="font-hero text-[clamp(3rem,7vw,5.4rem)] uppercase leading-[0.88] tracking-[0.01em] text-white [hyphens:manual]"
             >
               {copy.hero.titleA.split(/(?<=\.)\s+/).map((line) => (
                 <span key={line} className="block">
@@ -65,22 +79,30 @@ export function Hero({ locale }: { locale: Locale }) {
 
             <div className="flex flex-wrap items-center gap-3">
               <a
-                href="#run-it"
+                href={pilot}
                 className="inline-flex items-center border-2 border-accent bg-accent px-5 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-black transition-colors hover:border-white hover:bg-white"
               >
                 {copy.hero.ctaPrimary}
               </a>
               <a
-                href={showcase}
-                target="_blank"
-                rel="noreferrer"
+                href="#run-it"
                 className="inline-flex items-center border-2 border-white/25 px-5 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-white transition-colors hover:border-accent hover:text-accent"
               >
                 {copy.hero.ctaSecondary}
               </a>
+              <a
+                href={showcase}
+                target="_blank"
+                rel="noreferrer"
+                className="group inline-flex items-center gap-2 py-2.5"
+              >
+                <Pin solid={false} />
+                <Micro className="text-white/60 transition-colors group-hover:text-accent">
+                  {copy.hero.ctaShowcase} →
+                </Micro>
+              </a>
             </div>
 
-            <Micro className="block text-white/40">{copy.hero.micro}</Micro>
           </div>
 
           {/* The exhibit: a customer table, redacted as you watch. */}
@@ -105,7 +127,7 @@ export function Hero({ locale }: { locale: Locale }) {
             {[
               { label: copy.install.dockerCta, href: `${withLocalePrefix(locale, routes.get)}/` },
               { label: copy.install.helmCtaDocs, href: docs.kubernetes },
-              { label: copy.hero.ctaSecondary, href: showcase },
+              { label: copy.hero.ctaShowcase, href: showcase },
             ].map((link) => (
               <a
                 key={link.href}

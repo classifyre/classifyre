@@ -198,7 +198,7 @@ export const metadata: Metadata = {
     template: "%s | Classifyre Docs",
   },
   description:
-    "Documentation for Classifyre, open-source data governance: find personal data and secrets, mask them automatically, query everything with SQL, Excel and Power BI, and keep every read on record.",
+    "Documentation for Classifyre, open-source data access governance: access by department and role across 40+ systems, personal data masked by default, every read on record.",
   keywords: [
     "classifyre",
     "documentation",
@@ -226,7 +226,7 @@ export const metadata: Metadata = {
     type: "website",
     title: "Classifyre Docs",
     description:
-      "Documentation for Classifyre, open-source data governance: find personal data and secrets, mask them automatically, query everything with SQL, Excel and Power BI, and keep every read on record.",
+      "Documentation for Classifyre, open-source data access governance: access by department and role across 40+ systems, personal data masked by default, every read on record.",
     url: docsSiteUrl,
     siteName: "Classifyre Docs",
   },
@@ -234,7 +234,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Classifyre Docs",
     description:
-      "Documentation for Classifyre, open-source data governance: find personal data and secrets, mask them automatically, query everything with SQL, Excel and Power BI, and keep every read on record.",
+      "Documentation for Classifyre, open-source data access governance: access by department and role across 40+ systems, personal data masked by default, every read on record.",
   },
 };
 

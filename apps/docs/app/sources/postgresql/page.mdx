@@ -4,7 +4,7 @@ description: Scan PostgreSQL tables and views — what Classifyre extracts, the 
 ---
 
 import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
-import { SqlSourceNotes, LineageNote, SharedSettingsNote } from "@/components/source-notes";
+import { SqlSourceNotes, LineageNote, QueryNote, SharedSettingsNote } from "@/components/source-notes";
 
 # PostgreSQL
 
@@ -59,6 +59,10 @@ It's held against the table's platform name and completes itself if that schema
 is ever scanned — see [Lineage & Relationships](/sources/lineage/).
 
 </LineageNote>
+
+## Query data & SQL connections
+
+<QueryNote support="database" />
 
 ## Worth knowing
 

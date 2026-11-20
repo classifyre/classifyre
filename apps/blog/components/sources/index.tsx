@@ -8,7 +8,7 @@ import { getAllSourceDocs } from "@workspace/schemas/source-docs";
 import { getSourcesCopy } from "@/content/sources";
 import type { Locale } from "@/lib/locale";
 import { withLocalePrefix } from "@/lib/locale";
-import { docs, enterpriseContactEmail, repoUrl, routes } from "@/lib/site";
+import { docs, contactEmail, repoUrl, routes } from "@/lib/site";
 import { ClosingBoard } from "@/components/closing-board";
 import { Mascot } from "@/components/mascot";
 import {
@@ -275,7 +275,7 @@ export function SourcesPage({ locale }: { locale: Locale }) {
                 {copy.closing.ctaPrimary}
               </a>
               <a
-                href={`mailto:${enterpriseContactEmail}`}
+                href={`mailto:${contactEmail}`}
                 className="inline-flex items-center border-2 border-white/25 px-5 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-white transition-colors hover:border-accent hover:text-accent"
               >
                 {copy.closing.ctaSecondary}

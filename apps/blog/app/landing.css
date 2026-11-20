@@ -464,6 +464,25 @@ body {
   display: none;
 }
 
+/* The district analyst's row filter: rows outside her district grey out
+   (kept in place so the sheet doesn't jump), and the filter tag shows. */
+.cl-row {
+  transition: opacity 0.4s ease;
+}
+
+.cl-sheet[data-persona="analyst"]:not([data-intro]) .cl-row-out {
+  opacity: 0.12;
+}
+
+.cl-filter-tag {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.cl-sheet[data-persona="analyst"]:not([data-intro]) .cl-filter-tag {
+  opacity: 1;
+}
+
 /* ── The intro: print, tag, sweep ───────────────────────────────── */
 
 .cl-sheet[data-intro] .cl-row {

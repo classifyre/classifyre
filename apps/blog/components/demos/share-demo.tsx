@@ -2,7 +2,7 @@
 
 import { cn } from "@workspace/ui/lib/utils";
 
-import { SAMPLE_ROWS, sampleHash } from "@/content/sample-data";
+import { sampleHash, sampleRows } from "@/content/sample-data";
 import type { Locale } from "@/lib/locale";
 import {
   Caret,
@@ -127,7 +127,7 @@ export function ShareDemo({ locale, caption }: { locale: Locale; caption?: strin
         </div>
         <table className="mt-1 w-full border-collapse font-mono text-[11.5px]">
           <tbody>
-            {SAMPLE_ROWS.slice(0, 2).map((row, i) => (
+            {sampleRows(locale).slice(0, 2).map((row, i) => (
               <tr key={row.email} className="border-t border-[#0a0a0a]/10">
                 <td className="py-1 pr-3 text-[#0a0a0a]/60">{sampleHash(row.email)}</td>
                 <td className="py-1 pr-3">{row.city}</td>

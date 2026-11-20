@@ -22,44 +22,48 @@ import "../landing.css";
  */
 
 const description =
-  "Find personal data and secrets across 40+ systems, mask it automatically, and query everything with SQL and Power BI. Apache-2.0, self-hosted, made in Austria.";
+  "Control who sees which data across 40+ systems: access by department and role, masking by default, every read logged. Open source, on your own infrastructure — on-premises, your own cloud, or AWS, Azure or Google Cloud.";
+
+const ogTitle = "Classifyre: Your access rules, enforced on every query.";
+const ogDescription =
+  "One governed way into all your data. Access follows your org structure, personal data stays masked, every read is logged, nothing leaves your servers.";
 
 export const metadata: Metadata = {
   title: {
-    absolute: "Classifyre: Open-Source Data Governance, Self-Hosted",
+    absolute: "Classifyre: Open-Source Data Access Governance Platform",
   },
   description,
   keywords: [
-    "data governance",
-    "open source data governance",
     "data access governance",
-    "PII discovery",
-    "data masking",
-    "dynamic data masking",
-    "data classification",
-    "federated SQL",
+    "governed data access",
+    "open source data governance",
     "self-hosted data governance",
-    "GDPR compliant data access",
-    "Power BI gateway",
+    "role-based access control",
+    "attribute-based access control",
+    "row-level security",
+    "dynamic data masking",
+    "pseudonymisation",
+    "data products",
+    "GDPR data access",
+    "Power BI governed access",
   ],
   alternates: {
     canonical: "/",
     languages: { en: "/", de: "/de/", "x-default": "/" },
   },
   openGraph: {
-    title: "Classifyre: Find it. Protect it. Use it.",
-    description:
-      "Open-source data governance: find personal data, mask it inside the query, and let people use SQL, Excel and Power BI. Every read is logged. Nothing leaves your servers.",
+    title: ogTitle,
+    description: ogDescription,
     type: "website",
-    images: [ogImage("en", "home", "Classifyre: Find it. Protect it. Use it.")],
+    images: [ogImage("en", "home", ogTitle)],
     locale: "en_US",
     alternateLocale: ["de_AT", "de_DE"],
   },
   twitter: {
     card: "summary_large_image",
-    images: [ogImage("en", "home", "Classifyre: Find it. Protect it. Use it.").url],
-    title: "Classifyre: Find it. Protect it. Use it.",
-    description,
+    images: [ogImage("en", "home", ogTitle).url],
+    title: ogTitle,
+    description: ogDescription,
   },
 };
 

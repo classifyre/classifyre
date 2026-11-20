@@ -5,7 +5,7 @@ import * as React from "react";
 import { cn } from "@workspace/ui/lib/utils";
 
 import { getLandingCopy } from "@/content/landing";
-import { SAMPLE_ROWS, maskValue, sampleHash } from "@/content/sample-data";
+import { maskValue, sampleHash, sampleRows } from "@/content/sample-data";
 import type { Locale } from "@/lib/locale";
 import { Micro } from "@/components/landing/motifs";
 import { typed, typedEnd, useTimeline } from "@/components/demos/timeline";
@@ -29,14 +29,13 @@ type Variant = {
   clear: Result;
 };
 
-const TICKETS: Record<string, number> = {
-  "anna@example.at": 3,
-  "lukas@example.at": 1,
-  "marie@example.de": 2,
-};
+/** Support tickets per customer, by row position. */
+const TICKETS = [3, 1, 2];
 
-function buildVariants(): Record<string, Variant> {
-  const rows = SAMPLE_ROWS.slice(0, 3);
+function buildVariants(locale: Locale): Record<string, Variant> {
+  const all = sampleRows(locale);
+  const rows = all.slice(0, 3);
+  const ibanPrefix = (rows[0]?.iban ?? "").slice(0, 4);
   const clear = (text: string): Cell => ({ text, cleared: true });
   const plain = (text: string): Cell => ({ text });
   const masked = (text: string): Cell => ({ text, masked: true });
@@ -58,12 +57,12 @@ function buildVariants(): Record<string, Variant> {
       },
     },
     where: {
-      sql: "SELECT name, city\nFROM crm.customers\nWHERE iban LIKE 'AT61%';",
+      sql: `SELECT name, city\nFROM crm.customers\nWHERE iban LIKE '${ibanPrefix}%';`,
       masked: { columns: ["name", "city"], rows: [] },
       clear: {
         columns: ["name", "city"],
         rows: rows
-          .filter((r) => r.iban.startsWith("AT61"))
+          .filter((r) => r.iban.startsWith(ibanPrefix))
           .map((r) => [clear(r.name), plain(r.city)]),
       },
     },
@@ -73,29 +72,32 @@ function buildVariants(): Record<string, Variant> {
         columns: ["email", "tickets"],
         rows: rows.map((r) => [
           masked(sampleHash(r.email)),
-          plain(String(TICKETS[r.email] ?? 0)),
+          plain(String(TICKETS[rows.indexOf(r)] ?? 0)),
         ]),
       },
       clear: {
         columns: ["email", "tickets"],
-        rows: rows.map((r) => [clear(r.email), plain(String(TICKETS[r.email] ?? 0))]),
+        rows: rows.map((r, i) => [clear(r.email), plain(String(TICKETS[i] ?? 0))]),
       },
     },
     group: {
       sql: "SELECT city, count(DISTINCT email) AS customers\nFROM crm.customers\nGROUP BY city;",
       masked: {
         columns: ["city", "customers"],
-        rows: SAMPLE_ROWS.map((r) => [plain(r.city), plain("1")]),
+        rows: all.map((r) => [plain(r.city), plain("1")]),
       },
       clear: {
         columns: ["city", "customers"],
-        rows: SAMPLE_ROWS.map((r) => [plain(r.city), plain("1")]),
+        rows: all.map((r) => [plain(r.city), plain("1")]),
       },
     },
   };
 }
 
-const VARIANTS = buildVariants();
+const VARIANTS: Record<Locale, Record<string, Variant>> = {
+  en: buildVariants("en"),
+  de: buildVariants("de"),
+};
 
 const CPS = 55;
 
@@ -109,7 +111,8 @@ export function ReadersPanel({ locale }: { locale: Locale }) {
   const labels = locale === "de" ? { run: "Ausführen" } : { run: "Run" };
 
   // The script: one segment per query.
-  const segments = r.variants.map((v) => VARIANTS[v.id] ?? VARIANTS.select!);
+  const variants = VARIANTS[locale];
+  const segments = r.variants.map((v) => variants[v.id] ?? variants.select!);
   const starts: number[] = [];
   let cursor = 0;
   const plan = segments.map((variant) => {

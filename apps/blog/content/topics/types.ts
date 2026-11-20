@@ -10,7 +10,10 @@ import type { MascotName } from "@/components/mascot";
  * command and a pilot. The comparison pages add a dated, sourced table.
  */
 
-export type TopicId = "immuta-alternative" | "unity-catalog-alternative";
+export type TopicId =
+  | "data-access-governance"
+  | "immuta-alternative"
+  | "unity-catalog-alternative";
 
 export type { DemoId } from "@/components/demos";
 

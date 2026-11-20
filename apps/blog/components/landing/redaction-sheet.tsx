@@ -7,7 +7,8 @@ import { cn } from "@workspace/ui/lib/utils";
 import { getLandingCopy } from "@/content/landing";
 import {
   SAMPLE_COLUMNS,
-  SAMPLE_ROWS,
+  sampleRowFilterCity,
+  sampleRows,
   maskValue,
   type MaskKind,
 } from "@/content/sample-data";
@@ -24,12 +25,22 @@ import { Micro } from "@/components/landing/motifs";
  * without JavaScript and is skipped under `prefers-reduced-motion`: the base
  * styles are the final, masked state.
  *
- * Then the sheet keeps going on its own: it switches to the unmasked reader
- * (bars lift, lime goes under every cleared value) and back, until someone takes the switch themselves. The badge
- * hangs over the sheet's corner, the way the case file used to carry it.
+ * Then the sheet keeps going on its own, through three people reading the
+ * same query: the regional analyst (her group's row filter greys out every
+ * row outside her city, the masks stay), the finance steward (bars lift, lime
+ * goes under every cleared value) and the workspace admin (every row, still
+ * masked: admins don't read in clear by default). It cycles until someone
+ * takes the switch themselves. The badge hangs over the sheet's corner, the
+ * way the case file used to carry it.
  */
 
-type Persona = "analyst" | "steward";
+type Persona = "analyst" | "steward" | "admin";
+
+const PERSONAS: readonly Persona[] = ["analyst", "steward", "admin"];
+
+function nextPersona(p: Persona): Persona {
+  return PERSONAS[(PERSONAS.indexOf(p) + 1) % PERSONAS.length] ?? "analyst";
+}
 
 const SWEEP_START_MS = 1500;
 const SWEEP_STEP_MS = 320;
@@ -43,6 +54,8 @@ function sweepDelay(index: number): number {
 
 export function RedactionSheet({ locale, badge = true }: { locale: Locale; badge?: boolean }) {
   const copy = getLandingCopy(locale).sheet;
+  const rows = sampleRows(locale);
+  const filterCity = sampleRowFilterCity(locale);
   const [persona, setPersona] = React.useState<Persona>("analyst");
   const [run, setRun] = React.useState(0);
   const [intro, setIntro] = React.useState(true);
@@ -59,7 +72,7 @@ export function RedactionSheet({ locale, badge = true }: { locale: Locale; badge
       setIntro(false);
       setPersona("steward");
       interval = window.setInterval(() => {
-        setPersona((p) => (p === "analyst" ? "steward" : "analyst"));
+        setPersona(nextPersona);
       }, AUTO_EVERY_MS);
     }, AUTO_FIRST_MS);
     return () => {
@@ -102,15 +115,24 @@ export function RedactionSheet({ locale, badge = true }: { locale: Locale; badge
         data-intro={intro ? "" : undefined}
         aria-labelledby="sheet-caption"
       >
-        <div className="border-b-2 border-[#0a0a0a] px-4 py-2.5 sm:px-5">
-          <code className="block truncate font-mono text-[12px] text-[#0a0a0a]/80 sm:text-[13px]">
+        <div className="flex items-center gap-3 border-b-2 border-[#0a0a0a] px-4 py-2.5 sm:px-5">
+          <code className="block min-w-0 truncate font-mono text-[12px] text-[#0a0a0a]/80 sm:text-[13px]">
             <span className="font-semibold text-[#0a0a0a]">SELECT</span> *{" "}
             <span className="font-semibold text-[#0a0a0a]">FROM</span> crm.customers
           </code>
+          <span className="cl-filter-tag shrink-0 whitespace-nowrap border border-[#0a0a0a] bg-accent px-1.5 py-px font-mono text-[10px] text-black">
+            {copy.rowFilter}
+          </span>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[480px] border-collapse text-left">
+        {/*
+          The table is wider than a phone and grows again when the hidden
+          column folds open, so this scrolls sideways by design. The
+          scrollbar chrome is hidden so switching readers never flashes one
+          under the hero query line; touch and keyboard scrolling still work.
+        */}
+        <div className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <table className="w-full min-w-[540px] border-collapse text-left">
             <thead>
               <tr className="border-b border-[#0a0a0a]/20 align-bottom">
                 {SAMPLE_COLUMNS.map((col) => {
@@ -161,10 +183,13 @@ export function RedactionSheet({ locale, badge = true }: { locale: Locale; badge
               </tr>
             </thead>
             <tbody>
-              {SAMPLE_ROWS.map((row, rowIndex) => (
+              {rows.map((row, rowIndex) => (
                 <tr
                   key={row.email}
-                  className="cl-row border-b border-[#0a0a0a]/10 last:border-b-0"
+                  className={cn(
+                    "cl-row border-b border-[#0a0a0a]/10 last:border-b-0",
+                    row.city !== filterCity && "cl-row-out",
+                  )}
                   style={{ "--cl-delay": `${rowIndex * 90}ms` } as React.CSSProperties}
                 >
                   {SAMPLE_COLUMNS.map((col) => {
@@ -206,7 +231,7 @@ export function RedactionSheet({ locale, badge = true }: { locale: Locale; badge
         >
           <div role="radiogroup" aria-label={copy.readAs} className="flex flex-wrap items-center gap-2">
             <Micro className="mr-1 text-[#0a0a0a]/55">{copy.readAs}</Micro>
-            {(["analyst", "steward"] as const).map((key) => (
+            {PERSONAS.map((key) => (
               <button
                 key={key}
                 type="button"
@@ -228,7 +253,7 @@ export function RedactionSheet({ locale, badge = true }: { locale: Locale; badge
           </div>
           <p className="text-[13px] leading-5 text-[#0a0a0a]/70 sm:max-w-[48%] sm:text-right">
             <span className="cl-hidden-note font-mono text-[11px] text-[#0a0a0a]">
-              {persona === "analyst" ? `${copy.hidden}. ` : null}
+              {persona !== "steward" ? `${copy.hidden}. ` : null}
             </span>
             <span aria-live="polite">{copy.notes[persona]}</span>
           </p>

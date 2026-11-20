@@ -4,7 +4,7 @@ description: Scan a Hugging Face dataset, model or space repository — streamed
 ---
 
 import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
-import { ObjectStorageNotes, LineageNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
+import { ObjectStorageNotes, LineageNote, QueryNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
 
 # Hugging Face
 
@@ -47,6 +47,14 @@ you want.
 ## Lineage
 
 <LineageNote />
+
+## Query data & SQL connections
+
+<QueryNote support="none">
+  Only the four bucket sources and local folders are attached to the query
+  engine, so files here cannot be queried with SQL. Scans still classify
+  them; to query file content, keep the files in a bucket source instead.
+</QueryNote>
 
 ## Worth knowing
 

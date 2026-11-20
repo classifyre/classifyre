@@ -3,7 +3,7 @@
     "product": "Produkt",
     "get": "Classifyre holen",
     "sources": "Quellen",
-    "editions": "Open Source vs. Enterprise",
+    "support": "Support",
     "blog": "Blog",
     "overview": "Publikationsübersicht",
     "articles": "Blog",
@@ -14,13 +14,14 @@
     "githubLabel": "Classifyre auf GitHub"
   },
   "footer": {
-    "tagline": "Open-Source-Data-Governance",
-    "blurb": "Open-Source-Data-Governance zum Selbstbetrieb. Classifyre findet personenbezogene Daten und Secrets in den Systemen, die Sie bereits betreiben, maskiert sie automatisch und lässt Ihr Team alles mit SQL, Excel und Power BI abfragen. Jeder Lesezugriff wird protokolliert.",
+    "tagline": "Open-Source-Datenzugriffssteuerung",
+    "blurb": "Classifyre ist der kontrollierte Zugang zu den Daten Ihrer Organisation. Der Zugriff folgt Abteilungen und Rollen, personenbezogene Daten bleiben maskiert, jeder Zugriff wird protokolliert. Selbst betrieben, Apache-2.0, aus Österreich.",
     "navHeading": "Navigation",
     "navHome": "Start",
+    "navAbout": "Über uns · Made in Austria",
     "navGet": "Classifyre holen",
     "navSources": "Quellen",
-    "navEditions": "Open Source vs. Enterprise",
+    "navSupport": "Support",
     "navBlog": "Blog",
     "navDocumentation": "Dokumentation",
     "navShowcase": "Live-Showcase",
@@ -32,8 +33,8 @@
     "cookieSettings": "Cookie-Einstellungen",
     "contact": "Kontakt",
     "madeIn": "Made in Austria",
-    "baselineTagline": "Maskiert, bis jemand es sehen darf",
-    "topicsHeading": "Data Governance"
+    "baselineTagline": "Standardmäßig maskiert · jeder Zugriff protokolliert",
+    "topicsHeading": "Datenzugriff steuern"
   },
   "cookie": {
     "message": "Wir nutzen Analyse-Cookies nur, um zu sehen, welche Seiten gelesen werden — sonst nichts. Keine Werbung, kein Profiling, keine verkauften Daten. Lehnen Sie ab, funktioniert die Seite genau gleich.",
@@ -162,10 +163,10 @@
   },
   "site": {
     "title": "Classifyre",
-    "description": "Open-Source-Data-Governance: personenbezogene Daten und Secrets finden, automatisch maskieren und sicher mit SQL, Excel und Power BI abfragen. On-Premises, made in Austria.",
-    "websiteDescription": "Open-Source-Data-Governance: personenbezogene Daten und Secrets finden, automatisch maskieren und sicher mit SQL, Excel und Power BI abfragen. On-Premises, made in Austria.",
+    "description": "Open Source: Classifyre setzt Ihr Berechtigungskonzept auf 40+ Systemen durch, mit Maskierung und Protokollierung jedes Zugriffs. On-Premises, aus Österreich.",
+    "websiteDescription": "Open Source: Classifyre setzt Ihr Berechtigungskonzept auf 40+ Systemen durch, mit Maskierung und Protokollierung jedes Zugriffs. On-Premises, aus Österreich.",
     "blogDescription": "Produkt-Updates, Engineering-Notizen, Deployment-Anleitungen und Detektor-Designs von Classifyre.",
-    "orgDescription": "Classifyre entwickelt Open-Source-Data-Governance: Datenklassifizierung, Datenmaskierung und sicheren Datenzugriff, selbst betrieben. Gebaut in Österreich."
+    "orgDescription": "Classifyre entwickelt Open-Source-Software, mit der Organisationen den Datenzugriff steuern: Zugriff nach Rolle, Datenmaskierung und Protokollierung jedes Zugriffs, selbst betrieben. Gebaut in Österreich."
   },
   "findingTags": [
     "geleakte E-Mail",
@@ -200,23 +201,23 @@
     "autopilot": "PER AUTOPILOT"
   },
   "governanceTags": [
-    "iceberg-tabellen via s3",
-    "delta-tabelle verbunden",
+    "gruppe: vertrieb nord",
+    "entra-id-gruppen abgeglichen",
+    "zeilenfilter: nord",
+    "finanzen: klartext bis 30.6.",
+    "analysten: 90 tage",
     "iban gefunden 0,99",
-    "aws-schlüssel gefunden",
-    "svnr erkannt",
+    "svnr klassifiziert",
     "spalte maskiert",
     "secret ausgeblendet",
     "owner: finanzen",
     "steward benannt",
-    "zugriff 90 tage",
-    "zeilenfilter: graz",
-    "geteilte tabelle",
+    "datenprodukt geteilt",
     "orders + customers",
+    "masken als untergrenze",
     "power bi via odbc",
     "excel verbunden",
-    "zugriff protokolliert",
-    "export protokolliert",
-    "mcp-zugriff protokolliert"
+    "mcp-zugriff protokolliert",
+    "zugriff protokolliert"
   ]
 }

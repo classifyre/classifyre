@@ -8,7 +8,7 @@ import { Illustration, type IllustrationName } from "@/components/illustration";
 /**
  * The shared chrome of the marketing site: the section shell, the accent
  * marker chip, the headline block, and the docs button. Extracted out of the
- * landing page once /download, /sources, and /open-source-vs-enterprise
+ * landing page once /get, /sources, and the topic pages
  * started needing the same case-file visual language.
  *
  * `tone="signal"` paints a section with `bg-foreground`, which *flips* with

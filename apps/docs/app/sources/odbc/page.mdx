@@ -5,7 +5,7 @@ description: Scan any database that has an ODBC driver — SQL Server, Oracle, D
 
 import { Callout } from "nextra/components";
 import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
-import { SqlSourceNotes, SharedSettingsNote } from "@/components/source-notes";
+import { SqlSourceNotes, QueryNote, SharedSettingsNote } from "@/components/source-notes";
 
 # ODBC
 
@@ -102,10 +102,9 @@ catalog name `default`.
   ODBC and a scan through the native source meet on one object. A DSN hides the
   server, so it gets none.
 
-## SQL
+## Query data & SQL connections
 
-An ODBC table can be queried with [SQL](/data-query/#odbc). ODBC is the slowest
-way in: every query reads the table over the wire, so start with a `LIMIT`.
+<QueryNote support="odbc" />
 
 ## Configuration
 

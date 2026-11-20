@@ -3,11 +3,11 @@
 
 # Classifyre Helm Chart
 
-**Production Kubernetes deployment of Classifyre, open-source data governance — web UI, API, worker, ephemeral scan jobs and PostgreSQL.**
+**Production Kubernetes deployment of Classifyre, open-source data access governance — web UI, API, worker, ephemeral scan jobs and PostgreSQL.**
 
 </div>
 
-Classifyre finds personal data and secrets across the systems you already run — databases, lakehouses, file shares, Confluence, Jira, SharePoint, S3, Git — **masks them automatically**, and lets your team query everything with SQL, Excel and Power BI. Every read is logged; nothing leaves your servers.
+Classifyre is open-source data access governance you run yourself: one governed way into the systems you already run (databases, lakehouses, file shares, Confluence, Jira, SharePoint, S3, Git). Departments, roles and groups from your directory decide who sees which tables, rows and columns; personal data is **masked inside the query** until someone is cleared to see it; people use the result in SQL, Excel, Power BI and AI agents. Every read is logged; nothing leaves your servers.
 
 This chart (`classifyre/classifyre-core`) deploys Classifyre on Kubernetes 1.28+ (Helm 3.12+): the web UI and API deployments, the background worker, ephemeral [`classifyre/cli`](https://hub.docker.com/r/classifyre/cli) scan Jobs with shared uv-cache, ingress/TLS, autoscaling, RBAC — and PostgreSQL (embedded for trials, external or CloudNativePG for production). It runs the same [`classifyre/api`](https://hub.docker.com/r/classifyre/api) / [`classifyre/web`](https://hub.docker.com/r/classifyre/web) / [`classifyre/cli`](https://hub.docker.com/r/classifyre/cli) images as the [all-in-one Docker image](https://hub.docker.com/r/classifyre/all-in-one), as separate, independently scalable workloads.
 

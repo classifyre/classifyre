@@ -659,7 +659,7 @@ objectStorage:
 # and the issuer in tokens is the host the browser actually sees.
 iam:
   appUrl: http://localhost:3000
-  # Lets `bun run web-iam:dev:lan` sign in from the LAN IP.
+  # Lets `bun run web:dev:lan` sign in from the LAN IP.
   dynamicHostname: true
   # People who have not signed in read the public workspaces of the first
   # tenant (`default`), read-only (docs/prd/IAM step 8h).

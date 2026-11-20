@@ -4,7 +4,7 @@ description: Scan Oracle Database schemas, tables and views — extraction, meta
 ---
 
 import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
-import { SqlSourceNotes, LineageNote, SharedSettingsNote } from "@/components/source-notes";
+import { SqlSourceNotes, LineageNote, QueryNote, SharedSettingsNote } from "@/components/source-notes";
 
 # Oracle
 
@@ -53,6 +53,14 @@ Oracle scan produced instead of appearing twice. See
 [Lineage & Relationships](/sources/lineage/).
 
 </LineageNote>
+
+## Query data & SQL connections
+
+<QueryNote support="none">
+  Oracle has no DuckDB connector. Its ODBC driver is the way in: scan it
+  through an ODBC source instead — the same tables under the same names,
+  queryable.
+</QueryNote>
 
 ## Worth knowing
 

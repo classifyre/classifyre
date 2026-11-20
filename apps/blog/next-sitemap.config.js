@@ -174,6 +174,9 @@ const config = {
     } else if (TOPIC_SLUGS.some((entry) => rest === `/${entry.en}` || rest === `/${entry.de}`)) {
       priority = 0.9;
       changefreq = "weekly";
+    } else if (rest.startsWith("/use-cases/")) {
+      priority = 0.8;
+      changefreq = "weekly";
     } else if (normalized === "/rss.xml") {
       priority = 0.4;
       changefreq = "daily";

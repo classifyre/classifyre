@@ -5,7 +5,7 @@ description: Scan Jira Service Management requests, comments and attachments —
 ---
 
 import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
-import { AtlassianNotes, LineageNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
+import { AtlassianNotes, LineageNote, QueryNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
 
 # Jira Service Management
 
@@ -45,6 +45,14 @@ a search term.
 ## Lineage
 
 <LineageNote />
+
+## Query data & SQL connections
+
+<QueryNote support="none">
+  Requests, comments and attachments are documents, not tables, so there is
+  nothing SQL could read. Use Jira search, or land the data in a bucket as
+  Parquet or Delta.
+</QueryNote>
 
 ## Worth knowing
 

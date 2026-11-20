@@ -5,7 +5,7 @@ description: Scan Apache Iceberg tables through any Iceberg REST catalog — Pol
 ---
 
 import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
-import { LineageNote, SharedSettingsNote } from "@/components/source-notes";
+import { LineageNote, QueryNote, SharedSettingsNote } from "@/components/source-notes";
 
 # Iceberg REST Catalog
 
@@ -56,6 +56,10 @@ read as one column.
 ## Lineage
 
 <LineageNote />
+
+## Query data & SQL connections
+
+<QueryNote support="catalog" />
 
 ## Worth knowing
 

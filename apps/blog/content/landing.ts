@@ -13,40 +13,61 @@ import { docs, routes } from "@/lib/site";
  * (`@/lib/site`) so the two locales cannot drift apart on destinations,
  * only on words.
  *
+ * Narrative: Classifyre is the one governed way into an organisation's
+ * data. Lead with who sees what (access follows departments, roles and
+ * rules), then masking by default, data products on top, the tools people
+ * already use, and the read log. Discovery is the first step of masking,
+ * never the headline.
+ *
  * Word rules: masking is never called anonymisation (the hashed mask is
- * pseudonymisation); no "AI-powered", "zero trust", "DSPM" or "data
- * platform"; investigation is one use case, not the promise.
+ * pseudonymisation); no "AI-powered", "zero trust", "DSPM" or a bare
+ * "platform"; never "query everything" (say what people are allowed to
+ * see); regulations are "supported", never "compliant"; investigation is a
+ * use case with its own page, not the promise. "Data product" in headlines
+ * is always explained as a shared dataset right under it. The product name
+ * is the full "Open-source data access governance platform", never a bare
+ * "platform". No "Enterprise" edition and no OpenShift upsell: help with
+ * setup or tailoring is a contact, not a tier.
  */
 
 /* ── Hero ───────────────────────────────────────────────────────────────── */
 
 const enHero = {
   /** Small stamps above the headline. */
-  chips: ["Open-source data governance platform"],
-  titleA: "Find it. Protect it.",
+  chips: ["Open-source data access governance platform"],
+  /** Each sentence (split after a full stop) starts a new line. */
+  titleA: "Your access rules,",
   /** Rendered as `titleBLead` + an accent block with `titleBHighlight`. */
-  titleBLead: "",
-  titleBHighlight: "Use it.",
-  lede: "Classifyre finds personal data and secrets across the systems you already run, masks them automatically, and lets your team query everything with SQL, Excel and Power BI. Every read is logged. Nothing leaves your servers.",
-  ctaPrimary: "Run it on your machine",
-  ctaSecondary: "Walk the live showcase",
-  micro: "No signup. One Docker command. Your data stays with you.",
+  titleBLead: "enforced on",
+  titleBHighlight: "every query.",
+  lede: "Classifyre sits between your people and the systems you already run. Departments, roles and locations decide who sees which tables, rows and columns. Personal data stays masked until someone is cleared to see it. Teams build data products on top, and every read is on record. Nothing leaves your infrastructure: run it on-premises, in your own cloud, or on public cloud infrastructure like AWS, Azure or Google Cloud.",
+  /** For buyers: a pilot mapped onto their own organisation. */
+  ctaPrimary: "Plan a pilot with your org structure",
+  /** For engineers: the Docker command further down. */
+  ctaSecondary: "Run it on one database",
+  ctaShowcase: "Walk the live showcase",
 } as const;
 
 /* ── The redaction sheet (hero) ─────────────────────────────────────────── */
 
 const enSheet = {
   readAs: "Read as",
+  /** Three people, three answers to the same query. */
   personas: {
-    analyst: "Analyst",
-    steward: "Unmasked reader",
+    analyst: "Analyst · Amsterdam team",
+    steward: "Finance steward",
+    admin: "Workspace admin",
   },
   notes: {
     analyst:
-      "Personal columns are masked inside the query. The token column is hidden.",
+      "Her group's row filter shows Amsterdam only. Personal columns are masked inside the query; the token column is hidden.",
     steward:
       "Clear reading granted on this table until 30 June. This read is on record.",
+    admin:
+      "Every row, still masked. Workspace admins don't get clear values by default.",
   },
+  /** Shown on the query line while the row filter applies. */
+  rowFilter: "row filter · city = 'Amsterdam'",
   hidden: "1 column hidden",
   tags: {
     name: "Person · 0.97",
@@ -79,13 +100,13 @@ const enMascots = {
 const enPath = {
   label: "The path data takes through Classifyre",
   steps: [
-    { verb: "Connect", examples: ["Iceberg tables via S3", "PostgreSQL · crm", "Delta in Databricks", "Confluence wiki"] },
-    { verb: "Detect", examples: ["IBAN found · 0.99", "AWS key found · 0.96", "AT SVNR found · 0.93", "Email found · 0.98"] },
-    { verb: "Govern", examples: ["Owner: Finance", "Column masked", "Secret hidden", "Steward named"] },
-    { verb: "Grant", examples: ["Analysts · 90 days", "Clear reading · Finance", "Row filter · Graz", "Request approved"] },
-    { verb: "Share", examples: ["orders + customers", "Shared table, masks kept", "Joined with lake.orders", "Parquet export"] },
-    { verb: "Connect BI", examples: ["Power BI via ODBC", "Excel · own login", "Tableau · TLS only", "DBeaver · JDBC"] },
-    { verb: "Log", examples: ["Lena read · Power BI", "Tom read · SQL page", "Agent read · MCP", "Jakob export · Excel"] },
+    { verb: "Connect", examples: ["PostgreSQL · crm", "Iceberg tables via S3", "Delta in Databricks", "Confluence wiki"] },
+    { verb: "Classify", examples: ["IBAN found · 0.99", "National ID found · 0.93", "Email found · 0.98", "Column: personal"] },
+    { verb: "Organise", examples: ["Group · Amsterdam team", "Groups from Entra ID", "Row filter · Amsterdam", "Finance · clear to 30 June"] },
+    { verb: "Mask", examples: ["IBAN · last four", "Email · hashed", "Name · redacted", "Secret · hidden"] },
+    { verb: "Build", examples: ["orders + customers", "Owner: Finance", "Masks kept as a floor", "Granted · 90 days"] },
+    { verb: "Use", examples: ["Power BI via ODBC", "Excel · own login", "Agent · MCP", "Tableau · TLS only"] },
+    { verb: "Log", examples: ["Lena read · Power BI", "Tom read · SQL page", "Agent read · MCP", "Noah export · Excel"] },
   ],
 } as const;
 
@@ -110,9 +131,9 @@ const enInstall = {
 
 const enTension = {
   marker: "The problem",
-  title: "Your data is useful. It is also full of personal data.",
-  lede: "Every team wants the numbers. Every table that holds them also holds names, accounts, addresses and the odd password. So access becomes a negotiation, and the negotiation ends in a spreadsheet.",
-  /** Margin notes: the three ways access goes wrong. */
+  title: "Your access rules live on paper. Your data doesn't know them.",
+  lede: "Every organisation has an access concept that says who may see what. It sits in a wiki, while the data sits in a dozen systems with their own logins. So access becomes a ticket, the ticket becomes an export, and nobody can say who has what.",
+  /** Margin notes: the ways access goes wrong. */
   notes: [
     {
       label: "Field note 01",
@@ -129,10 +150,15 @@ const enTension = {
       title: "Prove it to the auditor",
       body: "Who read the payroll tables last quarter, with which tool? Without a log of every read, the honest answer is: we don't know.",
     },
+    {
+      label: "Field note 04",
+      title: "Can the districts see only their own cases?",
+      body: "The Amsterdam office asks for the case statistics. Today that means a separate export per district, rebuilt every month, and one more copy nobody tracks.",
+    },
   ],
   kicker:
-    "It is the same shape every time: useful data locked away because nobody can say what is personal in it, or handed out whole because nobody had time to say no. Masked by default, granted on purpose, every read on record: that is the way out.",
-  figureCaption: "Fig. 01: six systems, personal data in all of them, no line between who may see what",
+    "Access that follows your organisation, masked by default, every read on record: that is the way out. Because it is the same shape every time: useful data locked away because nobody can say who may see it, or handed out whole because nobody had time to say no.",
+  figureCaption: "Fig. 01: six systems, six logins, and an access concept none of them has read",
   /** The six systems on the board. */
   nodes: ["CRM", "HR", "BUCKET", "WIKI", "LAKE", "BI"],
 } as const;
@@ -143,16 +169,16 @@ const enJourney = {
   marker: "How it works",
   tape: "Reads 40+ systems in place · never copied",
   tapeLink: "Browse the source catalogue",
-  title: "From a raw table to a shared dataset.",
-  lede: "Follow the data through Classifyre: found where it lives, queried in place, governed, used in the tools your team already has, masked for the people who should not see it, and shared on purpose.",
+  title: "From your org chart to governed data products.",
+  lede: "Connect your systems, map your departments and roles, and Classifyre decides every read: which rows, which columns, masked or clear. Teams then build data products on top, and people use them in the tools they already have.",
   stages: [
     {
       id: "discover",
-      step: "Connect & detect",
-      title: "Find personal data and secrets where they live",
+      step: "Connect & classify",
+      title: "Connect and classify every source",
       body: [
-        "Connect databases, lakehouses, buckets and SaaS tools; Classifyre reads them in place, so nothing is copied into another warehouse. Built-in detectors look for 41 kinds of personal data, including Austrian, German and Swiss identifiers, and 27 kinds of secrets. Add your own with a regex, a model or a prompt.",
-        "Every finding comes with a score and a written reason, so a data protection officer can check it and a security team can rank the cleanup. The classification it produces is what the masks follow later.",
+        "Classification decides what is protected. Connect databases, lakehouses, buckets and SaaS tools; Classifyre reads them in place, so nothing is copied into another warehouse. Built-in detectors look for 41 kinds of personal data, including Austrian, German and Swiss identifiers, and 27 kinds of secrets. Add your own with a regex, a model or a prompt.",
+        "Every finding comes with a score and a written reason, so a data protection officer can check it before it counts. The classification it produces is what the masks follow from then on.",
       ],
       facts: ["40+ source types", "41 PII entities · 27 secret patterns", "A score and a reason on every finding"],
       href: docs.detectors,
@@ -161,53 +187,25 @@ const enJourney = {
       caption: "Personal data found across three sources, ranked with reasons.",
     },
     {
-      id: "query",
-      step: "Query across sources",
-      title: "Query every system with one SQL statement",
+      id: "access",
+      step: "Access by organisation",
+      title: "Access follows your organisation",
       body: [
-        "Ask questions across the systems you already have: PostgreSQL, MySQL, Databricks, and Delta, Iceberg and Parquet files in S3, Azure or Google Cloud Storage. Join up to eight sources in one query. Each query runs next to the data; nothing is loaded into a central store first.",
-        "Results go where people work: the SQL page, exports to Excel, CSV and Parquet up to a million rows, or straight into a BI tool.",
+        "Bring in your groups from single sign-on: Entra ID, Active Directory, Okta or any OIDC or SAML directory. Then grant a department a source, a team a table, a district only its own rows, a steward clear values until a date. Access is always given to groups, so when someone changes department in the directory, their data access follows at the next sign-in.",
+        "Nobody grants more than they have, and nobody approves their own request. Workspace admins don't get clear data by default: reading personal data in clear is a grant of its own, and it is on record.",
       ],
-      facts: ["Up to 8 sources in one query", "Delta · Iceberg · Parquet · CSV", "Exports up to 1M rows"],
-      href: docs.dataQuery,
-      linkLabel: "Query data",
-      media: "query",
-      caption: "A PostgreSQL table joined with Parquet files in a bucket.",
-    },
-    {
-      id: "govern",
-      step: "Governance",
-      title: "Governance: an owner, a contract and a history for every table",
-      body: [
-        "A governed table has an owner, stewards and a custodian, a classification for every column, and a status from draft to certified. Quality rules check it on a schedule: missing values, invalid IBANs, duplicates, row counts or any SQL you write. The agreement exports as an ODCS data contract.",
-        "Usage shows who reads the table and through which tool; Activity shows every read and every change, old value next to new. When the auditor asks, the answer is already written down.",
-      ],
-      facts: ["Owners, stewards, custodians", "Quality rules on a schedule", "ODCS data contracts", "Every read and change on record"],
-      href: docs.governance,
-      linkLabel: "Governed assets",
-      media: "govern",
-      caption: "Owner, steward and custodian assigned, access set, a quality rule run, the table certified, the contract exported.",
-    },
-    {
-      id: "bi",
-      step: "Power BI & Excel",
-      title: "Connect Power BI and Excel without a shared password",
-      body: [
-        "Classifyre answers as a PostgreSQL database. Each person creates their own SQL connection, encrypted and expiring, and points Power BI, Excel, Tableau or DBeaver at it. No service account with the keys to everything, no password inside a report file.",
-        "The connection carries the person's own rights: the tables they may query, the rows their group may see, the masks on every personal column. Revoke it and the report stops.",
-      ],
-      facts: ["A personal connection per tool", "TLS only, expiring, revocable", "The read log names the tool"],
-      href: docs.sqlConnections,
-      linkLabel: "SQL connections",
-      media: "bi",
-      caption: "A personal connection, used from a BI report, still masked.",
+      facts: ["Groups from Entra ID, AD, Okta", "Row filters per group, failing closed", "Grants with end dates", "Requests decided by owners"],
+      href: docs.whoMayQuery,
+      linkLabel: "Who may query what",
+      media: "access",
+      caption: "Directory groups mapped to grants: a district sees its own rows, finance reads in clear until 30 June.",
     },
     {
       id: "mask",
-      step: "Mask per person",
-      title: "Masked for one person, clear for another",
+      step: "Masked by default",
+      title: "Masked by default, inside the query",
       body: [
-        "Personal columns are masked by default: redacted, last four, hashed so tables still join, or hidden. Masks apply inside the query, so a WHERE or a JOIN can't reach past them. Only a group granted Data reader, unmasked reads the clear values, for a source or a single table, with an end date. Admins don't get it by default.",
+        "Personal columns are masked by default: redacted, last four, hashed so tables still join, or hidden. Masks apply inside the query, so a WHERE or a JOIN can't reach past them. Only a group granted Data reader, unmasked reads the clear values, for a source or a single table, with an end date.",
         "The hashed mask is pseudonymisation in the sense of the GDPR, not anonymisation: equal values hash the same, so analysts can join and count people without reading who they are. Watch it below: the same queries, run by an analyst and by a finance steward.",
       ],
       facts: ["Masked by default", "Redacted · last four · hashed · hidden", "Pseudonymisation, not anonymisation", "Clear reading is its own grant"],
@@ -218,17 +216,45 @@ const enJourney = {
     },
     {
       id: "share",
-      step: "Share",
-      title: "Share a dataset that joins your sources",
+      step: "Data products",
+      title: "Build data products on governed data",
       body: [
-        "Join tables from different systems into a shared dataset (customers from the CRM, orders from the lake, invoices from finance) and give it to the groups that need it. A shared dataset is a governed, saved query, not a copy: it reads the sources live, and the masks of every input table travel with it as a floor that can only be raised.",
-        "The receiving team queries it like any table, on the SQL page, in Excel or in Power BI, and every read is on record.",
+        "Yes — you can build data products on Classifyre. Join sources into a shared dataset (customers from the CRM, orders from the lake, invoices from finance), name an owning group, and grant it to the groups that need it. That is what we mean by a data product: a named, owned, sharable dataset a team can rely on, query with governance, and build on, without anyone handing over the raw tables.",
+        "A shared dataset is a saved query, not a copy: it reads up to eight sources live, next to the data, from databases to Delta, Iceberg and Parquet files. The masks of every input travel with it as a floor, so a data product can never be looser than its sources.",
       ],
-      facts: ["Joins across sources", "Masks travel with the data", "Granted per group, with an end date"],
+      facts: ["Joins up to 8 sources live", "Masks travel as a floor", "An owning group, readers per group", "Sharable assets, queried with governance"],
       href: docs.sharedDatasets,
       linkLabel: "Shared datasets",
       media: "share",
       caption: "Three sources joined into one dataset, shared with a group, masks kept.",
+    },
+    {
+      id: "bi",
+      step: "Power BI, Excel & agents",
+      title: "Use it in Power BI, Excel, SQL and AI agents",
+      body: [
+        "Classifyre answers as a PostgreSQL database. Each person creates their own SQL connection, encrypted and expiring, and points Power BI, Excel, Tableau or DBeaver at it. No service account with the keys to everything, no password inside a report file. The SQL page and exports to Excel, CSV and Parquet work the same way.",
+        "The connection carries the person's own rights: the tables they may query, the rows their group may see, the masks on every personal column. AI agents over MCP read through the same rules as the person who connected them, never more. Revoke it and the report stops.",
+      ],
+      facts: ["A personal connection per tool", "TLS only, expiring, revocable", "MCP agents read as you", "The read log names the tool"],
+      href: docs.sqlConnections,
+      linkLabel: "SQL connections",
+      media: "bi",
+      caption: "A personal connection, used from a BI report, still masked.",
+    },
+    {
+      id: "govern",
+      step: "Proof",
+      title: "Prove it: owners, contracts and every read on record",
+      body: [
+        "A governed table has an owner, stewards and a custodian, a classification for every column, and a status from draft to certified. Quality rules check it on a schedule: missing values, invalid IBANs, duplicates, row counts or any SQL you write. The agreement exports as an ODCS data contract.",
+        "Usage shows who reads the table and through which tool; Activity shows every read and every change, old value next to new. When the auditor or the data protection officer asks, the answer is already written down.",
+      ],
+      facts: ["Owners, stewards, custodians", "Quality rules on a schedule", "ODCS data contracts", "Every read and change on record"],
+      href: docs.governance,
+      linkLabel: "Governed assets",
+      media: "govern",
+      caption: "Owner, steward and custodian assigned, access set, a quality rule run, the table certified, the contract exported.",
     },
   ],
 } as const;
@@ -324,7 +350,7 @@ const enDemo = {
       },
       {
         finding: "Register entry contradicts filing",
-        where: "firmenbuch / public",
+        where: "company register / public",
         score: "0.52",
         reason: "Company marked active; no accounts filed in 34 years.",
       },
@@ -372,7 +398,7 @@ const enDemo = {
 const enSectors = {
   marker: "Where it lands",
   title: "The data looks different. The rules are the same.",
-  lede: "Classifyre reads whatever the organisation runs on; the sector only decides which columns are personal and who reads them in clear.",
+  lede: "Classifyre reads whatever the organisation runs on; the sector only decides which columns are personal, which rows each unit sees, and who reads them in clear.",
   columns: {
     sector: "Sector",
     data: "Typical data",
@@ -380,9 +406,9 @@ const enSectors = {
   },
   rows: [
     {
-      sector: "Public sector · Länder · cities",
+      sector: "Public sector · states · cities",
       data: "Registers, case files, statistics, procurement",
-      finds: "Districts query their own rows, personal columns arrive masked, the DPO reads the log",
+      finds: "Each district, department or municipal office sees its own rows; personal columns arrive masked; the DPO reads the log",
     },
     {
       sector: "Healthcare · hospitals",
@@ -417,89 +443,43 @@ const enSectors = {
     {
       sector: "Incident response",
       data: "Mail, drives, databases",
-      finds: "One fingerprint across systems, worked as a case",
+      finds: "When something leaks: one fingerprint across systems, worked as a case",
     },
   ],
   footnote:
-    "Each row is a starting point, not a separate product: the same masks, grants and read log underneath.",
+    "Each row is a starting point, not a separate product: the same groups, masks, grants and read log underneath.",
   links: [
+    { label: "Data access governance", href: "/data-access-governance" },
+    { label: "Incident response", href: routes.incidentResponse },
     { label: "Immuta alternative", href: "/immuta-alternative" },
     { label: "Unity Catalog alternative", href: "/unity-catalog-alternative" },
     { label: "Read the case files", href: routes.blog + "/cases" },
   ],
 } as const;
 
-/* ── Open source and Enterprise ─────────────────────────────────────────── */
-
-const enEditions = {
-  marker: "Open source and Enterprise",
-  title: "All of it is open source. Enterprise is tailored to your organisation.",
-  lede: "Run it yourself or with your consultants: every feature is in the open-source repository. Keep your ETL tools, pipelines and data products as they are. Classifyre doesn't build them; it governs what they produce.",
-  oss: {
-    title: "Open source",
-    sub: "Every feature · free forever",
-    items: [
-      "40+ source connectors",
-      "PII and secret detection, custom detectors",
-      "Column masks: redacted, last four, hashed, empty, hidden",
-      "Owners, stewards, quality rules, ODCS contracts",
-      "Grants per group, source and table, with end dates",
-      "SQL page, exports, shared datasets",
-      "PostgreSQL endpoint for Power BI, Excel, Tableau",
-      "Audit of every read",
-      "SSO, roles, tenants and workspaces",
-      "Cases, inquiries, lineage, autopilot",
-    ],
-  },
-  ent: {
-    title: "Enterprise",
-    sub: "Tailored to your organisation",
-    items: [
-      {
-        title: "Your stack stays",
-        body: "Your ETL jobs, dbt models, Spark pipelines and data products stay where they are. Classifyre reads what they produce and governs it: owners, masks, quality, access. In open source too.",
-      },
-      {
-        title: "Shaped to how you work",
-        body: "Roles mapped to your groups, an access model your data protection officer can sign, detectors and models tuned to your terminology and documents, OpenShift if that is your platform.",
-      },
-      {
-        title: "Your team, your integrator, or us",
-        body: "Roll it out yourself, with your consultants, or with our engineers. A fixed-price pilot is there if you want a head start; nobody has to wait for us.",
-      },
-      {
-        title: "Support and SLA",
-        body: "Supported releases and security patches, a named contact and published response times, for when someone has to be accountable.",
-      },
-    ],
-  },
-  ctaPilot: "Talk to us about Enterprise",
-  ctaCompare: "Compare open source and Enterprise",
-} as const;
-
 /* ── Conversion ─────────────────────────────────────────────────────────── */
 
 const enConvert = {
   marker: "Your move",
-  title: "Open your data safely tonight.",
-  lede: "Point it at one database you already run. By the morning you know which columns hold personal data, and your team can query the rest. Everything you set up carries over when you go to Kubernetes.",
+  title: "Start with one department and one source.",
+  lede: "A four-to-six-week pilot maps your groups and rules onto a real system. Engineers can run the same thing tonight with one Docker command, and everything they set up carries over to Kubernetes.",
   paths: [
     {
+      label: "A pilot with one department",
+      text: "Four to six weeks on a real system: your directory groups mapped, masks and row filters on, one Power BI connection, and an access report your DPO can sign off. Fixed scope, fixed price.",
+    },
+    {
       label: "Tonight, on your machine",
-      text: "One Docker command. Sources, masks and the read log stay local.",
+      text: "One Docker command. Sources, groups, masks and the read log stay local.",
     },
     {
       label: "At scale, on Kubernetes",
-      text: "The same core as a Helm chart: workers scale to zero between runs.",
-    },
-    {
-      label: "When it becomes infrastructure",
-      text: "Your team or your integrator runs it. Enterprise tailors it to your organisation, adds OpenShift and an SLA. Every feature is already open source.",
+      text: "The same core as a Helm chart: workers scale to zero between runs. Your team or your integrator runs it; if you need help with setup, installation or tailoring Classifyre to your organisation, contact us.",
     },
   ],
-  ctaPrimary: "Setup & configuration",
-  ctaSecondary: "Walk the live showcase",
-  ctaEnterprise: "Talk to us about Enterprise",
+  ctaPrimary: "Plan a pilot",
+  ctaSecondary: "Run it on one database",
+  ctaShowcase: "Walk the live showcase",
   ctaBlog: "Read the field notes",
 } as const;
 
@@ -512,11 +492,23 @@ const enFaq = {
   items: [
     {
       q: "What is Classifyre?",
-      a: "Open-source data governance you run yourself. It reads the systems you already have, finds personal data and secrets in them, masks those columns automatically, and lets people query the tables with SQL, exports, Excel and Power BI. Every read is recorded: who, which table, which tool, when.",
+      a: "Classifyre is the one governed way into your organisation's data: access follows your departments, roles and rules, personal data stays masked until someone is cleared for it, and every read is on record, on your own servers. It reads the 40+ systems you already run in place and serves them to SQL, Excel, Power BI and AI agents. All of it is open source under Apache-2.0.",
+    },
+    {
+      q: "How does Classifyre use our org structure and AD groups?",
+      a: "Sign-in runs through an identity server (Keycloak) connected to your directory: Entra ID, Active Directory over LDAP, Okta, or any OIDC or SAML provider. Directory groups map to groups in Classifyre, and access is always given to groups: Data reader on a workspace, a source or one table; clear reading of personal columns as a grant of its own; row filters that show each group only its rows. Grants can carry an end date. When someone moves department in the directory, their data access follows at their next sign-in.",
+    },
+    {
+      q: "Does Classifyre replace our access concept?",
+      a: "No, it enforces it. Your access concept still decides who may see what. Classifyre makes that decision hold on the data itself, on every query and in every tool, and writes down every read, so you can show that it held.",
+    },
+    {
+      q: "Can teams build data products on Classifyre?",
+      a: "Yes — you can build data products on Classifyre. A shared dataset joins tables from different sources into one named, saved query with an owning group and readers granted per group. It is a sharable asset: teams query it with the same governance — grants, row filters, masks and the read log — as the sources underneath. It reads the sources live instead of copying them, and the masks of every input travel with it as a floor, so a data product can never show more than its sources allow.",
     },
     {
       q: "Is everything really open source, including SSO and roles?",
-      a: "Yes. Every feature is Apache-2.0: connectors, detection, masking, grants, row filters, the SQL endpoint, the read audit, SSO, roles, tenants and workspaces. There is no enterprise build with extra code. Enterprise is the same product tailored to your organisation, with support and an SLA; rolling it out yourself or with your integrator is always an option.",
+      a: "Yes. Every feature is Apache-2.0: connectors, detection, masking, grants, row filters, the SQL endpoint, the read audit, SSO, roles, tenants and workspaces. There is no separate enterprise build with extra code. If you need help with rollout, installation or tailoring Classifyre to your organisation, contact us — running it yourself or with your integrator is always an option.",
     },
     {
       q: "Does Classifyre replace our ETL or data-product tools?",
@@ -524,7 +516,7 @@ const enFaq = {
     },
     {
       q: "How is this different from Immuta, Unity Catalog or Trino?",
-      a: "Immuta is a commercial product that enforces access policies inside cloud data platforms such as Snowflake and Databricks. Unity Catalog is the governance layer of Databricks. Trino federates queries and leaves finding and masking personal data to you. Classifyre does the three jobs in one self-hosted, open-source product: it finds the personal data, masks it inside the query, and serves the result to SQL, Excel and Power BI across 40+ systems.",
+      a: "Immuta is a commercial product that enforces access policies inside cloud data platforms such as Snowflake and Databricks. Unity Catalog is the governance layer of Databricks. Trino federates queries and leaves access rules and masking to you. Classifyre puts one governed access layer over 40+ systems, open source, running on your infrastructure — on-premises, in your own cloud, or on public cloud infrastructure like AWS, Azure or Google Cloud: access by group, row and column, masks inside the query, and the result in SQL, Excel and Power BI.",
     },
     {
       q: "Does it work with Power BI and Excel?",
@@ -536,15 +528,67 @@ const enFaq = {
     },
     {
       q: "Where does my data go? Does anything leave our infrastructure?",
-      a: "Nowhere. Classifyre runs inside your network and keeps everything in your own PostgreSQL database and storage. Queries run where the data is. It runs offline, and AI features use only the providers you configure, including models you host yourself.",
+      a: "Nowhere. Classifyre runs inside your network and keeps everything in your own PostgreSQL database and storage — on-premises, in your own cloud, or on public cloud infrastructure like AWS, Azure or Google Cloud. Queries run where the data is. It runs offline, and AI features use only the providers you configure, including models you host yourself.",
     },
     {
-      q: "Does it run on Kubernetes and OpenShift?",
-      a: "The quickest start is one Docker image on macOS, Windows or Linux. The same core ships as a Helm chart for Kubernetes, where workers run as jobs that scale to zero between runs. OpenShift installation and support are part of Enterprise.",
+      q: "Does it run on Kubernetes?",
+      a: "The quickest start is one Docker image on macOS, Windows or Linux. The same core ships as a Helm chart for Kubernetes, where workers run as jobs that scale to zero between runs — on-premises, in your own cloud, or on public cloud infrastructure like AWS, Azure or Google Cloud. If you need help with setup, installation or tailoring, contact us.",
+    },
+  ],
+} as const;
+
+/* ── Incident response (its own use-case page) ──────────────────────────── */
+
+const enIncident = {
+  metaTitle: "Incident Response for Data Leaks, Open Source",
+  metaDescription:
+    "When personal data or a secret leaks: ranked findings, fingerprints across systems, cases with evidence and hypotheses, and an autopilot that explains itself.",
+  breadcrumb: "Incident response",
+  chip: "Use case · incident response",
+  titleLead: "When something leaks,",
+  titleHighlight: "work it as a case.",
+  lede: "Governance is what you run every day. The investigation is what you open on the day a customer list leaves by email or a key turns up in a build log. The same findings that drive the masks feed it: standing inquiries, fingerprints across systems, cases with evidence and competing hypotheses, and an autopilot that does the legwork between scans.",
+  ctaPrimary: "Walk the live case",
+  ctaSecondary: "Read the case files",
+  points: {
+    marker: "What you get",
+    title: "From a finding to a conclusion you can defend.",
+    items: [
+      {
+        title: "Inquiries",
+        body: "Saved questions (“PII leaving the company”) that keep surfacing matching findings, scan after scan.",
+        href: docs.inquiry,
+      },
+      {
+        title: "Fingerprints",
+        body: "Deterministic duplicate and similarity detection that links the same file or record across systems.",
+        href: docs.duplicates,
+      },
+      {
+        title: "Cases and hypotheses",
+        body: "A workspace that collects exhibits, weighs competing explanations, and records how the conclusion was reached.",
+        href: docs.cases,
+      },
+      {
+        title: "Autopilot",
+        body: "Agents that open inquiries, maintain fingerprints, build cases and draft hypotheses after every scan, logging what they did and why.",
+        href: docs.autopilot,
+      },
+    ],
+    linkLabel: "Read the docs",
+  },
+  faq: [
+    {
+      q: "Is Classifyre still an investigation tool?",
+      a: "Yes, for the day something leaks. Cases, standing inquiries, fingerprints across sources and the autopilot are all there and open source. Governed access is what you run every day; the investigation is what you open when it matters.",
     },
     {
-      q: "Is it still an investigation tool?",
-      a: "Yes, for the day something leaks. Cases, standing inquiries, fingerprints across sources and the autopilot are all still there and open source. Governance is what you run every day; the investigation is what you open when it matters.",
+      q: "Does the autopilot act on its own?",
+      a: "Only as far as you let it. In observe-only mode every action stays a proposal for a person to accept. Every step logs what it did and why, and agents running on their own never read table rows: only a signed-in person's token does.",
+    },
+    {
+      q: "Do we need the governance part to use it?",
+      a: "No. Connect a source, switch on detectors, and the findings feed inquiries and cases straight away. The masks, grants and read log are there when you want them.",
     },
   ],
 } as const;
@@ -562,9 +606,9 @@ export const en = {
   readers: enReaders,
   demo: enDemo,
   sectors: enSectors,
-  editions: enEditions,
   convert: enConvert,
   faq: enFaq,
+  incident: enIncident,
 } as const;
 
 type Widen<T> = T extends string

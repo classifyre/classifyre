@@ -3,7 +3,7 @@
     "product": "Product",
     "get": "Get Classifyre",
     "sources": "Sources",
-    "editions": "Open source vs Enterprise",
+    "support": "Support",
     "blog": "Blog",
     "overview": "Publication overview",
     "articles": "Blog",
@@ -14,13 +14,14 @@
     "githubLabel": "Classifyre on GitHub"
   },
   "footer": {
-    "tagline": "Open-source data governance",
-    "blurb": "Open-source data governance you run yourself. Classifyre finds personal data and secrets across the systems you already run, masks them automatically, and lets your team query everything with SQL, Excel and Power BI. Every read is logged.",
+    "tagline": "Open-source data access governance platform",
+    "blurb": "Classifyre is the governed way into your organisation's data. Access follows your departments and roles, personal data stays masked until someone is cleared, and every read is on record. Apache-2.0, made in Austria. Deploy on-premises, in your own cloud, or on AWS, Azure or Google Cloud.",
     "navHeading": "Navigate",
     "navHome": "Home",
+    "navAbout": "About · Made in Austria",
     "navGet": "Get Classifyre",
     "navSources": "Sources",
-    "navEditions": "Open source vs Enterprise",
+    "navSupport": "Support",
     "navBlog": "Blog",
     "navDocumentation": "Documentation",
     "navShowcase": "Live showcase",
@@ -32,8 +33,8 @@
     "cookieSettings": "Cookie settings",
     "contact": "Contact",
     "madeIn": "Made in Austria",
-    "baselineTagline": "Masked until someone is allowed to see it",
-    "topicsHeading": "Data governance"
+    "baselineTagline": "Masked by default · every read on record",
+    "topicsHeading": "Data access governance"
   },
   "cookie": {
     "message": "We use analytics cookies to see which pages get read, nothing else. No ads, no profiling, no data sold. Decline and the site works exactly the same.",
@@ -162,10 +163,10 @@
   },
   "site": {
     "title": "Classifyre",
-    "description": "Open-source data governance: find personal data and secrets, mask them automatically, and query everything safely with SQL, Excel and Power BI. Self-hosted, made in Austria.",
-    "websiteDescription": "Open-source data governance: find personal data and secrets, mask them automatically, and query everything safely with SQL, Excel and Power BI. Self-hosted, made in Austria.",
+    "description": "Open-source data access governance platform: access by department and role across 40+ systems, masking by default, every read logged. Deploy on-premises, in your own cloud, or on AWS, Azure or Google Cloud. Made in Austria.",
+    "websiteDescription": "Open-source data access governance platform: access by department and role across 40+ systems, masking by default, every read logged. Deploy on-premises, in your own cloud, or on AWS, Azure or Google Cloud. Made in Austria.",
     "blogDescription": "Product updates, engineering notes, deployment guidance, and detector design write-ups from Classifyre.",
-    "orgDescription": "Classifyre builds open-source data governance: data classification, data masking and safe data access, self-hosted. Built in Austria."
+    "orgDescription": "Classifyre builds an open-source data access governance platform: one governed way into an organisation's data, with access by role, data masking and a log of every read. Deploy on-premises, in your own cloud, or on AWS, Azure or Google Cloud. Built in Austria."
   },
   "findingTags": [
     "leaked email",
@@ -200,23 +201,23 @@
     "autopilot": "BY AUTOPILOT"
   },
   "governanceTags": [
-    "iceberg tables via s3",
-    "delta table connected",
+    "group: sales north",
+    "entra id groups synced",
+    "row filter: north",
+    "finance: clear to 30 june",
+    "analysts: 90 days",
     "iban found 0.99",
-    "aws key found",
-    "svnr detected",
+    "national id classified",
     "column masked",
     "secret hidden",
     "owner: finance",
     "steward named",
-    "access 90 days",
-    "row filter: graz",
-    "shared table joined",
+    "data product shared",
     "orders + customers",
+    "masks kept as floor",
     "power bi via odbc",
     "excel connected",
-    "read logged",
-    "export logged",
-    "mcp read logged"
+    "mcp read logged",
+    "read logged"
   ]
 }

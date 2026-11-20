@@ -76,7 +76,7 @@ app forwards `/socket.io` to the API (`next.config.mjs`), as it does for `/api`
 and `/iam`, so one address works from any device or hostname.
 
 To open the app from another device on the same wifi, run
-`bun run web-iam:dev:lan` instead (or `LAN=1 ./scripts/dev/web-iam.sh`). It
+`bun run web:dev:lan` instead (or `LAN=1 ./scripts/dev/web-iam.sh`). It
 serves on all interfaces under this machine's Bonjour name (`mac.local`, else
 its LAN IP; override with `LAN_HOST=`), and registers that name and the IP as
 redirect URIs on the identity client at every start. This relies on

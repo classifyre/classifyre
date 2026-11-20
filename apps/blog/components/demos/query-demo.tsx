@@ -3,7 +3,7 @@
 import { SourceIcon } from "@workspace/ui/components";
 import { cn } from "@workspace/ui/lib/utils";
 
-import { SAMPLE_ROWS, sampleHash } from "@/content/sample-data";
+import { sampleHash, sampleRows } from "@/content/sample-data";
 import type { Locale } from "@/lib/locale";
 import {
   Caret,
@@ -129,7 +129,7 @@ export function QueryDemo({ locale, caption }: { locale: Locale; caption?: strin
           </tr>
         </thead>
         <tbody>
-          {SAMPLE_ROWS.slice(0, 3).map((row, i) => {
+          {sampleRows(locale).slice(0, 3).map((row, i) => {
             const show = step(t, resultAt + 120 + i * 160, 260);
             return (
               <tr key={row.email} className="border-b border-[#0a0a0a]/10" style={{ opacity: show }}>

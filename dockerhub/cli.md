@@ -3,11 +3,11 @@
 
 # Classifyre CLI
 
-**Scan worker of Classifyre, open-source data governance — source extraction, text/OCR/transcription and detector execution.**
+**Scan worker of Classifyre, open-source data access governance — source extraction, text/OCR/transcription and detector execution.**
 
 </div>
 
-Classifyre finds personal data and secrets across the systems you already run — databases, lakehouses, file shares, Confluence, Jira, SharePoint, S3, Git — **masks them automatically**, and lets your team query everything with SQL, Excel and Power BI. Every read is logged; nothing leaves your servers. This `classifyre/cli` image (Python) does the heavy lifting of every scan: it extracts content from sources (including image OCR, audio/video transcription and legacy Office conversion via LibreOffice), runs detector packs (secrets, PII, security, plus custom detectors) and streams findings back to the API in batches.
+Classifyre is open-source data access governance you run yourself: one governed way into the systems you already run (databases, lakehouses, file shares, Confluence, Jira, SharePoint, S3, Git). Departments, roles and groups from your directory decide who sees which tables, rows and columns; personal data is **masked inside the query** until someone is cleared to see it; people use the result in SQL, Excel, Power BI and AI agents. Every read is logged; nothing leaves your servers. This `classifyre/cli` image (Python) does the heavy lifting of every scan: it extracts content from sources (including image OCR, audio/video transcription and legacy Office conversion via LibreOffice), runs detector packs (secrets, PII, security, plus custom detectors) and streams findings back to the API in batches.
 
 It is one of three service images — with [`classifyre/api`](https://hub.docker.com/r/classifyre/api) (backend) and [`classifyre/web`](https://hub.docker.com/r/classifyre/web) (frontend) — composed into the [`classifyre/all-in-one`](https://hub.docker.com/r/classifyre/all-in-one) image and run as ephemeral Kubernetes Jobs by the [`classifyre/classifyre-core`](https://hub.docker.com/r/classifyre/classifyre-core) Helm chart.
 

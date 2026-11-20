@@ -4,7 +4,7 @@ description: Upload files directly to Classifyre and scan them through the norma
 ---
 
 import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
-import { ObjectStorageNotes, LineageNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
+import { ObjectStorageNotes, LineageNote, QueryNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
 
 # Sandbox
 
@@ -36,6 +36,14 @@ system is connected.
 ## Lineage
 
 <LineageNote />
+
+## Query data & SQL connections
+
+<QueryNote support="none">
+  Uploads are classified by the same scan pipeline, but the sandbox is not
+  attached to the query engine. To query file content, keep the files in a
+  bucket source or a local folder instead.
+</QueryNote>
 
 ## Worth knowing
 

@@ -4,7 +4,7 @@ description: Write a connector yourself in a Python notebook — for the system 
 ---
 
 import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
-import { LineageNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
+import { LineageNote, QueryNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
 
 # Custom Connector
 
@@ -56,6 +56,13 @@ See the [relationships section of the notebook reference](/sources/custom-connec
 and [Lineage & Relationships](/sources/lineage/).
 
 </LineageNote>
+
+## Query data & SQL connections
+
+<QueryNote support="none">
+  Custom connectors have no query binding, so their assets cannot be queried
+  with SQL yet.
+</QueryNote>
 
 ## Worth knowing
 

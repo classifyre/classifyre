@@ -5,7 +5,7 @@ description: Scan objects in a Google Cloud Storage bucket using Application Def
 ---
 
 import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
-import { ObjectStorageNotes, LakehouseNotes, LineageNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
+import { ObjectStorageNotes, LakehouseNotes, LineageNote, QueryNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
 
 # Google Cloud Storage
 
@@ -46,6 +46,10 @@ narrow it.
 ## Lineage
 
 <LineageNote />
+
+## Query data & SQL connections
+
+<QueryNote support="bucket" />
 
 ## Worth knowing
 

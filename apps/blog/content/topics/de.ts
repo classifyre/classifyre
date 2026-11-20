@@ -4,7 +4,7 @@ import type { TopicChrome, TopicCopy, TopicId } from "./types";
 
 export const deChrome: TopicChrome = {
   home: "Start",
-  chip: "Open-Source-Data-Governance",
+  chip: "Open Source · Datenzugriff steuern",
   marks: {
     points: "So funktioniert es",
     detail: "Klar gesagt",
@@ -20,11 +20,89 @@ export const deChrome: TopicChrome = {
   runDocs: "Einrichtung und Konfiguration",
   pilotTitle: "Oder mit einem Pilot beginnen",
   pilotBody:
-    "Vier bis sechs Wochen auf Ihren Daten: 3 bis 5 Quellen, abgestimmte Erkennung, Maskierung aktiv, eine BI-Anbindung und ein Fund- und Zugriffsbericht. Fester Umfang, Festpreis.",
+    "Vier bis sechs Wochen mit einer Abteilung: Ihre Verzeichnisgruppen und Regeln auf 3 bis 5 Quellen abgebildet, Masken und Zeilenfilter aktiv, eine BI-Anbindung und ein Zugriffsbericht, den Ihre Datenschutzbeauftragte abzeichnen kann. Fester Umfang, Festpreis.",
   pilotCta: "Über einen Pilot sprechen",
   relatedTitle: "Verwandte Themen",
   faqTitle: "Fragen",
   sourcesLabel: "Quellen",
+};
+
+const accessGovernance: TopicCopy = {
+  id: "data-access-governance",
+  name: "Berechtigungskonzept umsetzen",
+  metaTitle: "Berechtigungskonzept umsetzen: Datenzugriff steuern",
+  metaDescription:
+    "Berechtigungskonzept auf 40+ Systemen durchsetzen: AD-Gruppen bestimmen Tabellen, Zeilen und Spalten, Maskierung standardmäßig, jeder Zugriff protokolliert.",
+  keywords: [
+    "Berechtigungskonzept",
+    "Berechtigungskonzept umsetzen",
+    "Rollen- und Rechtekonzept",
+    "Datenzugriff steuern",
+    "Zugriffssteuerung",
+    "Need-to-know-Prinzip",
+    "Zeilenfilter",
+    "Datenmaskierung",
+  ],
+  h1: "Berechtigungskonzept umsetzen: auf den Daten, nicht nur auf Papier",
+  lede: "Ein Berechtigungskonzept legt fest, wer welche Daten sehen darf. Classifyre setzt es dort durch, wo die Daten gelesen werden: als eine kontrollierte Schicht über den Systemen, die Sie schon betreiben. AD-Gruppen bestimmen Tabellen, Zeilen und Spalten jeder Person, personenbezogene Daten bleiben maskiert, bis jemand freigegeben ist, und jeder Zugriff wird protokolliert.",
+  demo: "access",
+  demoCaption: "Verzeichnisgruppen auf Freigaben einer Tabelle abgebildet: Zeilen pro Bezirk, Klartext bis zu einem Datum.",
+  mascot: "looking-at-you",
+  mascotAlt: "Der Classifyre-Ermittler sieht Sie direkt an",
+  pointsTitle: "So setzt Classifyre es um",
+  points: [
+    {
+      title: "Gruppen aus Ihrem Verzeichnis",
+      body: "Entra ID, Active Directory, Okta oder jeder OIDC- oder SAML-Anbieter, über den mitgelieferten Identity-Server. Zugriff geht immer an Gruppen: Wer im Verzeichnis die Abteilung wechselt, hat bei der nächsten Anmeldung den passenden Datenzugriff.",
+      href: docs.directory,
+      linkLabel: "Firmenverzeichnis anbinden",
+    },
+    {
+      title: "Zeilen pro Gruppe",
+      body: "Zeilenfilter zeigen jeder Gruppe nur die Zeilen, die eine Regel für sie auswählt, und ohne Regel keine. Ein Bezirk sieht seinen Bezirk; Owner und Stewards der Tabelle verwalten die Regeln.",
+      href: docs.rowFilters,
+      linkLabel: "Gefilterte Zeilen",
+    },
+    {
+      title: "Spalten nach Klassifizierung maskiert",
+      body: "Personenbezogene und sensible Spalten werden in der Abfrage maskiert, Secrets ausgeblendet. Klartext ist eine eigene Freigabe mit Ablaufdatum, und Workspace-Admins haben sie standardmäßig nicht.",
+      href: docs.masking,
+      linkLabel: "Maskierte und ausgeblendete Spalten",
+    },
+    {
+      title: "Jeder Zugriff protokolliert",
+      body: "Jeder Zugriff nennt Person, Tabelle und Kanal: SQL-Seite, Export, Power BI oder Excel über eine persönliche Verbindung oder ein KI-Agent über MCP, der als diese Person liest.",
+      href: docs.whoMayQuery,
+      linkLabel: "Wer was abfragen darf",
+    },
+  ],
+  detail: {
+    title: "Warum das Berechtigungskonzept bis zu den Daten reichen muss",
+    paragraphs: [
+      "Fast jede Organisation hat ein Berechtigungskonzept, ein Rollen- und Rechtekonzept, das festhält, welche Abteilung welche Daten sehen darf und warum. Die Daten lesen keine Dokumente. Jedes System hat eigene Logins und Rollen, also wird das Konzept von Hand durchgesetzt, ein Ticket und ein Export nach dem anderen, und hinterher kann niemand sagen, wer was hat.",
+      "Classifyre schließt diese Lücke. Gruppen und Rollen kommen aus dem Verzeichnis, das Sie schon betreiben, die Regeln (Freigaben, Zeilenfilter, Masken, Ablaufdaten) liegen neben den Daten, und jede Abfrage läuft durch sie: in der App, über eine PostgreSQL-Verbindung aus Power BI oder Excel und für KI-Agenten. Das Zugriffsprotokoll ist der Nachweis, dass das Konzept gegolten hat: Nachvollziehbarkeit nach dem Need-to-know-Prinzip.",
+      "Das unterstützt die DSGVO-Grundsätze der Datenminimierung und der Rechenschaftspflicht (Art. 5) sowie Datenschutz durch Technikgestaltung (Art. 25). Keine Software macht eine Organisation allein konform; Classifyre sorgt dafür, dass die Regeln durchgesetzt werden und der Nachweis aufgeschrieben ist.",
+    ],
+  },
+  notDo: {
+    title: "Was Classifyre nicht tut",
+    body: "Classifyre regelt die Zugriffe, die über Classifyre laufen. Wer eine Datenbank oder Databricks direkt mit eigenen Zugangsdaten abfragt, folgt den Regeln dieses Systems, nicht denen von Classifyre. Ihren Identity-Provider ersetzt es auch nicht: Anmeldung und Gruppen bleiben dort, Classifyre folgt ihnen.",
+  },
+  faq: [
+    {
+      q: "Was ist ein Berechtigungskonzept?",
+      a: "Ein Dokument, das festhält, welche Rollen und Gruppen auf welche Daten zugreifen dürfen, in welchem Umfang und mit welcher Begründung, nach dem Need-to-know-Prinzip. Die DSGVO verlangt, dass personenbezogene Daten nur so weit zugänglich sind, wie es der Zweck erfordert; das Berechtigungskonzept ist, wie eine Organisation das festlegt.",
+    },
+    {
+      q: "Ersetzt Classifyre unser Berechtigungskonzept?",
+      a: "Nein, es setzt es durch. Ihr Konzept entscheidet weiterhin, wer was sehen darf; Classifyre sorgt dafür, dass diese Entscheidung auf den Daten selbst gilt, bei jeder Abfrage und in jedem Werkzeug, und protokolliert jeden Zugriff als Nachweis.",
+    },
+    {
+      q: "Müssen wir unsere AD-Gruppen in Classifyre neu anlegen?",
+      a: "Nein. Binden Sie Ihr Verzeichnis an den Identity-Server an und bilden Sie die Gruppen mit Group-Mappern ab; Änderungen erreichen Classifyre bei der nächsten Anmeldung. Gruppen, die es nur für ein Projekt gibt, legen Sie in der Identity-Konsole von Hand an.",
+    },
+  ],
+  related: ["immuta-alternative", "unity-catalog-alternative"],
 };
 
 const immuta: TopicCopy = {
@@ -32,7 +110,7 @@ const immuta: TopicCopy = {
   name: "Immuta-Alternative",
   metaTitle: "Open-Source-Alternative zu Immuta, On-Premises",
   metaDescription:
-    "Eine Open-Source-Alternative zu Immuta gesucht? Classifyre findet personenbezogene Daten, maskiert sie in der Abfrage und protokolliert jeden Zugriff, auf Ihren Servern.",
+    "Eine Open-Source-Alternative zu Immuta gesucht? Classifyre steuert den Zugriff nach Gruppe, Zeile und Spalte, maskiert in der Abfrage und protokolliert jeden Zugriff, auf Ihren Servern.",
   keywords: [
     "Immuta Alternative",
     "Alternative zu Immuta",
@@ -41,7 +119,7 @@ const immuta: TopicCopy = {
     "dynamische Datenmaskierung Open Source",
   ],
   h1: "Eine Open-Source-Alternative zu Immuta",
-  lede: "Immuta ist ein ausgereiftes kommerzielles Produkt, das Zugriffsrichtlinien in Cloud-Datenplattformen durchsetzt. Classifyre deckt dasselbe Feld anders ab: Open Source, selbst betrieben, mit Erkennung, Maskierung, Abfrage und Zugriffsprotokoll in einem Produkt.",
+  lede: "Immuta ist ein ausgereiftes kommerzielles Produkt, das Zugriffsrichtlinien in Cloud-Datenplattformen durchsetzt. Classifyre deckt dasselbe Feld anders ab: Open Source, selbst betrieben, mit Zugriff nach Gruppen, Erkennung, Maskierung, Abfrage und Zugriffsprotokoll in einem Produkt.",
   demo: "mask",
   demoCaption: "Die Klassifizierung steuert die Masken, ohne dass eine Richtlinie geschrieben wird.",
   mascot: "looking-at-you",
@@ -58,7 +136,7 @@ const immuta: TopicCopy = {
     },
     {
       title: "Alles ist Open Source",
-      body: "Apache-2.0, auch SSO, Rollen und das Gateway. Enterprise-Kunden zahlen für Umsetzung und Betreuung, nicht für Funktionen.",
+      body: "Apache-2.0, auch SSO, Rollen und das Gateway. Wenn Sie Hilfe bei Umsetzung oder Betreuung brauchen, kontaktieren Sie uns: Jede Funktion ist schon Open Source.",
     },
   ],
   detail: {
@@ -77,7 +155,7 @@ const immuta: TopicCopy = {
       {
         aspect: "Betrieb",
         them: "Immuta SaaS oder selbst verwaltet",
-        us: "Nur selbst betrieben: Docker, Kubernetes, OpenShift; läuft offline",
+        us: "Selbst betrieben: Docker oder Kubernetes — On-Premises, eigene Cloud oder Public Cloud (AWS, Azure, Google Cloud); läuft offline",
       },
       {
         aspect: "Wo Richtlinien greifen",
@@ -94,7 +172,7 @@ const immuta: TopicCopy = {
         them: "Über die verwaltete Plattform",
         us: "PostgreSQL-Gateway mit persönlichen, befristeten Verbindungen",
       },
-      { aspect: "Preis", them: "Lizenz", us: "Kostenlos; Enterprise sind Leistungen und SLA" },
+      { aspect: "Preis", them: "Lizenz", us: "Kostenlos und Open Source; Support auf Anfrage" },
     ],
     note: "Immutas Funktionen ändern sich oft; den aktuellen Stand finden Sie in deren Dokumentation. Korrekturen gerne an contact@classifyre.com.",
     sources: [
@@ -112,10 +190,10 @@ const immuta: TopicCopy = {
   faq: [
     {
       q: "Kann ich Richtlinien aus Immuta übernehmen?",
-      a: "Nicht automatisch. Die meisten Teams beginnen mit der Klassifizierung, die personenbezogene Daten standardmäßig maskiert, und geben Klartext dort frei, wo er nötig ist. Ein Enterprise-Pilot umfasst die Abbildung Ihres bestehenden Zugriffsmodells.",
+      a: "Nicht automatisch. Die meisten Teams beginnen mit der Klassifizierung, die personenbezogene Daten standardmäßig maskiert, und geben Klartext dort frei, wo er nötig ist. Ein Pilot umfasst die Abbildung Ihres bestehenden Zugriffsmodells.",
     },
   ],
-  related: ["unity-catalog-alternative"],
+  related: ["data-access-governance", "unity-catalog-alternative"],
 };
 
 const unity: TopicCopy = {
@@ -192,7 +270,7 @@ const unity: TopicCopy = {
       {
         aspect: "Betrieb",
         them: "Databricks-Clouddienst",
-        us: "Selbst betrieben: Docker, Kubernetes, OpenShift; läuft offline",
+        us: "Selbst betrieben: Docker oder Kubernetes — On-Premises, eigene Cloud oder Public Cloud (AWS, Azure, Google Cloud); läuft offline",
       },
     ],
     note: "Databricks ändert häufig; den aktuellen Stand finden Sie in deren Dokumentation. Korrekturen gerne an contact@classifyre.com.",
@@ -218,10 +296,11 @@ const unity: TopicCopy = {
       a: "Ja. Databricks-Delta-Tabellen sind als Quelle abfragbar, und Iceberg-Kataloge, einschließlich des REST-Endpunkts von Unity Catalog, lassen sich scannen.",
     },
   ],
-  related: ["immuta-alternative"],
+  related: ["data-access-governance", "immuta-alternative"],
 };
 
 export const deTopics: Record<TopicId, TopicCopy> = {
+  "data-access-governance": accessGovernance,
   "immuta-alternative": immuta,
   "unity-catalog-alternative": unity,
 };

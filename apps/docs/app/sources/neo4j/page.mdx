@@ -4,7 +4,7 @@ description: Scan Neo4j node labels and relationships — Bolt connection option
 ---
 
 import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
-import { LineageNote, SharedSettingsNote } from "@/components/source-notes";
+import { LineageNote, QueryNote, SharedSettingsNote } from "@/components/source-notes";
 
 # Neo4j
 
@@ -41,6 +41,13 @@ its contents.
 ## Lineage
 
 <LineageNote />
+
+## Query data & SQL connections
+
+<QueryNote support="none">
+  DuckDB has no built-in connector for Neo4j, so the graph cannot be queried.
+  Land the data in a bucket as Parquet or Delta to query it.
+</QueryNote>
 
 ## Worth knowing
 

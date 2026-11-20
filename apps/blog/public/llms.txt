@@ -1,28 +1,36 @@
 # Classifyre
 
-> Open-source data governance you run yourself. Classifyre finds personal data and secrets across 40+ systems, masks them automatically inside the query, and lets people query everything with SQL, Excel and Power BI. Every read is logged. Apache-2.0, self-hosted, made in Austria.
+> Open-source data access governance you run yourself. Classifyre is the one governed way into an organisation's data: access follows departments, roles and rules, personal data stays masked until someone is cleared for it, teams build data products on top, and every read is on record. Apache-2.0, self-hosted, made in Austria.
 
-Classifyre is one product with every feature open source, including SSO, roles, tenants, masking and the SQL gateway. Enterprise is services: a fixed-price pilot, implementation, an SLA subscription and tailoring.
+Classifyre is one product with every feature open source, including SSO, roles, tenants, row filters, masking and the SQL gateway. There is no separate enterprise build. If you need help with rollout, installation or tailoring, contact us: contact@classifyre.com.
 
 ## What it does
 
-- Finds personal data (41 entity types, including Austrian, German and Swiss identifiers) and secrets (27 patterns) in databases, lakehouses, object storage, wikis, tickets, mail and Git; custom detectors by regex, model or prompt.
-- Masks classified columns by default: redacted (****), last four (••••1234), hashed (joins and counts still work; pseudonymisation, not anonymisation), empty, or hidden. Masks apply inside the query, so WHERE, JOIN and GROUP BY cannot see past them.
-- Grants Data reader or Data reader, unmasked to groups per workspace, source or table, with end dates; row filters per group; access requests decided by owners and stewards.
-- Serves the tables to the SQL page, exports (Excel, CSV, Parquet), a PostgreSQL-protocol endpoint for Power BI, Excel, Tableau and DBeaver, and AI agents over MCP, all through the same masks.
-- Records every read per table and person, with the channel used.
-- Runs as one Docker image or a Helm chart on Kubernetes; OpenShift with Enterprise support. Runs offline.
+1. Access follows the organisation. Groups come from the company directory (Entra ID, Active Directory over LDAP, Okta, any OIDC or SAML provider) through the bundled Keycloak identity server. Access always goes to groups: Data reader or Data reader, unmasked per workspace, source or table, with end dates; row filters per group (a district sees only its rows, no row without a rule); access requests decided by owners and stewards. Workspace admins do not read clear values by default.
+2. Personal data is masked by default. Classification (41 personal-data entity types including Austrian, German and Swiss identifiers, 27 secret patterns, custom detectors by regex, model or prompt) decides what is protected. Masks: redacted (****), last four (••••1234), hashed (joins and counts still work; pseudonymisation, not anonymisation), empty, or hidden. Masks apply inside the query, so WHERE, JOIN and GROUP BY cannot see past them.
+3. Yes — teams can build data products on governed data. Shared datasets are governed, sharable, saved queries that join up to eight sources live, with an owning group and readers per group; teams query them with the same governance as the sources underneath, and the masks of every input travel with them as a floor. Owners, stewards, quality rules and ODCS data contracts.
+4. People use it in the tools they have: the SQL page, exports (Excel, CSV, Parquet), a PostgreSQL-protocol endpoint for Power BI, Excel, Tableau and DBeaver on personal, expiring connections, and AI agents over MCP, which read as the person who connected them.
+5. Every read is on record per table and person, with the channel used, and nothing leaves your infrastructure: run it on-premises, in your own cloud, or on public cloud infrastructure (AWS, Azure, Google Cloud). Runs as one Docker image or a Helm chart on Kubernetes. Runs offline.
+
+When something leaks, the same findings feed an investigation layer: standing inquiries, fingerprints across systems, cases with evidence and hypotheses, and an autopilot.
+
+Classifyre supports GDPR data minimisation, accountability (Art. 5) and data protection by design (Art. 25); it does not make an organisation compliant on its own.
 
 ## Pages
 
 - [Home](https://classifyre.com/): overview
+- [Data access governance](https://classifyre.com/data-access-governance/)
+- [Incident response](https://classifyre.com/use-cases/incident-response/)
 - [Immuta alternative](https://classifyre.com/immuta-alternative/)
 - [Unity Catalog alternative](https://classifyre.com/unity-catalog-alternative/)
-- [German site](https://classifyre.com/de/)
+- [Made in Austria](https://classifyre.com/made-in-europe/)
+- [German site](https://classifyre.com/de/) · [Berechtigungskonzept umsetzen](https://classifyre.com/de/berechtigungskonzept-umsetzen/)
 
 ## Docs
 
 - [Documentation](https://docs.classifyre.com/)
+- [Access](https://docs.classifyre.com/access/)
+- [Organizing people with groups](https://docs.classifyre.com/access/organizing/)
 - [Query data and masking](https://docs.classifyre.com/data-query/)
 - [SQL connections](https://docs.classifyre.com/sql-connections/)
 - [Roles](https://docs.classifyre.com/access/roles/)

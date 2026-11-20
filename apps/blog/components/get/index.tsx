@@ -473,15 +473,21 @@ export function GetPage({ locale }: { locale: Locale }) {
               ))}
             </div>
 
-            {/* The enterprise layer, said out loud: one memo, no card grid. */}
+            {/* Where to turn for help: one memo with a contact, no card grid. */}
             <Enter className="mt-12">
               <div className="border-2 border-foreground/25 bg-muted/50 p-6 sm:p-8">
                 <Micro className="text-accent-ink dark:text-accent">
                   {copy.which.marker}
                 </Micro>
                 <p className="mt-3 max-w-4xl text-base leading-8 sm:text-lg sm:leading-9">
-                  {copy.which.enterpriseNote}
+                  {copy.which.supportNote}
                 </p>
+                <a
+                  href={`${withLocalePrefix(locale, routes.support)}/`}
+                  className="mt-4 inline-block font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-accent-ink underline-offset-4 hover:underline dark:text-accent"
+                >
+                  {copy.which.supportCta} →
+                </a>
               </div>
             </Enter>
           </div>

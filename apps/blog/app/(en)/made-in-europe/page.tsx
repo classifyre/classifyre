@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { Button } from "@workspace/ui/components";
 import { cn } from "@workspace/ui/lib/utils";
 
+import { AboutPillars } from "@/components/about-pillars";
 import { Illustration } from "@/components/illustration";
 import {
   DocsLink,
@@ -15,7 +16,7 @@ import {
 import { Reveal } from "@/components/reveal";
 import {
   docs,
-  enterpriseContactEmail,
+  contactEmail,
   repoUrl,
   routes,
   showcaseUrl,
@@ -24,15 +25,23 @@ import {
 import "../../landing.css";
 
 export const metadata: Metadata = {
-  title: "Made in Austria",
+  title: { absolute: "About Classifyre: Made in Austria, Open Source" },
   description:
-    "Classifyre is built in Austria, in the European Union, and released as open source under Apache-2.0. The software runs on your own machines — your data stays where you put it, under the rules we work under ourselves.",
-  alternates: { canonical: routes.madeInEurope },
+    "The governed way into your organisation's data: access by role, masking by default, every read on record. Built in Austria, Apache-2.0. Deploy on-premises, in your own cloud, or on AWS, Azure or Google Cloud.",
+  alternates: {
+    canonical: "/made-in-europe/",
+    languages: {
+      en: "/made-in-europe/",
+      de: "/de/made-in-europe/",
+      "x-default": "/made-in-europe/",
+    },
+  },
   openGraph: {
-    title: "Classifyre — Made in Austria, built in the open",
+    title: "About Classifyre: made in Austria, built in the open",
     description:
-      "Austrian, European, Apache-2.0 open-source data governance. Your data never has to leave your infrastructure — or the continent.",
+      "Austrian, European, Apache-2.0 open-source data access governance platform. Your data never has to leave your infrastructure — on-premises, your own cloud, or AWS, Azure or Google Cloud — or the continent.",
     type: "website",
+    locale: "en_US",
   },
 };
 
@@ -134,7 +143,7 @@ const consequences: readonly {
   {
     marker: "Same rulebook",
     title: "We work under the regulations you do",
-    body: "GDPR, NIS2, DORA, and the AI Act are not an export checklist for us — they are the law where we sit. That shapes the product's defaults: audit trails on cases, encrypted credentials, workspace isolation, and telemetry you can switch off.",
+    body: "GDPR, NIS2, DORA, and the AI Act are not an export checklist for us — they are the law where we sit. That shapes the product's defaults: masked by default, a log of every read, encrypted credentials, workspace isolation, and telemetry you can switch off.",
     href: docs.telemetry,
     hrefLabel: "What telemetry sends",
   },
@@ -156,7 +165,7 @@ const openSourceFacts: readonly {
     label: "Scope",
     value: "The whole engine",
     detail:
-      "Connectors, detectors, investigations, autopilot, Docker image, and Helm chart — not a stripped demo.",
+      "Connectors, SSO and roles, grants and row filters, masking, the SQL gateway, investigations, the Docker image and the Helm chart. Not a stripped demo.",
   },
   {
     label: "Development",
@@ -265,10 +274,14 @@ export default function MadeInEuropePage() {
         }
         lede={
           <>
-            Classifyre is built in Austria, in the European Union, and released
-            as open source under Apache-2.0. We are not a European brand on top
-            of somebody else&apos;s cloud — the software runs on your machines,
-            under the same rules we work under ourselves.
+            Classifyre is the one governed way into your organisation&apos;s
+            data: access follows your departments, roles and rules, personal
+            data stays masked until someone is cleared for it, and every read
+            is on record, on your own servers. It is built in Austria, in the
+            European Union, and released as open source under Apache-2.0. We
+            are not a European brand on top of somebody else&apos;s cloud: the
+            software runs on your machines, under the same rules we work under
+            ourselves.
           </>
         }
         actions={
@@ -320,6 +333,9 @@ export default function MadeInEuropePage() {
         }
       />
 
+      {/* ── What Classifyre does: the five pillars ──────────────────────── */}
+      <AboutPillars locale="en" />
+
       {/* ── Where we sit ─────────────────────────────────────────────────── */}
       <section aria-labelledby="where-title">
         <SectionShell tone="plain">
@@ -344,8 +360,8 @@ export default function MadeInEuropePage() {
                 variant="secondary"
                 className="border-2 border-border"
               >
-                <a href={`mailto:${enterpriseContactEmail}`}>
-                  {enterpriseContactEmail}
+                <a href={`mailto:${contactEmail}`}>
+                  {contactEmail}
                 </a>
               </Button>
             </div>
@@ -459,7 +475,7 @@ export default function MadeInEuropePage() {
                 variant="secondary"
                 className="border-2 border-white/20 bg-white/10 text-white hover:bg-white/16"
               >
-                <a href={`mailto:${enterpriseContactEmail}`}>Talk to us</a>
+                <a href={`mailto:${contactEmail}`}>Talk to us</a>
               </Button>
             </div>
           </div>

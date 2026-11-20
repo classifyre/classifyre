@@ -4,7 +4,7 @@ description: Scan Snowflake tables and views — the four authentication methods
 ---
 
 import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
-import { SqlSourceNotes, LineageNote, SharedSettingsNote } from "@/components/source-notes";
+import { SqlSourceNotes, LineageNote, QueryNote, SharedSettingsNote } from "@/components/source-notes";
 
 # Snowflake
 
@@ -65,6 +65,14 @@ same way, which is what lets a Tableau workbook pointing at
 [Lineage & Relationships](/sources/lineage/).
 
 </LineageNote>
+
+## Query data & SQL connections
+
+<QueryNote support="none">
+  DuckDB has no built-in connector for Snowflake. Snowflake ships an ODBC
+  driver, so an ODBC source can read — and query — it instead; otherwise land
+  the data in a bucket as Parquet or Delta.
+</QueryNote>
 
 ## Worth knowing
 

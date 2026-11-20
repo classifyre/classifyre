@@ -87,9 +87,10 @@ export interface SiteFooterCopy {
   blurb: string;
   navHeading: string;
   navHome: string;
+  navAbout: string;
   navGet: string;
   navSources: string;
-  navEditions: string;
+  navSupport: string;
   navBlog: string;
   navDocumentation: string;
   navShowcase: string;
@@ -104,14 +105,15 @@ export interface SiteFooterCopy {
 }
 
 const DEFAULT_COPY: SiteFooterCopy = {
-  tagline: "Open-source data governance",
+  tagline: "Open-source data access governance platform",
   blurb:
-    "Open-source data governance you run yourself. Classifyre finds personal data and secrets across the systems you already run, masks them automatically, and lets your team query everything with SQL, Excel and Power BI. Every read is logged.",
+    "Classifyre is the governed way into your organisation's data. Access follows your departments and roles, personal data stays masked until someone is cleared, and every read is on record. Apache-2.0, made in Austria. Deploy on-premises, in your own cloud, or on AWS, Azure or Google Cloud.",
   navHeading: "Navigate",
   navHome: "Home",
+  navAbout: "About · Made in Austria",
   navGet: "Get Classifyre",
   navSources: "Sources",
-  navEditions: "Open source vs Enterprise",
+  navSupport: "Support",
   navBlog: "Blog",
   navDocumentation: "Documentation",
   navShowcase: "Live showcase",
@@ -122,7 +124,7 @@ const DEFAULT_COPY: SiteFooterCopy = {
   releaseNotes: "Release notes",
   cookieSettings: "Cookie settings",
   contact: "Contact",
-  baselineTagline: "Masked until someone is allowed to see it",
+  baselineTagline: "Masked by default · every read on record",
 };
 
 export function SiteFooter({
@@ -157,8 +159,10 @@ export function SiteFooter({
      actions that live as buttons up there (Showcase, GitHub). */
   const navigation: readonly FooterLink[] = [
     { label: text.navHome, href: marketing(marketingPaths.home) },
+    { label: text.navAbout, href: marketing(marketingPaths.madeInEurope) },
     { label: text.navGet, href: marketing(marketingPaths.get) },
     { label: text.navSources, href: marketing(marketingPaths.sources) },
+    { label: text.navSupport, href: marketing(marketingPaths.support) },
     { label: text.navBlog, href: marketing(marketingPaths.blog) },
     {
       label: text.releaseNotes,

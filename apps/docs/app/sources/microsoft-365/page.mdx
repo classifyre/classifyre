@@ -4,7 +4,7 @@ description: Scan SharePoint sites, OneDrive and Teams files through Microsoft G
 ---
 
 import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
-import { LineageNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
+import { LineageNote, QueryNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
 
 # Microsoft 365
 
@@ -54,6 +54,14 @@ also:
 ## Lineage
 
 <LineageNote />
+
+## Query data & SQL connections
+
+<QueryNote support="none">
+  SharePoint, OneDrive and Teams files are files, not tables, so there is
+  nothing SQL could read. To query file content, keep the files in a bucket
+  source instead.
+</QueryNote>
 
 ## Worth knowing
 

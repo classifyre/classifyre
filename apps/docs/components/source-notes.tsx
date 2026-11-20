@@ -240,6 +240,115 @@ export function SharedSettingsNote() {
 }
 
 /**
+ * Stated on every source page, so the answer to "can this source be read with
+ * SQL?" is always in the same place — including when the answer is no.
+ *
+ * `support` names how the query engine (DuckDB, one short-lived job per query)
+ * reaches the source, and mirrors `QUERYABLE_SOURCE_TYPES` in
+ * apps/cli/src/query/bindings.py with the detail on /data-query:
+ * `"database"` (every scanned table and view, e.g. PostgreSQL and MySQL),
+ * `"bucket"` (Delta/Iceberg tables and table-shaped files in the four bucket
+ * sources and local folders), `"catalog"` (an attached lakehouse catalog),
+ * `"odbc"` (any database behind an ODBC driver), `"databricks"` (Unity Catalog
+ * tables, with their extra conditions), or `"none"` (not queryable — the
+ * children say why, and what to do instead).
+ *
+ * "SQL connections" below means the PostgreSQL-protocol access for BI tools
+ * and drivers (Power BI, Excel, Tableau, DBeaver, psql, JDBC/ODBC clients): it
+ * reads the same tables as SQL, once the table or source is opened on its
+ * Governance tab. It is not the ODBC *source*.
+ */
+export function QueryNote({
+  support,
+  children,
+}: {
+  support: "database" | "bucket" | "catalog" | "odbc" | "databricks" | "none";
+  children?: React.ReactNode;
+}) {
+  if (support === "none") {
+    return (
+      <Note title="Query data & SQL connections">
+        <p>
+          This source <strong>cannot be queried with SQL yet</strong> — not on
+          the <strong>Query data</strong> page, the Data tabs, in exports,
+          through AI agents, or over{" "}
+          <DocLink href="/sql-connections/">SQL connections</DocLink> (Power
+          BI, Excel and the like). Scans still read and classify everything;
+          only reading rows back is missing.
+        </p>
+        {children}
+      </Note>
+    );
+  }
+  return (
+    <Note title="Query data & SQL connections">
+      {support === "database" && <p>Every scanned table and view.</p>}
+      {support === "catalog" && (
+        <p>Every scanned table, attached exactly as the scan attaches it.</p>
+      )}
+      {support === "bucket" && (
+        <p>
+          Delta and Iceberg tables — read as they are now, not as the last
+          scan saw them — along with Parquet, CSV, TSV, JSON Lines, JSON, Avro
+          and geospatial files (geometry as WKT text). Formats scans read but
+          SQL cannot, like Excel workbooks and SQLite files, are listed with
+          their reason. See{" "}
+          <DocLink href="/data-query/">SQL over your tables</DocLink>.
+        </p>
+      )}
+      {support === "databricks" && (
+        <>
+          <p>
+            Every scanned Unity Catalog table stored as Delta, read through
+            Unity Catalog itself: DuckDB asks it for short-lived credentials to
+            the table&apos;s files, so no storage keys are involved. Two things
+            must be switched on in Databricks, otherwise a query answers that
+            Databricks would not hand out storage credentials: an admin turns
+            on <strong>External data access</strong> for the metastore, and the
+            source&apos;s principal holds the{" "}
+            <strong>EXTERNAL USE SCHEMA</strong> privilege on each schema to
+            query.
+          </p>
+          <p>
+            Only Delta tables can be read. <strong>Views</strong> are listed but
+            cannot be queried, because they have no files of their own; query
+            the tables they read instead.
+          </p>
+        </>
+      )}
+      {support === "odbc" && (
+        <>
+          <p>
+            Every scanned table and view, read through DuckDB&apos;s{" "}
+            <code>odbc_scanner</code> extension with the same connection string,
+            user and password the scan uses. The one thing queries need beyond
+            the scan is <strong>the driver installed where queries run</strong>:
+            the image ships unixODBC and the PostgreSQL driver, anything else
+            rides in a custom CLI-jobs image.
+          </p>
+          <p>
+            ODBC is the slowest way in: a query is a plain{" "}
+            <code>SELECT * FROM table</code> sent to the database — no filter,
+            projection or aggregation is sent along, though a{" "}
+            <code>LIMIT</code> ends the read early. Start with one, or land the
+            table in a bucket first.
+          </p>
+        </>
+      )}
+      <p>
+        SQL runs on the <DocLink href="/data-query/">Query data</DocLink> page,
+        the Data tabs, in exports and through AI agents — and, once the table
+        or source is opened on its Governance tab, over{" "}
+        <DocLink href="/sql-connections/">SQL connections</DocLink> (Power BI,
+        Excel, Tableau, DBeaver, psql, JDBC/ODBC). Scan first: SQL only knows
+        the tables a scan found, and who may query follows roles and grants.
+      </p>
+      {children}
+    </Note>
+  );
+}
+
+/**
  * Stated on every source page, so the answer to "does this source do lineage?"
  * is always in the same place — including when the answer is no.
  */

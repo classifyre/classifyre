@@ -6,7 +6,7 @@ import { CookieSettingsButton } from "@workspace/ui/components";
 import { translate } from "@/i18n";
 import { Marker, PageHero, SectionShell } from "@/components/page-kit";
 import {
-  enterpriseContactEmail,
+  contactEmail,
   marketingSiteUrl,
   repoUrl,
   showcaseUrlFor,
@@ -43,7 +43,7 @@ const operator = {
   legalName: null as string | null,
   postalAddress: null as string | null,
   country: "Österreich, Europäische Union",
-  email: enterpriseContactEmail,
+  email: contactEmail,
 };
 
 const lastUpdated = "4. August 2026";

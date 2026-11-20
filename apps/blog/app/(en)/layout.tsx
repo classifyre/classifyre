@@ -29,7 +29,7 @@ const siteUrl = normalizeSiteUrl(
 );
 
 const siteDescription =
-    "Open-source data governance: find personal data and secrets, mask them automatically, and query everything safely with SQL, Excel and Power BI. Self-hosted, made in Austria.";
+    "Open-source data access governance platform: access by department and role across 40+ systems, masking by default, every read logged. Deploy on-premises, in your own cloud, or on AWS, Azure or Google Cloud. Made in Austria.";
 
 export const metadata: Metadata = {
     metadataBase: new URL(siteUrl),
@@ -39,13 +39,14 @@ export const metadata: Metadata = {
     },
     description: siteDescription,
     keywords: [
-        "data governance",
-        "open source data governance",
-        "data masking",
-        "PII discovery",
-        "data classification",
         "data access governance",
-        "self-hosted",
+        "governed data access",
+        "open source data governance",
+        "self-hosted data governance",
+        "role-based access control",
+        "row-level security",
+        "dynamic data masking",
+        "data products",
     ],
     alternates: {
         canonical: "/",
@@ -98,7 +99,7 @@ const navbar = (
                 <div className="grid flex-1 text-left text-sm leading-tight">
                     <span className="truncate font-serif font-bold">Classifyre</span>
                     <span className="truncate font-mono text-[10px] text-muted-foreground">
-            Open-source data governance
+            Open-source data access governance
 </span>
                 </div>
             </div>
@@ -111,7 +112,7 @@ const navbar = (
 
 const footer = (
     <Footer className="classifyre-site-footer">
-        <SiteFooter topics={{heading: "Data governance", links: topicLinks("en")}}/>
+        <SiteFooter topics={{heading: "Data access governance", links: topicLinks("en")}}/>
     </Footer>
 );
 

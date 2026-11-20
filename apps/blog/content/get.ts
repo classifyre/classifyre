@@ -88,9 +88,9 @@ export type GetCopy = {
     dockerPoints: readonly string[];
     kubernetesHead: string;
     kubernetesPoints: readonly string[];
-    /** The memo block: the enterprise layer, said out loud. */
-    enterpriseNote: string;
-    enterpriseCta: string;
+    /** Where to turn for help: a contact, not a tier. */
+    supportNote: string;
+    supportCta: string;
   };
   closing: {
     /** Rendered as `titleLead` + an accent block with `titleHighlight`. */
@@ -155,7 +155,7 @@ const enDocker = {
 
 const enFirstRun = {
   marker: "First run",
-  title: "Four steps to your first finding",
+  title: "Four steps to governed access on one source",
   lede: "Nothing here needs a config file. Every step is in the app, and each one has a page on the docs site when you want the detail.",
   action: { label: "Tour the app", href: docs.inTheApp },
   steps: [
@@ -173,17 +173,17 @@ const enFirstRun = {
     },
     {
       step: "03",
-      title: "Switch on detectors",
-      body: "Enable the built-in packs you care about: PII, secrets, security, moderation, quality. They work on the first scan with no model setup.",
+      title: "Classify it",
+      body: "Switch on the built-in packs you care about: PII, secrets, quality. They work on the first scan with no model setup, and the classification they produce decides which columns are masked.",
       href: docs.preBuiltDetectors,
       hrefLabel: "Pre-built detectors",
     },
     {
       step: "04",
-      title: "Run a scan, open a case",
-      body: "Findings land ranked by importance. Group them into inquiries and cases, or add an AI provider and let the autopilot work them between scans.",
-      href: docs.aiProviders,
-      hrefLabel: "AI providers",
+      title: "Give one group governed access",
+      body: "Grant a group Data reader on the source and add a row filter if it should see only its rows. Personal columns arrive masked. Query it on the SQL page or from Power BI, and watch the read land in the log.",
+      href: docs.whoMayQuery,
+      hrefLabel: "Who may query what",
     },
   ],
 } as const;
@@ -250,9 +250,9 @@ const enWhich = {
     "The estate is large enough to need workers fanning out.",
     "It has to sit inside your existing cluster and network.",
   ],
-  enterpriseNote:
-    "Wondering what Enterprise adds on top of either runtime? No features: SSO, roles and masking are all open source. Enterprise is the same product tailored to your organisation, with support and an SLA; you or your integrator can run it without us.",
-  enterpriseCta: "Open source vs Enterprise",
+  supportNote:
+    "No separate enterprise build, no gated features: SSO, roles and masking are all open source. If you need help with rollout, installation, a connector for your systems, or tailoring Classifyre to your organisation, contact us — you or your integrator can also run everything yourselves.",
+  supportCta: "How support works",
 } as const;
 
 const enClosing = {

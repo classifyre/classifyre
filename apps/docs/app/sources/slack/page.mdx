@@ -4,7 +4,7 @@ description: Scan Slack channel messages, threads and shared files — bot-token
 ---
 
 import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
-import { LineageNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
+import { LineageNote, QueryNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
 
 # Slack
 
@@ -58,6 +58,13 @@ without that, Slack simply reports no access.
 ## Lineage
 
 <LineageNote />
+
+## Query data & SQL connections
+
+<QueryNote support="none">
+  Messages and shared files are not tables, so there is nothing SQL could
+  read. Use Slack search, or land the data in a bucket as Parquet or Delta.
+</QueryNote>
 
 ## Worth knowing
 

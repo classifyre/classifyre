@@ -10,7 +10,7 @@ const total = sourceCount();
 
 export const metadata: Metadata = {
   title: "Supported Sources",
-  description: `Every system Classifyre can scan: ${total} connectors across databases, warehouses and lakehouses, streaming, object storage, collaboration tools, analytics, and public content. Each connector links to its configuration reference.`,
+  description: `Every system Classifyre can govern: ${total} connectors across databases, warehouses and lakehouses, streaming, object storage, collaboration tools, analytics, and public content. Each connector links to its configuration reference.`,
   alternates: { canonical: routes.sources },
   openGraph: {
     title: "Classifyre: Supported Sources",

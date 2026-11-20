@@ -9,7 +9,7 @@ const total = sourceCount();
 
 export const metadata: Metadata = {
   title: "Unterstützte Quellen",
-  description: `Jedes System, das Classifyre scannen kann: ${total} Konnektoren über Datenbanken, Warehouses und Lakehouses, Streaming, Object Storage, Kollaborationstools, Analytics und öffentliche Inhalte. Jeder Konnektor verlinkt auf seine Konfigurationsreferenz.`,
+  description: `Jedes System, das Classifyre steuern kann: ${total} Konnektoren über Datenbanken, Warehouses und Lakehouses, Streaming, Object Storage, Kollaborationstools, Analytics und öffentliche Inhalte. Jeder Konnektor verlinkt auf seine Konfigurationsreferenz.`,
   alternates: {
     canonical: "/de/sources/",
     languages: {

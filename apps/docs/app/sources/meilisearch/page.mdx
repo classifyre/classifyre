@@ -4,7 +4,7 @@ description: Discover Meilisearch indexes and sample documents — API key auth,
 ---
 
 import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
-import { SearchIndexNotes, LineageNote, SharedSettingsNote } from "@/components/source-notes";
+import { SearchIndexNotes, LineageNote, QueryNote, SharedSettingsNote } from "@/components/source-notes";
 
 # Meilisearch
 
@@ -38,6 +38,13 @@ produces.
 ## Lineage
 
 <LineageNote />
+
+## Query data & SQL connections
+
+<QueryNote support="none">
+  DuckDB has no built-in connector for Meilisearch, so indexes cannot be
+  queried. Land the data in a bucket as Parquet or Delta to query it.
+</QueryNote>
 
 ## Configuration
 

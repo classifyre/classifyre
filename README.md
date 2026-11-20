@@ -3,16 +3,18 @@
 
 # Classifyre
 
-## Open-Source Data Governance
+## Open-Source Data Access Governance
 
-**Find it. Protect it. Use it.**
+**Your access rules, enforced on every query.**
 
 [![CI](https://img.shields.io/github/actions/workflow/status/classifyre/classifyre/ci.yml?branch=develop&style=flat-square&label=CI&logo=github)](https://github.com/classifyre/classifyre/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/classifyre/classifyre?sort=semver&style=flat-square&label=release)](https://github.com/classifyre/classifyre/releases/latest)
 [![License](https://img.shields.io/github/license/classifyre/classifyre?style=flat-square)](LICENSE)
 [![Docs](https://img.shields.io/badge/docs-classifyre.com-1f6feb?style=flat-square)](https://docs.classifyre.com/)
 
-Classifyre finds personal data and secrets across the systems you already run, **masks them automatically**, and lets your team query everything with SQL, Excel and Power BI. Every read is logged. Nothing leaves your servers. All of it is Apache-2.0, including SSO, roles and masking; when something leaks, cases and an AI autopilot help you investigate it.
+Open-source data access governance you run yourself. Classifyre enforces who sees which tables, rows and columns across 40+ systems, **masks personal data inside the query**, and logs every read.
+
+Departments, roles and locations from your directory decide what each person sees; personal data stays masked until someone is cleared for it; teams build data products on top and use them in SQL, Excel, Power BI and AI agents. Nothing leaves your servers. All of it is Apache-2.0, including SSO, roles, row filters and masking.
 
 [Documentation](https://docs.classifyre.com/) · [Live Showcase](https://showcase.classifyre.com/)
 
@@ -22,18 +24,17 @@ Classifyre finds personal data and secrets across the systems you already run, *
 
 ## What Classifyre does
 
-Detection is the first step. The value is in what happens next: classified data is masked by default, people get governed access through the tools they already use, and every read is on record.
+Classifyre is the one governed way into your organisation's data. Five promises, each with the feature that proves it:
 
-| Capability                | What it means                                                                                                                                                                                                                      | Docs                                                                       |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| **Sources**               | Connect databases, lakehouses, storage, collaboration tools, and content platforms — no data migration. Choose sampling while image OCR and audio/video transcription run automatically.                                           | [Sources](https://docs.classifyre.com/sources/)                            |
-| **Detectors**             | Ready-made packs (secrets, PII, security) plus custom detectors you build — from a regex to an LLM, across text and images.                                                                                                        | [Detectors](https://docs.classifyre.com/detectors/)                        |
-| **Findings**              | Every signal a detector raises, with severity, confidence, and a lifecycle tracked across scans.                                                                                                                                   | [Findings](https://docs.classifyre.com/detectors/findings/)                |
-| **Masking & access**      | Classified columns are masked by default (redacted, last four, hashed, empty, or hidden). Masks apply inside the query, so `WHERE`, `JOIN` and `GROUP BY` cannot see past them. Grants, row filters and access requests per group. | [Query data & masking](https://docs.classifyre.com/data-query/)            |
-| **SQL, Excel & Power BI** | A SQL page, exports, and a PostgreSQL-protocol endpoint for Power BI, Excel, Tableau and DBeaver, plus AI agents over MCP — all through the same masks.                                                                            | [SQL connections](https://docs.classifyre.com/sql-connections/)            |
-| **Shared datasets**       | Governed saved queries shared with groups, so a team works from one reviewed dataset across sources.                                                                                                                               | [Shared datasets](https://docs.classifyre.com/data-query/#shared-datasets) |
-| **Roles & SSO**           | Single sign-on, roles, groups and workspaces. All open source, none of it behind a paid tier.                                                                                                                                      | [Roles](https://docs.classifyre.com/access/roles/)                         |
-| **Activity log**          | Every read, per table and person, with the channel used.                                                                                                                                                                           | [Access](https://docs.classifyre.com/access/)                              |
+| Promise                                        | What it means                                                                                                                                                                                                                                               | Docs                                                                       |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| **Access follows your organisation**           | Groups from Entra ID, Active Directory, Okta or any OIDC/SAML directory decide which sources, tables, rows and columns a person sees. Grants with end dates, row filters per group, access requests decided by owners. SSO and roles included.              | [Access](https://docs.classifyre.com/access/)                              |
+| **Sensitive data is masked by default**        | Classification decides what is personal (41 PII types incl. AT/DE/CH identifiers, 27 secret patterns, custom detectors). Masks apply inside the query (redacted, last four, hashed, empty, hidden), so `WHERE`, `JOIN` and `GROUP BY` cannot see past them. | [Query data & masking](https://docs.classifyre.com/data-query/)            |
+| **Teams build data products on governed data** | Shared datasets join sources live, with an owning group and readers per group; the masks of every input travel with them as a floor. Owners, stewards, quality rules, ODCS contracts.                                                                       | [Shared datasets](https://docs.classifyre.com/data-query/#shared-datasets) |
+| **People use it in the tools they have**       | A SQL page, exports, and a PostgreSQL-protocol endpoint for Power BI, Excel, Tableau and DBeaver on personal, expiring connections, plus AI agents over MCP that read as the person who connected them.                                                     | [SQL connections](https://docs.classifyre.com/sql-connections/)            |
+| **Every read is on record, nothing leaves**    | Every read, per table and person, with the channel used. Runs as one Docker image or a Helm chart on your own infrastructure, offline if you like.                                                                                                          | [Roles](https://docs.classifyre.com/access/roles/)                         |
+
+Underneath: 40+ [sources](https://docs.classifyre.com/sources/) read in place (databases, lakehouses, storage, collaboration tools, content platforms; image OCR and audio/video transcription run automatically), [detectors](https://docs.classifyre.com/detectors/) from a regex to an LLM, and [findings](https://docs.classifyre.com/detectors/findings/) with severity, confidence and a lifecycle across scans.
 
 ### When something leaks
 
@@ -50,23 +51,24 @@ Findings also feed an investigation layer for the cases that need a human to dig
 
 ```mermaid
 flowchart LR
-    A[Sources] --> B[Assets]
-    B --> C[Detectors]
-    C --> D[Findings]
+    O["Organisation<br/>groups · roles · departments"] --> P["Policies<br/>grants · row filters · masks"]
+    S[Sources] --> C["Classification<br/>detectors · findings"]
+    C --> P
+    P --> D["Governed data<br/>tables · shared datasets"]
+    D --> T["SQL · Excel · Power BI · MCP"]
+    T --> L[Read log]
 
-    D --> E[Masks and grants]
-    E --> F["SQL · Excel · Power BI · MCP"]
-    F --> G[Activity log]
-
-    D -.->|when something leaks| H["Inquiries · Fingerprints · Cases"]
+    C -.->|when something leaks| H["Inquiries · Fingerprints · Cases"]
     I[Autopilot] -.-> H
 ```
 
-1. **Scan.** A scan ingests each source into **assets**, and **detectors** raise **findings** on them.
-2. **Protect.** Findings decide which columns are **masked**. Access is granted per group.
-3. **Use.** People read the data through the SQL page, exports, a PostgreSQL endpoint or MCP, always through the masks.
-4. **Audit.** **Every read is logged**, per table and person.
-5. **Investigate (optional).** When something does leak, **inquiries**, **fingerprints** and **cases** turn findings into an investigation, with **Autopilot** doing the legwork.
+1. **Connect and classify.** A scan reads each source in place into **assets**; **detectors** raise **findings**, and the classification decides what is protected.
+2. **Organise.** Groups from your directory get **grants**, **row filters** and, where needed, clear reading of personal columns, each with an end date if you like.
+3. **Protect.** Personal columns are **masked inside the query** for everyone not cleared to read them, workspace admins included.
+4. **Build.** Teams share **datasets** that join sources live; the masks of every input travel with them.
+5. **Use.** People read the data through the SQL page, exports, a PostgreSQL endpoint or MCP, always through their own grants and masks.
+6. **Audit.** **Every read is logged**, per table and person.
+7. **Investigate (optional).** When something does leak, **inquiries**, **fingerprints** and **cases** turn findings into an investigation, with **Autopilot** doing the legwork.
 
 The end-to-end journey is documented in [Flow](https://docs.classifyre.com/flow/).
 
@@ -91,7 +93,7 @@ in a second terminal run it on your machine against the stack:
 
 Then open [http://localhost:3000](http://localhost:3000). The API is on
 <http://localhost:8811>. To open the app from another device on the same wifi,
-run `bun run web-iam:dev:lan` instead. Details:
+run `bun run web:dev:lan` instead. Details:
 [`scripts/dev/README.md`](scripts/dev/README.md).
 
 ### Or just run the image
@@ -140,7 +142,7 @@ This is a [Turborepo](https://turbo.build/) monorepo managed with [bun](https://
 | `apps/api`         | NestJS · Fastify      | API, orchestrator, and the Autopilot harness                                 |
 | `apps/cli`         | Python · `uv`         | The scan runner (extraction + detection)                                     |
 | `apps/docs`        | Nextra                | The documentation site ([docs.classifyre.com](https://docs.classifyre.com/)) |
-| `apps/blog`        | Next.js               | The marketing site                                                           |
+| `apps/blog`        | Next.js               | The marketing site ([classifyre.com](https://classifyre.com/))               |
 | `packages/schemas` | JSON Schema           | Shared source/detector schemas (cross-language)                              |
 | `packages/ui`      | shadcn/ui             | Shared UI components                                                         |
 

@@ -4,7 +4,7 @@ description: Scan MySQL and MariaDB tables — what Classifyre extracts, the met
 ---
 
 import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
-import { SqlSourceNotes, LineageNote, SharedSettingsNote } from "@/components/source-notes";
+import { SqlSourceNotes, LineageNote, QueryNote, SharedSettingsNote } from "@/components/source-notes";
 
 # MySQL
 
@@ -51,6 +51,15 @@ can be. **Foreign keys** become references — a useful map of how tables relate
 but not a path data travels. See [Lineage & Relationships](/sources/lineage/).
 
 </LineageNote>
+
+## Query data & SQL connections
+
+<QueryNote support="database">
+  A source set to verify the server&apos;s certificate (**Verify CA** or
+  **Verify identity** SSL mode) is queried the same way it is scanned: the
+  query checks the certificate against the CA stored on the source (or the
+  system roots when there is none).
+</QueryNote>
 
 ## Worth knowing
 

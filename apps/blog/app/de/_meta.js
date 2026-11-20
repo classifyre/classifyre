@@ -26,6 +26,10 @@ export default {
         title: "Quellen",
         href: "/de/sources",
       },
+      support: {
+        title: "Support",
+        href: "/de/support",
+      },
     },
   },
   journal: {
@@ -71,9 +75,24 @@ export default {
     title: "Quellen",
     display: "hidden",
   },
+  support: {
+    type: "page",
+    title: "Support",
+    display: "hidden",
+  },
   "made-in-europe": {
     type: "page",
     title: "Made in Austria",
+    display: "hidden",
+  },
+  "berechtigungskonzept-umsetzen": {
+    type: "page",
+    title: "Berechtigungskonzept umsetzen",
+    display: "hidden",
+  },
+  "use-cases": {
+    type: "page",
+    title: "Anwendungsfälle",
     display: "hidden",
   },
   "immuta-alternative": {

@@ -21,7 +21,7 @@ const SOURCES = [
 const FINDINGS = [
   { what: "IBAN", where: "crm.customers.iban", score: 0.99, why: { en: "Valid checksum in 4,211 of 4,215 rows", de: "Gültige Prüfsumme in 4.211 von 4.215 Zeilen" } },
   { what: "AWS access key", where: "wiki / Deploy notes", score: 0.96, why: { en: "Key and secret on the same page", de: "Schlüssel und Secret auf derselben Seite" } },
-  { what: "AT SVNR", where: "exports/2026-10.parquet", score: 0.93, why: { en: "Check digit valid, column named svnr", de: "Prüfziffer gültig, Spalte heißt svnr" } },
+  { what: { en: "National ID", de: "AT SVNR" }, where: "exports/2026-10.parquet", score: 0.93, why: { en: "Check digit valid, column named national_id", de: "Prüfziffer gültig, Spalte heißt svnr" } },
   { what: "Email", where: "crm.tickets.body", score: 0.81, why: { en: "Addresses in free text, 312 tickets", de: "Adressen im Freitext, 312 Tickets" } },
 ] as const;
 
@@ -83,16 +83,17 @@ export function DiscoverDemo({ locale, caption }: { locale: Locale; caption?: st
           {FINDINGS.map((f, i) => {
             const show = step(t, FINDINGS_AT + i * 650, 300);
             const top = i === 0 && t >= CLASSIFY_AT;
+            const what = typeof f.what === "string" ? f.what : f.what[locale];
             return (
               <li
-                key={f.what}
+                key={typeof f.what === "string" ? f.what : `${f.what.en}/${f.what.de}`}
                 className={cn(
                   "grid grid-cols-[1fr_auto] gap-x-4 gap-y-0.5 border-b border-[#0a0a0a]/10 py-2 sm:grid-cols-[7rem_1fr_6.5rem]",
                   top && "bg-accent/40",
                 )}
                 style={{ opacity: show, transform: `translateY(${(1 - show) * 8}px)` }}
               >
-                <span className="text-[13px] font-semibold">{f.what}</span>
+                <span className="text-[13px] font-semibold">{what}</span>
                 <span className="order-3 col-span-2 font-mono text-[11px] text-[#0a0a0a]/60 sm:order-none sm:col-span-1">
                   {f.where} · {f.why[locale]}
                 </span>

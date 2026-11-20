@@ -5,7 +5,7 @@ description: Scan objects in AWS S3, MinIO, Cloudflare R2, Backblaze B2 and othe
 ---
 
 import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
-import { ObjectStorageNotes, LakehouseNotes, LineageNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
+import { ObjectStorageNotes, LakehouseNotes, LineageNote, QueryNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
 
 # S3-Compatible Storage
 
@@ -52,6 +52,10 @@ denylists if you want to narrow it further.
 ## Lineage
 
 <LineageNote />
+
+## Query data & SQL connections
+
+<QueryNote support="bucket" />
 
 ## Worth knowing
 

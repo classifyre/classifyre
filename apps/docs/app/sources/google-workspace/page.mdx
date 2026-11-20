@@ -4,7 +4,7 @@ description: Scan Google Drive, Docs, Sheets and Slides — service account with
 ---
 
 import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
-import { LineageNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
+import { LineageNote, QueryNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
 
 # Google Workspace
 
@@ -52,6 +52,14 @@ with anyone who has the link".
 ## Lineage
 
 <LineageNote />
+
+## Query data & SQL connections
+
+<QueryNote support="none">
+  Drive files and Google-native documents are files, not tables, so there is
+  nothing SQL could read. To query file content, keep the files in a bucket
+  source instead.
+</QueryNote>
 
 ## Worth knowing
 

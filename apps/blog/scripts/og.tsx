@@ -15,11 +15,13 @@ import { TOPIC_IDS, getTopic } from "@/content/topics";
 import { renderOg } from "@/lib/og";
 import { ogImageName } from "@/lib/og-image";
 
-const KICKER = { en: "Open-source data governance", de: "Open-Source-Data-Governance" };
+const KICKER = { en: "Open-source data access governance", de: "Open Source · Datenzugriff steuern" };
 
 const cards: { name: string; title: string; kicker: string }[] = [
-  { name: ogImageName("en", "home"), title: "Find it. Protect it.\nUse it.", kicker: KICKER.en },
-  { name: ogImageName("de", "home"), title: "Finden. Schützen.\nNutzen.", kicker: KICKER.de },
+  { name: ogImageName("en", "home"), title: "Your access rules,\nenforced on every query.", kicker: KICKER.en },
+  { name: ogImageName("de", "home"), title: "Ihr Berechtigungskonzept.\nBei jeder Abfrage durchgesetzt.", kicker: KICKER.de },
+  { name: ogImageName("en", "incident-response"), title: "When something leaks,\nwork it as a case.", kicker: KICKER.en },
+  { name: ogImageName("de", "incident-response"), title: "Wenn etwas abfließt,\nals Fall bearbeiten.", kicker: KICKER.de },
 ];
 
 for (const locale of ["en", "de"] as const) {

@@ -4,7 +4,7 @@ description: Scan Dremio tables and views — Dremio Cloud or self-hosted, what 
 ---
 
 import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
-import { SqlSourceNotes, LineageNote, SharedSettingsNote } from "@/components/source-notes";
+import { SqlSourceNotes, LineageNote, QueryNote, SharedSettingsNote } from "@/components/source-notes";
 
 # Dremio
 
@@ -93,6 +93,14 @@ by name and the edge completes itself if they are scanned later.
 See [Lineage & Relationships](/sources/lineage/).
 
 </LineageNote>
+
+## Query data & SQL connections
+
+<QueryNote support="none">
+  DuckDB has no built-in connector for Dremio. Dremio ships an ODBC driver, so
+  an ODBC source can read — and query — it instead; otherwise land the data in
+  a bucket as Parquet or Delta.
+</QueryNote>
 
 ## Worth knowing
 

@@ -27,6 +27,10 @@ export default {
         title: "Sources",
         href: "/sources",
       },
+      support: {
+        title: "Support",
+        href: "/support",
+      },
     },
   },
   journal: {
@@ -72,9 +76,24 @@ export default {
     title: "Sources",
     display: "hidden",
   },
+  support: {
+    type: "page",
+    title: "Support",
+    display: "hidden",
+  },
   "made-in-europe": {
     type: "page",
     title: "Made in Austria",
+    display: "hidden",
+  },
+  "data-access-governance": {
+    type: "page",
+    title: "Data access governance",
+    display: "hidden",
+  },
+  "use-cases": {
+    type: "page",
+    title: "Use cases",
     display: "hidden",
   },
   "immuta-alternative": {

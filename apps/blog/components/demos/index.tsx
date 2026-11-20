@@ -1,4 +1,5 @@
 import type { Locale } from "@/lib/locale";
+import { AccessDemo } from "@/components/demos/access-demo";
 import { BiDemo } from "@/components/demos/bi-demo";
 import { DiscoverDemo } from "@/components/demos/discover-demo";
 import { GovernDemo } from "@/components/demos/govern-demo";
@@ -7,7 +8,7 @@ import { ShareDemo } from "@/components/demos/share-demo";
 import { RedactionSheet } from "@/components/landing/redaction-sheet";
 
 /** The self-running product demos, by name. */
-export type DemoId = "discover" | "query" | "govern" | "bi" | "share" | "mask";
+export type DemoId = "discover" | "access" | "query" | "govern" | "bi" | "share" | "mask";
 
 export function Demo({
   id,
@@ -21,6 +22,8 @@ export function Demo({
   switch (id) {
     case "discover":
       return <DiscoverDemo locale={locale} caption={caption} />;
+    case "access":
+      return <AccessDemo locale={locale} caption={caption} />;
     case "query":
       return <QueryDemo locale={locale} caption={caption} />;
     case "govern":
