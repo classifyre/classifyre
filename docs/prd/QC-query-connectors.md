@@ -1,0 +1,545 @@
+# PRD QC · Query connectors: one read interface for every source
+
+|                  |                                                                                                                                                                                                                                                                 |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Status**       | QC1 built 2026-11-21 (§11); QC0 and QC2–QC5 proposed |
+| **Size**         | L (6 phases, QC0–QC5, each its own PR)                                                                                                                                                                                                                          |
+| **Depends on**   | [DQ](DQ-data-query.md): the gate (`apps/cli/src/query/gate.py`), masks (§5.8), row filters (§5.10), the session (`session.py`), and the warm query worker (`apps/cli/src/query/worker.py`, `warm.py`; DQ §5.3)                                                   |
+| **Replaces**     | DQ phase 5 ("More sources")                                                                                                                                                                                                                                     |
+| **Used by**      | [BIC](BIC-bi-client-compatibility.md) (connector tables over SQL connections), MCP `query_data`, exports, shared datasets                                                                                                                                       |
+| **Starts from**  | The payload proof of concept `fedsql` (outside this repository: `poc-payload`), commit `6142207` *pluggable Python connectors, Meilisearch, dynamic script sources*, reviewed 2026-11-21                                                                         |
+| **Not in scope** | Writing to sources. Caching or materialising connector data. Third-party pip plugins (the microkernel in CLAUDE.md is future work). Semi-join pushdown (§8, later). Search relevance ranking as SQL. Graph path patterns (only nodes and single relationships). |
+
+## 1. Summary
+
+Today a source is queryable only when DuckDB can read it with one of its own extensions. The list of queryable types is written out twice by hand:
+- `QUERYABLE_SOURCE_TYPES` in `apps/cli/src/query/bindings.py` has 10 values.
+- The same set in `apps/api/src/data-query/sql-names.ts` adds `SHARED_DATASET`.
+
+Each type is a private method on `SourceBinding` (`_postgres`, `_mysql`, `_databricks`, `_odbc`, `_attached_catalog`, `_object_storage`). Meilisearch, Neo4j, Elasticsearch, MongoDB and every SaaS source can be scanned, but their rows cannot be read. Custom (notebook) sources cannot be queried at all.
+
+This PRD gives every source type **one read interface**, a `QueryBinding`, which lives next to the source's scan code. The source type also declares its **tier**, and the API and the CLI both read that declaration from the source schema. There are four tiers:
+
+| Tier | What reads the rows | When |
+| --- | --- | --- |
+| `native` | A DuckDB core extension (`ATTACH` or a scanner function) | DuckDB can read the source itself. All 10 types built today. |
+| `extension` | A DuckDB community or nightly extension, signed, pinned and baked into the image | One exists, is light and passes the QC0 spike (`odbc_scanner` is built; `mssql`, `mongo` and `bigquery` are candidates) |
+| `connector` | A Python **Arrow connector** that reuses the source's own client code, fed to DuckDB as an Arrow stream, with SQL-level pushdown | No extension exists, or it is *heavy* (§4.2). **Meilisearch and Neo4j in v1.** |
+| `custom` | The CUSTOM notebook's optional `scan()` function, run in the existing sandboxed child process | A user-written source that opts in |
+
+Everything DQ built applies unchanged to connector tables, because a connector table becomes the same `<source>.<schema>.<table>` view as any other:
+- the gate, masks, row filters, caps and audit;
+- SQL connections, MCP, exports and shared datasets.
+
+The proof of concept showed a join across Parquet × PostgreSQL × Meilisearch × Neo4j in 1.3 s. Pushdown cut the Meilisearch documents read from 20,000 to 632. QC3 repeats this on the skaffold dev stack, through the warm worker.
+
+## 2. What the proof of concept showed
+
+| Finding (POC, DuckDB 1.4.3, macOS arm64) | Taken over as |
+| --- | --- |
+| A connector answers the three questions of a DuckDB table function: bind → `schema(table)`, init → `ScanRequest(columns, predicates, max_rows)`, scan → Arrow record batches. Pushdown is *advisory*: DuckDB re-applies every predicate, so a connector may ignore any it cannot translate exactly, but must never return fewer rows than it matches | §5.2, unchanged |
+| Data reaches DuckDB through the Arrow PyCapsule (`__arrow_c_stream__` on a `LiveTable`), registered with `conn.register(name, obj)`. No table functions, UDFs, replacement scans or community extensions | §5.3. The gate forbids table functions anyway, so the view is the only way in |
+| DuckDB 1.4.3 reads a registered Arrow stream **once**: a second scan fails with `ArrowArrayStream was released`. The POC re-registers per query, and materialises tables referenced twice (self-join, CTE, subquery) | §5.3. To be checked again on DuckDB 2.0 (QC0) |
+| DuckDB pushes no filters into a Python Arrow stream, so the POC planned pushdown from the SQL with sqlglot (`pushdown.py`) | §5.4, ported, with one Classifyre rule added: never on masked columns |
+| Q1 with pushdown: 1 request, 632 documents, 0.22 s. Without: 21 requests, 20,000 documents, 0.69 s. Same result | QC3 acceptance (§9) |
+| Benchmark, 1M rows × 5 columns: native Parquet 0.02 s; in-process connector with Python dicts 1.87 s; **with Arrow batches 0.14 s (5–14× faster than dicts)**; child-process script source 0.39 s (Arrow), with about 190 ms fixed cost per scan | Connectors build Arrow batches, not dicts (§5.2 `to_batch`); custom `scan()` may yield either, and the SDK converts |
+| In-process connectors are bound by the GIL: 4 concurrent 4-source joins took 7.1 s against 1.3 s each serially | Solved by the warm worker: one forked process per query (§5.10) |
+| Timeouts are checked between batches; worst case one source request (2.6 s for a 2 s limit) | Each request's timeout is capped at the time left before the deadline (§5.3) |
+| Errors are safe: no keys, no response bodies | `ConnectorError` carries a user-facing message only, and passes the runner's redactor (§5.11) |
+| Schemas inferred from 100 rows; `LIMIT` not pushed; no join-key (semi-join) pushdown — in Q4 `orders.order_id = 1` still streamed all 20,000 Meilisearch documents | Schema comes from what the scan recorded (§5.7); LIMIT pushdown in the simple case (§5.4); semi-join later (§8) |
+| Script sources: `python -I -m fedsql.sandbox`, empty environment, RLIMITs, JSON request on stdin, Arrow IPC on stdout; "not a security boundary" | §5.8 reuses Classifyre's existing CUSTOM runner (`apps/cli/src/sources/custom/runner.py`, `env.py`), which is already that boundary for scans |
+| Verdict: fine for interactive and dashboard queries with up to about 10⁵–10⁶ connector rows per query and tens of concurrent queries; not for bulk analytics over APIs | §8: the row cap per connector table (`connector_limit`) and the docs say so |
+
+The POC did not know the Classifyre split:
+- The API decides who reads what; the CLI enforces it on the SQL.
+- Masks and row filters live in views.
+- Assets, their recorded columns and their classification come from scans.
+- The PostgreSQL protocol is PGlite in the API.
+- Queries run in a warm worker with a Job as overflow.
+
+This PRD places each POC part into that split.
+
+## 3. Requirements
+
+| # | Requirement |
+| --- | --- |
+| R1 | Each source type declares once whether and how it can be queried: tier, asset kinds, SQL names, extensions. The CLI and the API read that one declaration, and a test in each fails when a binding and the declaration disagree. |
+| R2 | A connector table is read through exactly the same view as a native one: masks, hidden columns, row filters, `knownColumns`, gate, caps, audit, SQL connections, MCP, export, shared datasets. Nothing in `gate.py`, `masks.py` or `rows.py` knows about tiers. |
+| R3 | Pushdown never changes a result. A connector may push less than asked, never more. **No predicate on a masked or hidden column is pushed**: a predicate on the raw value would answer a question the view hides. |
+| R4 | A connector table has a row cap (`connector_max_rows`, default 1,000,000). Over the cap the query is **refused** (`connector_limit`), never answered on part of the data (DQ R7). |
+| R5 | The query's single deadline covers connector setup and every request, as it does for native sources. |
+| R6 | Connectors reuse the scan's client code and recipe fields: no second set of credentials, no second configuration form. |
+| R7 | A custom source becomes queryable only when its notebook defines `scan()` **and** someone who may edit the source turns on *Allow SQL queries*. That change is audited. Custom code runs only in the sandboxed child process. |
+| R8 | A person sees, for each connector table, what reading it cost: requests, rows read, which filters were pushed. |
+| R9 | Meilisearch and Neo4j are queryable and joinable with PostgreSQL, Parquet/Delta in buckets and Iceberg, on the skaffold dev stack, through the warm worker. Correctness is checked against an independent calculation, and latency is measured (§9). |
+
+## 4. Tiers per source type
+
+### 4.1 The matrix
+
+The source types come from `packages/schemas/src/schemas/all_input_sources.json`. *Built* means it works today through DQ. *Candidate* means QC0 must confirm the extension: signed, published for `linux_amd64` and `linux_arm64` on the CLI's DuckDB version, size, and pushdown.
+
+| Source type | Asset kinds read | Tier | Reader | Status |
+| --- | --- | --- | --- | --- |
+| POSTGRESQL | table | native | `postgres` | Built |
+| MYSQL | table | native | `mysql` | Built |
+| DATABRICKS | table | native | `unity_catalog` + `delta` | Built |
+| ICEBERG_REST, DUCKLAKE | table | native | `iceberg`, `ducklake` via `DuckDBAttachedSource._attach` | Built |
+| S3_COMPATIBLE_STORAGE, AZURE_BLOB_STORAGE, GOOGLE_CLOUD_STORAGE, LOCAL_FOLDER | table, table files | native | `delta_scan`, `iceberg_scan`, `read_parquet`/`csv`/`json`/`avro`, `ST_Read` | Built |
+| ODBC | table | extension | `odbc_scanner` (nightly) | Built (no pushdown) |
+| SHARED_DATASET | dataset | (API) | DQ §5.12 | Built |
+| **MEILISEARCH** | index | **connector** | `sources/meilisearch/query.py` (*new*), REST | **v1 (QC2)** |
+| **NEO4J** | label, **relationship** (*new kind*) | **connector** | `sources/neo4j/query.py` (*new*), official `neo4j` driver | **v1 (QC2)** |
+| **CUSTOM** | table (what the notebook extracts) | **custom** | notebook `scan()` | **v1 (QC4)** |
+| MSSQL | table | extension → connector | community `mssql` (native TDS, no driver), else the source's client | Candidate (QC5) |
+| MONGODB | collection | extension → connector | community `mongo`, else `pymongo` with `find(filter, projection)` | Candidate (QC5) |
+| BIGQUERY | table | extension → connector | community `bigquery`, else Storage Read API (Arrow) | Candidate (QC5) |
+| SNOWFLAKE | table | connector | Community `snowflake` needs the ADBC Snowflake driver installed separately: heavy. Use the source's connector and `fetch_arrow_batches()` | Later (QC5) |
+| ELASTICSEARCH, OPENSEARCH | index | connector | `SearchEngineSourceMixin` client, point-in-time + `search_after`, query DSL pushdown | Later (QC5) |
+| ORACLE | table | connector | the source's `oracledb` client (`fetch_df_all` / Arrow) | Later |
+| REDSHIFT | table | native? | `postgres` scanner speaks the protocol; try in QC0, else connector | Candidate |
+| TRINO, ATHENA, DREMIO, HIVE | table | connector | Trino/Athena clients; Dremio Arrow Flight (`pyarrow.flight`); Hive tables usually read as bucket files | Later |
+| HUGGING_FACE | table files | native | `httpfs` `hf://` Parquet | Candidate |
+| KAFKA | topic | — | Unbounded streams; a bounded "last N messages" read could be a connector | Out for now |
+| JIRA, SERVICEDESK, CONFLUENCE, NOTION, SLACK, EMAIL, MICROSOFT_365, GOOGLE_WORKSPACE, DROPBOX | items | connector | The source's API client (Jira issues as a table is the obvious first one). Files in SharePoint/Drive by materialising (DQ phase 5 text) | Later |
+| POWERBI, TABLEAU, GIT, YOUTUBE, REDDIT, WORDPRESS, SANDBOX | — | — | Not tabular | Out |
+
+The row "Neo4j relationship" needs the scan to emit relationship types as assets (§5.6). Today they are only links between label assets.
+
+### 4.2 Extension or connector: the "heavy" rule
+
+Use the community extension when all of these hold. Otherwise write a connector that reuses the source's client.
+
+1. Published for the CLI's DuckDB version on `linux_amd64` **and** `linux_arm64`, and signed (`INSTALL x FROM community` with no `allow_unsigned_extensions`).
+2. Needs no native library outside the extension. The Snowflake community extension needs the ADBC driver installed separately, so it fails this rule.
+3. Adds at most about 50 MB to `/opt/duckdb-extensions` (the image already carries 356 MB of extensions, DQ §9).
+4. Pushes filters and projection to the source, or the source's tables are small.
+5. Authenticates with what the source's recipe already holds (R6).
+6. Passes the QC0 checks: `LIMIT` returns exactly the limit (the POC's F01 lesson with `pg_use_ctid_scan`), `READ_ONLY` or equivalent, errors without secrets.
+
+Extensions go in `COMMUNITY_EXTENSIONS` (`apps/cli/src/utils/duckdb_engine.py`; `paimon` and `hudi` are there today), in the image's baked extension step, and in `warm.py`'s `DEFAULT_EXTENSIONS` only if most queries need them.
+
+## 5. Design
+
+### 5.1 The declaration: `x-query` in the source schema
+
+Each `*Input` in `packages/schemas/src/schemas/all_input_sources.json` already carries `x-asset-metadata`. A queryable one gains `x-query`:
+
+```json
+"x-query": {
+  "tier": "connector",
+  "assetKinds": ["index"],
+  "names": { "schema": "indexes", "table": "asset.name" },
+  "extensions": [],
+  "pushdown": true
+}
+```
+
+- `tier`: `native` | `extension` | `connector` | `custom`.
+- `assetKinds`: the kinds that are table-shaped for this type. This replaces the hard-coded `kind === 'table'` part of `isTableShaped()`.
+- `names`: how `tableAddress` builds `<schema>.<table>`. For native types the current per-type logic in `sql-names.ts` stays as named strategies (`"strategy": "catalog" | "lakehouse" | "file"`). For connectors there is a fixed schema word plus a metadata field.
+- `extensions`: what the binding loads (for the image's bake step and the spike).
+- `pushdown`: the default for the per-source option `query.pushdown` (§5.4).
+
+Readers:
+
+- **API**: `sql-names.ts` builds `QUERYABLE_SOURCE_TYPES` and the per-type address from the schema at load time. `SHARED_DATASET` stays an API-only entry.
+- **CLI**: `apps/cli/src/query/bindings.py` builds its set from the same file. The Python schema package is already installed editable (CLAUDE.md, *CLI Implementation*).
+- **Tests**:
+  - `apps/cli/tests/test_query_manifest.py` (*new*): every type with `x-query` has a binding class (§5.2), and every binding class has a declaration.
+  - `apps/api/src/data-query/sql-names.manifest.spec.ts` (*new*): every declared type gets an address for each of its kinds.
+
+### 5.2 The Python interface
+
+New package `apps/cli/src/query/connectors/`:
+
+```python
+# apps/cli/src/query/connectors/base.py
+@dataclass(frozen=True)
+class Predicate:
+    column: str
+    op: Literal["=", "!=", "<", "<=", ">", ">=", "in"]
+    value: Any                       # a list for "in"
+
+@dataclass
+class ScanStats:
+    requests: int = 0
+    rows: int = 0
+    pushed: list[str] = field(default_factory=list)   # human-readable, e.g. "genre = 'Drama'"
+    ms: int = 0
+
+@dataclass(frozen=True)
+class ScanRequest:
+    columns: tuple[str, ...] | None   # None = all
+    predicates: tuple[Predicate, ...]
+    limit: int | None                 # pushed LIMIT (§5.4), else None
+    max_rows: int                     # connector_max_rows; the connector stops at max_rows + 1
+    deadline: float                   # time.monotonic() value; every request's timeout <= deadline - now
+    stats: ScanStats
+
+class ConnectorError(Exception):
+    """A message that is safe to show: never a response body, a key or a DSN."""
+
+class QueryBinding(ABC):
+    """How one source of a query is read. One instance per source per query."""
+    tier: ClassVar[str]
+    def __init__(self, source: BaseSource, alias: str, index: int) -> None: ...
+    def attach(self, conn: DuckDBPyConnection) -> None: ...            # ATTACH, secrets; no-op for connectors
+    @abstractmethod
+    def relation(self, conn: DuckDBPyConnection, location: TableLocation) -> str: ...
+    def close(self) -> None: ...
+
+class ArrowConnector(QueryBinding):
+    tier = "connector"
+    @abstractmethod
+    def schema(self, location: TableLocation, recorded: list[dict[str, str]] | None) -> pa.Schema: ...
+    @abstractmethod
+    def scan(self, location: TableLocation, request: ScanRequest) -> Iterator[pa.RecordBatch]: ...
+    def pushable(self, location: TableLocation) -> PushdownSupport: ...   # which columns/ops it can translate
+```
+
+Rules:
+- **Where the code lives.** *(Changed while building QC1, 2026-11-21.)* Bindings live in `apps/cli/src/query/connectors/<type>.py`, registered by source type in `connectors/__init__.py` (`_BINDINGS`, imported lazily), not in `sources/<type>/query.py` on the source class: importing a source package imports `src.sources` and the scan machinery (0.6 s, about 380 modules, measured), which a query must not pay for a source it reads with DuckDB alone. A binding that needs the source's client asks its context for the instance (`SourceContext.instance()`), which imports it then. The manifest tests check registry and declaration in both directions.
+- **No change for today's types.** The existing `SourceBinding` methods move one by one:
+  - `_postgres` → `sources/postgresql/query.py` `PostgresBinding`
+  - `_mysql` → `sources/mysql/query.py`
+  - `_databricks`, `_odbc` → their source folders
+  - `_attached_catalog` → `sources/duckdb_attached_base.py`
+  - `_object_storage` → `sources/object_storage/query.py`
+
+  `SourceBinding` becomes a thin dispatcher: `type(source).QUERY_BINDING(source, alias, index)`. This is QC1 and changes no behaviour. The whole of `tests/test_query.py` must stay green.
+- **Helpers ported from the POC's `connectors/base.py`:**
+  - `declared_schema()`: recorded column types → Arrow.
+  - `schema_from_rows()`: a null-only column becomes VARCHAR; a nested object becomes JSON text.
+  - `to_batch(rows, schema, columns)`: columns that were not asked for come back as NULL, and type drift raises `ConnectorError` naming the column, never the value.
+  - Connectors build `pa.RecordBatch` directly where the client gives columns (Neo4j records, Meilisearch JSON pages via `pa.Table.from_pylist`), never one Python dict per cell in a loop.
+- **The source's own client.** A connector gets the instantiated `BaseSource` (from `get_source(recipe)`, as the attached-catalog binding does today). It reuses that source's session, auth and TLS (`MeilisearchSource._session()`, `Neo4jSource._driver()`), so R6 holds without new recipe fields.
+
+### 5.3 The runtime in `session.py`
+
+Two phases for connector tables, on top of the current `_attach_tables_as_views`:
+
+1. **Bind** (when the view is created):
+   - `schema = connector.schema(location, recorded_columns)`.
+   - `conn.register("__live_<n>", schema.empty_table())`.
+   - The view is built exactly as today: `CREATE VIEW "<src>"."<schema>"."<table>" AS SELECT <masked_projection> FROM __live_<n> WHERE <row_predicate>` (`masks.py`, `rows.py`).
+   - The relation the view reads is the registered name. Nothing else changes, so R2 holds by construction.
+2. **Scan** (just before execution, after `lock_configuration`):
+   - `pushdown.plan(final_sql, targets)` gives a `ScanRequest` per referenced connector table (§5.4).
+   - `conn.register("__live_<n>", LiveTable(connector, location, request))`. `LiveTable.__arrow_c_stream__` wraps `connector.scan(...)` in a `pa.RecordBatchReader`.
+   - The table is materialised (`read_all()`) when the plan says it is read more than once.
+   - In `finally`, the empty table is registered again and the connector closed.
+
+   Registering after `lock_configuration` must be checked in QC0: `register` is not a configuration change, but this has to be confirmed on DuckDB 2.0.
+3. **Limits**:
+   - `LiveTable.batches()` counts rows and raises `ConnectorError("…more than N rows…", code="connector_limit")` at `max_rows + 1`.
+   - It checks `request.deadline` before every request. Each HTTP or Bolt call gets `timeout = min(source timeout, deadline - now)`.
+   - On a timeout the session's existing `conn.interrupt()` timer fires as before.
+4. **Errors**: a `ConnectorError` raised inside DuckDB's scan arrives wrapped. As in the POC's `_live_error()`, the session keeps the last connector error and reports *it* (code `source_unavailable` or `connector_limit`), not DuckDB's wrapper text. `runner.py`'s `_redactor` still runs on the message.
+5. **Stats**: each connector table's `ScanStats` goes into the result metadata (`X-Query-Run-Meta`, next to `setupMs`) as `scans: [{table, requests, rows, pushed, ms, materialised}]`.
+
+**QC0 spike on DuckDB 2.0** (the CLI's DuckDB; the POC ran 1.4.3). Write the answers into §11 *As built*:
+- Is a registered Arrow stream still single-use?
+- Does DuckDB 2.0 push projection or filters into a registered `pyarrow.dataset.Dataset` or a `RecordBatchReader`?
+- Is there a Python table-function API that gets filters (a cleaner bind/init/scan)?
+- Does `register` work after `lock_configuration`?
+- Do DuckDB's dynamic join filters reach a registered stream?
+
+If 2.0 pushes filters into a Python object, prefer that over the sqlglot planner for filters, and keep the planner for `LIMIT` and for the masked-column rule.
+
+```mermaid
+sequenceDiagram
+  participant A as API (QueryRunService)
+  participant W as Warm worker (query process)
+  participant D as DuckDB
+  participant C as Connector (Meilisearch / Neo4j)
+  participant S as Source API
+  A->>W: POST /v1/queries (request: sources with recipes, tables with masks, rows, knownColumns)
+  W->>W: gate.validate → allowed tables
+  W->>D: native sources: ATTACH / secrets (unchanged)
+  W->>C: bind: schema(location, recorded columns)
+  W->>D: register __live_n (empty) + CREATE VIEW masked/filtered
+  W->>W: pushdown.plan(final SQL) → ScanRequest per connector table
+  W->>D: register __live_n = LiveTable(stream)
+  D->>C: pull batches (__arrow_c_stream__)
+  C->>S: paged requests with pushed filter, fields, limit
+  S-->>C: pages
+  C-->>D: Arrow record batches
+  D-->>W: result (LIMIT max_rows+1)
+  W->>A: Arrow IPC + meta {setupMs, scans:[…]} (callback, X-Query-Run-Token)
+```
+
+### 5.4 Pushdown (`apps/cli/src/query/pushdown.py`, *new*)
+
+This is a port of the POC's `pushdown.py`. It runs on the SQL **after** the gate has rewritten names (the gate's output is DuckDB SQL over `"<src>"."<schema>"."<table>"`), with the gate still the authority.
+
+**What is pushed, for a connector table referenced exactly once:**
+- AND-ed conjuncts of the `WHERE` of the `SELECT` whose `FROM` reads the view directly, of the form `col op literal` or `col IN (literal, …)`, where:
+  - `col` is a column of that table that is **visible and not masked** for this person (from the request's `columns` entries: action `mask` or `hide` excludes it, as do columns not in `knownColumns`);
+  - the literal's type matches the column's Arrow type (no implicit casts);
+  - the connector's `pushable()` accepts the column and the operator (for example, Meilisearch only for its filterable attributes).
+- **Row-filter conditions** of the table's `rows` entry may be pushed as well. They are on raw values and only ever narrower, so pushing them reads less and changes nothing. This is optional in QC2; the planner gets them from the request, not from the SQL.
+- **Projection**: the set of column names used anywhere in the query for that table. It is turned off when the query uses `*` (other than `count(*)`), a `NATURAL` or `POSITIONAL` join, or the table as a row value.
+- **LIMIT**: only when the statement is a single-table `SELECT` with no aggregate, `DISTINCT`, `ORDER BY`, window or join, and every predicate was pushed. Then `limit = min(LIMIT, max_rows + 1)`.
+
+**What is never pushed:** `OR`, `IS NULL`, `LIKE`, functions, `ON`/`HAVING` conditions, predicates on masked or hidden columns, and anything on a table referenced twice (which is materialised instead).
+
+`query.pushdown: false` on a source turns all of it off. The `x-query.pushdown` default is true. Pushdown is advisory: DuckDB evaluates the view and the query's `WHERE` again on what comes back.
+
+### 5.5 Meilisearch (`apps/cli/src/sources/meilisearch/query.py`, *new*)
+
+| | |
+| --- | --- |
+| SQL name | `<source>.indexes.<index uid>` (lower-cased and sanitised by DQ §5.2's rules; collisions `_2`) |
+| Columns | Top-level document fields. Nested objects become `JSON`; arrays of scalars become `LIST`; mixed arrays become `JSON` |
+| Bind | Columns come from what the scan recorded (§5.7). If nothing was recorded, the binding fetches `GET /indexes/{uid}/documents?limit=100` and infers them, but masks then hide everything unrecorded (DQ §5.8), so the scan must record |
+| Scan | `POST /indexes/{uid}/documents/fetch` with `{limit, offset, filter, fields}` (Meilisearch ≥ 1.2: no `maxTotalHits` cap, unlike `/search`). Without a filter, `GET /indexes/{uid}/documents?fields=…`. `page_size` is the source's (default 1000, max 10,000). It stops at `max_rows + 1` |
+| Pushdown | `=`, `!=`, `IN [...]` on strings, numbers and booleans, plus numeric ranges. Only attributes in `GET /indexes/{uid}/settings/filterable-attributes`, read once per query (≥ 1.14 granular `attributePatterns` handled). String literals escaped (`"` and `\`) |
+| Errors | `ConnectorError("Meilisearch source <name> returned HTTP 403")` and `"… is unreachable"`, never the body |
+| Reuses | `MeilisearchSource._session()`, `_base_url()`, `_request_timeout()` (`sources/meilisearch/source.py`) |
+
+### 5.6 Neo4j (`apps/cli/src/sources/neo4j/query.py`, *new*)
+
+| | |
+| --- | --- |
+| SQL names | `<source>.nodes.<label>` and `<source>.relationships.<type>` |
+| Node table | One row per node with the label. Columns are the recorded property keys plus `element_id` (`elementId(n)`) |
+| Relationship table | One row per relationship of the type. Columns are `source_<key>`, `target_<key>`, the relationship properties, `source_label` and `target_label`. `<key>` defaults to `element_id`; a recipe field `query.relationship_key` (for example `id`) names a node property instead, so `source_id` joins with a node table's `id` |
+| Cypher | Built by `build_cypher(location, request)`: `MATCH (n:\`Label\`) WHERE n.\`p\` >= $p0 RETURN n {.a, .b, element_id: elementId(n)} AS row LIMIT $limit`, and for relationships `MATCH (a)-[r:\`TYPE\`]->(b) … RETURN r {.stars, source_id: a.\`id\`, target_id: b.\`id\`} AS row LIMIT $limit`. Every value is a parameter; labels and types are escaped with `_escape_label` (exists in `source.py`) |
+| Batches | 10,000 records per Arrow batch, from `session.run(...).fetch(n)` |
+| Pushdown | `=`, `!=`, ranges, `IN` on properties of the node or relationship (`source_*`/`target_*` key columns included), `LIMIT` |
+| Reuses | `Neo4jSource._driver()`, `_session()`, `_database()` |
+| **Scan change** | `Neo4jSource.extract_raw()` today emits labels as assets and relationships only as links (`_resolve_relationship_links`). It must also emit one asset of a new kind **`relationship`** per relationship type, with `metadata.columns` (property keys and types sampled like `_label_stats`), `relationship_type`, `source_labels` and `target_labels`. The new kind goes into `x-asset-metadata` for NEO4J, the web's asset-kind icons and i18n, and `isTableShaped()` via `x-query.assetKinds` |
+
+### 5.7 Recorded columns for connector tables
+
+Masks hide any column the scan did not record (`knownColumns`, DQ §5.8). Classification, and therefore default masking, is per recorded column. So a connector table is useful only when its scan records columns the way tabular sources do: `asset_metadata["columns"] = build_columns(names, types)` (`apps/cli/src/utils/file_metadata.py`, used by `sources/tabular_base.py`).
+
+- **Meilisearch** `_index_to_asset`: records the union of top-level fields over the sample `_sample_documents` already takes, with DuckDB type names.
+- **Neo4j** `_label_to_asset` (today `sample_property_keys`) and the new relationship asset: record `columns`.
+- The detectors' tabular path (`detectors/tabular_lines.py`) must tag findings with these columns, as it does for tables, so personal data in a Meilisearch field classifies that column. Check this against a Meilisearch index with emails (QC2 acceptance).
+
+### 5.8 Custom sources: `scan()` and the SDK
+
+A CUSTOM source is a notebook (`apps/cli/src/notebook/`) run by `sources/custom/runner.py` in a child process with a scrubbed environment (`custom/env.py`), over an NDJSON protocol. It can already emit `Asset(kind="table", …)`. This phase lets the same notebook answer queries over those tables.
+
+**Contract** (`notebook/contract.py`):
+- `OPTIONAL_FUNCTIONS` gains `"scan"`.
+- A new check `SCAN_SIGNATURE`: `def scan(table, request)` with two positional parameters, in any cell, with no default for `table`.
+- Validated on save, before execution, and before every query, as the other functions are.
+
+**What the notebook writes:**
+
+```python
+from classifyre import Asset, ctx, ScanRequest
+
+def extract():
+    yield Asset(id="tickets", name="tickets", kind="table",
+                metadata={"columns": [{"name": "id", "type": "BIGINT"}, {"name": "status", "type": "VARCHAR"}]})
+
+def scan(table: str, request: ScanRequest):
+    # request.columns, request.predicates, request.limit, request.max_rows
+    status = ctx.filter_value("status")          # a pushed "status = …" or None
+    for page in fetch_pages(ctx.secret("token"), status=status):
+        yield page                                # list[dict] or a pyarrow.RecordBatch
+```
+
+**SDK changes** (`notebook/sdk.py` `build_module`):
+- Export `ScanRequest` and `Predicate`.
+- Add to `ctx`: `ctx.columns`, `ctx.predicates`, `ctx.filter_value(column)` and `ctx.max_rows` (set only while `scan` runs).
+- Rows may be dicts or `pyarrow.RecordBatch`. The SDK converts dicts with `to_batch` and the recorded schema. The docs say that Arrow is several times faster (§2).
+
+**Running it:**
+
+```mermaid
+sequenceDiagram
+  participant Q as Query process (worker)
+  participant R as Custom runner child (scrubbed env, rlimits)
+  Q->>R: spawn sources/custom/runner.py, NDJSON {op: "scan", table, request}
+  R->>R: import notebook, call scan(table, request)
+  R-->>Q: Arrow IPC stream on a dedicated pipe (fd 3)
+  R-->>Q: NDJSON {op: "done", stats} | {op: "error", type, line}
+```
+
+- A new `op: scan` sits beside the scan-time ops. The Arrow IPC stream goes over its own pipe (fd 3), not over the NDJSON stdout, so logs and rows never mix.
+- `_RELAYED_OPS` (`query_assets`, `augment_*`, …) are refused during `op: scan`. A query process holds a run token, not runner credentials, and a query must not write tags or edges.
+- Limits:
+  - wall clock = time left before the query's deadline;
+  - `RLIMIT_CPU`;
+  - `RLIMIT_AS` = the query's memory budget (`CLASSIFYRE_QUERY_MEMORY_LIMIT`);
+  - `RLIMIT_NOFILE` 256.
+- Errors come back as `{type, line}` only (the POC's rule): never the exception text with values.
+- Secrets: `ctx.secret()` resolves from the recipe's masked config exactly as during a scan. The recipe already travels in the query request (DQ §5.4), decrypted only for sources the SQL names.
+- Fixed cost: about 190 ms per scan in the POC (interpreter + pyarrow import). It is measured in QC4. A warm pool of runner processes is later work.
+
+**Opt-in:**
+- A recipe field `query: { enabled: boolean }`, default false. The web shows it as *Allow SQL queries* on the CUSTOM source form; it is visible only when the notebook defines `scan`.
+- Changing it needs the right to edit the source (`source.manage`) and is audited as `sources.update` with `changes: {query.enabled}`.
+- When it is false, the catalog lists the tables with the reason *The source's owner has not allowed SQL queries* (R4 of DQ).
+
+**Docs:**
+- New section *Make your custom source queryable* in `apps/docs/app/sources/custom/page.mdx`: the contract, pushdown semantics ("advisory, never fewer rows"), Arrow vs dicts, the deadline, and that `ctx.filter_value` makes a parameterised source.
+- A commented `scan` example in the CUSTOM starter notebook (`all_input_examples.json`, loaded by `notebook/scaffold.py`).
+- Completions in `notebook_completions.json`.
+
+Third-party *pip* connectors (the POC's `fedsql.connectors` entry-point group) are **not** taken over. The notebook is Classifyre's extension point for user code. Built-in connectors live in the repository. Revisit this when the plugin system (CLAUDE.md, *Plugin System (Future)*) is built.
+
+### 5.9 API and web
+
+- **Catalog** (`QueryCatalogService`, `sql-names.ts`):
+  - Addresses come from `x-query`.
+  - New not-queryable reasons: `custom_query_disabled`, `not_tabular_kind`, and `tier_not_built` ("Reading rows of <type> sources is planned").
+  - `CatalogTableDto` gains `tier`.
+- **Run record**: migration `query_runs.scan_stats jsonb` (*new*), filled from the result meta `scans`. `GET query-runs/:id` returns it.
+- **Web**:
+  - Below the result: "Meilisearch `movies`: 1 request, 632 documents, filters sent: genre = 'Drama', year ≥ 2015". It is shown when `scan_stats` is present; i18n en/de in the data-query namespace.
+  - The explorer marks connector tables with a small *live* tag (tooltip: "Read live through the source's API on every query").
+  - The CUSTOM source form gets *Allow SQL queries*.
+  - The new asset kind `relationship` gets an icon and a label.
+- **MCP** `list_queryable_tables`: includes connector tables. `query_data`'s result adds the same scan stats line.
+- **Pre-check** (`sql-precheck.ts`) and `MAX_SOURCES_PER_QUERY` (8) are unchanged.
+
+### 5.10 How it runs in the warm worker
+
+- `warm.py` already runs `src.sources._discover_sources()`, which imports `neo4j`, `requests` and the other client libraries into the fork server. **No driver, session or socket may be created in the fork server.** Connectors create them inside the query process and close them in `close()`. `test_query_worker.py` gets a check that `/proc/self/task` stays single-threaded after warm-up with the connectors imported.
+- Each query is its own forked process, so the POC's cross-query GIL contention (§2) does not arise. Within one query, connector streams are pulled by DuckDB's threads; client calls release the GIL during I/O.
+- The worker's NetworkPolicy has no egress restriction today (`helm/classifyre/templates/networkpolicy.yaml`). Connectors need egress to the sources' endpoints, exactly as scans do. If egress is ever restricted, the query worker needs the same egress as scan Jobs.
+- The worker's environment scrub (`scrub_environment`, `CLASSIFYRE_QUERY_WORKER_ENV_ALLOW`) is unchanged: connectors read credentials from the request's recipe, never from the environment.
+- The Job overflow path (`kubernetes-cli-job.service.ts`, mode `query`) runs the same code, so connector tables also work when the worker is busy or turned off.
+
+### 5.11 Security
+
+- **Credentials**: the same rule as native sources — the recipe is decrypted by the API only for sources the SQL names, travels in the request, and is redacted from every error (`runner._redactor`).
+- **SSRF**: a connector calls only the endpoint in the source's recipe, which whoever created the source already chose (the same trust as a scan). Connectors never follow URLs found in data.
+- **Data**: R3. No pushdown on masked or hidden columns, so neither request counts nor timing answer a question about a raw value the view hides. Row-filter pushdown only narrows.
+- **Custom code**: only in the custom runner child (§5.8). A query process never imports a notebook.
+
+## 6. Test bed: lakehouse lab and skaffold
+
+`development/lakehouse-lab/` gains a compose profile `search-graph`, on the k3d network with fixed addresses like the other services:
+
+| Service | Image | Address | Cluster name |
+| --- | --- | --- | --- |
+| `meilisearch` | `getmeili/meilisearch:v1.13` (pin; ≥ 1.2 needed for `/documents/fetch`) | 172.18.10.50:7700 | `lab-meilisearch.classifyre-dev.svc` |
+| `neo4j` | `neo4j:5.26-community` | 172.18.10.51:7687 | `lab-neo4j.classifyre-dev.svc` |
+| `shop-pg` | `postgres:16-alpine` (or a `shop` database on `ducklake-pg`) | 172.18.10.52:5432 | `lab-shop-pg.classifyre-dev.svc` |
+
+- `k8s-services.yaml`: selector-less Services + Endpoints for the three.
+- `seed/connectors.py` (*new*): a port of the POC's `scripts/connectors_demo.py seed`, with fixed random seed 7:
+  - Meilisearch: 20,000 movies, index `movies`, filterable `genre`, `year`, `id`; nested `studio`, array `tags`.
+  - PostgreSQL: 5,000 customers, `shop.public.customers` with `email` and `country`.
+  - S3: 200,000 orders as Parquet in `s3://lake/connectors/orders/`.
+  - Neo4j: 5,000 `Person {id}` and 20,000 `Movie {id}` nodes, 50,000 `RATED {stars}` edges.
+  - Wired into `seed.sh` under the profile.
+- `sources/meilisearch.json`, `sources/neo4j.json`, `sources/shop-postgres.json` (*new*), created by `workspace.py`. The orders Parquet is found by the existing `lab_s3_tables` bucket source.
+- The README gets the profile and fixes the stale `172.19.10.x` addresses (the compose file moved to `172.18.10.x`).
+
+**Join queries** (`development/lakehouse-lab/queries/connectors/*.sql`, *new*). The POC's Q1–Q4 are rewritten with Classifyre names; exact schema and table names follow the scan:
+
+```sql
+-- Q1 Meilisearch × Parquet × PostgreSQL
+SELECT m.genre, c.country, count(*) AS orders, round(sum(o.amount), 2) AS revenue
+FROM lab_s3_tables.connectors.orders o
+JOIN lab_meilisearch.indexes.movies m ON m.id = o.movie_id
+JOIN lab_shop.public.customers c ON c.id = o.customer_id
+WHERE m.genre = 'Drama' AND m.year >= 2015
+GROUP BY ALL ORDER BY revenue DESC, c.country LIMIT 5;
+
+-- Q2 Neo4j × Meilisearch × PostgreSQL
+SELECT m.title, count(*) AS fans
+FROM lab_neo4j.relationships.rated r
+JOIN lab_meilisearch.indexes.movies m ON m.id = r.target_id
+JOIN lab_shop.public.customers c ON c.id = r.source_id
+WHERE c.country = 'DE' AND r.stars >= 4 AND m.genre IN ('Sci-Fi', 'Horror')
+GROUP BY ALL ORDER BY fans DESC, m.title LIMIT 5;
+
+-- Q3 all four
+SELECT c.country, m.genre, count(*) AS rated_orders, round(avg(r.stars), 3) AS avg_stars
+FROM lab_s3_tables.connectors.orders o
+JOIN lab_shop.public.customers c ON c.id = o.customer_id
+JOIN lab_meilisearch.indexes.movies m ON m.id = o.movie_id
+JOIN lab_neo4j.relationships.rated r ON r.source_id = o.customer_id AND r.target_id = o.movie_id
+WHERE m.genre IN ('Drama', 'Sci-Fi') AND c.country IN ('AT', 'DE')
+GROUP BY ALL ORDER BY ALL;
+
+-- Q4 nested fields and a mask: studio (JSON), tags (LIST), customers.email masked for a Data reader
+SELECT o.order_id, m.title, m.studio, m.tags, c.email
+FROM lab_s3_tables.connectors.orders o
+JOIN lab_meilisearch.indexes.movies m ON m.id = o.movie_id
+JOIN lab_shop.public.customers c ON c.id = o.customer_id
+WHERE o.order_id = 1;
+```
+
+`Q5` is a self-join on Meilisearch (`movies a JOIN movies b ON a.genre = b.genre AND a.id < b.id WHERE a.year = 2020 …`), to exercise materialisation.
+
+**Benchmark** (`development/lakehouse-lab/bench_query.py`, extended):
+- `CONNECTOR_MIX` = Q1–Q5, on both transports (REST and `--pg`).
+- `--pushdown on|off`: toggles the sources' `query.pushdown` through the API before a run.
+- `--verify`: compares every result with an independent calculation from the seed files (`seed/connectors.py --expected` writes `expected.json`), as the POC's `connectors_demo.py verify` did.
+- Records `scan_stats` from `GET query-runs/:id` next to the timings.
+- Phases `sequential` (repeat 10) and `concurrent` (`--clients 1,2,3`; for more, use two personas, because of `QUERY_MAX_ACTIVE_PER_PERSON`).
+- Saved results go to `.bench/connectors-<date>.json`, and the numbers into §11.
+
+## 7. Phases
+
+| Phase | What | Done when |
+| --- | --- | --- |
+| QC0 | **Spike** on the CLI's DuckDB 2.0: Arrow stream reuse, filter pushdown into Python objects, a table-function API, `register` after `lock_configuration`, join filters into streams. **Extension audit**: `mssql`, `mongo`, `bigquery`, `snowflake` and Redshift-through-`postgres` against §4.2 | Answers written into §11; the §4.1 matrix updated; design §5.3/§5.4 adjusted if 2.0 pushes filters itself |
+| QC1 | **Interface and declaration, no behaviour change**: `x-query` for the 10 built types; `QueryBinding`; the `SourceBinding` methods moved to `sources/<type>/query.py`; the CLI and API read the declaration; manifest tests | `tests/test_query.py`, `test_query_worker.py`, the API data-query specs and `apps/e2e` smoke green with no edits to their expectations |
+| QC2 | **Connector runtime + Meilisearch + Neo4j**: `ArrowConnector`, `LiveTable`, `pushdown.py`, stats, `connector_limit`, the Neo4j `relationship` asset kind, recorded columns for both sources, catalog reasons, `scan_stats` migration and web line | Unit tests (§9) green; on the dev stack both sources' tables are queryable from the SQL page, the Data tab, a SQL connection and MCP |
+| QC3 | **Lab joins and performance on skaffold**: `search-graph` profile, seed, sources, Q1–Q5, the benchmark extended | §9 skaffold targets met and written into §11 with the benchmark JSON |
+| QC4 | **Custom sources**: `scan` in the contract, SDK exports, runner `op: scan` over fd 3, opt-in field and switch, docs, starter notebook | A lab CUSTOM source (a notebook that pages a small public-shaped JSON fixture, served by `tools`) is joined with PostgreSQL on the dev stack; opt-in refusals and audit checked |
+| QC5 | **More sources by tier**, each its own PR in the order of §4.1: candidates that passed QC0 as `extension`, then Elasticsearch/OpenSearch and Snowflake as connectors | Per source: the binding, `x-query`, recorded columns, a lab service or a recorded fixture, and one join query on the dev stack |
+
+## 8. Risks and open questions
+
+- **No join-key pushdown.** `orders.order_id = 1` joined to Meilisearch still streams every movie the other predicates allow (the POC's Q4). Planned later: semi-join pushdown — run the selective side first, then push `id IN (…)` of at most N keys into the connector. DuckDB 2.0's join filters may do part of this (QC0).
+- **Big relationship tables.** A Neo4j relationship type with 10⁷ edges and no pushed predicate hits `connector_limit`. That is intended; the refusal says which table and suggests a filter on a key or property.
+- **Schema drift.** A field that appears after the last scan is not recorded, so it is hidden (DQ §5.8). A type that changes raises `ConnectorError` naming the column. Both are fixed by a re-scan, and the error says so.
+- **Source rate limits.** Every query reads live. Dashboards over SQL connections (BIC) can multiply requests. Per-source concurrency and rate limits, and a short TTL cache, are later work. The docs give the POC's envelope (§2 verdict).
+- **Masked columns cannot be filtered at the source.** `WHERE email = 'x'` on a masked column reads the whole table (and matches nothing, by DQ §5.8). Intended (R3); `scan_stats` makes the cost visible.
+- **Connector code runs in the query process.** It is built-in, reviewed code with the recipe's credentials, the same trust as `bindings.py` today. Custom code never does (§5.8).
+- **Search engines are not tables.** Meilisearch documents read in primary-key order, not by relevance. A relevance search as SQL is out of scope.
+- **Open:** should `relationship_key` default to `element_id` (always present, opaque) or to a property named `id` when every sampled node has one? The proposal is `element_id`, plus the recipe field.
+
+## 9. Testing and acceptance
+
+| Level | What |
+| --- | --- |
+| CLI unit `tests/test_query_connectors.py` (*new*) | `ScanRequest`/`to_batch`/schema helpers. The cap is a refusal at `max_rows + 1` (`connector_limit`), never a cut. The deadline caps the request timeout. A `ConnectorError` reaches the person without a body or key. Stream registration and materialisation for self-join, CTE and subquery. Masked and filtered views over a connector table give the same results as over a Parquet file with the same rows |
+| CLI unit `tests/test_query_pushdown.py` (*new*) | Port of the POC's planner cases: conjuncts pushed; `OR`/`LIKE`/functions/`ON`/`HAVING` not; **masked, hidden and unrecorded columns never pushed**; type mismatch not pushed; projection off for `*`; LIMIT only in the simple case; a table read twice not pushed; row-filter conditions pushed and results unchanged |
+| CLI unit Meilisearch | `httpx`/`requests` mock transport: filter translation and escaping, filterable attributes (both formats), paging stops at `max_rows + 1`, `/documents/fetch` vs `GET /documents`, HTTP 403 and unreachable messages |
+| CLI unit Neo4j | `build_cypher` for nodes and relationships, parameters only, escaped labels, projections, `LIMIT`; a fake driver for batches |
+| CLI unit custom | Contract: `scan` signature checks. Runner `op: scan`: rows as dicts and as Arrow, fd 3 stream, `{type, line}` errors, relayed ops refused, deadline kill, `RLIMIT_AS` |
+| CLI live `-m connectors` | Against the compose `search-graph` services (skipped without `CLASSIFYRE_CONNECTORS_LIVE=1`): Q1–Q5 results equal `expected.json` |
+| CLI worker | `test_query_worker.py`: the fork server stays single-threaded with connector modules imported; a connector query runs in the worker and posts `scans` in the meta |
+| API unit | Manifest: every declared type and kind gets an address; reasons `custom_query_disabled`, `not_tabular_kind`, `tier_not_built`; `scan_stats` stored and returned; the CUSTOM `query.enabled` change needs `source.manage` and is audited |
+| Web | The scan-stats line, the *live* tag, the CUSTOM switch (component tests); i18n keys en/de |
+| Dev stack (skaffold, `lakehouse-lab`, through the warm worker) | Q1–Q5 from the SQL page, a Data tab, a SQL connection (psql) and MCP `query_data`; `--verify` passes; Q4 as a Data reader shows `email` as `****`; a `WHERE` on a masked column pushes nothing (`scan_stats`); the Neo4j `relationships.rated` asset exists with recorded columns; personal data in a Meilisearch field classifies and masks that column |
+| **Skaffold targets** | Through the warm worker, REST, p50 over 10 runs: **Q1 ≤ 1.5 s, Q2 ≤ 2.5 s, Q3 ≤ 3 s**. Meilisearch documents read in Q1: **632 with pushdown, 20,000 without**, identical rows. Two personas × 3 concurrent clients on Q1–Q3: no failures other than the per-person cap; worker pod under its memory limit (`kubectl top`). Numbers and the benchmark JSON written into §11 |
+
+## 10. Work breakdown for the developer agent
+
+Work test-first (the repository's `tdd` skill). Each task is one commit; each phase one PR with a `changelog.d` fragment (`release-notes` skill).
+
+1. **QC0 spike.** Write a throwaway script under `development/lakehouse-lab/spikes/duckdb2_arrow.py` that answers the five questions of §5.3 on the CLI's DuckDB (`uv run` in `apps/cli`). Install and try each candidate extension of §4.1 against a lab or docker service. Record the answers and the updated matrix in §11 *As built* of this PRD.
+2. **QC1 declaration.** Add `x-query` to the 10 built types in `all_input_sources.json`, then regenerate the Pydantic and TypeScript artefacts as `ADDING_NEW_SOURCE.md` describes. Write `test_query_manifest.py` and `sql-names.manifest.spec.ts` first (red), then make `bindings.py` and `sql-names.ts` read the declaration.
+3. **QC1 interface.** Create `apps/cli/src/query/connectors/base.py`. Add `QUERY_BINDING` to `BaseSource`. Move each `SourceBinding._<type>` into `sources/<type>/query.py` one at a time, running `tests/test_query.py` after each move.
+4. **QC2 runtime.** Write `test_query_connectors.py` against a fake in-memory connector, then implement `LiveTable`, bind/scan registration in `session.py`, `connector_limit`, deadline handling, error unwrapping and `scans` in the result meta (`runner.py`).
+5. **QC2 pushdown.** `test_query_pushdown.py` first (port the POC's cases, add the mask cases), then `pushdown.py`.
+6. **QC2 Meilisearch.** Recorded columns in `_index_to_asset` (extend `tests/test_meilisearch*.py`), then `sources/meilisearch/query.py` with mock-transport tests, then `x-query`.
+7. **QC2 Neo4j.** The `relationship` asset kind (schema `x-asset-metadata`, the web's kind icon and label, i18n), recorded columns for labels and relationships, `sources/neo4j/query.py` with `build_cypher` tests, then `x-query`.
+8. **QC2 API and web.** Migration `query_runs.scan_stats`, DTOs, the catalog reasons and `tier`, the result line, the *live* tag, MCP output. API specs and web component tests.
+9. **QC3 lab.** The `search-graph` profile, `k8s-services.yaml`, `seed/connectors.py` (with `--expected`), the source JSONs and `workspace.py`, the queries, the `bench_query.py` extension; the lab README (including the `172.18` fix). Run on skaffold (`scripts/dev/start.sh`, then the lab steps) and write the numbers into §11.
+10. **QC4 custom.** Contract and SDK tests first (`test_notebook_*`, `test_custom_source*`), then runner `op: scan` on fd 3, the opt-in field (schema, API audit, web switch), docs and the starter notebook. Then a lab CUSTOM source and a join on the dev stack.
+11. **Docs.** `apps/docs` data-query page: a *Sources you can query* table from §4.1 (built rows only), *Live sources* (what pushdown means, the row cap, cost), and the custom section of §5.8.
+12. **Update this PRD**: §11 *As built* per phase (code, tests, what was verified on the dev stack and what was not), the status row, and `README.md`'s status table.
+
+## 11. As built
+
+### QC1, declaration and interface, 2026-11-21
+
+- **Code.** `x-query` (top level of `all_input_sources.json`, beside `x-asset-metadata`: `sources.<TYPE>` = tier, assetKinds, address, extensions) for the 10 built types. CLI `src/query/connectors/` (`base.py`: `QueryBinding`, `SourceContext`, `TableLocation`, `BindingError`; `postgres.py`, `mysql.py`, `databricks.py`, `odbc.py`, `attached_catalog.py`, `object_storage.py`; `__init__.py`: `declared_sources()`, `binding_class()`), moved unchanged out of `SourceBinding`, which is now the facade the session uses (same constructor, `label`, `relation`, `explain`, `close`; `QUERYABLE_SOURCE_TYPES` from the declaration). `warm.py` preloads every declared binding. API `sql-names.ts`: `queryDeclarations()`, `QUERYABLE_SOURCE_TYPES` (declared + `SHARED_DATASET`), `TABLE_SHAPED_ASSET_KINDS`, `joinsDatabasesInSchema()`, `isTableShaped` and `tableAddress` dispatch on the declared `address` strategy; the catalog's asset query and multi-database rule use them.
+- **Tests.** `apps/cli/tests/test_query_manifest.py` (5), `apps/api/src/data-query/sql-names.manifest.spec.ts` (14); `tests/test_query.py` and the data-query specs unchanged in what they expect (four tests patch `load_extension` at its new seam, `connectors.base`). CLI query tests 138, data-query specs 140, ruff and strict mypy clean.
+- **Verified on the dev stack**: the catalog after the API reloaded lists the same sources and queryable tables as before (Trino locked, Lance/Paimon not queryable); queries through the restarted query worker ran the new bindings (the BI smoke, BIC §9).
+- **Not done**: the QC0 spike, connectors (QC2).
