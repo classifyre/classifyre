@@ -45,6 +45,8 @@ import {
   QUERYABLE_SOURCE_TYPES,
   assignTableNames,
   isTableShaped,
+  joinsDatabasesInSchema,
+  TABLE_SHAPED_ASSET_KINDS,
   tableAddress,
   uniqueSourceSqlName,
   type TableLocation,
@@ -624,7 +626,7 @@ export class QueryCatalogService {
     const assets = await this.prisma.asset.findMany({
       where: {
         sourceId: { in: sourceRows.map((source) => source.id) },
-        assetType: { in: ['table', 'file'] },
+        assetType: { in: [...TABLE_SHAPED_ASSET_KINDS, 'file'] },
         status: { not: 'DELETED' },
       },
       select: {
@@ -667,8 +669,7 @@ export class QueryCatalogService {
           asset.assetType,
           asset.name,
           (asset.metadata ?? {}) as Record<string, unknown>,
-          (type === 'POSTGRESQL' || type === 'DATABRICKS' || type === 'ODBC') &&
-            databases.size > 1,
+          joinsDatabasesInSchema(type) && databases.size > 1,
         ),
       }));
       const names = assignTableNames(

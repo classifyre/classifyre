@@ -133,6 +133,126 @@
       "$ref": "#/definitions/CustomInput"
     }
   ],
+  "x-query": {
+    "description": "Which source types can be queried with SQL and how (docs/prd/QC-query-connectors.md \u00a75.1). Single source of truth for the API's table names (apps/api/src/data-query/sql-names.ts) and the query job's bindings (apps/cli/src/query/connectors/). tier: native (a DuckDB core extension), extension (a DuckDB community or nightly extension), connector (a Python Arrow connector), custom (a CUSTOM notebook's scan()). assetKinds: the asset kinds that are tables. address: how a table's SQL name and location are made from its asset. extensions: the DuckDB extensions the binding loads.",
+    "sources": {
+      "POSTGRESQL": {
+        "tier": "native",
+        "assetKinds": [
+          "table"
+        ],
+        "address": "postgres",
+        "extensions": [
+          "postgres"
+        ]
+      },
+      "MYSQL": {
+        "tier": "native",
+        "assetKinds": [
+          "table"
+        ],
+        "address": "mysql",
+        "extensions": [
+          "mysql"
+        ]
+      },
+      "DATABRICKS": {
+        "tier": "native",
+        "assetKinds": [
+          "table"
+        ],
+        "address": "databricks",
+        "extensions": [
+          "unity_catalog",
+          "delta",
+          "httpfs",
+          "azure"
+        ]
+      },
+      "ODBC": {
+        "tier": "extension",
+        "assetKinds": [
+          "table"
+        ],
+        "address": "odbc",
+        "extensions": [
+          "odbc_scanner"
+        ]
+      },
+      "ICEBERG_REST": {
+        "tier": "native",
+        "assetKinds": [
+          "table"
+        ],
+        "address": "catalog",
+        "extensions": [
+          "httpfs",
+          "iceberg"
+        ]
+      },
+      "DUCKLAKE": {
+        "tier": "native",
+        "assetKinds": [
+          "table"
+        ],
+        "address": "catalog",
+        "extensions": [
+          "ducklake"
+        ]
+      },
+      "S3_COMPATIBLE_STORAGE": {
+        "tier": "native",
+        "assetKinds": [
+          "table",
+          "file"
+        ],
+        "address": "object_storage",
+        "extensions": [
+          "httpfs",
+          "delta",
+          "iceberg"
+        ]
+      },
+      "AZURE_BLOB_STORAGE": {
+        "tier": "native",
+        "assetKinds": [
+          "table",
+          "file"
+        ],
+        "address": "object_storage",
+        "extensions": [
+          "azure",
+          "delta",
+          "iceberg"
+        ]
+      },
+      "GOOGLE_CLOUD_STORAGE": {
+        "tier": "native",
+        "assetKinds": [
+          "table",
+          "file"
+        ],
+        "address": "object_storage",
+        "extensions": [
+          "httpfs",
+          "delta",
+          "iceberg"
+        ]
+      },
+      "LOCAL_FOLDER": {
+        "tier": "native",
+        "assetKinds": [
+          "table",
+          "file"
+        ],
+        "address": "object_storage",
+        "extensions": [
+          "delta",
+          "iceberg"
+        ]
+      }
+    }
+  },
   "x-asset-metadata": {
     "description": "Declares the metadata each source attaches to every asset kind it produces, composed from reusable contentTypes. Single source of truth for docs rendering and CLI conformance (apps/cli/src/sources/asset_metadata.py).",
     "contentTypes": {

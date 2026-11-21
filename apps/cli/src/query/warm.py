@@ -106,6 +106,11 @@ def warm_up() -> dict[str, float]:
         import sqlglot  # noqa: F401
 
         from . import bindings, describe, gate, masks, rows, session  # noqa: F401
+        from .connectors import binding_class, declared_sources
+
+        # Every declared type's binding module, so a query never imports one.
+        for source_type in declared_sources():
+            binding_class(source_type)
     with _step("sources"):
         from ..sources import _discover_sources
 

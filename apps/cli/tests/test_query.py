@@ -662,10 +662,10 @@ def _attach_mysql(
     ca: str | None = None,
     password: str = "s3cret",
 ) -> tuple[Any, list[str]]:
-    from src.query import bindings
     from src.query.bindings import SourceBinding, TableLocation
+    from src.query.connectors import base as connectors_base
 
-    monkeypatch.setattr(bindings, "load_extension", lambda *_args: None)
+    monkeypatch.setattr(connectors_base, "load_extension", lambda *_args: None)
     recipe: dict[str, Any] = {
         "type": "MYSQL",
         "required": {"host": "db.example.test", "port": 3306},
@@ -793,11 +793,11 @@ def test_geojson_geometry_reads_as_text(folder: Path) -> None:
 def _attach_databricks(
     monkeypatch: pytest.MonkeyPatch, workspace_url: str
 ) -> tuple[Any, list[str], list[str]]:
-    from src.query import bindings
     from src.query.bindings import SourceBinding, TableLocation
+    from src.query.connectors import base as connectors_base
 
     loaded: list[str] = []
-    monkeypatch.setattr(bindings, "load_extension", lambda _conn, name: loaded.append(name))
+    monkeypatch.setattr(connectors_base, "load_extension", lambda _conn, name: loaded.append(name))
     recipe = {
         "type": "DATABRICKS",
         "required": {"workspace_url": workspace_url, "warehouse_id": "w"},
@@ -862,11 +862,11 @@ def test_databricks_endpoint_is_named_like_the_scan_does() -> None:
 
 
 def _attach_odbc(monkeypatch: pytest.MonkeyPatch, qualified: str = '"sales"."orders"') -> Any:
-    from src.query import bindings
     from src.query.bindings import SourceBinding, TableLocation
+    from src.query.connectors import base as connectors_base
 
     loaded: list[str] = []
-    monkeypatch.setattr(bindings, "load_extension", lambda _conn, name: loaded.append(name))
+    monkeypatch.setattr(connectors_base, "load_extension", lambda _conn, name: loaded.append(name))
     recipe = {
         "type": "ODBC",
         "required": {"connection_string": "Driver={PostgreSQL Unicode};Server=db.test;Port=5432"},
@@ -902,10 +902,10 @@ def test_odbc_reads_through_the_scanner_with_the_credentials_in_a_variable(
 
 
 def test_odbc_without_a_recorded_name_asks_for_a_rescan(monkeypatch: pytest.MonkeyPatch) -> None:
-    from src.query import bindings
     from src.query.bindings import BindingError, SourceBinding, TableLocation
+    from src.query.connectors import base as connectors_base
 
-    monkeypatch.setattr(bindings, "load_extension", lambda *_a: None)
+    monkeypatch.setattr(connectors_base, "load_extension", lambda *_a: None)
     binding = SourceBinding("warehouse", 0, {"type": "ODBC"}, "src-1")
     with pytest.raises(BindingError, match="run a scan of the source again"):
         binding.relation(_RecordingConn(), TableLocation(kind="catalog", table="orders"))

@@ -8,52 +8,98 @@
  * lower-case identifier, so nobody has to quote anything and the CLI's SQL
  * gate can compare names exactly.
  */
+import * as fs from 'fs';
+import { resolveSchemaFile } from '../utils/schema-path';
 import { stripLiteralsAndComments } from './sql-precheck';
 
+/** How a table's SQL name and location are made from its asset. */
+export type AddressStrategy =
+  | 'postgres'
+  | 'mysql'
+  | 'databricks'
+  | 'odbc'
+  | 'catalog'
+  | 'object_storage';
+
+/** One source type's `x-query` entry (docs/prd/QC-query-connectors.md §5.1). */
+export interface QueryDeclaration {
+  tier: 'native' | 'extension' | 'connector' | 'custom';
+  assetKinds: string[];
+  address: AddressStrategy;
+  extensions: string[];
+}
+
+let declarations: Map<string, QueryDeclaration> | undefined;
+
 /**
- * Source types the CLI can attach or scan with DuckDB.
- *
- * Keep in sync with `QUERYABLE_SOURCE_TYPES` in
- * apps/cli/src/query/bindings.py (same ten values); the API names them,
- * the job attaches them.
+ * Which source types can be queried and how: `x-query` in
+ * packages/schemas/src/schemas/all_input_sources.json, the declaration the
+ * CLI's bindings read too (apps/cli/src/query/connectors/).
  */
-export const QUERYABLE_SOURCE_TYPES = new Set([
-  'POSTGRESQL',
-  'MYSQL',
-  'DATABRICKS',
-  'ODBC',
-  'ICEBERG_REST',
-  'DUCKLAKE',
-  'S3_COMPATIBLE_STORAGE',
-  'AZURE_BLOB_STORAGE',
-  'GOOGLE_CLOUD_STORAGE',
-  'LOCAL_FOLDER',
+export function queryDeclarations(): Map<string, QueryDeclaration> {
+  if (!declarations) {
+    const schema = JSON.parse(
+      fs.readFileSync(
+        resolveSchemaFile(__dirname, 'all_input_sources.json'),
+        'utf8',
+      ),
+    ) as { 'x-query'?: { sources?: Record<string, QueryDeclaration> } };
+    declarations = new Map(
+      Object.entries(schema['x-query']?.sources ?? {}).map(([type, entry]) => [
+        type.toUpperCase(),
+        entry,
+      ]),
+    );
+  }
+  return declarations;
+}
+
+function declarationOf(sourceType: string): QueryDeclaration | undefined {
+  return queryDeclarations().get(sourceType.toUpperCase());
+}
+
+/** Source types the CLI can read: the declared ones, and shared datasets. */
+export const QUERYABLE_SOURCE_TYPES: ReadonlySet<string> = new Set([
+  ...queryDeclarations().keys(),
   // Shared datasets (§5.12): not attached, but expanded into views over
   // their inputs by the API and the job.
   'SHARED_DATASET',
 ]);
 
+/** Asset kinds the catalog lists: `table` for every source, and what types declare. */
+export const TABLE_SHAPED_ASSET_KINDS: readonly string[] = [
+  ...new Set([
+    'table',
+    ...[...queryDeclarations().values()].flatMap((d) => d.assetKinds),
+  ]),
+];
+
+/**
+ * Catalog-per-database sources (PostgreSQL's databases, Databricks'
+ * catalogs, an ODBC driver's catalogs): with more than one, the database
+ * joins the schema name.
+ */
+export function joinsDatabasesInSchema(sourceType: string): boolean {
+  const address = declarationOf(sourceType)?.address;
+  return (
+    address === 'postgres' || address === 'databricks' || address === 'odbc'
+  );
+}
+
 /** The built-in source of shared datasets (§5.12) and its SQL name. */
 export const SHARED_DATASET_SOURCE_TYPE = 'SHARED_DATASET';
 export const SHARED_DATASET_SQL_NAME = 'shared';
 
-const OBJECT_STORAGE_TYPES = new Set([
-  'S3_COMPATIBLE_STORAGE',
-  'AZURE_BLOB_STORAGE',
-  'GOOGLE_CLOUD_STORAGE',
-  'LOCAL_FOLDER',
-]);
-
 /**
  * Lakehouse formats DuckDB reads; Lance, Hudi and Paimon are not among them.
- * Keep in sync with `LAKEHOUSE_FORMATS` in apps/cli/src/query/bindings.py.
+ * Keep in sync with `LAKEHOUSE_FORMATS` in apps/cli/src/query/connectors/object_storage.py.
  */
 const LAKEHOUSE_FORMATS = new Set(['delta', 'iceberg']);
 
 /**
  * File tables by MIME type: what DuckDB reads straight from a bucket.
  * The `format` values match `FILE_FORMATS` in
- * apps/cli/src/query/bindings.py (`json` there is read via `read_json_auto`).
+ * apps/cli/src/query/connectors/object_storage.py (`json` there is read via `read_json_auto`).
  */
 const FILE_FORMATS: Record<string, string> = {
   'application/parquet': 'parquet',
@@ -171,12 +217,16 @@ export function isTableShaped(
   name: string,
 ): boolean {
   if (assetType === 'table') return true;
-  return (
-    OBJECT_STORAGE_TYPES.has(sourceType) &&
-    assetType === 'file' &&
-    !text(metadata.object_key)?.includes('#') &&
-    fileFormat(metadata, name) !== undefined
-  );
+  const declaration = declarationOf(sourceType);
+  if (!declaration?.assetKinds.includes(assetType)) return false;
+  if (declaration.address === 'object_storage') {
+    return (
+      assetType === 'file' &&
+      !text(metadata.object_key)?.includes('#') &&
+      fileFormat(metadata, name) !== undefined
+    );
+  }
+  return true;
 }
 
 /** Split an object key into a schema (its folders) and a table (its last part). */
@@ -202,8 +252,9 @@ export function tableAddress(
   const database = text(metadata.database);
   const schema = text(metadata.schema) ?? text(metadata.namespace);
   const tableName = text(metadata.table_name) ?? name;
+  const address = declarationOf(sourceType)?.address;
 
-  if (sourceType === 'POSTGRESQL') {
+  if (address === 'postgres') {
     const s = schema ?? 'public';
     return {
       schema: multiDatabase && database ? `${database}_${s}` : s,
@@ -214,7 +265,7 @@ export function tableAddress(
       reason: database ? undefined : 'Scan the source again to locate it.',
     };
   }
-  if (sourceType === 'MYSQL') {
+  if (address === 'mysql') {
     return {
       schema: database ?? 'main',
       table: tableName,
@@ -224,7 +275,7 @@ export function tableAddress(
       reason: database ? undefined : 'Scan the source again to locate it.',
     };
   }
-  if (sourceType === 'DATABRICKS') {
+  if (address === 'databricks') {
     // Unity Catalog: catalog.schema.table. DuckDB reads its Delta tables;
     // views have no files of their own to read.
     const catalog = text(metadata.catalog) ?? database;
@@ -246,7 +297,7 @@ export function tableAddress(
           : 'Scan the source again to locate it.',
     };
   }
-  if (sourceType === 'ODBC') {
+  if (address === 'odbc') {
     // Any database behind an ODBC driver. The scan recorded the table the way
     // the driver quotes and qualifies it, so the query reads it by that name.
     const qualifiedName = text(metadata.qualified_name);
@@ -267,7 +318,7 @@ export function tableAddress(
       reason: qualifiedName ? undefined : 'Scan the source again to locate it.',
     };
   }
-  if (sourceType === 'ICEBERG_REST' || sourceType === 'DUCKLAKE') {
+  if (address === 'catalog') {
     return {
       schema: schema ?? 'main',
       table: tableName,
@@ -284,7 +335,7 @@ export function tableAddress(
       reason: datasetId ? undefined : 'This shared dataset has no definition.',
     };
   }
-  if (OBJECT_STORAGE_TYPES.has(sourceType)) {
+  if (address === 'object_storage') {
     const key = text(metadata.object_key) ?? name;
     if (assetType === 'table') {
       const format = (text(metadata.table_format) ?? '').toLowerCase();
