@@ -7418,9 +7418,9 @@
     },
     "elapsed": "{{seconds}} s",
     "liveScans": {
-      "summary": "live: {{tables}} tables · {{requests}} requests · {{rows}} rows",
-      "table": "{{table}}: {{requests}} requests, {{rows}} rows read live, every row filtered here",
-      "tableFiltered": "{{table}}: {{requests}} requests, {{rows}} rows read live; filters sent to the source: {{filters}}"
+      "summary": "live: tables {{tables}} · requests {{requests}} · rows {{rows}}",
+      "table": "{{table}}: requests {{requests}}, rows read {{rows}}; filtered here, nothing sent to the source",
+      "tableFiltered": "{{table}}: requests {{requests}}, rows read {{rows}}; filters sent to the source: {{filters}}"
     },
     "timings": "setup {{setup}} s · query {{query}} s",
     "rows": "{{count}} rows",

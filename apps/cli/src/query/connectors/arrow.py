@@ -25,15 +25,11 @@ query's deadline (:meth:`ScanRequest.timeout`).
 
 from __future__ import annotations
 
-import datetime
-import decimal
 import json
-import math
 import os
-import re
 import time
 from abc import abstractmethod
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from functools import cache
 from typing import Any, ClassVar, Literal
@@ -115,6 +111,13 @@ class ScanRequest:
             raise ConnectorError("The query ran out of time reading its source.", "timeout")
         return min(default, left)
 
+    def sent(self, predicates: Iterable[Predicate]) -> None:
+        """Record the conditions the connector sent to its source (what the
+        person is shown as filtered there): only those, not all it was offered."""
+        for predicate in predicates:
+            if str(predicate) not in self.stats.pushed:
+                self.stats.pushed.append(str(predicate))
+
     def value_of(self, column: str) -> Any:
         """The value of a pushed ``column = …``, or None."""
         for predicate in self.predicates:
@@ -127,6 +130,10 @@ class ArrowConnector(QueryBinding):
     """A source whose tables are read through its own client, as Arrow."""
 
     tier: ClassVar[str] = "connector"
+    #: What the source is called in messages ("Meilisearch at …").
+    product: ClassVar[str] = "The source"
+    #: The ``required`` field holding the source's URL.
+    url_field: ClassVar[str] = "url"
 
     def __init__(self, source: SourceContext) -> None:
         super().__init__(source)
@@ -160,6 +167,21 @@ class ArrowConnector(QueryBinding):
         conn.register(name, live)
         self._live[name] = live
         return quote_identifier(name)
+
+    def label(self) -> str | None:
+        """``scheme://host:port/`` of the source's URL: never its path or
+        user info."""
+        from urllib.parse import urlsplit
+
+        parts = urlsplit(str(self.source.section("required").get(self.url_field) or ""))
+        if not parts.hostname:
+            return None
+        port = f":{parts.port}" if parts.port else ""
+        return f"{parts.scheme}://{parts.hostname}{port}/"
+
+    def where(self) -> str:
+        """The source as error messages name it."""
+        return f"{self.product} at {self.label() or self.source.alias}"
 
     def stats(self, relation: str) -> ScanStats | None:
         """What the scans of the table read through ``relation`` cost."""
@@ -197,6 +219,13 @@ def _live_class() -> Any:
     import pyarrow.dataset as ds
 
     class LiveTable(ds.Dataset):  # type: ignore[misc]
+        """Only ``schema`` and ``scanner`` work: DuckDB hands projection and
+        filters only to a ``pyarrow.dataset.Dataset`` (it checks the type; a
+        duck-typed object with ``__arrow_c_stream__`` gets neither, QC §11
+        QC0), and the C++ dataset ``Dataset.__init__`` would wrap does not
+        exist. Never pass one anywhere but ``DuckDBPyConnection.register``.
+        """
+
         connector: ArrowConnector
         location: TableLocation
         arrow_schema: Any
@@ -222,15 +251,12 @@ def _live_class() -> Any:
                 else:
                     read = None
             withheld = self.location.withheld
-            predicates = tuple(p for p in predicates if p.column not in withheld)
+            predicates = tuple(p for p in predicates if p.column.lower() not in withheld)
             self.stats.scans += 1
-            for predicate in predicates:
-                if str(predicate) not in self.stats.pushed:
-                    self.stats.pushed.append(str(predicate))
             request = ScanRequest(
                 columns=read,
                 predicates=predicates,
-                deadline=getattr(self.connector.source, "deadline", math.inf),
+                deadline=self.connector.source.deadline,
                 stats=self.stats,
             )
             out_schema = schema if names is None else pa.schema([schema.field(n) for n in names])
@@ -239,12 +265,14 @@ def _live_class() -> Any:
 
         def _batches(self, request: ScanRequest, filter: Any, out_schema: Any) -> Iterator[Any]:
             limit = connector_max_rows()
+            read = 0  # this scan's rows: the cap is per scan, not per table
             started = time.monotonic()
             try:
                 for chunk in self.connector.scan(self.location, request):
                     batch = to_batch(chunk, self.arrow_schema)
                     self.stats.rows += batch.num_rows
-                    if self.stats.rows > limit:
+                    read += batch.num_rows
+                    if read > limit:
                         raise ConnectorError(
                             f"has more than {limit:,} rows to read for this query; "
                             "filter it on a column its source can filter, or ask an "
@@ -362,187 +390,179 @@ def _as_text(value: Any) -> Any:
 
 
 # ── the filter DuckDB pushed, as predicates ────────────────────────────
+#
+# Read from the expression's own serialisation, not its printed text (a value
+# set prints its strings unescaped, so ``'a",\n  "b'`` reads as two values):
+# ``Expression.__reduce__`` gives an Arrow IPC file whose schema metadata is
+# the tree in prefix order (``call``, its arguments, ``options``, ``end``) and
+# whose columns hold every literal and option, typed. The tree read back is
+# rebuilt and compared with the original (``Expression.equals``); a filter
+# that does not come back identical sends the source nothing.
 
-_COMPARISON = re.compile(r"^\((?P<field>[^()]+?) (?P<op>==|!=|<=|>=|<|>) (?P<literal>.+)\)$", re.S)
-_IS_IN = re.compile(
-    r"^is_in\((?P<field>[^(),]+), \{value_set=[^:\[]+:\[(?P<values>.*)\], "
-    r"null_matching_behavior=MATCH\}\)$",
-    re.S,
-)
-_IF_VALID = re.compile(
-    r"^if_else\(is_valid\((?P<field>[^()]+)\), (?P<inner>.+), null\[bool\]\)$", re.S
-)
-_OPS: dict[str, Op] = {"==": "=", "!=": "!=", "<": "<", "<=": "<=", ">": ">", ">=": ">="}
+_COMPARISONS: dict[str, Op] = {
+    "equal": "=",
+    "not_equal": "!=",
+    "less": "<",
+    "less_equal": "<=",
+    "greater": ">",
+    "greater_equal": ">=",
+}
+
+
+@dataclass(frozen=True)
+class _Node:
+    kind: str  # "call" | "field" | "literal"
+    name: str = ""
+    args: tuple[_Node, ...] = ()
+    #: For a literal or an option: its column in the serialisation.
+    column: int | None = None
+    options: int | None = None
 
 
 def predicates_of(expression: Any, schema: Any) -> tuple[tuple[Predicate, ...], bool]:
     """The top-level conjuncts of a pushed filter that read as predicates.
 
-    Returns them and whether that is the whole filter. A conjunct is only
-    taken when rebuilding it gives back exactly the expression DuckDB sent,
-    so a filter misread never sends the source a wrong condition; the rest
-    (``OR``, ``IS NULL``, types without a literal form) is left to the local
-    filter.
+    Returns them and whether that is the whole filter. ``OR``, ``IS NULL``,
+    functions and literals of another type than their column are left to the
+    local filter.
     """
     if expression is None:
         return (), True
+    try:
+        tree, values = _read(expression)
+        if not _rebuild(tree, values).equals(expression):
+            return (), False
+    except Exception:
+        return (), False
     out: list[Predicate] = []
     complete = True
-    for part in _conjuncts(str(expression)):
-        predicates = _leaf(part, schema)
-        if predicates is None:
+    for part in _conjuncts(tree):
+        predicate = _leaf(part, values, schema)
+        if predicate is None:
             complete = False
         else:
-            out.extend(predicates)
+            out.append(predicate)
     return tuple(out), complete
 
 
-def _conjuncts(text: str) -> list[str]:
-    """Split ``((a and b) and c)`` into ``[a, b, c]`` at depth 0 of its parentheses."""
-    inner = _unwrap(text)
-    if inner is None:
-        return [text]
-    depth = 0
-    in_string = False
-    escaped = False
-    for i, ch in enumerate(inner):
-        if in_string:
-            if escaped:
-                escaped = False
-            elif ch == "\\":
-                escaped = True
-            elif ch == '"':
-                in_string = False
+def _read(expression: Any) -> tuple[_Node, Any]:
+    import pyarrow as pa
+
+    _, (buffer,) = expression.__reduce__()
+    table = pa.ipc.open_file(buffer).read_all()
+    text = table.schema.to_string(
+        truncate_metadata=False, show_field_metadata=False, show_schema_metadata=True
+    )
+    _, _, block = text.partition("-- schema metadata --\n")
+    entries: list[tuple[str, str]] = []
+    for line in block.split("\n"):
+        key, sep, value = line.partition(": ")
+        if not sep or len(value) < 2 or value[0] != "'" or value[-1] != "'":
+            raise ValueError("unreadable filter")
+        entries.append((key, value[1:-1]))
+    tree, rest = _parse(entries)
+    if rest:
+        raise ValueError("unreadable filter")
+    return tree, table
+
+
+def _parse(entries: list[tuple[str, str]]) -> tuple[_Node, list[tuple[str, str]]]:
+    if not entries:
+        raise ValueError("unreadable filter")
+    (key, value), rest = entries[0], entries[1:]
+    if key == "field_ref":
+        return _Node("field", name=value), rest
+    if key == "literal":
+        return _Node("literal", column=int(value)), rest
+    if key != "call":
+        raise ValueError("unreadable filter")
+    args: list[_Node] = []
+    options: int | None = None
+    while rest and rest[0][0] != "end":
+        if rest[0][0] == "options":
+            options = int(rest[0][1])
+            rest = rest[1:]
             continue
-        if ch == '"':
-            in_string = True
-        elif ch in "([{":
-            depth += 1
-        elif ch in ")]}":
-            depth -= 1
-        elif depth == 0 and inner.startswith(" and ", i):
-            return _conjuncts(inner[:i]) + _conjuncts(inner[i + 5 :])
-    return [text]
+        arg, rest = _parse(rest)
+        args.append(arg)
+    if not rest or rest[0] != ("end", value):
+        raise ValueError("unreadable filter")
+    return _Node("call", name=value, args=tuple(args), options=options), rest[1:]
 
 
-def _unwrap(text: str) -> str | None:
-    """``text`` without its outer parentheses, when they enclose all of it."""
-    if not (text.startswith("(") and text.endswith(")")):
-        return None
-    depth = 0
-    in_string = False
-    escaped = False
-    for i, ch in enumerate(text):
-        if in_string:
-            if escaped:
-                escaped = False
-            elif ch == "\\":
-                escaped = True
-            elif ch == '"':
-                in_string = False
-            continue
-        if ch == '"':
-            in_string = True
-        elif ch == "(":
-            depth += 1
-        elif ch == ")":
-            depth -= 1
-            if depth == 0 and i != len(text) - 1:
-                return None
-    return text[1:-1]
-
-
-def _leaf(text: str, schema: Any) -> list[Predicate] | None:
+def _rebuild(node: _Node, values: Any) -> Any:
+    import pyarrow as pa
     import pyarrow.compute as pc
 
-    match = _COMPARISON.match(text)
-    if match:
-        name = match["field"]
-        if name not in schema.names:
-            return None
-        value = _literal(match["literal"], schema.field(name).type)
-        if value is _NOT_A_LITERAL:
-            return None
-        op = _OPS[match["op"]]
-        rebuilt = _compare(pc.field(name), op, _scalar(value, schema.field(name).type))
-        return [Predicate(name, op, value)] if str(rebuilt) == text else None
-    wrapped = _IF_VALID.match(text)
-    inner_text = wrapped["inner"] if wrapped else text
-    match = _IS_IN.match(inner_text)
-    if match:
-        name = match["field"]
-        if name not in schema.names or (wrapped and wrapped["field"] != name):
-            return None
-        kind = schema.field(name).type
-        values = []
-        for item in _items(match["values"]):
-            # A value set prints its strings unescaped (a comparison escapes
-            # them); the round trip below catches what that makes ambiguous.
-            value = _literal(item, kind, escaped=False)
-            if value is _NOT_A_LITERAL:
-                return None
-            values.append(value)
-        import pyarrow as pa
+    if node.kind == "field":
+        return pc.field(node.name)
+    if node.kind == "literal":
+        return pc.scalar(values.column(node.column)[0])
+    options = None
+    if node.options is not None:
+        raw = values.column(node.options)[0].as_py()
+        if raw.get("_type_name") != b"SetLookupOptions" or raw.get("null_matching_behavior") != 0:
+            raise ValueError("options this reader does not rebuild")
+        kind = values.column(node.options).type.field("value_set").type.value_type
+        options = pc.SetLookupOptions(pa.array(raw["value_set"], type=kind), skip_nulls=False)
+    args = [_rebuild(arg, values) for arg in node.args]
+    return pc.Expression._call(node.name, args, options)
 
-        rebuilt = pc.field(name).isin(pa.array(values, type=kind))
-        if wrapped:
-            rebuilt = pc.if_else(pc.field(name).is_valid(), rebuilt, pa.scalar(None, pa.bool_()))
-        return [Predicate(name, "in", tuple(values))] if str(rebuilt) == text else None
+
+def _conjuncts(node: _Node) -> list[_Node]:
+    if node.kind == "call" and node.name in ("and_kleene", "and"):
+        return [part for arg in node.args for part in _conjuncts(arg)]
+    return [node]
+
+
+def _leaf(node: _Node, values: Any, schema: Any) -> Predicate | None:
+    if node.kind != "call":
+        return None
+    if node.name in _COMPARISONS and len(node.args) == 2:
+        left, right = node.args
+        op = _COMPARISONS[node.name]
+        if left.kind == "literal" and right.kind == "field":
+            left, right = right, left
+            op = {"<": ">", "<=": ">=", ">": "<", ">=": "<="}.get(op, op)  # type: ignore[assignment]
+        if left.kind != "field" or right.kind != "literal":
+            return None
+        value = _value(left.name, values.column(right.column), schema)
+        return None if value is _NOT_A_LITERAL else Predicate(left.name, op, value)
+    inner = node
+    if node.name == "if_else" and len(node.args) == 3:
+        # DuckDB's IN: if_else(is_valid(f), is_in(f, set), null).
+        guard, inner, otherwise = node.args
+        if not (
+            guard.kind == "call"
+            and guard.name == "is_valid"
+            and len(guard.args) == 1
+            and otherwise.kind == "literal"
+            and values.column(otherwise.column)[0].as_py() is None
+            and inner.kind == "call"
+            and inner.name == "is_in"
+            and inner.args[:1] == guard.args
+        ):
+            return None
+    if inner.name == "is_in" and len(inner.args) == 1 and inner.options is not None:
+        (target,) = inner.args
+        if target.kind != "field" or target.name not in schema.names:
+            return None
+        column = values.column(inner.options)
+        if column.type.field("value_set").type.value_type != schema.field(target.name).type:
+            return None
+        items = tuple(column[0].as_py()["value_set"])
+        if any(item is None for item in items):
+            return None
+        return Predicate(target.name, "in", items)
     return None
-
-
-def _items(body: str) -> list[str]:
-    """The literals of an ``is_in`` value set (one per line, comma-separated)."""
-    lines = [line.strip() for line in body.strip("\n").split("\n")]
-    return [line[:-1] if line.endswith(",") else line for line in lines if line]
 
 
 _NOT_A_LITERAL = object()
 
 
-def _literal(text: str, kind: Any, *, escaped: bool = True) -> Any:
-    import pyarrow as pa
-
-    try:
-        if pa.types.is_string(kind) or pa.types.is_large_string(kind):
-            if len(text) < 2 or not (text.startswith('"') and text.endswith('"')):
-                return _NOT_A_LITERAL
-            if not escaped:
-                return text[1:-1]
-            value = json.loads(text)
-            return value if isinstance(value, str) else _NOT_A_LITERAL
-        if pa.types.is_boolean(kind):
-            return {"true": True, "false": False}.get(text, _NOT_A_LITERAL)
-        if pa.types.is_integer(kind):
-            return int(text)
-        if pa.types.is_floating(kind):
-            return float(text)
-        if pa.types.is_decimal(kind):
-            return decimal.Decimal(text)
-        if pa.types.is_date(kind):
-            return datetime.date.fromisoformat(text)
-        if pa.types.is_timestamp(kind) and kind.tz is None:
-            return datetime.datetime.fromisoformat(text)
-    except (ValueError, decimal.InvalidOperation, json.JSONDecodeError):
+def _value(name: str, column: Any, schema: Any) -> Any:
+    """A literal's value, when it has its column's own type."""
+    if name not in schema.names or column.type != schema.field(name).type:
         return _NOT_A_LITERAL
-    return _NOT_A_LITERAL
-
-
-def _scalar(value: Any, kind: Any) -> Any:
-    import pyarrow as pa
-
-    return pa.scalar(value, type=kind)
-
-
-def _compare(field_expr: Any, op: Op, scalar: Any) -> Any:
-    if op == "=":
-        return field_expr == scalar
-    if op == "!=":
-        return field_expr != scalar
-    if op == "<":
-        return field_expr < scalar
-    if op == "<=":
-        return field_expr <= scalar
-    if op == ">":
-        return field_expr > scalar
-    return field_expr >= scalar
+    value = column[0].as_py()
+    return _NOT_A_LITERAL if value is None else value

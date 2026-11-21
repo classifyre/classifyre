@@ -203,6 +203,17 @@ class _Dataset:
     catalog: str
 
 
+@dataclass(frozen=True)
+class _Relation:
+    """What one view reads, and the name its reads are reported under."""
+
+    binding: SourceBinding
+    relation: str
+    shown: str
+    #: A shared dataset's input: its filters are the owning group's.
+    private: bool = False
+
+
 @dataclass
 class _Table:
     name: TableName
@@ -242,7 +253,7 @@ class QuerySession:
                     alias, index, recipe, str(entry.get("sourceId") or "")
                 )
         #: Each source table's view reads this binding's relation.
-        self._relations: dict[str, tuple[SourceBinding, str]] = {}
+        self._relations: dict[str, _Relation] = {}
         self._tables: dict[TableName, _Table] = {}
         for entry in request.tables:
             dataset = entry.get("dataset")
@@ -383,17 +394,23 @@ class QuerySession:
             entry = self._tables[name]
             target = target_of(name.source, name.schema, name.table)
             if entry.dataset is not None:
-                relation = self._dataset_relation(conn, entry.dataset, target_of)
+                relation = self._dataset_relation(conn, entry.dataset, target_of, str(name))
                 self._create_view(conn, target, relation, entry, label=str(name), binding=None)
             else:
                 self._source_view(conn, target, entry)
 
-    def _source_view(self, conn: Any, target: str, entry: _Table) -> None:
+    def _source_view(
+        self, conn: Any, target: str, entry: _Table, *, dataset: str | None = None
+    ) -> None:
+        """``dataset``: the shared dataset this table is an input of. Its
+        reads are reported under the dataset's name, never with the filters
+        sent: those hold the owning group's row filter (DQ §5.10)."""
         binding = self._bindings[entry.source_alias]
-        # A masked column is never a filter sent to its source (QC §5.11).
+        # A masked column is never a filter sent to its source (QC §5.11);
+        # masks match columns without case.
         location = replace(
             entry.location,
-            withheld=frozenset(m.column for m in entry.masks),
+            withheld=frozenset(m.column.lower() for m in entry.masks),
         )
         try:
             relation = binding.relation(conn, location)
@@ -408,10 +425,12 @@ class QuerySession:
             ) from exc
         if binding.source_type == "POSTGRESQL":
             _postgres_settings(conn)
-        self._relations[str(entry.name)] = (binding, relation)
+        self._relations[target] = _Relation(
+            binding, relation, dataset or str(entry.name), private=dataset is not None
+        )
         self._create_view(conn, target, relation, entry, label=str(entry.name), binding=binding)
 
-    def _dataset_relation(self, conn: Any, dataset: _Dataset, target_of: Any) -> str:
+    def _dataset_relation(self, conn: Any, dataset: _Dataset, target_of: Any, shown: str) -> str:
         """A shared dataset's SQL over its inputs (§5.12), as a relation.
 
         Each input becomes a view ``"__ds_<n>"."main"."t<j>"``, masked and
@@ -425,7 +444,12 @@ class QuerySession:
         validated = validate(dataset.sql, dataset.inputs.keys(), rename=hidden)
         for input_name in sorted(validated.tables, key=str):
             catalog, schema, table = hidden[input_name]
-            self._source_view(conn, target_of(catalog, schema, table), dataset.inputs[input_name])
+            self._source_view(
+                conn,
+                target_of(catalog, schema, table),
+                dataset.inputs[input_name],
+                dataset=shown,
+            )
         return f"({validated.sql}) AS __dataset"
 
     def _create_view(
@@ -647,31 +671,34 @@ class QuerySession:
     def _connector_failure(self) -> ConnectorError | None:
         """The error a connector raised, named for its table: DuckDB hands it
         on wrapped in its own text."""
-        for name, (binding, relation) in sorted(self._relations.items()):
-            error = binding.failure(relation)
+        for _, read in sorted(self._relations.items()):
+            error = read.binding.failure(read.relation)
             if error is None:
                 continue
             if error.code == "connector_limit":
-                return ConnectorError(f"{name} {error}", error.code)
-            return ConnectorError(f"Failed to read {name}: {error}", error.code)
+                return ConnectorError(f"{read.shown} {error}", error.code)
+            return ConnectorError(f"Failed to read {read.shown}: {error}", error.code)
         return None
 
     def _scan_stats(self) -> list[dict[str, Any]]:
-        out = []
-        for name, (binding, relation) in sorted(self._relations.items()):
-            stats = binding.scan_stats(relation)
-            if stats is not None and stats.scans:
-                out.append(
-                    {
-                        "table": name,
-                        "requests": stats.requests,
-                        "rows": stats.rows,
-                        "pushed": list(stats.pushed),
-                        "ms": stats.ms,
-                        "scans": stats.scans,
-                    }
-                )
-        return out
+        """Per table the person named: what its live reads cost. A shared
+        dataset's inputs add up under the dataset, without their filters."""
+        out: dict[str, dict[str, Any]] = {}
+        for _, read in sorted(self._relations.items()):
+            stats = read.binding.scan_stats(read.relation)
+            if stats is None or not stats.scans:
+                continue
+            entry = out.setdefault(
+                read.shown,
+                {"table": read.shown, "requests": 0, "rows": 0, "pushed": [], "ms": 0, "scans": 0},
+            )
+            entry["requests"] += stats.requests
+            entry["rows"] += stats.rows
+            entry["ms"] += stats.ms
+            entry["scans"] += stats.scans
+            if not read.private:
+                entry["pushed"] += [p for p in stats.pushed if p not in entry["pushed"]]
+        return [out[name] for name in sorted(out)]
 
 
 def _export_columns(conn: Any, sql: str, fmt: str) -> str:

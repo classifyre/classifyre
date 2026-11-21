@@ -143,6 +143,16 @@ class QueryBinding(ABC):
         remote URLs stay open, scoped by the source's own credentials."""
         return []
 
+    def stats(self, relation: str) -> Any:
+        """What reading ``relation`` cost (``ScanStats``); None for tables
+        DuckDB reads itself."""
+        return None
+
+    def failure(self, relation: str) -> Any:
+        """The error a scan of ``relation`` raised, as its source said it
+        (``ConnectorError``); None for tables DuckDB reads itself."""
+        return None
+
     def close(self) -> None:
         """Release what the binding made (temporary files); the session closes DuckDB."""
 

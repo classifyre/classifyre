@@ -4,12 +4,13 @@
  * label is read through its source's API on every query, so the person sees
  * how many requests and rows it took and which filters went to the source.
  */
-export interface ScanStatLike {
-  table: string;
-  requests: number;
-  rows: number;
-  pushed: string[];
-}
+import type { QueryRun } from "@/lib/data-query";
+
+/** One table of a run's `scans`, as the API returns it. */
+type ScanStatLike = Pick<
+  QueryRun["scans"][number],
+  "table" | "requests" | "rows" | "pushed"
+>;
 
 export interface ScanSummary {
   tables: number;

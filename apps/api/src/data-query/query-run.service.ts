@@ -1308,6 +1308,7 @@ export class QueryRunService {
         meta = {};
       }
       const tables = (meta.tables ?? []).map((t) => t.toLowerCase());
+      const scans = scanStatsOf(meta.scans);
       const assetIds = tables.length
         ? await this.assetIdsFor(tables)
         : undefined;
@@ -1322,12 +1323,8 @@ export class QueryRunService {
           truncatedReason: meta.truncatedReason ?? null,
           columns: meta.columns ?? [],
           timings: meta.timings ?? {},
-          ...(scanStatsOf(meta.scans).length
-            ? {
-                scanStats: scanStatsOf(
-                  meta.scans,
-                ) as unknown as Prisma.InputJsonValue,
-              }
+          ...(scans.length
+            ? { scanStats: scans as unknown as Prisma.InputJsonValue }
             : {}),
           ...(assetIds ? { assetIds } : {}),
           finishedAt: new Date(),

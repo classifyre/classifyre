@@ -340,3 +340,15 @@ async def test_the_scan_records_each_index_s_columns(monkeypatch: pytest.MonkeyP
     source = MeilisearchSource(_recipe())
     (asset,) = [a async for batch in source.extract_raw() for a in batch]
     assert asset.metadata["columns"] == COLUMNS
+
+
+def test_not_equal_on_text_is_left_to_duckdb(meili: FakeMeilisearch) -> None:
+    # Meilisearch's equality ignores case: `genre != "drama"` there would
+    # also drop Drama, which SQL keeps (QC review c2).
+    payload, _ = run_query(
+        _request(
+            "SELECT count(*) FROM search.indexes.movies WHERE genre <> 'drama' AND year <> 2001"
+        )
+    )
+    assert payload["status"] == "success", payload
+    assert meili.fetches[0]["filter"] == "year != 2001"

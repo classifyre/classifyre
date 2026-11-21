@@ -87,6 +87,7 @@ class FakeNeo4j:
     TRUST_ALL_CERTIFICATES = "TRUST_ALL_CERTIFICATES"
     TRUST_SYSTEM_CA_SIGNED_CERTIFICATES = "TRUST_SYSTEM_CA_SIGNED_CERTIFICATES"
     Query = FakeQuery
+    READ_ACCESS = "READ"
 
     class exceptions:  # noqa: N801 - the module's name
         ServiceUnavailable = ServiceUnavailable
@@ -136,8 +137,10 @@ class FakeDriver:
     def __init__(self) -> None:
         self.queries: list[tuple[str, dict[str, Any], Any, str]] = []
         self.fail: Exception | None = None
+        self.modes: list[Any] = []
 
-    def session(self, database: str, **_kwargs: Any) -> FakeSession:
+    def session(self, database: str, **kwargs: Any) -> FakeSession:
+        self.modes.append(kwargs.get("default_access_mode"))
         return FakeSession(self, database)
 
     def close(self) -> None:
@@ -257,13 +260,25 @@ def test_a_relationship_joins_its_node_tables(driver: FakeDriver) -> None:
     assert [(r["title"], r["fans"]) for r in _rows(payload, result)] == expected
     texts = {text for text, *_ in driver.queries}
     assert any("WHERE r.`stars` >= $p0" in t for t in texts)
-    assert any("WHERE n.`country` = $p0" in t for t in texts)
+    # country is text: a stored 5 would read as '5' here but not match in
+    # Cypher, so DuckDB filters it (QC review c4).
+    assert not any("country` =" in t for t in texts)
+    rated = next(s for s in payload["scans"] if s["table"] == "graph.relationships.rated")
+    assert rated["pushed"] == ["stars >= 4"]
+    person = next(s for s in payload["scans"] if s["table"] == "graph.nodes.person")
+    assert person["pushed"] == []
     assert {database for *_, database in driver.queries} == {"neo4j"}
     assert {s["table"] for s in payload["scans"]} == {
         "graph.nodes.movie",
         "graph.nodes.person",
         "graph.relationships.rated",
     }
+
+
+def test_every_session_is_read_only(driver: FakeDriver) -> None:
+    payload, _ = run_query(_request("SELECT count(*) FROM graph.nodes.person"))
+    assert payload["status"] == "success", payload
+    assert driver.modes == ["READ"]
 
 
 def test_every_statement_has_a_timeout_within_the_query_s(driver: FakeDriver) -> None:
@@ -374,3 +389,15 @@ async def test_the_scan_records_label_and_relationship_tables(
     assert rated.links == [by_kind["label"].hash]
     # A relationship type has no node content to scan for findings.
     assert await source.fetch_content(rated.hash) is None
+
+
+def test_only_conditions_compared_as_sql_reads_them_go_to_neo4j() -> None:
+    from src.query.connectors.neo4j import pushable
+
+    types = {"id": "BIGINT", "name": "VARCHAR", "meta": "JSON", "at": "TIMESTAMP", "ok": "BOOLEAN"}
+    assert [c for c in ("id", "name", "meta", "at", "ok") if pushable(c, types)] == [
+        "id",
+        "at",
+        "ok",
+    ]
+    assert pushable("element_id", types) and pushable("source_label", types)

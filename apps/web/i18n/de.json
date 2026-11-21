@@ -7418,9 +7418,9 @@
     },
     "elapsed": "{{seconds}} s",
     "liveScans": {
-      "summary": "live: {{tables}} Tabellen · {{requests}} Anfragen · {{rows}} Zeilen",
-      "table": "{{table}}: {{requests}} Anfragen, {{rows}} Zeilen live gelesen, jede Zeile hier gefiltert",
-      "tableFiltered": "{{table}}: {{requests}} Anfragen, {{rows}} Zeilen live gelesen; an die Quelle gesendete Filter: {{filters}}"
+      "summary": "live: Tabellen {{tables}} · Anfragen {{requests}} · Zeilen {{rows}}",
+      "table": "{{table}}: Anfragen {{requests}}, gelesene Zeilen {{rows}}; hier gefiltert, nichts an die Quelle gesendet",
+      "tableFiltered": "{{table}}: Anfragen {{requests}}, gelesene Zeilen {{rows}}; an die Quelle gesendete Filter: {{filters}}"
     },
     "timings": "Vorbereitung {{setup}} s · Abfrage {{query}} s",
     "rows": "{{count}} Zeilen",

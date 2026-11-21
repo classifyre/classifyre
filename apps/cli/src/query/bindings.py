@@ -24,7 +24,7 @@ import math
 from typing import Any
 
 from .connectors import BindingError, QueryBinding, TableLocation, binding_class, declared_sources
-from .connectors.arrow import ArrowConnector, ConnectorError, ScanStats
+from .connectors.arrow import ConnectorError, ScanStats
 from .connectors.object_storage import FILE_FORMATS, LAKEHOUSE_FORMATS, SPATIAL_FORMATS
 
 __all__ = [
@@ -126,13 +126,13 @@ class SourceBinding:
 
     def scan_stats(self, relation: str) -> ScanStats | None:
         """A connector table's reads (None for tables DuckDB reads itself)."""
-        reader = self._reader
-        return reader.stats(relation) if isinstance(reader, ArrowConnector) else None
+        stats: ScanStats | None = self._reader.stats(relation) if self._reader else None
+        return stats
 
     def failure(self, relation: str) -> ConnectorError | None:
         """Why a connector's scan of that table failed, as it said it."""
-        reader = self._reader
-        return reader.failure(relation) if isinstance(reader, ArrowConnector) else None
+        error: ConnectorError | None = self._reader.failure(relation) if self._reader else None
+        return error
 
     def close(self) -> None:
         if self._reader is not None:

@@ -20,11 +20,10 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from typing import Any
-from urllib.parse import urlsplit
 
 from ...utils.document_columns import native
 from .arrow import ArrowConnector, ConnectorError, Predicate, ScanRequest
-from .base import SourceContext, TableLocation
+from .base import TableLocation
 
 BATCH_SIZE = 10_000
 #: Transaction timeout when the query has more time than this.
@@ -55,6 +54,30 @@ def _column_expression(kind: str, column: str) -> str:
         "target_label": "head(labels(b))",
     }
     return special.get(column) or f"r.{escape(column)}"
+
+
+#: Columns Neo4j computes: always text, whatever the graph stores.
+_COMPUTED = {
+    "element_id",
+    "source_element_id",
+    "target_element_id",
+    "source_label",
+    "target_label",
+}
+#: Recorded types a property is compared as in Cypher exactly as SQL reads it.
+_COMPARABLE = {"BIGINT", "DOUBLE", "BOOLEAN", "DATE", "TIMESTAMP", "TIMESTAMP WITH TIME ZONE"}
+
+
+def pushable(column: str, types: dict[str, str]) -> bool:
+    """Whether a condition on ``column`` may go to Neo4j.
+
+    A property recorded as text (or JSON) reads any stored value as its
+    text (``5`` as ``'5'``), while Cypher compares the stored value itself:
+    ``p = '5'`` would miss the node holding the integer 5. Only properties
+    recorded with a non-text type are sent (a value of another type there is
+    an error, never a missing row), and the ids and labels Neo4j computes.
+    """
+    return column in _COMPUTED or types.get(column, "").upper() in _COMPARABLE
 
 
 def build_cypher(
@@ -95,19 +118,8 @@ def build_cypher(
 
 class Neo4jConnector(ArrowConnector):
     dependency_groups = ("neo4j",)
-
-    def __init__(self, source: SourceContext) -> None:
-        super().__init__(source)
-
-    def label(self) -> str | None:
-        parts = urlsplit(str(self.source.section("required").get("uri") or ""))
-        if not parts.hostname:
-            return None
-        port = f":{parts.port}" if parts.port else ""
-        return f"{parts.scheme}://{parts.hostname}{port}/"
-
-    def _where(self) -> str:
-        return f"Neo4j at {self.label() or self.source.alias}"
+    product = "Neo4j"
+    url_field = "uri"
 
     def scan(self, location: TableLocation, request: ScanRequest) -> Iterator[Any]:
         kind, name = self.require(location, "schema", "table")
@@ -117,7 +129,12 @@ class Neo4jConnector(ArrowConnector):
             if request.columns is not None
             else tuple(recorded)
         )
-        cypher, params = build_cypher(kind, name, columns, request.predicates)
+        types = dict(location.columns)
+        sent = tuple(
+            p for p in request.predicates if p.column in columns and pushable(p.column, types)
+        )
+        cypher, params = build_cypher(kind, name, columns, sent)
+        request.sent(sent)
         client = self.source.instance()
         neo4j = client._neo4j
         errors = getattr(neo4j, "exceptions", None)
@@ -126,7 +143,13 @@ class Neo4jConnector(ArrowConnector):
             timeout = request.timeout(DEFAULT_TIMEOUT_SECONDS)
             query = query_class(cypher, timeout=timeout) if query_class else cypher
             database = location.database or client._database()
-            with client._driver().session(database=database, fetch_size=BATCH_SIZE) as session:
+            # Read-only: a query never writes to the graph, whatever its
+            # statement (QC §5.6); the server refuses a write in this mode.
+            with client._driver().session(
+                database=database,
+                fetch_size=BATCH_SIZE,
+                default_access_mode=getattr(neo4j, "READ_ACCESS", "READ"),
+            ) as session:
                 result = session.run(query, params)
                 request.stats.requests += 1
                 batch: list[dict[str, Any]] = []
@@ -151,10 +174,10 @@ class Neo4jConnector(ArrowConnector):
             return isinstance(cls, type) and isinstance(exc, cls)
 
         if is_a("AuthError"):
-            return ConnectorError(f"{self._where()} refused the source's credentials.")
+            return ConnectorError(f"{self.where()} refused the source's credentials.")
         if is_a("ServiceUnavailable") or is_a("SessionExpired"):
-            return ConnectorError(f"{self._where()} is unreachable.")
+            return ConnectorError(f"{self.where()} is unreachable.")
         code = getattr(exc, "code", None)
         if isinstance(code, str) and code.startswith("Neo."):
-            return ConnectorError(f"{self._where()} refused the query ({code}).")
-        return ConnectorError(f"{self._where()} failed: {type(exc).__name__}.")
+            return ConnectorError(f"{self.where()} refused the query ({code}).")
+        return ConnectorError(f"{self.where()} failed: {type(exc).__name__}.")

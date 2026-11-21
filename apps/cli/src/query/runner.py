@@ -143,9 +143,11 @@ def run_query(request_data: dict[str, Any]) -> tuple[dict[str, Any], QueryResult
     except QueryTimeoutError as exc:
         return error_payload("timeout", str(exc)), None
     except BindingError as exc:
+        from .connectors.arrow import ConnectorError
+
         # A connector's refusal has its own code (connector_limit).
-        code = getattr(exc, "code", None) or "source_unavailable"
-        return error_payload(str(code), redact(str(exc))), None
+        code = exc.code if isinstance(exc, ConnectorError) else "source_unavailable"
+        return error_payload(code, redact(str(exc))), None
     except Exception as exc:
         message = str(exc).strip().splitlines()
         text = message[0] if message else type(exc).__name__

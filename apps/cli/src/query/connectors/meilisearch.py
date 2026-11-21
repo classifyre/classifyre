@@ -6,8 +6,13 @@ lists). Documents come from ``POST /indexes/{uid}/documents/fetch``
 (Meilisearch 1.2+), which pages by ``offset`` with no total-hits cap, asking
 only for the ``fields`` the query reads. Conditions on the index's
 filterable attributes go to Meilisearch as its ``filter``; it may return
-more than they select (its string equality ignores case, ``!=`` keeps
-documents without the field), never less, and DuckDB filters again.
+more than they select, never less, and DuckDB filters again. Checked on
+Meilisearch 1.13: string equality ignores case (``= "drama"`` also matches
+``Drama``), ``= 5`` also matches the text ``"5"``, ``!=`` keeps documents
+without the field, and JSON string escapes (``\\``, ``\"``, ``\n``) are
+read as JSON reads them. Because equality ignores case, ``!=`` on text would
+drop rows SQL keeps (``!= "drama"`` drops ``Drama``): it is sent for numbers
+and booleans only.
 
 Servers before 1.2 have no ``/documents/fetch``: they are read with
 ``GET /indexes/{uid}/documents`` and no filter.
@@ -23,7 +28,6 @@ import json
 import re
 from collections.abc import Iterator
 from typing import Any
-from urllib.parse import urlsplit
 
 from .arrow import ArrowConnector, ConnectorError, Predicate, ScanRequest
 from .base import SourceContext, TableLocation
@@ -38,20 +42,11 @@ _COMPARISON = {"<", "<=", ">", ">="}
 
 
 class MeilisearchConnector(ArrowConnector):
+    product = "Meilisearch"
+
     def __init__(self, source: SourceContext) -> None:
         super().__init__(source)
         self._session: Any = None
-
-    def label(self) -> str | None:
-        url = str(self.source.section("required").get("url") or "")
-        parts = urlsplit(url)
-        if not parts.hostname:
-            return None
-        port = f":{parts.port}" if parts.port else ""
-        return f"{parts.scheme}://{parts.hostname}{port}/"
-
-    def _where(self) -> str:
-        return f"Meilisearch at {self.label() or self.source.alias}"
 
     def scan(self, location: TableLocation, request: ScanRequest) -> Iterator[Any]:
         (uid,) = self.require(location, "table")
@@ -62,7 +57,8 @@ class MeilisearchConnector(ArrowConnector):
         timeout = float(client._request_timeout())
         fields = list(request.columns) if request.columns is not None else None
         allowed = self._filterable(base, request, timeout)
-        filter_text = meilisearch_filter(request.predicates, allowed)
+        filter_text, sent = meilisearch_filter(request.predicates, allowed)
+        request.sent(sent)
         offset = 0
         fetch = True
         while True:
@@ -88,7 +84,7 @@ class MeilisearchConnector(ArrowConnector):
             data = response.json()
             docs = data.get("results") if isinstance(data, dict) else None
             if not isinstance(docs, list):
-                raise ConnectorError(f"{self._where()} sent documents in an unknown form.")
+                raise ConnectorError(f"{self.where()} sent documents in an unknown form.")
             if docs:
                 yield docs
             offset += len(docs)
@@ -121,16 +117,16 @@ class MeilisearchConnector(ArrowConnector):
                 url, timeout=request.timeout(timeout), **kwargs
             )
         except requests.exceptions.Timeout:
-            raise ConnectorError(f"{self._where()} did not answer in time.") from None
+            raise ConnectorError(f"{self.where()} did not answer in time.") from None
         except requests.exceptions.RequestException:
-            raise ConnectorError(f"{self._where()} is unreachable.") from None
+            raise ConnectorError(f"{self.where()} is unreachable.") from None
         request.stats.requests += 1
         return response
 
     def _check(self, response: Any) -> None:
         if response.status_code >= 400:
             # Never the body: it may echo the filter, documents or the key.
-            raise ConnectorError(f"{self._where()} returned HTTP {response.status_code}.")
+            raise ConnectorError(f"{self.where()} returned HTTP {response.status_code}.")
 
     def close(self) -> None:
         super().close()
@@ -175,9 +171,10 @@ def filterable_operators(settings: Any, names: set[str]) -> dict[str, set[str]]:
 
 def meilisearch_filter(
     predicates: tuple[Predicate, ...], allowed: dict[str, set[str]]
-) -> str | None:
-    """Meilisearch's ``filter`` for the predicates it can apply, AND-ed."""
+) -> tuple[str | None, list[Predicate]]:
+    """Meilisearch's ``filter`` for the predicates it can apply, AND-ed, and those predicates."""
     parts: list[str] = []
+    sent: list[Predicate] = []
     for predicate in predicates:
         name = predicate.column
         if predicate.op not in allowed.get(name, set()) or not _PLAIN_ATTRIBUTE.match(name):
@@ -187,14 +184,19 @@ def meilisearch_filter(
             if None in values or not values:
                 continue
             parts.append(f"{name} IN [{', '.join(v for v in values if v is not None)}]")
+            sent.append(predicate)
             continue
         value = _value(predicate.value)
         if value is None:
             continue
         if predicate.op in _COMPARISON and not _is_number(predicate.value):
             continue
+        if predicate.op == "!=" and isinstance(predicate.value, str):
+            # Case-insensitive equality: != on text would drop rows.
+            continue
         parts.append(f"{name} {predicate.op} {value}")
-    return " AND ".join(parts) or None
+        sent.append(predicate)
+    return " AND ".join(parts) or None, sent
 
 
 def _is_number(value: Any) -> bool:

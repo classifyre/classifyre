@@ -27,8 +27,29 @@ def test_every_declared_source_type_has_a_binding_of_its_tier() -> None:
         assert cls.tier == declaration.tier, source_type
 
 
-def test_the_job_queries_exactly_the_declared_types() -> None:
-    assert bindings.QUERYABLE_SOURCE_TYPES == frozenset(declared_sources())
+def test_the_bindings_read_exactly_the_declared_types() -> None:
+    # Both directions: a binding nobody declared would never be offered, a
+    # declaration without one would be offered and fail.
+    from src.query.connectors import _BINDINGS
+
+    assert set(_BINDINGS) == set(declared_sources())
+    assert bindings.QUERYABLE_SOURCE_TYPES == frozenset(_BINDINGS)
+
+
+def test_every_declared_extension_is_baked_into_the_image() -> None:
+    """``extensions`` says what a type's queries load; a query must not
+    install one (the worker's root filesystem is read-only)."""
+    import re
+    from pathlib import Path
+
+    dockerfile = (Path(__file__).resolve().parents[3] / "Dockerfile").read_text("utf-8")
+    baked = set(re.findall(r"'([a-z_]+)'", " ".join(re.findall(r"INSTALL[^\n]*", dockerfile))))
+    # DuckDB names the nightly ODBC extension odbc_scanner once loaded.
+    if re.search(r"INSTALL odbc FROM core_nightly", dockerfile):
+        baked.add("odbc_scanner")
+    for source_type, declaration in declared_sources().items():
+        missing = set(declaration.extensions) - baked
+        assert not missing, f"{source_type}: bake {sorted(missing)} in the Dockerfile"
 
 
 def test_every_declaration_names_table_shaped_asset_kinds_and_an_address() -> None:

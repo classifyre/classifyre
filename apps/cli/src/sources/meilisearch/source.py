@@ -182,11 +182,10 @@ class MeilisearchSource(BaseSource):
         from ...utils.document_columns import record_columns
 
         try:
-            data = self._get(
-                self._session(),
-                f"/indexes/{index_uid}/documents",
-                limit=self.COLUMN_SAMPLE_SIZE,
-            )
+            with self._session() as session:
+                data = self._get(
+                    session, f"/indexes/{index_uid}/documents", limit=self.COLUMN_SAMPLE_SIZE
+                )
         except Exception as exc:
             logger.debug("Could not sample documents of index %s: %s", index_uid, exc)
             return []

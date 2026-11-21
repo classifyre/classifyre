@@ -75,6 +75,8 @@ class FakeConnector(ArrowConnector):
 
     def scan(self, location: TableLocation, request: ScanRequest) -> Iterator[Any]:
         FakeConnector.requests.append(request)
+        if self.honour_filters:
+            request.sent(request.predicates)
         rows = [r for r in self.rows if not self.honour_filters or _matches(r, request.predicates)]
         for start in range(0, len(rows), self.page_size):
             if self.fail_after is not None and FakeConnector.pages_read >= self.fail_after:
@@ -370,6 +372,12 @@ def _pushed(sql: str) -> tuple[tuple[Predicate, ...], bool]:
             (Predicate("genre", "in", ('a"b', "c\\d", "e'f")),),
             True,
         ),
+        # Printed, this value set reads as four values; it holds three.
+        (
+            "genre IN ('a\",\n  \"b', 'q', 'r')",
+            (Predicate("genre", "in", ('a",\n  "b', "q", "r")),),
+            True,
+        ),
         ("day >= DATE '2020-01-02'", None, True),
         ("id = 3 OR genre = 'x'", (), False),
         ("id = 3 AND (genre = 'x' OR genre = 'y')", (Predicate("id", "=", 3),), False),
@@ -391,3 +399,91 @@ def test_pushed_filters_become_predicates(
 
 def test_no_filter_means_no_predicates() -> None:
     assert predicates_of(None, _schema()) == ((), True)
+
+
+def test_a_value_shaped_like_a_value_set_separator_still_reaches_its_row(folder: Path) -> None:
+    # The reviewer's case (QC review c1): read from the printed filter, the
+    # set became four values and the row holding the first never arrived.
+    FakeConnector.rows = [{"id": 1, "genre": 'a",\n  "b'}, {"id": 2, "genre": "q"}]
+    payload, result = run_query(
+        _request(
+            folder,
+            "SELECT id FROM search.indexes.movies WHERE genre IN ('a\",\n  \"b', 'q', 'r') "
+            "ORDER BY id",
+        )
+    )
+    assert [r["id"] for r in _rows(payload, result)] == [1, 2]
+
+
+def test_a_row_filter_on_a_masked_column_is_not_sent_to_the_source(folder: Path) -> None:
+    # The view filters on the raw value and DuckDB pushes that filter; the
+    # column is masked for the reader, so it stays here (QC review c7). The
+    # mask names the column in another case, as a steward may.
+    payload, result = run_query(
+        _request(
+            folder,
+            "SELECT count(*) AS n FROM search.indexes.movies",
+            movies={
+                "columns": [{"column": "GENRE", "action": "mask", "mask": "redact"}],
+                "knownColumns": [c["name"] for c in COLUMNS],
+                "rows": {"anyOf": [[{"column": "genre", "op": "in", "values": ["Drama"]}]]},
+            },
+        )
+    )
+    assert _rows(payload, result) == [{"n": 100}]
+    assert FakeConnector.requests, "the table was read"
+    assert all(p.column != "genre" for r in FakeConnector.requests for p in r.predicates)
+
+
+def test_a_shared_dataset_s_reads_are_reported_without_its_filters(folder: Path) -> None:
+    # The dataset's input carries its owning group's row filter: the reader
+    # sees what the read cost, under the dataset's name, never those values
+    # (QC review c5, DQ §5.10).
+    request = _request(folder, "SELECT count(*) AS n FROM shared.films.drama")
+    movies = request["tables"][1]
+    request["tables"].append(
+        {
+            "source": "shared",
+            "schema": "films",
+            "table": "drama",
+            "dataset": {
+                "sql": "SELECT id, genre FROM search.indexes.movies WHERE year >= 2010",
+                "inputs": [
+                    {
+                        **movies,
+                        "rows": {"anyOf": [[{"column": "genre", "op": "in", "values": ["Drama"]}]]},
+                    }
+                ],
+            },
+        }
+    )
+    payload, result = run_query(request)
+    assert _rows(payload, result) == [
+        {"n": sum(1 for m in MOVIES if m["genre"] == "Drama" and m["year"] >= 2010)}
+    ]
+    assert [s["table"] for s in payload["scans"]] == ["shared.films.drama"]
+    assert payload["scans"][0]["pushed"] == []
+    assert payload["scans"][0]["requests"] > 0
+
+
+def test_only_conditions_the_connector_sent_are_reported(folder: Path) -> None:
+    FakeConnector.honour_filters = False
+    payload, _ = run_query(
+        _request(folder, "SELECT count(*) FROM search.indexes.movies WHERE year >= 2020")
+    )
+    assert payload["status"] == "success", payload
+    assert payload["scans"][0]["pushed"] == []
+
+
+def test_the_row_limit_holds_per_scan(folder: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Two scans of 300 rows each under a limit of 350: each is within it.
+    monkeypatch.setenv("CLASSIFYRE_QUERY_CONNECTOR_MAX_ROWS", "350")
+    payload, _ = run_query(
+        _request(
+            folder,
+            "SELECT count(*) FROM search.indexes.movies a "
+            "JOIN search.indexes.movies b ON a.id = b.id",
+        )
+    )
+    assert payload["status"] == "success", payload
+    assert payload["scans"][0]["rows"] == 600

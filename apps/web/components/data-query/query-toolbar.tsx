@@ -11,6 +11,11 @@ import {
 } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { Badge } from "@workspace/ui/components/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@workspace/ui/components/tooltip";
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
 import type { QueryRun } from "@/lib/data-query";
@@ -140,32 +145,35 @@ export function QueryToolbar({
           </span>
         )}
         {live && !busy && (
-          <span
-            className="tabular-nums"
-            data-testid="query-live-scans"
-            title={live.details
-              .map((d) =>
-                d.pushed
-                  ? t("dataQuery.liveScans.tableFiltered", {
-                      table: d.table,
-                      requests: d.requests,
-                      rows: d.rows,
-                      filters: d.pushed,
-                    })
-                  : t("dataQuery.liveScans.table", {
-                      table: d.table,
-                      requests: d.requests,
-                      rows: d.rows,
-                    }),
-              )
-              .join("\n")}
-          >
-            {t("dataQuery.liveScans.summary", {
-              tables: live.tables,
-              requests: live.requests,
-              rows: live.rows,
-            })}
-          </span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="tabular-nums" data-testid="query-live-scans">
+                {t("dataQuery.liveScans.summary", {
+                  tables: live.tables,
+                  requests: live.requests,
+                  rows: live.rows,
+                })}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-md space-y-1">
+              {live.details.map((d) => (
+                <p key={d.table}>
+                  {d.pushed
+                    ? t("dataQuery.liveScans.tableFiltered", {
+                        table: d.table,
+                        requests: d.requests,
+                        rows: d.rows,
+                        filters: d.pushed,
+                      })
+                    : t("dataQuery.liveScans.table", {
+                        table: d.table,
+                        requests: d.requests,
+                        rows: d.rows,
+                      })}
+                </p>
+              ))}
+            </TooltipContent>
+          </Tooltip>
         )}
         {timings?.totalMs !== undefined && !busy && (
           <span className="hidden tabular-nums xl:inline">

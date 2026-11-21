@@ -17,7 +17,7 @@ DuckDB's names:
 from __future__ import annotations
 
 import datetime
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
 from typing import Any
 
 from .file_metadata import build_columns
@@ -75,10 +75,7 @@ def _merge(types: Iterable[str | None]) -> str | None:
     return "JSON"
 
 
-def record_columns(
-    records: Iterable[dict[str, Any]],
-    typed: Callable[[Any], str | None] = value_type,
-) -> list[dict[str, str]]:
+def record_columns(records: Iterable[dict[str, Any]]) -> list[dict[str, str]]:
     """``[{name, type}]`` over the records' top-level fields."""
     order: list[str] = []
     types: dict[str, list[str | None]] = {}
@@ -87,6 +84,6 @@ def record_columns(
             if name not in types:
                 order.append(name)
                 types[name] = []
-            types[name].append(typed(value))
+            types[name].append(value_type(value))
     merged = {name: _merge(types[name]) or "VARCHAR" for name in order}
     return build_columns(order, merged)
