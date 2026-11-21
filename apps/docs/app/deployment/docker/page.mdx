@@ -248,6 +248,7 @@ startup. Override only with reason.
 | `AUTO_SCHEDULE_MAX_CONCURRENT` | Automatic scans in flight before the adaptive scheduler holds back. |
 | `MAX_RUNNERS_PER_SOURCE` | Finished runs kept per source. |
 | `CLASSIFYRE_MAX_POOL_WORKERS` | Detector worker processes per scan. |
+| `QUERY_WORKER_ENABLED`, `QUERY_WORKER_SLOTS` | The warm SQL query worker (on by default) and how many queries it runs at once; `CLASSIFYRE_QUERY_MEMORY_LIMIT` is DuckDB's memory per query. |
 | `CLASSIFYRE_MIN_MEMORY_MB` | The 4 GB startup floor. |
 
 The three scan limits can also be set per workspace in **Settings → General →

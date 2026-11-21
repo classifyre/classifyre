@@ -1,4 +1,5 @@
 import { DeploymentSettingsService } from '../deployment-settings/deployment-settings.service';
+import { QueryWorkerClient } from './query-worker.client';
 import { enqueueSemanticAfterRun } from '../semantic/semantic-jobs.scheduler';
 import {
   Injectable,
@@ -269,6 +270,8 @@ export class CliRunnerService {
     private pause?: NamespacePauseService,
     @Optional()
     private deploymentSettings?: DeploymentSettingsService,
+    @Optional()
+    private queryWorker?: QueryWorkerClient,
   ) {}
 
   /** Current namespace UUID from CLS, if running within a namespace context. */
@@ -2565,6 +2568,12 @@ export class CliRunnerService {
       namespace: string;
     }) => void | Promise<void>;
   }): Promise<{ output: string; exitCode: number }> {
+    // The warm query worker first; a Job (or local process) when it does not
+    // take the query (all slots busy, draining, unreachable).
+    if (this.queryWorker?.enabled) {
+      const result = await this.queryWorker.run(params);
+      if (result) return result;
+    }
     const environment = process.env.ENVIRONMENT || 'development';
     if (this.isKubernetesExecutionEnabled(environment)) {
       if (!this.kubernetesCliJobService) {
@@ -2603,8 +2612,9 @@ export class CliRunnerService {
     }
   }
 
-  /** Stop a running query: delete its Job, or end its local process. */
+  /** Stop a running query: drop its worker request, delete its Job, or end its local process. */
   async cancelQueryExecution(runId: string): Promise<void> {
+    this.queryWorker?.cancel(runId);
     if (this.kubernetesCliJobService) {
       await this.kubernetesCliJobService
         .cancelQueryJob(runId)

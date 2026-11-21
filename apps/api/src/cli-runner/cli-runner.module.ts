@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../prisma.service';
 import { NotificationsService } from '../notifications.service';
 import { KubernetesCliJobService } from './kubernetes-cli-job.service';
+import { QueryWorkerClient } from './query-worker.client';
 import { MaskedConfigCryptoService } from '../masked-config-crypto.service';
 import { RunnerLogStorageService } from './runner-log-storage.service';
 import { CustomDetectorsService } from '../custom-detectors.service';
@@ -29,6 +30,7 @@ import { CohortController } from '../cohort/cohort.controller';
     PrismaService,
     NotificationsService,
     KubernetesCliJobService,
+    QueryWorkerClient,
     MaskedConfigCryptoService,
     CustomDetectorsService,
     AiProviderConfigService,

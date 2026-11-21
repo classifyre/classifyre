@@ -259,6 +259,27 @@ if [ -z "${CLASSIFYRE_INTERNAL_KEY:-}" ]; then
   export CLASSIFYRE_INTERNAL_KEY="$(head -c 32 /dev/urandom | base64 | tr -d '\n')"
 fi
 
+# ── SQL query worker ──────────────────────────────────────────────────────────
+# SQL queries (the SQL page, exports, MCP, SQL connections) run in a warm worker
+# process (apps/cli/src/query/worker.py, s6 service `query-worker`) that forks
+# one process per query, instead of starting Python for every query. The API
+# finds it at QUERY_WORKER_URL and runs a query itself only when the worker has
+# no free slot. QUERY_WORKER_ENABLED=false goes back to a process per query.
+# DuckDB's budget per query is set here, from the container: the worker would
+# otherwise size itself as if it had the container to itself.
+default QUERY_WORKER_ENABLED "true"
+if [ "${QUERY_WORKER_ENABLED}" = "true" ]; then
+  default QUERY_WORKER_PORT  "8090"
+  default QUERY_WORKER_URL   "http://127.0.0.1:${QUERY_WORKER_PORT}"
+  default QUERY_WORKER_SLOTS "$(( CPUS > 3 ? 4 : 2 ))"
+  default CLASSIFYRE_QUERY_MEMORY_LIMIT "$(( TOTAL_MB / 4 / QUERY_WORKER_SLOTS ))MB"
+  default CLASSIFYRE_QUERY_THREADS "$(( CPUS / QUERY_WORKER_SLOTS > 0 ? CPUS / QUERY_WORKER_SLOTS : 1 ))"
+  # The API and the worker share it; a new one at every start is fine.
+  [ -n "${QUERY_WORKER_TOKEN:-}" ] || export QUERY_WORKER_TOKEN="$(head -c 32 /dev/urandom | base64 | tr -d '\n')"
+else
+  unset QUERY_WORKER_URL QUERY_WORKER_TOKEN
+fi
+
 # ── Sign-in ───────────────────────────────────────────────────────────────────
 # Sign-in is always on, here too: the identity server runs beside the API, and
 # its realm is set up on every start (s6 service iam-setup). The address
@@ -372,6 +393,7 @@ log "memory=${TOTAL_MB}MB cpus=${CPUS} shm=${SHM_MB}MB"
 log "node heap=${EFFECTIVE_HEAP_MB}MB rss guard=${guard_mb}MB"
 log "postgres shared_buffers=${PG_SHARED_BUFFERS} work_mem=${PG_WORK_MEM} effective_cache_size=${PG_EFFECTIVE_CACHE_SIZE}"
 log "scans: ${MAX_CONCURRENT_RUNNERS} concurrent, ${CLASSIFYRE_MAX_POOL_WORKERS} worker(s) each"
+[ "${QUERY_WORKER_ENABLED}" = "true" ] && log "sql queries: ${QUERY_WORKER_SLOTS} at once on the query worker, DuckDB ${CLASSIFYRE_QUERY_MEMORY_LIMIT} / ${CLASSIFYRE_QUERY_THREADS} thread(s) each"
 log "listening on :${PORT_HTTP}, for ${CLASSIFYRE_URL}"
 
 exec /init "$@"

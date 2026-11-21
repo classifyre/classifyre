@@ -153,4 +153,34 @@ spec:
     - ports:
         - protocol: TCP
           port: 443
+{{- if include "classifyre.queryWorker.enabled" . }}
+---
+# Query worker NetworkPolicy
+# Ingress: only the API roles that send it queries (api, worker, sql-gateway).
+# Egress is not limited: a query reads the sources wherever they are, as a
+# query Job does (and posts its result back to the API).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "classifyre.queryWorker.fullname" . }}
+  labels:
+    {{- include "classifyre.commonLabels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "classifyre.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: query-worker
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/component
+                operator: In
+                values: [api, worker, sql-gateway]
+      ports:
+        - protocol: TCP
+          port: {{ .Values.queryWorker.port }}
+{{- end }}
 {{- end }}

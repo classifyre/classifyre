@@ -688,6 +688,88 @@ api:
         # -- TTL for completed prune jobs (seconds).
         ttlSecondsAfterFinished: 3600
 
+queryWorker:
+  # -- Run SQL queries (the SQL page, exports, MCP, SQL connections) on a warm
+  # -- pool instead of starting a Job per query (docs/prd/DQ-data-query.md
+  # -- §5.3). It is the CLI image (`api.cliJobs.image`) running `query-worker`:
+  # -- one process per query, forked from a process that has already imported
+  # -- DuckDB and every source, so a query starts in milliseconds instead of
+  # -- waiting for a pod. Needs `api.cliJobs.enabled`.
+  enabled: true
+  # -- Worker pods when `queryWorker.autoscaling` is off. The Service spreads
+  # -- queries across them; each pod drains its running queries on a rollout
+  # -- or scale-down.
+  replicaCount: 1
+  # -- Port of the worker's HTTP endpoint (cluster-internal).
+  port: 8090
+  # -- Queries one pod runs at once. 0: as many as its memory limit holds at
+  # -- `memoryPerQuery` each (up to 256), so a bigger pod runs more (vertical
+  # -- scaling): 32Gi at 256Mi is about 125 at once. DuckDB gets an equal share
+  # -- of the pod's memory (70 % after a fixed reserve) and its cores.
+  slots: 0
+  # -- Memory planned per running query when `slots` is 0: Python and Arrow in
+  # -- the query process plus DuckDB's share. Larger sorts and joins spill to /tmp.
+  memoryPerQuery: 384Mi
+  # -- When every slot of the pod the query reached is taken: `job` runs the
+  # -- query as a Job (the query-Job settings in `api.cliJobs.query`), `refuse`
+  # -- fails it at once with "busy".
+  overflow: job
+  # -- Queries one person may have waiting or running at once (the SQL page,
+  # -- exports, MCP and SQL connections together: a BI tool's pool counts). A
+  # -- guard against a runaway client, not a capacity limit: slots, replicas
+  # -- and overflow Jobs are. Applies with the worker off too.
+  maxActivePerPerson: 100
+  autoscaling:
+    # -- Scale worker pods on CPU (horizontal scaling; metrics-server needed).
+    # -- New pods get new queries at once: each query is its own request.
+    enabled: true
+    # -- Fewest worker pods.
+    minReplicas: 1
+    # -- Most worker pods.
+    maxReplicas: 5
+    # -- Target average CPU utilization, of the pod's CPU request.
+    targetCPUUtilizationPercentage: 70
+    # -- Extra HPA metrics, e.g. a Pods metric on `classifyre_query_worker_active`
+    # -- (from /metrics) through a Prometheus adapter.
+    extraMetrics: []
+    # -- Seconds of lower load before scaling down (drains running queries).
+    scaleDownStabilizationSeconds: 300
+  # -- Seconds a stopping pod lets running queries finish before it stops them.
+  drainSeconds: 60
+  # -- Size limit of the pod's /tmp, where queries spill large sorts and joins.
+  tmpSizeLimit: 12Gi
+  # -- Requests and limits of one worker pod. Memory: about 400 MiB for the
+  # -- warmed fork server plus what `slots` queries use at once.
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+    limits:
+      cpu: "2"
+      memory: 4Gi
+  token:
+    # -- Existing Secret with the token the API signs worker requests with;
+    # -- empty: the chart creates one and keeps it across upgrades.
+    existingSecret: ""
+    # -- Key of the token in that Secret.
+    existingKey: token
+    # -- Token value when the chart creates the Secret; empty: generated.
+    value: ""
+  # -- Priority class of worker pods (a service, like the API).
+  priorityClassName: service-standard
+  # -- Extra environment for the worker (after `api.cliJobs.extraEnv`).
+  extraEnv: []
+  # -- Extra pod labels.
+  podLabels: {}
+  # -- Extra pod annotations.
+  podAnnotations: {}
+  # -- Node selector; empty: `api.cliJobs.nodeSelector`.
+  nodeSelector: {}
+  # -- Tolerations; empty: `api.cliJobs.tolerations`.
+  tolerations: []
+  # -- Affinity rules.
+  affinity: {}
+
 sqlGateway:
   # -- SQL connections (docs/prd/DQ-data-query.md §5.7): a PostgreSQL endpoint
   # -- for BI tools and drivers (psql, DBeaver, Power BI, Excel, Tableau, JDBC,

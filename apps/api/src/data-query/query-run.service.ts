@@ -72,11 +72,35 @@ export const EXPORT_MEDIA_TYPES: Record<ExportFormat, string> = {
   csv: 'text/csv; charset=utf-8',
   parquet: 'application/vnd.apache.parquet',
 };
-/** Queries one person may have waiting or running at once. */
-const MAX_ACTIVE_PER_ACTOR = 3;
+/**
+ * Queries one person may have waiting or running at once, whichever way they
+ * came (app, MCP, SQL connections). A guard against one runaway client, not a
+ * capacity limit: the query worker's slots and the Jobs it overflows to are
+ * that. `QUERY_MAX_ACTIVE_PER_PERSON` (Helm `queryWorker.maxActivePerPerson`).
+ */
+export const DEFAULT_MAX_ACTIVE_PER_PERSON = 100;
+
+export function maxActivePerPerson(
+  env: NodeJS.ProcessEnv = process.env,
+): number {
+  const value = Number.parseInt(env.QUERY_MAX_ACTIVE_PER_PERSON ?? '', 10);
+  return Number.isFinite(value) && value > 0
+    ? value
+    : DEFAULT_MAX_ACTIVE_PER_PERSON;
+}
+
+const MAX_ACTIVE_PER_ACTOR = maxActivePerPerson();
 /** System queries (quality rules) running at once per workspace. */
 const MAX_ACTIVE_SYSTEM = 2;
 const RESULT_TTL_MS = 24 * 60 * 60 * 1000;
+/**
+ * A run still waiting or running this long after it was created was lost: no
+ * query lives past the longest timeout a workspace may set (900 s) plus what a
+ * Job or the query worker adds to start and deliver it. It happens when the
+ * API restarts mid-run (nothing is left to settle it); such a run would
+ * otherwise count against its person's cap for good.
+ */
+const LOST_AFTER_MS = 20 * 60 * 1000;
 const RESULT_MARKER = '__CLASSIFYRE_QUERY_RESULT__';
 
 const TERMINAL: QueryRunStatus[] = [
@@ -628,7 +652,34 @@ export class QueryRunService {
     return maskSalt(resolveApplicationSecretKey(), workspaceId);
   }
 
+  /** Settle runs nothing will settle any more (see {@link LOST_AFTER_MS}). */
+  private async expireLostRuns(): Promise<void> {
+    await this.prisma.queryRun
+      .updateMany({
+        where: {
+          status: { in: [QueryRunStatus.PENDING, QueryRunStatus.RUNNING] },
+          createdAt: { lt: new Date(Date.now() - LOST_AFTER_MS) },
+        },
+        data: {
+          status: QueryRunStatus.ERROR,
+          error: {
+            code: 'lost',
+            message:
+              'The query never finished: the service running it restarted. Run it again.',
+          },
+          finishedAt: new Date(),
+          callbackTokenHash: null,
+        },
+      })
+      .catch((error: unknown) =>
+        this.logger.warn(
+          `Could not settle lost query runs: ${error instanceof Error ? error.message : String(error)}`,
+        ),
+      );
+  }
+
   private async activeRuns(origin: RunOrigin): Promise<number> {
+    await this.expireLostRuns();
     return this.prisma.queryRun.count({
       where: {
         ...(origin.personRef
@@ -860,6 +911,7 @@ export class QueryRunService {
     }
     const source = cached.sources.find((s) => s.id === table.sourceId);
     if (!source) return { refused: 'The table has no source.' };
+    await this.expireLostRuns();
     const active = await this.prisma.queryRun.count({
       where: {
         purpose: input.purpose,

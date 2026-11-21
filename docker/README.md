@@ -223,6 +223,7 @@ accordingly. Override any of these only if you have a reason to.
 | `PG_SHARED_BUFFERS`, `PG_WORK_MEM`, `PG_EFFECTIVE_CACHE_SIZE`, `PG_MAX_CONNECTIONS` | PostgreSQL memory. |
 | `MAX_CONCURRENT_RUNNERS` | Scans running at once. |
 | `CLASSIFYRE_MAX_POOL_WORKERS` | Detector worker processes per scan. |
+| `QUERY_WORKER_ENABLED`, `QUERY_WORKER_SLOTS` | The warm SQL query worker (on by default) and how many queries it runs at once; `CLASSIFYRE_QUERY_MEMORY_LIMIT` is DuckDB's memory per query. |
 | `CLASSIFYRE_MIN_MEMORY_MB` | The 4 GB startup floor. Lower it at your own risk. |
 
 The startup log prints exactly what it chose:
@@ -232,6 +233,7 @@ The startup log prints exactly what it chose:
 [classifyre] node heap=2048MB rss guard=5031MB
 [classifyre] postgres shared_buffers=512MB work_mem=16MB effective_cache_size=4096MB
 [classifyre] scans: 1 concurrent, 4 worker(s) each
+[classifyre] sql queries: 4 at once on the query worker, DuckDB 512MB / 1 thread(s) each
 ```
 
 ---

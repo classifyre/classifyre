@@ -50,6 +50,23 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- printf "%s-sql-gateway" (include "classifyre.fullname" .) | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
+{{- define "classifyre.queryWorker.fullname" -}}
+{{- printf "%s-query-worker" (include "classifyre.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{- /* The query worker runs where query Jobs would: it needs the CLI image. */ -}}
+{{- define "classifyre.queryWorker.enabled" -}}
+{{- if and .Values.queryWorker.enabled .Values.api.cliJobs.enabled -}}true{{- end -}}
+{{- end -}}
+
+{{- define "classifyre.queryWorker.tokenSecretName" -}}
+{{- .Values.queryWorker.token.existingSecret | default (printf "%s-query-worker-token" (include "classifyre.fullname" .)) -}}
+{{- end -}}
+
+{{- define "classifyre.queryWorker.tokenSecretKey" -}}
+{{- .Values.queryWorker.token.existingKey | default "token" -}}
+{{- end -}}
+
 {{- /* The Secret with the SQL gateway's certificate (tls.crt, tls.key, ca.crt). */ -}}
 {{- define "classifyre.sqlGateway.tlsSecret" -}}
 {{- .Values.sqlGateway.tls.existingSecret | default (printf "%s-sql-tls" (include "classifyre.fullname" .)) -}}
@@ -537,6 +554,21 @@ which each deployment sets on its own after including this block.
   value: {{ .Values.api.cliJobs.cleanupPolicy | quote }}
 - name: K8S_CLI_JOB_WORKDIR
   value: {{ .Values.api.cliJobs.workDir | quote }}
+- name: QUERY_MAX_ACTIVE_PER_PERSON
+  value: {{ .Values.queryWorker.maxActivePerPerson | quote }}
+{{- if include "classifyre.queryWorker.enabled" . }}
+{{- /* SQL queries go to the warm query worker first (both the API and the SQL
+     gateway run them); a Job runs what it cannot take. */}}
+- name: QUERY_WORKER_URL
+  value: {{ printf "http://%s:%v" (include "classifyre.queryWorker.fullname" .) .Values.queryWorker.port | quote }}
+- name: QUERY_WORKER_TOKEN
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "classifyre.queryWorker.tokenSecretName" . }}
+      key: {{ include "classifyre.queryWorker.tokenSecretKey" . }}
+- name: QUERY_WORKER_OVERFLOW
+  value: {{ .Values.queryWorker.overflow | quote }}
+{{- end }}
 {{- with .Values.api.cliJobs.query }}
 - name: K8S_CLI_QUERY_JOB_MEMORY
   value: {{ .memory | quote }}

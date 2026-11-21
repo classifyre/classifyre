@@ -67,7 +67,16 @@ def _post(url: str, token: str | None, body: bytes, headers: dict[str, str]) -> 
     logger.error("Could not deliver the query result: %s", last)
 
 
-def _report(request: QueryRequest | None, payload: dict[str, Any], arrow: bytes | None) -> None:
+def _report(
+    request: QueryRequest | None,
+    payload: dict[str, Any],
+    arrow: bytes | None,
+    *,
+    echo: bool = True,
+) -> None:
+    """Post the result to the API; with ``echo``, print the status line too
+    (a Job's log is how the API learns what happened when the callback did
+    not arrive; the query worker answers with the payload instead)."""
     if request is not None and request.callback_url:
         if arrow is not None:
             meta = base64.b64encode(json.dumps(payload).encode("utf-8")).decode("ascii")
@@ -89,7 +98,8 @@ def _report(request: QueryRequest | None, payload: dict[str, Any], arrow: bytes 
                 json.dumps(payload).encode("utf-8"),
                 {"Content-Type": "application/json"},
             )
-    print(f"{RESULT_MARKER} {json.dumps(payload)}", flush=True)
+    if echo:
+        print(f"{RESULT_MARKER} {json.dumps(payload)}", flush=True)
 
 
 def ensure_dependencies() -> None:

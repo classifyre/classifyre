@@ -492,6 +492,23 @@ api:
 # (psql "host=localhost port=15432 dbname=<workspace> user=<connection>
 # sslmode=verify-full sslrootcert=<CA from the app>"). The chart makes a CA and
 # a certificate for localhost and the Service names.
+# SQL queries on the warm query worker (docs/prd/DQ-data-query.md §5.3). It
+# runs the same classifyre/cli:dev-local image and mounts the same development
+# source as CLI jobs (api.cliJobs.extraVolumes), so a CLI change reaches it on
+# its next restart (kubectl rollout restart deploy/classifyre-query-worker).
+queryWorker:
+  enabled: true
+  slots: 0
+  priorityClassName: ""
+  tmpSizeLimit: 4Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      cpu: "2"
+      memory: 3Gi
+
 sqlGateway:
   enabled: true
   publicHost: localhost

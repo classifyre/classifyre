@@ -442,6 +442,7 @@ helm upgrade --install classifyre ./helm/classifyre \
 | iam.database.name | string | `"iam"` | Database name (shared mode). |
 | iam.database.poolMaxSize | int | `20` | Most connections the identity server opens (KC_DB_POOL_MAX_SIZE). Counts against PostgreSQL's `max_connections` next to the API's pools. |
 | iam.database.username | string | `"iam"` | Database role (shared mode). |
+| iam.dynamicHostname | bool | `false` | Development only: derive the identity server's public host from each request instead of `appUrl`, so the app can be opened by LAN IP. Tokens then carry whatever host the browser used; never enable in production. |
 | iam.exposeAdminConsole | bool | `false` | Expose the identity server's own admin console and master realm: the web proxy forwards only the `classifyre` realm and static files unless this is on, which also forwards `/iam/admin` and `/iam/realms/master`. |
 | iam.extraEnv | list | `[]` | Extra environment variables for the identity server (`KC_*` options). |
 | iam.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy. |
@@ -536,6 +537,32 @@ helm upgrade --install classifyre ./helm/classifyre \
 | priorityClasses.interactiveValue | int | `5000` | Numeric priority value for interactive CLI Jobs. |
 | priorityClasses.serviceName | string | `"service-standard"` | Priority class name for service workloads. |
 | priorityClasses.serviceValue | int | `10000` | Numeric priority value for service workloads. |
+| queryWorker.affinity | object | `{}` | Affinity rules. |
+| queryWorker.autoscaling.enabled | bool | `true` | New pods get new queries at once: each query is its own request. |
+| queryWorker.autoscaling.extraMetrics | from /metrics | `[]` | through a Prometheus adapter. |
+| queryWorker.autoscaling.maxReplicas | int | `5` | Most worker pods. |
+| queryWorker.autoscaling.minReplicas | int | `1` | Fewest worker pods. |
+| queryWorker.autoscaling.scaleDownStabilizationSeconds | int | `300` | Seconds of lower load before scaling down (drains running queries). |
+| queryWorker.autoscaling.targetCPUUtilizationPercentage | int | `70` | Target average CPU utilization, of the pod's CPU request. |
+| queryWorker.drainSeconds | int | `60` | Seconds a stopping pod lets running queries finish before it stops them. |
+| queryWorker.enabled | bool | `true` | waiting for a pod. Needs `api.cliJobs.enabled`. |
+| queryWorker.extraEnv | list | `[]` | Extra environment for the worker (after `api.cliJobs.extraEnv`). |
+| queryWorker.maxActivePerPerson | int | `100` | and overflow Jobs are. Applies with the worker off too. |
+| queryWorker.memoryPerQuery | string | `"384Mi"` | the query process plus DuckDB's share. Larger sorts and joins spill to /tmp. |
+| queryWorker.nodeSelector | object | `{}` | Node selector; empty: `api.cliJobs.nodeSelector`. |
+| queryWorker.overflow | string | `"job"` | fails it at once with "busy". |
+| queryWorker.podAnnotations | object | `{}` | Extra pod annotations. |
+| queryWorker.podLabels | object | `{}` | Extra pod labels. |
+| queryWorker.port | int | `8090` | Port of the worker's HTTP endpoint (cluster-internal). |
+| queryWorker.priorityClassName | string | `"service-standard"` | Priority class of worker pods (a service, like the API). |
+| queryWorker.replicaCount | int | `1` | or scale-down. |
+| queryWorker.resources | object | `{"limits":{"cpu":"2","memory":"4Gi"},"requests":{"cpu":"500m","memory":"2Gi"}}` | warmed fork server plus what `slots` queries use at once. |
+| queryWorker.slots | int | `0` | of the pod's memory (70 % after a fixed reserve) and its cores. |
+| queryWorker.tmpSizeLimit | string | `"12Gi"` | Size limit of the pod's /tmp, where queries spill large sorts and joins. |
+| queryWorker.token.existingKey | string | `"token"` | Key of the token in that Secret. |
+| queryWorker.token.existingSecret | string | `""` | empty: the chart creates one and keeps it across upgrades. |
+| queryWorker.token.value | string | `""` | Token value when the chart creates the Secret; empty: generated. |
+| queryWorker.tolerations | list | `[]` | Tolerations; empty: `api.cliJobs.tolerations`. |
 | rbac.create | bool | `true` | Create Role/RoleBinding for API CLI job orchestration. |
 | serviceAccount.annotations | object | `{}` | Extra annotations for the API service account. |
 | serviceAccount.automount | bool | `true` | Mount service account token into API pods (required for Kubernetes CLI jobs). |

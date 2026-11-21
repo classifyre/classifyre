@@ -1,0 +1,263 @@
+{{- if include "classifyre.queryWorker.enabled" . }}
+{{- /*
+Query worker (docs/prd/DQ-data-query.md §5.3): the CLI image running
+`query-worker`, a warm host that forks one process per SQL query, so a query
+does not wait for a Job's pod to start. The API (and the SQL gateway) send it
+the request they would put in a query Job; a query it cannot take (every slot
+busy, draining) runs as a Job.
+
+It holds what a query Job holds and nothing more: no service-account token, no
+API key; each query process sees only its own request's credentials.
+*/ -}}
+{{- $cli := .Values.api.cliJobs -}}
+{{- $qw := .Values.queryWorker -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "classifyre.queryWorker.fullname" . }}
+  labels:
+    {{- include "classifyre.commonLabels" . | nindent 4 }}
+    app.kubernetes.io/component: query-worker
+  {{- with .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if not $qw.autoscaling.enabled }}
+  replicas: {{ $qw.replicaCount }}
+  {{- end }}
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      # A new pod warms up before an old one drains: no moment without a worker.
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      {{- include "classifyre.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: query-worker
+  template:
+    metadata:
+      labels:
+        {{- include "classifyre.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: query-worker
+        {{- with $qw.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with $qw.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      {{- with (include "classifyre.priorityClassName" (dict "name" $qw.priorityClassName "root" .)) }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+      # preStop (endpoint removal) + drain + margin.
+      terminationGracePeriodSeconds: {{ add (int $qw.drainSeconds) 20 }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $cli.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: query-worker
+          image: "{{ $cli.image.repository }}:{{ $cli.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ $cli.image.pullPolicy }}
+          # The image's entrypoint is `python -m src.main`.
+          args: ["query-worker"]
+          workingDir: {{ $cli.workDir | quote }}
+          ports:
+            - name: http
+              containerPort: {{ $qw.port }}
+              protocol: TCP
+          env:
+            - name: CLASSIFYRE_QUERY_WORKER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "classifyre.queryWorker.tokenSecretName" . }}
+                  key: {{ include "classifyre.queryWorker.tokenSecretKey" . }}
+            - name: CLASSIFYRE_QUERY_WORKER_PORT
+              value: {{ $qw.port | quote }}
+            - name: CLASSIFYRE_QUERY_WORKER_SLOTS
+              value: {{ $qw.slots | quote }}
+            {{- with (include "classifyre.memQuantityMb" $qw.memoryPerQuery) }}
+            - name: CLASSIFYRE_QUERY_WORKER_MEMORY_PER_QUERY_MB
+              value: {{ . | quote }}
+            {{- end }}
+            - name: CLASSIFYRE_QUERY_WORKER_DRAIN_SECONDS
+              value: {{ $qw.drainSeconds | quote }}
+            - name: CLASSIFYRE_QUERY_WORKER_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            {{- with $cli.query.maxSpill }}
+            - name: CLASSIFYRE_QUERY_MAX_SPILL
+              value: {{ . | quote }}
+            {{- end }}
+            - name: CLASSIFYRE_CLI_AUTO_INSTALL_OPTIONAL_DEPS
+              value: {{ ternary "1" "0" $cli.autoInstallOptionalDeps | quote }}
+            - name: HOME
+              value: /tmp
+            - name: UV_CACHE_DIR
+              value: /tmp/uv-cache
+            - name: TELEMETRY_DISABLED
+              value: "1"
+            {{- /* The worker passes queries only an allowlisted environment;
+                 what an operator adds below is kept on purpose. */}}
+            {{- $extra := list }}
+            {{- range (concat ($cli.extraEnv | default list) ($qw.extraEnv | default list)) }}
+            {{- $extra = append $extra .name }}
+            {{- end }}
+            {{- if $extra }}
+            - name: CLASSIFYRE_QUERY_WORKER_ENV_ALLOW
+              value: {{ join "," $extra | quote }}
+            {{- end }}
+            {{- with $cli.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+            {{- with $qw.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          volumeMounts:
+            # Spill space and the temporary files queries write (CA bundles).
+            - name: tmp
+              mountPath: /tmp
+            {{- with $cli.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+            {{- range .Values.api.localFolders }}
+            - name: local-folder-{{ .name }}
+              mountPath: {{ .mountPath | quote }}
+              readOnly: {{ ne .readOnly false }}
+            {{- end }}
+          {{- with $qw.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          startupProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 2
+            # The fork server imports DuckDB and every source once: seconds.
+            failureThreshold: 90
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 5
+            failureThreshold: 1
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          lifecycle:
+            preStop:
+              # Let the Service drop this pod before it stops taking queries.
+              exec:
+                command: ["sleep", "5"]
+          {{- with $cli.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir:
+            {{- with $qw.tmpSizeLimit }}
+            sizeLimit: {{ . }}
+            {{- end }}
+        {{- with $cli.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- range .Values.api.localFolders }}
+        - {{ merge (dict "name" (printf "local-folder-%s" .name)) (omit . "name" "mountPath" "readOnly") | toJson }}
+        {{- end }}
+      {{- with ($qw.nodeSelector | default $cli.nodeSelector) }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with ($qw.tolerations | default $cli.tolerations) }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $qw.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "classifyre.queryWorker.fullname" . }}
+  labels:
+    {{- include "classifyre.commonLabels" . | nindent 4 }}
+    app.kubernetes.io/component: query-worker
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "classifyre.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: query-worker
+  ports:
+    - name: http
+      port: {{ $qw.port }}
+      targetPort: http
+      protocol: TCP
+{{- if or (gt (int $qw.replicaCount) 1) (and $qw.autoscaling.enabled (gt (int $qw.autoscaling.minReplicas) 1)) }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "classifyre.queryWorker.fullname" . }}
+  labels:
+    {{- include "classifyre.commonLabels" . | nindent 4 }}
+    app.kubernetes.io/component: query-worker
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      {{- include "classifyre.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: query-worker
+{{- end }}
+{{- if $qw.autoscaling.enabled }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "classifyre.queryWorker.fullname" . }}
+  labels:
+    {{- include "classifyre.commonLabels" . | nindent 4 }}
+    app.kubernetes.io/component: query-worker
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "classifyre.queryWorker.fullname" . }}
+  minReplicas: {{ $qw.autoscaling.minReplicas }}
+  maxReplicas: {{ $qw.autoscaling.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ $qw.autoscaling.targetCPUUtilizationPercentage }}
+    {{- with $qw.autoscaling.extraMetrics }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0
+    scaleDown:
+      # A pod leaving drains its queries; do not shed pods on a short lull.
+      stabilizationWindowSeconds: {{ $qw.autoscaling.scaleDownStabilizationSeconds }}
+{{- end }}
+{{- end }}

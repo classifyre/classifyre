@@ -76,15 +76,17 @@ def extension_directory() -> str | None:
     return None
 
 
-def connect(duckdb_module: Any | None = None) -> Any:
+def connect(duckdb_module: Any | None = None, config: dict[str, Any] | None = None) -> Any:
     """A fresh in-memory DuckDB connection with the extension settings applied.
 
     Fresh rather than shared: an ``ATTACH`` is visible to every cursor of a
     database, and a payload's temporary file should not outlive its read.
-    Opening one costs about a millisecond.
+    Opening one costs about a millisecond. ``config`` is applied when the
+    database is created (``threads`` there means no thread pool is started at
+    all, where ``SET threads`` later leaves the started threads running).
     """
     duckdb = duckdb_module or require_duckdb()
-    conn = duckdb.connect()
+    conn = duckdb.connect(config=config or {})
     directory = extension_directory()
     if directory:
         try:
@@ -159,11 +161,10 @@ def load_extension(conn: Any, name: str) -> None:
     """
     for dependency in _DEPENDENCIES.get(name, ()):
         load_extension(conn, dependency)
-    try:
-        conn.execute(f"LOAD {name}")
-        return
-    except Exception as first_error:
-        load_error: Exception = first_error
+    # The image's copy before `LOAD <name>`: with DuckDB's default
+    # autoinstall, `LOAD delta` on an empty extension directory does not fail
+    # over, it downloads the extension (100 MB for delta) -- in every fresh
+    # pod, and not at all without internet access.
     baked = baked_extension_path(conn, name)
     if baked:
         try:
@@ -171,6 +172,11 @@ def load_extension(conn: Any, name: str) -> None:
             return
         except Exception as exc:
             logger.debug("Baked DuckDB extension %s did not load: %s", baked, exc)
+    try:
+        conn.execute(f"LOAD {name}")
+        return
+    except Exception as first_error:
+        load_error: Exception = first_error
     with _install_lock:
         try:
             if name not in _installed:

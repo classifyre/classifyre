@@ -1,5 +1,10 @@
 import { QueryRunStatus } from '@prisma/client';
-import { QueryRunService, runOrigin } from './query-run.service';
+import {
+  DEFAULT_MAX_ACTIVE_PER_PERSON,
+  maxActivePerPerson,
+  QueryRunService,
+  runOrigin,
+} from './query-run.service';
 
 const table = (sqlName: string, assetId: string) => ({
   assetId,
@@ -18,6 +23,7 @@ function setup(options: { active?: number; result?: Buffer | null } = {}) {
   const created: Record<string, unknown>[] = [];
   const updates: Record<string, unknown>[] = [];
   const order: string[] = [];
+  const settled: Array<{ where: any; data: any }> = [];
   const prisma = {
     queryRun: {
       count: () => Promise.resolve(options.active ?? 0),
@@ -29,7 +35,11 @@ function setup(options: { active?: number; result?: Buffer | null } = {}) {
         updates.push(data);
         return Promise.resolve({});
       },
-      updateMany: ({ data }: { data: Record<string, unknown> }) => {
+      updateMany: ({ where, data }: { where: any; data: any }) => {
+        if (where?.createdAt) {
+          settled.push({ where, data });
+          return Promise.resolve({ count: 0 });
+        }
         order.push(`status:${String(data.status)}`);
         return Promise.resolve({ count: 1 });
       },
@@ -95,7 +105,7 @@ function setup(options: { active?: number; result?: Buffer | null } = {}) {
     { check: () => Promise.resolve({ allow: true }) } as never,
     { resolve: () => Promise.resolve({ datasets: [] }) } as never,
   );
-  return { service, created, updates, order };
+  return { service, created, updates, order, settled };
 }
 
 const input = (tables: string[]) => ({
@@ -149,7 +159,9 @@ describe('runOrigin', () => {
 
 describe('QueryRunService for SQL connections', () => {
   it('refuses at the person’s cap', async () => {
-    const { service, created } = setup({ active: 3 });
+    const { service, created } = setup({
+      active: DEFAULT_MAX_ACTIVE_PER_PERSON,
+    });
     const result = await service.createForConnection(
       input(['shop.public.orders']),
     );
@@ -196,5 +208,40 @@ describe('QueryRunService for SQL connections', () => {
     const { service, order } = setup();
     await service.cancelConnectionRun('run-1');
     expect(order).toEqual([`status:${QueryRunStatus.CANCELLED}`, 'cancel-job']);
+  });
+});
+
+describe('lost runs', () => {
+  it('settles runs nothing will settle before counting the cap', async () => {
+    const { service, settled } = setup();
+    const before = Date.now();
+    await service.createForConnection(input(['shop.public.orders']));
+    expect(settled).toHaveLength(1);
+    const { where, data } = settled[0];
+    expect(where.status.in).toEqual([
+      QueryRunStatus.PENDING,
+      QueryRunStatus.RUNNING,
+    ]);
+    // Older than any query can live: 900 s timeout plus start and delivery.
+    const age = before - (where.createdAt.lt as Date).getTime();
+    expect(age).toBeGreaterThanOrEqual(20 * 60 * 1000 - 1000);
+    expect(data).toMatchObject({
+      status: QueryRunStatus.ERROR,
+      error: { code: 'lost' },
+      callbackTokenHash: null,
+    });
+  });
+});
+
+describe('maxActivePerPerson', () => {
+  it('defaults high and takes a positive number from the environment', () => {
+    expect(maxActivePerPerson({})).toBe(DEFAULT_MAX_ACTIVE_PER_PERSON);
+    expect(maxActivePerPerson({ QUERY_MAX_ACTIVE_PER_PERSON: '50' })).toBe(50);
+    expect(maxActivePerPerson({ QUERY_MAX_ACTIVE_PER_PERSON: '0' })).toBe(
+      DEFAULT_MAX_ACTIVE_PER_PERSON,
+    );
+    expect(maxActivePerPerson({ QUERY_MAX_ACTIVE_PER_PERSON: 'x' })).toBe(
+      DEFAULT_MAX_ACTIVE_PER_PERSON,
+    );
   });
 });
