@@ -237,6 +237,42 @@ def test_postgres_client_sql_runs_on_duckdb(folder: Path) -> None:
     assert payload["tables"] == ["files.local.customers", "files.local.orders"]
 
 
+def test_postgres_client_fully_qualified_columns_run_on_duckdb(folder: Path) -> None:
+    # Metabase's query builder names every column with its schema and table,
+    # `"src.sch"."tbl"."col"` (POC F10, BIC M2): the qualifier is the table's
+    # client name and must be rewritten with it.
+    payload, result = run_query(
+        _request(
+            folder,
+            'SELECT "files.local"."customers"."country" AS "country", count(*) AS "count" '
+            'FROM "files.local"."customers" '
+            'INNER JOIN "files.local"."orders" AS "Orders" '
+            'ON "files.local"."customers"."id" = "Orders"."customer_id" '
+            'WHERE lab."files.local"."customers"."country" = \'AT\' '
+            'GROUP BY "files.local"."customers"."country" '
+            'ORDER BY "files.local"."customers"."country" ASC LIMIT 2000',
+            dialect="postgres",
+            database="lab",
+            searchPath=["files.local"],
+        )
+    )
+    assert _rows(payload, result) == [{"country": "AT", "count": 100}]
+    assert payload["tables"] == ["files.local.customers", "files.local.orders"]
+
+
+def test_postgres_client_column_of_a_table_not_read_is_refused(folder: Path) -> None:
+    payload, _ = run_query(
+        _request(
+            folder,
+            'SELECT "files.local"."secret"."id" FROM "files.local"."customers"',
+            dialect="postgres",
+            database="lab",
+            searchPath=["files.local"],
+        )
+    )
+    assert payload["error"]["code"] == "table_not_available"
+
+
 def _masked(folder: Path, sql: str, masks: list[dict[str, Any]], **extra: Any) -> Any:
     request = _request(folder, sql, maskSalt="salt-1", **extra)
     request["tables"][0]["columns"] = masks
