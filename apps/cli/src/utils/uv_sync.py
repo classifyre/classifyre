@@ -36,7 +36,7 @@ import subprocess
 import sys
 import threading
 import time
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -228,6 +228,29 @@ def sync_group(group: str) -> tuple[bool, str | None]:
             _failed_groups[group] = detail
         logger.error(detail)
         return False, detail
+
+
+def keep_installed(groups: Mapping[str, Iterable[str]]) -> list[str]:
+    """Record the groups whose modules are all importable as synced; return the others.
+
+    A sync installs exactly the groups it is given and uninstalls the rest,
+    and a group that came installed in the image was never recorded: without
+    this, the first on-demand sync of another group would remove it from
+    under the process (a query losing pyarrow mid-scan, 2026-11-21).
+    """
+    import importlib.util
+
+    present: list[str] = []
+    missing: list[str] = []
+    for group, modules in groups.items():
+        try:
+            installed = all(importlib.util.find_spec(name) is not None for name in modules)
+        except (ImportError, ValueError):
+            installed = False
+        (present if installed else missing).append(group)
+    with _lock:
+        _synced_groups.update(present)
+    return missing
 
 
 def warm_groups(groups: Iterable[str]) -> tuple[bool, str | None]:

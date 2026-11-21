@@ -111,6 +111,10 @@ class QueryBinding(ABC):
     #: The tier the source type declares in ``x-query`` (checked by
     #: tests/test_query_manifest.py).
     tier: ClassVar[str]
+    #: Optional dependency groups the binding's source client needs
+    #: (``uv sync --group``); the query worker installs them before it forks
+    #: a query, so no query syncs the environment under another.
+    dependency_groups: ClassVar[tuple[str, ...]] = ()
 
     def __init__(self, source: SourceContext) -> None:
         self.source = source

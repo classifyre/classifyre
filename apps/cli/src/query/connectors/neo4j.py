@@ -94,6 +94,8 @@ def build_cypher(
 
 
 class Neo4jConnector(ArrowConnector):
+    dependency_groups = ("neo4j",)
+
     def __init__(self, source: SourceContext) -> None:
         super().__init__(source)
 

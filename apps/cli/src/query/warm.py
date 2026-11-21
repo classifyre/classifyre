@@ -5,7 +5,8 @@ Imported once, by the fork server of ``python -m src.main query-worker``
 process is a ``fork()`` of that server, so it starts with all of this already
 in memory instead of paying for it per query the way a query Job does:
 
-* DuckDB, pyarrow and SQLGlot, and this package;
+* DuckDB, pyarrow and SQLGlot, and this package; the dependency groups
+  connectors need (``QueryBinding.dependency_groups``), installed;
 * every source module (``get_source`` imports the whole connector catalog on
   first use, which is most of a cold query's setup);
 * the DuckDB extensions queries load, read once so their files are in the page
@@ -97,9 +98,16 @@ def warm_up() -> dict[str, float]:
     if timings:
         return timings
     with _step("dependencies"):
+        from ..utils.uv_sync import warm_groups
+        from .connectors import binding_class, declared_sources
         from .runner import ensure_dependencies
 
         ensure_dependencies()
+        # The connectors' own clients (Neo4j's driver), installed now: a
+        # query that installed one would re-sync the environment every other
+        # query is running from.
+        groups = {g for t in declared_sources() for g in binding_class(t).dependency_groups}
+        warm_groups(groups)
     with _step("imports"):
         import pyarrow
         import pyarrow.ipc  # noqa: F401

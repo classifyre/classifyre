@@ -102,11 +102,22 @@ def _report(
         print(f"{RESULT_MARKER} {json.dumps(payload)}", flush=True)
 
 
+#: The optional groups every query needs, and a module of each.
+QUERY_GROUPS: dict[str, tuple[str, ...]] = {
+    "file-processing": ("duckdb", "pyarrow"),
+    "lineage": ("sqlglot",),
+}
+
+
 def ensure_dependencies() -> None:
     """DuckDB and pyarrow (file-processing) and SQLGlot (lineage): optional
     groups of the CLI image, installed on first use into the shared uv cache."""
     from ..detectors.dependencies import require_module
+    from ..utils.uv_sync import keep_installed
 
+    # Installed with the image but never recorded: a source's own group
+    # synced later (Neo4j's) must not uninstall these.
+    keep_installed(QUERY_GROUPS)
     require_module("duckdb", "SQL query", ["file-processing"])
     require_module("pyarrow", "SQL query", ["file-processing"])
     require_module("sqlglot", "SQL query", ["lineage"])
