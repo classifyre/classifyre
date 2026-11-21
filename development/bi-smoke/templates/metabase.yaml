@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-metabase
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}-metabase
+    app.kubernetes.io/part-of: bi-smoke
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Release.Name }}-metabase
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Release.Name }}-metabase
+        app.kubernetes.io/part-of: bi-smoke
+    spec:
+      containers:
+        - name: metabase
+          image: {{ .Values.metabase.image }}
+          imagePullPolicy: IfNotPresent
+          env:
+            - { name: MB_ANON_TRACKING_ENABLED, value: "false" }
+            - { name: MB_CHECK_FOR_UPDATES, value: "false" }
+            - { name: MB_DB_TYPE, value: h2 }
+            - { name: MB_DB_FILE, value: /metabase-data/metabase.db }
+            - { name: JAVA_OPTS, value: {{ .Values.metabase.javaOpts | quote }} }
+            {{- with .Values.metabase.dataWarehousePoolSize }}
+            - { name: MB_JDBC_DATA_WAREHOUSE_MAX_CONNECTION_POOL_SIZE, value: {{ . | quote }} }
+            {{- end }}
+          ports:
+            - { name: http, containerPort: 3000 }
+          readinessProbe:
+            httpGet: { path: /api/health, port: http }
+            periodSeconds: 5
+            failureThreshold: 60
+          resources: {{- toYaml .Values.metabase.resources | nindent 12 }}
+          volumeMounts:
+            - { name: data, mountPath: /metabase-data }
+            - { name: ca, mountPath: /ca, readOnly: true }
+      volumes:
+        # Throwaway application database: a restart starts Metabase from scratch.
+        - name: data
+          emptyDir: {}
+        - name: ca
+          configMap:
+            name: {{ .Values.metabase.caConfigMap }}
+            optional: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-metabase
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}-metabase
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: {{ .Release.Name }}-metabase
+  ports:
+    - { name: http, port: 3000, targetPort: http }

@@ -1,0 +1,34 @@
+{{- if .Values.drivers.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-drivers-{{ .Values.drivers.runId }}
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}-drivers
+    app.kubernetes.io/part-of: bi-smoke
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 900
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Release.Name }}-drivers
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      containers:
+        - name: drivers
+          image: {{ .Values.drivers.image }}
+          imagePullPolicy: IfNotPresent
+          args: ["/spec/spec.json"]
+          resources:
+            requests: { cpu: 100m, memory: 512Mi }
+            limits: { memory: 1Gi }
+          volumeMounts:
+            - { name: spec, mountPath: /spec, readOnly: true }
+      volumes:
+        - name: spec
+          secret:
+            secretName: {{ .Values.drivers.specSecret }}
+{{- end }}
