@@ -23,8 +23,23 @@ from typing import Any
 from .file_metadata import build_columns
 
 
+def native(value: Any) -> Any:
+    """A driver's value as Python's own: Neo4j's dates and times have
+    ``to_native()``; lists are converted item by item."""
+    if isinstance(value, (list, tuple)):
+        return [native(v) for v in value]
+    to_native = getattr(value, "to_native", None)
+    if callable(to_native):
+        try:
+            return to_native()
+        except Exception:
+            return str(value)
+    return value
+
+
 def value_type(value: Any) -> str | None:
     """DuckDB's name for one value's type; None for null."""
+    value = native(value)
     if value is None:
         return None
     if isinstance(value, bool):

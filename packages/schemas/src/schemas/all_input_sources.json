@@ -144,6 +144,15 @@
         "address": "search_index",
         "extensions": []
       },
+      "NEO4J": {
+        "tier": "connector",
+        "assetKinds": [
+          "label",
+          "relationship"
+        ],
+        "address": "graph",
+        "extensions": []
+      },
       "POSTGRESQL": {
         "tier": "native",
         "assetKinds": [
@@ -1708,10 +1717,78 @@
               "items": {
                 "type": "string"
               }
+            },
+            "columns": {
+              "type": "array",
+              "description": "The label's columns for SQL as {name, type} objects: element_id and the properties of a sample of its nodes (DuckDB type names)",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Column name"
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "Column type"
+                  }
+                }
+              }
             }
           },
           "required": [
             "label",
+            "database"
+          ]
+        },
+        "relationship": {
+          "properties": {
+            "relationship_type": {
+              "type": "string",
+              "description": "Relationship type"
+            },
+            "database": {
+              "type": "string",
+              "description": "Database name"
+            },
+            "relationship_count": {
+              "type": "integer",
+              "description": "Number of relationships of this type"
+            },
+            "source_labels": {
+              "type": "array",
+              "description": "Labels of the sampled start nodes",
+              "items": {
+                "type": "string"
+              }
+            },
+            "target_labels": {
+              "type": "array",
+              "description": "Labels of the sampled end nodes",
+              "items": {
+                "type": "string"
+              }
+            },
+            "columns": {
+              "type": "array",
+              "description": "The relationship type's columns for SQL as {name, type} objects: the endpoints' element ids (and their id property when every sampled endpoint has one), the relationship's properties, the endpoints' labels",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Column name"
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "Column type"
+                  }
+                }
+              }
+            }
+          },
+          "required": [
+            "relationship_type",
             "database"
           ]
         }

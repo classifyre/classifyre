@@ -21,7 +21,9 @@ export type AddressStrategy =
   | 'catalog'
   | 'object_storage'
   /** Search indexes read live: `<source>.indexes.<index>`. */
-  | 'search_index';
+  | 'search_index'
+  /** Graphs read live: `<source>.nodes.<label>`, `<source>.relationships.<type>`. */
+  | 'graph';
 
 /** One source type's `x-query` entry (docs/prd/QC-query-connectors.md §5.1). */
 export interface QueryDeclaration {
@@ -391,6 +393,14 @@ export function tableAddress(
   if (address === 'search_index') {
     const index = text(metadata.index_name) ?? name;
     return connectorAddress('indexes', index, metadata);
+  }
+  if (address === 'graph') {
+    if (assetType === 'relationship') {
+      const type = text(metadata.relationship_type) ?? name;
+      return connectorAddress('relationships', type, metadata, database);
+    }
+    const label = text(metadata.label) ?? name;
+    return connectorAddress('nodes', label, metadata, database);
   }
   if (sourceType === SHARED_DATASET_SOURCE_TYPE) {
     const datasetId = text(metadata.dataset_id);

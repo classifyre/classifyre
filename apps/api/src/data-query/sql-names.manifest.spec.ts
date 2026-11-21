@@ -47,6 +47,7 @@ describe('x-query declaration', () => {
         'LOCAL_FOLDER',
         'MEILISEARCH',
         'MYSQL',
+        'NEO4J',
         'ODBC',
         'POSTGRESQL',
         'S3_COMPATIBLE_STORAGE',
@@ -120,6 +121,43 @@ describe('x-query declaration', () => {
     expect(address.location).toBeNull();
     expect(address.reason).toBe(
       'Scan the source again to record its columns.',
+    );
+  });
+
+  it('names Neo4j labels <source>.nodes.<label> and relationship types <source>.relationships.<type>', () => {
+    const columns = [{ name: 'element_id', type: 'VARCHAR' }];
+    expect(
+      tableAddress('NEO4J', 'label', 'neo4j:Person', {
+        label: 'Person',
+        database: 'neo4j',
+        columns,
+      }),
+    ).toEqual({
+      schema: 'nodes',
+      table: 'Person',
+      location: {
+        kind: 'connector',
+        schema: 'nodes',
+        table: 'Person',
+        database: 'neo4j',
+        columns,
+      },
+    });
+    expect(
+      tableAddress('NEO4J', 'relationship', 'neo4j:[RATED]', {
+        relationship_type: 'RATED',
+        database: 'neo4j',
+        columns,
+      }).location,
+    ).toEqual({
+      kind: 'connector',
+      schema: 'relationships',
+      table: 'RATED',
+      database: 'neo4j',
+      columns,
+    });
+    expect(TABLE_SHAPED_ASSET_KINDS).toEqual(
+      expect.arrayContaining(['label', 'relationship', 'index']),
     );
   });
 });

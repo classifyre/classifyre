@@ -40,6 +40,7 @@ _BINDINGS: dict[str, tuple[str, str]] = {
     "GOOGLE_CLOUD_STORAGE": ("object_storage", "ObjectStorageBinding"),
     "LOCAL_FOLDER": ("object_storage", "ObjectStorageBinding"),
     "MEILISEARCH": ("meilisearch", "MeilisearchConnector"),
+    "NEO4J": ("neo4j", "Neo4jConnector"),
 }
 
 
