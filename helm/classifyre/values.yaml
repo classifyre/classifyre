@@ -851,9 +851,18 @@ sqlGateway:
   # -- entrypoint's).
   publicPort: 5432
 
-  # -- Sessions one gateway pod holds at once; size `resources` to about
-  # -- 150 MB per session on top of the process.
+  # -- Sessions one gateway pod holds at once. Each is a PGlite of its own:
+  # -- about 150 MB idle, about 450 MB while a BI tool syncs and queries.
+  # -- Memory bounds it too: a new session is refused as busy (53300) unless
+  # -- the pod's memory, plus `sessionMemoryMb` for it and for each session
+  # -- still starting, stays under the RSS guard (87.5 % of
+  # -- `resources.limits.memory`). At the default 4Gi that is about 6 busy
+  # -- sessions: raise the limit along with this.
   maxSessions: 16
+
+  # -- What one more session is allowed for when deciding whether the pod has
+  # -- room for it (MB; measured 2026-11-21 with Metabase, BIC M5).
+  sessionMemoryMb: 450
 
   # -- Sessions one SQL connection may have open at once.
   maxSessionsPerConnection: 4

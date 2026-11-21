@@ -28,12 +28,12 @@ SKIP_BUILD=1 scripts/dev/bi-smoke.sh --keep           # leave the persona, grant
 It prints a table in the shape of BIC §5 and writes evidence to
 `.evidence/<date>-<sha>.json` (gitignored); it exits 1 when a check fails.
 Metabase stays up afterwards (`kubectl -n classifyre-dev port-forward
-svc/bi-smoke-metabase 3030:3000`, sign in as `bi-smoke@example.test` /
-`bi-smoke-metabase-1`).
+svc/bi-smoke-metabase 3030:3000`, sign in as `bi-smoke@example.test` with
+the password in the `bi-smoke-metabase-admin` Secret).
 
 What one run does (`bi_smoke.py`):
 
-1. Signs in as `admin` (Keycloak password grant on the dev realm's `lab-cli`).
+1. Signs in as `BI_SMOKE_USER` / `BI_SMOKE_PASSWORD` (a workspace admin; Keycloak password grant on the dev realm's `lab-cli`). The throwaway Metabase's admin password is made on the first run and kept in the `bi-smoke-metabase-admin` Secret (or set `BI_SMOKE_METABASE_PASSWORD`).
 2. Opens the fixture tables to SQL connections (only those not open yet), makes
    an admin connection, and a persona `bi-smoke-viewer` in group
    `bi-smoke-viewers` with Viewer plus Data reader on two tables (whose

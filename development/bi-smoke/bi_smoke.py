@@ -56,7 +56,32 @@ GATEWAY_HOST = f"{RELEASE}-sql-gateway.{NS}.svc"
 PERSONA = "bi-smoke-viewer"
 PERSONA_GROUP = "bi-smoke-viewers"
 MB_EMAIL = "bi-smoke@example.test"
-MB_PASSWORD = "bi-smoke-" + "metabase-1"  # throwaway Metabase in the dev cluster
+#: The Classifyre user the harness signs in as (a workspace admin of WORKSPACE).
+ADMIN_USER = os.environ.get("BI_SMOKE_USER", "")
+ADMIN_PASSWORD = os.environ.get("BI_SMOKE_PASSWORD", "")
+#: Holds the throwaway Metabase's admin password, made on the first run.
+MB_SECRET = "bi-smoke-metabase-admin"
+
+
+def metabase_password() -> str:
+    """The Metabase admin's password: BI_SMOKE_METABASE_PASSWORD, else the
+    one in the MB_SECRET Secret, made (random) the first time."""
+    if os.environ.get("BI_SMOKE_METABASE_PASSWORD"):
+        return os.environ["BI_SMOKE_METABASE_PASSWORD"]
+    found = subprocess.run(
+        ["kubectl", "-n", NS, "get", "secret", MB_SECRET, "-o", "jsonpath={.data.password}"],
+        capture_output=True, text=True, check=False,
+    )
+    if found.returncode == 0 and found.stdout.strip():
+        import base64
+
+        return base64.b64decode(found.stdout.strip()).decode()
+    password = secrets.token_urlsafe(24)
+    subprocess.run(
+        ["kubectl", "-n", NS, "create", "secret", "generic", MB_SECRET, f"--from-literal=password={password}"],
+        capture_output=True, text=True, check=True,
+    )
+    return password
 
 #: The tables every client must see, by their REST name.
 FIXTURES = [
@@ -197,9 +222,13 @@ echo "$G"
 
 
 def drop_persona() -> None:
+    """The persona user and its organization group."""
     kcadm(
         f"""OLD=$($K get users -r $R -q username={PERSONA} -q exact=true --fields id --format csv --noquotes | head -1)
-[ -z "$OLD" ] || $K delete "users/$OLD" -r $R"""
+[ -z "$OLD" ] || $K delete "users/$OLD" -r $R
+ORG=$($K get organizations -r $R --fields id --format csv --noquotes | head -1)
+G=$($K get "organizations/$ORG/groups" -r $R --fields id,name --format csv --noquotes | {{ grep ",{PERSONA_GROUP}$" || true; }} | cut -d, -f1 | head -1)
+[ -z "$G" ] || $K delete "organizations/$ORG/groups/$G" -r $R"""
     )
 
 
@@ -222,8 +251,9 @@ def _metabase_error(body: str) -> str:
 
 
 class Metabase:
-    def __init__(self, port: int) -> None:
+    def __init__(self, port: int, password: str) -> None:
         self.http = httpx.Client(base_url=f"http://127.0.0.1:{port}/api/", timeout=300)
+        self.password = password
 
     def call(self, method: str, path: str, **kwargs: Any) -> Any:
         response = self.http.request(method, path, **kwargs)
@@ -243,13 +273,13 @@ class Metabase:
                 "setup",
                 json={
                     "token": setup_token,
-                    "user": {"email": MB_EMAIL, "password": MB_PASSWORD, "first_name": "BI",
+                    "user": {"email": MB_EMAIL, "password": self.password, "first_name": "BI",
                              "last_name": "Smoke", "site_name": "bi-smoke"},
                     "prefs": {"site_name": "bi-smoke", "allow_tracking": False},
                 },
             )
         else:
-            session = self.call("POST", "session", json={"username": MB_EMAIL, "password": MB_PASSWORD})
+            session = self.call("POST", "session", json={"username": MB_EMAIL, "password": self.password})
         self.http.headers["X-Metabase-Session"] = session["id"]
 
     def add_database(self, name: str, user: str, password: str) -> int:
@@ -474,8 +504,16 @@ def run_drivers(spec: dict[str, Any], ca: str) -> list[dict[str, Any]]:
          "--set", f"drivers.runId={run_id}", "--show-only", "templates/drivers-job.yaml"],
         capture_output=True, text=True, check=True,
     ).stdout
-    subprocess.run(["kubectl", "-n", NS, "apply", "-f", "-"], input=job, text=True, check=True, capture_output=True)
-    name = f"job/bi-smoke-drivers-{run_id}"
+    try:
+        subprocess.run(["kubectl", "-n", NS, "apply", "-f", "-"], input=job, text=True, check=True, capture_output=True)
+        return _wait_drivers(f"job/bi-smoke-drivers-{run_id}")
+    finally:
+        # It holds the connections' passwords.
+        subprocess.run(["kubectl", "-n", NS, "delete", "secret", "bi-smoke-drivers-spec", "--ignore-not-found"],
+                       capture_output=True, text=True, check=False)
+
+
+def _wait_drivers(name: str) -> list[dict[str, Any]]:
     log(f"drivers {name} started")
     subprocess.run(
         ["kubectl", "-n", NS, "wait", name, "--for=jsonpath={.status.conditions[0].status}=True", "--timeout=900s"],
@@ -501,7 +539,10 @@ def main() -> int:
     started = dt.datetime.now(dt.UTC)
     cleanup: list[tuple[str, Callable[[], Any]]] = []
 
-    admin = Classifyre(token("admin", "admin"))
+    if not (ADMIN_USER and ADMIN_PASSWORD):
+        log("export BI_SMOKE_USER and BI_SMOKE_PASSWORD: a workspace admin of " + WS)
+        return 2
+    admin = Classifyre(token(ADMIN_USER, ADMIN_PASSWORD))
     catalog = admin.catalog()
     missing = [name for name in FIXTURES if name not in catalog or not catalog[name].get("canQuery")]
     if missing:
@@ -514,6 +555,9 @@ def main() -> int:
         capture_output=True, text=True, check=True,
     ).stdout
     subprocess.run(["kubectl", "-n", NS, "apply", "-f", "-"], input=configmap, text=True, check=True, capture_output=True)
+    cleanup.append(("delete CA configmap", lambda: subprocess.run(
+        ["kubectl", "-n", NS, "delete", "configmap", "bi-smoke-ca", "--ignore-not-found"],
+        capture_output=True, text=True, check=False)))
 
     try:
         # ── arrange: exposures, persona, grants, connections ──────────────
@@ -542,12 +586,15 @@ def main() -> int:
         persona_pw = secrets.token_hex(16)
         group_id = make_persona(persona_pw)
         cleanup.append(("drop persona", drop_persona))
-        grants = [admin.call("POST", "access/grants", json={"subjectType": "group", "subjectId": group_id, "roleKey": "viewer"})]
-        for name in PERSONA_TABLES:
-            grants.append(admin.call("POST", "access/grants", json={
-                "subjectType": "group", "subjectId": group_id, "roleKey": "data-reader",
-                "scopeType": "asset", "resourceId": catalog[name]["assetId"]}))
-        for grant in grants:
+        bodies = [{"subjectType": "group", "subjectId": group_id, "roleKey": "viewer"}] + [
+            {"subjectType": "group", "subjectId": group_id, "roleKey": "data-reader",
+             "scopeType": "asset", "resourceId": catalog[name]["assetId"]}
+            for name in PERSONA_TABLES
+        ]
+        for body in bodies:
+            # Each one is cleaned up as soon as it exists: a later grant failing
+            # must not leave the earlier ones behind.
+            grant = admin.call("POST", "access/grants", json=body)
             cleanup.append((f"remove grant {grant['id']}", lambda g=grant["id"]: admin.call("DELETE", f"access/grants/{g}")))
         viewer = Classifyre(token(PERSONA, persona_pw))
         made = viewer.call("POST", "data-connections", json={
@@ -645,7 +692,7 @@ def run_metabase(
     only: set[str] | None,
 ) -> None:
     with port_forward():
-        mb = Metabase(METABASE_PORT)
+        mb = Metabase(METABASE_PORT, metabase_password())
         mb.sign_in()
         mb.call("PUT", "setting/report-timezone", json={"value": "Europe/Vienna"})
         db = mb.add_database("Classifyre (admin)", *admin_conn)
@@ -812,23 +859,28 @@ def run_metabase(
                 # the admin database goes first, so the gateway has the memory.
                 mb.call("DELETE", f"database/{db}")
                 vdb = mb.add_database("Classifyre (viewer)", *viewer_conn)
-                vtables = {(t["schema"], t["name"]): t for t in mb.sync(vdb, expect=len(PERSONA_TABLES))}
-                customers = vtables[pg_parts(MASKED[0])]
-                preview = mb.dataset(vdb, {"source-table": customers["id"], "limit": 2000})
-                cols = [c["name"] for c in preview["data"]["cols"]]
-                seen = {str(v) for row in preview["data"]["rows"] for v in row}
-                leaked = sorted(raw_values & seen)
-                field_id = next(f["id"] for f in customers["fields"] if f["name"] == MASKED[1])
-                values = mb.call("GET", f"field/{field_id}/values").get("values", [])
-                stored = {str(v[0] if isinstance(v, list) else v) for v in values}
-                leaked_stored = sorted(raw_values & stored)
-                like = mb.dataset(vdb, {"sql": f"SELECT count(*) FROM {pg_name(MASKED[0])} WHERE {MASKED[1]} LIKE '%@%'"}, native=True)
-                like_count = like["data"]["rows"][0][0]
-                others = [n for n in FIXTURES if n not in PERSONA_TABLES and pg_parts(n) in vtables]
-                out["ok"] = not leaked and not leaked_stored and like_count == 0 and not others
-                out["detail"] = (f"viewer sees {len(vtables)} tables (extra: {others}); columns {cols}; "
-                                 f"leaked in preview {leaked[:3]}, in stored field values {leaked_stored[:3]}; "
-                                 f"LIKE '%@%' counted {like_count}")
+                try:
+                    vtables = {(t["schema"], t["name"]): t for t in mb.sync(vdb, expect=len(PERSONA_TABLES))}
+                    customers = vtables[pg_parts(MASKED[0])]
+                    preview = mb.dataset(vdb, {"source-table": customers["id"], "limit": 2000})
+                    cols = [c["name"] for c in preview["data"]["cols"]]
+                    seen = {str(v) for row in preview["data"]["rows"] for v in row}
+                    leaked = sorted(raw_values & seen)
+                    field_id = next(f["id"] for f in customers["fields"] if f["name"] == MASKED[1])
+                    values = mb.call("GET", f"field/{field_id}/values").get("values", [])
+                    stored = {str(v[0] if isinstance(v, list) else v) for v in values}
+                    leaked_stored = sorted(raw_values & stored)
+                    like = mb.dataset(vdb, {"sql": f"SELECT count(*) FROM {pg_name(MASKED[0])} WHERE {MASKED[1]} LIKE '%@%'"}, native=True)
+                    like_count = like["data"]["rows"][0][0]
+                    others = [n for n in FIXTURES if n not in PERSONA_TABLES and pg_parts(n) in vtables]
+                    out["ok"] = not leaked and not leaked_stored and like_count == 0 and not others
+                    out["detail"] = (f"viewer sees {len(vtables)} tables (extra: {others}); columns {cols}; "
+                                     f"leaked in preview {leaked[:3]}, in stored field values {leaked_stored[:3]}; "
+                                     f"LIKE '%@%' counted {like_count}")
+                finally:
+                    # Its pool holds the viewer connection's password.
+                    mb.call("DELETE", f"database/{vdb}")
+
 
 def metabase_errors(since: dt.datetime) -> list[str]:
     output = subprocess.run(

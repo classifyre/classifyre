@@ -122,6 +122,8 @@ spec:
               value: {{ .Values.sqlGateway.maxSessionsPerConnection | quote }}
             - name: SQL_GATEWAY_IDLE_MINUTES
               value: {{ .Values.sqlGateway.idleMinutes | quote }}
+            - name: SQL_GATEWAY_SESSION_MEMORY_MB
+              value: {{ .Values.sqlGateway.sessionMemoryMb | quote }}
           {{- with .Values.api.extraEnvFrom }}
           envFrom:
             {{- toYaml . | nindent 12 }}

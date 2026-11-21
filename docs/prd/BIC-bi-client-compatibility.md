@@ -323,6 +323,26 @@ A Metabase or driver version bump is the same process: bump the image or jar ver
 | M13 | pass: over the cap the download is aborted (refused), never a short complete file | 2,323 |
 | M6, M10, M11 | not run: row-filter persona, closing/revoking mid-session, cancel from Metabase (J8 covers cancel) | — |
 
+**After review, 2026-11-21** (`docs/reviews/2026-11-21-sql-gateway-bi-fixes.md`):
+
+- **Fixed:**
+  - **c1:** a DECLARE after a comment or with its options in another order is served; one the gateway cannot read, or one sent through Parse/Bind/Execute over data, is refused (`0A000`), never answered from PGlite's empty tables.
+  - **c2:** `SCROLL`, `FETCH BACKWARD|PRIOR|ABSOLUTE` and `MOVE` on a data cursor are refused with `0A000`.
+  - **c3:** cursors end with their transaction block (after a commit or rollback through either protocol). A `WITH HOLD` cursor declared in a block that rolls back is dropped. A duplicate name is `42P03`, and a failed block refuses cursor statements (`25P02`).
+  - **c4:** at most 8 open data cursors per session, holding at most twice the row cap in rows (`53400`).
+  - **c5:** at most 8 sign-ins wait on one key, and at most 16 sockets per remote address may be signing in at once (of the 64 shared).
+  - `bi_smoke.py` takes the admin's credentials from `BI_SMOKE_USER`/`BI_SMOKE_PASSWORD`. Metabase's admin password is made per install and kept in a Secret. Cleanup also removes the persona's group, the drivers' spec Secret, the CA ConfigMap and the viewer's Metabase database, and a failed grant no longer leaves earlier ones.
+  - Helm: `sqlGateway.sessionMemoryMb`, and the `maxSessions` comment states the memory bound.
+  - One parser for `UNDER_PRESSURE_MAX_RSS_BYTES`.
+  - The psqlODBC corpus holds the `declare … cursor with hold for` form.
+- **Still open:**
+  - BIC1's `test_query_bi_dialect.py`, the PG-describe vs Arrow type agreement table (`pg-types.agreement.spec.ts`), and "a Describe of a data statement starts no run" (F05). The corpus replay still uses a fake runner and node-pg's simple protocol.
+  - Data cursors through the extended protocol: refused, not served.
+  - Sessions already admitted can still grow past the memory guard (it checks at sign-in).
+  - There is no per-workspace share of a pod's sessions.
+  - Without PROXY protocol, tenants behind one SNAT address share the per-address limits.
+  - The duplicated pager (portal vs data cursor) and `signInTo`'s parameter list (review smells).
+
 - **Not verified**: Npgsql/Power BI (BIC3), the `bi-smoke` skaffold profile (not added; `scripts/dev/bi-smoke.sh` installs the chart itself), the all-in-one image's gateway with these fixes, a corpus from a fresh capture (the two files are seeded from the POC and adapted to the spec's fixture catalog).
 
 ## 10. Work breakdown for the developer agent

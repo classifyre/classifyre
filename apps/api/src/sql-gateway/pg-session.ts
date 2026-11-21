@@ -97,7 +97,21 @@ interface DataCursor {
   offset: number;
   /** WITH HOLD: kept past its transaction, until CLOSE. */
   hold: boolean;
+  /**
+   * Declared in the transaction still open: a rollback drops it, WITH HOLD
+   * or not, as PostgreSQL does; a commit keeps a WITH HOLD one.
+   */
+  pending: boolean;
 }
+
+/**
+ * What one session may hold in cursors over data: every row of every open
+ * one sits in the gateway's memory until CLOSE, so a session that never
+ * closed them would grow without bound (review of 493fba5d, c4).
+ */
+export const MAX_DATA_CURSORS = 8;
+/** Rows of all open data cursors of a session, in multiples of the row cap. */
+export const CURSOR_ROWS_PER_ROW_CAP = 2;
 
 /** Internal statement and portal names; clients never see them. */
 const READS = '__classifyre_reads';
@@ -346,11 +360,15 @@ export class PgSession {
     if (this.skipping && bytes[0] !== 'S'.charCodeAt(0)) return true;
     const reply = await this.raw(bytes);
     let failed = false;
+    let rolledBack = false;
     const out: Buffer[] = [];
     for (const m of splitMessages(reply)) {
       if (m.type === 'E') failed = true;
+      if (m.type === 'C' && /^ROLLBACK\b/.test(m.body.toString('utf8'))) {
+        rolledBack = true;
+      }
       if (m.type === 'Z') {
-        this.status = String.fromCharCode(m.body[0]);
+        this.moveTo(String.fromCharCode(m.body[0]), rolledBack || failed);
         if (!keepReady) continue;
       }
       out.push(Buffer.from(m.raw));
@@ -358,6 +376,23 @@ export class PgSession {
     if (out.length) this.send(Buffer.concat(out));
     if (failed) this.skipping = true;
     return failed;
+  }
+
+  /**
+   * The transaction status PGlite reported. When a transaction block ends,
+   * its cursors end with it: those without HOLD always, those declared in it
+   * when it rolled back (a COMMIT in a failed block is a rollback too).
+   */
+  private moveTo(next: string, rolledBack: boolean): void {
+    const ended = this.status !== 'I' && next === 'I';
+    const aborted = this.status === 'E' || rolledBack;
+    this.status = next;
+    if (!ended) return;
+    for (const [name, cursor] of this.cursors) {
+      if (!cursor.hold || (cursor.pending && aborted))
+        this.cursors.delete(name);
+      else cursor.pending = false;
+    }
   }
 
   /**
@@ -447,7 +482,9 @@ export class PgSession {
     }
     for (const statement of statements) {
       const cursor = parseCursorStatement(statement);
-      if (cursor) {
+      if (cursor && this.status !== 'E') {
+        // In a failed transaction PGlite refuses everything (25P02), as
+        // PostgreSQL does: cursor statements included.
         const handled = await this.cursorStatement(cursor);
         if (handled === 'failed') return;
         if (handled === 'served') continue;
@@ -490,8 +527,11 @@ export class PgSession {
     }
     this.skipping = false;
     if (this.status === 'I') {
+      // Declared outside a transaction block: a cursor without HOLD lasts
+      // only as long as its statement's own transaction.
       for (const [name, cursor] of this.cursors) {
         if (!cursor.hold) this.cursors.delete(name);
+        else cursor.pending = false;
       }
     }
     this.send(readyForQuery(this.status));
@@ -506,6 +546,14 @@ export class PgSession {
   private async cursorStatement(
     cursor: CursorStatement,
   ): Promise<'served' | 'pglite' | 'failed'> {
+    if (cursor.kind === 'unsupported') {
+      // Never left to PGlite when it may concern data: there it would read
+      // empty tables and answer as if that were the result.
+      const refusal = this.unsupportedCursor(cursor);
+      if (!refusal) return 'pglite';
+      await this.failSimple(refusal);
+      return 'failed';
+    }
     if (cursor.kind === 'declare') {
       let tables: string[];
       try {
@@ -515,6 +563,11 @@ export class PgSession {
         return 'failed';
       }
       if (!tables.length) return 'pglite';
+      const refusal = this.declareRefusal(cursor.name, cursor.scroll);
+      if (refusal) {
+        await this.failSimple(refusal);
+        return 'failed';
+      }
       const described = await this.internal(
         frontend.parse(PROBE, cursor.query),
         frontend.describe('S', PROBE),
@@ -529,6 +582,13 @@ export class PgSession {
       const description = described.find((m) => m.type === 'T');
       try {
         const result = await this.run(cursor.query, tables);
+        const budget = this.data.maxRows * CURSOR_ROWS_PER_ROW_CAP;
+        if (this.cursorRows() + result.rows.length > budget) {
+          throw new DataError(
+            '53400',
+            `Open cursors of this connection would hold more than ${budget} rows: close one (CLOSE) before declaring another.`,
+          );
+        }
         this.cursors.set(cursor.name, {
           description: description ? Buffer.from(description.raw) : null,
           fields: description ? parseRowDescription(description.body) : [],
@@ -536,6 +596,7 @@ export class PgSession {
           truncated: result.truncated,
           offset: 0,
           hold: cursor.hold,
+          pending: this.status === 'T',
         });
       } catch (failure) {
         await this.failSimple(failure);
@@ -570,6 +631,50 @@ export class PgSession {
     return 'served';
   }
 
+  /** Why a DECLARE over data cannot be served, if it cannot. */
+  private declareRefusal(name: string, scroll: boolean): DataError | null {
+    if (scroll) {
+      return new DataError(
+        '0A000',
+        'Cursors over your tables read forward only: declare it NO SCROLL (psqlODBC reads forward unless told otherwise).',
+      );
+    }
+    if (this.cursors.has(name)) {
+      return new DataError('42P03', `cursor "${name}" already exists`);
+    }
+    if (this.cursors.size >= MAX_DATA_CURSORS) {
+      return new DataError(
+        '53400',
+        `A connection may hold ${MAX_DATA_CURSORS} open cursors over your tables: close one (CLOSE) first.`,
+      );
+    }
+    return null;
+  }
+
+  /** A cursor statement the gateway does not serve, refused when it concerns data. */
+  private unsupportedCursor(cursor: {
+    verb: string;
+    name: string | null;
+  }): DataError | null {
+    if (cursor.verb === 'DECLARE') {
+      return new DataError(
+        '0A000',
+        'This form of DECLARE is not supported: DECLARE name [NO SCROLL] CURSOR [WITH HOLD] FOR query.',
+      );
+    }
+    if (cursor.name !== null && !this.cursors.has(cursor.name)) return null;
+    return new DataError(
+      '0A000',
+      `Cursors over your tables read forward only: ${cursor.verb} NEXT, FORWARD n or ALL.`,
+    );
+  }
+
+  private cursorRows(): number {
+    let rows = 0;
+    for (const cursor of this.cursors.values()) rows += cursor.rows.length;
+    return rows;
+  }
+
   /** An error in a simple query, through PGlite so the transaction knows. */
   private async failSimple(error: unknown): Promise<void> {
     const { sqlState, message } = this.errorOf(error);
@@ -586,6 +691,11 @@ export class PgSession {
   private async parse(message: Message): Promise<void> {
     if (this.skipping) return;
     const parsed = parseParse(message.body);
+    const refusal = await this.extendedCursorRefusal(parsed.sql);
+    if (refusal) {
+      await this.failExtended(refusal);
+      return;
+    }
     if (await this.forward(message.raw)) return;
     let tables: string[] = [];
     try {
@@ -694,6 +804,40 @@ export class PgSession {
   }
 
   /** An error in the extended protocol: raised in PGlite, which then skips to Sync. */
+  /**
+   * Cursors over data are served in the simple query protocol only (where
+   * psqlODBC's UseDeclareFetch sends them). Sent through Parse, the
+   * statement would reach PGlite's empty tables and FETCH would answer 0
+   * rows, so it is refused (review of 493fba5d, c1).
+   */
+  private async extendedCursorRefusal(sql: string): Promise<DataError | null> {
+    const cursor = parseCursorStatement(sql);
+    if (!cursor || this.status === 'E') return null;
+    const unsupported = new DataError(
+      '0A000',
+      'Cursors over your tables work in the simple query protocol only (psqlODBC: UseServerSidePrepare=0, or turn UseDeclareFetch off).',
+    );
+    if (cursor.kind === 'declare') {
+      let tables: string[];
+      try {
+        tables = await this.classify(cursor.query);
+      } catch (error) {
+        return error instanceof DataError ? error : unsupported;
+      }
+      return tables.length ? unsupported : null;
+    }
+    if (cursor.kind === 'unsupported' && cursor.verb === 'DECLARE')
+      return unsupported;
+    if (cursor.kind === 'close') {
+      return cursor.name !== null && this.cursors.has(cursor.name)
+        ? unsupported
+        : null;
+    }
+    return cursor.name !== null && this.cursors.has(cursor.name)
+      ? unsupported
+      : null;
+  }
+
   private async failExtended(error: unknown): Promise<void> {
     const { sqlState, message } = this.errorOf(error);
     const reply = await this.internal(

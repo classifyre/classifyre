@@ -188,4 +188,19 @@ describe('one sign-in at a time per key', () => {
     );
     lockout.end(here);
   });
+
+  it('lets only a few wait on one key; the rest are refused at once', async () => {
+    // One address must not hold the sign-in slots every tenant shares.
+    const lockout = new SignInLockout();
+    expect(await lockout.begin(here)).toBe(true);
+    const waiting = [1, 2].map(() => lockout.begin(here, 5_000, 2));
+    const started = Date.now();
+    expect(await lockout.begin(here, 5_000, 2)).toBe(false);
+    expect(Date.now() - started).toBeLessThan(1_000);
+    lockout.end(here);
+    expect(await waiting[0]).toBe(true);
+    lockout.end(here);
+    expect(await waiting[1]).toBe(true);
+    lockout.end(here);
+  });
 });

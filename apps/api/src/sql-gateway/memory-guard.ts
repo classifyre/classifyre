@@ -9,6 +9,8 @@
  * for is refused as busy (53300, which clients retry), the others live on.
  */
 
+import { rssGuardBytes } from '../utils/heap-guard';
+
 const MB = 1024 * 1024;
 
 export interface SessionMemory {
@@ -21,10 +23,11 @@ export interface SessionMemory {
 export function sessionMemoryConfig(
   env: Record<string, string | undefined> = process.env,
 ): SessionMemory {
+  // Unlike the API's under-pressure check (1 GB when unset), no guard set
+  // means no ceiling here: refusing sessions on a guessed limit would make
+  // the gateway unusable on a large pod nobody configured.
   const ceiling =
-    Number(env.SQL_GATEWAY_MAX_RSS_BYTES) ||
-    Number(env.UNDER_PRESSURE_MAX_RSS_BYTES) ||
-    0;
+    Number(env.SQL_GATEWAY_MAX_RSS_BYTES) || rssGuardBytes(env) || 0;
   const perSession = (Number(env.SQL_GATEWAY_SESSION_MEMORY_MB) || 450) * MB;
   return { ceiling, perSession };
 }

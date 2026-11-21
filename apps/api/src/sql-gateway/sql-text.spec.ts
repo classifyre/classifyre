@@ -81,11 +81,18 @@ describe('cursor statements (psqlODBC UseDeclareFetch, BIC D5)', () => {
       kind: 'declare',
       name: 'SQL_CUR0x1e68',
       hold: true,
+      scroll: false,
       query: 'SELECT id FROM "a.b".t ORDER BY id',
     });
     expect(
       parseCursorStatement('DECLARE C1 BINARY NO SCROLL CURSOR FOR select 1;'),
-    ).toEqual({ kind: 'declare', name: 'c1', hold: false, query: 'select 1' });
+    ).toEqual({
+      kind: 'declare',
+      name: 'c1',
+      hold: false,
+      scroll: false,
+      query: 'select 1',
+    });
     expect(
       parseCursorStatement(
         'declare c insensitive cursor without hold for select 1',
@@ -122,10 +129,48 @@ describe('cursor statements (psqlODBC UseDeclareFetch, BIC D5)', () => {
     });
   });
 
-  it('leaves everything else, and moves it does not serve, to PGlite', () => {
+  it('reads a DECLARE after comments, with its options in any order', () => {
+    // Review: a DECLARE the old pattern missed went to PGlite, and its
+    // FETCH answered 0 rows as if that were the result.
+    expect(
+      parseCursorStatement(
+        '-- x\n/* y */ DECLARE c SCROLL BINARY CURSOR WITH HOLD FOR select 1',
+      ),
+    ).toEqual({
+      kind: 'declare',
+      name: 'c',
+      hold: true,
+      scroll: true,
+      query: 'select 1',
+    });
+    expect(
+      parseCursorStatement(
+        'declare c no scroll insensitive cursor for select 1',
+      ),
+    ).toMatchObject({ scroll: false });
+  });
+
+  it('marks cursor statements it cannot serve, so they are refused, not guessed', () => {
     expect(parseCursorStatement('SELECT 1')).toBeNull();
-    expect(parseCursorStatement('fetch backward 1 from c')).toBeNull();
-    expect(parseCursorStatement('fetch absolute 3 from c')).toBeNull();
-    expect(parseCursorStatement('move 1 in c')).toBeNull();
+    expect(parseCursorStatement('fetch backward 1 from c')).toEqual({
+      kind: 'unsupported',
+      verb: 'FETCH',
+      name: 'c',
+    });
+    expect(parseCursorStatement('fetch absolute 3 from "C x"')).toEqual({
+      kind: 'unsupported',
+      verb: 'FETCH',
+      name: 'C x',
+    });
+    expect(parseCursorStatement('move 1 in c')).toEqual({
+      kind: 'unsupported',
+      verb: 'MOVE',
+      name: 'c',
+    });
+    expect(parseCursorStatement('declare c cursor')).toEqual({
+      kind: 'unsupported',
+      verb: 'DECLARE',
+      name: 'c',
+    });
   });
 });

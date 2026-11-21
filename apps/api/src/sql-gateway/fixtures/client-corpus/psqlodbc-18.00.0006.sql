@@ -8,3 +8,9 @@ select oid, typbasetype from pg_type where typname = 'lo'
 
 -- @@ data select-for-declare-fetch
 SELECT id, customer FROM "shop.public".orders ORDER BY id
+
+-- @@ data declare-with-hold
+declare "SQL_CUR0x1e68" cursor with hold for SELECT id, customer FROM "shop.public".orders ORDER BY id
+
+-- @@ session close-cursor
+close "SQL_CUR0x1e68"

@@ -88,6 +88,12 @@ const SWEEP_MS = 30_000;
 /** Sockets that may be signing in at once, and how long each may take. */
 const MAX_SIGNING_IN = 64;
 const SIGN_IN_MS = 20_000;
+/**
+ * Sockets one address may have signing in at once: a BI tool's pool opens a
+ * few together; one address must not take every slot of MAX_SIGNING_IN,
+ * which every tenant shares (review of 60a16b9b, c5).
+ */
+const MAX_SIGNING_IN_PER_ADDRESS = 16;
 
 /** Error codes of query runs, as the SQLSTATE a PostgreSQL client expects. */
 const SQLSTATE: Record<string, string> = {
@@ -325,6 +331,8 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
   private readonly lockout = new SignInLockout();
   /** Sockets not signed in yet. */
   private signingIn = 0;
+  /** Sockets not signed in yet, by remote address. */
+  private readonly signingInFrom = new Map<string, number>();
   /** Sessions signed in whose PGlite is starting: slot → connection id. */
   private readonly opening = new Map<number, string>();
   private nextSlot = 1;
@@ -403,16 +411,25 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
     raw.on('error', () => undefined);
     // Before sign-in a socket costs memory and gives nothing back: there are
     // at most MAX_SIGNING_IN of them, each with SIGN_IN_MS to finish.
-    if (this.signingIn >= MAX_SIGNING_IN) {
+    const address = raw.remoteAddress ?? '-';
+    const fromHere = this.signingInFrom.get(address) ?? 0;
+    if (
+      this.signingIn >= MAX_SIGNING_IN ||
+      fromHere >= MAX_SIGNING_IN_PER_ADDRESS
+    ) {
       raw.destroy();
       return;
     }
     this.signingIn += 1;
+    this.signingInFrom.set(address, fromHere + 1);
     const deadline = setTimeout(() => raw.destroy(), SIGN_IN_MS);
     deadline.unref();
     const signedIn = () => {
       clearTimeout(deadline);
       this.signingIn -= 1;
+      const left = (this.signingInFrom.get(address) ?? 1) - 1;
+      if (left > 0) this.signingInFrom.set(address, left);
+      else this.signingInFrom.delete(address);
     };
     let counted = true;
     const once = () => {

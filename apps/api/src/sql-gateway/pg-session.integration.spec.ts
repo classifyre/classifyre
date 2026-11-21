@@ -396,6 +396,95 @@ describe('PgSession over PGlite', () => {
     socket.end();
   }, 60_000);
 
+  it('refuses cursor statements over data it cannot serve, never answering 0 rows', async () => {
+    const { socket, untilReady, codes } = await rawSession(port);
+    const rowsOf = (types: string[]) => types.filter((t) => t === 'D').length;
+    const orders = 'SELECT * FROM "shop.public".orders';
+    // After a comment, options in another order: served (review c1).
+    socket.write(
+      frontend.query(
+        `BEGIN;-- x\nDECLARE c1 BINARY NO SCROLL CURSOR FOR ${orders};fetch all in c1`,
+      ),
+    );
+    expect(rowsOf(await untilReady())).toBe(2);
+    expect(codes()).toEqual([]);
+    // A second cursor of the same name (42P03), SCROLL and BACKWARD (0A000).
+    socket.write(frontend.query(`declare c1 cursor for ${orders}`));
+    await untilReady();
+    expect(codes()).toEqual(['42P03']);
+    socket.write(frontend.query('rollback'));
+    await untilReady();
+    socket.write(
+      frontend.query(`BEGIN;declare c2 scroll cursor for ${orders}`),
+    );
+    await untilReady();
+    expect(codes()).toEqual(['0A000']);
+    socket.write(frontend.query('rollback'));
+    await untilReady();
+    socket.write(
+      frontend.query(
+        `BEGIN;declare c3 cursor for ${orders};fetch backward 1 from c3`,
+      ),
+    );
+    await untilReady();
+    expect(codes()).toEqual(['0A000']);
+    // A failed block refuses everything, cursors too (25P02).
+    socket.write(frontend.query('fetch 1 in c3'));
+    await untilReady();
+    expect(codes()).toEqual(['25P02']);
+    socket.write(frontend.query('rollback'));
+    await untilReady();
+    // Through Parse/Bind/Execute: refused, not read from empty tables.
+    socket.write(
+      Buffer.concat([
+        frontend.parse('', `declare c4 cursor with hold for ${orders}`),
+        frontend.bind('', '', []),
+        frontend.execute('', 0),
+        frontend.sync(),
+      ]),
+    );
+    await untilReady();
+    expect(codes()).toEqual(['0A000']);
+    socket.end();
+  }, 60_000);
+
+  it('ends cursors with their transaction, and caps them per connection', async () => {
+    const { socket, untilReady, codes } = await rawSession(port);
+    const rowsOf = (types: string[]) => types.filter((t) => t === 'D').length;
+    const orders = 'SELECT * FROM "shop.public".orders';
+    // WITH HOLD declared in a block that rolls back is gone, as in PostgreSQL.
+    socket.write(
+      frontend.query(
+        `BEGIN;declare h1 cursor with hold for ${orders};rollback`,
+      ),
+    );
+    await untilReady();
+    socket.write(frontend.query('fetch 1 in h1'));
+    await untilReady();
+    expect(codes()).toEqual(['34000']);
+    // Committed, it outlives the block; a cursor without HOLD does not.
+    socket.write(
+      frontend.query(
+        `BEGIN;declare h2 cursor with hold for ${orders};declare n1 cursor for ${orders};commit`,
+      ),
+    );
+    await untilReady();
+    socket.write(frontend.query('fetch all in h2'));
+    expect(rowsOf(await untilReady())).toBe(2);
+    socket.write(frontend.query('fetch 1 in n1'));
+    await untilReady();
+    expect(codes()).toEqual(['34000']);
+    // At most MAX_DATA_CURSORS open at once (53400).
+    const declares = Array.from(
+      { length: 8 },
+      (_, i) => `declare m${i} cursor with hold for ${orders}`,
+    ).join(';');
+    socket.write(frontend.query(declares));
+    await untilReady();
+    expect(codes()).toEqual(['53400']);
+    socket.end();
+  }, 60_000);
+
   /**
    * The client corpus (fixtures/client-corpus, BIC §6): what Metabase,
    * psqlODBC and pgJDBC send, replayed statement by statement. A new driver
@@ -453,6 +542,8 @@ async function rawSession(port: number) {
   const reader = new MessageReader();
   const inbox: { type: string; body: Buffer }[] = [];
   let wake: (() => void) | undefined;
+  /** The SQLSTATEs of the errors in the last reply untilReady returned. */
+  let codes: string[] = [];
   socket.on('data', (chunk: Buffer) => {
     inbox.push(...reader.push(chunk));
     wake?.();
@@ -461,7 +552,13 @@ async function rawSession(port: number) {
     const deadline = Date.now() + 20_000;
     for (;;) {
       const at = inbox.findIndex((m) => m.type === 'Z');
-      if (at >= 0) return inbox.splice(0, at + 1).map((m) => m.type);
+      if (at >= 0) {
+        const reply = inbox.splice(0, at + 1);
+        codes = reply
+          .filter((m) => m.type === 'E')
+          .map((m) => errorCode(m.body));
+        return reply.map((m) => m.type);
+      }
       if (Date.now() > deadline) {
         throw new Error(
           `no ReadyForQuery; got ${inbox.map((m) => m.type).join('')}`,
@@ -478,7 +575,19 @@ async function rawSession(port: number) {
   };
   socket.write(startupMessage({ user: 'ana_bi', database: 'lab' }));
   await untilReady();
-  return { socket, untilReady };
+  return { socket, untilReady, codes: () => codes };
+}
+
+/** The `C` (SQLSTATE) field of an ErrorResponse body. */
+function errorCode(body: Buffer): string {
+  let at = 0;
+  while (at < body.length && body[at] !== 0) {
+    const type = String.fromCharCode(body[at]);
+    const end = body.indexOf(0, at + 1);
+    if (type === 'C') return body.subarray(at + 1, end).toString('utf8');
+    at = end + 1;
+  }
+  return '';
 }
 
 interface CorpusEntry {

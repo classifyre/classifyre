@@ -92,3 +92,16 @@ export function heapOverThreshold(
   const usedBytes = heapUsedBytes();
   return usedBytes > thresholdBytes ? { usedBytes, thresholdBytes } : null;
 }
+
+/**
+ * `UNDER_PRESSURE_MAX_RSS_BYTES`: the process's RSS guard, or null when it is
+ * not set. One parser for every reader; each picks its own fallback (the
+ * API's under-pressure 1 GB, the SQL gateway's "no ceiling"), so the two
+ * can differ only where they say why.
+ */
+export function rssGuardBytes(
+  env: Record<string, string | undefined> = process.env,
+): number | null {
+  const value = Number.parseInt(env.UNDER_PRESSURE_MAX_RSS_BYTES ?? '', 10);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}

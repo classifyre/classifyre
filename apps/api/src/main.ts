@@ -39,7 +39,7 @@ import { PrismaClientManager } from './prisma/prisma-client-manager';
 import { InternalApiKeyService } from './internal-api-key.service';
 import compress from '@fastify/compress';
 import { constants as zlibConstants } from 'node:zlib';
-import { resolveHeapGuard } from './utils/heap-guard';
+import { resolveHeapGuard, rssGuardBytes } from './utils/heap-guard';
 
 // No API-side ceiling on request bodies. The CLI posts whole assets in a single
 // bulk request and a single asset (large parquet/archive payloads, extracted
@@ -176,10 +176,7 @@ async function bootstrap() {
       10,
     ),
     maxHeapUsedBytes: heapGuard.thresholdBytes,
-    maxRssBytes: parseInt(
-      process.env.UNDER_PRESSURE_MAX_RSS_BYTES ?? String(1024 * 1024 * 1024),
-      10,
-    ),
+    maxRssBytes: rssGuardBytes() ?? 1024 * 1024 * 1024,
     // No-op: guard handles per-route rejection, not this global hook.
     pressureHandler: () => undefined,
     exposeStatusRoute: '/api/health/pressure',

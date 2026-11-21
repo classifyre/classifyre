@@ -178,28 +178,47 @@ export function substituteParams(
  * psqlODBC with `UseDeclareFetch=1` (what Excel and Power BI's ODBC sources
  * run) reads every result through `DECLARE … CURSOR … FOR`, `FETCH n IN` and
  * `CLOSE` (docs/prd/BIC-bi-client-compatibility.md D5). Only forward reads are
- * served; anything else (`FETCH BACKWARD`, `MOVE`, …) is left to PGlite, where
- * a data cursor does not exist and so fails as an unknown cursor.
+ * served. A cursor statement this does not read (`FETCH BACKWARD`, `MOVE`, a
+ * DECLARE without `FOR`) is `unsupported`: the session refuses it when it
+ * names a cursor over data, rather than letting PGlite answer it over empty
+ * tables (0 rows, as if that were the result).
  */
 export type CursorStatement =
-  | { kind: 'declare'; name: string; hold: boolean; query: string }
+  | {
+      kind: 'declare';
+      name: string;
+      hold: boolean;
+      scroll: boolean;
+      query: string;
+    }
   | { kind: 'fetch'; name: string; count: number | 'all' }
-  | { kind: 'close'; name: string | null };
+  | { kind: 'close'; name: string | null }
+  | {
+      kind: 'unsupported';
+      verb: 'DECLARE' | 'FETCH' | 'MOVE';
+      name: string | null;
+    };
 
-const CURSOR_NAME = String.raw`("(?:[^"]|"")+"|[A-Za-z_][A-Za-z0-9_$]*)`;
+/** A cursor name: quoted (`""` an escaped quote) or plain. */
+const NAME = String.raw`(?:"(?:[^"]|"")+"|[A-Za-z_][A-Za-z0-9_$]*)`;
+const CURSOR_NAME = `(${NAME})`;
+/** PostgreSQL takes DECLARE's options in any order. */
 const DECLARE_CURSOR = new RegExp(
-  String.raw`^\s*declare\s+${CURSOR_NAME}\s+(?:binary\s+)?(?:(?:asensitive|insensitive)\s+)?` +
-    String.raw`(?:(?:no\s+)?scroll\s+)?cursor\s+(?:(with|without)\s+hold\s+)?for\s+([\s\S]+?)\s*;?\s*$`,
+  String.raw`^declare\s+${CURSOR_NAME}\s+((?:(?:binary|asensitive|insensitive|no\s+scroll|scroll)\s+)*)` +
+    String.raw`cursor\s+(?:(with|without)\s+hold\s+)?for\s+([\s\S]+?)\s*;?\s*$`,
   'i',
 );
 const FETCH_CURSOR = new RegExp(
-  String.raw`^\s*fetch\s+(?:(next|all|forward\s+all|forward\s+\d+|forward|\d+)\s+)?(?:(?:from|in)\s+)?${CURSOR_NAME}\s*;?\s*$`,
+  String.raw`^fetch\s+(?:(next|all|forward\s+all|forward\s+\d+|forward|\d+)\s+)?(?:(?:from|in)\s+)?${CURSOR_NAME}\s*;?\s*$`,
   'i',
 );
 const CLOSE_CURSOR = new RegExp(
-  String.raw`^\s*close\s+(all|${CURSOR_NAME.slice(1, -1)})\s*;?\s*$`,
+  String.raw`^close\s+(all|${NAME})\s*;?\s*$`,
   'i',
 );
+const CURSOR_VERB = /^(declare|fetch|move)\b/i;
+const DECLARED_NAME = new RegExp(String.raw`^declare\s+${CURSOR_NAME}`, 'i');
+const LAST_NAME = new RegExp(String.raw`${CURSOR_NAME}\s*;?\s*$`, 'i');
 
 function cursorName(raw: string): string {
   return raw.startsWith('"')
@@ -207,14 +226,50 @@ function cursorName(raw: string): string {
     : raw.toLowerCase();
 }
 
-export function parseCursorStatement(sql: string): CursorStatement | null {
+/** `sql` without the whitespace and comments before its first word. */
+export function withoutLeadingComments(sql: string): string {
+  let rest = sql;
+  for (;;) {
+    const trimmed = rest.replace(/^\s+/, '');
+    if (trimmed.startsWith('--')) {
+      const end = trimmed.indexOf('\n');
+      rest = end < 0 ? '' : trimmed.slice(end + 1);
+    } else if (trimmed.startsWith('/*')) {
+      let depth = 0;
+      let i = 0;
+      for (; i < trimmed.length; i++) {
+        if (trimmed.startsWith('/*', i)) {
+          depth++;
+          i++;
+        } else if (trimmed.startsWith('*/', i)) {
+          depth--;
+          i++;
+          if (depth === 0) break;
+        }
+      }
+      rest = trimmed.slice(i + 1);
+    } else {
+      return trimmed;
+    }
+  }
+}
+
+export function parseCursorStatement(raw: string): CursorStatement | null {
+  const sql = withoutLeadingComments(raw);
+  const verb = CURSOR_VERB.exec(sql)?.[1]?.toUpperCase() as
+    | 'DECLARE'
+    | 'FETCH'
+    | 'MOVE'
+    | undefined;
   const declare = DECLARE_CURSOR.exec(sql);
   if (declare) {
+    const options = declare[2].toLowerCase();
     return {
       kind: 'declare',
       name: cursorName(declare[1]),
-      hold: declare[2]?.toLowerCase() === 'with',
-      query: declare[3],
+      hold: declare[3]?.toLowerCase() === 'with',
+      scroll: /(^|\s)scroll\b/.test(options) && !/no\s+scroll/.test(options),
+      query: declare[4],
     };
   }
   const fetch = FETCH_CURSOR.exec(sql);
@@ -233,6 +288,15 @@ export function parseCursorStatement(sql: string): CursorStatement | null {
     return {
       kind: 'close',
       name: /^all$/i.test(close[1]) ? null : cursorName(close[1]),
+    };
+  }
+  if (verb) {
+    const named =
+      verb === 'DECLARE' ? DECLARED_NAME.exec(sql) : LAST_NAME.exec(sql);
+    return {
+      kind: 'unsupported',
+      verb,
+      name: named ? cursorName(named[1]) : null,
     };
   }
   return null;
