@@ -24,7 +24,7 @@ There is nothing to switch on: who may query which table follows roles and grant
 
 ## What you can query
 
-SQL runs on DuckDB, so a source is queryable when DuckDB has a built-in way to reach it. Scan a source first: SQL only knows the tables a scan found.
+SQL runs on DuckDB. A source is queryable when DuckDB has a built-in way to reach it, or when Classifyre reads it live through the source's own API (search and graph sources, see [Live sources](#live-sources)). Scan a source first: SQL only knows the tables a scan found.
 
 | Source | What becomes a table |
 | --- | --- |
@@ -33,6 +33,8 @@ SQL runs on DuckDB, so a source is queryable when DuckDB has a built-in way to r
 | ODBC | Every scanned table and view of any database that has an ODBC driver — see [ODBC](#odbc) |
 | Iceberg REST catalogs, DuckLake | Every scanned table |
 | S3-compatible storage, Azure Blob, Google Cloud Storage, Local folder | Delta and Iceberg tables, and the [files](#files-in-a-bucket-or-folder) below |
+| Meilisearch | Every scanned index, as `<source>.indexes.<index>` — read live, see [Live sources](#live-sources) |
+| Neo4j | Every node label, as `<source>.nodes.<label>`, and every relationship type, as `<source>.relationships.<type>` — read live |
 
 ### Files in a bucket or folder
 
@@ -73,9 +75,21 @@ An [ODBC source](/sources/odbc/) is queried with DuckDB's official `odbc_scanner
 
 An ODBC query is a plain `SELECT * FROM <table>` sent to the database; nothing a query filters, projects or aggregates is sent along. A `LIMIT` ends the read early, anything else reads the table once across the network. Query a large ODBC table with a `LIMIT`, or land it in a bucket first. Each read of a table opens its own connection to the database, and they close when the query ends.
 
+### Live sources
+
+Meilisearch and Neo4j have no files or SQL engine for DuckDB to read, so a query reads them through their own API while it runs, with the source's own credentials, and always sees them as they are now.
+
+- **Columns are what the scan recorded.** A Meilisearch index's columns are the top-level fields of its documents (an object reads as its JSON text, a list of text or numbers as a list); a Neo4j label's are its nodes' properties and `element_id`. A relationship type has `source_element_id` and `target_element_id`, `source_id` and `target_id` (the start and end nodes' `id` property, when every one has one), its own properties, and `source_label` and `target_label`. A field added after the last scan is not there until the next scan; a table scanned before this release asks for one.
+- **Filters go to the source where it can apply them.** Conditions such as `genre = 'Drama'`, `year >= 2015` or `country IN ('AT', 'DE')` are sent to Meilisearch (on its filterable attributes) and to Neo4j (in the Cypher statement); only the columns the query uses are fetched; a `LIMIT` stops reading after the first page. Everything is checked again before you see it, so the answer is the same whether or not the source could filter. A condition on a masked column is never sent to the source.
+- **Joins read each side.** A join on a key (`r.source_id = c.id`) is not sent to the source: the live table is read with its own conditions, then joined. Give it a condition of its own on a large table.
+- **One query reads at most 1,000,000 rows from a live table.** More is refused with a message naming the table, never answered on part of it (operators: `CLASSIFYRE_QUERY_CONNECTOR_MAX_ROWS`).
+- **What it cost is shown.** After the query the toolbar says how many live tables, requests and rows it took; hover for each table and the filters sent to it.
+
+Measured on the development stack, through the query worker: films from a 20,000-document Meilisearch index joined with 200,000 orders in Parquet and 5,000 PostgreSQL customers in 1.2 s (574 documents read, the rest filtered at the source; 1.7 s when the index cannot filter); a join that reads all 50,000 relationships of a Neo4j type takes about 4.4 s, most of it reading the relationships.
+
 ### Sources that cannot be queried
 
-DuckDB has no built-in connector for Snowflake, BigQuery, Redshift, Athena, Trino, Dremio, Hive, MongoDB, Elasticsearch, OpenSearch, Meilisearch, Neo4j or Kafka, so their tables are listed with the reason. SQL Server, Oracle and any other database with an ODBC driver can be reached through an [ODBC source](/sources/odbc/) instead. The same holds for sources of documents and messages (Confluence, Jira, SharePoint, Slack and the like): they have no tables. Use the source's own query tool, or land the data in a bucket as Parquet or Delta.
+DuckDB has no built-in connector for Snowflake, BigQuery, Redshift, Athena, Trino, Dremio, Hive, MongoDB, Elasticsearch, OpenSearch or Kafka, so their tables are listed with the reason. SQL Server, Oracle and any other database with an ODBC driver can be reached through an [ODBC source](/sources/odbc/) instead. The same holds for sources of documents and messages (Confluence, Jira, SharePoint, Slack and the like): they have no tables. Use the source's own query tool, or land the data in a bucket as Parquet or Delta.
 
 A MySQL source set to verify the server's certificate (**SSL mode** *Verify CA* or *Verify identity*) is queried the same way it is scanned: the query checks the server's certificate against the CA you stored on the source (or the system's trusted roots when there is none), and fails to connect if it does not match.
 

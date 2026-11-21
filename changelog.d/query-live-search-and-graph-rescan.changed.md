@@ -1,0 +1,1 @@
+Scan Meilisearch and Neo4j sources again after upgrading: scans now record an index's or label's columns, and list each Neo4j relationship type as an asset of its own, which SQL needs before it can read them.

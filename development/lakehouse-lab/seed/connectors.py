@@ -232,8 +232,8 @@ def expected(data: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
 def _plain(row: tuple[Any, ...]) -> list[Any]:
     out = []
     for value in row:
-        if isinstance(value, float):
-            value = round(value, 6)
+        if isinstance(value, float) or hasattr(value, "as_tuple"):  # float, Decimal
+            value = round(float(value), 6)
         elif isinstance(value, (datetime.date, datetime.datetime)):
             value = value.isoformat()
         elif not isinstance(value, (int, str, list, type(None))):

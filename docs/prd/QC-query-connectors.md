@@ -2,7 +2,7 @@
 
 |                  |                                                                                                                                                                                                                                                                 |
 | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Status**       | QC1 built 2026-11-21 (§11); QC0 and QC2–QC5 proposed |
+| **Status**       | QC0–QC3 built 2026-11-21 (§11): the interface, the connector runtime, Meilisearch and Neo4j, the lab joins on skaffold; QC4–QC5 proposed |
 | **Size**         | L (6 phases, QC0–QC5, each its own PR)                                                                                                                                                                                                                          |
 | **Depends on**   | [DQ](DQ-data-query.md): the gate (`apps/cli/src/query/gate.py`), masks (§5.8), row filters (§5.10), the session (`session.py`), and the warm query worker (`apps/cli/src/query/worker.py`, `warm.py`; DQ §5.3)                                                   |
 | **Replaces**     | DQ phase 5 ("More sources")                                                                                                                                                                                                                                     |
@@ -217,6 +217,8 @@ Rules:
 
 ### 5.3 The runtime in `session.py`
 
+> **Changed while building QC2, 2026-11-21 (QC0 answers, §11).** DuckDB 2.0 hands projection and filters to a registered `pyarrow.dataset.Dataset`, so there is no bind/scan registration pair and no planner of ours: `ArrowConnector.relation()` registers one `LiveTable` (a `Dataset` subclass, `apps/cli/src/query/connectors/arrow.py`) whose `scanner(columns, filter)` DuckDB calls once per scan, after its optimiser has inlined the masked, filtered view. The pushed `filter` (a `pyarrow.compute` expression) is read into `Predicate`s only where rebuilding it gives the same expression (`predicates_of`), and every batch is filtered again locally, because DuckDB drops filters it pushed. A table read twice is simply scanned twice (no materialising). The stats travel as `scans` in the result meta. The rest of this section is the original design, kept for the record.
+
 Two phases for connector tables, on top of the current `_attach_tables_as_views`:
 
 1. **Bind** (when the view is created):
@@ -270,6 +272,8 @@ sequenceDiagram
 ```
 
 ### 5.4 Pushdown (`apps/cli/src/query/pushdown.py`, *new*)
+
+> **Not built (2026-11-21): DuckDB does it** (§5.3 note, §11 QC0). What DuckDB pushes into a dataset matches the rules below without a planner: comparisons with a constant, `IN` lists, `BETWEEN`, `IS NOT NULL`, the view's row filter, equivalences carried across a self-join; never `OR` of different columns, `LIKE`, functions, or a condition on a mask's output (a masked column's condition is on `md5(col)` or a constant, which DuckDB keeps). Projection is pushed always; `LIMIT` needs no pushdown, because DuckDB stops pulling batches and the connector's generator stops paging. Not pushed by DuckDB: ranges on `DOUBLE` columns (only equality), join keys. `TableLocation.withheld` (the request's masked columns) is a second guard: no predicate on them reaches a connector even if DuckDB ever pushes one. `query.pushdown: false` is not built.
 
 This is a port of the POC's `pushdown.py`. It runs on the SQL **after** the gate has rewritten names (the gate's output is DuckDB SQL over `"<src>"."<schema>"."<table>"`), with the gate still the authority.
 
@@ -543,3 +547,80 @@ Work test-first (the repository's `tdd` skill). Each task is one commit; each ph
 - **Tests.** `apps/cli/tests/test_query_manifest.py` (5), `apps/api/src/data-query/sql-names.manifest.spec.ts` (14); `tests/test_query.py` and the data-query specs unchanged in what they expect (four tests patch `load_extension` at its new seam, `connectors.base`). CLI query tests 138, data-query specs 140, ruff and strict mypy clean.
 - **Verified on the dev stack**: the catalog after the API reloaded lists the same sources and queryable tables as before (Trino locked, Lance/Paimon not queryable); queries through the restarted query worker ran the new bindings (the BI smoke, BIC §9).
 - **Not done**: the QC0 spike, connectors (QC2).
+
+### QC0, spike on DuckDB 2.0, 2026-11-21
+
+`development/lakehouse-lab/spikes/duckdb2_arrow.py` (DuckDB 2.0.0, pyarrow 26.0.1). The answers to §5.3's questions:
+
+- **Is a registered stream single-use?** A `RecordBatchReader` is: the second query fails. An object with `__arrow_c_stream__` is not, because DuckDB reopens it for every bind, describe and scan (4 opens for one `count(*)`). It reads batches only when a scan pulls them, so opens are free if the stream is lazy.
+- **Pushdown into Python objects:** yes, into a `pyarrow.dataset.Dataset`, including a Python subclass that DuckDB never constructs through `Dataset.__init__`. DuckDB reads `schema` and calls `scanner(columns=…, filter=<pyarrow.compute.Expression>)` once per scan, after its optimiser has run.
+  - **Pushed:** projection, `=`, `!=`, `<`… on integers, strings, dates and timestamps; `IN` (as `is_in` wrapped in `if_else(is_valid(...))`); `BETWEEN`; `IS NOT NULL`; `OR` between conjuncts; the view's own `WHERE`; equivalences across a self-join (`a.id < 3` reaches both scans).
+  - **Not pushed:** `LIKE`, functions, ranges on `DOUBLE` (only equality), join keys or dynamic join filters (no semi-join for free), `LIMIT` (DuckDB just stops pulling: one page read for `LIMIT 5`), and any condition on a masked column. A condition on `md5(email)` or on a constant mask stays in DuckDB; with a constant, the optimiser drops the scan altogether.
+  - DuckDB trusts the dataset with what it pushed: the connector must apply the filter itself (`arrow.py` filters every batch locally).
+- **A Python table-function API:** none in 2.0 (`create_table_function` absent). The dataset protocol is the bind/init/scan.
+- **`register` after `lock_configuration`:** works.
+- **Literal forms:** a comparison prints strings JSON-escaped; an `is_in` value set prints them raw. `predicates_of` reads both, and keeps a conjunct only when rebuilding it prints the same text.
+- **Extension audit** (`mssql`, `mongo`, `bigquery`, `snowflake`): not run. §4.1 is unchanged for those rows.
+
+### QC2, connector runtime, Meilisearch, Neo4j, 2026-11-21
+
+- **Runtime.** `apps/cli/src/query/connectors/arrow.py`:
+  - `ArrowConnector(QueryBinding)` (tier `connector`): `schema()` from the recorded columns, `scan()` yields Arrow batches or lists of dicts.
+  - `LiveTable`: the `Dataset` subclass.
+  - Supporting pieces: `Predicate`, `ScanRequest` (`timeout()` is at most the time left; `value_of()`), `ScanStats`, `ConnectorError(code)`, `to_batch`, `arrow_type`, `predicates_of`.
+  - The source is asked for the projection plus the filter's own columns (DuckDB leaves those out), or for every column when the filter was not read whole.
+  - A scan reading more than `CLASSIFYRE_QUERY_CONNECTOR_MAX_ROWS` (1,000,000) rows is refused with `connector_limit`.
+  - The session names a connector's error for its table instead of DuckDB's wrapper, and passes masked columns as `TableLocation.withheld` (never sent).
+  - The result meta carries `scans`.
+- **Recorded columns.** `src/utils/document_columns.py`: the top-level fields of a sample, DuckDB-typed (objects and mixed lists `JSON`, lists of one scalar `T[]`, Neo4j temporal values via `to_native()`).
+- **Meilisearch.**
+  - `connectors/meilisearch.py`: `/documents/fetch` with `fields`, `filter`, offset paging of 1,000 per page, and `GET /documents` before 1.2. Only filterable attributes are filtered at the source (names, or 1.14 patterns with their `equality`/`comparison` features); strings are JSON-escaped.
+  - Errors: "returned HTTP n", "is unreachable", "did not answer in time", never the body.
+  - The scan records `columns` (`_sample_columns`, 100 documents).
+  - `x-query`: `MEILISEARCH`, `search_index`, asset kind `index`.
+- **Neo4j.**
+  - `connectors/neo4j.py`: `build_cypher` (map projection of the requested columns, `WHERE` with `$pN` parameters only, backtick escaping), `neo4j.Query` with a timeout no longer than the time left, 10,000-row batches.
+  - Errors: credentials refused, unreachable, or the `Neo.*` code only.
+  - The scan records label `columns` (`element_id` plus the properties of 100 nodes). It also emits every relationship type as an asset of the new kind `relationship` (name `<db>:[TYPE]`, linked to its labels, no node content to scan), with `source_element_id`, `target_element_id`, `source_id`/`target_id` (when every sampled endpoint has `id`; this resolves §8's open question without a recipe field), its properties, `source_label` and `target_label`.
+  - `x-query`: `NEO4J`, `graph`, asset kinds `label`, `relationship`.
+- **API.**
+  - `sql-names.ts`: addresses `search_index` (`<src>.indexes.<uid>`) and `graph` (`<src>.nodes.<label>`, `<src>.relationships.<type>`), a `connector` location carrying the recorded columns; without them, "Scan the source again to record its columns."
+  - Migration `20261121120000_query_run_scan_stats` (`query_runs.scan_stats`), `scan-stats.ts`, and `QueryRunDto.scans`.
+- **Web.** The toolbar line "live: n tables · requests · rows", with each table and the filters sent in the tooltip (`lib/scan-summary.ts`, i18n en/de), plus kind icons for `index` and `relationship`.
+- **Not built:** the "live" tag in the explorer; the `query.pushdown` switch; the catalog's `tier` field and its `tier_not_built`/`not_tabular_kind` reasons (undeclared types keep the old reason); the MCP output line; tagging findings in Meilisearch fields to their column (§5.7 last bullet: default masking of connector columns still needs a steward's classification).
+- **Found on the dev stack and fixed.** The first Neo4j query installed the `neo4j` group from inside the query process, and that `uv sync` removed pyarrow, DuckDB and SQLGlot (shipped in the image, never recorded as synced) from the worker. Every later query failed until a restart. Fixes: `uv_sync.keep_installed` (`runner.ensure_dependencies`), plus `QueryBinding.dependency_groups`, which the worker installs during warm-up.
+- **Tests:**
+  - CLI: `tests/test_query_connectors.py` (23: fake connector through `run_query`, filter parsing), `test_query_meilisearch.py` (12), `test_query_neo4j.py` (8), `test_uv_sync.py` (+1).
+  - API: `sql-names.manifest.spec.ts` (+3), `scan-stats.spec.ts` (2). Web: `scan-summary.spec.ts` (2).
+  - CLI query suites 232 passed; data-query specs 147; ruff, mypy, tsc clean.
+
+### QC3, lab joins and performance on skaffold, 2026-11-21
+
+- **Test bed.**
+  - Services: `development/lakehouse-lab/compose.search-graph.yaml` (Meilisearch 1.13 at 172.18.10.50, Neo4j 5.26 Community at .51, shop PostgreSQL at .52) and `k8s-services.search-graph.yaml`.
+  - Data: `seed/connectors.py` (seed 7; 20,000 films, 5,000 customers, 200,000 orders as Parquet in S3, 50,000 `RATED`) writes `queries/connectors/expected.json`: the five queries run by a plain DuckDB over the same rows.
+  - Sources: `sources/meilisearch.json`, `neo4j.json`, `shop-postgres.json`.
+  - Queries Q1–Q5: `queries/connectors/`, portable SQL, so they also run through the gateway. Q1 casts instead of `round(double, int)`, which PostgreSQL lacks.
+  - Benchmark: `bench_query.py --mix connectors --verify --no-source-filters`.
+- **Correctness.** All five answers equal `expected.json`: over REST, with and without source filters, and through the SQL gateway (Q1 checked after the cast).
+- **Latency**, through the warm worker (REST, 10 sequential runs; `.bench/connectors-20261121.json`, not committed):
+
+| Query | p50 | p95 | Read from live sources | Target (§9) |
+|---|---|---|---|---|
+| Q1 Meilisearch × Parquet × PostgreSQL | 1.20 s | 1.72 s | 574 documents, 2 requests | ≤ 1.5 s: met |
+| Q2 Neo4j × Meilisearch × PostgreSQL | 2.75 s | 2.93 s | 4,902 documents; 19,898 relationships (`stars >= 4` sent) | ≤ 2.5 s: **missed** |
+| Q3 all four | 4.42 s | 4.83 s | 4,968 documents; all 50,000 relationships | ≤ 3 s: **missed** |
+| Q4 nested fields | 1.71 s | 1.79 s | 20,000 documents (join key only: no condition to send) | — |
+| Q5 self-join | 0.61 s | 0.81 s | 962 documents, two scans | — |
+
+- **Through the SQL gateway** (psycopg, one session, 10 runs): Q1 0.96 s, Q2 2.52 s, Q3 4.14 s, Q4 1.40 s, Q5 0.54 s. Three concurrent clients over REST: 36 of 36 succeeded, p50 2.3 s, p95 5.4 s, 1.08 queries/s.
+- **Source filters off** (Meilisearch filterable attributes cleared): identical answers. Q1 read 20,000 documents in 21 requests instead of 574 in 2 (1.70 s against 1.20 s), and Q5 40,000 instead of 962 (1.20 s against 0.61 s). The PRD's "632 vs 20,000" is 574 vs 20,000 on this seed.
+- **Why Q2 and Q3 miss.** The Neo4j read: the Python driver decodes about 20,000 to 25,000 records a second from this server (50,000 relationships in about 2 s from the host, measured outside Classifyre; `neo4j-rust-ext` took it to 1.8 s, not adopted). Q3 joins on keys only, so every relationship is read (§8, no semi-join). Semi-join pushdown (`r.source_id IN (…)` from the selective side) is the fix, planned as later work.
+- **Also done on the dev stack:** the six lab tables were opened to SQL connections.
+- **Not verified on the dev stack:**
+  - a Data reader seeing a masked connector column;
+  - personal data in a Meilisearch field classifying its column;
+  - the Data tab and MCP `query_data` on connector tables;
+  - the worker's memory under the concurrent run;
+  - two personas.
+

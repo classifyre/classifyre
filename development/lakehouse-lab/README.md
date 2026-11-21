@@ -162,6 +162,45 @@ To try the readers without a scan, `apps/cli/.venv/bin/python` can call
 `describe_table` and `iter_lakehouse_batches` from `src/utils/lakehouse_tables`
 on `dump_files/lakehouse-lab/tables` with `local_table_storage`.
 
+## Search and graph: live sources
+
+Meilisearch and Neo4j tables are read live by queries, through the source's
+own API (docs/prd/QC-query-connectors.md). Their lab runs from its own compose
+file, on the same network:
+
+| Service | Cluster name | Container | Host port | Credentials |
+| --- | --- | --- | --- | --- |
+| Meilisearch 1.13 | `http://lab-meilisearch.classifyre-dev.svc:7700` | `172.18.10.50:7700` | 17700 | master key `lab-meili-master-key-0123456789` |
+| Neo4j 5.26 | `bolt://lab-neo4j.classifyre-dev.svc:7687` | `172.18.10.51:7687` | 17687 (browser 17474) | `neo4j` / `lab-neo4j-pass` |
+| Shop PostgreSQL | `lab-shop-pg.classifyre-dev.svc:5432` | `172.18.10.52:5432` | 15433 | `lab` / `lab-shop-pass`, database `shop` |
+
+```bash
+docker compose -f compose.search-graph.yaml up -d
+kubectl --context k3d-classifyre apply -f k8s-services.search-graph.yaml
+uv run seed/connectors.py                       # data + queries/connectors/expected.json
+python3 workspace.py --run meilisearch neo4j shop-postgres s3-tables
+BENCH_USER=admin BENCH_PASSWORD=admin \
+  uv run --with pyarrow --with 'psycopg[binary]' python bench_query.py \
+  --mix connectors --verify --repeat 10 --pg --out .bench/connectors.json
+```
+
+The seed is fixed (random seed 7): 20,000 films in the Meilisearch index
+`movies`, 5,000 customers in `shop.public.customers`, 200,000 orders as
+Parquet at `s3://lake/tables/connectors/orders.parquet` (the S3 tables
+source reads `tables/`), and 5,000 `Person`, 20,000 `Movie` and 50,000
+`RATED` in Neo4j. `queries/connectors/*.sql` join them;
+`expected.json` holds their answers, worked out by a plain DuckDB over the
+same rows, which `--verify` compares with what Classifyre answers.
+`--no-source-filters` clears the index's filterable attributes for a run:
+the same answers, with every document read.
+
+For `--pg`, open the six tables to SQL connections first (a table's **SQL
+connections** switch, or `PUT /<ws>/assets/<id>/data-connections/exposure`
+`{"open": true}`).
+
+Do not commit while a benchmark runs: the pre-commit hook regenerates files
+the dev API watches, and its restart breaks the port-forward mid-run.
+
 ## The CLI image
 
 Scan pods take Python dependencies from the CLI image's baked
