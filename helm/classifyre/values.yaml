@@ -690,38 +690,56 @@ api:
 
 queryWorker:
   # -- Run SQL queries (the SQL page, exports, MCP, SQL connections) on a warm
-  # -- pool instead of starting a Job per query (docs/prd/DQ-data-query.md
-  # -- §5.3). It is the CLI image (`api.cliJobs.image`) running `query-worker`:
-  # -- one process per query, forked from a process that has already imported
-  # -- DuckDB and every source, so a query starts in milliseconds instead of
-  # -- waiting for a pod. Needs `api.cliJobs.enabled`.
+  # pool instead of starting a Job per query (docs/prd/DQ-data-query.md §5.3).
+  # It is the CLI image (`api.cliJobs.image`) running `query-worker`: one
+  # process per query, forked from a process that has already imported DuckDB
+  # and every source, so a query starts in milliseconds instead of waiting for
+  # a pod. Needs `api.cliJobs.enabled`.
   enabled: true
   # -- Worker pods when `queryWorker.autoscaling` is off. The Service spreads
-  # -- queries across them; each pod drains its running queries on a rollout
-  # -- or scale-down.
+  # queries across them; each pod drains its running queries on a rollout or
+  # scale-down.
   replicaCount: 1
   # -- Port of the worker's HTTP endpoint (cluster-internal).
   port: 8090
   # -- Queries one pod runs at once. 0: as many as its memory limit holds at
-  # -- `memoryPerQuery` each (up to 256), so a bigger pod runs more (vertical
-  # -- scaling): 32Gi at 256Mi is about 125 at once. DuckDB gets an equal share
-  # -- of the pod's memory (70 % after a fixed reserve) and its cores.
+  # `memoryPerQuery` each (up to 256), so a bigger pod runs more (vertical
+  # scaling): 32Gi at 256Mi is about 125 at once. DuckDB gets an equal share of
+  # the pod's memory (70 % after a fixed reserve) and its cores.
   slots: 0
   # -- Memory planned per running query when `slots` is 0: Python and Arrow in
-  # -- the query process plus DuckDB's share. Larger sorts and joins spill to /tmp.
+  # the query process plus DuckDB's share. Larger sorts and joins spill to /tmp.
   memoryPerQuery: 384Mi
+  # -- Most memory one query process may use before the worker stops it (the
+  # query fails as "out of memory", nothing else does): DuckDB's share plus an
+  # export at its 256 MB limit. Empty: no cap per query.
+  maxMemoryPerQuery: 1536Mi
+  # -- When the pod's memory use passes this share of its limit, the worker
+  # stops its largest query. Without it the kernel would stop every query in
+  # the pod (Kubernetes sets memory.oom.group on cgroup v2). 0: off.
+  memoryGuardPercent: 90
+  # -- Source types whose queries always run as Jobs, never in the shared
+  # worker: they load native code the source names (an ODBC `Driver=` path).
+  jobOnlySourceTypes:
+    - ODBC
   # -- When every slot of the pod the query reached is taken: `job` runs the
-  # -- query as a Job (the query-Job settings in `api.cliJobs.query`), `refuse`
-  # -- fails it at once with "busy".
+  # query as a Job (the query-Job settings in `api.cliJobs.query`), `refuse`
+  # fails it at once with "busy".
   overflow: job
   # -- Queries one person may have waiting or running at once (the SQL page,
-  # -- exports, MCP and SQL connections together: a BI tool's pool counts). A
-  # -- guard against a runaway client, not a capacity limit: slots, replicas
-  # -- and overflow Jobs are. Applies with the worker off too.
+  # exports, MCP and SQL connections together: a BI tool's pool counts). A
+  # guard against a runaway client, not a capacity limit: slots, replicas and
+  # overflow Jobs are. With the worker off the API keeps its default of 20.
   maxActivePerPerson: 100
+  # -- Queries one workspace may have waiting or running at once, so one
+  # workspace cannot take every slot of a pool other workspaces share.
+  maxActivePerWorkspace: 200
+  # -- Overflow Jobs one workspace may have running at once. Past this, a query
+  # the pool has no room for fails as "busy" instead of starting another pod.
+  maxOverflowJobsPerWorkspace: 10
   autoscaling:
     # -- Scale worker pods on CPU (horizontal scaling; metrics-server needed).
-    # -- New pods get new queries at once: each query is its own request.
+    # New pods get new queries at once: each query is its own request.
     enabled: true
     # -- Fewest worker pods.
     minReplicas: 1
@@ -730,16 +748,20 @@ queryWorker:
     # -- Target average CPU utilization, of the pod's CPU request.
     targetCPUUtilizationPercentage: 70
     # -- Extra HPA metrics, e.g. a Pods metric on `classifyre_query_worker_active`
-    # -- (from /metrics) through a Prometheus adapter.
+    # (from /metrics) through a Prometheus adapter, to scale on running queries
+    # rather than CPU alone.
     extraMetrics: []
     # -- Seconds of lower load before scaling down (drains running queries).
     scaleDownStabilizationSeconds: 300
   # -- Seconds a stopping pod lets running queries finish before it stops them.
-  drainSeconds: 60
+  # The default outlasts the longest query timeout a workspace may set (900 s)
+  # plus the worker's backstop, so a rollout or scale-down stops no query; the
+  # pod takes no new query meanwhile.
+  drainSeconds: 960
   # -- Size limit of the pod's /tmp, where queries spill large sorts and joins.
   tmpSizeLimit: 12Gi
   # -- Requests and limits of one worker pod. Memory: about 400 MiB for the
-  # -- warmed fork server plus what `slots` queries use at once.
+  # warmed fork server plus what `slots` queries use at once.
   resources:
     requests:
       cpu: 500m
@@ -747,9 +769,44 @@ queryWorker:
     limits:
       cpu: "2"
       memory: 4Gi
+  # -- Pod security context. Emptied, the template still sets these.
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 10001
+    runAsGroup: 10001
+    fsGroup: 10001
+    seccompProfile:
+      type: RuntimeDefault
+  # -- Container security context. Read-only root filesystem: nothing a query
+  # does can change the code later queries (of other workspaces) run. Emptied,
+  # the template still sets these.
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+  networkPolicy:
+    # -- A NetworkPolicy for the worker pods, on by default (unlike the chart's
+    # `networkPolicy`): ingress only from this release's API, worker and SQL
+    # gateway pods; egress anywhere but `deniedEgressCidrs`.
+    enabled: true
+    # -- Egress the worker never gets: link-local, where cloud metadata
+    # endpoints hand out the node's credentials.
+    deniedEgressCidrs:
+      - 169.254.0.0/16
+      - fe80::/10
+      - fd00:ec2::254/128
+    # -- More ingress rules (NetworkPolicyIngressRule), e.g. from Prometheus to
+    # port `queryWorker.port` for /metrics.
+    extraIngress: []
   token:
-    # -- Existing Secret with the token the API signs worker requests with;
-    # -- empty: the chart creates one and keeps it across upgrades.
+    # -- Existing Secret with the token the API signs worker requests with.
+    # Empty: the chart creates one and keeps it across `helm upgrade`. With
+    # `helm template` or a GitOps tool that renders without cluster access, set
+    # this (or `value`), or each render makes a new token; the API and the
+    # worker read the mounted file again when it changes, so a new one is
+    # picked up within the kubelet's sync period, without restarts.
     existingSecret: ""
     # -- Key of the token in that Secret.
     existingKey: token

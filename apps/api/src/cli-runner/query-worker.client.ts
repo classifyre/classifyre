@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import * as fs from 'node:fs';
 import * as http from 'node:http';
 import * as https from 'node:https';
 
@@ -14,28 +15,58 @@ const CONNECT_TIMEOUT_MS = 3_000;
  * second or third try usually reaches another replica before a Job is started.
  */
 const BUSY_ATTEMPTS = 3;
+/** How often a running query checks whether another replica cancelled it. */
+const CANCEL_POLL_MS = 3_000;
+const MIN_TOKEN_LENGTH = 16;
 
 export type QueryWorkerOverflow = 'job' | 'refuse';
 
 export interface QueryWorkerConfig {
   url: URL;
+  /** The token, or (the chart) the file that holds it, read again when it changes. */
   token: string;
+  tokenFile: string | null;
   /** What happens to a query no worker takes: a Job runs it, or it fails. */
   overflow: QueryWorkerOverflow;
 }
 
+/** One query for the worker: what a query Job would be given. */
+export interface QueryWorkerRun {
+  runId: string;
+  request: Record<string, unknown>;
+  timeoutSeconds: number;
+  /** Polled while it runs: true once the run was cancelled, by any replica. */
+  isCancelled?: () => Promise<boolean>;
+}
+
+/**
+ * How a query the worker took ended (apps/cli/src/query/worker.py,
+ * `OutcomeKind`): `done` carries the status payload a Job prints; the others
+ * are what only the worker saw.
+ */
+export type WorkerOutcome =
+  | 'done'
+  | 'timeout'
+  | 'cancelled'
+  | 'crashed'
+  | 'memory'
+  | 'stopped';
+
 /** What the worker answers when it ran (or tried to run) the query. */
 interface WorkerAnswer {
-  outcome: 'done' | 'timeout' | 'cancelled' | 'crashed' | 'stopped';
+  outcome: WorkerOutcome;
   exitCode: number | null;
   payload: Record<string, unknown> | null;
   worker?: string;
   ms?: number;
 }
 
-/** The worker did not take the query: nothing ran. */
-interface NotTakenResult {
-  notTaken: 'busy' | 'unavailable';
+/**
+ * The worker did not take the query: nothing ran. `job_only`: the query reads
+ * a source that only a Job may run (it loads native drivers).
+ */
+export interface NotTakenResult {
+  notTaken: 'busy' | 'unavailable' | 'job_only';
 }
 
 export interface QueryWorkerResult {
@@ -50,7 +81,10 @@ export function queryWorkerConfig(
 ): QueryWorkerConfig | null {
   const raw = env.QUERY_WORKER_URL?.trim();
   if (!raw) return null;
-  const token = env.QUERY_WORKER_TOKEN?.trim() ?? '';
+  const tokenFile = env.QUERY_WORKER_TOKEN_FILE?.trim() || null;
+  const token = tokenFile
+    ? readToken(tokenFile)
+    : (env.QUERY_WORKER_TOKEN?.trim() ?? '');
   let url: URL;
   try {
     url = new URL(raw);
@@ -60,20 +94,30 @@ export function queryWorkerConfig(
   if (url.protocol !== 'http:' && url.protocol !== 'https:') {
     throw new Error('QUERY_WORKER_URL must be http:// or https://');
   }
-  if (token.length < 16) {
+  if (token.length < MIN_TOKEN_LENGTH) {
     throw new Error(
-      'QUERY_WORKER_TOKEN must be set (at least 16 characters) with QUERY_WORKER_URL',
+      'QUERY_WORKER_TOKEN_FILE (or QUERY_WORKER_TOKEN) must give a token of at least 16 characters with QUERY_WORKER_URL',
     );
   }
   const overflow = env.QUERY_WORKER_OVERFLOW?.trim() || 'job';
   if (overflow !== 'job' && overflow !== 'refuse') {
     throw new Error('QUERY_WORKER_OVERFLOW must be job or refuse');
   }
-  return { url: new URL('/v1/queries', url), token, overflow };
+  return { url: new URL('/v1/queries', url), token, tokenFile, overflow };
+}
+
+function readToken(path: string): string {
+  try {
+    return fs.readFileSync(path, 'utf8').trim();
+  } catch (error) {
+    throw new Error(
+      `QUERY_WORKER_TOKEN_FILE ${path} cannot be read: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
 }
 
 /** The error payload a Job would have printed, for what only the worker saw. */
-function errorLine(code: string, message: string): string {
+export function queryErrorLine(code: string, message: string): string {
   return `${QUERY_RESULT_MARKER} ${JSON.stringify({
     status: 'error',
     error: { code, message },
@@ -101,6 +145,7 @@ export class QueryWorkerClient {
   private readonly config: QueryWorkerConfig | null;
   private readonly inFlight = new Map<string, AbortController>();
   private readonly agent: http.Agent;
+  private tokenStamp: number | null = null;
 
   constructor() {
     this.config = queryWorkerConfig(process.env);
@@ -123,36 +168,64 @@ export class QueryWorkerClient {
   }
 
   /**
-   * Run one query on a worker. Null: no worker took it, so nothing ran; run
-   * it as a Job. With `overflow: refuse` that case is a "busy" error instead.
+   * Run one query on a worker. Not taken (`notTaken`): nothing ran; run it as
+   * a Job. With `overflow: refuse` a busy or missing worker is a "busy" error
+   * instead; a `job_only` query always goes to a Job. Null without a worker.
    */
-  async run(params: {
-    runId: string;
-    request: Record<string, unknown>;
-    timeoutSeconds: number;
-  }): Promise<QueryWorkerResult | null> {
+  async run(
+    params: QueryWorkerRun,
+  ): Promise<QueryWorkerResult | NotTakenResult | null> {
     if (!this.config) return null;
     const result = await this.attempt(this.config, params);
     if (!('notTaken' in result)) return result;
-    if (this.config.overflow === 'job') return null;
+    if (this.config.overflow === 'job' || result.notTaken === 'job_only') {
+      return result;
+    }
     const message =
       result.notTaken === 'busy'
         ? 'Every query slot is taken. Run the query again in a moment.'
         : 'No query worker is available. Run the query again in a moment.';
-    return { output: errorLine('busy', message), exitCode: 1, worker: null };
+    return {
+      output: queryErrorLine('busy', message),
+      exitCode: 1,
+      worker: null,
+    };
+  }
+
+  /** The token to sign with; from the file when there is one, as it is now. */
+  private token(config: QueryWorkerConfig): string {
+    if (!config.tokenFile) return config.token;
+    try {
+      const stat = fs.statSync(config.tokenFile);
+      if (stat.mtimeMs !== this.tokenStamp) {
+        const value = fs.readFileSync(config.tokenFile, 'utf8').trim();
+        if (value.length >= MIN_TOKEN_LENGTH) {
+          config.token = value;
+          this.tokenStamp = stat.mtimeMs;
+        }
+      }
+    } catch {
+      // A Secret update swaps the file; keep the last token meanwhile.
+    }
+    return config.token;
   }
 
   private async attempt(
     config: QueryWorkerConfig,
-    params: {
-      runId: string;
-      request: Record<string, unknown>;
-      timeoutSeconds: number;
-    },
+    params: QueryWorkerRun,
   ): Promise<QueryWorkerResult | NotTakenResult> {
     const controller = new AbortController();
     this.inFlight.set(params.runId, controller);
     const body = JSON.stringify(params.request);
+    const poll = params.isCancelled
+      ? setInterval(() => {
+          params.isCancelled!()
+            .then((cancelled) => {
+              if (cancelled) controller.abort();
+            })
+            .catch(() => undefined);
+        }, CANCEL_POLL_MS)
+      : null;
     try {
       let answer: { status: number; body: string } | null = null;
       for (let attempt = 1; attempt <= BUSY_ATTEMPTS; attempt++) {
@@ -162,6 +235,11 @@ export class QueryWorkerClient {
           (Math.max(1, params.timeoutSeconds) + RESPONSE_MARGIN_SECONDS) * 1000,
           controller.signal,
         );
+        if (answer.status === 401 && config.tokenFile && attempt === 1) {
+          // The worker may have read a new Secret first: read ours again.
+          this.tokenStamp = null;
+          continue;
+        }
         if (answer.status !== 503 || this.parse(answer.body)?.code !== 'busy') {
           break;
         }
@@ -172,11 +250,18 @@ export class QueryWorkerClient {
         this.logger.log(
           `Query ${params.runId}: query worker ${code}, not taken`,
         );
-        return { notTaken: code === 'busy' ? 'busy' : 'unavailable' };
+        return {
+          notTaken:
+            code === 'busy'
+              ? 'busy'
+              : code === 'job_only'
+                ? 'job_only'
+                : 'unavailable',
+        };
       }
       if (status === 401) {
         this.logger.error(
-          'The query worker refused the API token (QUERY_WORKER_TOKEN differs from its own)',
+          'The query worker refused the API token (the API and the worker read different query-worker tokens); queries run as Jobs until they agree',
         );
         return { notTaken: 'unavailable' };
       }
@@ -189,7 +274,10 @@ export class QueryWorkerClient {
       const parsed = this.parse(answer!.body) as WorkerAnswer | null;
       if (!parsed?.outcome) {
         return {
-          output: errorLine('job_failed', 'The query worker sent no result.'),
+          output: queryErrorLine(
+            'job_failed',
+            'The query worker sent no result.',
+          ),
           exitCode: 1,
           worker: null,
         };
@@ -208,7 +296,7 @@ export class QueryWorkerClient {
       }
       const message = error instanceof Error ? error.message : String(error);
       return {
-        output: errorLine(
+        output: queryErrorLine(
           'job_failed',
           `The query worker stopped answering while the query ran (${message}).`,
         ),
@@ -216,6 +304,7 @@ export class QueryWorkerClient {
         worker: null,
       };
     } finally {
+      if (poll) clearInterval(poll);
       this.inFlight.delete(params.runId);
     }
   }
@@ -242,7 +331,7 @@ export class QueryWorkerClient {
         };
       case 'timeout':
         return {
-          output: errorLine(
+          output: queryErrorLine(
             'timeout',
             `The query took longer than ${timeoutSeconds} s and was stopped.`,
           ),
@@ -251,9 +340,18 @@ export class QueryWorkerClient {
         };
       case 'cancelled':
         return { output: '', exitCode: 1, worker };
+      case 'memory':
+        return {
+          output: queryErrorLine(
+            'out_of_memory',
+            'The query needed more memory than one query may use and was stopped. Select fewer rows or columns, or aggregate first.',
+          ),
+          exitCode: 1,
+          worker,
+        };
       case 'stopped':
         return {
-          output: errorLine(
+          output: queryErrorLine(
             'job_failed',
             'The query worker shut down while the query ran. Run it again.',
           ),
@@ -270,7 +368,7 @@ export class QueryWorkerClient {
             ? 'The query process was killed (signal 9), most often because it ran out of memory.'
             : `The query process ended unexpectedly (exit ${answer.exitCode ?? 'unknown'}).`;
         return {
-          output: errorLine('job_failed', message),
+          output: queryErrorLine('job_failed', message),
           exitCode: 1,
           worker,
         };
@@ -310,7 +408,7 @@ export class QueryWorkerClient {
           agent: this.agent,
           signal,
           headers: {
-            Authorization: `Bearer ${config.token}`,
+            Authorization: `Bearer ${this.token(config)}`,
             'Content-Type': 'application/json',
             'Content-Length': Buffer.byteLength(body),
           },

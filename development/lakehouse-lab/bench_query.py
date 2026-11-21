@@ -73,6 +73,8 @@ def token() -> str:
         _token["value"] = body["access_token"]
         _token["expires"] = time.monotonic() + int(body.get("expires_in", 300)) - 60
         return str(_token["value"])
+
+
 PG_HOST = os.environ.get("PG_HOST", "localhost")
 PG_PORT = int(os.environ.get("PG_PORT", "25432"))
 
@@ -127,7 +129,9 @@ def call(method: str, path: str, body: object = None) -> Any:
     headers = {"authorization": f"Bearer {token()}"}
     if data:
         headers["content-type"] = "application/json"
-    request = urllib.request.Request(f"{BASE}/{NS}{path}", data=data, method=method, headers=headers)
+    request = urllib.request.Request(
+        f"{BASE}/{NS}{path}", data=data, method=method, headers=headers
+    )
     with urllib.request.urlopen(request, timeout=300) as response:
         payload = response.read()
     return json.loads(payload) if payload else None
@@ -139,7 +143,11 @@ def rest_query(sql: str, timeout: float = 180.0) -> dict[str, Any]:
         return _rest_query(sql, start, timeout)
     except urllib.error.HTTPError as exc:
         body = exc.read().decode("utf-8", "replace")[:200]
-        return {"ok": False, "seconds": time.monotonic() - start, "error": f"HTTP {exc.code} {body}"}
+        return {
+            "ok": False,
+            "seconds": time.monotonic() - start,
+            "error": f"HTTP {exc.code} {body}",
+        }
     except Exception as exc:
         return {"ok": False, "seconds": time.monotonic() - start, "error": str(exc)[:200]}
 
@@ -206,8 +214,12 @@ def verify(mix: dict[str, str]) -> dict[str, Any]:
         want = expected["queries"].get(name)
         same = rows == want
         report[name] = {"ok": same, "rows": len(rows), "scans": sample["scans"]}
-        reads = ", ".join(f"{s['table']} {s['rows']} rows/{s['requests']} req" for s in sample["scans"])
-        print(f"  {name:28} {'same' if same else 'DIFFERENT'} ({len(rows)} rows) {reads}", flush=True)
+        reads = ", ".join(
+            f"{s['table']} {s['rows']} rows/{s['requests']} req" for s in sample["scans"]
+        )
+        print(
+            f"  {name:28} {'same' if same else 'DIFFERENT'} ({len(rows)} rows) {reads}", flush=True
+        )
         if not same:
             report[name]["got"] = rows[:5]
             report[name]["want"] = (want or [])[:5]
@@ -285,7 +297,9 @@ class PgClient:
 
 
 def pg_credentials(out_dir: Path) -> tuple[str, str, str]:
-    secret = call("POST", "/data-connections", {"name": f"bench {int(time.time())}", "expiresInDays": 1})
+    secret = call(
+        "POST", "/data-connections", {"name": f"bench {int(time.time())}", "expiresInDays": 1}
+    )
     endpoint = call("GET", "/data-connections/endpoint")
     ca = out_dir / "bench-ca.crt"
     ca.write_text(endpoint["caCertificate"], encoding="utf-8")
@@ -298,7 +312,7 @@ def summarize(samples: list[dict[str, Any]]) -> dict[str, Any]:
     if ok:
         ok.sort()
         out["p50"] = round(statistics.median(ok), 3)
-        out["p95"] = round(ok[min(len(ok) - 1, int(round(0.95 * (len(ok) - 1))))], 3)
+        out["p95"] = round(ok[min(len(ok) - 1, round(0.95 * (len(ok) - 1)))], 3)
         out["min"] = round(ok[0], 3)
         out["max"] = round(ok[-1], 3)
     setups = [s["setup_ms"] for s in samples if s.get("setup_ms") is not None]
@@ -384,19 +398,34 @@ def compare(paths: list[str]) -> None:
                 cells.append(f"{s['p50']} / {s['p95']}" if s and "p50" in s else "—")
             print(f"| {name} | " + " | ".join(cells) + " |")
         print(f"\n### {transport}: concurrent\n")
-        print("| clients | " + " | ".join(f"{label} q/s · p50 · p95 · failed" for label in labels) + " |")
+        print(
+            "| clients | "
+            + " | ".join(f"{label} q/s · p50 · p95 · failed" for label in labels)
+            + " |"
+        )
         print("|---|" + "---|" * len(labels))
-        counts = sorted({c["clients"] for r in runs for c in r.get(transport, {}).get("concurrent", [])})
+        counts = sorted(
+            {c["clients"] for r in runs for c in r.get(transport, {}).get("concurrent", [])}
+        )
         for n in counts:
             cells = []
             for r in runs:
-                c = next((c for c in r.get(transport, {}).get("concurrent", []) if c["clients"] == n), None)
-                cells.append(f"{c['qps']} · {c.get('p50', '—')} · {c.get('p95', '—')} · {c['failed']}" if c else "—")
+                c = next(
+                    (c for c in r.get(transport, {}).get("concurrent", []) if c["clients"] == n),
+                    None,
+                )
+                cells.append(
+                    f"{c['qps']} · {c.get('p50', '—')} · {c.get('p95', '—')} · {c['failed']}"
+                    if c
+                    else "—"
+                )
             print(f"| {n} | " + " | ".join(cells) + " |")
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument("--label", default="run")
     parser.add_argument("--out")
     parser.add_argument("--repeat", type=int, default=5)
@@ -419,7 +448,7 @@ def main() -> None:
         return
     if not TOKEN and not (BENCH_USER and BENCH_PASSWORD):
         sys.exit("export API_TOKEN, or BENCH_USER and BENCH_PASSWORD")
-    out_dir = Path(args.out).parent if args.out else Path(".")
+    out_dir = Path(args.out).parent if args.out else Path()
     out_dir.mkdir(parents=True, exist_ok=True)
     clients = [int(c) for c in args.clients.split(",") if c]
     report: dict[str, Any] = {"label": args.label, "at": time.strftime("%Y-%m-%dT%H:%M:%S")}
@@ -435,7 +464,7 @@ def main() -> None:
         mix = MIX
         rest_mix = {**MIX, **REST_EXTRA}
     try:
-        _run(args, report, mix, rest_mix, clients, out_dir)
+        _run(args, report, mix=mix, rest_mix=rest_mix, clients=clients, out_dir=out_dir)
     finally:
         if args.mix == "connectors" and args.no_source_filters:
             meili_filterable(MEILI_FILTERABLE)
@@ -447,6 +476,7 @@ def main() -> None:
 def _run(
     args: Any,
     report: dict[str, Any],
+    *,
     mix: dict[str, str],
     rest_mix: dict[str, str],
     clients: list[int],
@@ -458,7 +488,10 @@ def _run(
         report["verify"] = verify(mix)
     if not args.no_rest:
         print("REST sequential", flush=True)
-        report["rest"] = {"sequential": sequential(rest_query, args.repeat, rest_mix), "concurrent": []}
+        report["rest"] = {
+            "sequential": sequential(rest_query, args.repeat, rest_mix),
+            "concurrent": [],
+        }
         print("REST concurrent", flush=True)
         for n in clients:
             report["rest"]["concurrent"].append(

@@ -136,6 +136,13 @@ class QueryBinding(ABC):
         """What a failed read of this source's table means, when it is known."""
         return None
 
+    def local_paths(self) -> list[str]:
+        """Local directories or files DuckDB itself reads for this source's
+        tables once the query runs. Every other local path is closed to the
+        query (``enable_external_access = false``, see ``QuerySession``);
+        remote URLs stay open, scoped by the source's own credentials."""
+        return []
+
     def close(self) -> None:
         """Release what the binding made (temporary files); the session closes DuckDB."""
 

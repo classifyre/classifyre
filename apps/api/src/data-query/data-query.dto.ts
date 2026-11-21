@@ -258,7 +258,7 @@ export class QueryRunErrorDto {
     example: 'table_not_available',
     description:
       'invalid_sql, select_only, function_not_allowed, table_name_required, table_not_available, ' +
-      'source_unavailable, execution_error, timeout, result_too_large, job_failed, no_result',
+      'source_unavailable, execution_error, timeout, result_too_large, job_failed, no_result, busy, out_of_memory, lost',
   })
   code: string;
 

@@ -25,6 +25,7 @@ __all__ = [
     "TableLocation",
     "binding_class",
     "declared_sources",
+    "query_dependency_groups",
 ]
 
 #: source type → (module in this package, class).
@@ -42,6 +43,36 @@ _BINDINGS: dict[str, tuple[str, str]] = {
     "MEILISEARCH": ("meilisearch", "MeilisearchConnector"),
     "NEO4J": ("neo4j", "Neo4jConnector"),
 }
+
+
+#: The optional dependency groups each type's source client imports
+#: (``require_module(..., uv_groups=...)`` in ``src/sources/<type>/``). They
+#: are baked into the CLI image (root ``Dockerfile``, cli-builder), so neither a
+#: query Job nor the query worker installs anything while a query waits, and
+#: the worker can run on a read-only root filesystem.
+#: tests/test_query_manifest.py checks both against the sources and the image.
+_SOURCE_GROUPS: dict[str, tuple[str, ...]] = {
+    "POSTGRESQL": ("postgresql",),
+    "MYSQL": ("mysql",),
+    "DATABRICKS": ("databricks",),
+    "ODBC": ("odbc",),
+    "ICEBERG_REST": ("iceberg-rest",),
+    "DUCKLAKE": ("file-processing",),
+    "S3_COMPATIBLE_STORAGE": ("s3-compatible-storage",),
+    "AZURE_BLOB_STORAGE": ("azure-blob-storage",),
+    "GOOGLE_CLOUD_STORAGE": ("google-cloud-storage",),
+    "LOCAL_FOLDER": (),
+    "MEILISEARCH": (),
+    "NEO4J": ("neo4j",),
+}
+
+
+def query_dependency_groups() -> set[str]:
+    """Every group a query of a declared type may import: the sources' own
+    clients and the bindings' (``QueryBinding.dependency_groups``)."""
+    groups = {g for t in declared_sources() for g in _SOURCE_GROUPS.get(t, ())}
+    groups.update(g for t in declared_sources() for g in binding_class(t).dependency_groups)
+    return groups
 
 
 @dataclass(frozen=True)

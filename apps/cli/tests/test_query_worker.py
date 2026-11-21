@@ -10,7 +10,10 @@ from __future__ import annotations
 import http.client
 import http.server
 import json
+import os
+import signal
 import socket
+import sys
 import threading
 import time
 from collections.abc import Iterator
@@ -34,6 +37,7 @@ from src.query.runner import TOKEN_HEADER
 from src.query.worker import (
     QUERY_PATH,
     QueryWorker,
+    Token,
     WorkerConfig,
     WorkerConfigError,
     _Handler,
@@ -84,7 +88,8 @@ def test_unset_slots_come_from_memory(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_config_takes_the_token_out_of_the_environment() -> None:
     env = {"CLASSIFYRE_QUERY_WORKER_TOKEN": TOKEN, "CLASSIFYRE_QUERY_WORKER_SLOTS": "3"}
     config = WorkerConfig.from_env(env)
-    assert config.token == TOKEN
+    assert config.token.matches(f"Bearer {TOKEN}")
+    assert not config.token.matches("Bearer nope-0123456789abcdef")
     assert config.slots == 3
     assert "CLASSIFYRE_QUERY_WORKER_TOKEN" not in env
     assert TOKEN not in repr(config)
@@ -94,7 +99,23 @@ def test_config_reads_a_token_file(tmp_path: Path) -> None:
     path = tmp_path / "token"
     path.write_text(TOKEN + "\n", encoding="utf-8")
     env = {"CLASSIFYRE_QUERY_WORKER_TOKEN_FILE": str(path)}
-    assert WorkerConfig.from_env(env).token == TOKEN
+    assert WorkerConfig.from_env(env).token.matches(f"Bearer {TOKEN}")
+
+
+def test_a_new_token_file_takes_effect_without_a_restart(tmp_path: Path) -> None:
+    """The kubelet swaps a Secret's file when the Secret changes."""
+    path = tmp_path / "token"
+    path.write_text(TOKEN, encoding="utf-8")
+    token = Token(path=str(path))
+    assert token.matches(f"Bearer {TOKEN}")
+    following = "next-token-0123456789abcdef"
+    (tmp_path / "token.new").write_text(following, encoding="utf-8")
+    (tmp_path / "token.new").replace(path)
+    assert token.matches(f"Bearer {following}")
+    assert not token.matches(f"Bearer {TOKEN}")
+    # Mid-swap (no file) or a short one: the last good token stays.
+    path.unlink()
+    assert token.matches(f"Bearer {following}")
 
 
 def test_query_processes_see_only_what_they_need() -> None:
@@ -135,6 +156,8 @@ def test_query_processes_see_only_what_they_need() -> None:
         {"CLASSIFYRE_QUERY_WORKER_TOKEN": "short"},
         {"CLASSIFYRE_QUERY_WORKER_TOKEN": TOKEN, "CLASSIFYRE_QUERY_WORKER_SLOTS": "-1"},
         {"CLASSIFYRE_QUERY_WORKER_TOKEN": TOKEN, "CLASSIFYRE_QUERY_WORKER_START_METHOD": "x"},
+        # A forked query process would start as a copy of the main process.
+        {"CLASSIFYRE_QUERY_WORKER_TOKEN": TOKEN, "CLASSIFYRE_QUERY_WORKER_START_METHOD": "fork"},
     ],
 )
 def test_config_refuses_what_cannot_work(env: dict[str, str]) -> None:
@@ -224,14 +247,16 @@ class _Running:
         return response.status, text
 
 
-def _start(slots: int = 2, drain_seconds: int = 1) -> _Running:
+def _start(slots: int = 2, drain_seconds: int = 1, **options: Any) -> _Running:
     config = WorkerConfig(
-        token=TOKEN,
+        token=Token(value=TOKEN),
         host="127.0.0.1",
         port=0,
         slots=slots,
         drain_seconds=drain_seconds,
         start_method=default_start_method(),
+        memory_mb=4096,
+        **options,
     )
     worker = QueryWorker(config)
     server = _Server(("127.0.0.1", 0), _Handler)
@@ -383,6 +408,8 @@ def test_a_dropped_request_stops_its_query(running: _Running, folder: Path) -> N
     sock.close()  # what the API does when the person cancels
     assert _wait(lambda: running.worker.stats.active == 0)
     assert running.worker.stats.queries == {"cancelled": 1}
+    # Killed mid-query, it could not clean up: the worker did.
+    assert list(running.worker._query_dirs.iterdir()) == []
 
 
 def test_draining_finishes_then_refuses(running: _Running, folder: Path) -> None:
@@ -416,3 +443,95 @@ def test_metrics_count_outcomes(running: _Running, folder: Path) -> None:
     assert 'classifyre_query_worker_queries_total{outcome="success"} 1' in text
     assert "classifyre_query_worker_slots 2" in text
     assert "classifyre_query_worker_ready 1" in text
+
+
+# ── isolation ────────────────────────────────────────────────────────────
+
+
+def test_a_query_writes_only_into_its_own_directory_which_goes_with_it(
+    running: _Running, folder: Path
+) -> None:
+    seen: list[list[Path]] = []
+    done = threading.Event()
+
+    def watch() -> None:
+        while not done.is_set():
+            entries = list(running.worker._query_dirs.iterdir())
+            if entries:
+                seen.append(entries)
+            time.sleep(0.01)
+
+    watcher = threading.Thread(target=watch, daemon=True)
+    watcher.start()
+    status, body = running.post(_request(folder, "SELECT count(*) FROM files.local.orders"))
+    done.set()
+    watcher.join(5)
+    assert status == 200 and body["exitCode"] == 0, body
+    assert seen and all(len(entries) == 1 for entries in seen)
+    assert list(running.worker._query_dirs.iterdir()) == []
+
+
+def test_a_query_that_dies_takes_no_other_query_with_it(running: _Running, folder: Path) -> None:
+    results: list[tuple[int, dict[str, Any]]] = []
+    slow = threading.Thread(
+        target=lambda: results.append(running.post(_request(folder, SLOW_SQL, timeoutSeconds=60)))
+    )
+    slow.start()
+    assert _wait(lambda: len(running.worker._running) == 1)
+    (pid,) = list(running.worker._running)
+    os.kill(pid, signal.SIGKILL)
+    slow.join(30)
+    assert results and results[0][1]["outcome"] == "crashed"
+    assert results[0][1]["exitCode"] == -signal.SIGKILL
+    status, body = running.post(_request(folder, "SELECT count(*) FROM files.local.orders"))
+    assert status == 200 and body["payload"]["status"] == "success"
+
+
+def test_sources_that_load_native_drivers_run_as_jobs(running: _Running, folder: Path) -> None:
+    request = _request(folder, "SELECT 1")
+    request["sources"].append(
+        {"alias": "erp", "sourceId": "src-2", "recipe": {"type": "ODBC", "required": {}}}
+    )
+    status, body = running.post(request)
+    assert status == 503
+    assert body["code"] == "job_only"
+    assert running.worker.stats.refused == {"job_only": 1}
+
+
+linux_only = pytest.mark.skipif(not sys.platform.startswith("linux"), reason="Linux /proc")
+
+
+@linux_only
+def test_set_not_dumpable_closes_the_process_to_others() -> None:
+    import subprocess
+
+    probe = (
+        "import ctypes; from src.query.worker import set_not_dumpable; "
+        "set_not_dumpable(); print(ctypes.CDLL(None).prctl(3, 0, 0, 0, 0))"  # PR_GET_DUMPABLE
+    )
+    out = subprocess.run(
+        [sys.executable, "-c", probe], capture_output=True, text=True, check=True, timeout=60
+    )
+    assert out.stdout.strip() == "0"
+
+
+@linux_only
+def test_the_memory_guard_stops_a_query_past_its_cap(
+    monkeypatch: pytest.MonkeyPatch, folder: Path
+) -> None:
+    monkeypatch.setenv("CLASSIFYRE_QUERY_WORKER_EXTENSIONS", "")
+    monkeypatch.setenv("CLASSIFYRE_QUERY_WORKER_FORKSERVER", "1")
+    guarded = _start(max_query_memory_mb=1)  # any query is past 1 MB of its own
+    try:
+        status, body = guarded.post(_request(folder, SLOW_SQL, timeoutSeconds=60))
+        assert status == 200
+        assert body["outcome"] == "memory"
+    finally:
+        guarded.server.shutdown()
+        guarded.server.server_close()
+
+
+@linux_only
+def test_the_fork_server_has_no_other_thread_when_it_forks(running: _Running) -> None:
+    """A thread holding a lock at fork() leaves it held in every query process."""
+    assert running.worker.warm_timings.get("other_threads") == 0.0

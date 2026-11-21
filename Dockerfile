@@ -134,11 +134,21 @@ ENV UV_LINK_MODE=copy \
 # the CLI loads from before it tries the shared extension cache or INSTALL.
 # ODBC is in the same list: pyodbc (group `odbc`) and DuckDB's ODBC scanner, which
 # DuckDB publishes only in its nightly repository (`INSTALL odbc FROM core_nightly`).
+# The clients of every source a query can read (src/query/connectors/__init__.py,
+# _SOURCE_GROUPS) are baked in for the same reason, and so that the query worker
+# runs with installing turned off on a read-only root filesystem: a query never
+# re-syncs the environment other queries are running from. Checked by
+# apps/cli/tests/test_query_manifest.py.
 # Byte-compiled here, since every job is a fresh pod that would otherwise compile
 # each module it imports on every start: about a second of a query job's start
 # (measured 2026-11-15: 1.1-1.5 s of imports cold, 0.4 s compiled).
+# The baked groups are recorded where src/utils/uv_sync.py keeps the groups it
+# installed: a later on-demand sync passes every recorded group, so it cannot
+# uninstall one of these from under a running job.
+ARG CLI_BAKED_GROUPS="file-processing lineage odbc postgresql mysql databricks iceberg-rest s3-compatible-storage azure-blob-storage google-cloud-storage neo4j"
 RUN uv venv --python /usr/local/bin/python3 .venv \
-    && UV_COMPILE_BYTECODE=1 uv sync --locked --no-dev --group file-processing --group lineage --group odbc \
+    && UV_COMPILE_BYTECODE=1 uv sync --locked --no-dev $(printf -- '--group %s ' ${CLI_BAKED_GROUPS}) \
+    && printf '%s\n' ${CLI_BAKED_GROUPS} | .venv/bin/python -c "import json, sys; json.dump(sorted(sys.stdin.read().split()), open('.venv/.classifyre-uv-sync-groups.json', 'w'))" \
     && .venv/bin/python -m compileall -q -j 0 src \
     && .venv/bin/python -c "import duckdb; c = duckdb.connect(); c.execute(\"SET extension_directory = '/opt/duckdb-extensions'\"); [c.execute('INSTALL ' + e) for e in ('httpfs', 'postgres', 'mysql', 'sqlite', 'delta', 'iceberg', 'ducklake', 'azure', 'avro', 'excel', 'unity_catalog', 'spatial')]" \
     && .venv/bin/python -c "import duckdb; c = duckdb.connect(); c.execute(\"SET extension_directory = '/opt/duckdb-extensions'\"); c.execute('INSTALL odbc FROM core_nightly')"

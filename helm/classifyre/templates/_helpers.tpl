@@ -67,6 +67,41 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- .Values.queryWorker.token.existingKey | default "token" -}}
 {{- end -}}
 
+{{- /*
+The query-worker token as a file, for the worker and every pod that sends it
+queries. Mounted rather than set in the environment: no copy sits in a
+process's environment, and a new Secret reaches running pods (both sides read
+the file again when it changes) without a restart, also when a GitOps render
+generates a new one.
+*/ -}}
+{{- define "classifyre.queryWorker.tokenDir" -}}/var/run/classifyre/query-worker{{- end -}}
+
+{{- define "classifyre.queryWorker.tokenFile" -}}
+{{- printf "%s/%s" (include "classifyre.queryWorker.tokenDir" .) (include "classifyre.queryWorker.tokenSecretKey" .) -}}
+{{- end -}}
+
+{{- define "classifyre.queryWorker.tokenMount" -}}
+{{- if include "classifyre.queryWorker.enabled" . }}
+- name: query-worker-token
+  mountPath: {{ include "classifyre.queryWorker.tokenDir" . }}
+  readOnly: true
+{{- end }}
+{{- end -}}
+
+{{- define "classifyre.queryWorker.tokenVolume" -}}
+{{- if include "classifyre.queryWorker.enabled" . }}
+- name: query-worker-token
+  secret:
+    secretName: {{ include "classifyre.queryWorker.tokenSecretName" . }}
+    # Read by a non-root uid that may have no fsGroup (the API); the token
+    # only goes to pods that send queries or run them.
+    defaultMode: 0444
+    items:
+      - key: {{ include "classifyre.queryWorker.tokenSecretKey" . }}
+        path: {{ include "classifyre.queryWorker.tokenSecretKey" . }}
+{{- end }}
+{{- end -}}
+
 {{- /* The Secret with the SQL gateway's certificate (tls.crt, tls.key, ca.crt). */ -}}
 {{- define "classifyre.sqlGateway.tlsSecret" -}}
 {{- .Values.sqlGateway.tls.existingSecret | default (printf "%s-sql-tls" (include "classifyre.fullname" .)) -}}
@@ -554,18 +589,20 @@ which each deployment sets on its own after including this block.
   value: {{ .Values.api.cliJobs.cleanupPolicy | quote }}
 - name: K8S_CLI_JOB_WORKDIR
   value: {{ .Values.api.cliJobs.workDir | quote }}
-- name: QUERY_MAX_ACTIVE_PER_PERSON
-  value: {{ .Values.queryWorker.maxActivePerPerson | quote }}
 {{- if include "classifyre.queryWorker.enabled" . }}
 {{- /* SQL queries go to the warm query worker first (both the API and the SQL
-     gateway run them); a Job runs what it cannot take. */}}
+     gateway run them); a Job runs what it cannot take. Without the worker the
+     API keeps its own per-person default, sized for one Job per query. */}}
+- name: QUERY_MAX_ACTIVE_PER_PERSON
+  value: {{ .Values.queryWorker.maxActivePerPerson | quote }}
+- name: QUERY_MAX_ACTIVE_PER_WORKSPACE
+  value: {{ .Values.queryWorker.maxActivePerWorkspace | quote }}
+- name: QUERY_MAX_OVERFLOW_JOBS_PER_WORKSPACE
+  value: {{ .Values.queryWorker.maxOverflowJobsPerWorkspace | quote }}
 - name: QUERY_WORKER_URL
   value: {{ printf "http://%s:%v" (include "classifyre.queryWorker.fullname" .) .Values.queryWorker.port | quote }}
-- name: QUERY_WORKER_TOKEN
-  valueFrom:
-    secretKeyRef:
-      name: {{ include "classifyre.queryWorker.tokenSecretName" . }}
-      key: {{ include "classifyre.queryWorker.tokenSecretKey" . }}
+- name: QUERY_WORKER_TOKEN_FILE
+  value: {{ include "classifyre.queryWorker.tokenFile" . | quote }}
 - name: QUERY_WORKER_OVERFLOW
   value: {{ .Values.queryWorker.overflow | quote }}
 {{- end }}

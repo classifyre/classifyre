@@ -7,7 +7,10 @@ the request they would put in a query Job; a query it cannot take (every slot
 busy, draining) runs as a Job.
 
 It holds what a query Job holds and nothing more: no service-account token, no
-API key; each query process sees only its own request's credentials.
+API key; each query process sees only its own request's credentials. Queries
+of every workspace share these pods, so they run tighter than a Job: a
+read-only root filesystem (nothing a query does can change the code later
+queries run), the token as a file, and a NetworkPolicy of their own.
 */ -}}
 {{- $cli := .Values.api.cliJobs -}}
 {{- $qw := .Values.queryWorker -}}
@@ -61,10 +64,9 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with $cli.podSecurityContext }}
+      {{- /* Never without one: blanked values fall back to these. */}}
       securityContext:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- toYaml ($qw.podSecurityContext | default (dict "runAsNonRoot" true "runAsUser" 10001 "runAsGroup" 10001 "fsGroup" 10001 "seccompProfile" (dict "type" "RuntimeDefault"))) | nindent 8 }}
       containers:
         - name: query-worker
           image: "{{ $cli.image.repository }}:{{ $cli.image.tag | default .Chart.AppVersion }}"
@@ -77,11 +79,8 @@ spec:
               containerPort: {{ $qw.port }}
               protocol: TCP
           env:
-            - name: CLASSIFYRE_QUERY_WORKER_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "classifyre.queryWorker.tokenSecretName" . }}
-                  key: {{ include "classifyre.queryWorker.tokenSecretKey" . }}
+            - name: CLASSIFYRE_QUERY_WORKER_TOKEN_FILE
+              value: {{ include "classifyre.queryWorker.tokenFile" . | quote }}
             - name: CLASSIFYRE_QUERY_WORKER_PORT
               value: {{ $qw.port | quote }}
             - name: CLASSIFYRE_QUERY_WORKER_SLOTS
@@ -90,6 +89,14 @@ spec:
             - name: CLASSIFYRE_QUERY_WORKER_MEMORY_PER_QUERY_MB
               value: {{ . | quote }}
             {{- end }}
+            {{- with (include "classifyre.memQuantityMb" $qw.maxMemoryPerQuery) }}
+            - name: CLASSIFYRE_QUERY_WORKER_MAX_QUERY_MEMORY_MB
+              value: {{ . | quote }}
+            {{- end }}
+            - name: CLASSIFYRE_QUERY_WORKER_MEMORY_GUARD_PERCENT
+              value: {{ $qw.memoryGuardPercent | quote }}
+            - name: CLASSIFYRE_QUERY_WORKER_JOB_ONLY_SOURCES
+              value: {{ join "," $qw.jobOnlySourceTypes | quote }}
             - name: CLASSIFYRE_QUERY_WORKER_DRAIN_SECONDS
               value: {{ $qw.drainSeconds | quote }}
             - name: CLASSIFYRE_QUERY_WORKER_NODE_NAME
@@ -100,8 +107,10 @@ spec:
             - name: CLASSIFYRE_QUERY_MAX_SPILL
               value: {{ . | quote }}
             {{- end }}
+            # Everything a query imports is in the image (and the root
+            # filesystem is read-only): nothing to install while queries run.
             - name: CLASSIFYRE_CLI_AUTO_INSTALL_OPTIONAL_DEPS
-              value: {{ ternary "1" "0" $cli.autoInstallOptionalDeps | quote }}
+              value: "0"
             - name: HOME
               value: /tmp
             - name: UV_CACHE_DIR
@@ -125,9 +134,11 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
           volumeMounts:
-            # Spill space and the temporary files queries write (CA bundles).
+            # The only writable path: each query's own directory under it
+            # (spill files, CA bundles, an export), removed when it ends.
             - name: tmp
               mountPath: /tmp
+            {{- include "classifyre.queryWorker.tokenMount" . | trim | nindent 12 }}
             {{- with $cli.extraVolumeMounts }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
@@ -165,16 +176,15 @@ spec:
               # Let the Service drop this pod before it stops taking queries.
               exec:
                 command: ["sleep", "5"]
-          {{- with $cli.containerSecurityContext }}
           securityContext:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
+            {{- toYaml ($qw.containerSecurityContext | default (dict "allowPrivilegeEscalation" false "readOnlyRootFilesystem" true "capabilities" (dict "drop" (list "ALL")))) | nindent 12 }}
       volumes:
         - name: tmp
           emptyDir:
             {{- with $qw.tmpSizeLimit }}
             sizeLimit: {{ . }}
             {{- end }}
+        {{- include "classifyre.queryWorker.tokenVolume" . | trim | nindent 8 }}
         {{- with $cli.extraVolumes }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -259,5 +269,67 @@ spec:
     scaleDown:
       # A pod leaving drains its queries; do not shed pods on a short lull.
       stabilizationWindowSeconds: {{ $qw.autoscaling.scaleDownStabilizationSeconds }}
+{{- end }}
+{{- if and (include "classifyre.queryWorker.enabled" .) .Values.queryWorker.networkPolicy.enabled }}
+{{- /*
+On by default, unlike the chart-wide `networkPolicy`: queries of every
+workspace share these pods. Ingress: only this release's pods that send
+queries (api, worker, sql-gateway), plus `extraIngress` (a metrics scraper).
+Egress: anywhere a source may be (as for a query Job) and this release's pods
+(the result goes back to the API), but not the link-local range, where cloud
+metadata endpoints hand out the node's credentials.
+*/}}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "classifyre.queryWorker.fullname" . }}
+  labels:
+    {{- include "classifyre.commonLabels" . | nindent 4 }}
+    app.kubernetes.io/component: query-worker
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "classifyre.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: query-worker
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "classifyre.selectorLabels" . | nindent 14 }}
+            matchExpressions:
+              - key: app.kubernetes.io/component
+                operator: In
+                values: [api, worker, sql-gateway]
+      ports:
+        - protocol: TCP
+          port: {{ $qw.port }}
+    {{- with $qw.networkPolicy.extraIngress }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  egress:
+    # Pods in the cluster (the API's callback, in-cluster sources, DNS):
+    # matched by pod, since some CNIs never match pod IPs with ipBlock.
+    - to:
+        - namespaceSelector: {}
+    {{- $v4 := list }}
+    {{- $v6 := list }}
+    {{- range $qw.networkPolicy.deniedEgressCidrs }}
+    {{- if contains ":" . }}{{ $v6 = append $v6 . }}{{ else }}{{ $v4 = append $v4 . }}{{ end }}
+    {{- end }}
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            {{- with $v4 }}
+            except: {{ toJson . }}
+            {{- end }}
+        - ipBlock:
+            cidr: ::/0
+            {{- with $v6 }}
+            except: {{ toJson . }}
+            {{- end }}
 {{- end }}
 {{- end }}

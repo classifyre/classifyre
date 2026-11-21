@@ -120,6 +120,10 @@ class SourceBinding:
         binding = self._known_binding()
         return binding.explain(exc) if binding else None
 
+    def local_paths(self) -> list[str]:
+        """Local paths DuckDB reads for this source (none until it is opened)."""
+        return self._reader.local_paths() if self._reader is not None else []
+
     def scan_stats(self, relation: str) -> ScanStats | None:
         """A connector table's reads (None for tables DuckDB reads itself)."""
         reader = self._reader

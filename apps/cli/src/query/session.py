@@ -6,7 +6,8 @@ time the person asked for (the proof of concept's review, finding F02):
 1. validate the SQL against the request's tables (:mod:`.gate`);
 2. attach only the sources the SQL reads, and create a view
    ``"<source>"."<schema>"."<table>"`` over each table it names;
-3. lock the configuration, so nothing the query does can change a setting;
+3. lock it down: no local path but its own and its sources', no new extension,
+   no setting the query could change back (:meth:`QuerySession._lock_down`);
 4. run ``SELECT * FROM (<sql>) LIMIT max_rows + 1`` and return Arrow, cut to
    ``max_rows`` and ``max_result_bytes`` with ``truncated`` set.
 """
@@ -36,6 +37,46 @@ logger = logging.getLogger(__name__)
 DEFAULT_MAX_ROWS = 10_000
 DEFAULT_MAX_RESULT_BYTES = 32 * 1024 * 1024
 DEFAULT_TIMEOUT_SECONDS = 120
+
+
+#: URL schemes a query's views may read once the session is locked down
+#: (:meth:`QuerySession._lock_down`); each source's secret scopes what it reaches.
+REMOTE_PREFIXES = (
+    "s3://",
+    "s3a://",
+    "s3n://",
+    "r2://",
+    "gcs://",
+    "gs://",
+    "az://",
+    "azure://",
+    "abfs://",
+    "abfss://",
+    "http://",
+    "https://",
+    "hf://",
+)
+#: Extra local roots queries may read (the chart lists ``api.localFolders``
+#: mount paths), separated by ``os.pathsep`` or commas.
+LOCAL_ROOTS_ENV = "CLASSIFYRE_QUERY_LOCAL_ROOTS"
+
+
+def _env_paths(name: str) -> list[str]:
+    raw = os.environ.get(name, "")
+    return [part.strip() for part in raw.replace(",", os.pathsep).split(os.pathsep) if part.strip()]
+
+
+def _as_directory(path: str) -> str:
+    """A directory for ``allowed_directories``: real path, trailing slash, so
+    ``/data/a`` does not also open ``/data/ab``."""
+    if "://" in path:
+        return path
+    resolved = os.path.realpath(path)
+    return resolved if resolved.endswith("/") or not Path(resolved).is_dir() else resolved + "/"
+
+
+def _sql_list(values: list[str]) -> str:
+    return "[" + ", ".join("'" + v.replace("'", "''") + "'" for v in values) + "]"
 
 
 #: Formats a query can be exported as, and their media types.
@@ -293,6 +334,35 @@ class QuerySession:
             conn.execute(f"SET max_temp_directory_size = '{spill.replace(chr(39), '')}'")
         return conn
 
+    def _lock_down(self, conn: Any) -> None:
+        """Once the views exist: no new extension, no local path but the
+        query's own, and no setting the query could change back.
+
+        The SQL gate already refuses table functions and file names; this is
+        the second wall behind it. A query process shares its host with other
+        queries (the query worker), so a query that got past the gate must
+        still not read another's spill files or ``/proc``. Remote URLs stay
+        open: what a query reaches there is what its sources' secrets allow.
+        """
+        conn.execute("SET autoinstall_known_extensions = false")
+        conn.execute("SET autoload_known_extensions = false")
+        allowed = [*REMOTE_PREFIXES, _as_directory(self._spill.name)]
+        allowed += [_as_directory(path) for path in _env_paths(LOCAL_ROOTS_ENV)]
+        for binding in self._bindings.values():
+            allowed += [_as_directory(path) for path in binding.local_paths()]
+        try:
+            rows = conn.execute(
+                "SELECT path FROM duckdb_databases() WHERE path IS NOT NULL AND path <> ''"
+            ).fetchall()
+        except Exception:  # pragma: no cover - older DuckDB
+            rows = []
+        allowed_files = [str(row[0]) for row in rows if "://" not in str(row[0])]
+        conn.execute(f"SET allowed_directories = {_sql_list(sorted(set(allowed)))}")
+        if allowed_files:
+            conn.execute(f"SET allowed_paths = {_sql_list(sorted(set(allowed_files)))}")
+        conn.execute("SET enable_external_access = false")
+        conn.execute("SET lock_configuration = true")
+
     def _attach_tables_as_views(self, conn: Any, tables: set[TableName]) -> None:
         created_catalogs: set[str] = set()
         created_schemas: set[tuple[str, str]] = set()
@@ -487,6 +557,7 @@ class QuerySession:
         with self._deadline(conn, self.request.timeout_seconds) as fired:
             try:
                 self._attach_tables_as_views(conn, validated.tables)
+                self._lock_down(conn)
                 described = conn.execute(
                     f"DESCRIBE SELECT * FROM ({validated.sql}) AS __result"
                 ).fetchall()
@@ -542,9 +613,7 @@ class QuerySession:
                 setup_done = time.monotonic()
                 if self.request.export_format == "xlsx":
                     load_extension(conn, "excel")
-                conn.execute("SET autoinstall_known_extensions = false")
-                conn.execute("SET autoload_known_extensions = false")
-                conn.execute("SET lock_configuration = true")
+                self._lock_down(conn)
                 if self.request.export_format:
                     exported = self._export(conn, validated.sql)
                 else:

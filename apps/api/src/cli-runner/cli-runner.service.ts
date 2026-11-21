@@ -1,5 +1,9 @@
 import { DeploymentSettingsService } from '../deployment-settings/deployment-settings.service';
-import { QueryWorkerClient } from './query-worker.client';
+import {
+  QueryWorkerClient,
+  queryErrorLine,
+  type QueryWorkerRun,
+} from './query-worker.client';
 import { enqueueSemanticAfterRun } from '../semantic/semantic-jobs.scheduler';
 import {
   Injectable,
@@ -2559,20 +2563,31 @@ export class CliRunnerService {
    * printed status line is only read when that callback never came. Local
    * runs get the notebook environment (no database URL, no callback key).
    */
-  async runQueryExecution(params: {
-    runId: string;
-    request: Record<string, unknown>;
-    timeoutSeconds: number;
-    onJobCreated?: (job: {
-      jobName: string;
-      namespace: string;
-    }) => void | Promise<void>;
-  }): Promise<{ output: string; exitCode: number }> {
+  async runQueryExecution(
+    params: QueryWorkerRun & {
+      onJobCreated?: (job: {
+        jobName: string;
+        namespace: string;
+      }) => void | Promise<void>;
+      /**
+       * Asked before a query the worker did not take starts a Job: null to
+       * go ahead, or why not (the workspace has its share of Jobs running).
+       * A query only a Job may run (`job_only`) is not asked.
+       */
+      mayStartJob?: () => Promise<string | null>;
+    },
+  ): Promise<{ output: string; exitCode: number }> {
     // The warm query worker first; a Job (or local process) when it does not
     // take the query (all slots busy, draining, unreachable).
     if (this.queryWorker?.enabled) {
       const result = await this.queryWorker.run(params);
-      if (result) return result;
+      if (result && !('notTaken' in result)) return result;
+      if (result?.notTaken !== 'job_only' && params.mayStartJob) {
+        const refusal = await params.mayStartJob();
+        if (refusal) {
+          return { output: queryErrorLine('busy', refusal), exitCode: 1 };
+        }
+      }
     }
     const environment = process.env.ENVIRONMENT || 'development';
     if (this.isKubernetesExecutionEnabled(environment)) {

@@ -56,3 +56,41 @@ def test_today_s_ten_types_stay_queryable() -> None:
         "GOOGLE_CLOUD_STORAGE",
         "LOCAL_FOLDER",
     }
+
+
+def _required_groups(source_type: str) -> set[str]:
+    """``uv_groups=[...]`` literals in a source package: what its client imports."""
+    import re
+    from pathlib import Path
+
+    package = Path(__file__).resolve().parents[1] / "src" / "sources" / source_type.lower()
+    found: set[str] = set()
+    for path in package.rglob("*.py"):
+        for listed in re.findall(r"uv_groups=\[([^\]]*)\]", path.read_text(encoding="utf-8")):
+            found.update(re.findall(r'"([a-z0-9-]+)"', listed))
+    return found
+
+
+def test_every_group_a_queryable_source_imports_is_declared() -> None:
+    from src.query.connectors import _SOURCE_GROUPS
+
+    for source_type in declared_sources():
+        assert source_type in _SOURCE_GROUPS, source_type
+        assert _required_groups(source_type) <= set(_SOURCE_GROUPS[source_type]), source_type
+
+
+def test_the_cli_image_bakes_every_group_a_query_imports() -> None:
+    """The query worker runs with installing turned off on a read-only root
+    filesystem: what a query imports must already be in the image."""
+    import re
+    from pathlib import Path
+
+    from src.query.connectors import query_dependency_groups
+    from src.query.runner import QUERY_GROUPS
+
+    root = Path(__file__).resolve().parents[3]
+    for dockerfile in (root / "Dockerfile", root / "development/cli-dev-image/Dockerfile"):
+        declared = re.search(r'ARG CLI_BAKED_GROUPS="([^"]*)"', dockerfile.read_text("utf-8"))
+        assert declared, f"{dockerfile} no longer declares CLI_BAKED_GROUPS"
+        missing = (query_dependency_groups() | set(QUERY_GROUPS)) - set(declared.group(1).split())
+        assert not missing, f"add to CLI_BAKED_GROUPS in {dockerfile}: {sorted(missing)}"

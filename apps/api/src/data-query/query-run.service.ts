@@ -12,6 +12,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { tableFromIPC } from 'apache-arrow';
 import { PrismaService } from '../prisma.service';
 import { CliRunnerService } from '../cli-runner/cli-runner.service';
+import { QUERY_RESULT_MARKER } from '../cli-runner/query-worker.client';
 import { MaskedConfigCryptoService } from '../masked-config-crypto.service';
 import { ActorContextService } from '../identity/actor-context.service';
 import {
@@ -77,32 +78,75 @@ export const EXPORT_MEDIA_TYPES: Record<ExportFormat, string> = {
  * Queries one person may have waiting or running at once, whichever way they
  * came (app, MCP, SQL connections). A guard against one runaway client, not a
  * capacity limit: the query worker's slots and the Jobs it overflows to are
- * that. `QUERY_MAX_ACTIVE_PER_PERSON` (Helm `queryWorker.maxActivePerPerson`).
+ * that. `QUERY_MAX_ACTIVE_PER_PERSON` (Helm `queryWorker.maxActivePerPerson`,
+ * set only with the worker); without a worker every query is a Job, and the
+ * default stays the one Jobs were sized for (DQ §5.4).
  */
 export const DEFAULT_MAX_ACTIVE_PER_PERSON = 100;
+export const DEFAULT_MAX_ACTIVE_PER_PERSON_JOBS = 20;
+/**
+ * Queries one workspace may have waiting or running at once, so one
+ * workspace cannot take every slot of a worker pool other workspaces share.
+ * `QUERY_MAX_ACTIVE_PER_WORKSPACE` (Helm `queryWorker.maxActivePerWorkspace`).
+ */
+export const DEFAULT_MAX_ACTIVE_PER_WORKSPACE = 200;
+/**
+ * Overflow Jobs one workspace may have running at once: a query the worker
+ * pool has no room for is refused as busy past this, rather than each one
+ * starting a pod. `QUERY_MAX_OVERFLOW_JOBS_PER_WORKSPACE`.
+ */
+export const DEFAULT_MAX_OVERFLOW_JOBS_PER_WORKSPACE = 10;
+
+function positiveInt(raw: string | undefined, fallback: number): number {
+  const value = Number.parseInt(raw ?? '', 10);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
 
 export function maxActivePerPerson(
   env: NodeJS.ProcessEnv = process.env,
 ): number {
-  const value = Number.parseInt(env.QUERY_MAX_ACTIVE_PER_PERSON ?? '', 10);
-  return Number.isFinite(value) && value > 0
-    ? value
-    : DEFAULT_MAX_ACTIVE_PER_PERSON;
+  const fallback = env.QUERY_WORKER_URL?.trim()
+    ? DEFAULT_MAX_ACTIVE_PER_PERSON
+    : DEFAULT_MAX_ACTIVE_PER_PERSON_JOBS;
+  return positiveInt(env.QUERY_MAX_ACTIVE_PER_PERSON, fallback);
+}
+
+export function maxActivePerWorkspace(
+  env: NodeJS.ProcessEnv = process.env,
+): number {
+  return positiveInt(
+    env.QUERY_MAX_ACTIVE_PER_WORKSPACE,
+    DEFAULT_MAX_ACTIVE_PER_WORKSPACE,
+  );
+}
+
+export function maxOverflowJobsPerWorkspace(
+  env: NodeJS.ProcessEnv = process.env,
+): number {
+  return positiveInt(
+    env.QUERY_MAX_OVERFLOW_JOBS_PER_WORKSPACE,
+    DEFAULT_MAX_OVERFLOW_JOBS_PER_WORKSPACE,
+  );
 }
 
 const MAX_ACTIVE_PER_ACTOR = maxActivePerPerson();
+const MAX_ACTIVE_PER_WORKSPACE = maxActivePerWorkspace();
+const MAX_OVERFLOW_JOBS_PER_WORKSPACE = maxOverflowJobsPerWorkspace();
 /** System queries (quality rules) running at once per workspace. */
 const MAX_ACTIVE_SYSTEM = 2;
 const RESULT_TTL_MS = 24 * 60 * 60 * 1000;
 /**
- * A run still waiting or running this long after it was created was lost: no
- * query lives past the longest timeout a workspace may set (900 s) plus what a
- * Job or the query worker adds to start and deliver it. It happens when the
- * API restarts mid-run (nothing is left to settle it); such a run would
- * otherwise count against its person's cap for good.
+ * A run still waiting or running this long after it was created is taken for
+ * lost: the longest timeout a workspace may set is 900 s, and a Job adds its
+ * pod's start. It happens when the API restarts mid-run (nothing is left to
+ * settle it); such a run would otherwise count against its person's cap for
+ * good. A lost run keeps its callback token: if its result does arrive after
+ * all, it is recorded (and the read audited) like any other.
  */
-const LOST_AFTER_MS = 20 * 60 * 1000;
-const RESULT_MARKER = '__CLASSIFYRE_QUERY_RESULT__';
+const LOST_AFTER_MS = 30 * 60 * 1000;
+/** The sweep runs at most this often per workspace and API process. */
+const LOST_SWEEP_EVERY_MS = 60 * 1000;
+const LOST_CODE = 'lost';
 
 const TERMINAL: QueryRunStatus[] = [
   QueryRunStatus.SUCCESS,
@@ -293,6 +337,8 @@ function tokenHash(token: string): string {
 @Injectable()
 export class QueryRunService {
   private readonly logger = new Logger(QueryRunService.name);
+  /** When each workspace's lost runs were last swept, by this process. */
+  private readonly lostSweptAt = new Map<string, number>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -659,6 +705,11 @@ export class QueryRunService {
 
   /** Settle runs nothing will settle any more (see {@link LOST_AFTER_MS}). */
   private async expireLostRuns(): Promise<void> {
+    // The workspace's own schema; once a minute is plenty for runs this old.
+    const key = this.actors.workspaceId() ?? '';
+    const now = Date.now();
+    if (now - (this.lostSweptAt.get(key) ?? 0) < LOST_SWEEP_EVERY_MS) return;
+    this.lostSweptAt.set(key, now);
     await this.prisma.queryRun
       .updateMany({
         where: {
@@ -668,12 +719,11 @@ export class QueryRunService {
         data: {
           status: QueryRunStatus.ERROR,
           error: {
-            code: 'lost',
+            code: LOST_CODE,
             message:
               'The query never finished: the service running it restarted. Run it again.',
           },
           finishedAt: new Date(),
-          callbackTokenHash: null,
         },
       })
       .catch((error: unknown) =>
@@ -701,9 +751,43 @@ export class QueryRunService {
    */
   private async capRefusal(origin: RunOrigin): Promise<string | null> {
     const active = await this.activeRuns(origin);
-    return active >= MAX_ACTIVE_PER_ACTOR
-      ? `You have ${active} queries running. Wait for one to finish or cancel it.`
+    if (active >= MAX_ACTIVE_PER_ACTOR) {
+      return `You have ${active} queries running. Wait for one to finish or cancel it.`;
+    }
+    // Runs live in the workspace's own schema: this counts the workspace.
+    const workspace = await this.prisma.queryRun.count({
+      where: {
+        status: { in: [QueryRunStatus.PENDING, QueryRunStatus.RUNNING] },
+      },
+    });
+    return workspace >= MAX_ACTIVE_PER_WORKSPACE
+      ? `This workspace has ${workspace} queries running, as many as it may. Run yours again in a moment.`
       : null;
+  }
+
+  /**
+   * Whether a query the worker pool did not take may start a Job: null, or
+   * why not. Counts the workspace's runs that have a Job.
+   */
+  private async overflowRefusal(): Promise<string | null> {
+    const jobs = await this.prisma.queryRun.count({
+      where: {
+        status: { in: [QueryRunStatus.PENDING, QueryRunStatus.RUNNING] },
+        jobName: { not: null },
+      },
+    });
+    return jobs >= MAX_OVERFLOW_JOBS_PER_WORKSPACE
+      ? 'Every query slot is taken. Run the query again in a moment.'
+      : null;
+  }
+
+  /** True once the run was cancelled (by any API replica). */
+  private async isCancelled(runId: string): Promise<boolean> {
+    const run = await this.prisma.queryRun.findUnique({
+      where: { id: runId },
+      select: { status: true },
+    });
+    return run?.status === QueryRunStatus.CANCELLED;
   }
 
   private async assertBelowCap(origin: RunOrigin): Promise<void> {
@@ -1062,14 +1146,18 @@ export class QueryRunService {
     timeoutSeconds: number,
   ): Promise<void> {
     try {
-      await this.prisma.queryRun.update({
-        where: { id: runId },
+      // Only a run still waiting starts: one cancelled meanwhile stays so.
+      const { count } = await this.prisma.queryRun.updateMany({
+        where: { id: runId, status: QueryRunStatus.PENDING },
         data: { status: QueryRunStatus.RUNNING, startedAt: new Date() },
       });
+      if (count === 0) return;
       const { output, exitCode } = await this.cliRunner.runQueryExecution({
         runId,
         request,
         timeoutSeconds,
+        mayStartJob: () => this.overflowRefusal(),
+        isCancelled: () => this.isCancelled(runId),
         onJobCreated: async ({ jobName, namespace }) => {
           await this.prisma.queryRun.update({
             where: { id: runId },
@@ -1102,11 +1190,11 @@ export class QueryRunService {
     const line = output
       .split('\n')
       .reverse()
-      .find((l) => l.startsWith(RESULT_MARKER));
+      .find((l) => l.startsWith(QUERY_RESULT_MARKER));
     let meta: QueryCallbackMeta | null = null;
     if (line) {
       try {
-        meta = JSON.parse(line.slice(RESULT_MARKER.length).trim());
+        meta = JSON.parse(line.slice(QUERY_RESULT_MARKER.length).trim());
       } catch {
         meta = null;
       }
@@ -1157,6 +1245,7 @@ export class QueryRunService {
       select: {
         callbackTokenHash: true,
         status: true,
+        error: true,
         sourceIds: true,
         actorRef: true,
         resultFormat: true,
@@ -1175,7 +1264,10 @@ export class QueryRunService {
     ) {
       throw new UnauthorizedException('Unknown query run or token.');
     }
-    if (TERMINAL.includes(run.status)) return;
+    // A run taken for lost whose result came after all is recorded (and its
+    // read audited); any other settled run keeps what settled it.
+    const lost = (run.error as { code?: string } | null)?.code === LOST_CODE;
+    if (TERMINAL.includes(run.status) && !lost) return;
 
     if (
       !Buffer.isBuffer(body) &&
@@ -1423,16 +1515,22 @@ export class QueryRunService {
   async cancel(runId: string): Promise<QueryRunView> {
     const run = await this.own(runId);
     if (TERMINAL.includes(run.status)) return this.view(run);
-    await this.cliRunner.cancelQueryExecution(runId).catch(() => undefined);
-    const updated = await this.prisma.queryRun.update({
-      where: { id: runId },
+    // Cancelled first, and only if nothing settled it meanwhile (a result
+    // that arrived first stands); then the query stopped. Another replica
+    // running it on the worker sees the status and drops its request.
+    await this.prisma.queryRun.updateMany({
+      where: { id: runId, status: { notIn: TERMINAL } },
       data: {
         status: QueryRunStatus.CANCELLED,
         finishedAt: new Date(),
         callbackTokenHash: null,
       },
     });
-    return this.view(updated);
+    await this.cliRunner.cancelQueryExecution(runId).catch(() => undefined);
+    const current = await this.prisma.queryRun.findUnique({
+      where: { id: runId },
+    });
+    return this.view(current ?? run);
   }
 
   /** Drop expired results; called by the scheduler. */

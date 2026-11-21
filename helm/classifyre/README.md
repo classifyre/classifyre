@@ -538,29 +538,39 @@ helm upgrade --install classifyre ./helm/classifyre \
 | priorityClasses.serviceName | string | `"service-standard"` | Priority class name for service workloads. |
 | priorityClasses.serviceValue | int | `10000` | Numeric priority value for service workloads. |
 | queryWorker.affinity | object | `{}` | Affinity rules. |
-| queryWorker.autoscaling.enabled | bool | `true` | New pods get new queries at once: each query is its own request. |
-| queryWorker.autoscaling.extraMetrics | from /metrics | `[]` | through a Prometheus adapter. |
+| queryWorker.autoscaling.enabled | bool | `true` | Scale worker pods on CPU (horizontal scaling; metrics-server needed). New pods get new queries at once: each query is its own request. |
+| queryWorker.autoscaling.extraMetrics | list | `[]` | Extra HPA metrics, e.g. a Pods metric on `classifyre_query_worker_active` (from /metrics) through a Prometheus adapter, to scale on running queries rather than CPU alone. |
 | queryWorker.autoscaling.maxReplicas | int | `5` | Most worker pods. |
 | queryWorker.autoscaling.minReplicas | int | `1` | Fewest worker pods. |
 | queryWorker.autoscaling.scaleDownStabilizationSeconds | int | `300` | Seconds of lower load before scaling down (drains running queries). |
 | queryWorker.autoscaling.targetCPUUtilizationPercentage | int | `70` | Target average CPU utilization, of the pod's CPU request. |
-| queryWorker.drainSeconds | int | `60` | Seconds a stopping pod lets running queries finish before it stops them. |
-| queryWorker.enabled | bool | `true` | waiting for a pod. Needs `api.cliJobs.enabled`. |
+| queryWorker.containerSecurityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true}` | Container security context. Read-only root filesystem: nothing a query does can change the code later queries (of other workspaces) run. Emptied, the template still sets these. |
+| queryWorker.drainSeconds | int | `960` | Seconds a stopping pod lets running queries finish before it stops them. The default outlasts the longest query timeout a workspace may set (900 s) plus the worker's backstop, so a rollout or scale-down stops no query; the pod takes no new query meanwhile. |
+| queryWorker.enabled | bool | `true` | Run SQL queries (the SQL page, exports, MCP, SQL connections) on a warm pool instead of starting a Job per query (docs/prd/DQ-data-query.md §5.3). It is the CLI image (`api.cliJobs.image`) running `query-worker`: one process per query, forked from a process that has already imported DuckDB and every source, so a query starts in milliseconds instead of waiting for a pod. Needs `api.cliJobs.enabled`. |
 | queryWorker.extraEnv | list | `[]` | Extra environment for the worker (after `api.cliJobs.extraEnv`). |
-| queryWorker.maxActivePerPerson | int | `100` | and overflow Jobs are. Applies with the worker off too. |
-| queryWorker.memoryPerQuery | string | `"384Mi"` | the query process plus DuckDB's share. Larger sorts and joins spill to /tmp. |
+| queryWorker.jobOnlySourceTypes | list | `["ODBC"]` | Source types whose queries always run as Jobs, never in the shared worker: they load native code the source names (an ODBC `Driver=` path). |
+| queryWorker.maxActivePerPerson | int | `100` | Queries one person may have waiting or running at once (the SQL page, exports, MCP and SQL connections together: a BI tool's pool counts). A guard against a runaway client, not a capacity limit: slots, replicas and overflow Jobs are. With the worker off the API keeps its default of 20. |
+| queryWorker.maxActivePerWorkspace | int | `200` | Queries one workspace may have waiting or running at once, so one workspace cannot take every slot of a pool other workspaces share. |
+| queryWorker.maxMemoryPerQuery | string | `"1536Mi"` | Most memory one query process may use before the worker stops it (the query fails as "out of memory", nothing else does): DuckDB's share plus an export at its 256 MB limit. Empty: no cap per query. |
+| queryWorker.maxOverflowJobsPerWorkspace | int | `10` | Overflow Jobs one workspace may have running at once. Past this, a query the pool has no room for fails as "busy" instead of starting another pod. |
+| queryWorker.memoryGuardPercent | int | `90` | When the pod's memory use passes this share of its limit, the worker stops its largest query. Without it the kernel would stop every query in the pod (Kubernetes sets memory.oom.group on cgroup v2). 0: off. |
+| queryWorker.memoryPerQuery | string | `"384Mi"` | Memory planned per running query when `slots` is 0: Python and Arrow in the query process plus DuckDB's share. Larger sorts and joins spill to /tmp. |
+| queryWorker.networkPolicy.deniedEgressCidrs | list | `["169.254.0.0/16","fe80::/10","fd00:ec2::254/128"]` | Egress the worker never gets: link-local, where cloud metadata endpoints hand out the node's credentials. |
+| queryWorker.networkPolicy.enabled | bool | `true` | A NetworkPolicy for the worker pods, on by default (unlike the chart's `networkPolicy`): ingress only from this release's API, worker and SQL gateway pods; egress anywhere but `deniedEgressCidrs`. |
+| queryWorker.networkPolicy.extraIngress | list | `[]` | More ingress rules (NetworkPolicyIngressRule), e.g. from Prometheus to port `queryWorker.port` for /metrics. |
 | queryWorker.nodeSelector | object | `{}` | Node selector; empty: `api.cliJobs.nodeSelector`. |
-| queryWorker.overflow | string | `"job"` | fails it at once with "busy". |
+| queryWorker.overflow | string | `"job"` | When every slot of the pod the query reached is taken: `job` runs the query as a Job (the query-Job settings in `api.cliJobs.query`), `refuse` fails it at once with "busy". |
 | queryWorker.podAnnotations | object | `{}` | Extra pod annotations. |
 | queryWorker.podLabels | object | `{}` | Extra pod labels. |
+| queryWorker.podSecurityContext | object | `{"fsGroup":10001,"runAsGroup":10001,"runAsNonRoot":true,"runAsUser":10001,"seccompProfile":{"type":"RuntimeDefault"}}` | Pod security context. Emptied, the template still sets these. |
 | queryWorker.port | int | `8090` | Port of the worker's HTTP endpoint (cluster-internal). |
 | queryWorker.priorityClassName | string | `"service-standard"` | Priority class of worker pods (a service, like the API). |
-| queryWorker.replicaCount | int | `1` | or scale-down. |
-| queryWorker.resources | object | `{"limits":{"cpu":"2","memory":"4Gi"},"requests":{"cpu":"500m","memory":"2Gi"}}` | warmed fork server plus what `slots` queries use at once. |
-| queryWorker.slots | int | `0` | of the pod's memory (70 % after a fixed reserve) and its cores. |
+| queryWorker.replicaCount | int | `1` | Worker pods when `queryWorker.autoscaling` is off. The Service spreads queries across them; each pod drains its running queries on a rollout or scale-down. |
+| queryWorker.resources | object | `{"limits":{"cpu":"2","memory":"4Gi"},"requests":{"cpu":"500m","memory":"2Gi"}}` | Requests and limits of one worker pod. Memory: about 400 MiB for the warmed fork server plus what `slots` queries use at once. |
+| queryWorker.slots | int | `0` | Queries one pod runs at once. 0: as many as its memory limit holds at `memoryPerQuery` each (up to 256), so a bigger pod runs more (vertical scaling): 32Gi at 256Mi is about 125 at once. DuckDB gets an equal share of the pod's memory (70 % after a fixed reserve) and its cores. |
 | queryWorker.tmpSizeLimit | string | `"12Gi"` | Size limit of the pod's /tmp, where queries spill large sorts and joins. |
 | queryWorker.token.existingKey | string | `"token"` | Key of the token in that Secret. |
-| queryWorker.token.existingSecret | string | `""` | empty: the chart creates one and keeps it across upgrades. |
+| queryWorker.token.existingSecret | string | `""` | Existing Secret with the token the API signs worker requests with. Empty: the chart creates one and keeps it across `helm upgrade`. With `helm template` or a GitOps tool that renders without cluster access, set this (or `value`), or each render makes a new token; the API and the worker read the mounted file again when it changes, so a new one is picked up within the kubelet's sync period, without restarts. |
 | queryWorker.token.value | string | `""` | Token value when the chart creates the Secret; empty: generated. |
 | queryWorker.tolerations | list | `[]` | Tolerations; empty: `api.cliJobs.tolerations`. |
 | rbac.create | bool | `true` | Create Role/RoleBinding for API CLI job orchestration. |

@@ -10,18 +10,30 @@ result path and the audit are unchanged.
 
 Processes::
 
-    main process (HTTP, one thread per request)
+    main process (HTTP, one thread per request; not dumpable)
       • bearer-token check, admission (one slot per running query), deadline,
-        cancel when the API drops the request, drain on SIGTERM
+        memory guard, cancel when the API drops the request, drain on SIGTERM
       │ multiprocessing, "forkserver" start method (Linux)
       ▼
-    fork server (single-threaded; imported src.query.warm once)
+    fork server (single-threaded, not dumpable; imported src.query.warm once)
       │ fork() per query
       ▼
     query process (one per query)
       • only this request's sources and credentials, as a Job holds them
-      • not dumpable: other processes of the same user cannot read its memory
+      • not dumpable: no other process of the same user can read its memory,
+        its environment or its open files through /proc
+      • its own temporary directory, removed by the main process when it ends
+        (also after a kill); DuckDB opens no other local path
+        (``QuerySession._lock_down``)
+      • killed alone when it outgrows its memory, or when the pod runs short
+        of memory, before the kernel would stop every query in the pod
       • exits when the query is done
+
+What is not here: a query process runs as the same user as the main process,
+so it could signal it; what keeps another workspace's credentials out of its
+reach is that it cannot read the memory or /proc files of any other process.
+Sources that load native code chosen by the source (ODBC drivers) never run
+here: the worker answers ``job_only`` and the API starts a Job.
 
 The API talks to it over HTTP (``POST /v1/queries``). The request body is the
 same JSON a query Job receives; the response is the status payload the Job
@@ -41,21 +53,24 @@ import json
 import logging
 import multiprocessing
 import os
+import shutil
 import signal
 import socket
 import sys
+import tempfile
 import threading
 import time
 from collections.abc import MutableMapping
 from dataclasses import dataclass, field
 from multiprocessing.connection import Connection, wait
-from typing import Any
+from pathlib import Path
+from typing import Any, Literal
 
 from ..utils.resources import get_effective_cpu_count, get_effective_memory_mb
 
 logger = logging.getLogger(__name__)
 
-ENV = "CLASSIFYRE_QUERY_WORKER_"
+ENV_PREFIX = "CLASSIFYRE_QUERY_WORKER_"
 QUERY_PATH = "/v1/queries"
 DEFAULT_PORT = 8090
 #: Memory one running query is planned with when the slots follow the pod's
@@ -74,6 +89,32 @@ MAX_TIMEOUT_SECONDS = 3600
 #: Memory the fork server, the HTTP process and Python in each query need
 #: besides DuckDB's own buffer (which memory_limit bounds).
 RESERVED_MEMORY_MB = 768
+#: Default cap on one query process's own memory: DuckDB's share plus an
+#: export at its limit (256 MB, read once and posted once) and Python.
+DEFAULT_MAX_QUERY_MEMORY_MB = 1536
+#: When the pod's memory use passes this share of its limit, the largest
+#: query is stopped: the kernel would otherwise stop every process in the
+#: container (Kubernetes sets memory.oom.group on cgroup v2).
+DEFAULT_MEMORY_GUARD_PERCENT = 90
+#: How often the memory guard looks.
+GUARD_INTERVAL_SECONDS = 0.25
+#: Source types whose queries always run as Jobs: they load native code the
+#: source names (an ODBC ``Driver=`` path), which must not share a process
+#: host with other workspaces' queries.
+DEFAULT_JOB_ONLY_SOURCES = frozenset({"ODBC"})
+#: Native thread pools that start when a library loads (numpy's OpenBLAS starts
+#: one thread per core on import, and pyarrow imports numpy when it is there):
+#: one thread each, so the fork server stays single-threaded. A query's own
+#: work runs in DuckDB, which sizes its threads itself.
+SINGLE_THREAD_ENV = {
+    "OPENBLAS_NUM_THREADS": "1",
+    "OMP_NUM_THREADS": "1",
+    "MKL_NUM_THREADS": "1",
+}
+#: Where each query's private temporary directory is made.
+QUERY_DIRS = "classifyre-queries"
+
+OutcomeKind = Literal["done", "timeout", "cancelled", "crashed", "memory", "stopped"]
 
 
 #: Environment a query process may see: enough to run Python, find the venv
@@ -133,7 +174,11 @@ def scrub_environment(environ: MutableMapping[str, str]) -> list[str]:
     ``*`` for a prefix) keeps more, for what an operator adds on purpose (the
     chart lists its ``extraEnv`` there).
     """
-    extra = [name.strip() for name in environ.get(ENV + "ENV_ALLOW", "").split(",") if name.strip()]
+    extra = [
+        name.strip()
+        for name in environ.get(ENV_PREFIX + "ENV_ALLOW", "").split(",")
+        if name.strip()
+    ]
     names = {n for n in extra if not n.endswith("*")}
     prefixes = ALLOWED_ENV_PREFIXES + tuple(n[:-1] for n in extra if n.endswith("*"))
     removed = [
@@ -150,30 +195,91 @@ class WorkerConfigError(ValueError):
     """The worker's environment does not describe a usable configuration."""
 
 
+MIN_TOKEN_LENGTH = 16
+
+
+class Token:
+    """The bearer token the API signs requests with.
+
+    Read from a file (the chart mounts the Secret there) and read again when
+    the file changes, so a new Secret reaches a running worker without a
+    restart and nothing holds the token in its environment. A token given in
+    the environment (``…_TOKEN``, the all-in-one image) is taken out of it at
+    start, so the fork server and the query processes never inherit it.
+    """
+
+    def __init__(self, value: str = "", path: str = "") -> None:
+        self._path = path
+        self._value = value
+        self._stamp: tuple[float, int] | None = None
+        self._lock = threading.Lock()
+        if path:
+            self._reload(force=True)
+        if len(self._value) < MIN_TOKEN_LENGTH:
+            raise WorkerConfigError(
+                f"{ENV_PREFIX}TOKEN is too short (fewer than {MIN_TOKEN_LENGTH} characters)"
+            )
+
+    def _reload(self, force: bool = False) -> None:
+        try:
+            stat = Path(self._path).stat()
+        except OSError:
+            if force:
+                raise
+            return  # a Secret update swaps the file; keep the last token meanwhile
+        stamp = (stat.st_mtime, stat.st_ino)
+        if not force and stamp == self._stamp:
+            return
+        with open(self._path, encoding="utf-8") as handle:
+            value = handle.read().strip()
+        if len(value) >= MIN_TOKEN_LENGTH or force:
+            self._value, self._stamp = value, stamp
+
+    def matches(self, header: str) -> bool:
+        if self._path:
+            with self._lock:
+                self._reload()
+        expected = f"Bearer {self._value}".encode()
+        return hmac.compare_digest(header.encode("utf-8"), expected)
+
+    def __repr__(self) -> str:
+        return "Token(***)"
+
+
 def _int(environ: MutableMapping[str, str], name: str, default: int, minimum: int = 0) -> int:
-    raw = environ.get(ENV + name, "").strip()
+    raw = environ.get(ENV_PREFIX + name, "").strip()
     if not raw:
         return default
     try:
         value = int(raw)
     except ValueError:
-        raise WorkerConfigError(f"{ENV + name} must be a whole number, not {raw!r}") from None
+        raise WorkerConfigError(
+            f"{ENV_PREFIX + name} must be a whole number, not {raw!r}"
+        ) from None
     if value < minimum:
-        raise WorkerConfigError(f"{ENV + name} must be at least {minimum}")
+        raise WorkerConfigError(f"{ENV_PREFIX + name} must be at least {minimum}")
     return value
 
 
 @dataclass(frozen=True)
 class WorkerConfig:
-    token: str = field(repr=False)
+    token: Token = field(repr=False)
     host: str = "0.0.0.0"
     port: int = DEFAULT_PORT
     slots: int = 4
     drain_seconds: int = 60
     start_method: str = "forkserver"
     max_body_bytes: int = 16 * 1024 * 1024
-    #: Address-space limit of one query process (Linux), 0 for none.
-    query_memory_mb: int = 0
+    #: The memory the worker plans with: the container's limit, unless the
+    #: worker shares its container (the all-in-one image sets a share).
+    memory_mb: int = 0
+    #: The container's memory limit, which the memory guard watches.
+    container_memory_mb: int = 0
+    #: Cap on one query process's own memory, 0 for none.
+    max_query_memory_mb: int = DEFAULT_MAX_QUERY_MEMORY_MB
+    #: Stop the largest query past this share of ``container_memory_mb``; 0: never.
+    memory_guard_percent: int = DEFAULT_MEMORY_GUARD_PERCENT
+    job_only_sources: frozenset[str] = DEFAULT_JOB_ONLY_SOURCES
     node: str = ""
 
     @classmethod
@@ -181,34 +287,42 @@ class WorkerConfig:
         """Read the configuration; the token leaves the environment here, so
         neither the fork server nor any query process inherits it."""
         env = os.environ if environ is None else environ
-        token = env.pop(ENV + "TOKEN", "").strip()
-        token_file = env.pop(ENV + "TOKEN_FILE", "").strip()
-        if not token and token_file:
-            with open(token_file, encoding="utf-8") as handle:
-                token = handle.read().strip()
-        if not token:
+        value = env.pop(ENV_PREFIX + "TOKEN", "").strip()
+        path = env.pop(ENV_PREFIX + "TOKEN_FILE", "").strip()
+        if not value and not path:
             raise WorkerConfigError(
-                f"Set {ENV}TOKEN (or {ENV}TOKEN_FILE): the API signs its requests with it."
+                f"Set {ENV_PREFIX}TOKEN_FILE (or {ENV_PREFIX}TOKEN): "
+                "the API signs its requests with it."
             )
-        if len(token) < 16:
-            raise WorkerConfigError(f"{ENV}TOKEN is too short (fewer than 16 characters)")
-        method = env.get(ENV + "START_METHOD", "").strip() or default_start_method()
-        if method not in {"forkserver", "spawn", "fork"}:
-            raise WorkerConfigError(f"{ENV}START_METHOD must be forkserver, spawn or fork")
+        token = Token(path=path) if path else Token(value=value)
+        method = env.get(ENV_PREFIX + "START_METHOD", "").strip() or default_start_method()
+        # Not "fork": a query process would start as a copy of the main
+        # process, with the token and every other running query's request.
+        if method not in {"forkserver", "spawn"}:
+            raise WorkerConfigError(f"{ENV_PREFIX}START_METHOD must be forkserver or spawn")
+        container_mb = get_effective_memory_mb()
+        memory_mb = _int(env, "MEMORY_MB", 0) or container_mb
+        job_only = env.get(ENV_PREFIX + "JOB_ONLY_SOURCES")
         return cls(
             token=token,
-            host=env.get(ENV + "HOST", "").strip() or "0.0.0.0",
+            host=env.get(ENV_PREFIX + "HOST", "").strip() or "0.0.0.0",
             port=_int(env, "PORT", DEFAULT_PORT, 1),
             slots=_int(env, "SLOTS", 0)
             or auto_slots(
-                get_effective_memory_mb(),
+                memory_mb,
                 _int(env, "MEMORY_PER_QUERY_MB", DEFAULT_MEMORY_PER_QUERY_MB, 64),
             ),
             drain_seconds=_int(env, "DRAIN_SECONDS", 60),
             start_method=method,
             max_body_bytes=_int(env, "MAX_BODY_BYTES", 16 * 1024 * 1024, 1024),
-            query_memory_mb=_int(env, "QUERY_MEMORY_MB", 0),
-            node=env.get(ENV + "NODE_NAME", "").strip() or socket.gethostname(),
+            memory_mb=memory_mb,
+            container_memory_mb=container_mb,
+            max_query_memory_mb=_int(env, "MAX_QUERY_MEMORY_MB", DEFAULT_MAX_QUERY_MEMORY_MB),
+            memory_guard_percent=_int(env, "MEMORY_GUARD_PERCENT", DEFAULT_MEMORY_GUARD_PERCENT),
+            job_only_sources=DEFAULT_JOB_ONLY_SOURCES
+            if job_only is None
+            else frozenset(t.strip().upper() for t in job_only.split(",") if t.strip()),
+            node=env.get(ENV_PREFIX + "NODE_NAME", "").strip() or socket.gethostname(),
         )
 
 
@@ -239,42 +353,50 @@ def engine_budget(slots: int, memory_mb: int, cpus: int) -> tuple[str, int]:
 # ── the query process ──────────────────────────────────────────────────
 
 
-def _harden(query_memory_mb: int) -> None:
-    """First thing a query process does: default signals, not dumpable, limits."""
+def set_not_dumpable() -> None:
+    """``prctl(PR_SET_DUMPABLE, 0)``: other processes of this user can no
+    longer read this one's memory, environment or open files through /proc
+    (or attach to it). Linux only; a no-op elsewhere. ``exec`` resets it, so
+    the main process, the fork server and each query process set it."""
+    if not sys.platform.startswith("linux"):
+        return
+    try:
+        import ctypes
+
+        pr_set_dumpable = 4
+        ctypes.CDLL(None, use_errno=True).prctl(pr_set_dumpable, 0, 0, 0, 0)
+    except Exception as exc:  # pragma: no cover - libc without prctl
+        logger.warning("prctl(PR_SET_DUMPABLE) failed: %s", exc)
+
+
+def _harden(workdir: str) -> None:
+    """First thing a query process does: default signals, not dumpable, and
+    every temporary file in its own directory."""
     signal.signal(signal.SIGTERM, signal.SIG_DFL)
     signal.signal(signal.SIGINT, signal.SIG_DFL)
-    if sys.platform.startswith("linux"):
-        try:
-            import ctypes
-
-            pr_set_dumpable = 4
-            ctypes.CDLL(None, use_errno=True).prctl(pr_set_dumpable, 0, 0, 0, 0)
-        except Exception as exc:  # pragma: no cover - libc without prctl
-            logger.debug("prctl(PR_SET_DUMPABLE) failed: %s", exc)
-        if query_memory_mb > 0:
-            import resource
-
-            limit = query_memory_mb * 1024 * 1024
-            resource.setrlimit(resource.RLIMIT_AS, (limit, limit))
+    set_not_dumpable()
+    os.environ["TMPDIR"] = workdir
+    tempfile.tempdir = workdir
+    os.chdir(workdir)
 
 
-def _query_process(request_data: dict[str, Any], out: Connection, query_memory_mb: int) -> None:
+def _query_process(request_data: dict[str, Any], out: Connection, workdir: str) -> None:
     """Runs in the forked query process: one query, as a query Job runs it."""
-    _harden(query_memory_mb)
-    from .runner import _error, _report, run_query
+    _harden(workdir)
+    from .runner import error_payload, report_result, run_query
     from .session import QueryRequest
 
-    payload: dict[str, Any] = _error("execution_error", "The query process stopped early.")
+    payload: dict[str, Any] = error_payload("execution_error", "The query process stopped early.")
     try:
         payload, result = run_query(request_data)
-        _report(
+        report_result(
             QueryRequest.from_dict(request_data),
             payload,
             result.arrow if result is not None else None,
             echo=False,
         )
     except Exception as exc:  # run_query catches query errors; this is the rest
-        payload = _error("execution_error", type(exc).__name__)
+        payload = error_payload("execution_error", type(exc).__name__)
     finally:
         try:
             out.send(payload)
@@ -295,8 +417,7 @@ def _ping(out: Connection) -> None:
 
 @dataclass
 class Outcome:
-    #: done | timeout | cancelled | crashed | stopped
-    kind: str
+    kind: OutcomeKind
     payload: dict[str, Any] | None = None
     exit_code: int | None = None
 
@@ -366,6 +487,50 @@ def _client_gone(sock: socket.socket) -> bool:
         return True
 
 
+_PAGE_MB = (os.sysconf("SC_PAGE_SIZE") if hasattr(os, "sysconf") else 4096) / (1024 * 1024)
+
+
+def process_memory_mb(pid: int) -> float | None:
+    """A process's own resident memory (resident minus file-backed and shared
+    pages), from ``/proc/<pid>/statm``, which a not-dumpable process still
+    shows. None where there is no /proc (macOS) or the process is gone."""
+    try:
+        with open(f"/proc/{pid}/statm", encoding="ascii") as handle:
+            fields = handle.read().split()
+        return (int(fields[1]) - int(fields[2])) * _PAGE_MB
+    except (OSError, IndexError, ValueError):
+        return None
+
+
+def container_memory_mb() -> float | None:
+    """The container's memory use as the kernel counts it against its limit
+    (cgroup v2, then v1); None outside a cgroup."""
+    for path in ("/sys/fs/cgroup/memory.current", "/sys/fs/cgroup/memory/memory.usage_in_bytes"):
+        try:
+            with open(path, encoding="ascii") as handle:
+                return int(handle.read().strip()) / (1024 * 1024)
+        except (OSError, ValueError):
+            continue
+    return None
+
+
+def query_source_types(request_data: dict[str, Any]) -> set[str]:
+    types: set[str] = set()
+    for entry in request_data.get("sources") or []:
+        recipe = entry.get("recipe") if isinstance(entry, dict) else None
+        if isinstance(recipe, dict):
+            types.add(str(recipe.get("type") or "").upper())
+    return types
+
+
+@dataclass
+class _Running:
+    process: multiprocessing.process.BaseProcess
+    workdir: str
+    #: Set by the memory guard before it kills the process.
+    memory_mb: float | None = None
+
+
 class QueryWorker:
     def __init__(self, config: WorkerConfig) -> None:
         self.config = config
@@ -377,13 +542,25 @@ class QueryWorker:
         # Any: the typeshed BaseContext has no Process/Pipe; each concrete one does.
         self._ctx: Any = multiprocessing.get_context(config.start_method)
         self.warm_timings: dict[str, float] = {}
+        self._running: dict[int, _Running] = {}
+        self._running_lock = threading.Lock()
+        self._query_dirs = Path(tempfile.gettempdir()) / QUERY_DIRS
 
     @property
     def ready(self) -> bool:
         return self._ready.is_set() and not self._draining.is_set()
 
+    @property
+    def draining(self) -> bool:
+        return self._draining.is_set()
+
     def start(self) -> None:
         """Bring the fork server up and wait until it has warmed up."""
+        # Left over by a worker that was killed: no process of ours uses them.
+        shutil.rmtree(self._query_dirs, ignore_errors=True)
+        self._query_dirs.mkdir(mode=0o700, parents=True, exist_ok=True)
+        for name, value in SINGLE_THREAD_ENV.items():
+            os.environ.setdefault(name, value)  # the fork server inherits these
         if self.config.start_method == "forkserver":
             os.environ["CLASSIFYRE_QUERY_WORKER_FORKSERVER"] = "1"
             self._ctx.set_forkserver_preload(["src.query.warm"])
@@ -400,6 +577,7 @@ class QueryWorker:
         reader.close()
         if process.exitcode != 0:
             raise RuntimeError(f"The query fork server did not start (exit {process.exitcode}).")
+        threading.Thread(target=self._guard_memory, name="memory-guard", daemon=True).start()
         self._ready.set()
 
     def run(
@@ -412,6 +590,13 @@ class QueryWorker:
         if not self._ready.is_set():
             self.stats.refuse("starting")
             return 503, {"code": "starting", "message": "The query worker is starting."}
+        job_only = sorted(query_source_types(request_data) & self.config.job_only_sources)
+        if job_only:
+            self.stats.refuse("job_only")
+            return 503, {
+                "code": "job_only",
+                "message": f"Queries over {', '.join(job_only)} sources run as Jobs.",
+            }
         if not self._slots.acquire(blocking=False):
             self.stats.refuse("busy")
             return 503, {"code": "busy", "message": "Every query slot is taken."}
@@ -423,7 +608,7 @@ class QueryWorker:
         finally:
             self._slots.release()
             seconds = time.monotonic() - started
-            label = outcome.kind
+            label: str = outcome.kind
             if outcome.kind == "done" and outcome.payload is not None:
                 label = "success" if outcome.payload.get("status") == "success" else "error"
             self.stats.finished(label, seconds)
@@ -452,21 +637,35 @@ class QueryWorker:
             else DEFAULT_TIMEOUT_SECONDS
         )
         deadline = started + seconds + BACKSTOP_SECONDS
+        workdir = tempfile.mkdtemp(prefix="q-", dir=self._query_dirs)
         reader, writer = self._ctx.Pipe(duplex=False)
         process = self._ctx.Process(
             target=_query_process,
-            args=(request_data, writer, self.config.query_memory_mb),
+            args=(request_data, writer, workdir),
             daemon=False,
         )
-        process.start()
-        writer.close()
+        running: _Running | None = None
         try:
-            return self._await(process, reader, client, deadline)
+            process.start()
+            writer.close()
+            running = _Running(process, workdir)
+            with self._running_lock:
+                self._running[process.pid] = running
+            outcome = self._await(process, reader, client, deadline)
+            if outcome.kind == "crashed" and running.memory_mb is not None:
+                return Outcome("memory", exit_code=process.exitcode)
+            return outcome
         finally:
             reader.close()
-            if process.is_alive():
-                process.kill()
-            process.join(5)
+            if process.pid is not None:
+                if process.is_alive():
+                    process.kill()
+                process.join(5)
+                with self._running_lock:
+                    self._running.pop(process.pid, None)
+            # What the query wrote (spill files, CA bundles, an export) goes
+            # with it, also when it was killed before it could clean up.
+            shutil.rmtree(workdir, ignore_errors=True)
 
     def _await(
         self,
@@ -511,6 +710,42 @@ class QueryWorker:
                         return Outcome("crashed", exit_code=process.exitcode)
                     code = 0 if payload.get("status") == "success" else 1
                     return Outcome("done", payload, code)
+
+    def _guard_memory(self) -> None:
+        """Stop a query that outgrows its cap, and the largest query when the
+        pod runs short: one query fails instead of every query in the pod."""
+        cap = self.config.max_query_memory_mb
+        container = self.config.container_memory_mb or self.config.memory_mb
+        limit = container * self.config.memory_guard_percent / 100
+        while not self._stopping.is_set():
+            time.sleep(GUARD_INTERVAL_SECONDS)
+            with self._running_lock:
+                running = list(self._running.values())
+            if not running:
+                continue
+            sizes = [
+                (size, entry)
+                for entry in running
+                if entry.process.pid is not None
+                and (size := process_memory_mb(entry.process.pid)) is not None
+            ]
+            for size, entry in sizes:
+                if cap and size > cap:
+                    self._stop_for_memory(entry, size, f"more than its {cap} MB")
+            used = container_memory_mb() if limit else None
+            if used is not None and used > limit and sizes:
+                size, entry = max(sizes, key=lambda pair: pair[0])
+                if entry.memory_mb is None:
+                    self._stop_for_memory(
+                        entry, size, f"the container at {used:.0f} of {container} MB"
+                    )
+
+    def _stop_for_memory(self, entry: _Running, size: float, why: str) -> None:
+        if entry.memory_mb is not None:
+            return
+        entry.memory_mb = size
+        logger.warning("query process %s stopped: %.0f MB, %s", entry.process.pid, size, why)
+        entry.process.kill()
 
     def drain(self) -> None:
         """Stop taking queries, let running ones finish, then stop the rest."""
@@ -576,9 +811,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         if self.path != QUERY_PATH:
             self._send(404, {"code": "not_found"})
             return
-        header = self.headers.get("Authorization", "")
-        expected = f"Bearer {worker.config.token}"
-        if not hmac.compare_digest(header.encode("utf-8"), expected.encode("utf-8")):
+        if not worker.config.token.matches(self.headers.get("Authorization", "")):
             self._send(401, {"code": "unauthorized"})
             return
         try:
@@ -606,14 +839,15 @@ def apply_engine_budget(
 ) -> None:
     """Size DuckDB per query from the container, unless set explicitly."""
     env = os.environ if environ is None else environ
-    memory, threads = engine_budget(
-        config.slots, get_effective_memory_mb(), get_effective_cpu_count()
-    )
+    memory, threads = engine_budget(config.slots, config.memory_mb, get_effective_cpu_count())
     env.setdefault("CLASSIFYRE_QUERY_MEMORY_LIMIT", memory)
     env.setdefault("CLASSIFYRE_QUERY_THREADS", str(threads))
 
 
 def serve(config: WorkerConfig) -> int:
+    # This process holds the token and every running query's request (each
+    # with its sources' credentials): nothing else may read its memory.
+    set_not_dumpable()
     removed = scrub_environment(os.environ)
     if removed:
         logger.info("Query worker: %d environment variables withheld from queries", len(removed))
@@ -623,7 +857,7 @@ def serve(config: WorkerConfig) -> int:
     server.worker = worker
 
     def on_signal(signum: int, _frame: object) -> None:
-        if worker._draining.is_set():
+        if worker.draining:
             return
         logger.info("Signal %d: draining (up to %d s)", signum, config.drain_seconds)
 

@@ -1137,3 +1137,29 @@ def test_describe_marks_columns_no_table_feeds(folder: Path) -> None:
     )
     by_table = {entry["table"]: entry["fields"] for entry in payload["describe"]["lineage"]}
     assert {f["downstream"] for f in by_table[""]} >= {"n", "label"}
+
+
+def test_locked_session_reads_its_folder_and_no_other_local_path(
+    folder: Path, tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    """Behind the gate: once locked, DuckDB opens no local file but the
+    query's own (its source's folder, its spill directory), so a query that
+    got past the gate still cannot read another query's files or /proc."""
+    from src.query.session import QueryRequest, QuerySession
+
+    other = tmp_path_factory.mktemp("other-query")
+    (other / "secret.csv").write_text("a\n1\n")
+    session = QuerySession(QueryRequest.from_dict(_request(folder, "SELECT 1")))
+    try:
+        conn = session._open()
+        session._conn = conn
+        session._attach_tables_as_views(conn, set(session._tables))
+        session._lock_down(conn)
+        assert conn.execute('SELECT count(*) FROM "files"."local"."customers"').fetchone() == (30,)
+        for path in (str(other / "secret.csv"), "/etc/hosts", f"{folder}/../{other.name}/x"):
+            with pytest.raises(duckdb.PermissionException):
+                conn.execute(f"SELECT * FROM read_text('{path}')").fetchall()
+        with pytest.raises(duckdb.Error):
+            conn.execute("SET enable_external_access = true")
+    finally:
+        session.close()

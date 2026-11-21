@@ -28,3 +28,12 @@ class AttachedCatalogBinding(QueryBinding):
             source._attach(conn)
             self._alias = self.source.hidden
         return ".".join(quote_identifier(part) for part in (self._alias, schema, table))
+
+    def local_paths(self) -> list[str]:
+        """A DuckLake's local data path (its catalog file DuckDB already holds
+        open; the session adds every attached database's file)."""
+        if self._alias is None:
+            return []
+        reader = getattr(self.source.instance(), "_connection", None)
+        data_path = reader("data_path") if callable(reader) else None
+        return [str(data_path)] if data_path and "://" not in str(data_path) else []

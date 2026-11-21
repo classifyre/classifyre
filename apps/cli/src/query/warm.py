@@ -97,16 +97,22 @@ def warm_up() -> dict[str, float]:
     """Run every warm-up step once; return how long each took."""
     if timings:
         return timings
+    # exec reset the main process's setting: this process is not dumpable
+    # either, and every query process forked from it starts that way.
+    from .worker import set_not_dumpable
+
+    set_not_dumpable()
     with _step("dependencies"):
         from ..utils.uv_sync import warm_groups
-        from .connectors import binding_class, declared_sources
+        from .connectors import query_dependency_groups
         from .runner import ensure_dependencies
 
         ensure_dependencies()
-        # The connectors' own clients (Neo4j's driver), installed now: a
-        # query that installed one would re-sync the environment every other
-        # query is running from.
-        groups = {g for t in declared_sources() for g in binding_class(t).dependency_groups}
+        # Every source client a query may import. The image has them (and the
+        # chart turns installing off and the root filesystem read-only); a
+        # dev or slim image installs them now, since a query that installed
+        # one would re-sync the environment every other query is running from.
+        groups = query_dependency_groups()
         warm_groups(groups)
     with _step("imports"):
         import pyarrow

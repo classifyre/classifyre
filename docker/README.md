@@ -223,7 +223,7 @@ accordingly. Override any of these only if you have a reason to.
 | `PG_SHARED_BUFFERS`, `PG_WORK_MEM`, `PG_EFFECTIVE_CACHE_SIZE`, `PG_MAX_CONNECTIONS` | PostgreSQL memory. |
 | `MAX_CONCURRENT_RUNNERS` | Scans running at once. |
 | `CLASSIFYRE_MAX_POOL_WORKERS` | Detector worker processes per scan. |
-| `QUERY_WORKER_ENABLED`, `QUERY_WORKER_SLOTS` | The warm SQL query worker (on by default) and how many queries it runs at once; `CLASSIFYRE_QUERY_MEMORY_LIMIT` is DuckDB's memory per query. |
+| `QUERY_WORKER_ENABLED`, `QUERY_WORKER_SLOTS`, `QUERY_WORKER_MEMORY_MB` | The warm SQL query worker (on by default), how many queries it runs at once, and the memory it plans them in (a quarter of the container by default; DuckDB gets a share of it per query). |
 | `CLASSIFYRE_MIN_MEMORY_MB` | The 4 GB startup floor. Lower it at your own risk. |
 
 The startup log prints exactly what it chose:

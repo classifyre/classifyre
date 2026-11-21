@@ -80,6 +80,13 @@ class ObjectStorageBinding(QueryBinding):
             raise BindingError(f"{fmt or 'These'} files cannot be queried with SQL yet.")
         raise BindingError(f"Unknown table location kind '{location.kind}'.")
 
+    def local_paths(self) -> list[str]:
+        """A local folder's root; a bucket's URL is remote, so not listed."""
+        if self._storage is None:
+            return []
+        root = str(self._storage.uri(""))
+        return [] if "://" in root else [root]
+
     def _spatial(self, conn: Any, uri: str) -> str:
         """``ST_Read`` with every geometry column turned into WKT text.
 
