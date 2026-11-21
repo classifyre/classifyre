@@ -20,6 +20,13 @@ import {
     QueryRunErrorDtoToJSON,
     QueryRunErrorDtoToJSONTyped,
 } from './QueryRunErrorDto';
+import type { QueryRunScanDto } from './QueryRunScanDto';
+import {
+    QueryRunScanDtoFromJSON,
+    QueryRunScanDtoFromJSONTyped,
+    QueryRunScanDtoToJSON,
+    QueryRunScanDtoToJSONTyped,
+} from './QueryRunScanDto';
 import type { QueryRunRowFilterDto } from './QueryRunRowFilterDto';
 import {
     QueryRunRowFilterDtoFromJSON,
@@ -121,6 +128,12 @@ export interface QueryRunDto {
      */
     timings?: { [key: string]: number; } | null;
     /**
+     * Tables read live through their source (Meilisearch, Neo4j): requests, rows and the filters sent to the source.
+     * @type {Array<QueryRunScanDto>}
+     * @memberof QueryRunDto
+     */
+    scans: Array<QueryRunScanDto>;
+    /**
      * 
      * @type {QueryRunErrorDto}
      * @memberof QueryRunDto
@@ -184,6 +197,7 @@ export function instanceOfQueryRunDto(value: object): value is QueryRunDto {
     if (!('truncated' in value) || value['truncated'] === undefined) return false;
     if (!('masks' in value) || value['masks'] === undefined) return false;
     if (!('rowFilters' in value) || value['rowFilters'] === undefined) return false;
+    if (!('scans' in value) || value['scans'] === undefined) return false;
     if (!('createdAt' in value) || value['createdAt'] === undefined) return false;
     return true;
 }
@@ -210,6 +224,7 @@ export function QueryRunDtoFromJSONTyped(json: any, ignoreDiscriminator: boolean
         'masks': ((json['masks'] as Array<any>).map(QueryRunMaskDtoFromJSON)),
         'rowFilters': ((json['rowFilters'] as Array<any>).map(QueryRunRowFilterDtoFromJSON)),
         'timings': json['timings'] == null ? undefined : json['timings'],
+        'scans': ((json['scans'] as Array<any>).map(QueryRunScanDtoFromJSON)),
         'error': json['error'] == null ? undefined : QueryRunErrorDtoFromJSON(json['error']),
         'resultBytes': json['resultBytes'] == null ? undefined : json['resultBytes'],
         'resultFormat': json['resultFormat'] == null ? undefined : json['resultFormat'],
@@ -242,6 +257,7 @@ export function QueryRunDtoToJSONTyped(value?: QueryRunDto | null, ignoreDiscrim
         'masks': ((value['masks'] as Array<any>).map(QueryRunMaskDtoToJSON)),
         'rowFilters': ((value['rowFilters'] as Array<any>).map(QueryRunRowFilterDtoToJSON)),
         'timings': value['timings'],
+        'scans': ((value['scans'] as Array<any>).map(QueryRunScanDtoToJSON)),
         'error': QueryRunErrorDtoToJSON(value['error']),
         'resultBytes': value['resultBytes'],
         'resultFormat': value['resultFormat'],

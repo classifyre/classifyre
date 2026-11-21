@@ -989,6 +989,7 @@ All URIs are relative to *http://localhost*
 - [QueryRunErrorDto](docs/QueryRunErrorDto.md)
 - [QueryRunMaskDto](docs/QueryRunMaskDto.md)
 - [QueryRunRowFilterDto](docs/QueryRunRowFilterDto.md)
+- [QueryRunScanDto](docs/QueryRunScanDto.md)
 - [QuickSearchAssetDto](docs/QuickSearchAssetDto.md)
 - [QuickSearchFindingDto](docs/QuickSearchFindingDto.md)
 - [QuickSearchRequestDto](docs/QuickSearchRequestDto.md)

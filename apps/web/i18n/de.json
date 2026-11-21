@@ -7417,6 +7417,11 @@
       "CANCELLED": "Abgebrochen"
     },
     "elapsed": "{{seconds}} s",
+    "liveScans": {
+      "summary": "live: {{tables}} Tabellen · {{requests}} Anfragen · {{rows}} Zeilen",
+      "table": "{{table}}: {{requests}} Anfragen, {{rows}} Zeilen live gelesen, jede Zeile hier gefiltert",
+      "tableFiltered": "{{table}}: {{requests}} Anfragen, {{rows}} Zeilen live gelesen; an die Quelle gesendete Filter: {{filters}}"
+    },
     "timings": "Vorbereitung {{setup}} s · Abfrage {{query}} s",
     "rows": "{{count}} Zeilen",
     "columns": "{{count}} Spalten",

@@ -14,8 +14,12 @@ import { Badge } from "@workspace/ui/components/badge";
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
 import type { QueryRun } from "@/lib/data-query";
+import { scanSummary } from "@/lib/scan-summary";
 
-const STATUS_TONE: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+const STATUS_TONE: Record<
+  string,
+  "default" | "secondary" | "destructive" | "outline"
+> = {
   PENDING: "outline",
   RUNNING: "secondary",
   SUCCESS: "default",
@@ -62,16 +66,27 @@ export function QueryToolbar({
 }) {
   const { t } = useTranslation();
   const timings = run?.timings ?? undefined;
+  const live = scanSummary(run?.scans);
 
   return (
     <div className="flex flex-wrap items-center gap-1.5 rounded-md border bg-muted/40 px-2 py-1.5">
       {busy ? (
-        <Button size="sm" variant="secondary" onClick={onStop} data-testid="cancel-query">
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={onStop}
+          data-testid="cancel-query"
+        >
           <Square className="mr-1.5 h-3.5 w-3.5" />
           {t("dataQuery.cancel")}
         </Button>
       ) : (
-        <Button size="sm" onClick={onRun} disabled={!canRun} data-testid="run-query">
+        <Button
+          size="sm"
+          onClick={onRun}
+          disabled={!canRun}
+          data-testid="run-query"
+        >
           <Play className="mr-1.5 h-3.5 w-3.5" />
           {t("dataQuery.run")}
         </Button>
@@ -122,6 +137,34 @@ export function QueryToolbar({
         {(busy || run) && (
           <span data-testid="query-elapsed" className="tabular-nums">
             {t("dataQuery.elapsed", { seconds: seconds(elapsed) })}
+          </span>
+        )}
+        {live && !busy && (
+          <span
+            className="tabular-nums"
+            data-testid="query-live-scans"
+            title={live.details
+              .map((d) =>
+                d.pushed
+                  ? t("dataQuery.liveScans.tableFiltered", {
+                      table: d.table,
+                      requests: d.requests,
+                      rows: d.rows,
+                      filters: d.pushed,
+                    })
+                  : t("dataQuery.liveScans.table", {
+                      table: d.table,
+                      requests: d.requests,
+                      rows: d.rows,
+                    }),
+              )
+              .join("\n")}
+          >
+            {t("dataQuery.liveScans.summary", {
+              tables: live.tables,
+              requests: live.requests,
+              rows: live.rows,
+            })}
           </span>
         )}
         {timings?.totalMs !== undefined && !busy && (

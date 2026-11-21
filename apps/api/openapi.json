@@ -37559,6 +37559,46 @@
           "table"
         ]
       },
+      "QueryRunScanDto": {
+        "type": "object",
+        "properties": {
+          "table": {
+            "type": "string",
+            "description": "The table, as SQL names it."
+          },
+          "requests": {
+            "type": "number",
+            "description": "Calls to the source."
+          },
+          "rows": {
+            "type": "number",
+            "description": "Rows the source sent."
+          },
+          "pushed": {
+            "description": "Conditions sent to the source, as SQL (genre = 'Drama').",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "ms": {
+            "type": "number",
+            "description": "Milliseconds spent reading it."
+          },
+          "scans": {
+            "type": "number",
+            "description": "How often the query read it."
+          }
+        },
+        "required": [
+          "table",
+          "requests",
+          "rows",
+          "pushed",
+          "ms",
+          "scans"
+        ]
+      },
       "QueryRunErrorDto": {
         "type": "object",
         "properties": {
@@ -37648,6 +37688,13 @@
             },
             "description": "setupMs, executeMs, totalMs (inside the job)."
           },
+          "scans": {
+            "description": "Tables read live through their source (Meilisearch, Neo4j): requests, rows and the filters sent to the source.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QueryRunScanDto"
+            }
+          },
           "error": {
             "nullable": true,
             "type": "object",
@@ -37689,6 +37736,7 @@
           "truncated",
           "masks",
           "rowFilters",
+          "scans",
           "createdAt"
         ]
       },

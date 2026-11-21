@@ -27,6 +27,7 @@ import {
   datasetResource,
   tableReadResources,
 } from '../identity/audit-resources';
+import { scanStatsOf, type ScanStat } from './scan-stats';
 import {
   QueryCatalogService,
   type CatalogTable,
@@ -125,6 +126,8 @@ export interface QueryRunView {
   /** Row filters of the tables it names (DQ §5.10). */
   rowFilters: RunRowFilter[];
   timings: Record<string, number> | null;
+  /** What each connector table cost (QC §5.9); empty for other tables. */
+  scans: ScanStat[];
   error: { code: string; message: string } | null;
   resultBytes: number | null;
   /** Null for rows shown in the app; the file format for an export. */
@@ -143,6 +146,8 @@ export interface QueryCallbackMeta {
   columns?: { name: string; type: string }[];
   timings?: Record<string, number>;
   tables?: string[];
+  /** Connector tables (QC §5.3): requests, rows and filters sent per table. */
+  scans?: unknown;
   error?: { code?: string; message?: string };
   /** A describe run's answer (§5.12): output columns and their lineage. */
   describe?: {
@@ -1225,6 +1230,13 @@ export class QueryRunService {
           truncatedReason: meta.truncatedReason ?? null,
           columns: meta.columns ?? [],
           timings: meta.timings ?? {},
+          ...(scanStatsOf(meta.scans).length
+            ? {
+                scanStats: scanStatsOf(
+                  meta.scans,
+                ) as unknown as Prisma.InputJsonValue,
+              }
+            : {}),
           ...(assetIds ? { assetIds } : {}),
           finishedAt: new Date(),
           callbackTokenHash: null,
@@ -1396,6 +1408,7 @@ export class QueryRunService {
         masks: true,
         rowFilters: true,
         timings: true,
+        scanStats: true,
         error: true,
         resultBytes: true,
         resultFormat: true,
@@ -1452,6 +1465,7 @@ export class QueryRunService {
     masks: Prisma.JsonValue;
     rowFilters: Prisma.JsonValue;
     timings: Prisma.JsonValue;
+    scanStats: Prisma.JsonValue;
     error: Prisma.JsonValue;
     resultBytes: number | null;
     resultFormat: string | null;
@@ -1472,6 +1486,7 @@ export class QueryRunService {
       masks: parseRunMasks(run.masks),
       rowFilters: parseRunRowFilters(run.rowFilters),
       timings: (run.timings as QueryRunView['timings']) ?? null,
+      scans: scanStatsOf(run.scanStats),
       error: (run.error as QueryRunView['error']) ?? null,
       resultBytes: run.resultBytes,
       resultFormat: run.resultFormat,

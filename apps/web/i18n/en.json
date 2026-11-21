@@ -7417,6 +7417,11 @@
       "CANCELLED": "Cancelled"
     },
     "elapsed": "{{seconds}} s",
+    "liveScans": {
+      "summary": "live: {{tables}} tables · {{requests}} requests · {{rows}} rows",
+      "table": "{{table}}: {{requests}} requests, {{rows}} rows read live, every row filtered here",
+      "tableFiltered": "{{table}}: {{requests}} requests, {{rows}} rows read live; filters sent to the source: {{filters}}"
+    },
     "timings": "setup {{setup}} s · query {{query}} s",
     "rows": "{{count}} rows",
     "columns": "{{count}} columns",

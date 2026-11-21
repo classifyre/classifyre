@@ -119,9 +119,7 @@ describe('x-query declaration', () => {
       index_name: 'movies',
     });
     expect(address.location).toBeNull();
-    expect(address.reason).toBe(
-      'Scan the source again to record its columns.',
-    );
+    expect(address.reason).toBe('Scan the source again to record its columns.');
   });
 
   it('names Neo4j labels <source>.nodes.<label> and relationship types <source>.relationships.<type>', () => {
