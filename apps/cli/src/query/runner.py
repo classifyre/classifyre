@@ -132,7 +132,9 @@ def run_query(request_data: dict[str, Any]) -> tuple[dict[str, Any], QueryResult
     except QueryTimeoutError as exc:
         return _error("timeout", str(exc)), None
     except BindingError as exc:
-        return _error("source_unavailable", redact(str(exc))), None
+        # A connector's refusal has its own code (connector_limit).
+        code = getattr(exc, "code", None) or "source_unavailable"
+        return _error(str(code), redact(str(exc))), None
     except Exception as exc:
         message = str(exc).strip().splitlines()
         text = message[0] if message else type(exc).__name__
@@ -163,6 +165,8 @@ def run_query(request_data: dict[str, Any]) -> tuple[dict[str, Any], QueryResult
         "format": result.export_format or "arrow",
         "mediaType": result.media_type,
     }
+    if result.scans:
+        payload["scans"] = result.scans
     return payload, result
 
 

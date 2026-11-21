@@ -21,12 +21,12 @@ import threading
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
 from ..utils.duckdb_engine import connect, load_extension, quote_identifier, require_duckdb
-from .bindings import BindingError, SourceBinding, TableLocation
+from .bindings import BindingError, ConnectorError, SourceBinding, TableLocation
 from .gate import QueryRefusedError, TableName, validate
 from .masks import ColumnMask, ColumnsHiddenError, masked_projection
 from .rows import RowFilter, row_predicate
@@ -145,6 +145,9 @@ class QueryResult:
     export_format: str | None = None
     #: For a describe request: output columns and column lineage, no rows.
     description: dict[str, Any] | None = None
+    #: What reading each connector table cost (QC §5.3): table, requests,
+    #: rows, filters sent, ms, scans.
+    scans: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -197,6 +200,8 @@ class QuerySession:
                 self._bindings[alias] = SourceBinding(
                     alias, index, recipe, str(entry.get("sourceId") or "")
                 )
+        #: Each source table's view reads this binding's relation.
+        self._relations: dict[str, tuple[SourceBinding, str]] = {}
         self._tables: dict[TableName, _Table] = {}
         for entry in request.tables:
             dataset = entry.get("dataset")
@@ -315,8 +320,13 @@ class QuerySession:
 
     def _source_view(self, conn: Any, target: str, entry: _Table) -> None:
         binding = self._bindings[entry.source_alias]
+        # A masked column is never a filter sent to its source (QC §5.11).
+        location = replace(
+            entry.location,
+            withheld=frozenset(m.column for m in entry.masks),
+        )
         try:
-            relation = binding.relation(conn, entry.location)
+            relation = binding.relation(conn, location)
         except BindingError as exc:
             # Scan wording: "Failed to connect to <label>: <cause>".
             # The binding already names the endpoint in its message, so
@@ -328,6 +338,7 @@ class QuerySession:
             ) from exc
         if binding.source_type == "POSTGRESQL":
             _postgres_settings(conn)
+        self._relations[str(entry.name)] = (binding, relation)
         self._create_view(conn, target, relation, entry, label=str(entry.name), binding=binding)
 
     def _dataset_relation(self, conn: Any, dataset: _Dataset, target_of: Any) -> str:
@@ -523,6 +534,8 @@ class QuerySession:
         )
         conn = self._open()
         self._conn = conn
+        for binding in self._bindings.values():
+            binding.deadline = started + self.request.timeout_seconds
         with self._deadline(conn, self.request.timeout_seconds) as fired:
             try:
                 self._attach_tables_as_views(conn, validated.tables)
@@ -538,12 +551,15 @@ class QuerySession:
                     limit = int(self.request.max_rows) + 1
                     wrapped = f"SELECT * FROM ({validated.sql}) AS __result LIMIT {limit}"
                     table = _fetch_arrow(conn.sql(wrapped))
-            except Exception:
-                if fired.is_set():
+            except Exception as exc:
+                failed = self._connector_failure()
+                if fired.is_set() or (failed is not None and failed.code == "timeout"):
                     raise QueryTimeoutError(
                         f"The query took longer than {self.request.timeout_seconds} s "
                         "and was stopped."
                     ) from None
+                if failed is not None and failed is not exc:
+                    raise failed from None
                 raise
         executed = time.monotonic()
         if self.request.export_format:
@@ -556,7 +572,37 @@ class QuerySession:
             "totalMs": int((time.monotonic() - started) * 1000),
         }
         result.tables = sorted(str(t) for t in validated.tables)
+        result.scans = self._scan_stats()
         return result
+
+    def _connector_failure(self) -> ConnectorError | None:
+        """The error a connector raised, named for its table: DuckDB hands it
+        on wrapped in its own text."""
+        for name, (binding, relation) in sorted(self._relations.items()):
+            error = binding.failure(relation)
+            if error is None:
+                continue
+            if error.code == "connector_limit":
+                return ConnectorError(f"{name} {error}", error.code)
+            return ConnectorError(f"Failed to read {name}: {error}", error.code)
+        return None
+
+    def _scan_stats(self) -> list[dict[str, Any]]:
+        out = []
+        for name, (binding, relation) in sorted(self._relations.items()):
+            stats = binding.scan_stats(relation)
+            if stats is not None and stats.scans:
+                out.append(
+                    {
+                        "table": name,
+                        "requests": stats.requests,
+                        "rows": stats.rows,
+                        "pushed": list(stats.pushed),
+                        "ms": stats.ms,
+                        "scans": stats.scans,
+                    }
+                )
+        return out
 
 
 def _export_columns(conn: Any, sql: str, fmt: str) -> str:

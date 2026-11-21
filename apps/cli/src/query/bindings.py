@@ -14,13 +14,17 @@ in the source schema (docs/prd/QC-query-connectors.md §5.1, §5.2):
 * Iceberg REST and DuckLake: attached exactly as their scans do.
 * Buckets (S3-compatible, Azure, GCS, local folder): the source's
   :class:`~src.utils.lakehouse_tables.TableStorage`.
+* Connectors (Meilisearch, Neo4j): read live through the source's client,
+  as Arrow (:mod:`.connectors.arrow`).
 """
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 from .connectors import BindingError, QueryBinding, TableLocation, binding_class, declared_sources
+from .connectors.arrow import ArrowConnector, ConnectorError, ScanStats
 from .connectors.object_storage import FILE_FORMATS, LAKEHOUSE_FORMATS, SPATIAL_FORMATS
 
 __all__ = [
@@ -31,6 +35,7 @@ __all__ = [
     "QUERYABLE_SOURCE_TYPES",
     "SPATIAL_FORMATS",
     "BindingError",
+    "ConnectorError",
     "SourceBinding",
     "TableLocation",
 ]
@@ -57,6 +62,8 @@ class SourceBinding:
         self.source_type = str(recipe.get("type") or "").upper()
         self._source: Any = None
         self._reader: QueryBinding | None = None
+        #: Set by the session: when the query must be done.
+        self.deadline = math.inf
 
     @property
     def hidden(self) -> str:
@@ -112,6 +119,16 @@ class SourceBinding:
         """What a failed read of this source's table means, when it is known."""
         binding = self._known_binding()
         return binding.explain(exc) if binding else None
+
+    def scan_stats(self, relation: str) -> ScanStats | None:
+        """A connector table's reads (None for tables DuckDB reads itself)."""
+        reader = self._reader
+        return reader.stats(relation) if isinstance(reader, ArrowConnector) else None
+
+    def failure(self, relation: str) -> ConnectorError | None:
+        """Why a connector's scan of that table failed, as it said it."""
+        reader = self._reader
+        return reader.failure(relation) if isinstance(reader, ArrowConnector) else None
 
     def close(self) -> None:
         if self._reader is not None:

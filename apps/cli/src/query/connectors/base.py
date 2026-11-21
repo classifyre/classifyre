@@ -19,7 +19,7 @@ then.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, ClassVar, Protocol
 
 from ...utils.duckdb_engine import load_extension
@@ -42,6 +42,11 @@ class TableLocation:
     version: str | None = None
     #: ODBC: the table as the driver's SQL names it (quoted), as the scan recorded it.
     qualified_name: str | None = None
+    #: Connector tables: the columns the scan recorded, ``(name, type)``.
+    columns: tuple[tuple[str, str], ...] = ()
+    #: Set by the session, not the API: columns the person reads masked,
+    #: which no filter may be sent to the source on (QC §5.11, R3).
+    withheld: frozenset[str] = field(default_factory=frozenset)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> TableLocation:
@@ -58,7 +63,19 @@ class TableLocation:
             object_key=text("objectKey"),
             version=text("version"),
             qualified_name=text("qualifiedName"),
+            columns=_columns(data.get("columns")),
         )
+
+
+def _columns(value: Any) -> tuple[tuple[str, str], ...]:
+    if not isinstance(value, list):
+        return ()
+    out: list[tuple[str, str]] = []
+    for column in value:
+        if isinstance(column, dict) and isinstance(column.get("name"), str) and column["name"]:
+            kind = column.get("type")
+            out.append((column["name"], kind if isinstance(kind, str) else ""))
+    return tuple(out)
 
 
 class SourceContext(Protocol):
@@ -69,6 +86,8 @@ class SourceContext(Protocol):
     recipe: dict[str, Any]
     source_id: str
     source_type: str
+    #: ``time.monotonic()`` by which the query must be done.
+    deadline: float
 
     @property
     def hidden(self) -> str:
