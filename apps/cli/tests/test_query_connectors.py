@@ -365,6 +365,11 @@ def _pushed(sql: str) -> tuple[tuple[Predicate, ...], bool]:
         ),
         ("id BETWEEN 1 AND 3", (Predicate("id", ">=", 1), Predicate("id", "<=", 3)), True),
         ("genre IN ('x', 'y')", (Predicate("genre", "in", ("x", "y")),), True),
+        (
+            "genre IN ('a\"b', 'c\\d', 'e''f')",
+            (Predicate("genre", "in", ('a"b', "c\\d", "e'f")),),
+            True,
+        ),
         ("day >= DATE '2020-01-02'", None, True),
         ("id = 3 OR genre = 'x'", (), False),
         ("id = 3 AND (genre = 'x' OR genre = 'y')", (Predicate("id", "=", 3),), False),

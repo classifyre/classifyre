@@ -26,12 +26,17 @@ const LOCATED = {
   object_key: 'lake/orders',
   table_format: 'delta',
   mime_type: 'application/parquet',
+  // Connector tables: the scan's recorded columns, the index or label.
+  columns: [{ name: 'id', type: 'BIGINT' }],
+  index_name: 'orders',
+  label: 'Order',
+  relationship_type: 'PLACED',
 };
 
 describe('x-query declaration', () => {
   const declared = queryDeclarations();
 
-  it('declares the ten source types DQ built', () => {
+  it('declares the ten source types DQ built and the connectors', () => {
     expect([...declared.keys()].sort()).toEqual(
       [
         'AZURE_BLOB_STORAGE',
@@ -40,6 +45,7 @@ describe('x-query declaration', () => {
         'GOOGLE_CLOUD_STORAGE',
         'ICEBERG_REST',
         'LOCAL_FOLDER',
+        'MEILISEARCH',
         'MYSQL',
         'ODBC',
         'POSTGRESQL',
@@ -82,5 +88,38 @@ describe('x-query declaration', () => {
     expect(joinsDatabasesInSchema('ODBC')).toBe(true);
     expect(joinsDatabasesInSchema('MYSQL')).toBe(false);
     expect(joinsDatabasesInSchema('S3_COMPATIBLE_STORAGE')).toBe(false);
+  });
+
+  it('names a Meilisearch index <source>.indexes.<uid> and sends its recorded columns', () => {
+    const columns = [
+      { name: 'id', type: 'BIGINT' },
+      { name: 'studio', type: 'JSON' },
+    ];
+    expect(isTableShaped('MEILISEARCH', 'index', {}, 'movies')).toBe(true);
+    expect(
+      tableAddress('MEILISEARCH', 'index', 'movies', {
+        index_name: 'Movies-2024',
+        columns,
+      }),
+    ).toEqual({
+      schema: 'indexes',
+      table: 'Movies-2024',
+      location: {
+        kind: 'connector',
+        schema: 'indexes',
+        table: 'Movies-2024',
+        columns,
+      },
+    });
+  });
+
+  it('asks for a new scan of an index whose columns were never recorded', () => {
+    const address = tableAddress('MEILISEARCH', 'index', 'movies', {
+      index_name: 'movies',
+    });
+    expect(address.location).toBeNull();
+    expect(address.reason).toBe(
+      'Scan the source again to record its columns.',
+    );
   });
 });

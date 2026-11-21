@@ -210,7 +210,17 @@ def _live_class() -> Any:
         def scanner(self, columns: Any = None, filter: Any = None, **_: Any) -> Any:
             schema = self.arrow_schema
             names = tuple(columns) if columns is not None else None
-            predicates, _complete = predicates_of(filter, schema)
+            predicates, complete = predicates_of(filter, schema)
+            # DuckDB leaves the filter's own columns out of ``columns``: the
+            # local filter needs them, so the source is asked for them too
+            # (all columns when the filter was not read whole).
+            read: tuple[str, ...] | None = names
+            if names is not None and filter is not None:
+                if complete:
+                    extra = [p.column for p in predicates if p.column not in names]
+                    read = names + tuple(dict.fromkeys(extra))
+                else:
+                    read = None
             withheld = self.location.withheld
             predicates = tuple(p for p in predicates if p.column not in withheld)
             self.stats.scans += 1
@@ -218,7 +228,7 @@ def _live_class() -> Any:
                 if str(predicate) not in self.stats.pushed:
                     self.stats.pushed.append(str(predicate))
             request = ScanRequest(
-                columns=names,
+                columns=read,
                 predicates=predicates,
                 deadline=getattr(self.connector.source, "deadline", math.inf),
                 stats=self.stats,
@@ -466,7 +476,9 @@ def _leaf(text: str, schema: Any) -> list[Predicate] | None:
         kind = schema.field(name).type
         values = []
         for item in _items(match["values"]):
-            value = _literal(item, kind)
+            # A value set prints its strings unescaped (a comparison escapes
+            # them); the round trip below catches what that makes ambiguous.
+            value = _literal(item, kind, escaped=False)
             if value is _NOT_A_LITERAL:
                 return None
             values.append(value)
@@ -488,13 +500,15 @@ def _items(body: str) -> list[str]:
 _NOT_A_LITERAL = object()
 
 
-def _literal(text: str, kind: Any) -> Any:
+def _literal(text: str, kind: Any, *, escaped: bool = True) -> Any:
     import pyarrow as pa
 
     try:
         if pa.types.is_string(kind) or pa.types.is_large_string(kind):
-            if not (text.startswith('"') and text.endswith('"')):
+            if len(text) < 2 or not (text.startswith('"') and text.endswith('"')):
                 return _NOT_A_LITERAL
+            if not escaped:
+                return text[1:-1]
             value = json.loads(text)
             return value if isinstance(value, str) else _NOT_A_LITERAL
         if pa.types.is_boolean(kind):

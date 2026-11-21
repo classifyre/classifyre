@@ -39,6 +39,7 @@ _BINDINGS: dict[str, tuple[str, str]] = {
     "AZURE_BLOB_STORAGE": ("object_storage", "ObjectStorageBinding"),
     "GOOGLE_CLOUD_STORAGE": ("object_storage", "ObjectStorageBinding"),
     "LOCAL_FOLDER": ("object_storage", "ObjectStorageBinding"),
+    "MEILISEARCH": ("meilisearch", "MeilisearchConnector"),
 }
 
 

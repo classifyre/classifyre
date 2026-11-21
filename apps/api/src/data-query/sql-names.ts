@@ -19,7 +19,9 @@ export type AddressStrategy =
   | 'databricks'
   | 'odbc'
   | 'catalog'
-  | 'object_storage';
+  | 'object_storage'
+  /** Search indexes read live: `<source>.indexes.<index>`. */
+  | 'search_index';
 
 /** One source type's `x-query` entry (docs/prd/QC-query-connectors.md §5.1). */
 export interface QueryDeclaration {
@@ -182,7 +184,18 @@ export type TableLocation =
   | { kind: 'lakehouse'; format: string; objectKey: string }
   | { kind: 'file'; format: string; objectKey: string }
   /** A shared dataset (§5.12): its SQL over its inputs, expanded per read. */
-  | { kind: 'dataset'; datasetId: string };
+  | { kind: 'dataset'; datasetId: string }
+  /**
+   * Read live through the source's API (QC §5.3): the source's own name for
+   * the table, and the columns the scan recorded, which are its schema.
+   */
+  | {
+      kind: 'connector';
+      schema: string;
+      table: string;
+      database?: string;
+      columns: { name: string; type: string }[];
+    };
 
 export interface TableAddress {
   /** Unsanitised, before collisions are resolved. */
@@ -235,6 +248,55 @@ function keyParts(key: string, stripExtension: boolean): [string, string] {
   let table = parts.pop() ?? key;
   if (stripExtension) table = table.replace(/\.[^.]+$/, '');
   return [parts.length ? parts.join('_') : 'root', table];
+}
+
+/** The columns a scan recorded, `{name, type}` (a bare name has no type). */
+function recordedColumns(metadata: Metadata): { name: string; type: string }[] {
+  const columns = Array.isArray(metadata.columns) ? metadata.columns : [];
+  const out: { name: string; type: string }[] = [];
+  for (const column of columns) {
+    if (typeof column === 'string' && column) {
+      out.push({ name: column, type: '' });
+    } else if (column && typeof column === 'object') {
+      const { name, type } = column as Record<string, unknown>;
+      if (typeof name === 'string' && name) {
+        out.push({ name, type: typeof type === 'string' ? type : '' });
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * A table read live (QC §5.3). Without recorded columns it has no schema
+ * (and every column would be hidden, DQ §5.8): a new scan records them.
+ */
+function connectorAddress(
+  schema: string,
+  table: string,
+  metadata: Metadata,
+  database?: string,
+): TableAddress {
+  const columns = recordedColumns(metadata);
+  if (!columns.length) {
+    return {
+      schema,
+      table,
+      location: null,
+      reason: 'Scan the source again to record its columns.',
+    };
+  }
+  return {
+    schema,
+    table,
+    location: {
+      kind: 'connector',
+      schema,
+      table,
+      ...(database ? { database } : {}),
+      columns,
+    },
+  };
 }
 
 /**
@@ -325,6 +387,10 @@ export function tableAddress(
       location: schema ? { kind: 'catalog', schema, table: tableName } : null,
       reason: schema ? undefined : 'Scan the source again to locate it.',
     };
+  }
+  if (address === 'search_index') {
+    const index = text(metadata.index_name) ?? name;
+    return connectorAddress('indexes', index, metadata);
   }
   if (sourceType === SHARED_DATASET_SOURCE_TYPE) {
     const datasetId = text(metadata.dataset_id);

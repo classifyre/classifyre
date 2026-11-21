@@ -136,6 +136,14 @@
   "x-query": {
     "description": "Which source types can be queried with SQL and how (docs/prd/QC-query-connectors.md \u00a75.1). Single source of truth for the API's table names (apps/api/src/data-query/sql-names.ts) and the query job's bindings (apps/cli/src/query/connectors/). tier: native (a DuckDB core extension), extension (a DuckDB community or nightly extension), connector (a Python Arrow connector), custom (a CUSTOM notebook's scan()). assetKinds: the asset kinds that are tables. address: how a table's SQL name and location are made from its asset. extensions: the DuckDB extensions the binding loads.",
     "sources": {
+      "MEILISEARCH": {
+        "tier": "connector",
+        "assetKinds": [
+          "index"
+        ],
+        "address": "search_index",
+        "extensions": []
+      },
       "POSTGRESQL": {
         "tier": "native",
         "assetKinds": [
@@ -2852,6 +2860,23 @@
             "is_indexing": {
               "type": "boolean",
               "description": "Whether the index has an indexing operation in progress"
+            },
+            "columns": {
+              "type": "array",
+              "description": "Top-level document fields of a sample as {name, type} objects (DuckDB type names; objects and mixed lists JSON): the index's columns for SQL",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Field name"
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "Field type"
+                  }
+                }
+              }
             }
           },
           "required": [
