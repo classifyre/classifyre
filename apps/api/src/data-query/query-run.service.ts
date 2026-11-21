@@ -951,6 +951,8 @@ export class QueryRunService {
       ...(input.exportFormat ? { exportFormat: input.exportFormat } : {}),
       ...(input.extra ?? {}),
       timeoutSeconds: input.timeoutSeconds,
+      // The query worker gives each workspace its share of its slots.
+      workspaceId: this.actors.workspaceId(),
       callbackUrl: `${this.cliRunner.queryCallbackBaseUrl(this.actors.workspaceId())}/query-runs/${run.id}/result`,
       callbackToken: token,
       sources: attached.map((source) => ({
@@ -1112,6 +1114,8 @@ export class QueryRunService {
       maxResultBytes: MAX_RESULT_BYTES,
       exportFormat: 'csv',
       timeoutSeconds: settings.timeoutSeconds,
+      // The query worker gives each workspace its share of its slots.
+      workspaceId: this.actors.workspaceId(),
       callbackUrl: `${this.cliRunner.queryCallbackBaseUrl(this.actors.workspaceId())}/query-runs/${run.id}/result`,
       callbackToken: token,
       sources: attach.map((a) => ({

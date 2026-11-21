@@ -753,6 +753,10 @@ queryWorker:
     extraMetrics: []
     # -- Seconds of lower load before scaling down (drains running queries).
     scaleDownStabilizationSeconds: 300
+  # -- The share of one pod's query slots one workspace may hold at once (%);
+  # its queries past that go to another pod or to a Job, so workspaces sharing
+  # the pool always find room. 100: no share.
+  workspaceSharePercent: 75
   # -- Seconds a stopping pod lets running queries finish before it stops them.
   # The default outlasts the longest query timeout a workspace may set (900 s)
   # plus the worker's backstop, so a rollout or scale-down stops no query; the

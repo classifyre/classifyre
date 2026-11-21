@@ -99,6 +99,7 @@ DEFAULT_MEMORY_GUARD_PERCENT = 90
 #: How often the memory guard looks.
 GUARD_INTERVAL_SECONDS = 0.1
 DEFAULT_DRAIN_SECONDS = 960
+DEFAULT_WORKSPACE_SHARE_PERCENT = 75
 #: Source types whose queries always run as Jobs: they load native code the
 #: source names (an ODBC ``Driver=`` path), which must not share a process
 #: host with other workspaces' queries.
@@ -284,6 +285,9 @@ class WorkerConfig:
     memory_guard_percent: int = DEFAULT_MEMORY_GUARD_PERCENT
     job_only_sources: frozenset[str] = DEFAULT_JOB_ONLY_SOURCES
     node: str = ""
+    #: The share of the slots one workspace may hold at once (review of
+    #: 383fd5c4, P6): the rest stay for other workspaces sharing the pool.
+    workspace_share_percent: int = DEFAULT_WORKSPACE_SHARE_PERCENT
 
     @classmethod
     def from_env(cls, environ: MutableMapping[str, str] | None = None) -> WorkerConfig:
@@ -326,11 +330,19 @@ class WorkerConfig:
             if job_only is None
             else frozenset(t.strip().upper() for t in job_only.split(",") if t.strip()),
             node=env.get(ENV_PREFIX + "NODE_NAME", "").strip() or socket.gethostname(),
+            workspace_share_percent=_int(
+                env, "WORKSPACE_SHARE_PERCENT", DEFAULT_WORKSPACE_SHARE_PERCENT, 1
+            ),
         )
 
 
 def default_start_method() -> str:
     return "spawn" if sys.platform == "darwin" else "forkserver"
+
+
+def workspace_slots(slots: int, share_percent: int) -> int:
+    """Slots one workspace may hold: its share, rounded down, at least one."""
+    return max(1, min(slots, slots * min(100, share_percent) // 100))
 
 
 def auto_slots(memory_mb: int, per_query_mb: int) -> int:
@@ -558,6 +570,9 @@ class QueryWorker:
         self.config = config
         self.stats = Stats()
         self._slots = threading.BoundedSemaphore(config.slots)
+        #: Running queries per workspace (``workspaceId`` of the request).
+        self._by_workspace: dict[str, int] = {}
+        self._workspace_lock = threading.Lock()
         self._draining = threading.Event()
         self._stopping = threading.Event()
         self._ready = threading.Event()
@@ -619,7 +634,15 @@ class QueryWorker:
                 "code": "job_only",
                 "message": f"Queries over {', '.join(job_only)} sources run as Jobs.",
             }
+        workspace = str(request_data.get("workspaceId") or "")
+        if not self._claim_workspace(workspace):
+            self.stats.refuse("busy")
+            return 503, {
+                "code": "busy",
+                "message": "This workspace has its share of this worker's query slots.",
+            }
         if not self._slots.acquire(blocking=False):
+            self._release_workspace(workspace)
             self.stats.refuse("busy")
             return 503, {"code": "busy", "message": "Every query slot is taken."}
         started = time.monotonic()
@@ -629,6 +652,7 @@ class QueryWorker:
             outcome = self._run(request_data, client, started)
         finally:
             self._slots.release()
+            self._release_workspace(workspace)
             seconds = time.monotonic() - started
             label: str = outcome.kind
             if outcome.kind == "done" and outcome.payload is not None:
@@ -732,6 +756,28 @@ class QueryWorker:
                         return Outcome("crashed", exit_code=process.exitcode)
                     code = 0 if payload.get("status") == "success" else 1
                     return Outcome("done", payload, code)
+
+    def _claim_workspace(self, workspace: str) -> bool:
+        """One slot of the workspace's share, or False when it holds all of it."""
+        if not workspace:
+            return True
+        share = workspace_slots(self.config.slots, self.config.workspace_share_percent)
+        with self._workspace_lock:
+            held = self._by_workspace.get(workspace, 0)
+            if held >= share:
+                return False
+            self._by_workspace[workspace] = held + 1
+            return True
+
+    def _release_workspace(self, workspace: str) -> None:
+        if not workspace:
+            return
+        with self._workspace_lock:
+            left = self._by_workspace.get(workspace, 1) - 1
+            if left > 0:
+                self._by_workspace[workspace] = left
+            else:
+                self._by_workspace.pop(workspace, None)
 
     def _guard_memory(self) -> None:
         """Stop a query that outgrows its cap, and the largest query when the

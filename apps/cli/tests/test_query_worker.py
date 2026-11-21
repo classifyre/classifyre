@@ -557,3 +557,41 @@ def test_the_memory_guard_counts_the_working_set_not_the_page_cache(tmp_path: Pa
     (v1 / "memory" / "memory.stat").write_text(f"total_inactive_file {500 * mib}\n")
     assert container_memory_mb(v1) == 2500
     assert container_memory_mb(tmp_path / "none") is None
+
+
+def test_one_workspace_keeps_room_for_the_others(
+    monkeypatch: pytest.MonkeyPatch, folder: Path
+) -> None:
+    """Workspaces share the pool: one cannot take every slot (review of
+    383fd5c4, P6). Over its share a query is answered busy, which the API
+    takes to another pod or to a Job."""
+    monkeypatch.setenv("CLASSIFYRE_QUERY_WORKER_EXTENSIONS", "")
+    monkeypatch.setenv("CLASSIFYRE_QUERY_WORKER_FORKSERVER", "1")
+    running = _start(slots=2, workspace_share_percent=50)
+    try:
+        slow = threading.Thread(
+            target=lambda: running.post(
+                _request(folder, SLOW_SQL, timeoutSeconds=60, workspaceId="ws-a")
+            )
+        )
+        slow.start()
+        assert _wait(lambda: running.worker.stats.active == 1)
+        status, body = running.post(_request(folder, "SELECT 1 AS x", workspaceId="ws-a"))
+        assert status == 503
+        assert body["code"] == "busy"
+        assert "share" in body["message"]
+        status, body = running.post(_request(folder, "SELECT 1 AS x", workspaceId="ws-b"))
+        assert status == 200, body
+        running.worker.drain()
+        slow.join(timeout=30)
+    finally:
+        running.server.shutdown()
+        running.server.server_close()
+
+
+def test_the_workspace_share_is_at_least_one_slot() -> None:
+    from src.query.worker import workspace_slots
+
+    assert workspace_slots(8, 75) == 6
+    assert workspace_slots(1, 50) == 1
+    assert workspace_slots(3, 100) == 3
