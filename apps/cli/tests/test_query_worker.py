@@ -535,3 +535,25 @@ def test_the_memory_guard_stops_a_query_past_its_cap(
 def test_the_fork_server_has_no_other_thread_when_it_forks(running: _Running) -> None:
     """A thread holding a lock at fork() leaves it held in every query process."""
     assert running.worker.warm_timings.get("other_threads") == 0.0
+
+
+def test_the_memory_guard_counts_the_working_set_not_the_page_cache(tmp_path: Path) -> None:
+    """Spilling to the disk-backed /tmp fills the page cache, which the
+    kernel reclaims before it kills anything: counting it would stop
+    healthy queries (review of 383fd5c4, P5)."""
+    from src.query.worker import container_memory_mb
+
+    mib = 1024 * 1024
+    v2 = tmp_path / "v2"
+    v2.mkdir()
+    (v2 / "memory.current").write_text(str(3000 * mib))
+    (v2 / "memory.stat").write_text(
+        f"anon {1000 * mib}\nfile {2000 * mib}\ninactive_file {1800 * mib}\n"
+    )
+    assert container_memory_mb(v2) == 1200
+    v1 = tmp_path / "v1"
+    (v1 / "memory").mkdir(parents=True)
+    (v1 / "memory" / "memory.usage_in_bytes").write_text(str(3000 * mib))
+    (v1 / "memory" / "memory.stat").write_text(f"total_inactive_file {500 * mib}\n")
+    assert container_memory_mb(v1) == 2500
+    assert container_memory_mb(tmp_path / "none") is None

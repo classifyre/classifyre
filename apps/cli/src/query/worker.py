@@ -97,7 +97,8 @@ DEFAULT_MAX_QUERY_MEMORY_MB = 1536
 #: container (Kubernetes sets memory.oom.group on cgroup v2).
 DEFAULT_MEMORY_GUARD_PERCENT = 90
 #: How often the memory guard looks.
-GUARD_INTERVAL_SECONDS = 0.25
+GUARD_INTERVAL_SECONDS = 0.1
+DEFAULT_DRAIN_SECONDS = 960
 #: Source types whose queries always run as Jobs: they load native code the
 #: source names (an ODBC ``Driver=`` path), which must not share a process
 #: host with other workspaces' queries.
@@ -267,7 +268,9 @@ class WorkerConfig:
     host: str = "0.0.0.0"
     port: int = DEFAULT_PORT
     slots: int = 4
-    drain_seconds: int = 60
+    #: Long enough for the longest query (900 s timeout) to finish; the
+    #: chart's ``queryWorker.drainSeconds`` (and the grace period) match it.
+    drain_seconds: int = DEFAULT_DRAIN_SECONDS
     start_method: str = "forkserver"
     max_body_bytes: int = 16 * 1024 * 1024
     #: The memory the worker plans with: the container's limit, unless the
@@ -312,7 +315,7 @@ class WorkerConfig:
                 memory_mb,
                 _int(env, "MEMORY_PER_QUERY_MB", DEFAULT_MEMORY_PER_QUERY_MB, 64),
             ),
-            drain_seconds=_int(env, "DRAIN_SECONDS", 60),
+            drain_seconds=_int(env, "DRAIN_SECONDS", DEFAULT_DRAIN_SECONDS),
             start_method=method,
             max_body_bytes=_int(env, "MAX_BODY_BYTES", 16 * 1024 * 1024, 1024),
             memory_mb=memory_mb,
@@ -502,15 +505,34 @@ def process_memory_mb(pid: int) -> float | None:
         return None
 
 
-def container_memory_mb() -> float | None:
-    """The container's memory use as the kernel counts it against its limit
-    (cgroup v2, then v1); None outside a cgroup."""
-    for path in ("/sys/fs/cgroup/memory.current", "/sys/fs/cgroup/memory/memory.usage_in_bytes"):
+def container_memory_mb(root: Path = Path("/sys/fs/cgroup")) -> float | None:
+    """The container's working set: memory the kernel charges to its limit
+    and cannot simply drop (cgroup v2, then v1); None outside a cgroup.
+
+    The charge (``memory.current``) includes the page cache, which spilling
+    to the disk-backed ``/tmp`` fills and the kernel reclaims before it kills
+    anything; counting it would stop queries that use little memory. The
+    working set leaves out the inactive file cache, as the kubelet's
+    eviction does (review of 383fd5c4, P5).
+    """
+    for current_name, stat_name, inactive_key in (
+        ("memory.current", "memory.stat", "inactive_file"),
+        ("memory/memory.usage_in_bytes", "memory/memory.stat", "total_inactive_file"),
+    ):
         try:
-            with open(path, encoding="ascii") as handle:
-                return int(handle.read().strip()) / (1024 * 1024)
+            current = int((root / current_name).read_text(encoding="ascii").strip())
         except (OSError, ValueError):
             continue
+        inactive = 0
+        try:
+            for line in (root / stat_name).read_text(encoding="ascii").splitlines():
+                key, _, value = line.partition(" ")
+                if key == inactive_key:
+                    inactive = int(value)
+                    break
+        except (OSError, ValueError):
+            pass
+        return max(0, current - inactive) / (1024 * 1024)
     return None
 
 

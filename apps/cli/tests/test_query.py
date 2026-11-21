@@ -1159,7 +1159,76 @@ def test_locked_session_reads_its_folder_and_no_other_local_path(
         for path in (str(other / "secret.csv"), "/etc/hosts", f"{folder}/../{other.name}/x"):
             with pytest.raises(duckdb.PermissionException):
                 conn.execute(f"SELECT * FROM read_text('{path}')").fetchall()
+        # HTTP only to the query's own sources' endpoints: never an in-cluster
+        # service a source did not name (review of 383fd5c4, P15).
+        for url in ("http://classifyre-api.classifyre-dev.svc:8000/x", "https://example.com/x"):
+            with pytest.raises(duckdb.PermissionException):
+                conn.execute(f"SELECT * FROM read_text('{url}')").fetchall()
         with pytest.raises(duckdb.Error):
             conn.execute("SET enable_external_access = true")
     finally:
         session.close()
+
+
+@pytest.mark.parametrize("root", ["/", "/tmp", "/proc", "/etc/ssl", "/run"])
+def test_a_local_root_that_opens_the_lockdown_is_refused(
+    folder: Path, root: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A workspace admin sets a local folder's path; a root of / or /tmp
+    would let its queries read every other query's private directory
+    (review of 383fd5c4, P15)."""
+    monkeypatch.delenv("CLASSIFYRE_QUERY_LOCAL_ROOTS", raising=False)
+    request = _request(folder, "SELECT count(*) FROM files.local.customers")
+    request["sources"][0]["recipe"]["required"]["path"] = root
+    payload, _ = run_query(request)
+    assert payload["status"] == "error"
+    assert payload["error"]["code"] == "source_unavailable"
+    # (A root this machine lacks, /proc on macOS, fails as missing first.)
+    message = payload["error"]["message"]
+    assert "may not be read by queries" in message or "does not exist" in message
+
+
+def test_a_local_root_inside_the_query_directories_is_refused(
+    folder: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("CLASSIFYRE_QUERY_LOCAL_ROOTS", raising=False)
+    other = tmp_path / "classifyre-queries" / "q-other"
+    other.mkdir(parents=True)
+    request = _request(folder, "SELECT count(*) FROM files.local.customers")
+    request["sources"][0]["recipe"]["required"]["path"] = str(other)
+    payload, _ = run_query(request)
+    assert payload["error"]["code"] == "source_unavailable", payload
+
+
+def test_with_an_allowlist_only_roots_inside_it_are_read(
+    folder: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("CLASSIFYRE_QUERY_LOCAL_ROOTS", str(folder))
+    ok, result = run_query(_request(folder, "SELECT count(*) AS n FROM files.local.customers"))
+    assert _rows(ok, result) == [{"n": 30}]
+    monkeypatch.setenv("CLASSIFYRE_QUERY_LOCAL_ROOTS", str(tmp_path / "elsewhere"))
+    refused, _ = run_query(_request(folder, "SELECT count(*) FROM files.local.customers"))
+    assert refused["error"]["code"] == "source_unavailable"
+    # Set but empty: the operator mounted no folders, so none is read.
+    monkeypatch.setenv("CLASSIFYRE_QUERY_LOCAL_ROOTS", "")
+    none, _ = run_query(_request(folder, "SELECT count(*) FROM files.local.customers"))
+    assert none["error"]["code"] == "source_unavailable"
+
+
+def test_a_source_s_own_http_endpoint_stays_open() -> None:
+    from src.query.session import recipe_endpoints
+
+    recipe = {
+        "type": "ICEBERG_REST",
+        "required": {"uri": "https://catalog.example.com:8181/api/catalog"},
+        "optional": {
+            "connection": {"endpoint_url": "http://lab-s3.svc:9000"},
+            "x": ["https://a.b/c"],
+        },
+        "masked": {"token": "https://not-a-place-to-open"},
+    }
+    assert recipe_endpoints(recipe) == [
+        "http://lab-s3.svc:9000/",
+        "https://a.b/",
+        "https://catalog.example.com:8181/",
+    ]

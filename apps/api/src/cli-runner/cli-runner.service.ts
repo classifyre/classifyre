@@ -2572,7 +2572,7 @@ export class CliRunnerService {
       /**
        * Asked before a query the worker did not take starts a Job: null to
        * go ahead, or why not (the workspace has its share of Jobs running).
-       * A query only a Job may run (`job_only`) is not asked.
+       * Asked for queries only a Job may run (`job_only`) too.
        */
       mayStartJob?: () => Promise<string | null>;
     },
@@ -2582,7 +2582,9 @@ export class CliRunnerService {
     if (this.queryWorker?.enabled) {
       const result = await this.queryWorker.run(params);
       if (result && !('notTaken' in result)) return result;
-      if (result?.notTaken !== 'job_only' && params.mayStartJob) {
+      // Jobs only a Job may run (ODBC) count against the same share: they
+      // are Jobs all the same (review of 383fd5c4, P6).
+      if (params.mayStartJob) {
         const refusal = await params.mayStartJob();
         if (refusal) {
           return { output: queryErrorLine('busy', refusal), exitCode: 1 };

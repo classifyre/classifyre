@@ -134,6 +134,8 @@ const MAX_ACTIVE_PER_WORKSPACE = maxActivePerWorkspace();
 const MAX_OVERFLOW_JOBS_PER_WORKSPACE = maxOverflowJobsPerWorkspace();
 /** System queries (quality rules) running at once per workspace. */
 const MAX_ACTIVE_SYSTEM = 2;
+/** `jobName` of a run about to start a Job: counted by the overflow cap. */
+const JOB_CLAIM = 'claimed';
 const RESULT_TTL_MS = 24 * 60 * 60 * 1000;
 /**
  * A run still waiting or running this long after it was created is taken for
@@ -616,23 +618,37 @@ export class QueryRunService {
         table,
       })),
     );
-    const { run, done } = await this.launch({
-      actor,
-      origin,
-      sql: input.sql,
-      used: used.map((entry) => entry.source),
-      tables,
-      namedAssetIds: tables.map(({ table }) => table.assetId),
-      maxRows: input.maxRows,
-      maxResultBytes: MAX_EXPORT_BYTES,
-      timeoutSeconds: settings.timeoutSeconds,
-      extra: {
-        dialect: 'postgres',
-        database: input.database,
-        searchPath: input.searchPath,
-      },
-    });
-    return { runId: run.id, done };
+    let launched: Awaited<ReturnType<QueryRunService['launch']>>;
+    try {
+      launched = await this.launch({
+        actor,
+        origin,
+        sql: input.sql,
+        used: used.map((entry) => entry.source),
+        tables,
+        namedAssetIds: tables.map(({ table }) => table.assetId),
+        maxRows: input.maxRows,
+        maxResultBytes: MAX_EXPORT_BYTES,
+        timeoutSeconds: settings.timeoutSeconds,
+        extra: {
+          dialect: 'postgres',
+          database: input.database,
+          searchPath: input.searchPath,
+        },
+      });
+    } catch (error) {
+      if (error instanceof ConflictException) {
+        return {
+          refused: {
+            code: 'too_many_queries',
+            sqlState: '53000',
+            message: (error.getResponse() as { message: string }).message,
+          },
+        };
+      }
+      throw error;
+    }
+    return { runId: launched.run.id, done: launched.done };
   }
 
   /**
@@ -749,9 +765,13 @@ export class QueryRunService {
    * One person's queries at once, whichever way they came (app, MCP, SQL
    * connection): the refusal text when the person is at the cap, else null.
    */
-  private async capRefusal(origin: RunOrigin): Promise<string | null> {
+  private async capRefusal(
+    origin: RunOrigin,
+    /** Runs of this request already counted (1 once it is inserted). */
+    own = 0,
+  ): Promise<string | null> {
     const active = await this.activeRuns(origin);
-    if (active >= MAX_ACTIVE_PER_ACTOR) {
+    if (active - own >= MAX_ACTIVE_PER_ACTOR) {
       return `You have ${active} queries running. Wait for one to finish or cancel it.`;
     }
     // Runs live in the workspace's own schema: this counts the workspace.
@@ -760,8 +780,8 @@ export class QueryRunService {
         status: { in: [QueryRunStatus.PENDING, QueryRunStatus.RUNNING] },
       },
     });
-    return workspace >= MAX_ACTIVE_PER_WORKSPACE
-      ? `This workspace has ${workspace} queries running, as many as it may. Run yours again in a moment.`
+    return workspace - own >= MAX_ACTIVE_PER_WORKSPACE
+      ? `This workspace has ${workspace - own} queries running, as many as it may. Run yours again in a moment.`
       : null;
   }
 
@@ -769,16 +789,25 @@ export class QueryRunService {
    * Whether a query the worker pool did not take may start a Job: null, or
    * why not. Counts the workspace's runs that have a Job.
    */
-  private async overflowRefusal(): Promise<string | null> {
+  private async overflowRefusal(runId: string): Promise<string | null> {
+    // Claimed before counting, so a burst of runs sees each other: the Job's
+    // real name replaces the claim in onJobCreated (review of 383fd5c4, P6).
+    await this.prisma.queryRun.updateMany({
+      where: { id: runId, jobName: null },
+      data: { jobName: JOB_CLAIM },
+    });
     const jobs = await this.prisma.queryRun.count({
       where: {
         status: { in: [QueryRunStatus.PENDING, QueryRunStatus.RUNNING] },
         jobName: { not: null },
       },
     });
-    return jobs >= MAX_OVERFLOW_JOBS_PER_WORKSPACE
-      ? 'Every query slot is taken. Run the query again in a moment.'
-      : null;
+    if (jobs <= MAX_OVERFLOW_JOBS_PER_WORKSPACE) return null;
+    await this.prisma.queryRun.updateMany({
+      where: { id: runId, jobName: JOB_CLAIM },
+      data: { jobName: null },
+    });
+    return 'Every query slot is taken. Run the query again in a moment.';
   }
 
   /** True once the run was cancelled (by any API replica). */
@@ -880,6 +909,27 @@ export class QueryRunService {
         expiresAt: new Date(Date.now() + RESULT_TTL_MS),
       },
     });
+    // Checked again now that this run counts: requests checked before any
+    // of them was inserted would all pass (review of 383fd5c4, P6). Runs
+    // racing here may each refuse; none goes past the cap.
+    const over = await this.capRefusal(input.origin, 1);
+    if (over) {
+      await this.prisma.queryRun.update({
+        where: { id: run.id },
+        data: {
+          status: QueryRunStatus.ERROR,
+          error: { code: 'too_many_queries', message: over },
+          finishedAt: new Date(),
+          callbackTokenHash: null,
+        },
+      });
+      throw new ConflictException({
+        statusCode: 409,
+        error: 'Conflict',
+        code: 'TOO_MANY_QUERIES',
+        message: over,
+      });
+    }
 
     const sources = await this.prisma.source.findMany({
       where: { id: { in: attached.map((source) => source.id) } },
@@ -1156,7 +1206,7 @@ export class QueryRunService {
         runId,
         request,
         timeoutSeconds,
-        mayStartJob: () => this.overflowRefusal(),
+        mayStartJob: () => this.overflowRefusal(runId),
         isCancelled: () => this.isCancelled(runId),
         onJobCreated: async ({ jobName, namespace }) => {
           await this.prisma.queryRun.update({
@@ -1268,6 +1318,16 @@ export class QueryRunService {
     // read audited); any other settled run keeps what settled it.
     const lost = (run.error as { code?: string } | null)?.code === LOST_CODE;
     if (TERMINAL.includes(run.status) && !lost) return;
+    // Checked again in the write itself: a cancel (or another replica's
+    // result) that lands between the read above and this write wins, and
+    // nothing is recorded or audited (review of 383fd5c4, P7).
+    const settleable: Prisma.QueryRunWhereInput = {
+      id: runId,
+      OR: [
+        { status: { notIn: TERMINAL } },
+        { error: { path: ['code'], equals: LOST_CODE } },
+      ],
+    };
 
     if (
       !Buffer.isBuffer(body) &&
@@ -1282,8 +1342,8 @@ export class QueryRunService {
         tables: (meta.tables ?? []).map((t) => t.toLowerCase()),
       };
       const bytes = Buffer.from(JSON.stringify(description), 'utf8');
-      await this.prisma.queryRun.update({
-        where: { id: runId },
+      await this.prisma.queryRun.updateMany({
+        where: settleable,
         data: {
           status: QueryRunStatus.SUCCESS,
           result: new Uint8Array(bytes),
@@ -1312,8 +1372,8 @@ export class QueryRunService {
       const assetIds = tables.length
         ? await this.assetIdsFor(tables)
         : undefined;
-      await this.prisma.queryRun.update({
-        where: { id: runId },
+      const settled = await this.prisma.queryRun.updateMany({
+        where: settleable,
         data: {
           status: QueryRunStatus.SUCCESS,
           result: new Uint8Array(body),
@@ -1331,6 +1391,7 @@ export class QueryRunService {
           callbackTokenHash: null,
         },
       });
+      if (settled.count === 0) return;
       // R6: audit exactly the tables the job validated and read, attributed
       // to the run's actor. Refusals and failures read nothing, so they
       // record no per-table event; the run row itself keeps the attribution.

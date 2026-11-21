@@ -28,20 +28,31 @@ function setup(
     workspaceActive?: number;
     result?: Buffer | null;
     started?: boolean;
+    /** The person's active runs once this one is inserted (a race). */
+    activeAfterInsert?: number;
+    /** Active runs holding (or claiming) a Job. */
+    jobs?: number;
+    /** What a conditional result write matches (0: a cancel won). */
+    settles?: number;
   } = {},
 ) {
   const created: Record<string, unknown>[] = [];
   const updates: Record<string, unknown>[] = [];
   const order: string[] = [];
   const settled: Array<{ where: any; data: any }> = [];
+  const runs: any[] = [];
   const prisma = {
     queryRun: {
       // The person's runs carry personRef/actorRef; the workspace count does not.
       count: ({ where }: { where: Record<string, unknown> }) =>
         Promise.resolve(
-          'personRef' in where || 'actorRef' in where
-            ? (options.active ?? 0)
-            : (options.workspaceActive ?? 0),
+          'jobName' in where
+            ? (options.jobs ?? 0)
+            : 'personRef' in where || 'actorRef' in where
+              ? created.length && options.activeAfterInsert !== undefined
+                ? options.activeAfterInsert
+                : (options.active ?? 0)
+              : (options.workspaceActive ?? 0),
         ),
       create: ({ data }: { data: Record<string, unknown> }) => {
         created.push(data);
@@ -55,6 +66,12 @@ function setup(
         if (where?.createdAt) {
           settled.push({ where, data });
           return Promise.resolve({ count: 0 });
+        }
+        if (where?.OR || 'jobName' in data) {
+          updates.push({ where, data });
+          return Promise.resolve({
+            count: where?.OR ? (options.settles ?? 1) : 1,
+          });
         }
         order.push(`status:${String(data.status)}`);
         if (
@@ -104,7 +121,8 @@ function setup(
   };
   const cliRunner = {
     queryCallbackBaseUrl: () => 'http://api/ns',
-    runQueryExecution: () => {
+    runQueryExecution: (params: unknown) => {
+      runs.push(params);
       order.push('run');
       return Promise.resolve({ output: '', exitCode: 0 });
     },
@@ -130,7 +148,7 @@ function setup(
     { check: () => Promise.resolve({ allow: true }) } as never,
     { resolve: () => Promise.resolve({ datasets: [] }) } as never,
   );
-  return { service, created, updates, order, settled };
+  return { service, created, updates, order, settled, runs, prisma };
 }
 
 const input = (tables: string[]) => ({
@@ -306,5 +324,63 @@ describe('maxActivePerPerson', () => {
     expect(
       maxActivePerWorkspace({ QUERY_MAX_ACTIVE_PER_WORKSPACE: '30' }),
     ).toBe(30);
+  });
+});
+
+describe('admission under concurrency (review of 383fd5c4, P6, P7)', () => {
+  const cap = maxActivePerPerson();
+
+  it('withdraws a run another one pushed over the cap after both were checked', async () => {
+    const { service, updates } = setup({
+      active: cap - 1,
+      activeAfterInsert: cap + 1,
+    });
+    const result = await service.createForConnection(
+      input(['shop.public.orders']),
+    );
+    expect(result).toMatchObject({ refused: { code: 'too_many_queries' } });
+    expect(updates).toContainEqual(
+      expect.objectContaining({
+        status: QueryRunStatus.ERROR,
+        error: expect.objectContaining({ code: 'too_many_queries' }),
+      }),
+    );
+  });
+
+  it('claims a Job before counting, so a burst cannot pass the cap together', async () => {
+    const { service, runs, updates } = setup({ jobs: 11 });
+    const result = await service.createForConnection(
+      input(['shop.public.orders']),
+    );
+    if ('runId' in result) await result.done;
+    const mayStartJob = (
+      runs[0] as { mayStartJob: () => Promise<string | null> }
+    ).mayStartJob;
+    await expect(mayStartJob()).resolves.toMatch(/slot is taken/);
+    const writes = updates.filter((u: any) => u.data && 'jobName' in u.data);
+    expect(writes.map((u: any) => u.data.jobName)).toEqual(['claimed', null]);
+  });
+
+  it('records nothing when a cancel lands before the result is written', async () => {
+    const { createHash } = await import('crypto');
+    const audits: unknown[] = [];
+    const { service, prisma } = setup({ settles: 0 });
+    (service as any).audit = { record: (e: unknown) => audits.push(e) };
+    prisma.queryRun.findUnique = () =>
+      Promise.resolve({
+        callbackTokenHash: createHash('sha256')
+          .update('tok', 'utf8')
+          .digest('hex'),
+        status: QueryRunStatus.RUNNING,
+        error: null,
+        actorRef: 'user:ana',
+        channel: 'sql',
+      } as never);
+    const meta = Buffer.from(
+      JSON.stringify({ tables: ['shop.public.orders'] }),
+    ).toString('base64');
+    (service as any).assetIdsFor = () => Promise.resolve(['a1']);
+    await service.receiveResult('run-1', 'tok', Buffer.from('arrow'), meta);
+    expect(audits).toEqual([]);
   });
 });

@@ -606,6 +606,10 @@ which each deployment sets on its own after including this block.
 - name: QUERY_WORKER_OVERFLOW
   value: {{ .Values.queryWorker.overflow | quote }}
 {{- end }}
+# The folders a query's local sources may lie in (session.check_local_root):
+# the mounted ones, and no other.
+- name: K8S_CLI_QUERY_LOCAL_ROOTS
+  value: {{ include "classifyre.localFolders.mountPaths" . | quote }}
 {{- with .Values.api.cliJobs.query }}
 - name: K8S_CLI_QUERY_JOB_MEMORY
   value: {{ .memory | quote }}
@@ -693,6 +697,13 @@ it at the same path.
 Only CLI job pods get these mounts: the API and worker never open the folder,
 they only store and hand on the path the user typed.
 */}}
+{{- /* api.localFolders mount paths, comma-separated (empty: none). */ -}}
+{{- define "classifyre.localFolders.mountPaths" -}}
+{{- $paths := list -}}
+{{- range .Values.api.localFolders }}{{- $paths = append $paths .mountPath -}}{{- end -}}
+{{- join "," $paths -}}
+{{- end }}
+
 {{- define "classifyre.localFolders.volumeMountsJson" -}}
 {{- range $i, $folder := .Values.api.localFolders }}
 {{- if $i }},{{ end }}

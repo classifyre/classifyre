@@ -103,6 +103,9 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
+            # Local sources may only lie in the mounted folders.
+            - name: CLASSIFYRE_QUERY_LOCAL_ROOTS
+              value: {{ include "classifyre.localFolders.mountPaths" . | quote }}
             {{- with $cli.query.maxSpill }}
             - name: CLASSIFYRE_QUERY_MAX_SPILL
               value: {{ . | quote }}
@@ -311,13 +314,20 @@ spec:
     {{- toYaml . | nindent 4 }}
     {{- end }}
   egress:
-    # Pods in the cluster (the API's callback, in-cluster sources, DNS):
-    # matched by pod, since some CNIs never match pod IPs with ipBlock.
+    # Pods in the cluster (in-cluster sources, DNS), matched by pod since some
+    # CNIs never match pod IPs with ipBlock; never this release's database,
+    # identity server, gateway, workers or the query worker itself. The API
+    # stays reachable: a query Job posts its result there.
     - to:
         - namespaceSelector: {}
+          podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/component
+                operator: NotIn
+                values: [postgres, iam, sql-gateway, worker, query-worker]
     {{- $v4 := list }}
     {{- $v6 := list }}
-    {{- range $qw.networkPolicy.deniedEgressCidrs }}
+    {{- range (concat $qw.networkPolicy.deniedEgressCidrs $qw.networkPolicy.clusterCidrs) }}
     {{- if contains ":" . }}{{ $v6 = append $v6 . }}{{ else }}{{ $v4 = append $v4 . }}{{ end }}
     {{- end }}
     - to:
