@@ -26,6 +26,8 @@ import {
   quoteLiteral,
   splitStatements,
   substituteParams,
+  parseCursorStatement,
+  type CursorStatement,
 } from './sql-text';
 
 /** A data statement failed: what the client is told, as PostgreSQL would. */
@@ -71,11 +73,30 @@ interface Statement {
 
 interface Portal {
   statement: string;
+  /**
+   * The statement as it was when bound. A portal keeps it, as in
+   * PostgreSQL: pgJDBC pages through a portal of the unnamed statement and
+   * re-parses that statement between pages (BIC J3, Metabase downloads M13).
+   */
+  parsed?: Statement;
+  /** Its parameter types, read when bound (for the same reason). */
+  paramTypes?: number[];
   bind: BindMessage;
   fields?: FieldDescription[];
   rows?: PlainValue[][];
   truncated?: boolean;
   offset: number;
+}
+
+/** A data cursor: its query ran once, as a job; FETCH reads it forward. */
+interface DataCursor {
+  description: Buffer | null;
+  fields: FieldDescription[];
+  rows: PlainValue[][];
+  truncated: boolean;
+  offset: number;
+  /** WITH HOLD: kept past its transaction, until CLOSE. */
+  hold: boolean;
 }
 
 /** Internal statement and portal names; clients never see them. */
@@ -151,6 +172,8 @@ export function readTables(
 export class PgSession {
   private readonly statements = new Map<string, Statement>();
   private readonly portals = new Map<string, Portal>();
+  /** Cursors over data (`DECLARE … FOR` a statement that reads tables), by name. */
+  private readonly cursors = new Map<string, DataCursor>();
   /** After an error in the extended protocol: ignore everything until Sync. */
   private skipping = false;
   private status = 'I';
@@ -423,6 +446,12 @@ export class PgSession {
       return;
     }
     for (const statement of statements) {
+      const cursor = parseCursorStatement(statement);
+      if (cursor) {
+        const handled = await this.cursorStatement(cursor);
+        if (handled === 'failed') return;
+        if (handled === 'served') continue;
+      }
       let tables: string[] = [];
       try {
         tables = await this.classify(statement);
@@ -460,7 +489,85 @@ export class PgSession {
       }
     }
     this.skipping = false;
+    if (this.status === 'I') {
+      for (const [name, cursor] of this.cursors) {
+        if (!cursor.hold) this.cursors.delete(name);
+      }
+    }
     this.send(readyForQuery(this.status));
+  }
+
+  /**
+   * DECLARE, FETCH and CLOSE of a cursor over data (BIC D5): the query runs
+   * once as a job when declared, and FETCH reads its rows forward. A cursor
+   * over the catalog is PGlite's (`'pglite'`). A result over the row cap is
+   * refused when a FETCH reaches the cap, never cut short.
+   */
+  private async cursorStatement(
+    cursor: CursorStatement,
+  ): Promise<'served' | 'pglite' | 'failed'> {
+    if (cursor.kind === 'declare') {
+      let tables: string[];
+      try {
+        tables = await this.classify(cursor.query);
+      } catch (error) {
+        await this.failSimple(error);
+        return 'failed';
+      }
+      if (!tables.length) return 'pglite';
+      const described = await this.internal(
+        frontend.parse(PROBE, cursor.query),
+        frontend.describe('S', PROBE),
+        frontend.close('S', PROBE),
+      );
+      const error = described.find((m) => m.type === 'E');
+      if (error) {
+        this.send(Buffer.from(error.raw));
+        await this.forward(frontend.sync(), false);
+        return 'failed';
+      }
+      const description = described.find((m) => m.type === 'T');
+      try {
+        const result = await this.run(cursor.query, tables);
+        this.cursors.set(cursor.name, {
+          description: description ? Buffer.from(description.raw) : null,
+          fields: description ? parseRowDescription(description.body) : [],
+          rows: result.rows,
+          truncated: result.truncated,
+          offset: 0,
+          hold: cursor.hold,
+        });
+      } catch (failure) {
+        await this.failSimple(failure);
+        return 'failed';
+      }
+      this.send(commandComplete('DECLARE CURSOR'));
+      return 'served';
+    }
+    if (cursor.kind === 'close') {
+      if (cursor.name === null) {
+        this.cursors.clear();
+        return 'pglite';
+      }
+      if (!this.cursors.delete(cursor.name)) return 'pglite';
+      this.send(commandComplete('CLOSE CURSOR'));
+      return 'served';
+    }
+    const open = this.cursors.get(cursor.name);
+    if (!open) return 'pglite';
+    const start = open.offset;
+    const wanted =
+      cursor.count === 'all' ? Number.POSITIVE_INFINITY : cursor.count;
+    const end = Math.min(start + wanted, open.rows.length);
+    if (open.description) this.send(open.description);
+    this.sendRows(open.fields, open.rows, start, end);
+    open.offset = end;
+    if (open.truncated && start + wanted > open.rows.length) {
+      await this.failSimple(this.tooMany());
+      return 'failed';
+    }
+    this.send(commandComplete(`FETCH ${end - start}`));
+    return 'served';
   }
 
   /** An error in a simple query, through PGlite so the transaction knows. */
@@ -498,8 +605,14 @@ export class PgSession {
     if (this.skipping) return;
     const bind = parseBind(message.body);
     if (await this.forward(message.raw)) return;
+    const parsed = this.statements.get(bind.statement);
     this.portals.set(bind.portal, {
       statement: bind.statement,
+      parsed,
+      paramTypes:
+        parsed?.tables.length && bind.params.length
+          ? await this.paramTypes(parsed, bind)
+          : undefined,
       bind,
       offset: 0,
     });
@@ -525,9 +638,7 @@ export class PgSession {
     if (this.skipping) return;
     const { portal: name, maxRows } = parseExecute(message.body);
     const portal = this.portals.get(name);
-    const statement = portal
-      ? this.statements.get(portal.statement)
-      : undefined;
+    const statement = portal?.parsed;
     if (!portal || !statement?.tables.length) {
       await this.forward(message.raw);
       return;
@@ -541,7 +652,7 @@ export class PgSession {
           : [];
       }
       if (!portal.rows) {
-        const literals = await this.paramLiterals(statement, portal.bind);
+        const literals = await this.paramLiterals(portal);
         const result = await this.run(
           substituteParams(statement.sql, literals),
           statement.tables,
@@ -596,12 +707,11 @@ export class PgSession {
 
   // ── Data ──────────────────────────────────────────────────────────────
 
-  /** The bound values as text, decoded by PGlite from whatever format the client used. */
-  private async paramLiterals(
+  /** The parameter types of a statement as PGlite inferred them, for its bound values. */
+  private async paramTypes(
     statement: Statement,
     bind: BindMessage,
-  ): Promise<string[]> {
-    if (!bind.params.length) return [];
+  ): Promise<number[]> {
     const described = await this.internal(
       frontend.describe('S', bind.statement),
     );
@@ -615,6 +725,15 @@ export class PgSession {
     while (types.length < bind.params.length) {
       types.push(statement.paramTypes[types.length] ?? OID.unknown);
     }
+    return types;
+  }
+
+  /** The bound values as text, decoded by PGlite from whatever format the client used. */
+  private async paramLiterals(portal: Portal): Promise<string[]> {
+    const { bind } = portal;
+    if (!bind.params.length) return [];
+    const types =
+      portal.paramTypes ?? (await this.paramTypes(portal.parsed!, bind));
     const key = types.join(',');
     let decoder = this.decoders.get(key);
     if (!decoder) {

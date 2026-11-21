@@ -1,7 +1,20 @@
-import { type AddressInfo, createServer, type Server } from 'node:net';
+import {
+  type AddressInfo,
+  connect as connectRaw,
+  createServer,
+  type Server,
+} from 'node:net';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { Client, type QueryConfig } from 'pg';
 import { catalogDdl } from './catalog-ddl';
-import { MessageReader, authenticationOk, readyForQuery } from './pg-protocol';
+import {
+  MessageReader,
+  MessageWriter,
+  authenticationOk,
+  frontend,
+  readyForQuery,
+} from './pg-protocol';
 import { PgliteHost, type PgliteSession } from './pglite-host';
 import {
   DataError,
@@ -294,4 +307,213 @@ describe('PgSession over PGlite', () => {
     ).rejects.toMatchObject({ code: '42501' });
     await client.end();
   }, 60_000);
+
+  /**
+   * What pgJDBC does with a fetch size inside a transaction (BIC J3, and
+   * Metabase's downloads, M13): one Execute per page, each followed by Sync,
+   * on a named portal. Every page must arrive; the last ends the result.
+   * Spoken over a raw socket, message by message, as the driver does.
+   */
+  it('serves a portal page by page across Syncs in a transaction', async () => {
+    const { socket, untilReady } = await rawSession(port);
+    socket.write(frontend.query('BEGIN'));
+    await untilReady();
+    // pgJDBC binds the page portal to the *unnamed* statement…
+    socket.write(
+      Buffer.concat([
+        frontend.parse('', 'SELECT * FROM "shop.public".orders'),
+        frontend.bind('C_1', '', []),
+        frontend.describe('P', 'C_1'),
+        frontend.execute('C_1', 1),
+        frontend.sync(),
+      ]),
+    );
+    const rowsOf = (types: string[]) => types.filter((t) => t === 'D').length;
+    const first = await untilReady();
+    expect(rowsOf(first)).toBe(1);
+    expect(first).toContain('s'); // PortalSuspended
+    // …and between pages asks for column metadata through the unnamed
+    // statement again: the portal keeps the statement it was bound from.
+    socket.write(
+      Buffer.concat([
+        frontend.parse('', 'SELECT attname FROM pg_attribute LIMIT 1'),
+        frontend.bind('', '', []),
+        frontend.execute('', 0),
+        frontend.sync(),
+      ]),
+    );
+    expect(await untilReady()).not.toContain('E');
+    socket.write(Buffer.concat([frontend.execute('C_1', 1), frontend.sync()]));
+    let page = await untilReady();
+    let rows = rowsOf(first) + rowsOf(page);
+    // The page holding the last row may end the result, as here, or be
+    // suspended with an empty last page, as PostgreSQL does: clients take both.
+    while (page.includes('s')) {
+      socket.write(
+        Buffer.concat([frontend.execute('C_1', 1), frontend.sync()]),
+      );
+      page = await untilReady();
+      rows += rowsOf(page);
+    }
+    expect(page).toContain('C'); // CommandComplete
+    expect(page).not.toContain('E');
+    expect(rows).toBe(2);
+    socket.end();
+  }, 60_000);
+
+  /**
+   * What psqlODBC does with UseDeclareFetch=1 (BIC D5, and Excel through it):
+   * the SELECT runs in a cursor, read with FETCH, all in simple queries.
+   */
+  it('reads a data cursor with FETCH, as psqlODBC does', async () => {
+    const { socket, untilReady } = await rawSession(port);
+    const rowsOf = (types: string[]) => types.filter((t) => t === 'D').length;
+    socket.write(
+      frontend.query(
+        'BEGIN;declare "SQL_CUR0x1" cursor with hold for SELECT * FROM "shop.public".orders;fetch 1 in "SQL_CUR0x1"',
+      ),
+    );
+    const first = await untilReady();
+    expect(first).not.toContain('E');
+    expect(rowsOf(first)).toBe(1);
+    expect(first).toContain('T'); // the FETCH describes its rows
+    socket.write(frontend.query('fetch 100 in "SQL_CUR0x1"'));
+    const rest = await untilReady();
+    expect(rowsOf(rest)).toBe(1);
+    socket.write(frontend.query('fetch 100 in "SQL_CUR0x1"'));
+    expect(rowsOf(await untilReady())).toBe(0);
+    socket.write(frontend.query('close "SQL_CUR0x1";commit'));
+    expect(await untilReady()).not.toContain('E');
+    // A cursor over the catalog is still PGlite's own.
+    socket.write(
+      frontend.query(
+        'BEGIN;declare c cursor for SELECT relname FROM pg_class LIMIT 2;fetch all in c;close c;commit',
+      ),
+    );
+    const catalog = await untilReady();
+    expect(catalog).not.toContain('E');
+    expect(rowsOf(catalog)).toBe(2);
+    socket.end();
+  }, 60_000);
+
+  /**
+   * The client corpus (fixtures/client-corpus, BIC §6): what Metabase,
+   * psqlODBC and pgJDBC send, replayed statement by statement. A new driver
+   * version that breaks a statement shows here, not at a customer's.
+   */
+  it.each(corpusFiles())(
+    'replays the client corpus %s',
+    async (_file, entries) => {
+      const client = await connect();
+      const failures: string[] = [];
+      for (const entry of entries) {
+        const before = asked.length;
+        try {
+          const result = await client.query(entry.sql);
+          if (entry.kind === 'refused') {
+            failures.push(`${entry.label}: was not refused`);
+          } else if (entry.kind === 'data' && asked.length === before) {
+            failures.push(`${entry.label}: did not run as a query job`);
+          } else if (entry.kind !== 'data' && asked.length !== before) {
+            failures.push(`${entry.label}: ran as a query job`);
+          } else if (entry.minRows !== undefined && result.rowCount !== null) {
+            if ((result.rows?.length ?? 0) < entry.minRows) {
+              failures.push(
+                `${entry.label}: ${result.rows.length} rows, want ≥ ${entry.minRows}`,
+              );
+            }
+          }
+        } catch (error) {
+          if (entry.kind !== 'refused') {
+            failures.push(`${entry.label}: ${(error as Error).message}`);
+          }
+        }
+      }
+      await client.end();
+      expect(failures).toEqual([]);
+    },
+    60_000,
+  );
 });
+
+/** A protocol-3.0 StartupMessage, as every driver sends first. */
+function startupMessage(params: Record<string, string>): Buffer {
+  const w = new MessageWriter().int32(196608);
+  for (const [key, value] of Object.entries(params))
+    w.cstring(key).cstring(value);
+  return w.cstring('').build();
+}
+
+/**
+ * A raw protocol connection to the test listener: what a driver writes,
+ * message by message, and every reply up to each ReadyForQuery.
+ */
+async function rawSession(port: number) {
+  const socket = connectRaw(port);
+  const reader = new MessageReader();
+  const inbox: { type: string; body: Buffer }[] = [];
+  let wake: (() => void) | undefined;
+  socket.on('data', (chunk: Buffer) => {
+    inbox.push(...reader.push(chunk));
+    wake?.();
+  });
+  const untilReady = async () => {
+    const deadline = Date.now() + 20_000;
+    for (;;) {
+      const at = inbox.findIndex((m) => m.type === 'Z');
+      if (at >= 0) return inbox.splice(0, at + 1).map((m) => m.type);
+      if (Date.now() > deadline) {
+        throw new Error(
+          `no ReadyForQuery; got ${inbox.map((m) => m.type).join('')}`,
+        );
+      }
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, 200);
+        wake = () => {
+          clearTimeout(timer);
+          resolve();
+        };
+      });
+    }
+  };
+  socket.write(startupMessage({ user: 'ana_bi', database: 'lab' }));
+  await untilReady();
+  return { socket, untilReady };
+}
+
+interface CorpusEntry {
+  kind: 'session' | 'catalog' | 'data' | 'refused';
+  label: string;
+  minRows?: number;
+  sql: string;
+}
+
+/** fixtures/client-corpus/*.sql, as [file, statements] (format: its README). */
+function corpusFiles(): [string, CorpusEntry[]][] {
+  const folder = join(__dirname, 'fixtures', 'client-corpus');
+  return readdirSync(folder)
+    .filter((name) => name.endsWith('.sql'))
+    .sort()
+    .map((name) => {
+      const entries: CorpusEntry[] = [];
+      let current: CorpusEntry | undefined;
+      for (const line of readFileSync(join(folder, name), 'utf8').split('\n')) {
+        const head =
+          /^-- @@ (session|catalog|data|refused) (\S+)(?: rows>=(\d+))?/.exec(
+            line,
+          );
+        if (head) {
+          current = {
+            kind: head[1] as CorpusEntry['kind'],
+            label: head[2],
+            minRows: head[3] ? Number(head[3]) : undefined,
+            sql: '',
+          };
+          entries.push(current);
+        } else if (current && !line.startsWith('--')) {
+          current.sql = `${current.sql}\n${line}`.trim();
+        }
+      }
+      return [name, entries] as [string, CorpusEntry[]];
+    });
+}

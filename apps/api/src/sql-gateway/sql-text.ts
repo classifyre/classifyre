@@ -172,3 +172,68 @@ export function substituteParams(
   }
   return out;
 }
+
+/**
+ * A cursor statement the gateway serves itself when its query reads data:
+ * psqlODBC with `UseDeclareFetch=1` (what Excel and Power BI's ODBC sources
+ * run) reads every result through `DECLARE … CURSOR … FOR`, `FETCH n IN` and
+ * `CLOSE` (docs/prd/BIC-bi-client-compatibility.md D5). Only forward reads are
+ * served; anything else (`FETCH BACKWARD`, `MOVE`, …) is left to PGlite, where
+ * a data cursor does not exist and so fails as an unknown cursor.
+ */
+export type CursorStatement =
+  | { kind: 'declare'; name: string; hold: boolean; query: string }
+  | { kind: 'fetch'; name: string; count: number | 'all' }
+  | { kind: 'close'; name: string | null };
+
+const CURSOR_NAME = String.raw`("(?:[^"]|"")+"|[A-Za-z_][A-Za-z0-9_$]*)`;
+const DECLARE_CURSOR = new RegExp(
+  String.raw`^\s*declare\s+${CURSOR_NAME}\s+(?:binary\s+)?(?:(?:asensitive|insensitive)\s+)?` +
+    String.raw`(?:(?:no\s+)?scroll\s+)?cursor\s+(?:(with|without)\s+hold\s+)?for\s+([\s\S]+?)\s*;?\s*$`,
+  'i',
+);
+const FETCH_CURSOR = new RegExp(
+  String.raw`^\s*fetch\s+(?:(next|all|forward\s+all|forward\s+\d+|forward|\d+)\s+)?(?:(?:from|in)\s+)?${CURSOR_NAME}\s*;?\s*$`,
+  'i',
+);
+const CLOSE_CURSOR = new RegExp(
+  String.raw`^\s*close\s+(all|${CURSOR_NAME.slice(1, -1)})\s*;?\s*$`,
+  'i',
+);
+
+function cursorName(raw: string): string {
+  return raw.startsWith('"')
+    ? raw.slice(1, -1).replace(/""/g, '"')
+    : raw.toLowerCase();
+}
+
+export function parseCursorStatement(sql: string): CursorStatement | null {
+  const declare = DECLARE_CURSOR.exec(sql);
+  if (declare) {
+    return {
+      kind: 'declare',
+      name: cursorName(declare[1]),
+      hold: declare[2]?.toLowerCase() === 'with',
+      query: declare[3],
+    };
+  }
+  const fetch = FETCH_CURSOR.exec(sql);
+  if (fetch) {
+    const how = (fetch[1] ?? 'next').toLowerCase().replace(/\s+/g, ' ');
+    const number = /\d+/.exec(how);
+    const count: number | 'all' = how.endsWith('all')
+      ? 'all'
+      : number
+        ? Number(number[0])
+        : 1;
+    return { kind: 'fetch', name: cursorName(fetch[2]), count };
+  }
+  const close = CLOSE_CURSOR.exec(sql);
+  if (close) {
+    return {
+      kind: 'close',
+      name: /^all$/i.test(close[1]) ? null : cursorName(close[1]),
+    };
+  }
+  return null;
+}

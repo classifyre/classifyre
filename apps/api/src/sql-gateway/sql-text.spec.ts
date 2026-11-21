@@ -1,4 +1,9 @@
-import { firstKeyword, splitStatements, substituteParams } from './sql-text';
+import {
+  firstKeyword,
+  parseCursorStatement,
+  splitStatements,
+  substituteParams,
+} from './sql-text';
 import { paramLiteral, readTables } from './pg-session';
 import { OID } from './pg-types';
 
@@ -63,5 +68,64 @@ describe('readTables', () => {
       data: ['lab_s3.tables.delta_orders'],
       other: ['pg_catalog.pg_class'],
     });
+  });
+});
+
+describe('cursor statements (psqlODBC UseDeclareFetch, BIC D5)', () => {
+  it('reads DECLARE … CURSOR … FOR as psqlODBC and others write it', () => {
+    expect(
+      parseCursorStatement(
+        'declare "SQL_CUR0x1e68" cursor with hold for SELECT id FROM "a.b".t ORDER BY id',
+      ),
+    ).toEqual({
+      kind: 'declare',
+      name: 'SQL_CUR0x1e68',
+      hold: true,
+      query: 'SELECT id FROM "a.b".t ORDER BY id',
+    });
+    expect(
+      parseCursorStatement('DECLARE C1 BINARY NO SCROLL CURSOR FOR select 1;'),
+    ).toEqual({ kind: 'declare', name: 'c1', hold: false, query: 'select 1' });
+    expect(
+      parseCursorStatement(
+        'declare c insensitive cursor without hold for select 1',
+      ),
+    ).toMatchObject({ name: 'c', hold: false, query: 'select 1' });
+  });
+
+  it('reads FETCH counts and CLOSE', () => {
+    expect(parseCursorStatement('fetch 100 in "SQL_CUR0x1"')).toEqual({
+      kind: 'fetch',
+      name: 'SQL_CUR0x1',
+      count: 100,
+    });
+    expect(parseCursorStatement('FETCH NEXT FROM c')).toMatchObject({
+      count: 1,
+    });
+    expect(parseCursorStatement('fetch all from c')).toMatchObject({
+      count: 'all',
+    });
+    expect(parseCursorStatement('FETCH FORWARD 5 FROM c')).toMatchObject({
+      count: 5,
+    });
+    expect(parseCursorStatement('fetch c')).toMatchObject({
+      name: 'c',
+      count: 1,
+    });
+    expect(parseCursorStatement('close "SQL_CUR0x1"')).toEqual({
+      kind: 'close',
+      name: 'SQL_CUR0x1',
+    });
+    expect(parseCursorStatement('CLOSE ALL')).toEqual({
+      kind: 'close',
+      name: null,
+    });
+  });
+
+  it('leaves everything else, and moves it does not serve, to PGlite', () => {
+    expect(parseCursorStatement('SELECT 1')).toBeNull();
+    expect(parseCursorStatement('fetch backward 1 from c')).toBeNull();
+    expect(parseCursorStatement('fetch absolute 3 from c')).toBeNull();
+    expect(parseCursorStatement('move 1 in c')).toBeNull();
   });
 });
