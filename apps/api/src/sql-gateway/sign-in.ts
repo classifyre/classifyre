@@ -93,6 +93,7 @@ export class SignInLockout {
   private readonly failures = new Map<string, number[]>();
   private readonly reported = new Map<string, number>();
   private readonly inFlight = new Set<string>();
+  private readonly waiting = new Set<() => void>();
 
   constructor(
     private readonly windowMs = 15 * 60_000,
@@ -120,18 +121,37 @@ export class SignInLockout {
   }
 
   /**
-   * Claims the keys for one sign-in; false while another sign-in holds one
-   * of them. Without it, N sign-ins started together all pass `isLocked`
-   * and get N guesses before the first failure is counted.
+   * Claims the keys for one sign-in, waiting (up to `waitMs`) while another
+   * sign-in holds one of them; false when it waited that long. Sign-ins with
+   * a key in common run one after another, so N started together cannot all
+   * pass `isLocked` and get N guesses before the first failure is counted.
+   * They wait rather than fail: a BI tool's connection pool opens several
+   * connections at once, from one address (Metabase, BIC M0).
    */
-  begin(keys: readonly string[]): boolean {
-    if (keys.some((key) => this.inFlight.has(key))) return false;
+  async begin(keys: readonly string[], waitMs = 10_000): Promise<boolean> {
+    const until = this.now() + waitMs;
+    while (keys.some((key) => this.inFlight.has(key))) {
+      const left = until - this.now();
+      if (left <= 0) return false;
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(done, left);
+        function done(): void {
+          clearTimeout(timer);
+          resolve();
+        }
+        this.waiting.add(done);
+      });
+    }
     keys.forEach((key) => this.inFlight.add(key));
     return true;
   }
 
   end(keys: readonly string[]): void {
     keys.forEach((key) => this.inFlight.delete(key));
+    // Every waiter checks its own keys again; the ones still blocked wait on.
+    const waiting = [...this.waiting];
+    this.waiting.clear();
+    waiting.forEach((wake) => wake());
   }
 
   /** Drops keys whose window has passed (names tried once and never again). */

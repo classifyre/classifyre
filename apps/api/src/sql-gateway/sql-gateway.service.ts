@@ -1,3 +1,4 @@
+import { roomForSession, sessionMemoryConfig } from './memory-guard';
 import {
   Inject,
   Injectable,
@@ -320,6 +321,7 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
   private config: Config | null = null;
   private readonly host = new PgliteHost();
   private readonly live = new Map<number, Live>();
+  private readonly sessionMemory = sessionMemoryConfig();
   private readonly lockout = new SignInLockout();
   /** Sockets not signed in yet. */
   private signingIn = 0;
@@ -577,12 +579,21 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
       `u:${ns?.namespaceId ?? `?${database}`}:${username}:${client ?? '-'}`,
       `ip:${client ?? '-'}`,
     ];
-    if (!this.lockout.begin(keys)) {
+    if (!(await this.lockout.begin(keys))) {
       throw new Refusal(
         '53300',
         'Another sign-in from here is under way; try again in a moment.',
       );
     }
+    // Held only while the password is being checked: once the proof is
+    // settled (and a failure counted), the next sign-in from here may start
+    // while this one opens its session (PGlite, catalog: a second or two).
+    let held = true;
+    const release = () => {
+      if (!held) return;
+      held = false;
+      this.lockout.end(keys);
+    };
     try {
       if (!ns) {
         // An unknown workspace is refused like a wrong password, after the
@@ -599,10 +610,11 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
         username,
         client,
         keys,
+        release,
         signedIn,
       );
     } finally {
-      this.lockout.end(keys);
+      release();
     }
   }
 
@@ -641,6 +653,7 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
     username: string,
     client: string | null,
     keys: string[],
+    release: () => void,
     signedIn: () => void,
   ): Promise<void> {
     const config = this.config!;
@@ -721,11 +734,19 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
       );
       throw new Refusal('28P01', refusalMessage(username, proofOk, status));
     }
+    release();
     const row = found.row;
     // Counted before the session's PGlite starts (about a second): sign-ins
     // racing each other would all pass a check of the live sessions alone.
     const opening = [...this.opening.values()];
-    if (this.live.size + opening.length >= config.maxSessions) {
+    if (
+      this.live.size + opening.length >= config.maxSessions ||
+      !roomForSession(
+        process.memoryUsage().rss,
+        opening.length,
+        this.sessionMemory,
+      )
+    ) {
       throw new Refusal('53300', 'The SQL gateway is busy; try again shortly.');
     }
     if (

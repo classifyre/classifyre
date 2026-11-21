@@ -45,7 +45,7 @@ A table's or source's owner or steward can **give a connection** for it to someo
 
 Every connection uses TLS and checks the server's certificate (`sslmode=verify-full`). When your installation uses its own certificate authority, download it from the connection dialog (**Download the certificate authority**) and point your tool at it.
 
-<Tabs items={["psql", "DBeaver / JDBC", "Power BI", "Excel / ODBC", "Tableau"]}>
+<Tabs items={["psql", "DBeaver / JDBC", "Power BI", "Excel / ODBC", "Tableau", "Metabase"]}>
 <Tabs.Tab>
 ```bash
 psql "host=sql.example.com port=5432 dbname=finance user=ana_power_bi sslmode=verify-full sslrootcert=classifyre-sql-ca.crt"
@@ -72,6 +72,14 @@ Driver={PostgreSQL Unicode};Server=sql.example.com;Port=5432;Database=finance;Ui
 <Tabs.Tab>
 **Connect → PostgreSQL**: server, port, database, username and password; tick **Require SSL**. Tableau uses its bundled JDBC driver and the JDBC settings above.
 </Tabs.Tab>
+<Tabs.Tab>
+**Admin → Databases → Add database → PostgreSQL**. Host, port, database name (the workspace), username and password from the dialog; turn on **Use a secure connection (SSL)**, mode `verify-full`, and give the downloaded CA as the server SSL certificate. Then:
+
+- Set `MB_JDBC_DATA_WAREHOUSE_MAX_CONNECTION_POOL_SIZE=4` on the Metabase server (see [Tools that pool connections](#tools-that-pool-connections)).
+- Under **Scheduling**, scan field values *Only when adding a new filter widget* and turn refingerprinting off: every scan is a query against your sources.
+
+Table previews, the query builder (filters, groupings, joins, binning, median) and native SQL all work.
+</Tabs.Tab>
 </Tabs>
 
 ### Naming tables
@@ -84,6 +92,12 @@ SELECT * FROM invoices WHERE amount > 1000;
 ```
 
 Without quotes, PostgreSQL reads `source.schema.table` as *database.schema.table* and refuses it; write `"source.schema".table`, or `"lakehouse-lab"."source.schema".table` with the workspace as the database.
+
+### Tools that pool connections
+
+Metabase, Tableau Server and application servers keep several connections open to the same database. A SQL connection allows **4 sessions at a time** (`sqlGateway.maxSessionsPerConnection`); a pool larger than that cannot open its extra connections, and some tools then give up on all of them. Set the tool's pool to 4 or fewer (Metabase: `MB_JDBC_DATA_WAREHOUSE_MAX_CONNECTION_POOL_SIZE=4`).
+
+Everyone using such a tool reads through its one SQL connection, with **its** person's access: give a shared BI tool a connection of a person (or a scope) whose access every user of that tool may have. Values the tool stores for its filters come through that connection too, masked as that person sees them.
 
 ## What happens to a query
 
