@@ -1166,6 +1166,17 @@ def test_locked_session_reads_its_folder_and_no_other_local_path(
                 conn.execute(f"SELECT * FROM read_text('{url}')").fetchall()
         with pytest.raises(duckdb.Error):
             conn.execute("SET enable_external_access = true")
+        # Writing out, attaching or installing are refused too (review of
+        # 383fd5c4, P8): the gate refuses them first, this is the wall behind.
+        for statement in (
+            f"COPY (SELECT 1) TO '{other}/leak.csv'",
+            f"ATTACH '{other}/x.duckdb' AS x",
+            "INSTALL spatial",
+            "LOAD 'spatial'",
+        ):
+            with pytest.raises(duckdb.Error):
+                conn.execute(statement)
+        assert not (other / "leak.csv").exists()
     finally:
         session.close()
 
