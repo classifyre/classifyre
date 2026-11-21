@@ -1,0 +1,121 @@
+{
+  "queries": {
+    "q1_meili_parquet_pg": [
+      {
+        "genre": "Drama",
+        "country": "ES",
+        "orders": 783,
+        "revenue": 17096.07
+      },
+      {
+        "genre": "Drama",
+        "country": "DE",
+        "orders": 734,
+        "revenue": 15457.09
+      },
+      {
+        "genre": "Drama",
+        "country": "NL",
+        "orders": 710,
+        "revenue": 15232.35
+      },
+      {
+        "genre": "Drama",
+        "country": "PL",
+        "orders": 721,
+        "revenue": 15083.57
+      },
+      {
+        "genre": "Drama",
+        "country": "AT",
+        "orders": 714,
+        "revenue": 14475.28
+      }
+    ],
+    "q2_neo4j_meili_pg": [
+      {
+        "title": "Paper Night 222",
+        "fans": 3
+      },
+      {
+        "title": "Summer Summer 11665",
+        "fans": 3
+      },
+      {
+        "title": "Echo Echo 8597",
+        "fans": 2
+      },
+      {
+        "title": "Echo Harbor 17739",
+        "fans": 2
+      },
+      {
+        "title": "Echo Harbor 18662",
+        "fans": 2
+      }
+    ],
+    "q3_all_four": [
+      {
+        "country": "AT",
+        "genre": "Sci-Fi",
+        "rated_orders": 3,
+        "avg_stars": 3.0
+      },
+      {
+        "country": "DE",
+        "genre": "Sci-Fi",
+        "rated_orders": 2,
+        "avg_stars": 1.0
+      }
+    ],
+    "q4_nested_masked": [
+      {
+        "order_id": 1,
+        "title": "Summer Signal 15857",
+        "studio": "{\"name\": \"Basalt\", \"country\": \"NL\"}",
+        "tags": [
+          "sequel"
+        ],
+        "email": "customer1207@shop.example"
+      }
+    ],
+    "q5_meili_self_join": [
+      {
+        "genre": "Action",
+        "pairs": 1225
+      },
+      {
+        "genre": "Comedy",
+        "pairs": 1540
+      },
+      {
+        "genre": "Documentary",
+        "pairs": 1891
+      },
+      {
+        "genre": "Drama",
+        "pairs": 1891
+      },
+      {
+        "genre": "Horror",
+        "pairs": 1770
+      },
+      {
+        "genre": "Romance",
+        "pairs": 1830
+      },
+      {
+        "genre": "Sci-Fi",
+        "pairs": 2016
+      },
+      {
+        "genre": "Thriller",
+        "pairs": 2145
+      }
+    ]
+  },
+  "q1_documents": {
+    "pushed": 574,
+    "all": 20000
+  }
+}

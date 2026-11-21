@@ -10,6 +10,15 @@ person waits for: submit to result.
     python3 bench_query.py --label jobs --out .bench/jobs.json
     uv run --with 'psycopg[binary]' python bench_query.py --pg --label jobs
 
+``--mix connectors`` runs the joins over live sources instead
+(``queries/connectors/*.sql``: Meilisearch, Neo4j, PostgreSQL and Parquet,
+docs/prd/QC-query-connectors.md §6); ``--verify`` checks each answer against
+``queries/connectors/expected.json`` (``seed/connectors.py``), and
+``--no-source-filters`` runs with Meilisearch's filterable attributes cleared,
+so nothing is filtered at the source (same answers, more documents read):
+
+    uv run --with pyarrow python bench_query.py --mix connectors --verify --repeat 10
+
 Phases: ``sequential`` (each query alone, --repeat times) and ``concurrent``
 (--clients workers looping over the mix for --seconds; one person may have 3
 queries running, so 3 is the most one user can measure). Results go to stdout
@@ -89,6 +98,21 @@ REST_EXTRA: dict[str, str] = {
     ),
 }
 
+#: Joins over live sources (QC §6), one per file; seed/connectors.py writes
+#: their answers to expected.json.
+CONNECTOR_QUERIES = Path(__file__).parent / "queries" / "connectors"
+MEILI_ADMIN = os.environ.get("MEILI_ADMIN", "http://localhost:17700")
+MEILI_KEY = os.environ.get("MEILI_KEY", "lab-meili-master-key-0123456789")
+MEILI_FILTERABLE = ["genre", "year", "id"]
+
+
+def connector_mix() -> dict[str, str]:
+    return {
+        path.stem: path.read_text(encoding="utf-8")
+        for path in sorted(CONNECTOR_QUERIES.glob("*.sql"))
+    }
+
+
 TERMINAL = {"SUCCESS", "ERROR", "TIMEOUT", "CANCELLED"}
 _TABLE = re.compile(r"\b([a-z_][a-z0-9_]*)\.([a-z_][a-z0-9_]*)\.([a-z_][a-z0-9_]*)\b")
 
@@ -138,7 +162,75 @@ def _rest_query(sql: str, start: float, timeout: float) -> dict[str, Any]:
         "setup_ms": timings.get("setupMs"),
         "execute_ms": timings.get("executeMs"),
         "error": (run.get("error") or {}).get("message"),
+        "run_id": run["id"],
+        # Connector tables: requests, rows and filters sent per table.
+        "scans": run.get("scans") or [],
     }
+
+
+def result_rows(run_id: str) -> list[dict[str, Any]]:
+    """A finished run's rows (needs pyarrow: ``uv run --with pyarrow``)."""
+    import pyarrow as pa
+
+    request = urllib.request.Request(
+        f"{BASE}/{NS}/query-runs/{run_id}/result",
+        headers={"authorization": f"Bearer {token()}"},
+    )
+    with urllib.request.urlopen(request, timeout=300) as response:
+        return pa.ipc.open_stream(response.read()).read_all().to_pylist()
+
+
+def _plain(value: Any) -> Any:
+    if isinstance(value, float):
+        return round(value, 6)
+    if isinstance(value, list):
+        return [_plain(v) for v in value]
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    if hasattr(value, "as_tuple"):  # Decimal
+        return round(float(value), 6)
+    return value
+
+
+def verify(mix: dict[str, str]) -> dict[str, Any]:
+    """Each query's answer against the one worked out from the seed."""
+    expected = json.loads((CONNECTOR_QUERIES / "expected.json").read_text(encoding="utf-8"))
+    report: dict[str, Any] = {}
+    for name, sql in mix.items():
+        sample = rest_query(sql)
+        if not sample["ok"]:
+            report[name] = {"ok": False, "error": sample["error"]}
+            print(f"  {name:28} FAILED {sample['error']}", flush=True)
+            continue
+        rows = [{k: _plain(v) for k, v in row.items()} for row in result_rows(sample["run_id"])]
+        want = expected["queries"].get(name)
+        same = rows == want
+        report[name] = {"ok": same, "rows": len(rows), "scans": sample["scans"]}
+        reads = ", ".join(f"{s['table']} {s['rows']} rows/{s['requests']} req" for s in sample["scans"])
+        print(f"  {name:28} {'same' if same else 'DIFFERENT'} ({len(rows)} rows) {reads}", flush=True)
+        if not same:
+            report[name]["got"] = rows[:5]
+            report[name]["want"] = (want or [])[:5]
+    return report
+
+
+def meili_filterable(attributes: list[str]) -> None:
+    """Set the lab index's filterable attributes and wait until applied."""
+    headers = {"authorization": f"Bearer {MEILI_KEY}", "content-type": "application/json"}
+    request = urllib.request.Request(
+        f"{MEILI_ADMIN}/indexes/movies/settings/filterable-attributes",
+        data=json.dumps(attributes).encode(),
+        method="PUT",
+        headers=headers,
+    )
+    with urllib.request.urlopen(request, timeout=60) as response:
+        task = json.loads(response.read())["taskUid"]
+    while True:
+        status = urllib.request.Request(f"{MEILI_ADMIN}/tasks/{task}", headers=headers)
+        with urllib.request.urlopen(status, timeout=60) as response:
+            if json.loads(response.read())["status"] in ("succeeded", "failed", "canceled"):
+                return
+        time.sleep(0.2)
 
 
 class PgClient:
@@ -215,6 +307,13 @@ def summarize(samples: list[dict[str, Any]]) -> dict[str, Any]:
     errors = sorted({s["error"] for s in samples if not s["ok"] and s.get("error")})
     if errors:
         out["errors"] = errors[:5]
+    # Live tables: what the last successful run read from each source.
+    last = next((s for s in reversed(samples) if s["ok"] and s.get("scans")), None)
+    if last:
+        out["reads"] = {
+            scan["table"]: {"requests": scan["requests"], "rows": scan["rows"]}
+            for scan in last["scans"]
+        }
     return out
 
 
@@ -227,11 +326,13 @@ def sequential(run_one: Any, repeat: int, mix: dict[str, str]) -> dict[str, Any]
     return result
 
 
-def concurrent(make_runner: Any, clients: int, seconds: float) -> dict[str, Any]:
+def concurrent(
+    make_runner: Any, clients: int, seconds: float, mix: dict[str, str] | None = None
+) -> dict[str, Any]:
     samples: list[dict[str, Any]] = []
     lock = threading.Lock()
     stop_at = time.monotonic() + seconds
-    sqls = list(MIX.values())
+    sqls = list((mix or MIX).values())
 
     def worker(index: int) -> None:
         try:
@@ -305,6 +406,13 @@ def main() -> None:
     parser.add_argument("--pg", action="store_true", help="also run through the SQL gateway")
     parser.add_argument("--no-rest", action="store_true")
     parser.add_argument("--compare", nargs="+", metavar="JSON")
+    parser.add_argument("--mix", choices=("lab", "connectors"), default="lab")
+    parser.add_argument("--verify", action="store_true", help="check answers (connectors mix)")
+    parser.add_argument(
+        "--no-source-filters",
+        action="store_true",
+        help="clear Meilisearch's filterable attributes for the run (connectors mix)",
+    )
     args = parser.parse_args()
     if args.compare:
         compare(args.compare)
@@ -316,14 +424,45 @@ def main() -> None:
     clients = [int(c) for c in args.clients.split(",") if c]
     report: dict[str, Any] = {"label": args.label, "at": time.strftime("%Y-%m-%dT%H:%M:%S")}
 
-    print("warm-up", rest_query(MIX["s3_delta_count"]), flush=True)
+    if args.mix == "connectors":
+        mix = connector_mix()
+        rest_mix = mix
+        report["mix"] = "connectors"
+        report["source_filters"] = not args.no_source_filters
+        if args.no_source_filters:
+            meili_filterable([])
+    else:
+        mix = MIX
+        rest_mix = {**MIX, **REST_EXTRA}
+    try:
+        _run(args, report, mix, rest_mix, clients, out_dir)
+    finally:
+        if args.mix == "connectors" and args.no_source_filters:
+            meili_filterable(MEILI_FILTERABLE)
+    if args.out:
+        Path(args.out).write_text(json.dumps(report, indent=2), encoding="utf-8")
+        print(f"wrote {args.out}")
+
+
+def _run(
+    args: Any,
+    report: dict[str, Any],
+    mix: dict[str, str],
+    rest_mix: dict[str, str],
+    clients: list[int],
+    out_dir: Path,
+) -> None:
+    print("warm-up", rest_query(next(iter(mix.values()))), flush=True)
+    if args.verify:
+        print("verify", flush=True)
+        report["verify"] = verify(mix)
     if not args.no_rest:
         print("REST sequential", flush=True)
-        report["rest"] = {"sequential": sequential(rest_query, args.repeat, {**MIX, **REST_EXTRA}), "concurrent": []}
+        report["rest"] = {"sequential": sequential(rest_query, args.repeat, rest_mix), "concurrent": []}
         print("REST concurrent", flush=True)
         for n in clients:
             report["rest"]["concurrent"].append(
-                concurrent(lambda: (rest_query, lambda: None), n, args.seconds)
+                concurrent(lambda: (rest_query, lambda: None), n, args.seconds, mix)
             )
     if args.pg:
         user, password, ca = pg_credentials(out_dir)
@@ -334,14 +473,11 @@ def main() -> None:
 
         print("PG sequential", flush=True)
         run_one, close = pg_runner()
-        report["pg"] = {"sequential": sequential(run_one, args.repeat, MIX), "concurrent": []}
+        report["pg"] = {"sequential": sequential(run_one, args.repeat, mix), "concurrent": []}
         close()
         print("PG concurrent", flush=True)
         for n in clients:
-            report["pg"]["concurrent"].append(concurrent(pg_runner, n, args.seconds))
-    if args.out:
-        Path(args.out).write_text(json.dumps(report, indent=2), encoding="utf-8")
-        print(f"wrote {args.out}")
+            report["pg"]["concurrent"].append(concurrent(pg_runner, n, args.seconds, mix))
 
 
 if __name__ == "__main__":

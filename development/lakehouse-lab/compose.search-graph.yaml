@@ -1,0 +1,51 @@
+# Lakehouse lab, search and graph (docs/prd/QC-query-connectors.md §6): the
+# live sources SQL reads through their own API, and a shop database to join
+# them with. Same k3d network as compose.yaml; cluster names in
+# k8s-services.search-graph.yaml.
+#
+#   docker compose -f compose.search-graph.yaml up -d
+#   kubectl --context k3d-classifyre apply -f k8s-services.search-graph.yaml
+#   uv run seed/connectors.py          # data, and queries/connectors/expected.json
+#
+# Every credential below is a local test value; every record is invented.
+
+name: lakehouse-lab-search-graph
+
+networks:
+  k3d:
+    name: k3d-classifyre
+    external: true
+
+services:
+  meilisearch:
+    # >= 1.2 for /documents/fetch with a filter (what a query reads through).
+    image: getmeili/meilisearch:v1.13
+    environment:
+      MEILI_MASTER_KEY: lab-meili-master-key-0123456789
+      MEILI_ENV: development
+      MEILI_NO_ANALYTICS: "true"
+    ports: ["17700:7700"]
+    networks:
+      k3d:
+        ipv4_address: 172.18.10.50
+
+  neo4j:
+    image: neo4j:5.26-community
+    environment:
+      NEO4J_AUTH: neo4j/lab-neo4j-pass
+      NEO4J_server_memory_heap_max__size: 1G
+    ports: ["17474:7474", "17687:7687"]
+    networks:
+      k3d:
+        ipv4_address: 172.18.10.51
+
+  shop-pg:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: lab
+      POSTGRES_PASSWORD: lab-shop-pass
+      POSTGRES_DB: shop
+    ports: ["15433:5432"]
+    networks:
+      k3d:
+        ipv4_address: 172.18.10.52

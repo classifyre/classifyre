@@ -1,0 +1,30 @@
+{
+  "type": "NEO4J",
+  "name": "Lab · Neo4j",
+  "config": {
+    "type": "NEO4J",
+    "required": {
+      "uri": "bolt://lab-neo4j.classifyre-dev.svc:7687",
+      "database": "neo4j"
+    },
+    "masked": {
+      "username": "neo4j",
+      "password": "lab-neo4j-pass"
+    },
+    "optional": {
+      "scope": {
+        "include_relationships": true
+      }
+    },
+    "sampling": {
+      "strategy": "RANDOM",
+      "rows_per_page": 50
+    },
+    "detectors": [
+      {
+        "type": "PII",
+        "enabled": true
+      }
+    ]
+  }
+}

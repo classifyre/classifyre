@@ -1,0 +1,24 @@
+{
+  "type": "MEILISEARCH",
+  "name": "Lab · Meilisearch",
+  "config": {
+    "type": "MEILISEARCH",
+    "required": {
+      "auth_mode": "API_KEY",
+      "url": "http://lab-meilisearch.classifyre-dev.svc:7700"
+    },
+    "masked": {
+      "api_key": "lab-meili-master-key-0123456789"
+    },
+    "sampling": {
+      "strategy": "RANDOM",
+      "rows_per_page": 50
+    },
+    "detectors": [
+      {
+        "type": "PII",
+        "enabled": true
+      }
+    ]
+  }
+}
