@@ -34,6 +34,10 @@ NOTEBOOK = """import time
 
 from classifyre import Asset, ScanRefusedError, Table, ctx
 
+if ctx.var("mode") == "load_fails":
+    # A top-level cell that fails on data (setup, a fetch at import).
+    raise KeyError("officer Maria Huber born 1971-04-02")
+
 COMPANIES = [
     {"fnr": "001a", "name": "Alpha GmbH", "employees": 12, "founded": "2001-02-03"},
     {"fnr": "002b", "name": "Beta AG", "employees": 3, "founded": "1999-12-31"},
@@ -63,6 +67,8 @@ def tables():
 def scan(table, request):
     ctx.log(f"scan {table} filters={[str(f) for f in request.filters]}")
     MODE = ctx.var("mode")
+    if MODE == "exits":
+        raise SystemExit("officer Maria Huber born 1971-04-02")
     if MODE == "secret":
         raise RuntimeError("the register said no to " + ctx.secret("api_key") + " for Alpha GmbH")
     if MODE == "refused":
@@ -203,6 +209,21 @@ def test_a_failing_scan_says_where_but_never_what_it_held() -> None:
     assert "scan() raised RuntimeError at cell nb, line" in message
     assert "ScanRefusedError" in message
     for leaked in ("the register said no", "sk-live-0123456789abcdef", "Alpha", "Traceback"):
+        assert leaked not in message
+
+
+@pytest.mark.parametrize(
+    ("mode", "kind", "where"),
+    [("load_fails", "KeyError", "loading"), ("exits", "SystemExit", "scan()")],
+)
+def test_no_other_error_shows_what_it_held(mode: str, kind: str, where: str) -> None:
+    # A cell that fails while the notebook loads, and a BaseException out of
+    # scan(), are cut like any other: type and line, never their text.
+    payload, _ = run_query(_request("SELECT * FROM register.main.companies", mode=mode))
+    assert payload["status"] == "error"
+    message = payload["error"]["message"]
+    assert kind in message and where in message and "at cell nb, line" in message
+    for leaked in ("Maria", "Huber", "1971", "Traceback"):
         assert leaked not in message
 
 
@@ -434,3 +455,18 @@ def test_the_starter_notebooks_sql_example_works_once_uncommented() -> None:
     payload, result = run_query(request)
     assert [r["id"] for r in _rows(payload, result)] == ["a", "b"]
     assert payload["scans"][0]["pushed"] == ["id IN ('a', 'b')"]
+
+
+def test_classify_takes_exactly_the_labels_the_api_masks_by() -> None:
+    # The API reads a declared classification only when it knows the label
+    # (governance-rules.ts CLASSIFICATIONS): a label the notebook accepts and
+    # the API does not would be dropped without a word.
+    import re
+    from pathlib import Path
+
+    from src.notebook.query import COLUMN_CLASSIFICATIONS
+
+    rules = Path(__file__).resolve().parents[2] / "api/src/governance/governance-rules.ts"
+    block = re.search(r"export const CLASSIFICATIONS = \[(.*?)\] as const", rules.read_text(), re.S)
+    assert block, "CLASSIFICATIONS not found in governance-rules.ts"
+    assert tuple(re.findall(r"'([a-z]+)'", block.group(1))) == COLUMN_CLASSIFICATIONS

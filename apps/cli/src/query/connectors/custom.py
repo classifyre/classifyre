@@ -64,13 +64,17 @@ class CustomConnector(ArrowConnector):
         try:
             outcome = yield from instance.query_scan(call, request.deadline)
         except CustomSourceError as exc:
-            # Already safe to show: runner.py lets only a ScanRefusedError's
-            # message, the contract's, or an exception's type and line out.
-            text = str(exc).strip()
-            logger.warning("scan(%r) failed: %s", table, text)
-            first = text.splitlines()[0][:300] if text else "scan() failed"
+            # The one place that decides what the person sees: only text known
+            # to hold no data (exc.shown); the rest, redacted, goes to the log.
+            logger.warning("scan(%r) failed: %s", table, str(exc).strip())
+            shown = (exc.shown or "").strip().splitlines()
+            message = (
+                shown[0][:300]
+                if shown
+                else ("the notebook stopped unexpectedly; its message is in the query's log.")
+            )
             code = "timeout" if isinstance(exc, NotebookTimeoutError) else "source_unavailable"
-            raise ConnectorError(f"{self.where()}: {first}", code) from None
+            raise ConnectorError(f"{self.where()}: {message}", code) from None
         finally:
             self._release(instance)
         request.stats.requests += int(outcome.get("requests") or 0)

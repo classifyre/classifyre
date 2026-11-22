@@ -143,7 +143,7 @@ describe('QueryCatalogService column masks', () => {
   });
 
   it('masks what a notebook declares its table columns hold, never less than findings', async () => {
-    const { svc } = service({
+    const { svc, prisma } = service({
       declared: [
         {
           id: 'a-1',
@@ -165,6 +165,16 @@ describe('QueryCatalogService column masks', () => {
       { column: 'api_key', action: 'hide' },
       { column: 'country', action: 'mask', mask: 'redact' },
     ]);
+    // Only a custom source's tables: indexed columns first, so a workspace of
+    // millions of file assets never has its metadata read for this.
+    expect(prisma.asset.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          sourceType: 'CUSTOM',
+          assetType: 'table',
+        }),
+      }),
+    );
   });
 
   it("follows a steward's choice over the classification", async () => {

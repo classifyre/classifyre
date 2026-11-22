@@ -259,9 +259,10 @@ What a query reads, and how it runs:
   returns at most 1,000,000 rows.
 - **Errors.** `raise ScanRefusedError("…")` fails the query with your message,
   so write it for the person who ran the query and keep values out of it. Any
-  other exception fails it with only its type and line (*scan() raised KeyError
-  at cell sql-tables, line 42*): its text may hold the values it was raised
-  over, so it goes to the query's log instead, secrets redacted.
+  other error, in `scan()` or in a cell while the notebook loads for the
+  query, fails it with only its type and line (*scan() raised KeyError at cell
+  sql-tables, line 42*): its text may hold the values it was raised over, so
+  it goes to the query's log instead, secrets redacted.
 - **Joins read each table on its own.** `JOIN companies c ON c.fnr = x.fnr`
   does not hand `scan()` the keys of the other side. Give the custom table a
   condition of its own (`WHERE c.fnr IN (...)`).

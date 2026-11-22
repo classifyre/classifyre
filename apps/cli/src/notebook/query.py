@@ -54,7 +54,8 @@ COLUMN_TYPES = (
 #: What a column may be declared to hold (``Table(classify=...)``), least
 #: guarded first; ``personal`` and ``sensitive`` are masked and ``secret``
 #: hidden for people who do not read the table in clear, as when findings
-#: classify a column (the API's ``CLASSIFICATIONS``).
+#: classify a column. Equal to the API's ``CLASSIFICATIONS`` (governance-rules.ts),
+#: checked by tests/test_query_custom.py.
 COLUMN_CLASSIFICATIONS = ("public", "internal", "confidential", "personal", "sensitive", "secret")
 _TABLE_NAME = re.compile(r"^[a-z_][a-z0-9_]{0,62}$")
 

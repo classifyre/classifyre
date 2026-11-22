@@ -528,6 +528,10 @@ export class QueryCatalogService {
     // can only raise.
     const declared = await this.prisma.asset.findMany({
       where: {
+        // Indexed columns narrow it to custom sources' tables before the
+        // metadata is read (assets_source_type_idx, assets_asset_type_idx).
+        sourceType: 'CUSTOM',
+        assetType: 'table',
         metadata: { path: ['query'], equals: 'scan' },
         status: { not: 'DELETED' },
       },

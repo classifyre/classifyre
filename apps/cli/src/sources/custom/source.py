@@ -20,6 +20,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import select
 import shutil
 import subprocess
@@ -82,11 +83,24 @@ ASSET_QUERY_TIMEOUT_SECONDS = 60
 
 
 class CustomSourceError(RuntimeError):
-    """The notebook could not be loaded or run."""
+    """The notebook could not be loaded or run.
+
+    ``shown`` is what a query may tell the person who ran it, when it is
+    known to hold no data: the error's own text can carry the values it was
+    raised over (docs/prd/QC-query-connectors.md §5.8). None: nothing but
+    that the notebook failed.
+    """
+
+    def __init__(self, message: str, *, shown: str | None = None) -> None:
+        super().__init__(message)
+        self.shown = shown
 
 
 class NotebookTimeoutError(CustomSourceError):
     """A query's deadline passed while the notebook was still scanning."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message, shown=message)
 
 
 class CustomSource(BaseSource):
@@ -240,7 +254,10 @@ class CustomSource(BaseSource):
         frame = self._read_frame(timeout=STARTUP_TIMEOUT_SECONDS)
         if frame.get("type") == "error":
             self._terminate()
-            raise CustomSourceError(self._safe(_describe(frame.get("error"))))
+            error = frame.get("error")
+            raise CustomSourceError(
+                self._safe(_describe(error)), shown=_where_it_failed(error, "loading")
+            )
         if frame.get("type") != "ready":
             self._terminate()
             raise CustomSourceError(
@@ -653,8 +670,11 @@ class CustomSource(BaseSource):
                     error = frame.get("error")
                     if isinstance(error, dict) and error.get("type") == "ScanFailedError":
                         # Already cut to what may be shown (runner.py, scan).
-                        raise CustomSourceError(self._safe(str(error.get("message") or "")))
-                    raise CustomSourceError(self._safe(_describe(error)))
+                        message = self._safe(str(error.get("message") or ""))
+                        raise CustomSourceError(message, shown=message)
+                    raise CustomSourceError(
+                        self._safe(_describe(error)), shown=_where_it_failed(error, "scan()")
+                    )
                 elif kind == "need":
                     self._serve_need(frame)
         finally:
@@ -1225,6 +1245,24 @@ def _cohort_weights_from_env() -> dict[str, Any] | None:
         logger.warning("Ignoring unreadable CLASSIFYRE_COHORT_WEIGHTS: %s", exc)
         return None
     return decoded if isinstance(decoded, dict) else None
+
+
+_CELL_FRAME = re.compile(r'File "<cell ([^>]+)>", line (\d+)')
+
+
+def _where_it_failed(error: Any, phase: str) -> str:
+    """What a query may say about a notebook error: its type and the
+    innermost notebook line, never its message (it may hold the values it
+    was raised over)."""
+    kind = str(error.get("type") or "an error") if isinstance(error, dict) else "an error"
+    frames = error.get("traceback") if isinstance(error, dict) else None
+    found = _CELL_FRAME.findall("".join(frames)) if isinstance(frames, list) else []
+    at = f" at cell {found[-1][0]}, line {found[-1][1]}" if found else ""
+    during = " while loading" if phase == "loading" else ""
+    return (
+        f"{'The notebook' if phase == 'loading' else 'scan()'} raised {kind}{at}{during}; "
+        "its message is in the query's log (raise ScanRefusedError(...) to show one here)."
+    )
 
 
 def _describe(error: Any) -> str:
