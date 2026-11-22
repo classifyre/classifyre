@@ -351,7 +351,8 @@ A Metabase or driver version bump is the same process: bump the image or jar ver
   - `FETCH 0` is refused (`0A000`).
   - `PREPARE … AS`, `EXECUTE`, `CREATE … AS`, `COPY (…) TO` and `COPY table TO` over your tables are refused (`0A000`), as are functions, procedures and `DO` blocks; before, each answered 0 rows from PGlite's empty tables.
   - bi-smoke cleanup: the persona's group in the `default` organization, registered before the persona is made.
-- **Still open (fidelity, each an error or a PostgreSQL difference, none a silent 0 rows):**
+- **After re-review 2, 2026-11-22:** a SQL connection refuses writes and DDL outright (`25006`: INSERT, UPDATE, DELETE, MERGE, CREATE, COPY, DO, CALL, …), comments anywhere in the statement included. PREPARE, EXECUTE and EXPLAIN ANALYZE are planned first and refused when they read your tables or cannot be planned. The functions that run SQL text (`*_to_xml*`, `ts_stat`, `ts_rewrite`) are revoked in PGlite. A socket must send its startup packet within 5 s, and IPv6 clients are counted by their /64.
+- **Still open (fidelity, each an error or a PostgreSQL difference; no statement shape known to answer 0 rows silently, but the check is a list of what was found, not a proof):**
   - `ROLLBACK TO SAVEPOINT` keeps a data cursor declared after the savepoint.
   - A data cursor's name may repeat one of PGlite's own cursors.
   - `FETCH 1 c -- comment` answers 34000, and `CLOSE c -- comment` does not close.

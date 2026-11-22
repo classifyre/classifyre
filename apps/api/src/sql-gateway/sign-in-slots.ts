@@ -12,6 +12,29 @@
 export const MAX_SIGNING_IN = 64;
 export const MAX_SIGNING_IN_PER_CLIENT = 16;
 
+/**
+ * The key a client is counted by: its address, an IPv6 one by its /64 (one
+ * host has a whole /64 to open connections from).
+ */
+export function clientKey(address: string): string {
+  const plain = address.replace(/^::ffff:(?=\d+\.)/i, '');
+  if (!plain.includes(':')) return plain;
+  const [head, tail = ''] = plain.split('::');
+  const left = head ? head.split(':') : [];
+  const right = tail ? tail.split(':') : [];
+  const groups = plain.includes('::')
+    ? [
+        ...left,
+        ...Array<string>(Math.max(0, 8 - left.length - right.length)).fill('0'),
+        ...right,
+      ]
+    : left;
+  return `${groups
+    .slice(0, 4)
+    .map((g) => (g || '0').toLowerCase().replace(/^0+(?=.)/, ''))
+    .join(':')}::/64`;
+}
+
 export interface SignInTicket {
   /** Count the socket for its client; false when that client has its share. */
   identify(client: string): boolean;
@@ -38,8 +61,9 @@ export class SignInSlots {
     let away = false;
     let client: string | null = null;
     return {
-      identify: (address: string): boolean => {
+      identify: (raw: string): boolean => {
         if (client !== null) return true;
+        const address = clientKey(raw);
         const held = this.byClient.get(address) ?? 0;
         if (held >= this.perClient) return false;
         this.byClient.set(address, held + 1);

@@ -203,9 +203,11 @@ describe('PgSession over PGlite', () => {
 
   it('keeps the catalog read-only for the connection', async () => {
     const client = await connect();
+    // Refused before PGlite (a SQL connection only reads), and PGlite's
+    // role could not write anyway.
     await expect(
       client.query(`CREATE TABLE public.x (id int)`),
-    ).rejects.toThrow(/permission denied/);
+    ).rejects.toMatchObject({ code: '25006' });
     const who = await client.query(
       `SELECT current_user AS u, current_setting('is_superuser') AS su`,
     );
@@ -301,10 +303,10 @@ describe('PgSession over PGlite', () => {
     ]);
     await expect(
       client.query(`DELETE FROM "shop.public".orders`),
-    ).rejects.toMatchObject({ code: '42501' });
+    ).rejects.toMatchObject({ code: '25006' });
     await expect(
       client.query(`CREATE TABLE public.x (a int)`),
-    ).rejects.toMatchObject({ code: '42501' });
+    ).rejects.toMatchObject({ code: '25006' });
     await client.end();
   }, 60_000);
 
@@ -486,20 +488,50 @@ describe('PgSession over PGlite', () => {
   }, 60_000);
 
   it('refuses statements that would answer from empty tables, and FETCH 0', async () => {
-    // Re-review 2026-11-22: each of these reached PGlite and answered 0 rows.
+    // Re-reviews 2026-11-22: each of these reached PGlite and answered 0 rows.
     const { socket, untilReady, codes } = await rawSession(port);
-    const orders = 'SELECT * FROM "shop.public".orders';
-    for (const sql of [
-      `PREPARE p AS ${orders}`,
-      `CREATE TEMP TABLE x AS ${orders}`,
-      `COPY (${orders}) TO STDOUT`,
-      'COPY "shop.public".orders TO STDOUT',
-      `DO $$ BEGIN PERFORM count(*) FROM "shop.public".orders; END $$`,
-      'CREATE FUNCTION pg_temp.f() RETURNS bigint LANGUAGE sql AS $$ SELECT 1 $$',
-    ]) {
+    const T = '"shop.public".orders';
+    const orders = `SELECT * FROM ${T}`;
+    const cases: [string, string][] = [
+      // A SQL connection only reads: writes and DDL, whatever they read.
+      [`CREATE TEMP TABLE x AS ${orders}`, '25006'],
+      [
+        `CREATE /*x*/ FUNCTION pg_temp.f() RETURNS bigint LANGUAGE sql AS 'SELECT count(*) FROM ${T}'`,
+        '25006',
+      ],
+      [
+        `CREATE OR REPLACE\n--c\nFUNCTION pg_temp.g() RETURNS int LANGUAGE sql AS 'SELECT 1'`,
+        '25006',
+      ],
+      [`COPY (${orders}) TO STDOUT`, '25006'],
+      [`COPY /*x*/ ${T} TO STDOUT`, '25006'],
+      [`DO $$ BEGIN PERFORM count(*) FROM ${T}; END $$`, '25006'],
+      [`INSERT INTO pg_temp.nope SELECT * FROM ${T} RETURNING *`, '25006'],
+      [`UPDATE u SET id = o.id FROM ${T} o RETURNING o.*`, '25006'],
+      [`DELETE FROM u USING ${T} o RETURNING o.*`, '25006'],
+      [
+        `MERGE INTO u USING ${T} o ON true WHEN NOT MATCHED THEN DO NOTHING`,
+        '25006',
+      ],
+      [`CREATE RULE r AS ON INSERT TO u DO ALSO SELECT 1`, '25006'],
+      // Planned first: refused when they read your tables.
+      [`PREPARE p AS ${orders}`, '0A000'],
+      [`EXPLAIN ANALYZE ${orders}`, '0A000'],
+      // Functions that run SQL text are revoked in PGlite.
+      [`SELECT table_to_xml('${T}'::regclass, false, false, '')`, '42501'],
+      [
+        `SELECT * FROM ts_stat('SELECT to_tsvector(customer) FROM ${T}')`,
+        '42501',
+      ],
+      [
+        `SELECT query_to_xml('${orders.replace(/'/g, "''")}', false, false, '')`,
+        '42501',
+      ],
+    ];
+    for (const [sql, code] of cases) {
       socket.write(frontend.query(sql));
       await untilReady();
-      expect([sql, codes()]).toEqual([sql, ['0A000']]);
+      expect([sql, codes()]).toEqual([sql, [code]]);
     }
     // Over the catalog they are PGlite's, as before.
     socket.write(

@@ -27,9 +27,43 @@ import {
   splitStatements,
   substituteParams,
   parseCursorStatement,
-  withoutLeadingComments,
+  stripComments,
   type CursorStatement,
 } from './sql-text';
+
+/**
+ * A SQL connection only reads (DQ §5.7): these are refused before PGlite
+ * sees them. In PGlite they would write to or define over empty copies of
+ * your tables, and the SELECT that follows would answer 0 rows.
+ */
+const WRITE_VERBS = new Set([
+  'INSERT',
+  'UPDATE',
+  'DELETE',
+  'MERGE',
+  'UPSERT',
+  'CREATE',
+  'ALTER',
+  'DROP',
+  'TRUNCATE',
+  'DO',
+  'COPY',
+  'CALL',
+  'GRANT',
+  'REVOKE',
+  'COMMENT',
+  'SECURITY',
+  'REINDEX',
+  'CLUSTER',
+  'VACUUM',
+  'ANALYZE',
+  'ANALYSE',
+  'REFRESH',
+  'IMPORT',
+  'LOAD',
+  'REASSIGN',
+  'LOCK',
+]);
 
 /** A data statement failed: what the client is told, as PostgreSQL would. */
 export class DataError extends Error {
@@ -427,54 +461,58 @@ export class PgSession {
     if (!READING_KEYWORDS.has(firstKeyword(sql)) || this.status === 'E') {
       return [];
     }
-    return this.readsOf(sql);
+    return (await this.readsOf(sql)) ?? [];
   }
 
   /**
    * A statement other than a SELECT that would read your tables in PGlite,
    * where they are empty, and answer 0 rows as if that were the result
-   * (re-review 2026-11-22): refused. Over the catalog it is PGlite's.
+   * (re-reviews 2026-11-22). A SQL connection only reads, so writes and DDL
+   * are refused outright, whatever they would read; PREPARE, EXECUTE and
+   * EXPLAIN ANALYZE are planned first, and refused when they read your
+   * tables or cannot be planned (fail closed). Functions that run SQL text
+   * (`query_to_xml`, `ts_stat`, …) are revoked in PGlite itself.
    */
   private async unservedRead(sql: string): Promise<DataError | null> {
     if (this.status === 'E') return null;
-    const text = withoutLeadingComments(sql);
+    const text = stripComments(sql).trim();
     const word = firstKeyword(text);
-    if (
-      word === 'DO' ||
-      /^create\s+(?:or\s+replace\s+)?(?:function|procedure)\b/i.test(text)
-    ) {
+    if (WRITE_VERBS.has(word)) {
       return new DataError(
-        '0A000',
-        'Functions, procedures and DO blocks are not supported on a SQL connection.',
+        '25006',
+        `A SQL connection only reads: ${word} is not supported.`,
       );
     }
     let probe: string | null = null;
     if (word === 'PREPARE') {
       probe =
-        /^prepare\s+\S+(?:\s*\([^)]*\))?\s+as\s+([\s\S]+)$/i.exec(text)?.[1] ??
-        null;
-    } else if (word === 'COPY') {
-      const query = /^copy\s*\(([\s\S]+)\)\s*to\b/i.exec(text)?.[1];
-      const table =
-        /^copy\s+((?:"(?:[^"]|"")+"|[^\s(".]+)(?:\.(?:"(?:[^"]|"")+"|[^\s(".]+))*)/i.exec(
+        /^prepare\s+(?:"(?:[^"]|"")+"|\S+?)(?:\s*\([^)]*\))?\s+as\s+([\s\S]+)$/i.exec(
           text,
-        )?.[1];
-      probe = query ?? (table ? `TABLE ${table}` : null);
-    } else if (word === 'CREATE' || word === 'EXECUTE') {
+        )?.[1] ?? '';
+    } else if (word === 'EXECUTE') {
       probe = text;
+    } else if (
+      word === 'EXPLAIN' &&
+      /^explain\s*(?:\([^)]*\banaly[sz]e\b|analy[sz]e\b)/i.test(text)
+    ) {
+      probe = text.replace(
+        /^explain\s*(?:\([^)]*\)|(?:analy[sz]e|verbose|costs|buffers|timing|summary|settings|wal)\b\s*)*/i,
+        '',
+      );
     }
-    if (!probe) return null;
-    const tables = await this.readsOf(probe).catch(() => ['?']);
-    return tables.length
-      ? new DataError(
-          '0A000',
-          `${word} over your tables is not served on a SQL connection: run the SELECT itself.`,
-        )
-      : null;
+    if (probe === null) return null;
+    const tables = probe ? await this.readsOf(probe).catch(() => null) : null;
+    if (tables !== null && !tables.length) return null;
+    return new DataError(
+      '0A000',
+      tables === null
+        ? `This ${word} cannot be checked for what it reads, so it is not run on a SQL connection.`
+        : `${word} over your tables is not served on a SQL connection: run the SELECT itself.`,
+    );
   }
 
-  /** Your tables a statement reads, from its plan in PGlite. */
-  private async readsOf(sql: string): Promise<string[]> {
+  /** Your tables a statement reads, from its plan in PGlite; null when it cannot be planned. */
+  private async readsOf(sql: string): Promise<string[] | null> {
     const nulls = substituteParams(
       sql,
       Array.from({ length: 100 }, () => 'NULL'),
@@ -485,11 +523,11 @@ export class PgSession {
       frontend.close('P', PROBE),
     );
     const row = reply.find((m) => m.type === 'D');
-    if (!row) return [];
+    if (!row) return null;
     const reader = new BodyReader(row.body);
     reader.int16();
     const length = reader.int32();
-    if (length < 0) return [];
+    if (length < 0) return null;
     const reads = JSON.parse(reader.bytes(length).toString('utf8')) as string[];
     const { data, other } = readTables(reads, this.dataSchemas);
     if (data.length && other.length) {

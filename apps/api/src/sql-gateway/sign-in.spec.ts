@@ -4,6 +4,7 @@ import {
   scramVerifier,
 } from '../sql-connections/scram';
 import {
+  MAX_WAITERS,
   SignInLockout,
   challengeVerifier,
   decoyVerifier,
@@ -215,5 +216,21 @@ describe('one sign-in at a time per key', () => {
     expect(await second).toBe(true);
     expect(seen).toEqual([true, false]);
     lockout.end(here);
+  });
+
+  it('lets at most MAX_WAITERS sign-ins wait in all', async () => {
+    const lockout = new SignInLockout();
+    expect(await lockout.begin(['k'])).toBe(true);
+    const waiting = Array.from({ length: MAX_WAITERS }, () =>
+      lockout.begin(['k'], 200, MAX_WAITERS + 1),
+    );
+    // Refused at once, not after the wait: every waiting place is taken.
+    const started = Date.now();
+    expect(await lockout.begin(['k'], 200, MAX_WAITERS + 1)).toBe(false);
+    expect(Date.now() - started).toBeLessThan(100);
+    expect(await Promise.all(waiting)).toEqual(
+      Array<boolean>(MAX_WAITERS).fill(false),
+    );
+    lockout.end(['k']);
   });
 });

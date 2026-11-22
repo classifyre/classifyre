@@ -44,14 +44,18 @@ def escape(name: str) -> str:
 #: and their Cypher. One list: the scan records them
 #: (``Neo4jSource._label_columns``, ``_relationship_to_asset``), the
 #: connector reads and filters them.
-NODE_COLUMNS = {"element_id": "elementId(n)"}
+ELEMENT_ID = "element_id"
+SOURCE_ELEMENT_ID, TARGET_ELEMENT_ID = "source_element_id", "target_element_id"
+SOURCE_ID, TARGET_ID = "source_id", "target_id"
+SOURCE_LABEL, TARGET_LABEL = "source_label", "target_label"
+NODE_COLUMNS = {ELEMENT_ID: "elementId(n)"}
 RELATIONSHIP_COLUMNS = {
-    "source_element_id": "elementId(a)",
-    "target_element_id": "elementId(b)",
-    "source_id": "a.`id`",
-    "target_id": "b.`id`",
-    "source_label": "head(labels(a))",
-    "target_label": "head(labels(b))",
+    SOURCE_ELEMENT_ID: "elementId(a)",
+    TARGET_ELEMENT_ID: "elementId(b)",
+    SOURCE_ID: "a.`id`",
+    TARGET_ID: "b.`id`",
+    SOURCE_LABEL: "head(labels(a))",
+    TARGET_LABEL: "head(labels(b))",
 }
 
 
@@ -83,8 +87,12 @@ def pushable(column: str, types: dict[str, str]) -> bool:
     A property recorded as text (or JSON) reads any stored value as its
     text (``5`` as ``'5'``), while Cypher compares the stored value itself:
     ``p = '5'`` would miss the node holding the integer 5. Only properties
-    recorded with a non-text type are sent (a value of another type there is
-    an error, never a missing row), and the ids and labels Neo4j computes.
+    recorded as numbers or booleans are sent, and the ids and labels Neo4j
+    computes. A value is never read as something else (``to_batch`` refuses
+    it), but a node whose property is of another type than the sample saw is
+    one Cypher's condition may not match: the answer then leaves that node
+    out where reading every node would have stopped with an error. Known and
+    accepted (QC re-review 2, 2026-11-22); a new scan records the type.
     """
     return column in _COMPUTED or types.get(column, "").upper() in _COMPARABLE
 

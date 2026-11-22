@@ -1,4 +1,4 @@
-import { SignInSlots } from './sign-in-slots';
+import { SignInSlots, clientKey } from './sign-in-slots';
 
 describe('SignInSlots', () => {
   it('counts each client by the address its PROXY header names, not the proxy', () => {
@@ -49,5 +49,24 @@ describe('SignInSlots', () => {
     ticket.leave();
     ticket.waiting(false);
     expect(slots.active).toBe(0);
+  });
+
+  it('counts an IPv6 client by its /64', () => {
+    const slots = new SignInSlots(64, 1);
+    expect(slots.enter()!.identify('2001:db8:1:2::a')).toBe(true);
+    expect(slots.enter()!.identify('2001:db8:1:2:ffff::1')).toBe(false);
+    expect(slots.enter()!.identify('2001:db8:1:3::a')).toBe(true);
+    expect(slots.enter()!.identify('::ffff:203.0.113.7')).toBe(true);
+    expect(slots.enter()!.identify('203.0.113.7')).toBe(false);
+  });
+});
+
+describe('clientKey', () => {
+  it('groups IPv6 by /64 and leaves IPv4 alone', () => {
+    expect(clientKey('2001:0db8:0001:0002:0000:0000:0000:000a')).toBe(
+      '2001:db8:1:2::/64',
+    );
+    expect(clientKey('2001:db8::1')).toBe('2001:db8:0:0::/64');
+    expect(clientKey('203.0.113.7')).toBe('203.0.113.7');
   });
 });

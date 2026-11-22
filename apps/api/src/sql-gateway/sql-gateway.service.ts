@@ -87,6 +87,15 @@ const STARTUP_SETTINGS = new Set([
 
 const SWEEP_MS = 30_000;
 const SIGN_IN_MS = 20_000;
+/**
+ * A socket must have sent its startup packet (after TLS, if any) by then: a
+ * socket that stalls before it holds a sign-in slot others need (re-review
+ * 2026-11-22). The password exchange keeps the rest of SIGN_IN_MS.
+ */
+const STARTUP_MS = 5_000;
+
+/** A socket's sign-in slot, and its startup deadline. */
+type Admission = SignInTicket & { started(): void };
 
 /** Error codes of query runs, as the SQLSTATE a PostgreSQL client expects. */
 const SQLSTATE: Record<string, string> = {
@@ -410,11 +419,15 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
     }
     const deadline = setTimeout(() => raw.destroy(), SIGN_IN_MS);
     deadline.unref();
-    const signedIn: SignInTicket = {
+    const startup = setTimeout(() => raw.destroy(), STARTUP_MS);
+    startup.unref();
+    const signedIn: Admission = {
       identify: (client) => ticket.identify(client),
       waiting: (on) => ticket.waiting(on),
+      started: () => clearTimeout(startup),
       leave: () => {
         clearTimeout(deadline);
+        clearTimeout(startup);
         ticket.leave();
       },
     };
@@ -428,7 +441,7 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
 
   private async acceptSigningIn(
     raw: Socket,
-    signedIn: SignInTicket,
+    signedIn: Admission,
   ): Promise<void> {
     const config = this.config!;
     raw.setNoDelay(true);
@@ -515,6 +528,7 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
             'Connect with TLS (sslmode=require or stronger).',
           );
         }
+        signedIn.started();
         await this.signIn(
           socket,
           incoming,

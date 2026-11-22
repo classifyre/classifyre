@@ -287,8 +287,10 @@ class Neo4jSource(BaseSource):
         except Exception as exc:
             logger.debug("Could not sample nodes of label %s: %s", ref.label, exc)
             return []
-        columns = [c for c in record_columns(props) if c["name"] != "element_id"]
-        return [{"name": "element_id", "type": "VARCHAR"}, *columns]
+        from ...query.connectors.neo4j import ELEMENT_ID
+
+        columns = [c for c in record_columns(props) if c["name"] != ELEMENT_ID]
+        return [{"name": ELEMENT_ID, "type": "VARCHAR"}, *columns]
 
     # ── Relationship types: tables of their own (QC §5.6) ──────────────
 
@@ -336,24 +338,32 @@ class Neo4jSource(BaseSource):
             return None
         source_labels = sorted({lbl for row in sample for lbl in row["al"] or []})
         target_labels = sorted({lbl for row in sample for lbl in row["bl"] or []})
+        from ...query.connectors.neo4j import (
+            RELATIONSHIP_COLUMNS,
+            SOURCE_ELEMENT_ID,
+            SOURCE_ID,
+            SOURCE_LABEL,
+            TARGET_ELEMENT_ID,
+            TARGET_ID,
+            TARGET_LABEL,
+        )
+
         columns = [
-            {"name": "source_element_id", "type": "VARCHAR"},
-            {"name": "target_element_id", "type": "VARCHAR"},
+            {"name": SOURCE_ELEMENT_ID, "type": "VARCHAR"},
+            {"name": TARGET_ELEMENT_ID, "type": "VARCHAR"},
         ]
         # The endpoints' own ``id``, when every one sampled has it: what a
         # relationship joins other sources' tables on.
-        for side, key in (("source_id", "aid"), ("target_id", "bid")):
+        for side, key in ((SOURCE_ID, "aid"), (TARGET_ID, "bid")):
             types = {value_type(row[key]) for row in sample}
             if None not in types and len(types) == 1:
                 columns.append({"name": side, "type": str(types.pop())})
-        from ...query.connectors.neo4j import RELATIONSHIP_COLUMNS
-
         reserved = {c["name"] for c in columns} | set(RELATIONSHIP_COLUMNS)
         properties = [dict(row["p"]) for row in sample if row["p"] is not None]
         columns += [c for c in record_columns(properties) if c["name"] not in reserved]
         columns += [
-            {"name": "source_label", "type": "VARCHAR"},
-            {"name": "target_label", "type": "VARCHAR"},
+            {"name": SOURCE_LABEL, "type": "VARCHAR"},
+            {"name": TARGET_LABEL, "type": "VARCHAR"},
         ]
         metadata: dict[str, Any] = {
             "relationship_type": relationship_type,
