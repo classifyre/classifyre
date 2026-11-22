@@ -72,6 +72,22 @@ const ALLOWED_ENV_KEYS = new Set([
 ]);
 
 /**
+ * The query engine's settings (CLASSIFYRE_QUERY_LOCAL_ROOTS above all, the
+ * folders a local source may lie in; also memory, threads, spill and the
+ * connector row cap): settings, never credentials. Without them a query the
+ * API runs itself (the worker busy or off) would check local folders
+ * against the denylist only (re-review 2026-11-22).
+ */
+const ALLOWED_ENV_PREFIXES = ['CLASSIFYRE_QUERY_'];
+
+function allowed(key: string): boolean {
+  return (
+    ALLOWED_ENV_KEYS.has(key) ||
+    ALLOWED_ENV_PREFIXES.some((prefix) => key.startsWith(prefix))
+  );
+}
+
+/**
  * Names that must never reach a notebook execution, whatever else changes.
  *
  * The allowlist above already excludes them; this list exists so the intent is
@@ -93,7 +109,7 @@ export function buildNotebookEnvironment(
 ): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {};
   for (const [key, value] of Object.entries(base)) {
-    if (value !== undefined && ALLOWED_ENV_KEYS.has(key)) {
+    if (value !== undefined && allowed(key)) {
       env[key] = value;
     }
   }
@@ -107,5 +123,5 @@ export function buildNotebookEnvironment(
 }
 
 export function isEnvKeyAllowedForNotebooks(key: string): boolean {
-  return ALLOWED_ENV_KEYS.has(key);
+  return allowed(key);
 }

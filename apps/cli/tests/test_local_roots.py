@@ -45,3 +45,22 @@ def test_a_local_folder_scan_refuses_the_image_s_state(monkeypatch: pytest.Monke
     source = LocalFolderSource({"type": "LOCAL_FOLDER", "required": {"path": "/etc"}})
     with pytest.raises(LocalRootRefusedError, match="may not be read by Classifyre"):
         source._root()
+
+
+def test_a_folder_holding_a_configured_key_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("CLASSIFYRE_QUERY_LOCAL_ROOTS", raising=False)
+    keys = tmp_path / "keys"
+    keys.mkdir()
+    monkeypatch.setenv("CLASSIFYRE_KEY_FILE", str(keys / "masked-config.key"))
+    with pytest.raises(LocalRootRefusedError, match="holds Classifyre's keys"):
+        refuse_local_root(str(tmp_path))
+    refuse_local_root(str(tmp_path / "elsewhere"))
+
+
+def test_the_query_directories_are_on_the_shared_list() -> None:
+    from src.query.worker import QUERY_DIRS
+    from src.utils.local_roots import _denylist
+
+    assert QUERY_DIRS in _denylist()["privateNames"]

@@ -1,0 +1,26 @@
+{
+  "description": "Folders a local-folder source may never point at, read by the CLI (apps/cli/src/utils/local_roots.py: every scan and query) and the API (apps/api/src/utils/local-folder-path.ts: when a source is saved). containsNot: a source folder may not be or contain these (other work's temporary files). insideNot: nor lie inside, be, or contain these (the system's view of the machine; the all-in-one image's state, whose masked-config.key decrypts every workspace's source credentials, its database and its code). privateNames: no path part may start with these (a query's private and spill directories). protectedPathEnv: environment variables naming key files or folders; a source folder may not contain what they name.",
+  "containsNot": ["/tmp", "/var/tmp", "/dev/shm"],
+  "insideNot": [
+    "/proc",
+    "/sys",
+    "/dev",
+    "/etc",
+    "/run",
+    "/var/run",
+    "/root",
+    "/var/lib/classifyre",
+    "/var/lib/postgresql",
+    "/app",
+    "/opt",
+    "/cache"
+  ],
+  "privateNames": ["classifyre-queries", "classifyre-query-"],
+  "protectedPathEnv": [
+    "CLASSIFYRE_KEY_FILE",
+    "CLASSIFYRE_IAM_SECRETS_FILE",
+    "CLASSIFYRE_SQL_TLS_DIR",
+    "QUERY_WORKER_TOKEN_FILE",
+    "CLASSIFYRE_QUERY_WORKER_TOKEN_FILE"
+  ]
+}

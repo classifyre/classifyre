@@ -93,11 +93,6 @@ def check_local_root(path: str) -> None:
         raise BindingError(str(exc)) from None
 
 
-def _env_paths(name: str) -> list[str]:
-    raw = os.environ.get(name, "")
-    return [part.strip() for part in raw.replace(",", os.pathsep).split(os.pathsep) if part.strip()]
-
-
 def _as_directory(path: str) -> str:
     """A directory for ``allowed_directories``: real path, trailing slash, so
     ``/data/a`` does not also open ``/data/ab``."""

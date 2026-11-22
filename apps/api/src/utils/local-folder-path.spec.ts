@@ -20,4 +20,20 @@ describe('localFolderRefusal', () => {
       expect(localFolderRefusal(path)).toBeNull();
     },
   );
+
+  it('refuses a query’s private directory and the folder holding a configured key', () => {
+    expect(localFolderRefusal('/srv/x/classifyre-queries/q-1')).toMatch(
+      /private directory/,
+    );
+    expect(
+      localFolderRefusal('/srv/secrets', {
+        CLASSIFYRE_KEY_FILE: '/srv/secrets/masked-config.key',
+      }),
+    ).toMatch(/holds Classifyre's keys/);
+    expect(
+      localFolderRefusal('/srv/data', {
+        CLASSIFYRE_KEY_FILE: '/srv/secrets/masked-config.key',
+      }),
+    ).toBeNull();
+  });
 });

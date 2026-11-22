@@ -15,35 +15,25 @@ directories, or the key that decrypts every workspace's source credentials.
 
 from __future__ import annotations
 
+import json
 import os
 import tempfile
+from functools import cache
 from pathlib import Path
 
 #: Separated by ``os.pathsep`` or commas.
 LOCAL_ROOTS_ENV = "CLASSIFYRE_QUERY_LOCAL_ROOTS"
 
-#: Never a source's folder, nor contained in one: other queries' private and
-#: spill directories live under these.
-_CONTAINS_NOT = ("/tmp", "/var/tmp", "/dev/shm")
-#: Never a source's folder, inside one or containing one: the process's view
-#: of the machine, and the image's state (masked-config.key, iam.secrets, the
-#: SQL TLS keys, the database) and code.
-_INSIDE_NOT = (
-    "/proc",
-    "/sys",
-    "/dev",
-    "/etc",
-    "/run",
-    "/var/run",
-    "/root",
-    "/var/lib/classifyre",
-    "/var/lib/postgresql",
-    "/app",
-    "/opt",
-    "/cache",
-)
-#: Directory names of query workspaces (worker.QUERY_DIRS, the spill prefix).
-_PRIVATE_NAMES = ("classifyre-queries", "classifyre-query-")
+
+@cache
+def _denylist() -> dict[str, list[str]]:
+    """``packages/schemas/src/schemas/local_folder_denylist.json``: the one list
+    the API checks too (``apps/api/src/utils/local-folder-path.ts``)."""
+    import schemas
+
+    path = Path(schemas.__file__).parent / "local_folder_denylist.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    return {key: [str(v) for v in data.get(key) or []] for key in data if key != "description"}
 
 
 class LocalRootRefusedError(ValueError):
@@ -70,13 +60,18 @@ def refuse_local_root(path: str, reader: str = "queries") -> None:
     """Raise :class:`LocalRootRefusedError` when ``path`` may not be read."""
     real = _real(path)
     refused = f"The folder {path} may not be read by {reader}"
-    temp_roots = {_real(p) for p in (*_CONTAINS_NOT, tempfile.gettempdir())}
+    deny = _denylist()
+    temp_roots = {_real(p) for p in (*deny["containsNot"], tempfile.gettempdir())}
     if any(_within(root, real) for root in temp_roots):
         raise LocalRootRefusedError(f"{refused}: it holds temporary files of other work.")
-    if any(_within(real, _real(p)) or _within(_real(p), real) for p in _INSIDE_NOT):
+    if any(_within(real, _real(p)) or _within(_real(p), real) for p in deny["insideNot"]):
         raise LocalRootRefusedError(f"{refused}: it is part of the system or of Classifyre.")
-    if any(part.startswith(_PRIVATE_NAMES) for part in real.parts):
+    if any(part.startswith(tuple(deny["privateNames"])) for part in real.parts):
         raise LocalRootRefusedError(f"{refused}: it is a query's private directory.")
+    for name in deny["protectedPathEnv"]:
+        named = os.environ.get(name, "").strip()
+        if named and _within(_real(named), real):
+            raise LocalRootRefusedError(f"{refused}: it holds Classifyre's keys ({name}).")
     allowed = allowed_roots()
     if allowed is not None and not any(_within(real, _real(root)) for root in allowed):
         raise LocalRootRefusedError(

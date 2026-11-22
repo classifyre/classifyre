@@ -1,27 +1,37 @@
+import * as fs from 'node:fs';
+import { tmpdir } from 'node:os';
 import { posix } from 'node:path';
+import { resolveSchemaFile } from './schema-path';
 
 /**
- * Folders a Mounted Folder source may never point at (the same list as the
- * CLI's apps/cli/src/utils/local_roots.py, which checks again at every scan
- * and query): the system's view of the machine, temporary files of other
- * work, and the image's own state — /var/lib/classifyre holds the key that
+ * Folders a Mounted Folder source may never point at: the one list in
+ * packages/schemas/src/schemas/local_folder_denylist.json, which the CLI
+ * (apps/cli/src/utils/local_roots.py) checks again at every scan and query,
+ * against the mounted folders too. /var/lib/classifyre holds the key that
  * decrypts every workspace's source credentials (re-review 2026-11-22).
  */
-const CONTAINS_NOT = ['/tmp', '/var/tmp', '/dev/shm'];
-const INSIDE_NOT = [
-  '/proc',
-  '/sys',
-  '/dev',
-  '/etc',
-  '/run',
-  '/var/run',
-  '/root',
-  '/var/lib/classifyre',
-  '/var/lib/postgresql',
-  '/app',
-  '/opt',
-  '/cache',
-];
+interface Denylist {
+  containsNot: string[];
+  insideNot: string[];
+  privateNames: string[];
+  protectedPathEnv: string[];
+}
+
+let denylist: Denylist | undefined;
+
+function loadDenylist(): Denylist {
+  denylist ??= JSON.parse(
+    fs.readFileSync(
+      resolveSchemaFile(__dirname, 'local_folder_denylist.json'),
+      'utf8',
+    ),
+  ) as Denylist;
+  return denylist;
+}
+
+function normal(raw: string): string {
+  return posix.normalize(raw.trim()).replace(/\/+$/, '') || '/';
+}
 
 function within(path: string, root: string): boolean {
   return (
@@ -30,15 +40,34 @@ function within(path: string, root: string): boolean {
 }
 
 /** Why a source may not read this folder, or null when it may. */
-export function localFolderRefusal(raw: string): string | null {
-  const path = posix.normalize(raw.trim()).replace(/\/+$/, '') || '/';
+export function localFolderRefusal(
+  raw: string,
+  env: Record<string, string | undefined> = process.env,
+): string | null {
+  const path = normal(raw);
   if (!path.startsWith('/')) return null; // the run refuses a relative path
+  const deny = loadDenylist();
   const refused = `The folder ${raw} cannot be a source`;
-  if (CONTAINS_NOT.some((root) => within(root, path))) {
+  if (
+    [...deny.containsNot, normal(tmpdir())].some((root) => within(root, path))
+  ) {
     return `${refused}: it holds temporary files of other work.`;
   }
-  if (INSIDE_NOT.some((root) => within(path, root) || within(root, path))) {
+  if (deny.insideNot.some((root) => within(path, root) || within(root, path))) {
     return `${refused}: it is part of the system or of Classifyre.`;
+  }
+  if (
+    path
+      .split('/')
+      .some((part) => deny.privateNames.some((name) => part.startsWith(name)))
+  ) {
+    return `${refused}: it is a query's private directory.`;
+  }
+  for (const name of deny.protectedPathEnv) {
+    const named = env[name]?.trim();
+    if (named && named.startsWith('/') && within(normal(named), path)) {
+      return `${refused}: it holds Classifyre's keys (${name}).`;
+    }
   }
   return null;
 }
