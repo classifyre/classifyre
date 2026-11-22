@@ -177,6 +177,82 @@ export function generateBreadcrumbSchema(
   };
 }
 
+/** TechArticle structured data for evergreen governance & comparison pages (SEO + AI search). */
+export function generateTechArticleSchema({
+  siteUrl,
+  path,
+  headline,
+  description,
+  locale = "en",
+  keywords,
+  dateModified = "2026-11-22",
+}: {
+  siteUrl: string;
+  path: string;
+  headline: string;
+  description: string;
+  locale?: "en" | "de";
+  keywords?: readonly string[];
+  dateModified?: string;
+}): SiteLikeSchema {
+  return {
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
+    "@id": `${siteUrl}${path}#article`,
+    headline,
+    description,
+    url: `${siteUrl}${path}`,
+    inLanguage: locale === "de" ? "de" : "en",
+    datePublished: "2026-11-01",
+    dateModified,
+    ...(keywords?.length ? { keywords: keywords.join(", ") } : {}),
+    author: { "@type": "Organization", "@id": `${siteUrl}/#organization`, name: "Classifyre" },
+    publisher: { "@type": "Organization", "@id": `${siteUrl}/#organization`, name: "Classifyre" },
+    mainEntityOfPage: { "@type": "WebPage", "@id": `${siteUrl}${path}` },
+  };
+}
+
+/** AboutPage structured data for the About Classifyre page. */
+export function generateAboutPageSchema(
+  siteUrl: string,
+  path: string,
+  locale: "en" | "de" = "en",
+): SiteLikeSchema {
+  return {
+    "@context": "https://schema.org",
+    "@type": "AboutPage",
+    "@id": `${siteUrl}${path}#about`,
+    url: `${siteUrl}${path}`,
+    name: locale === "de" ? "Über Classifyre" : "About Classifyre",
+    inLanguage: locale === "de" ? "de" : "en",
+    mainEntity: { "@type": "Organization", "@id": `${siteUrl}/#organization` },
+  };
+}
+
+/** ContactPage structured data for the Support & Tailoring page. */
+export function generateContactPageSchema(
+  siteUrl: string,
+  path: string,
+  locale: "en" | "de" = "en",
+): SiteLikeSchema {
+  return {
+    "@context": "https://schema.org",
+    "@type": "ContactPage",
+    "@id": `${siteUrl}${path}#contact`,
+    url: `${siteUrl}${path}`,
+    name:
+      locale === "de"
+        ? "Classifyre Support & individuelle Anpassung"
+        : "Classifyre Support & Tailored Deployments",
+    inLanguage: locale === "de" ? "de" : "en",
+    mainEntity: {
+      "@type": "Organization",
+      "@id": `${siteUrl}/#organization`,
+      email: "contact@classifyre.com",
+    },
+  };
+}
+
 /** The site's public origin, from the build environment. */
 export function siteOrigin(): string {
   return normalizeSiteUrl(

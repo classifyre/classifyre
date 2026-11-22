@@ -52,7 +52,7 @@ export function SectionShell({
           ? "cl-bleed rounded-none border-0"
           : "rounded-[8px] border-2 border-border",
         tone === "signal"
-          ? "bg-foreground text-primary-foreground"
+          ? "bg-black text-white"
           : "bg-background text-foreground",
         className,
       )}
@@ -115,7 +115,7 @@ export function SectionHead({
               className={cn(
                 "max-w-2xl text-base leading-7",
                 tone === "signal"
-                  ? "text-primary-foreground/72"
+                  ? "text-white/75"
                   : "text-muted-foreground",
               )}
             >
@@ -141,12 +141,13 @@ export function DocsLink({
   return (
     <Button
       asChild
-      variant="secondary"
+      size="lg"
+      variant="ghost"
       className={cn(
-        "border-2",
+        "border-2 font-mono text-[11px] font-bold uppercase tracking-[0.16em]",
         tone === "signal"
-          ? "border-primary-foreground/25 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/16"
-          : "border-border",
+          ? "border-white/35 bg-white/10 text-white hover:border-accent hover:bg-white/15 hover:text-accent"
+          : "border-foreground/80 bg-background text-foreground hover:border-accent hover:bg-accent hover:text-black",
       )}
     >
       <a href={href} target="_blank" rel="noreferrer">

@@ -140,6 +140,7 @@ export default async function RootLayout({
                 browser from `/` to `/de/` before first paint. `/de/…` URLs
                 and explicit cookie choices are never touched. */}
             <LocaleRedirectHeadScript/>
+            <link rel="alternate" type="text/plain" href="/llms.txt" title="LLMs.txt" />
             <link rel="dns-prefetch" href="//fonts.googleapis.com"/>
             <link
                 rel="preconnect"

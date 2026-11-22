@@ -491,7 +491,7 @@ const de: LandingCopy = {
     ],
     tailoringTitle: "Classifyre passgenau auf Ihre Organisation abstimmen?",
     tailoringLede:
-      "Es gibt keine separate Enterprise-Edition mit gesperrten Funktionen. Betreiben Sie alles selbst – oder starten Sie mit unserem Engineering-Team in einem 4- bis 6-wöchigen Piloten.",
+      "Es gibt keine separate Enterprise-Edition mit gesperrten Funktionen. Betreiben Sie alles selbst – oder arbeiten Sie direkt mit unserem Engineering-Team zu individuell vereinbartem Umfang passend zu Ihrer Infrastruktur, Sicherheitsarchitektur und Ihren Zielen.",
     ctaPrimary: "Mit uns sprechen",
     ctaSecondary: "Installationsleitfaden",
     ctaShowcase: "Live-Demo ansehen",

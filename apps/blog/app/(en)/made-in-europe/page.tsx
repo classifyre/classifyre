@@ -12,6 +12,12 @@ import {
 } from "@/components/page-kit";
 import { Reveal } from "@/components/reveal";
 import {
+  JsonLdScripts,
+  generateAboutPageSchema,
+  generateBreadcrumbSchema,
+  siteOrigin,
+} from "@/lib/seo";
+import {
   contactEmail,
   docs,
   repoUrl,
@@ -125,8 +131,20 @@ const coordinates: readonly { label: string; value: string; accent?: boolean }[]
 ];
 
 export default function MadeInEuropePage() {
+  const siteUrl = siteOrigin();
+
   return (
-    <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 sm:px-6 lg:px-8">
+    <>
+      <JsonLdScripts
+        schemas={[
+          generateBreadcrumbSchema(siteUrl, [
+            { name: "Classifyre", path: "/" },
+            { name: "About", path: "/made-in-europe/" },
+          ]),
+          generateAboutPageSchema(siteUrl, "/made-in-europe/", "en"),
+        ]}
+      />
+      <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 sm:px-6 lg:px-8">
       <PageHero
         eyebrow="About Classifyre"
         title={
@@ -159,8 +177,8 @@ export default function MadeInEuropePage() {
             <Button
               asChild
               size="lg"
-              variant="secondary"
-              className="border-2 border-white/20 bg-white/10 text-white hover:bg-white/16"
+              variant="ghost"
+              className="border-2 border-white/35 bg-white/10 font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-white hover:border-accent hover:bg-white/15 hover:text-accent"
             >
               <a href={repoUrl} target="_blank" rel="noreferrer">
                 View source on GitHub
@@ -293,8 +311,8 @@ export default function MadeInEuropePage() {
               <Button
                 asChild
                 size="lg"
-                variant="secondary"
-                className="border-2 border-white/20 bg-white/10 text-white hover:bg-white/16"
+                variant="ghost"
+                className="border-2 border-white/35 bg-white/10 font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-white hover:border-accent hover:bg-white/15 hover:text-accent"
               >
                 <a href={`mailto:${contactEmail}`}>{contactEmail}</a>
               </Button>
@@ -302,7 +320,7 @@ export default function MadeInEuropePage() {
                 href={showcaseUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="font-mono text-[11px] uppercase tracking-[0.14em] text-white/60 underline-offset-4 hover:text-accent hover:underline"
+                className="font-mono text-[11px] uppercase tracking-[0.14em] text-white/75 underline-offset-4 hover:text-accent hover:underline"
               >
                 Explore live demo →
               </a>
@@ -310,6 +328,7 @@ export default function MadeInEuropePage() {
           </div>
         </SectionShell>
       </section>
-    </main>
+      </main>
+    </>
   );
 }

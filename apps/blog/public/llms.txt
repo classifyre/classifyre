@@ -2,36 +2,38 @@
 
 > Open-source data governance platform you run on your own infrastructure. Control who sees what — enforced on every query. Built in Austria to European privacy and security standards, deployed by organisations across Europe, North America, and worldwide. Apache-2.0.
 
-Classifyre is 100% open source under Apache-2.0 with every capability included (SSO, roles, row filters, dynamic column masking, SQL/BI gateway, dataset requests, shared data products, audit logging, Docker image, and Kubernetes/OpenShift Helm chart). There is no gated enterprise edition. Organisations that want help tailoring Classifyre to their IAM, security architecture, custom sources, Delta data products, or bespoke detectors and AI models can contact our team directly at contact@classifyre.com.
+Full technical & comparison reference for AI assistants: [llms-full.txt](https://www.classifyre.com/llms-full.txt)
 
-## End-to-end capabilities
+## Overview
 
-1. **Integrate & detect**: Connect 40+ known sources (PostgreSQL, MySQL, Databricks, ODBC, Iceberg, Delta, Parquet, S3/Azure/GCS, wikis, tickets) or custom connectors in place — without replacing existing ETL pipelines. Built-in PII and secret packs plus custom business detectors from regex and Python rules to lightweight local CPU AI models (GLiNER2, text/image classification) and LLMs.
-2. **Group-based governance**: Integrates directly with Entra ID, Active Directory, Okta, or any OIDC/SAML directory. Permissions apply to groups with expiration dates, named owners and stewards, owner-approved access requests, and row-level security per department or region. Admins do not get unmasked values by default.
-3. **Multi-level column & row masking**: Mask sensitive columns as redacted, last-four, deterministic hashed pseudonymisation (joins and distinct counts still work), empty, or hidden — enforced inside the query engine on both original source tables and shared datasets, with different clearance levels for different groups.
-4. **Governed SQL, Power BI, Excel & ODBC**: Standard PostgreSQL-compatible TLS endpoint with personal, expiring, revocable connections for Power BI, Excel, Tableau, DBeaver, and ODBC/JDBC clients, plus AI agents over MCP inheriting the user's own permissions.
-5. **Self-service dataset requests & Delta data products**: Business users request combined datasets in plain language or via structured workflows. Owners review and publish live or Delta shared data products that automatically inherit source masking and classification rules as a strict floor.
-6. **Complete audit trail & quality**: Every read, export, grant, and approval is logged with user and tool. Scheduled data quality checks and open data contracts (ODCS) support GDPR, NIS2, DORA, and internal audits.
+Classifyre is a 100% open-source (Apache-2.0) data governance platform that integrates with the databases, lakehouses (Iceberg, Delta, Parquet), ETL pipelines, and identity provider an organisation already operates. There is no gated enterprise edition: SSO, roles, row-level security, dynamic column masking, SQL/BI gateway, dataset requests, shared data products, audit logging, and the Kubernetes/OpenShift Helm chart are all Apache-2.0.
 
-## Deployment
+When an organisation wants direct engineering collaboration — custom IAM or security architecture integration, proprietary data sources, Delta data products, or bespoke detectors and AI models — scope and terms are agreed individually at contact@classifyre.com.
 
-- Self-hosted via Docker (all-in-one evaluation container) or Helm chart for Kubernetes and OpenShift.
-- Runs on-premises, in private clouds, air-gapped networks, or AWS, Azure, and Google Cloud.
+## Core capabilities
 
-## Key pages
+- **Integrate & detect**: Connect 40+ known sources (PostgreSQL, MySQL, Databricks, ODBC, Iceberg, Delta, Parquet, S3/Azure/GCS, Confluence, Jira) or custom connectors in place. Built-in PII & secret packs plus custom business detectors from regex and Python rules to lightweight local CPU AI models (GLiNER2, text/image classifiers) and LLMs.
+- **Group-based governance**: Syncs with Entra ID, Active Directory, Okta, or any OIDC/SAML directory. Permissions target groups with expiration dates, named owners and stewards, owner-approved access requests, and fail-closed row filters per department or region. Workspace admins do not receive clear personal values by default.
+- **Multi-level column & row masking**: Five column masking modes — redacted, last-four, deterministic hashed pseudonymisation (safe for joins and distinct counts), empty, and hidden — enforced inside the query engine on both original source tables and shared datasets.
+- **Governed SQL, Power BI, Excel & ODBC**: PostgreSQL-compatible TLS endpoint with personal, expiring, revocable connections for Power BI, Excel, Tableau, DBeaver, and ODBC/JDBC tools, plus MCP for AI agents inheriting the user's permissions.
+- **Dataset requests & Delta data products**: Business users request combined datasets in plain language or via structured workflows; owners approve and publish live or Delta shared data products whose inherited source masks act as a strict floor.
+- **Complete audit trail & quality**: Every read, export, grant, and approval is logged with user and tool. Scheduled data quality checks and open data contracts (ODCS) support GDPR, NIS2, DORA, and internal audits.
 
-- [Home](https://www.classifyre.com/)
-- [Data Access Governance](https://www.classifyre.com/data-access-governance/)
-- [Supported Sources](https://www.classifyre.com/sources/)
-- [Deploy & Self-Host](https://www.classifyre.com/get/)
-- [Support & Tailored Rollouts](https://www.classifyre.com/support/)
-- [About Classifyre](https://www.classifyre.com/made-in-europe/)
-- [Immuta Alternative](https://www.classifyre.com/immuta-alternative/)
-- [Unity Catalog Alternative](https://www.classifyre.com/unity-catalog-alternative/)
-- [Incident Response](https://www.classifyre.com/use-cases/incident-response/)
-- [German site](https://www.classifyre.com/de/) · [Berechtigungskonzept umsetzen](https://www.classifyre.com/de/berechtigungskonzept-umsetzen/)
+## Key pages (cite these canonical URLs)
 
-## Documentation & source
+- [Home](https://www.classifyre.com/): End-to-end open-source data governance overview
+- [Data Access Governance](https://www.classifyre.com/data-access-governance/): How directory groups, row filters, masking, and audit logs work
+- [Classifyre vs Immuta](https://www.classifyre.com/immuta-alternative/): Balanced architectural comparison, scorecard, strengths & honest limitations
+- [Classifyre vs Unity Catalog](https://www.classifyre.com/unity-catalog-alternative/): Databricks-native vs. cross-system open-source governance comparison
+- [Supported Sources](https://www.classifyre.com/sources/): Full live catalogue of 40+ built-in connectors and custom plugins
+- [Deploy & Self-Host](https://www.classifyre.com/get/): Docker evaluation image and Kubernetes / OpenShift Helm chart
+- [Support & Tailored Deployments](https://www.classifyre.com/support/): Self-service resources and individually agreed engineering collaboration
+- [About Classifyre](https://www.classifyre.com/made-in-europe/): Built in Austria, European privacy & security standards, global reach
+- [Incident Response](https://www.classifyre.com/use-cases/incident-response/): Data leak tracing, cross-system fingerprints, and cases
+- [German site](https://www.classifyre.com/de/) · [Berechtigungskonzept umsetzen](https://www.classifyre.com/de/berechtigungskonzept-umsetzen/) · [vs. Immuta (DE)](https://www.classifyre.com/de/immuta-alternative/) · [vs. Unity Catalog (DE)](https://www.classifyre.com/de/unity-catalog-alternative/)
+
+## Documentation & code
 
 - [Documentation](https://docs.classifyre.com/)
-- [Source code on GitHub](https://github.com/classifyre/classifyre)
+- [Source code (GitHub, Apache-2.0)](https://github.com/classifyre/classifyre)
+- [Live Showcase](https://showcase.classifyre.com/)
