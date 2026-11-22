@@ -16,7 +16,10 @@ Fixed random seed 7, so every run makes the same data:
 * S3: 200,000 orders as Parquet, ``s3://lake/tables/connectors/orders.parquet``
   (the lab's S3 source reads ``tables/``);
 * Neo4j: 5,000 ``Person {id}`` (the customers), 20,000 ``Movie {id, title}``
-  and 50,000 ``RATED {stars}`` from a person to a film.
+  and 50,000 ``RATED {stars}`` from a person to a film;
+* a CUSTOM source, ``sources/support.json``, written from
+  ``seed/support_notebook.py``: the customers' support tickets, read by its
+  notebook's ``scan()`` (QC4).
 
 ``queries/connectors/expected.json``: each ``queries/connectors/*.sql`` run by
 a plain DuckDB over the same generated rows, under the same table names: the
@@ -192,6 +195,59 @@ def load_neo4j(data: dict[str, list[dict[str, Any]]]) -> None:
 # ── the expected answers ───────────────────────────────────────────────
 
 
+SUPPORT_NOTEBOOK = HERE / "seed" / "support_notebook.py"
+SUPPORT_SOURCE = HERE / "sources" / "support.json"
+
+
+def write_support_source() -> None:
+    """``sources/support.json``: the notebook as one code cell."""
+    body = {
+        "type": "CUSTOM",
+        "name": "Lab · Support",
+        "config": {
+            "type": "CUSTOM",
+            "required": {
+                "notebook": {
+                    "revision": 1,
+                    "cells": [
+                        {
+                            "id": "support-desk",
+                            "type": "code",
+                            "source": SUPPORT_NOTEBOOK.read_text(encoding="utf-8"),
+                        }
+                    ],
+                }
+            },
+            "masked": {"secrets": {}},
+            "optional": {"variables": {}},
+            "sampling": {"strategy": "ALL"},
+        },
+    }
+    SUPPORT_SOURCE.write_text(json.dumps(body, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
+def support_tickets() -> list[dict[str, Any]]:
+    """Every ticket, from the notebook's own generator (run here with a
+    stand-in for the SDK it imports)."""
+    import types
+
+    sdk = types.ModuleType("classifyre")
+    for name in ("Asset", "ScanRefusedError", "Table"):
+        setattr(sdk, name, type(name, (Exception,), {}))
+    previous = sys.modules.get("classifyre")
+    sys.modules["classifyre"] = sdk
+    try:
+        scope: dict[str, Any] = {}
+        exec(compile(SUPPORT_NOTEBOOK.read_text(encoding="utf-8"), str(SUPPORT_NOTEBOOK), "exec"), scope)
+    finally:
+        if previous is None:
+            sys.modules.pop("classifyre", None)
+        else:
+            sys.modules["classifyre"] = previous
+    rows = [t for c in range(1, scope["CUSTOMERS"] + 1) for t in scope["tickets_for"](c)]
+    return [{**t, "opened": datetime.date.fromisoformat(t["opened"])} for t in rows]
+
+
 def expected(data: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
     """Every query over the generated rows in a plain DuckDB, same names."""
     import duckdb
@@ -208,6 +264,7 @@ def expected(data: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
         ("lab_meilisearch", "indexes", "movies"): movies,
         ("lab_shop", "public", "customers"): data["customers"],
         ("lab_neo4j", "relationships", "rated"): rated,
+        ("lab_support", "main", "tickets"): support_tickets(),
     }
     for (catalog, schema, table), rows in tables.items():
         conn.execute(f"ATTACH IF NOT EXISTS ':memory:' AS {catalog}")
@@ -247,6 +304,7 @@ def main() -> None:
     parser.add_argument("--expected", action="store_true", help="only write expected.json")
     args = parser.parse_args()
     data = generate()
+    write_support_source()
     if not args.expected:
         load_meilisearch(data["movies"])
         load_postgres(data["customers"])
