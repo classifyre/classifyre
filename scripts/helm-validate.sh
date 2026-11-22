@@ -13,6 +13,8 @@ HELM_COMMON_ARGS=(
   # generates a random key on every render.
   --set "api.internalApiKey.value=${CLASSIFYRE_INTERNAL_KEY:-snapshot-classifyre-internal-key-0001}"
   --set "ingress.host=validate.example.com"
+  # The query worker's NetworkPolicy needs the cluster's networks (k3s's here).
+  --set "queryWorker.networkPolicy.clusterCidrs={10.42.0.0/16,10.43.0.0/16}"
 )
 
 if ! command -v helm >/dev/null 2>&1; then

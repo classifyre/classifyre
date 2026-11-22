@@ -29,6 +29,10 @@ HELM_COMMON_ARGS=(
   --set "api.internalApiKey.value=${CLASSIFYRE_INTERNAL_KEY:-snapshot-classifyre-internal-key-0001}"
   # Sign-in is always on, and it needs the address people open Classifyre at.
   --set "ingress.host=snapshot.example.com"
+  # The query worker's NetworkPolicy needs the cluster's networks (k3s's here).
+  --set "queryWorker.networkPolicy.clusterCidrs={10.42.0.0/16,10.43.0.0/16}"
+  # Fixed, or the chart generates a new worker token on every render.
+  --set "queryWorker.token.value=${QUERY_WORKER_TOKEN:-snapshot-query-worker-token-0001}"
 )
 
 while [[ $# -gt 0 ]]; do

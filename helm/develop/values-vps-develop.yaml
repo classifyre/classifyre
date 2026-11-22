@@ -128,3 +128,12 @@ iam:
       memory: 512Mi
     limits:
       memory: 1Gi
+
+# The query worker's NetworkPolicy needs the cluster's networks (the render
+# fails without them): the VPS is a single-node k3s, with k3s's default pod
+# and service networks.
+queryWorker:
+  networkPolicy:
+    clusterCidrs:
+      - 10.42.0.0/16
+      - 10.43.0.0/16
