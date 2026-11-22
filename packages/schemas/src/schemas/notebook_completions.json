@@ -52,10 +52,17 @@
       "insertText": "FlowType"
     },
     {
+      "label": "ScanRefusedError",
+      "kind": "class",
+      "detail": "raise ScanRefusedError(\"companies needs WHERE fnr = ...\")",
+      "documentation": "Raise it from ``scan()`` to refuse a query with a message of your own.\n\nThe message is shown to whoever ran the query, so write it for them\n(*\"companies needs WHERE fnr = ...\"*) and keep values out of it. Any other\nexception fails the query with only its type and line: its text may hold\nthe values it was raised over, and goes to the query's log instead.",
+      "insertText": "ScanRefusedError"
+    },
+    {
       "label": "Table",
       "kind": "class",
       "detail": "Table(name, {\"column\": \"VARCHAR\", ...}, description=\"\")",
-      "documentation": "One table a query can read from this source.\n\n``columns`` maps each column to its type: ``VARCHAR``, ``BIGINT``,\n``INTEGER``, ``DOUBLE``, ``BOOLEAN``, ``DATE``, ``TIMESTAMP``,\n``TIMESTAMPTZ``, ``JSON`` (objects and lists as JSON text), or a list of\none of them (``VARCHAR[]``). The table is ``<source>.main.<name>`` in SQL\n(``schema`` picks another middle part).",
+      "documentation": "One table a query can read from this source.\n\n``columns`` maps each column to its type: ``VARCHAR``, ``BIGINT``,\n``INTEGER``, ``DOUBLE``, ``BOOLEAN``, ``DATE``, ``TIMESTAMP``,\n``TIMESTAMPTZ``, ``JSON`` (objects and lists as JSON text), or a list of\none of them (``VARCHAR[]``). The table is ``<source>.main.<name>`` in SQL\n(``schema`` picks another middle part).\n\n``classify`` says what a column holds: ``{\"birth_date\": \"personal\"}``. A\nquery's rows are never scanned for personal data, so this (or a steward)\nis what masks a column by default: ``personal`` and ``sensitive`` are\nmasked, ``secret`` hidden, for people who do not read the table in clear.",
       "insertText": "Table"
     },
     {
@@ -1090,7 +1097,7 @@
       ]
     },
     "Table": {
-      "documentation": "One table a query can read from this source.\n\n``columns`` maps each column to its type: ``VARCHAR``, ``BIGINT``,\n``INTEGER``, ``DOUBLE``, ``BOOLEAN``, ``DATE``, ``TIMESTAMP``,\n``TIMESTAMPTZ``, ``JSON`` (objects and lists as JSON text), or a list of\none of them (``VARCHAR[]``). The table is ``<source>.main.<name>`` in SQL\n(``schema`` picks another middle part).",
+      "documentation": "One table a query can read from this source.\n\n``columns`` maps each column to its type: ``VARCHAR``, ``BIGINT``,\n``INTEGER``, ``DOUBLE``, ``BOOLEAN``, ``DATE``, ``TIMESTAMP``,\n``TIMESTAMPTZ``, ``JSON`` (objects and lists as JSON text), or a list of\none of them (``VARCHAR[]``). The table is ``<source>.main.<name>`` in SQL\n(``schema`` picks another middle part).\n\n``classify`` says what a column holds: ``{\"birth_date\": \"personal\"}``. A\nquery's rows are never scanned for personal data, so this (or a steward)\nis what masks a column by default: ``personal`` and ``sensitive`` are\nmasked, ``secret`` hidden, for people who do not read the table in clear.",
       "fields": [
         {
           "label": "name",
@@ -1119,6 +1126,39 @@
           "detail": "str",
           "required": false,
           "insertText": "schema="
+        },
+        {
+          "label": "classify",
+          "kind": "field",
+          "detail": "Mapping[str, str]",
+          "required": false,
+          "insertText": "classify="
+        }
+      ]
+    },
+    "Filter": {
+      "documentation": "A condition every row the query keeps meets.\n\n``op`` is one of ``=``, ``!=``, ``<``, ``<=``, ``>``, ``>=`` or ``in``\n(then ``value`` is a tuple). Values are typed: a date is a\n``datetime.date``, a timestamp a ``datetime.datetime``.",
+      "fields": [
+        {
+          "label": "column",
+          "kind": "field",
+          "detail": "str",
+          "required": true,
+          "insertText": "column="
+        },
+        {
+          "label": "op",
+          "kind": "field",
+          "detail": "Op",
+          "required": true,
+          "insertText": "op="
+        },
+        {
+          "label": "value",
+          "kind": "field",
+          "detail": "Any",
+          "required": true,
+          "insertText": "value="
         }
       ]
     },

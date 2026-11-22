@@ -3492,7 +3492,7 @@
                 {
                   "id": "intro",
                   "type": "markdown",
-                  "source": "# Custom connector\n\nCells run top to bottom in a fresh process on every execution -- there is no\npersistent kernel, so state is rebuilt from these cells each time.\n\nThis notebook must define `test_connection()` and `extract()`. It may also\ndefine `discover()` and `fetch_content(asset_id)`.\n\nConfiguration comes from `ctx`:\n\n- `ctx.var(\"name\")` -- a value from **Variables**\n- `ctx.secret(\"name\")` -- a value from **Secrets** (encrypted, redacted from output)\n- `ctx.strategy` / `ctx.limit` / `ctx.offset` -- this run's sampling. Every\n  strategy works without you doing anything; pushing these into your own query\n  just makes it cheaper. Under LATEST, \"latest\" means whatever you yield first.\n  Reading `ctx.offset` means you apply it yourself and the runtime stops skipping.\n- `ctx.should_abort` -- check it in long loops so Stop can work.\n"
+                  "source": "# Custom connector\n\nCells run top to bottom in a fresh process on every execution -- there is no\npersistent kernel, so state is rebuilt from these cells each time.\n\nThis notebook must define `test_connection()` and `extract()`. It may also\ndefine `discover()` and `fetch_content(asset_id)`, and `tables()` with\n`scan(table, request)` to make the source queryable with SQL (see the last cell).\n\nConfiguration comes from `ctx`:\n\n- `ctx.var(\"name\")` -- a value from **Variables**\n- `ctx.secret(\"name\")` -- a value from **Secrets** (encrypted, redacted from output)\n- `ctx.strategy` / `ctx.limit` / `ctx.offset` -- this run's sampling. Every\n  strategy works without you doing anything; pushing these into your own query\n  just makes it cheaper. Under LATEST, \"latest\" means whatever you yield first.\n  Reading `ctx.offset` means you apply it yourself and the runtime stops skipping.\n- `ctx.should_abort` -- check it in long loops so Stop can work.\n"
                 },
                 {
                   "id": "imports",
@@ -3508,6 +3508,11 @@
                   "id": "extract",
                   "type": "code",
                   "source": "def extract():\n    \"\"\"Yield Asset(...) objects. Runs on every scan.\"\"\"\n    yield Asset(\n        id=\"example-1\",\n        name=\"Example record\",\n        url=\"https://example.com/records/1\",\n        content=\"Hello from a custom connector.\",\n        kind=\"record\",\n        metadata={\"origin\": \"scaffold\"},\n    )\n"
+                },
+                {
+                  "id": "sql-tables",
+                  "type": "code",
+                  "source": "# SQL over this source (optional): define both functions to make the source\n# queryable on the Query data page, over SQL connections and MCP. A scan\n# records the tables; each query then calls scan() for the rows it needs.\n#\n# from classifyre import ScanRefusedError, Table\n#\n#\n# def tables():\n#     return [\n#         Table(\n#             \"records\",\n#             {\"id\": \"VARCHAR\", \"title\": \"VARCHAR\", \"updated\": \"DATE\"},\n#             description=\"One row per record. Needs WHERE id = ... or id IN (...).\",\n#             classify={\"title\": \"personal\"},  # masked by default for others\n#         ),\n#     ]\n#\n#\n# def scan(table, request):\n#     ids = request.values(\"id\")  # the ids the query asks for, or None\n#     if ids is None:\n#         raise ScanRefusedError(\"records needs WHERE id = '...' or id IN (...)\")\n#     for record_id in ids:\n#         request.count_request()\n#         yield {\"id\": record_id, \"title\": \"Example record\", \"updated\": \"2026-01-31\"}\n"
                 }
               ]
             }

@@ -27,7 +27,7 @@ import sys
 import tempfile
 import threading
 import time
-from collections.abc import AsyncGenerator, Iterator, Mapping
+from collections.abc import AsyncGenerator, Generator, Mapping
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -48,6 +48,7 @@ from ...models.generated_single_asset_scan_results import (
 from ...notebook.contract import NotebookContractError, validate_notebook
 from ...notebook.groups import warm_declared_groups
 from ...notebook.packages import install as install_packages
+from ...notebook.query import ScanCall
 from ...outputs.rest import internal_key_headers
 from ...utils.hashing import hash_id, unhash_id
 from ...utils.redaction import Redactor, redact_generic
@@ -82,6 +83,10 @@ ASSET_QUERY_TIMEOUT_SECONDS = 60
 
 class CustomSourceError(RuntimeError):
     """The notebook could not be loaded or run."""
+
+
+class NotebookTimeoutError(CustomSourceError):
+    """A query's deadline passed while the notebook was still scanning."""
 
 
 class CustomSource(BaseSource):
@@ -496,7 +501,7 @@ class CustomSource(BaseSource):
         self._start()
         # The tables a query can read, first: a run stopped or windowed early
         # still records them (docs/prd/QC-query-connectors.md §5.8).
-        tables = [asset for asset in self._table_assets() if asset is not None]
+        tables = self._table_assets()
         if tables:
             yield tables
         self._send(
@@ -563,7 +568,7 @@ class CustomSource(BaseSource):
         if not self._aborted and self._notebook_defines("augment_sources"):
             self._augment()
 
-    def _table_assets(self) -> list[SingleAssetScanResults | None]:
+    def _table_assets(self) -> list[SingleAssetScanResults]:
         """One ``table`` asset per table ``tables()`` declares (with ``scan()``).
 
         Its columns are the table's schema for SQL; its rows are read live by
@@ -572,7 +577,7 @@ class CustomSource(BaseSource):
         if not (self._notebook_defines("tables") and self._notebook_defines("scan")):
             return []
         declared = self._call("tables") or []
-        return [
+        assets = [
             self._to_scan_result(
                 {
                     "id": f"sql-table:{table['schema']}.{table['name']}",
@@ -596,40 +601,22 @@ class CustomSource(BaseSource):
             for table in declared
             if isinstance(table, dict)
         ]
+        return [asset for asset in assets if asset is not None]
 
-    def query_scan(
-        self,
-        table: str,
-        *,
-        columns: list[tuple[str, str]],
-        read: list[str] | None,
-        filters: list[dict[str, Any]],
-        max_rows: int,
-        deadline: float,
-        outcome: dict[str, Any],
-    ) -> Iterator[Any]:
+    def query_scan(self, call: ScanCall, deadline: float) -> Generator[Any, None, dict[str, Any]]:
         """Run ``scan(table, request)`` for a query; yield its Arrow batches.
 
-        ``outcome`` is filled at the end with what the notebook reported (the
-        filters it used, the requests it made). A scan the query stops reading
-        early (a ``LIMIT``) leaves the child mid-stream, so it is stopped: the
-        next scan starts a fresh one rather than reading the old one's rows.
+        Returns what the notebook reported at the end (``used``: the filters
+        it sent to its source, ``requests``: the calls it counted). A scan the
+        query stops reading early (a ``LIMIT``) leaves the child mid-stream,
+        so it is stopped: the next scan starts a fresh one rather than reading
+        the old one's rows.
         """
         from ...notebook.query import batch_from_wire
 
         self._query_mode = True
         self._start()
-        self._send(
-            {
-                "command": "scan",
-                "table": table,
-                "columns": [list(c) for c in columns],
-                "read": read,
-                "filters": filters,
-                "maxRows": max_rows,
-                "secondsLeft": max(0.0, deadline - time.monotonic()),
-            }
-        )
+        self._send(call.to_wire())
         finished = False
         # The deadline stops the child rather than timing out a read: frames
         # already in this process's read buffer are invisible to select(), so
@@ -651,7 +638,7 @@ class CustomSource(BaseSource):
                     frame = self._read_frame()
                 except CustomSourceError:
                     if expired:
-                        raise CustomSourceError(
+                        raise NotebookTimeoutError(
                             "The query ran out of time reading the notebook."
                         ) from None
                     raise
@@ -659,12 +646,15 @@ class CustomSource(BaseSource):
                 if kind == "rows":
                     yield batch_from_wire(str(frame.get("ipc") or ""))
                 elif kind == "end":
-                    outcome.update(frame)
                     finished = True
-                    return
+                    return frame
                 elif kind == "error":
                     finished = True
-                    raise CustomSourceError(self._safe(_describe(frame.get("error"))))
+                    error = frame.get("error")
+                    if isinstance(error, dict) and error.get("type") == "ScanFailedError":
+                        # Already cut to what may be shown (runner.py, scan).
+                        raise CustomSourceError(self._safe(str(error.get("message") or "")))
+                    raise CustomSourceError(self._safe(_describe(error)))
                 elif kind == "need":
                     self._serve_need(frame)
         finally:

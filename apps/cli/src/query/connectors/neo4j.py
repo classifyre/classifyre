@@ -22,7 +22,8 @@ from collections.abc import Iterator
 from typing import Any
 
 from ...utils.document_columns import native
-from .arrow import ArrowConnector, ConnectorError, Predicate, ScanRequest
+from ..predicate import Predicate
+from .arrow import ArrowConnector, ConnectorError, ScanRequest
 from .base import TableLocation
 
 BATCH_SIZE = 10_000

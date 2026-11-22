@@ -95,6 +95,19 @@ def test_config_takes_the_token_out_of_the_environment() -> None:
     assert TOKEN not in repr(config)
 
 
+@pytest.mark.parametrize("configured", ["ODBC", "", "MYSQL"])
+def test_odbc_and_custom_stay_job_only_whatever_is_configured(configured: str) -> None:
+    # A list that leaves CUSTOM out (an upgrade's old values) must not let a
+    # notebook's scan() into the shared worker.
+    env = {
+        "CLASSIFYRE_QUERY_WORKER_TOKEN": TOKEN,
+        "CLASSIFYRE_QUERY_WORKER_JOB_ONLY_SOURCES": configured,
+    }
+    job_only = WorkerConfig.from_env(env).job_only_sources
+    assert {"ODBC", "CUSTOM"} <= job_only
+    assert ("MYSQL" in job_only) == (configured == "MYSQL")
+
+
 def test_config_reads_a_token_file(tmp_path: Path) -> None:
     path = tmp_path / "token"
     path.write_text(TOKEN + "\n", encoding="utf-8")

@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 from collections.abc import Iterator
 from typing import Any
 
@@ -47,33 +48,34 @@ class CustomConnector(ArrowConnector):
         return f"The notebook of {self.source.alias}"
 
     def scan(self, location: TableLocation, request: ScanRequest) -> Iterator[Any]:
-        from ...notebook.query import decode_filters, encode_filters
-        from ...sources.custom.source import CustomSourceError
+        from ...notebook.query import ScanCall, decode_filters
+        from ...sources.custom.source import CustomSourceError, NotebookTimeoutError
 
         (table,) = self.require(location, "table")
+        call = ScanCall(
+            table=table,
+            columns=location.columns,
+            projection=request.columns,
+            filters=request.predicates,
+            max_rows=connector_max_rows(),
+            seconds_left=max(0.0, request.deadline - time.monotonic()),
+        )
         instance = self._acquire()
-        outcome: dict[str, Any] = {}
         try:
-            yield from instance.query_scan(
-                table,
-                columns=list(location.columns),
-                read=list(request.columns) if request.columns is not None else None,
-                filters=encode_filters(request.predicates),
-                max_rows=connector_max_rows(),
-                deadline=request.deadline,
-                outcome=outcome,
-            )
+            outcome = yield from instance.query_scan(call, request.deadline)
         except CustomSourceError as exc:
+            # Already safe to show: runner.py lets only a ScanRefusedError's
+            # message, the contract's, or an exception's type and line out.
             text = str(exc).strip()
             logger.warning("scan(%r) failed: %s", table, text)
             first = text.splitlines()[0][:300] if text else "scan() failed"
-            code = "timeout" if "ran out of time" in first else "source_unavailable"
+            code = "timeout" if isinstance(exc, NotebookTimeoutError) else "source_unavailable"
             raise ConnectorError(f"{self.where()}: {first}", code) from None
         finally:
             self._release(instance)
         request.stats.requests += int(outcome.get("requests") or 0)
-        used = {str(f) for f in decode_filters(outcome.get("used"))}
-        request.sent(p for p in request.predicates if str(p) in used)
+        used = decode_filters(outcome.get("used"))
+        request.sent(p for p in request.predicates if p in used)
 
     def _acquire(self) -> Any:
         with self._lock:

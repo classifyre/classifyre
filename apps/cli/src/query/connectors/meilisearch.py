@@ -29,7 +29,8 @@ import re
 from collections.abc import Iterator
 from typing import Any
 
-from .arrow import ArrowConnector, ConnectorError, Predicate, ScanRequest
+from ..predicate import Predicate
+from .arrow import ArrowConnector, ConnectorError, ScanRequest
 from .base import SourceContext, TableLocation
 
 #: Documents per request.

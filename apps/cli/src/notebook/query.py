@@ -23,7 +23,21 @@ import time
 from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
+
+from ..query.predicate import OPS, Op
+from ..query.predicate import Predicate as Filter
+
+__all__ = [
+    "COLUMN_CLASSIFICATIONS",
+    "COLUMN_TYPES",
+    "Filter",
+    "QueryContractError",
+    "ScanCall",
+    "ScanRefusedError",
+    "ScanRequest",
+    "Table",
+]
 
 #: The column types a table may declare (DuckDB names), and ``<type>[]`` lists.
 COLUMN_TYPES = (
@@ -37,12 +51,26 @@ COLUMN_TYPES = (
     "TIMESTAMPTZ",
     "JSON",
 )
+#: What a column may be declared to hold (``Table(classify=...)``), least
+#: guarded first; ``personal`` and ``sensitive`` are masked and ``secret``
+#: hidden for people who do not read the table in clear, as when findings
+#: classify a column (the API's ``CLASSIFICATIONS``).
+COLUMN_CLASSIFICATIONS = ("public", "internal", "confidential", "personal", "sensitive", "secret")
 _TABLE_NAME = re.compile(r"^[a-z_][a-z0-9_]{0,62}$")
-OPS = ("=", "!=", "<", "<=", ">", ">=", "in")
 
 
 class QueryContractError(ValueError):
     """``tables()`` or ``scan()`` broke the contract; the message says how."""
+
+
+class ScanRefusedError(Exception):
+    """Raise it from ``scan()`` to refuse a query with a message of your own.
+
+    The message is shown to whoever ran the query, so write it for them
+    (*"companies needs WHERE fnr = ..."*) and keep values out of it. Any other
+    exception fails the query with only its type and line: its text may hold
+    the values it was raised over, and goes to the query's log instead.
+    """
 
 
 @dataclass(frozen=True)
@@ -54,12 +82,18 @@ class Table:
     ``TIMESTAMPTZ``, ``JSON`` (objects and lists as JSON text), or a list of
     one of them (``VARCHAR[]``). The table is ``<source>.main.<name>`` in SQL
     (``schema`` picks another middle part).
+
+    ``classify`` says what a column holds: ``{"birth_date": "personal"}``. A
+    query's rows are never scanned for personal data, so this (or a steward)
+    is what masks a column by default: ``personal`` and ``sensitive`` are
+    masked, ``secret`` hidden, for people who do not read the table in clear.
     """
 
     name: str
     columns: Mapping[str, str]
     description: str = ""
     schema: str = "main"
+    classify: Mapping[str, str] = field(default_factory=dict)
 
     def check(self) -> None:
         for label, value in (("name", self.name), ("schema", self.schema)):
@@ -79,6 +113,18 @@ class Table:
                     f"Column {column!r} of table {self.name!r} has type {kind!r}; "
                     f"use one of {', '.join(COLUMN_TYPES)} (or a list, like VARCHAR[])."
                 )
+        if not isinstance(self.classify, Mapping):
+            raise QueryContractError(f"Table {self.name!r}: classify must be a dict.")
+        for column, label in self.classify.items():
+            if column not in self.columns:
+                raise QueryContractError(
+                    f"Table {self.name!r} classifies {column!r}, which it does not declare."
+                )
+            if label not in COLUMN_CLASSIFICATIONS:
+                raise QueryContractError(
+                    f"Column {column!r} of table {self.name!r} is classified {label!r}; "
+                    f"use one of {', '.join(COLUMN_CLASSIFICATIONS)}."
+                )
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -86,7 +132,11 @@ class Table:
             "schema": self.schema,
             "description": self.description,
             "columns": [
-                {"name": name, "type": str(kind).strip().upper()}
+                {
+                    "name": name,
+                    "type": str(kind).strip().upper(),
+                    **({"classification": self.classify[name]} if name in self.classify else {}),
+                }
                 for name, kind in self.columns.items()
             ],
         }
@@ -112,32 +162,6 @@ def declared_tables(value: Any) -> list[Table]:
         seen.add(item.name)
         out.append(item)
     return out
-
-
-@dataclass(frozen=True)
-class Filter:
-    """A condition every row the query keeps meets: ``column op value``.
-
-    ``op`` is one of ``=``, ``!=``, ``<``, ``<=``, ``>``, ``>=`` or ``in``
-    (then ``value`` is a tuple).
-    """
-
-    column: str
-    op: str
-    value: Any
-
-    def __str__(self) -> str:
-        if self.op == "in":
-            return f"{self.column} IN ({', '.join(_shown(v) for v in self.value)})"
-        return f"{self.column} {self.op} {_shown(self.value)}"
-
-
-def _shown(value: Any) -> str:
-    # The connector's own rendering: the scan stats match a used Filter to
-    # its pushed Predicate by this text.
-    from ..query.connectors.arrow import _shown as shown
-
-    return shown(value)
 
 
 @dataclass
@@ -196,6 +220,43 @@ class ScanRequest:
 # ── the wire between the query (parent) and the notebook (child) ───────
 
 
+@dataclass(frozen=True)
+class ScanCall:
+    """One ``scan()`` the query asks the notebook for (the ``scan`` command)."""
+
+    table: str
+    #: The table's declared columns, ``(name, type)``: the batches' schema.
+    columns: tuple[tuple[str, str], ...]
+    #: The columns the query reads (None: all), what ``request.columns`` says.
+    projection: tuple[str, ...] | None
+    filters: tuple[Filter, ...]
+    max_rows: int
+    seconds_left: float
+
+    def to_wire(self) -> dict[str, Any]:
+        return {
+            "command": "scan",
+            "table": self.table,
+            "columns": [list(c) for c in self.columns],
+            "projection": list(self.projection) if self.projection is not None else None,
+            "filters": encode_filters(self.filters),
+            "maxRows": self.max_rows,
+            "secondsLeft": self.seconds_left,
+        }
+
+    @classmethod
+    def from_wire(cls, raw: Mapping[str, Any]) -> ScanCall:
+        projection = raw.get("projection")
+        return cls(
+            table=str(raw.get("table") or ""),
+            columns=tuple((str(n), str(t)) for n, t in raw.get("columns") or ()),
+            projection=tuple(str(c) for c in projection) if isinstance(projection, list) else None,
+            filters=decode_filters(raw.get("filters")),
+            max_rows=int(raw.get("maxRows") or 0),
+            seconds_left=float(raw.get("secondsLeft") or 0),
+        )
+
+
 def encode_value(value: Any) -> Any:
     """A filter value as JSON: dates and decimals tagged, the rest as is."""
     if isinstance(value, tuple):
@@ -229,8 +290,11 @@ def encode_filters(filters: Iterable[Any]) -> list[dict[str, Any]]:
 def decode_filters(raw: Any) -> tuple[Filter, ...]:
     out: list[Filter] = []
     for item in raw or ():
-        if isinstance(item, dict) and item.get("op") in OPS and isinstance(item.get("column"), str):
-            out.append(Filter(item["column"], str(item["op"]), decode_value(item.get("value"))))
+        if not isinstance(item, dict) or not isinstance(item.get("column"), str):
+            continue
+        op = next((o for o in OPS if o == item.get("op")), None)
+        if op is not None:
+            out.append(Filter(item["column"], cast(Op, op), decode_value(item.get("value"))))
     return tuple(out)
 
 
@@ -265,33 +329,26 @@ def chunks(result: Any, size: int = 1000) -> Iterator[Any]:
         return
     if isinstance(result, (pa.RecordBatch, pa.Table, Mapping)):
         result = [result]
-    page: list[Any] = []
+    page: list[dict[str, Any]] = []
     for item in result:
-        if isinstance(item, pa.Table):
-            if page:
+        if isinstance(item, (pa.Table, pa.RecordBatch)):
+            if page:  # rows before a batch go first, in order
                 yield page
                 page = []
-            yield from item.to_batches()
-        elif isinstance(item, pa.RecordBatch):
-            if page:
-                yield page
-                page = []
-            yield item
-        elif isinstance(item, Mapping):
+            yield from item.to_batches() if isinstance(item, pa.Table) else [item]
+            continue
+        if isinstance(item, Mapping):
             page.append(dict(item))
-            if len(page) >= size:
-                yield page
-                page = []
         elif isinstance(item, list) and all(isinstance(row, Mapping) for row in item):
             page.extend(dict(row) for row in item)
-            if len(page) >= size:
-                yield page
-                page = []
         else:
             raise QueryContractError(
                 "scan() must yield dicts (one per row), lists of dicts, or Arrow "
                 f"record batches; got {type(item).__name__}."
             )
+        if len(page) >= size:
+            yield page
+            page = []
     if page:
         yield page
 
@@ -334,6 +391,8 @@ def rows_to_batch(chunk: Any, schema: Any, table: str) -> Any:
 
 
 def _coerced(row: Mapping[str, Any], schema: Any) -> dict[str, Any]:
+    """ISO text as dates and timestamps, ``Decimal`` as numbers, and
+    timestamps in the zone the column declares (UTC)."""
     import pyarrow as pa
 
     out = dict(row)
@@ -344,32 +403,30 @@ def _coerced(row: Mapping[str, Any], schema: Any) -> dict[str, Any]:
         if isinstance(value, Decimal) and (
             pa.types.is_floating(f.type) or pa.types.is_integer(f.type)
         ):
-            out[f.name] = (
-                int(value)
-                if pa.types.is_integer(f.type) and value == value.to_integral_value()
-                else float(value)
-            )
+            integral = value == value.to_integral_value()
+            out[f.name] = int(value) if pa.types.is_integer(f.type) and integral else float(value)
         elif isinstance(value, str) and pa.types.is_date(f.type):
             try:
-                out[f.name] = dt.date.fromisoformat(value[:10]) if len(value) >= 10 else value
+                out[f.name] = dt.date.fromisoformat(value[:10])
             except ValueError:
-                pass
-        elif isinstance(value, str) and pa.types.is_timestamp(f.type):
-            try:
-                parsed = dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
-            except ValueError:
-                continue
-            if f.type.tz is not None and parsed.tzinfo is None:
-                parsed = parsed.replace(tzinfo=dt.UTC)
-            elif f.type.tz is None and parsed.tzinfo is not None:
-                parsed = parsed.astimezone(dt.UTC).replace(tzinfo=None)
-            out[f.name] = parsed
-        elif isinstance(value, dt.datetime) and pa.types.is_timestamp(f.type):
-            if f.type.tz is not None and value.tzinfo is None:
-                out[f.name] = value.replace(tzinfo=dt.UTC)
-            elif f.type.tz is None and value.tzinfo is not None:
-                out[f.name] = value.astimezone(dt.UTC).replace(tzinfo=None)
+                pass  # refused below, naming the column
+        elif pa.types.is_timestamp(f.type) and isinstance(value, (str, dt.datetime)):
+            if isinstance(value, str):
+                try:
+                    value = dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
+                except ValueError:
+                    continue
+            out[f.name] = _in_zone(value, utc=f.type.tz is not None)
     return out
+
+
+def _in_zone(value: dt.datetime, *, utc: bool) -> dt.datetime:
+    """A naive timestamp is UTC; a column without a zone gets UTC, naive."""
+    if utc:
+        return value if value.tzinfo is not None else value.replace(tzinfo=dt.UTC)
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(dt.UTC).replace(tzinfo=None)
 
 
 def _type_name(kind: Any) -> str:

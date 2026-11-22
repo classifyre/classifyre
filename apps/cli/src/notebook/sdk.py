@@ -53,7 +53,7 @@ from ..utils.sampling_frontier import ListFrontier
 from ..utils.urn import Urn
 from .cohort import CohortItem, normalize_bands, select_cohort
 from .files import DEFAULT_PAGE_SIZE, ParsedContent, pages, parse
-from .query import Filter, ScanRequest, Table
+from .query import Filter, ScanRefusedError, ScanRequest, Table
 
 MODULE_NAME = "classifyre"
 
@@ -1643,6 +1643,7 @@ def build_module(context: Context) -> types.ModuleType:
     module.Table = Table  # type: ignore[attr-defined]
     module.Filter = Filter  # type: ignore[attr-defined]
     module.ScanRequest = ScanRequest  # type: ignore[attr-defined]
+    module.ScanRefusedError = ScanRefusedError  # type: ignore[attr-defined]
     module.ctx = context  # type: ignore[attr-defined]
     module.parse = parse  # type: ignore[attr-defined]
     module.pages = pages  # type: ignore[attr-defined]
@@ -1660,6 +1661,7 @@ def build_module(context: Context) -> types.ModuleType:
         "Ref",
         "ReferenceType",
         "ScanRequest",
+        "ScanRefusedError",
         "Filter",
         "Table",
         "Tag",
@@ -1713,6 +1715,10 @@ def namespace(context: Context) -> dict[str, Any]:
         "ctx": context,
         "parse": parse,
         "pages": pages,
+        "Table": Table,
+        "Filter": Filter,
+        "ScanRequest": ScanRequest,
+        "ScanRefusedError": ScanRefusedError,
     }
 
 

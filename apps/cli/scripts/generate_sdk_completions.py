@@ -37,10 +37,12 @@ from src.notebook.sdk import (  # noqa: E402
     Context,
     Entity,
     FieldMapping,
+    Filter,
     FlowType,
     NotebookFile,
     ParsedContent,
     Ref,
+    ScanRefusedError,
     ScanRequest,
     Table,
     Tag,
@@ -291,6 +293,13 @@ def build() -> dict[str, Any]:
                 "insertText": "FlowType",
             },
             {
+                "label": "ScanRefusedError",
+                "kind": "class",
+                "detail": 'raise ScanRefusedError("companies needs WHERE fnr = ...")',
+                "documentation": _summary(ScanRefusedError),
+                "insertText": "ScanRefusedError",
+            },
+            {
                 "label": "Table",
                 "kind": "class",
                 "detail": 'Table(name, {"column": "VARCHAR", ...}, description="")',
@@ -348,6 +357,10 @@ def build() -> dict[str, Any]:
             "Table": {
                 "documentation": _summary(Table),
                 "fields": _fields(Table),
+            },
+            "Filter": {
+                "documentation": _summary(Filter),
+                "fields": _fields(Filter),
             },
             "ScanRequest": {
                 "documentation": _summary(ScanRequest),

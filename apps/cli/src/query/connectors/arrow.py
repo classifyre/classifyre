@@ -32,12 +32,11 @@ from abc import abstractmethod
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from functools import cache
-from typing import Any, ClassVar, Literal
+from typing import Any, ClassVar
 
 from ...utils.duckdb_engine import quote_identifier
+from ..predicate import Op, Predicate
 from .base import BindingError, QueryBinding, SourceContext, TableLocation
-
-Op = Literal["=", "!=", "<", "<=", ">", ">=", "in"]
 
 DEFAULT_CONNECTOR_MAX_ROWS = 1_000_000
 
@@ -57,35 +56,6 @@ class ConnectorError(BindingError):
     def __init__(self, message: str, code: str = "source_unavailable") -> None:
         super().__init__(message)
         self.code = code
-
-
-@dataclass(frozen=True)
-class Predicate:
-    column: str
-    op: Op
-    #: A tuple for ``in``.
-    value: Any
-
-    def __str__(self) -> str:
-        if self.op == "in":
-            return f"{self.column} IN ({', '.join(_shown(v) for v in self.value)})"
-        return f"{self.column} {self.op} {_shown(self.value)}"
-
-
-def _shown(value: Any) -> str:
-    """A value as SQL writes it: ``'text'``, ``DATE '2026-11-16'``, ``5``."""
-    import datetime as dt
-
-    if isinstance(value, str):
-        return "'" + value.replace("'", "''") + "'"
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    if isinstance(value, dt.datetime):
-        kind = "TIMESTAMPTZ" if value.tzinfo is not None else "TIMESTAMP"
-        return f"{kind} '{value.isoformat(sep=' ')}'"
-    if isinstance(value, dt.date):
-        return f"DATE '{value.isoformat()}'"
-    return str(value)
 
 
 @dataclass

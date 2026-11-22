@@ -104,7 +104,8 @@ DEFAULT_WORKSPACE_SHARE_PERCENT = 75
 #: Source types whose queries always run as Jobs: they load native code the
 #: source names (an ODBC ``Driver=`` path) or run code its editors wrote (a
 #: CUSTOM notebook's ``scan()``), which must not share a process host with
-#: other workspaces' queries.
+#: other workspaces' queries. ``JOB_ONLY_SOURCES`` can add types, never take
+#: these away: the docs promise it (docs/prd/QC-query-connectors.md §5.8).
 DEFAULT_JOB_ONLY_SOURCES = frozenset({"ODBC", "CUSTOM"})
 #: Native thread pools that start when a library loads (numpy's OpenBLAS starts
 #: one thread per core on import, and pyarrow imports numpy when it is there):
@@ -329,8 +330,7 @@ class WorkerConfig:
             max_query_memory_mb=_int(env, "MAX_QUERY_MEMORY_MB", DEFAULT_MAX_QUERY_MEMORY_MB),
             memory_guard_percent=_int(env, "MEMORY_GUARD_PERCENT", DEFAULT_MEMORY_GUARD_PERCENT),
             job_only_sources=DEFAULT_JOB_ONLY_SOURCES
-            if job_only is None
-            else frozenset(t.strip().upper() for t in job_only.split(",") if t.strip()),
+            | frozenset(t.strip().upper() for t in (job_only or "").split(",") if t.strip()),
             node=env.get(ENV_PREFIX + "NODE_NAME", "").strip() or socket.gethostname(),
             workspace_share_percent=_int(
                 env, "WORKSPACE_SHARE_PERCENT", DEFAULT_WORKSPACE_SHARE_PERCENT, 1

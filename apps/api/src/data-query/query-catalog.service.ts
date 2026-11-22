@@ -468,7 +468,10 @@ export class QueryCatalogService {
     return out;
   }
 
-  /** What open PII and secret findings classify, per table column (GOV §5.1). */
+  /**
+   * What open PII and secret findings classify, per table column (GOV §5.1),
+   * and what a notebook declares its SQL tables' columns hold (QC §5.8).
+   */
   private async derivedClassifications(): Promise<
     Map<string, Map<string, Classification>>
   > {
@@ -507,13 +510,39 @@ export class QueryCatalogService {
       groups.set(row.asset_id, columns);
     }
     const byAsset = new Map<string, Map<string, Classification>>();
+    const put = (assetId: string, column: string, value: string | null) => {
+      const map = byAsset.get(assetId) ?? new Map<string, Classification>();
+      const stricter = stricterClassification(map.get(column), value);
+      if (!stricter) return;
+      map.set(column, stricter);
+      byAsset.set(assetId, map);
+    };
     for (const [assetId, columns] of groups) {
       for (const [column, list] of columns) {
-        const classification = deriveClassification(list);
-        if (!classification) continue;
-        const map = byAsset.get(assetId) ?? new Map();
-        map.set(column, classification);
-        byAsset.set(assetId, map);
+        put(assetId, column, deriveClassification(list));
+      }
+    }
+    // A custom source's SQL tables (QC §5.8): their rows are read by queries,
+    // never scanned, so no finding classifies them; what the notebook's
+    // tables() declares a column holds does instead, as a floor findings
+    // can only raise.
+    const declared = await this.prisma.asset.findMany({
+      where: {
+        metadata: { path: ['query'], equals: 'scan' },
+        status: { not: 'DELETED' },
+      },
+      select: { id: true, metadata: true },
+    });
+    for (const asset of declared) {
+      const metadata = (asset.metadata ?? {}) as Record<string, unknown>;
+      const columns = Array.isArray(metadata.columns) ? metadata.columns : [];
+      for (const column of columns) {
+        if (!column || typeof column !== 'object') continue;
+        const { name, classification } = column as Record<string, unknown>;
+        if (typeof name !== 'string' || typeof classification !== 'string') {
+          continue;
+        }
+        put(asset.id, name, classification);
       }
     }
     this.classified.set(key, { at: Date.now(), byAsset });

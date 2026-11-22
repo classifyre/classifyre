@@ -24,8 +24,8 @@ except Exception as exc:  # auto-install off and the groups absent
 
 pa = pytest.importorskip("pyarrow")
 
-from src.query.connectors.arrow import Predicate  # noqa: E402
 from src.query.connectors.neo4j import build_cypher  # noqa: E402
+from src.query.predicate import Predicate  # noqa: E402
 from src.sources.neo4j.source import Neo4jSource  # noqa: E402
 
 PERSONS = [

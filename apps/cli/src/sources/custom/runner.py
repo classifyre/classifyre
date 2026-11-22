@@ -29,11 +29,13 @@ from ...notebook.contract import validate_module
 from ...notebook.execute import cell_filename
 from ...notebook.files import local_folders
 from ...notebook.query import (
+    QueryContractError,
+    ScanCall,
+    ScanRefusedError,
     ScanRequest,
     batch_to_wire,
     chunks,
     declared_tables,
-    decode_filters,
     encode_filters,
     rows_to_batch,
 )
@@ -127,7 +129,12 @@ def _no_relay(op: str, _args: dict[str, Any]) -> Any:
     to scope a call by, so ``ctx.query_assets()``, ``ctx.tag()`` and the rest
     are refused (docs/prd/QC-query-connectors.md §5.8).
     """
-    raise AssetQueryError(f"{op} is not available while a query reads this notebook's tables.")
+    raise _QueryModeError(f"{op} is not available while a query reads this notebook's tables.")
+
+
+class _QueryModeError(AssetQueryError, ScanRefusedError):
+    """The platform's own refusal: what a notebook catches as an
+    ``AssetQueryError``, and safe to show as a ``ScanRefusedError``."""
 
 
 def _error_payload(exc: BaseException) -> dict[str, Any]:
@@ -422,44 +429,67 @@ class NotebookRuntime:
             return []
         return [table.to_dict() for table in declared_tables(function())]
 
-    def scan(
-        self,
-        *,
-        table: str,
-        columns: list[list[str]],
-        read: list[str] | None,
-        filters: Any,
-        max_rows: int,
-        seconds_left: float,
-    ) -> dict[str, Any]:
+    def scan(self, call: ScanCall) -> dict[str, Any]:
         """Stream ``scan(table, request)``'s rows as Arrow batches.
 
         Each page is converted here, against the columns ``tables()``
         declared, so a wrong value is reported as the notebook's mistake with
         the column it is in. Reading stops one row past ``max_rows``: the
         query refuses the table then, and the source is asked for no more.
+
+        Only a message meant to be shown leaves this process: a
+        ``ScanRefusedError``'s, or the contract's own (which names a column,
+        never a value). Any other exception may hold the values it was raised
+        over, so the query is told its type and line, and the full text goes
+        to stderr (the query's log, redacted).
         """
         from ...query.connectors.arrow import declared_schema
 
         function = self._require("scan")
-        schema = declared_schema(tuple((str(n), str(t)) for n, t in columns))
+        schema = declared_schema(call.columns)
         request = ScanRequest(
-            columns=tuple(read) if read is not None else None,
-            filters=decode_filters(filters),
-            max_rows=max_rows,
-            deadline=time.monotonic() + max(0.0, seconds_left),
+            columns=call.projection,
+            filters=call.filters,
+            max_rows=call.max_rows,
+            deadline=time.monotonic() + max(0.0, call.seconds_left),
         )
         rows = 0
-        for page in chunks(function(table, request)):
-            if _aborted():
-                break
-            batch = rows_to_batch(page, schema, table)
-            if batch.num_rows:
-                _emit({"type": ROWS, "ipc": batch_to_wire(batch)})
-            rows += batch.num_rows
-            if rows > max_rows:
-                break
+        try:
+            for page in chunks(function(call.table, request)):
+                if _aborted():
+                    break
+                batch = rows_to_batch(page, schema, call.table)
+                if batch.num_rows:
+                    _emit({"type": ROWS, "ipc": batch_to_wire(batch)})
+                rows += batch.num_rows
+                if rows > call.max_rows:
+                    break
+        except (ScanRefusedError, QueryContractError) as exc:
+            raise ScanFailedError(str(exc)) from None
+        except Exception as exc:
+            import traceback
+
+            traceback.print_exception(exc, file=sys.stderr)
+            raise ScanFailedError(
+                f"scan() raised {type(exc).__name__}{_cell_line(exc)}; its message is in "
+                "the query's log (raise ScanRefusedError(...) to show one here)."
+            ) from None
         return {"rows": rows, "used": encode_filters(request.used), "requests": request.requests}
+
+
+class ScanFailedError(RuntimeError):
+    """What the query is told about a failed ``scan()``: safe to show."""
+
+
+def _cell_line(exc: BaseException) -> str:
+    """`` at cell <id>, line <n>``: the innermost notebook frame, if any."""
+    import traceback
+
+    frames = [f for f in traceback.extract_tb(exc.__traceback__) if f.filename.startswith("<cell ")]
+    if not frames:
+        return ""
+    last = frames[-1]
+    return f" at {last.filename.strip('<>')}, line {last.lineno}"
 
 
 def _asset_to_dict(asset: Asset) -> dict[str, Any]:
@@ -498,15 +528,7 @@ def _handle(runtime: NotebookRuntime, request: dict[str, Any]) -> dict[str, Any]
     if command == "tables":
         return {"result": runtime.tables()}
     if command == "scan":
-        read = request.get("read")
-        return runtime.scan(
-            table=str(request.get("table") or ""),
-            columns=list(request.get("columns") or []),
-            read=[str(c) for c in read] if isinstance(read, list) else None,
-            filters=request.get("filters"),
-            max_rows=int(request.get("maxRows") or 0),
-            seconds_left=float(request.get("secondsLeft") or 0),
-        )
+        return runtime.scan(ScanCall.from_wire(request))
     raise ValueError(f"Unknown command {command!r}")
 
 
