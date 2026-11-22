@@ -528,7 +528,7 @@ queryWorker:
 ```
 
 - **Workspaces share it safely.** Each query process sees only its own sources' credentials and its own temporary directory; the pod runs with a read-only root file system; a query that outgrows `maxMemoryPerQuery` (or the pod's memory guard) fails alone.
-- **Some sources never run in it.** Queries that read a source in `jobOnlySourceTypes` always run as a Job of their own: ODBC sources load the driver the source names, and custom sources run their notebook's `scan()`.
+- **Some sources never run in it.** Queries that read an ODBC source (it loads the driver the source names) or a custom source (it runs the notebook's `scan()`) always run as a Job of their own, whatever `jobOnlySourceTypes` lists; list more types there to add them.
 - **Network.** The worker has its own NetworkPolicy: ingress only from this release's API, worker and SQL gateway; egress anywhere but link-local addresses (cloud metadata). Set `queryWorker.networkPolicy.clusterCidrs` to the cluster's pod and service networks, so a query cannot reach other pods (such as the database) directly; the install notes warn while it is empty.
 - **GitOps.** With `helm template` or a tool that renders without cluster access, set `queryWorker.token.existingSecret` (or `value`), or each render makes a new token.
 

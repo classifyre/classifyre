@@ -20,7 +20,7 @@ from classifyre import (
     parse, pages,                                     # reading files
     Ref, FieldMapping, FlowType, urn_for,             # naming things
     flow, contains, references, same_as, uses,        # relationships
-    Table,                                            # SQL over the source
+    Table, ScanRefusedError,                          # SQL over the source
 )
 ```
 
@@ -153,7 +153,7 @@ label. Nothing is copied into Classifyre first: each query calls `scan()`,
 which asks your API for the rows it needs while the query runs.
 
 ```python
-from classifyre import Table, ctx
+from classifyre import ScanRefusedError, Table, ctx
 
 
 def tables():
@@ -163,13 +163,18 @@ def tables():
             {"fnr": "VARCHAR", "name": "VARCHAR", "employees": "BIGINT", "founded": "DATE"},
             description="One row per company. Needs WHERE fnr = ... or fnr IN (...).",
         ),
+        Table(
+            "officers",
+            {"fnr": "VARCHAR", "name": "VARCHAR", "birth_date": "DATE", "role": "VARCHAR"},
+            classify={"name": "personal", "birth_date": "personal"},
+        ),
     ]
 
 
 def scan(table, request):
     fns = request.values("fnr")          # the fnr values the query asks for, or None
     if fns is None:
-        raise ValueError("companies needs WHERE fnr = '...' or fnr IN (...)")
+        raise ScanRefusedError(f"{table} needs WHERE fnr = '...' or fnr IN (...)")
     for fn in fns:
         request.count_request()
         row = api.company(fn, timeout=request.seconds_left())
@@ -195,10 +200,15 @@ middle name). A table added or changed here reaches SQL with the next scan.
 | `columns` | `{"column": "TYPE"}`. Types: `VARCHAR`, `BIGINT`, `INTEGER`, `DOUBLE`, `BOOLEAN`, `DATE`, `TIMESTAMP`, `TIMESTAMPTZ`, `JSON` (a dict or list, as its JSON text), or a list of one of them (`VARCHAR[]`). |
 | `description` | Shown with the table. Say which condition the table needs. |
 | `schema` | The middle part of the name, `main` by default. |
+| `classify` | What columns hold: `{"birth_date": "personal"}`. One of `public`, `internal`, `confidential`, `personal`, `sensitive`, `secret`. |
 
-Masks, row filters and access work on these columns as on any other table: a
-column the [classification](/data-query/#masked-and-hidden-columns) masks is
-masked, and a column `tables()` does not declare does not exist for SQL.
+**Say what your columns hold.** A custom table's rows are read by each query
+and never scanned, so no detector can find personal data in them. `classify`
+is what [masks](/data-query/#masked-and-hidden-columns) a column by default:
+`personal` and `sensitive` columns are masked and `secret` ones hidden for
+everyone who does not read the table in clear. A column you leave out stays
+clear until a steward marks it. Row filters and access work as on any other
+table, and a column `tables()` does not declare does not exist for SQL.
 
 ### `scan(table, request)`
 
@@ -245,8 +255,13 @@ What a query reads, and how it runs:
   the other calls that read or write the workspace are refused while a query
   runs, and `ctx.files` is empty: a query reads your API, not the workspace.
 - **Limits.** The query's time limit (Settings → General, 120 s by default)
-  covers the whole scan; one scan returns at most 1,000,000 rows. An error
-  `scan()` raises fails the query with its first line, secrets redacted.
+  covers the whole scan, and a scan still running then is stopped; one scan
+  returns at most 1,000,000 rows.
+- **Errors.** `raise ScanRefusedError("…")` fails the query with your message,
+  so write it for the person who ran the query and keep values out of it. Any
+  other exception fails it with only its type and line (*scan() raised KeyError
+  at cell sql-tables, line 42*): its text may hold the values it was raised
+  over, so it goes to the query's log instead, secrets redacted.
 - **Joins read each table on its own.** `JOIN companies c ON c.fnr = x.fnr`
   does not hand `scan()` the keys of the other side. Give the custom table a
   condition of its own (`WHERE c.fnr IN (...)`).
@@ -925,7 +940,8 @@ each, and may declare at most **50 packages**.
 | _"Tag '…' matches no Tag detector"_ | The key in `tags` has no Tag detector. The warning lists the keys that do exist. |
 | _"uses unknown kind …"_ | A typo in `kind`. The asset was recorded as `record`; the warning names the valid kinds. |
 | `••••` where you expected a value | Working as intended — that is a secret being redacted from output. |
-| _"… is read live …: add WHERE …"_ in a query | Your own `scan()` refused: the table needs the condition it names. |
+| _"… is read live …: add WHERE …"_ in a query | Your own `scan()` refused (`ScanRefusedError`): the table needs the condition it names. |
+| _"scan() raised KeyError at cell …, line …"_ | An exception in `scan()`; its message is in the query's log. Catch it and raise `ScanRefusedError` to tell people what to do. |
 | _"… returned a value for companies.x that is not a date …"_ | `scan()` yielded a value of another type than `tables()` declares for that column. |
 | _"query_assets is not available while a query reads …"_ | `scan()` called a workspace function; those work in scans only. |
 | A new table is not in the **Tables** tab | `tables()` is read by a scan: run one. |

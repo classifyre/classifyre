@@ -69,7 +69,7 @@ This PRD places each POC part into that split.
 | R4 | A connector table has a row cap (`connector_max_rows`, default 1,000,000). Over the cap the query is **refused** (`connector_limit`), never answered on part of the data (DQ R7). |
 | R5 | The query's single deadline covers connector setup and every request, as it does for native sources. |
 | R6 | Connectors reuse the scan's client code and recipe fields: no second set of credentials, no second configuration form. |
-| R7 | A custom source becomes queryable only when its notebook defines `scan()` **and** someone who may edit the source turns on *Allow SQL queries*. That change is audited. Custom code runs only in the sandboxed child process. |
+| R7 | A custom source becomes queryable only when its notebook defines `tables()` and `scan()`; writing them takes the right to edit the source (decided 2026-11-22, §5.8: no separate switch). Custom code runs only in the sandboxed child process, and only in a query Job of its own, never in the shared worker. |
 | R8 | A person sees, for each connector table, what reading it cost: requests, rows read, which filters were pushed. |
 | R9 | Meilisearch and Neo4j are queryable and joinable with PostgreSQL, Parquet/Delta in buckets and Iceberg, on the skaffold dev stack, through the warm worker. Correctness is checked against an independent calculation, and latency is measured (§9). |
 
@@ -90,7 +90,7 @@ The source types come from `packages/schemas/src/schemas/all_input_sources.json`
 | SHARED_DATASET | dataset | (API) | DQ §5.12 | Built |
 | **MEILISEARCH** | index | **connector** | `sources/meilisearch/query.py` (*new*), REST | **v1 (QC2)** |
 | **NEO4J** | label, **relationship** (*new kind*) | **connector** | `sources/neo4j/query.py` (*new*), official `neo4j` driver | **v1 (QC2)** |
-| **CUSTOM** | table (what the notebook extracts) | **custom** | notebook `scan()` | **v1 (QC4)** |
+| **CUSTOM** | table (what the notebook's `tables()` declares) | **custom** | notebook `scan()` | **built (QC4)** |
 | MSSQL | table | extension → connector | community `mssql` (native TDS, no driver), else the source's client | Candidate (QC5) |
 | MONGODB | collection | extension → connector | community `mongo`, else `pymongo` with `find(filter, projection)` | Candidate (QC5) |
 | BIGQUERY | table | extension → connector | community `bigquery`, else Storage Read API (Arrow) | Candidate (QC5) |
@@ -349,7 +349,7 @@ def scan(table, request):
 
 **Contract** (`notebook/contract.py`): `OPTIONAL_FUNCTIONS` gains `tables` and `scan`, mirrored in the API (`notebook.service.ts`) and the editor completions. A new violation `QUERY_CONTRACT`: one of the two without the other, or a `scan` that is async or takes fewer than two positional parameters. Checked before every execution, scan and query, like the rest of the contract (not on save: an autosave must land mid-edit).
 
-**SDK** (`notebook/query.py`, exported by `build_module`): `Table(name, columns, description, schema="main")`; `Filter(column, op, value)`; `ScanRequest` with `columns`, `filters`, `values(column)`, `value(column)`, `use(*filters)`, `count_request(n)`, `max_rows` and `seconds_left()`. Column types are the DuckDB names the connector tier reads (`VARCHAR`, `BIGINT`, `INTEGER`, `DOUBLE`, `BOOLEAN`, `DATE`, `TIMESTAMP`, `TIMESTAMPTZ`, `JSON`, and `T[]`).
+**SDK** (`notebook/query.py`, exported by `build_module`): `Table(name, columns, description, schema="main", classify={})`; `Filter(column, op, value)` (the connector tier's own `Predicate`, `query/predicate.py`); `ScanRefusedError`; `ScanRequest` with `columns`, `filters`, `values(column)`, `value(column)`, `use(*filters)`, `count_request(n)`, `max_rows` and `seconds_left()`. Column types are the DuckDB names the connector tier reads (`VARCHAR`, `BIGINT`, `INTEGER`, `DOUBLE`, `BOOLEAN`, `DATE`, `TIMESTAMP`, `TIMESTAMPTZ`, `JSON`, and `T[]`).
 
 **Tables in the catalog.** Each scan first asks the notebook for `tables()` (`runner.py` command `tables`) and records one asset per table before `extract()` runs, so a windowed or stopped run still records them: kind `table`, no content (`extract=False`, *"Read live by SQL queries"*), metadata `{table_name, schema, columns, query: "scan", description}`. `x-query` declares `CUSTOM: {tier: custom, assetKinds: [table], address: notebook}`; the API's `notebook` address names it `<source>.<schema>.<table>` and locates it as a connector table. A `table` asset the notebook yields itself (no `query: scan`) stays listed and locked: *Only tables the notebook declares in tables() and reads in scan() can be queried.*
 
@@ -372,8 +372,9 @@ sequenceDiagram
 - Filters cross as JSON with dates and decimals tagged (`encode_filters`). The filters the notebook used are mapped back to the pushed predicates and recorded with `request.sent`; `count_request` becomes the scan's `requests`.
 - Query mode: `ctx.query_assets()`, `ctx.tag()` and every relayed op are refused in the child (`_no_relay`) and again in the parent; no uploaded files are downloaded (`ctx.files` is empty).
 - One notebook process per scan running at once (a self-join reads two pipes); a scan DuckDB stops early (a `LIMIT`) stops its process, and the next scan starts a fresh one. The deadline kills the child from a timer rather than timing out a read: frames already in the parent's read buffer are invisible to `select()`.
-- Errors: the first line of the notebook's exception (redacted by the runner) is the query's message, *"The notebook of <source>: ValueError: …"*; the full text goes to the Job's log. The row cap and the local re-filter are the connector tier's (§5.3).
-- Where it runs: CUSTOM is in `DEFAULT_JOB_ONLY_SOURCES` and `queryWorker.jobOnlySourceTypes`, so a query that reads a custom source always runs as a Job of its own; notebook packages and uv groups are installed in that Job as for a scan.
+- Errors (the draft's rule, kept): only a message meant to be shown leaves the child: a `ScanRefusedError`'s (the notebook's own refusal, *"companies needs WHERE fnr = …"*), the contract's (it names a column, never a value) and the platform's refusal of namespace calls. Any other exception reaches the query as its type and cell line only, *"scan() raised KeyError at cell sql-tables, line 42; its message is in the query's log"*, since its text may hold the values it was raised over; the full traceback goes to the Job's log, redacted. The row cap and the local re-filter are the connector tier's (§5.3).
+- Classification: the rows are never scanned, so no finding classifies a custom table's column. `Table(classify={"birth_date": "personal"})` records what a column holds in the asset's `columns[].classification`; the API reads it like a finding-derived classification (`derivedClassifications`, the stricter of the two wins), so `personal` and `sensitive` columns are masked and `secret` ones hidden by default. A steward's choice still overrides both.
+- Where it runs: CUSTOM (with ODBC) is in `DEFAULT_JOB_ONLY_SOURCES`, which `JOB_ONLY_SOURCES` / `queryWorker.jobOnlySourceTypes` can add to but not take from, so a query that reads a custom source always runs as a Job of its own; notebook packages and uv groups are installed in that Job as for a scan.
 
 **Decided 2026-11-22, differing from the first draft:**
 - **The tables are declared, not extracted.** `tables()` replaces "the source's own extracted `table` assets": a notebook's data assets (companies, persons) and its SQL tables are different things, and a table needs a schema the notebook states rather than one sampled from records.
@@ -381,8 +382,10 @@ sequenceDiagram
 - **Arrow over the NDJSON channel, not fd 3.** Logs already go to stderr, so stdout carries only frames; a second pipe would add a protocol for no separation gained.
 - **No rlimits in the child.** CUSTOM queries never run in the shared worker; the Job's pod limits bound the notebook, and `RLIMIT_AS` breaks numpy and pyarrow's virtual reservations.
 - **`ctx.filter_value()` became `request.values()`/`value()`,** on the request rather than the context, so it also records which filter was used.
+- **Default masking comes from the notebook, not from detectors** (review of ef855852, c1). §5.7 classifies a connector table's columns from the findings of its scanned rows; a custom table's rows are read per query and never scanned, and scanning a sample would mean calling `scan()` with conditions the table may refuse. So the notebook states what a column holds (`classify=`), as it states its types; a column it leaves out is clear until a steward marks it.
+- **The lab source generates its tickets in the notebook** rather than paging a fixture served by `tools`: the test is the notebook path (scan, conditions sent, re-filter, join with PostgreSQL), and a generator in the notebook makes the expected answer reproducible anywhere without another service.
 
-**Docs:** *SQL over the source* in `apps/docs/app/sources/custom-connectors/reference/page.mdx`, *Query it with SQL* in the custom-connectors overview, and *Custom sources* in `data-query/page.mdx`.
+**Docs:** *SQL over the source* in `apps/docs/app/sources/custom-connectors/reference/page.mdx`, *Query it with SQL* in the custom-connectors overview, *Custom sources* in `data-query/page.mdx`, and a commented `sql-tables` cell in the CUSTOM starter notebook (`all_input_examples.json`; `test_query_custom.py` runs it uncommented).
 
 Third-party *pip* connectors (the POC's `fedsql.connectors` entry-point group) are **not** taken over. The notebook is Classifyre's extension point for user code. Built-in connectors live in the repository. Revisit this when the plugin system (CLAUDE.md, *Plugin System (Future)*) is built.
 
@@ -390,13 +393,12 @@ Third-party *pip* connectors (the POC's `fedsql.connectors` entry-point group) a
 
 - **Catalog** (`QueryCatalogService`, `sql-names.ts`):
   - Addresses come from `x-query`.
-  - New not-queryable reasons: `custom_query_disabled`, `not_tabular_kind`, and `tier_not_built` ("Reading rows of <type> sources is planned").
+  - New not-queryable reasons: `not_tabular_kind` and `tier_not_built` ("Reading rows of <type> sources is planned"). A CUSTOM `table` asset that `tables()` did not declare is locked with *Only tables the notebook declares in tables() and reads in scan() can be queried* (§5.8).
   - `CatalogTableDto` gains `tier`.
 - **Run record**: migration `query_runs.scan_stats jsonb` (*new*), filled from the result meta `scans`. `GET query-runs/:id` returns it.
 - **Web**:
   - Below the result: "Meilisearch `movies`: 1 request, 632 documents, filters sent: genre = 'Drama', year ≥ 2015". It is shown when `scan_stats` is present; i18n en/de in the data-query namespace.
   - The explorer marks connector tables with a small *live* tag (tooltip: "Read live through the source's API on every query").
-  - The CUSTOM source form gets *Allow SQL queries*.
   - The new asset kind `relationship` gets an icon and a label.
 - **MCP** `list_queryable_tables`: includes connector tables. `query_data`'s result adds the same scan stats line.
 - **Pre-check** (`sql-precheck.ts`) and `MAX_SOURCES_PER_QUERY` (8) are unchanged.
@@ -512,11 +514,11 @@ WHERE o.order_id = 1;
 | CLI unit `tests/test_query_pushdown.py` (*new*) | Port of the POC's planner cases: conjuncts pushed; `OR`/`LIKE`/functions/`ON`/`HAVING` not; **masked, hidden and unrecorded columns never pushed**; type mismatch not pushed; projection off for `*`; LIMIT only in the simple case; a table read twice not pushed; row-filter conditions pushed and results unchanged |
 | CLI unit Meilisearch | `httpx`/`requests` mock transport: filter translation and escaping, filterable attributes (both formats), paging stops at `max_rows + 1`, `/documents/fetch` vs `GET /documents`, HTTP 403 and unreachable messages |
 | CLI unit Neo4j | `build_cypher` for nodes and relationships, parameters only, escaped labels, projections, `LIMIT`; a fake driver for batches |
-| CLI unit custom | Contract: `scan` signature checks. Runner `op: scan`: rows as dicts and as Arrow, fd 3 stream, `{type, line}` errors, relayed ops refused, deadline kill, `RLIMIT_AS` |
+| CLI unit custom (`tests/test_query_custom.py`) | Contract: `tables`/`scan` pair and signature. Runner `scan`: rows as dicts and as Arrow over the NDJSON channel, errors as a `ScanRefusedError`'s message or an exception's type and line only, relayed ops refused, deadline kill, conditions on masked columns never sent, declared classifications recorded, the starter notebook's example |
 | CLI live `-m connectors` | Against the compose `search-graph` services (skipped without `CLASSIFYRE_CONNECTORS_LIVE=1`): Q1–Q5 results equal `expected.json` |
 | CLI worker | `test_query_worker.py`: the fork server stays single-threaded with connector modules imported; a connector query runs in the worker and posts `scans` in the meta |
-| API unit | Manifest: every declared type and kind gets an address; reasons `custom_query_disabled`, `not_tabular_kind`, `tier_not_built`; `scan_stats` stored and returned; the CUSTOM `query.enabled` change needs `source.manage` and is audited |
-| Web | The scan-stats line, the *live* tag, the CUSTOM switch (component tests); i18n keys en/de |
+| API unit | Manifest: every declared type and kind gets an address (CUSTOM: `notebook`, locked unless declared); reasons `not_tabular_kind`, `tier_not_built`; `scan_stats` stored and returned; a notebook's declared column classifications mask by default, never below what findings say |
+| Web | The scan-stats line, the *live* tag (component tests); i18n keys en/de |
 | Dev stack (skaffold, `lakehouse-lab`, through the warm worker) | Q1–Q5 from the SQL page, a Data tab, a SQL connection (psql) and MCP `query_data`; `--verify` passes; Q4 as a Data reader shows `email` as `****`; a `WHERE` on a masked column pushes nothing (`scan_stats`); the Neo4j `relationships.rated` asset exists with recorded columns; personal data in a Meilisearch field classifies and masks that column |
 | **Skaffold targets** | Through the warm worker, REST, p50 over 10 runs: **Q1 ≤ 1.5 s, Q2 ≤ 2.5 s, Q3 ≤ 3 s**. Meilisearch documents read in Q1: **632 with pushdown, 20,000 without**, identical rows. Two personas × 3 concurrent clients on Q1–Q3: no failures other than the per-person cap; worker pod under its memory limit (`kubectl top`). Numbers and the benchmark JSON written into §11 |
 
@@ -533,7 +535,7 @@ Work test-first (the repository's `tdd` skill). Each task is one commit; each ph
 7. **QC2 Neo4j.** The `relationship` asset kind (schema `x-asset-metadata`, the web's kind icon and label, i18n), recorded columns for labels and relationships, `sources/neo4j/query.py` with `build_cypher` tests, then `x-query`.
 8. **QC2 API and web.** Migration `query_runs.scan_stats`, DTOs, the catalog reasons and `tier`, the result line, the *live* tag, MCP output. API specs and web component tests.
 9. **QC3 lab.** The `search-graph` profile, `k8s-services.yaml`, `seed/connectors.py` (with `--expected`), the source JSONs and `workspace.py`, the queries, the `bench_query.py` extension; the lab README (including the `172.18` fix). Run on skaffold (`scripts/dev/start.sh`, then the lab steps) and write the numbers into §11.
-10. **QC4 custom.** Contract and SDK tests first (`test_notebook_*`, `test_custom_source*`), then runner `op: scan` on fd 3, the opt-in field (schema, API audit, web switch), docs and the starter notebook. Then a lab CUSTOM source and a join on the dev stack.
+10. **QC4 custom** (built, §5.8, §11). Contract and SDK tests first (`test_query_custom.py`), then the runner's `tables` and `scan` commands, the `notebook` address, declared classifications, docs and the starter notebook's commented example. Then the lab CUSTOM source (`Lab · Support`, Q6) joined with PostgreSQL on the dev stack.
 11. **Docs.** `apps/docs` data-query page: a *Sources you can query* table from §4.1 (built rows only), *Live sources* (what pushdown means, the row cap, cost), and the custom section of §5.8.
 12. **Update this PRD**: §11 *As built* per phase (code, tests, what was verified on the dev stack and what was not), the status row, and `README.md`'s status table.
 
@@ -639,6 +641,10 @@ Work test-first (the repository's `tdd` skill). Each task is one commit; each ph
 
   - Wall time minus time in the Job is the Job starting: 18 s cold, then 4–9 s (pod start, uv sync of the notebook's `custom` group). In the Job, each register call takes about 1–3 s, which is most of the scan time.
   - **The re-filter caught a notebook bug.** The register answers `008316f` as `8316f`; the first `scan()` returned the register's spelling, and the engine dropped those rows because they did not meet `fnr IN ('008316f', …)` (2 of 4 companies returned, none wrong). Revision 29 answers each spelling the query asked for, one call per company.
-- **Not verified live:** a Data reader seeing a masked column of a custom table; the tables through the SQL gateway and MCP; the all-in-one image (local subprocess, no Job).
+- **After the review of ef855852 (2026-11-22):**
+  - Errors carry only a `ScanRefusedError`'s message, the contract's, or an exception's type and cell line; `Table(classify=)` masks by default; ODBC and CUSTOM stay job-only whatever `jobOnlySourceTypes` lists; the starter notebook has a commented `sql-tables` cell, run uncommented by a test; `Filter` is the connector tier's `Predicate` (`query/predicate.py`).
+  - **Lab:** `Lab · Support` (CUSTOM, `seed/support_notebook.py` → `sources/support.json`, tickets generated per customer in the notebook) and Q6 `q6_custom_pg.sql`, its tickets joined with `lab_shop.public.customers`. `bench_query.py --mix connectors --verify`: Q6 equals `expected.json` (24 rows), reading 483 tickets in 1 request (`status = 'open'` and `customer_id <= 1000` sent to the notebook); Q1–Q5 unchanged; 7.9 s, as a Job.
+  - **Firmenbuch revision 30:** refusals raise `ScanRefusedError` (*"companies is read live from the register, one company at a time: add WHERE fnr = …"*, no exception type), and `officers` classifies `name` and `birth_date` as personal. The catalog then masks both for people who do not read the register in clear; admin, who may unmask, still reads them.
+- **Not verified live:** a Data reader *running* a query on a masked custom column (the catalog's masks were checked, and the CLI applies them as for every table, `test_a_condition_on_a_masked_column_never_reaches_the_notebook`); the tables through the SQL gateway and MCP; the all-in-one image (local subprocess, no Job).
 - **Left for later:** a pool of warm notebook processes per source (the Job start dominates); semi-join pushdown would let `fnr IN (SELECT …)` reach `scan()`.
 
