@@ -73,10 +73,18 @@ class Predicate:
 
 
 def _shown(value: Any) -> str:
+    """A value as SQL writes it: ``'text'``, ``DATE '2026-11-16'``, ``5``."""
+    import datetime as dt
+
     if isinstance(value, str):
         return "'" + value.replace("'", "''") + "'"
     if isinstance(value, bool):
         return "true" if value else "false"
+    if isinstance(value, dt.datetime):
+        kind = "TIMESTAMPTZ" if value.tzinfo is not None else "TIMESTAMP"
+        return f"{kind} '{value.isoformat(sep=' ')}'"
+    if isinstance(value, dt.date):
+        return f"DATE '{value.isoformat()}'"
     return str(value)
 
 

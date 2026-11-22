@@ -133,11 +133,11 @@ class Filter:
 
 
 def _shown(value: Any) -> str:
-    if isinstance(value, str):
-        return "'" + value.replace("'", "''") + "'"
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    return str(value)
+    # The connector's own rendering: the scan stats match a used Filter to
+    # its pushed Predicate by this text.
+    from ..query.connectors.arrow import _shown as shown
+
+    return shown(value)
 
 
 @dataclass

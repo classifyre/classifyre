@@ -66,6 +66,10 @@ def scan(table, request):
     if MODE == "wrong_type":
         yield {"fnr": "x", "name": "x", "employees": "twelve"}
         return
+    if MODE == "dates":
+        (low,) = [f for f in request.filters if f.column == "founded"]
+        assert type(low.value).__name__ == "date", low
+        request.use(low)
     wanted = None if MODE == "ignore_filters" else request.values("fnr")
     request.count_request()
     for row in COMPANIES * (1000 if MODE == "many" else 1):
@@ -141,6 +145,17 @@ def test_in_lists_reach_scan_as_values() -> None:
     )
     assert [r["fnr"] for r in _rows(payload, result)] == ["001a", "003c"]
     assert payload["scans"][0]["rows"] == 2
+
+
+def test_date_filters_reach_scan_as_dates_and_show_as_sql() -> None:
+    payload, result = run_query(
+        _request(
+            "SELECT fnr FROM register.main.companies WHERE founded >= DATE '2000-01-01' ORDER BY 1",
+            mode="dates",
+        )
+    )
+    assert [r["fnr"] for r in _rows(payload, result)] == ["001a"]
+    assert payload["scans"][0]["pushed"] == ["founded >= DATE '2000-01-01'"]
 
 
 def test_a_notebook_that_ignores_the_filters_still_answers_right() -> None:
