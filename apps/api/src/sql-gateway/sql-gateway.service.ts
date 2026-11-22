@@ -1,4 +1,5 @@
 import { roomForSession, sessionMemoryConfig } from './memory-guard';
+import { SignInSlots, type SignInTicket } from './sign-in-slots';
 import {
   Inject,
   Injectable,
@@ -85,15 +86,7 @@ const STARTUP_SETTINGS = new Set([
 ]);
 
 const SWEEP_MS = 30_000;
-/** Sockets that may be signing in at once, and how long each may take. */
-const MAX_SIGNING_IN = 64;
 const SIGN_IN_MS = 20_000;
-/**
- * Sockets one address may have signing in at once: a BI tool's pool opens a
- * few together; one address must not take every slot of MAX_SIGNING_IN,
- * which every tenant shares (review of 60a16b9b, c5).
- */
-const MAX_SIGNING_IN_PER_ADDRESS = 16;
 
 /** Error codes of query runs, as the SQLSTATE a PostgreSQL client expects. */
 const SQLSTATE: Record<string, string> = {
@@ -330,9 +323,7 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
   private readonly sessionMemory = sessionMemoryConfig();
   private readonly lockout = new SignInLockout();
   /** Sockets not signed in yet. */
-  private signingIn = 0;
-  /** Sockets not signed in yet, by remote address. */
-  private readonly signingInFrom = new Map<string, number>();
+  private readonly signInSlots = new SignInSlots();
   /** Sessions signed in whose PGlite is starting: slot → connection id. */
   private readonly opening = new Map<number, string>();
   private nextSlot = 1;
@@ -409,46 +400,35 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
 
   private async accept(raw: Socket): Promise<void> {
     raw.on('error', () => undefined);
-    // Before sign-in a socket costs memory and gives nothing back: there are
-    // at most MAX_SIGNING_IN of them, each with SIGN_IN_MS to finish.
-    const address = raw.remoteAddress ?? '-';
-    const fromHere = this.signingInFrom.get(address) ?? 0;
-    if (
-      this.signingIn >= MAX_SIGNING_IN ||
-      fromHere >= MAX_SIGNING_IN_PER_ADDRESS
-    ) {
+    // Before sign-in a socket costs memory and gives nothing back: at most
+    // MAX_SIGNING_IN of them, each with SIGN_IN_MS to finish; per client
+    // counted once its address is known (sign-in-slots.ts).
+    const ticket = this.signInSlots.enter();
+    if (!ticket) {
       raw.destroy();
       return;
     }
-    this.signingIn += 1;
-    this.signingInFrom.set(address, fromHere + 1);
     const deadline = setTimeout(() => raw.destroy(), SIGN_IN_MS);
     deadline.unref();
-    const signedIn = () => {
-      clearTimeout(deadline);
-      this.signingIn -= 1;
-      const left = (this.signingInFrom.get(address) ?? 1) - 1;
-      if (left > 0) this.signingInFrom.set(address, left);
-      else this.signingInFrom.delete(address);
+    const signedIn: SignInTicket = {
+      identify: (client) => ticket.identify(client),
+      waiting: (on) => ticket.waiting(on),
+      leave: () => {
+        clearTimeout(deadline);
+        ticket.leave();
+      },
     };
-    let counted = true;
-    const once = () => {
-      if (counted) {
-        counted = false;
-        signedIn();
-      }
-    };
-    raw.once('close', once);
+    raw.once('close', () => signedIn.leave());
     try {
-      await this.acceptSigningIn(raw, once);
+      await this.acceptSigningIn(raw, signedIn);
     } finally {
-      once();
+      signedIn.leave();
     }
   }
 
   private async acceptSigningIn(
     raw: Socket,
-    signedIn: () => void,
+    signedIn: SignInTicket,
   ): Promise<void> {
     const config = this.config!;
     raw.setNoDelay(true);
@@ -467,6 +447,13 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
         }
         const proxied = await readProxyHeader(incoming);
         if (proxied) client = proxied;
+      }
+      // Counted by the client's own address: behind a proxy, only now known.
+      if (!signedIn.identify(client ?? '-')) {
+        throw new Refusal(
+          '53300',
+          'Too many connections from this address are signing in; try again in a moment.',
+        );
       }
       if (config.allowedCidrs.length && client) {
         const ip = client;
@@ -581,7 +568,7 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
     incoming: Incoming,
     params: Record<string, string>,
     client: string | null,
-    signedIn: () => void,
+    signedIn: SignInTicket,
   ): Promise<void> {
     const username = (params.user ?? '').toLowerCase();
     const database = params.database ?? username;
@@ -596,7 +583,11 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
       `u:${ns?.namespaceId ?? `?${database}`}:${username}:${client ?? '-'}`,
       `ip:${client ?? '-'}`,
     ];
-    if (!(await this.lockout.begin(keys))) {
+    if (
+      !(await this.lockout.begin(keys, undefined, undefined, (on) =>
+        signedIn.waiting(on),
+      ))
+    ) {
       throw new Refusal(
         '53300',
         'Another sign-in from here is under way; try again in a moment.',
@@ -671,7 +662,7 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
     client: string | null,
     keys: string[],
     release: () => void,
-    signedIn: () => void,
+    signedIn: SignInTicket,
   ): Promise<void> {
     const config = this.config!;
     const locked = keys.find((key) => this.lockout.isLocked(key));
@@ -804,7 +795,7 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
     row: NonNullable<
       Awaited<ReturnType<ConnectionSignInService['forSignIn']>>
     >['row'],
-    signedIn: () => void,
+    signedIn: SignInTicket,
   ): Promise<void> {
     const config = this.config!;
     const sub = row.personRef.replace(/^user:/, '');
@@ -832,7 +823,7 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
       at: Date.now(),
     };
     socket.write(authenticationOk());
-    signedIn();
+    signedIn.leave();
 
     // The catalog: what the person may read through this connection right now.
     const scope = await this.inWorkspace(ns, () =>

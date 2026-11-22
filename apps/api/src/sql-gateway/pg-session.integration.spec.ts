@@ -485,6 +485,63 @@ describe('PgSession over PGlite', () => {
     socket.end();
   }, 60_000);
 
+  it('refuses statements that would answer from empty tables, and FETCH 0', async () => {
+    // Re-review 2026-11-22: each of these reached PGlite and answered 0 rows.
+    const { socket, untilReady, codes } = await rawSession(port);
+    const orders = 'SELECT * FROM "shop.public".orders';
+    for (const sql of [
+      `PREPARE p AS ${orders}`,
+      `CREATE TEMP TABLE x AS ${orders}`,
+      `COPY (${orders}) TO STDOUT`,
+      'COPY "shop.public".orders TO STDOUT',
+      `DO $$ BEGIN PERFORM count(*) FROM "shop.public".orders; END $$`,
+      'CREATE FUNCTION pg_temp.f() RETURNS bigint LANGUAGE sql AS $$ SELECT 1 $$',
+    ]) {
+      socket.write(frontend.query(sql));
+      await untilReady();
+      expect([sql, codes()]).toEqual([sql, ['0A000']]);
+    }
+    // Over the catalog they are PGlite's, as before.
+    socket.write(
+      frontend.query(
+        'PREPARE c AS SELECT relname FROM pg_class LIMIT 1; EXECUTE c',
+      ),
+    );
+    await untilReady();
+    expect(codes()).toEqual([]);
+    socket.write(
+      frontend.query(`BEGIN;declare f cursor for ${orders};fetch 0 in f`),
+    );
+    await untilReady();
+    expect(codes()).toEqual(['0A000']);
+    socket.write(frontend.query('rollback'));
+    await untilReady();
+    socket.end();
+  }, 60_000);
+
+  it('drops a WITH HOLD cursor when its block rolls back through Parse/Execute', async () => {
+    const { socket, untilReady, codes } = await rawSession(port);
+    socket.write(
+      frontend.query(
+        'BEGIN;declare h cursor with hold for SELECT * FROM "shop.public".orders',
+      ),
+    );
+    await untilReady();
+    socket.write(
+      Buffer.concat([
+        frontend.parse('', 'ROLLBACK'),
+        frontend.bind('', '', []),
+        frontend.execute('', 0),
+        frontend.sync(),
+      ]),
+    );
+    await untilReady();
+    socket.write(frontend.query('fetch all in h'));
+    await untilReady();
+    expect(codes()).toEqual(['34000']);
+    socket.end();
+  }, 60_000);
+
   /**
    * The client corpus (fixtures/client-corpus, BIC §6): what Metabase,
    * psqlODBC and pgJDBC send, replayed statement by statement. A new driver

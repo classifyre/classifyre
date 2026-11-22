@@ -203,4 +203,17 @@ describe('one sign-in at a time per key', () => {
     expect(await waiting[1]).toBe(true);
     lockout.end(here);
   });
+
+  it('tells the caller while a sign-in waits, so it can give its slot back', async () => {
+    const lockout = new SignInLockout();
+    const seen: boolean[] = [];
+    expect(await lockout.begin(here)).toBe(true);
+    const second = lockout.begin(here, 5_000, 8, (on) => seen.push(on));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(seen).toEqual([true]);
+    lockout.end(here);
+    expect(await second).toBe(true);
+    expect(seen).toEqual([true, false]);
+    lockout.end(here);
+  });
 });

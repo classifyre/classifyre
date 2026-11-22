@@ -226,7 +226,6 @@ def drop_persona() -> None:
     kcadm(
         f"""OLD=$($K get users -r $R -q username={PERSONA} -q exact=true --fields id --format csv --noquotes | head -1)
 [ -z "$OLD" ] || $K delete "users/$OLD" -r $R
-ORG=$($K get organizations -r $R --fields id --format csv --noquotes | head -1)
 G=$($K get "organizations/$ORG/groups" -r $R --fields id,name --format csv --noquotes | {{ grep ",{PERSONA_GROUP}$" || true; }} | cut -d, -f1 | head -1)
 [ -z "$G" ] || $K delete "organizations/$ORG/groups/$G" -r $R"""
     )
@@ -584,8 +583,9 @@ def main() -> int:
         log(f"admin connection {admin_conn[0]}")
 
         persona_pw = secrets.token_hex(16)
-        group_id = make_persona(persona_pw)
+        # Registered first: a make_persona that fails halfway leaves nothing.
         cleanup.append(("drop persona", drop_persona))
+        group_id = make_persona(persona_pw)
         bodies = [{"subjectType": "group", "subjectId": group_id, "roleKey": "viewer"}] + [
             {"subjectType": "group", "subjectId": group_id, "roleKey": "data-reader",
              "scopeType": "asset", "resourceId": catalog[name]["assetId"]}

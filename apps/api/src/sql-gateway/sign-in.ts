@@ -85,6 +85,8 @@ const PRUNE_AT = 10_000;
 
 /** Sign-ins that may wait on one key (an address, a name) at once. */
 export const MAX_WAITERS_PER_KEY = 8;
+/** Sign-ins that may wait at once, all keys together. */
+export const MAX_WAITERS = 256;
 
 /**
  * Failed sign-ins per key (a user name, a client address): ten within 15
@@ -137,6 +139,8 @@ export class SignInLockout {
     keys: readonly string[],
     waitMs = 10_000,
     maxWaiters = MAX_WAITERS_PER_KEY,
+    /** Told when the sign-in starts and stops waiting (`SignInTicket.waiting`). */
+    onWait?: (waiting: boolean) => void,
   ): Promise<boolean> {
     const until = this.now() + waitMs;
     while (keys.some((key) => this.inFlight.has(key))) {
@@ -145,12 +149,16 @@ export class SignInLockout {
       // A pool opens a handful at once; more waiting on one key is one
       // address holding sign-in slots everyone shares (review c5).
       const blocked = keys.filter((key) => this.inFlight.has(key));
-      if (blocked.some((key) => (this.waiters.get(key) ?? 0) >= maxWaiters)) {
+      if (
+        blocked.some((key) => (this.waiters.get(key) ?? 0) >= maxWaiters) ||
+        this.waiting.size >= MAX_WAITERS
+      ) {
         return false;
       }
       blocked.forEach((key) =>
         this.waiters.set(key, (this.waiters.get(key) ?? 0) + 1),
       );
+      onWait?.(true);
       try {
         await new Promise<void>((resolve) => {
           const done = (): void => {
@@ -162,6 +170,7 @@ export class SignInLockout {
           this.waiting.add(done);
         });
       } finally {
+        onWait?.(false);
         for (const key of blocked) {
           const count = (this.waiters.get(key) ?? 1) - 1;
           if (count > 0) this.waiters.set(key, count);

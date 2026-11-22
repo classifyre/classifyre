@@ -27,6 +27,7 @@ import {
   splitStatements,
   substituteParams,
   parseCursorStatement,
+  withoutLeadingComments,
   type CursorStatement,
 } from './sql-text';
 
@@ -191,6 +192,8 @@ export class PgSession {
   /** After an error in the extended protocol: ignore everything until Sync. */
   private skipping = false;
   private status = 'I';
+  /** A ROLLBACK completed since the last ReadyForQuery. */
+  private sawRollback = false;
   private queue: Promise<void> = Promise.resolve();
   private running: AbortController | null = null;
   private decoders = new Map<string, string>();
@@ -360,14 +363,18 @@ export class PgSession {
     if (this.skipping && bytes[0] !== 'S'.charCodeAt(0)) return true;
     const reply = await this.raw(bytes);
     let failed = false;
-    let rolledBack = false;
     const out: Buffer[] = [];
     for (const m of splitMessages(reply)) {
       if (m.type === 'E') failed = true;
+      // Kept on the session: through Parse/Execute the ROLLBACK's
+      // CommandComplete comes in the Execute reply, its ReadyForQuery only
+      // in the Sync reply (re-review 2026-11-22).
       if (m.type === 'C' && /^ROLLBACK\b/.test(m.body.toString('utf8'))) {
-        rolledBack = true;
+        this.sawRollback = true;
       }
       if (m.type === 'Z') {
+        const rolledBack = this.sawRollback;
+        this.sawRollback = false;
         this.moveTo(String.fromCharCode(m.body[0]), rolledBack || failed);
         if (!keepReady) continue;
       }
@@ -420,6 +427,54 @@ export class PgSession {
     if (!READING_KEYWORDS.has(firstKeyword(sql)) || this.status === 'E') {
       return [];
     }
+    return this.readsOf(sql);
+  }
+
+  /**
+   * A statement other than a SELECT that would read your tables in PGlite,
+   * where they are empty, and answer 0 rows as if that were the result
+   * (re-review 2026-11-22): refused. Over the catalog it is PGlite's.
+   */
+  private async unservedRead(sql: string): Promise<DataError | null> {
+    if (this.status === 'E') return null;
+    const text = withoutLeadingComments(sql);
+    const word = firstKeyword(text);
+    if (
+      word === 'DO' ||
+      /^create\s+(?:or\s+replace\s+)?(?:function|procedure)\b/i.test(text)
+    ) {
+      return new DataError(
+        '0A000',
+        'Functions, procedures and DO blocks are not supported on a SQL connection.',
+      );
+    }
+    let probe: string | null = null;
+    if (word === 'PREPARE') {
+      probe =
+        /^prepare\s+\S+(?:\s*\([^)]*\))?\s+as\s+([\s\S]+)$/i.exec(text)?.[1] ??
+        null;
+    } else if (word === 'COPY') {
+      const query = /^copy\s*\(([\s\S]+)\)\s*to\b/i.exec(text)?.[1];
+      const table =
+        /^copy\s+((?:"(?:[^"]|"")+"|[^\s(".]+)(?:\.(?:"(?:[^"]|"")+"|[^\s(".]+))*)/i.exec(
+          text,
+        )?.[1];
+      probe = query ?? (table ? `TABLE ${table}` : null);
+    } else if (word === 'CREATE' || word === 'EXECUTE') {
+      probe = text;
+    }
+    if (!probe) return null;
+    const tables = await this.readsOf(probe).catch(() => ['?']);
+    return tables.length
+      ? new DataError(
+          '0A000',
+          `${word} over your tables is not served on a SQL connection: run the SELECT itself.`,
+        )
+      : null;
+  }
+
+  /** Your tables a statement reads, from its plan in PGlite. */
+  private async readsOf(sql: string): Promise<string[]> {
     const nulls = substituteParams(
       sql,
       Array.from({ length: 100 }, () => 'NULL'),
@@ -492,6 +547,10 @@ export class PgSession {
       let tables: string[] = [];
       try {
         tables = await this.classify(statement);
+        if (!tables.length) {
+          const refusal = await this.unservedRead(statement);
+          if (refusal) throw refusal;
+        }
       } catch (error) {
         await this.failSimple(error);
         return;
@@ -616,6 +675,17 @@ export class PgSession {
     }
     const open = this.cursors.get(cursor.name);
     if (!open) return 'pglite';
+    if (cursor.count === 0) {
+      // PostgreSQL re-reads the current row; answering 0 rows would look
+      // like the end of the result.
+      await this.failSimple(
+        new DataError(
+          '0A000',
+          'Cursors over your tables read forward only: FETCH NEXT, FORWARD n (n > 0) or ALL.',
+        ),
+      );
+      return 'failed';
+    }
     const start = open.offset;
     const wanted =
       cursor.count === 'all' ? Number.POSITIVE_INFINITY : cursor.count;
@@ -691,7 +761,13 @@ export class PgSession {
   private async parse(message: Message): Promise<void> {
     if (this.skipping) return;
     const parsed = parseParse(message.body);
-    const refusal = await this.extendedCursorRefusal(parsed.sql);
+    const refusal =
+      (await this.extendedCursorRefusal(parsed.sql)) ??
+      (READING_KEYWORDS.has(firstKeyword(parsed.sql))
+        ? null
+        : await this.unservedRead(parsed.sql).catch((error: unknown) =>
+            error instanceof DataError ? error : null,
+          ));
     if (refusal) {
       await this.failExtended(refusal);
       return;

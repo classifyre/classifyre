@@ -343,6 +343,21 @@ A Metabase or driver version bump is the same process: bump the image or jar ver
   - Without PROXY protocol, tenants behind one SNAT address share the per-address limits.
   - The duplicated pager (portal vs data cursor) and `signInTo`'s parameter list (review smells).
 
+**After the re-review, 2026-11-22** (`docs/reviews/2026-11-22-recheck-sql-gateway.md`):
+
+- **Fixed:**
+  - The per-client sign-in limit counts the address a PROXY header names, not the proxy's (`sign-in-slots.ts`). A sign-in waiting for the lockout leaves the shared pre-auth count while it waits; waits are bounded at 8 per key and 256 in all.
+  - A WITH HOLD cursor is dropped when its block rolls back through Parse/Execute.
+  - `FETCH 0` is refused (`0A000`).
+  - `PREPARE … AS`, `EXECUTE`, `CREATE … AS`, `COPY (…) TO` and `COPY table TO` over your tables are refused (`0A000`), as are functions, procedures and `DO` blocks; before, each answered 0 rows from PGlite's empty tables.
+  - bi-smoke cleanup: the persona's group in the `default` organization, registered before the persona is made.
+- **Still open (fidelity, each an error or a PostgreSQL difference, none a silent 0 rows):**
+  - `ROLLBACK TO SAVEPOINT` keeps a data cursor declared after the savepoint.
+  - A data cursor's name may repeat one of PGlite's own cursors.
+  - `FETCH 1 c -- comment` answers 34000, and `CLOSE c -- comment` does not close.
+  - A DECLARE without HOLD outside a transaction block runs (PostgreSQL refuses with 25P01).
+  - The cursor budget counts rows, not bytes.
+
 - **Not verified**: Npgsql/Power BI (BIC3), the `bi-smoke` skaffold profile (not added; `scripts/dev/bi-smoke.sh` installs the chart itself), the all-in-one image's gateway with these fixes, a corpus from a fresh capture (the two files are seeded from the POC and adapted to the spec's fixture catalog).
 
 ## 10. Work breakdown for the developer agent
