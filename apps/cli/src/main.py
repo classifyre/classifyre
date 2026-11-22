@@ -1168,6 +1168,12 @@ def main() -> None:
         from .query.runner import run_query_command
 
         sys.exit(run_query_command(sys.argv[2] if len(sys.argv) > 2 else None))
+    if len(sys.argv) > 1 and sys.argv[1] == "query-worker":
+        # The warm host for the same queries (src/query/worker.py): it imports
+        # what a query needs once, in its fork server, not here.
+        from .query.worker import run_worker_command
+
+        sys.exit(run_worker_command())
     from .telemetry import init_telemetry
 
     init_telemetry()

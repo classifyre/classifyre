@@ -1,5 +1,13 @@
 import { QueryRunStatus } from '@prisma/client';
-import { QueryRunService, runOrigin } from './query-run.service';
+import {
+  DEFAULT_MAX_ACTIVE_PER_PERSON,
+  DEFAULT_MAX_ACTIVE_PER_PERSON_JOBS,
+  DEFAULT_MAX_ACTIVE_PER_WORKSPACE,
+  maxActivePerWorkspace,
+  maxActivePerPerson,
+  QueryRunService,
+  runOrigin,
+} from './query-run.service';
 
 const table = (sqlName: string, assetId: string) => ({
   assetId,
@@ -14,13 +22,38 @@ const table = (sqlName: string, assetId: string) => ({
   location: { kind: 'table' },
 });
 
-function setup(options: { active?: number; result?: Buffer | null } = {}) {
+function setup(
+  options: {
+    active?: number;
+    workspaceActive?: number;
+    result?: Buffer | null;
+    started?: boolean;
+    /** The person's active runs once this one is inserted (a race). */
+    activeAfterInsert?: number;
+    /** Active runs holding (or claiming) a Job. */
+    jobs?: number;
+    /** What a conditional result write matches (0: a cancel won). */
+    settles?: number;
+  } = {},
+) {
   const created: Record<string, unknown>[] = [];
   const updates: Record<string, unknown>[] = [];
   const order: string[] = [];
+  const settled: Array<{ where: any; data: any }> = [];
+  const runs: any[] = [];
   const prisma = {
     queryRun: {
-      count: () => Promise.resolve(options.active ?? 0),
+      // The person's runs carry personRef/actorRef; the workspace count does not.
+      count: ({ where }: { where: Record<string, unknown> }) =>
+        Promise.resolve(
+          'jobName' in where
+            ? (options.jobs ?? 0)
+            : 'personRef' in where || 'actorRef' in where
+              ? created.length && options.activeAfterInsert !== undefined
+                ? options.activeAfterInsert
+                : (options.active ?? 0)
+              : (options.workspaceActive ?? 0),
+        ),
       create: ({ data }: { data: Record<string, unknown> }) => {
         created.push(data);
         return Promise.resolve({ id: 'run-1', ...data });
@@ -29,8 +62,24 @@ function setup(options: { active?: number; result?: Buffer | null } = {}) {
         updates.push(data);
         return Promise.resolve({});
       },
-      updateMany: ({ data }: { data: Record<string, unknown> }) => {
+      updateMany: ({ where, data }: { where: any; data: any }) => {
+        if (where?.createdAt) {
+          settled.push({ where, data });
+          return Promise.resolve({ count: 0 });
+        }
+        if (where?.OR || 'jobName' in data) {
+          updates.push({ where, data });
+          return Promise.resolve({
+            count: where?.OR ? (options.settles ?? 1) : 1,
+          });
+        }
         order.push(`status:${String(data.status)}`);
+        if (
+          data.status === QueryRunStatus.RUNNING &&
+          options.started === false
+        ) {
+          return Promise.resolve({ count: 0 });
+        }
         return Promise.resolve({ count: 1 });
       },
       findUnique: () =>
@@ -72,7 +121,11 @@ function setup(options: { active?: number; result?: Buffer | null } = {}) {
   };
   const cliRunner = {
     queryCallbackBaseUrl: () => 'http://api/ns',
-    runQueryExecution: () => Promise.resolve({ output: '', exitCode: 0 }),
+    runQueryExecution: (params: unknown) => {
+      runs.push(params);
+      order.push('run');
+      return Promise.resolve({ output: '', exitCode: 0 });
+    },
     cancelQueryExecution: () => {
       order.push('cancel-job');
       return Promise.resolve();
@@ -95,7 +148,7 @@ function setup(options: { active?: number; result?: Buffer | null } = {}) {
     { check: () => Promise.resolve({ allow: true }) } as never,
     { resolve: () => Promise.resolve({ datasets: [] }) } as never,
   );
-  return { service, created, updates, order };
+  return { service, created, updates, order, settled, runs, prisma };
 }
 
 const input = (tables: string[]) => ({
@@ -149,7 +202,9 @@ describe('runOrigin', () => {
 
 describe('QueryRunService for SQL connections', () => {
   it('refuses at the person’s cap', async () => {
-    const { service, created } = setup({ active: 3 });
+    const { service, created } = setup({
+      active: DEFAULT_MAX_ACTIVE_PER_PERSON,
+    });
     const result = await service.createForConnection(
       input(['shop.public.orders']),
     );
@@ -157,6 +212,29 @@ describe('QueryRunService for SQL connections', () => {
       refused: { code: 'too_many_queries', sqlState: '53000' },
     });
     expect(created).toHaveLength(0);
+  });
+
+  it('refuses when the workspace has its share of the worker pool', async () => {
+    const { service, created } = setup({
+      workspaceActive: DEFAULT_MAX_ACTIVE_PER_WORKSPACE,
+    });
+    const result = await service.createForConnection(
+      input(['shop.public.orders']),
+    );
+    expect(result).toMatchObject({
+      refused: { code: 'too_many_queries' },
+    });
+    expect(created).toHaveLength(0);
+  });
+
+  it('does not start a run cancelled while it waited', async () => {
+    const { service, order } = setup({ started: false });
+    const result = await service.createForConnection(
+      input(['shop.public.orders']),
+    );
+    if ('runId' in result) await result.done;
+    expect(order).toContain(`status:${QueryRunStatus.RUNNING}`);
+    expect(order).not.toContain('run');
   });
 
   it('refuses tables the catalog does not give this connection', async () => {
@@ -196,5 +274,113 @@ describe('QueryRunService for SQL connections', () => {
     const { service, order } = setup();
     await service.cancelConnectionRun('run-1');
     expect(order).toEqual([`status:${QueryRunStatus.CANCELLED}`, 'cancel-job']);
+  });
+});
+
+describe('lost runs', () => {
+  it('settles runs nothing will settle before counting the cap', async () => {
+    const { service, settled } = setup();
+    const before = Date.now();
+    await service.createForConnection(input(['shop.public.orders']));
+    expect(settled).toHaveLength(1);
+    const { where, data } = settled[0];
+    expect(where.status.in).toEqual([
+      QueryRunStatus.PENDING,
+      QueryRunStatus.RUNNING,
+    ]);
+    // Older than any query can live: 900 s timeout plus a Job's start.
+    const age = before - (where.createdAt.lt as Date).getTime();
+    expect(age).toBeGreaterThanOrEqual(30 * 60 * 1000 - 1000);
+    expect(data).toMatchObject({
+      status: QueryRunStatus.ERROR,
+      error: { code: 'lost' },
+    });
+    // Kept: a result that arrives after all is still recorded and audited.
+    expect(data).not.toHaveProperty('callbackTokenHash');
+  });
+});
+
+describe('maxActivePerPerson', () => {
+  const worker = { QUERY_WORKER_URL: 'http://w:8090' };
+  it('defaults high with a worker and takes a positive number from the environment', () => {
+    expect(maxActivePerPerson(worker)).toBe(DEFAULT_MAX_ACTIVE_PER_PERSON);
+    expect(
+      maxActivePerPerson({ ...worker, QUERY_MAX_ACTIVE_PER_PERSON: '50' }),
+    ).toBe(50);
+    expect(
+      maxActivePerPerson({ ...worker, QUERY_MAX_ACTIVE_PER_PERSON: '0' }),
+    ).toBe(DEFAULT_MAX_ACTIVE_PER_PERSON);
+    expect(
+      maxActivePerPerson({ ...worker, QUERY_MAX_ACTIVE_PER_PERSON: 'x' }),
+    ).toBe(DEFAULT_MAX_ACTIVE_PER_PERSON);
+  });
+
+  it('keeps the Job-sized default without a worker', () => {
+    expect(maxActivePerPerson({})).toBe(DEFAULT_MAX_ACTIVE_PER_PERSON_JOBS);
+  });
+
+  it('caps a workspace too', () => {
+    expect(maxActivePerWorkspace({})).toBe(DEFAULT_MAX_ACTIVE_PER_WORKSPACE);
+    expect(
+      maxActivePerWorkspace({ QUERY_MAX_ACTIVE_PER_WORKSPACE: '30' }),
+    ).toBe(30);
+  });
+});
+
+describe('admission under concurrency (review of 383fd5c4, P6, P7)', () => {
+  const cap = maxActivePerPerson();
+
+  it('withdraws a run another one pushed over the cap after both were checked', async () => {
+    const { service, updates } = setup({
+      active: cap - 1,
+      activeAfterInsert: cap + 1,
+    });
+    const result = await service.createForConnection(
+      input(['shop.public.orders']),
+    );
+    expect(result).toMatchObject({ refused: { code: 'too_many_queries' } });
+    expect(updates).toContainEqual(
+      expect.objectContaining({
+        status: QueryRunStatus.ERROR,
+        error: expect.objectContaining({ code: 'too_many_queries' }),
+      }),
+    );
+  });
+
+  it('claims a Job before counting, so a burst cannot pass the cap together', async () => {
+    const { service, runs, updates } = setup({ jobs: 11 });
+    const result = await service.createForConnection(
+      input(['shop.public.orders']),
+    );
+    if ('runId' in result) await result.done;
+    const mayStartJob = (
+      runs[0] as { mayStartJob: () => Promise<string | null> }
+    ).mayStartJob;
+    await expect(mayStartJob()).resolves.toMatch(/slot is taken/);
+    const writes = updates.filter((u: any) => u.data && 'jobName' in u.data);
+    expect(writes.map((u: any) => u.data.jobName)).toEqual(['claimed', null]);
+  });
+
+  it('records nothing when a cancel lands before the result is written', async () => {
+    const { createHash } = await import('crypto');
+    const audits: unknown[] = [];
+    const { service, prisma } = setup({ settles: 0 });
+    (service as any).audit = { record: (e: unknown) => audits.push(e) };
+    prisma.queryRun.findUnique = () =>
+      Promise.resolve({
+        callbackTokenHash: createHash('sha256')
+          .update('tok', 'utf8')
+          .digest('hex'),
+        status: QueryRunStatus.RUNNING,
+        error: null,
+        actorRef: 'user:ana',
+        channel: 'sql',
+      } as never);
+    const meta = Buffer.from(
+      JSON.stringify({ tables: ['shop.public.orders'] }),
+    ).toString('base64');
+    (service as any).assetIdsFor = () => Promise.resolve(['a1']);
+    await service.receiveResult('run-1', 'tok', Buffer.from('arrow'), meta);
+    expect(audits).toEqual([]);
   });
 });

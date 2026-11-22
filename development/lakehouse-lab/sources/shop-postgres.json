@@ -1,0 +1,30 @@
+{
+  "type": "POSTGRESQL",
+  "name": "Lab · Shop",
+  "config": {
+    "type": "POSTGRESQL",
+    "required": {
+      "host": "lab-shop-pg.classifyre-dev.svc",
+      "port": 5432
+    },
+    "masked": {
+      "username": "lab",
+      "password": "lab-shop-pass"
+    },
+    "optional": {
+      "scope": {
+        "database": "shop"
+      }
+    },
+    "sampling": {
+      "strategy": "RANDOM",
+      "rows_per_page": 50
+    },
+    "detectors": [
+      {
+        "type": "PII",
+        "enabled": true
+      }
+    ]
+  }
+}

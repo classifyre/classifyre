@@ -85,6 +85,23 @@ describe('notebook execution environment', () => {
     }
   });
 
+  it('keeps the query engine settings, the local-folder allowlist above all', () => {
+    const env = buildNotebookEnvironment({
+      PATH: '/usr/bin',
+      CLASSIFYRE_QUERY_LOCAL_ROOTS: '/data',
+      CLASSIFYRE_QUERY_MEMORY_LIMIT: '1GB',
+      CLASSIFYRE_INTERNAL_KEY: 'k',
+    });
+    expect(env.CLASSIFYRE_QUERY_LOCAL_ROOTS).toBe('/data');
+    expect(env.CLASSIFYRE_QUERY_MEMORY_LIMIT).toBe('1GB');
+    expect(env.CLASSIFYRE_INTERNAL_KEY).toBeUndefined();
+    // Set but empty is an allowlist too: no folder may be read.
+    expect(
+      buildNotebookEnvironment({ CLASSIFYRE_QUERY_LOCAL_ROOTS: '' })
+        .CLASSIFYRE_QUERY_LOCAL_ROOTS,
+    ).toBe('');
+  });
+
   it('passes through the directory holding the source uploaded files', () => {
     // ctx.files is a path, not a credential: it is how a notebook reaches its
     // uploads without holding the means to fetch anything from the API.

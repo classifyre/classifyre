@@ -1,0 +1,22 @@
+#!/command/with-contenv bash
+# The warm SQL query worker (apps/cli/src/query/worker.py): imports DuckDB and
+# every source once and forks one process per query. Listens on 127.0.0.1 only;
+# the API signs its requests with the token in QUERY_WORKER_TOKEN_FILE (written
+# by entrypoint.sh, readable by the classifyre user only). The worker strips its own
+# environment to an allowlist before any query runs, so the API's database URL
+# and keys in this container never reach a query.
+set -euo pipefail
+
+if [ "${QUERY_WORKER_ENABLED:-true}" != "true" ]; then
+  # Off: stay up doing nothing, so s6 does not restart it in a loop.
+  exec sleep infinity
+fi
+
+cd /app/apps/cli
+exec s6-setuidgid classifyre \
+  env CLASSIFYRE_QUERY_WORKER_TOKEN_FILE="${QUERY_WORKER_TOKEN_FILE}" \
+      CLASSIFYRE_QUERY_WORKER_HOST=127.0.0.1 \
+      CLASSIFYRE_QUERY_WORKER_PORT="${QUERY_WORKER_PORT}" \
+      CLASSIFYRE_QUERY_WORKER_SLOTS="${QUERY_WORKER_SLOTS}" \
+      CLASSIFYRE_QUERY_WORKER_MEMORY_MB="${QUERY_WORKER_MEMORY_MB}" \
+  "${VENV_PATH:-/app/apps/cli/.venv}/bin/python" -m src.main query-worker

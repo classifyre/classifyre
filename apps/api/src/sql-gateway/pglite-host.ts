@@ -30,6 +30,22 @@ BEGIN
   );
 END$$;
 REVOKE ALL ON SCHEMA classifyre FROM PUBLIC;
+-- Functions that run SQL text: what they read never shows in a plan, so a
+-- SELECT through them would read PGlite's empty copies of your tables and
+-- answer as if they were empty (re-review 2026-11-22). Clients never need them.
+DO $$
+DECLARE
+  f regprocedure;
+BEGIN
+  FOR f IN
+    SELECT p.oid::regprocedure FROM pg_proc p
+     WHERE p.pronamespace = 'pg_catalog'::regnamespace
+       AND (p.proname LIKE '%\\_to\\_xml%' OR p.proname LIKE '%\\_to\\_xmlschema'
+            OR p.proname IN ('ts_stat', 'ts_rewrite', 'query_to_xml_and_xmlschema'))
+  LOOP
+    EXECUTE format('REVOKE EXECUTE ON FUNCTION %s FROM PUBLIC', f);
+  END LOOP;
+END$$;
 `;
 
 const TEMPLATE_TTL_MS = 6 * 60 * 60 * 1000;

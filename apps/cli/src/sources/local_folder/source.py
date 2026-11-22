@@ -60,6 +60,11 @@ class LocalFolderSource(ObjectStorageSourceBase):
             raise ValueError(f"Folder does not exist: {root}")
         if not root.is_dir():
             raise ValueError(f"Path is not a folder: {root}")
+        # Scans and queries alike: never the image's own state (its key file
+        # decrypts every workspace's credentials) nor other work's temp files.
+        from ...utils.local_roots import refuse_local_root
+
+        refuse_local_root(str(root), "Classifyre")
         self._resolved_root = root.resolve()
         return self._resolved_root
 

@@ -1,4 +1,9 @@
 import { DeploymentSettingsService } from '../deployment-settings/deployment-settings.service';
+import {
+  QueryWorkerClient,
+  queryErrorLine,
+  type QueryWorkerRun,
+} from './query-worker.client';
 import { enqueueSemanticAfterRun } from '../semantic/semantic-jobs.scheduler';
 import {
   Injectable,
@@ -269,6 +274,8 @@ export class CliRunnerService {
     private pause?: NamespacePauseService,
     @Optional()
     private deploymentSettings?: DeploymentSettingsService,
+    @Optional()
+    private queryWorker?: QueryWorkerClient,
   ) {}
 
   /** Current namespace UUID from CLS, if running within a namespace context. */
@@ -2556,15 +2563,34 @@ export class CliRunnerService {
    * printed status line is only read when that callback never came. Local
    * runs get the notebook environment (no database URL, no callback key).
    */
-  async runQueryExecution(params: {
-    runId: string;
-    request: Record<string, unknown>;
-    timeoutSeconds: number;
-    onJobCreated?: (job: {
-      jobName: string;
-      namespace: string;
-    }) => void | Promise<void>;
-  }): Promise<{ output: string; exitCode: number }> {
+  async runQueryExecution(
+    params: QueryWorkerRun & {
+      onJobCreated?: (job: {
+        jobName: string;
+        namespace: string;
+      }) => void | Promise<void>;
+      /**
+       * Asked before a query the worker did not take starts a Job: null to
+       * go ahead, or why not (the workspace has its share of Jobs running).
+       * Asked for queries only a Job may run (`job_only`) too.
+       */
+      mayStartJob?: () => Promise<string | null>;
+    },
+  ): Promise<{ output: string; exitCode: number }> {
+    // The warm query worker first; a Job (or local process) when it does not
+    // take the query (all slots busy, draining, unreachable).
+    if (this.queryWorker?.enabled) {
+      const result = await this.queryWorker.run(params);
+      if (result && !('notTaken' in result)) return result;
+      // Jobs only a Job may run (ODBC) count against the same share: they
+      // are Jobs all the same (review of 383fd5c4, P6).
+      if (params.mayStartJob) {
+        const refusal = await params.mayStartJob();
+        if (refusal) {
+          return { output: queryErrorLine('busy', refusal), exitCode: 1 };
+        }
+      }
+    }
     const environment = process.env.ENVIRONMENT || 'development';
     if (this.isKubernetesExecutionEnabled(environment)) {
       if (!this.kubernetesCliJobService) {
@@ -2603,8 +2629,9 @@ export class CliRunnerService {
     }
   }
 
-  /** Stop a running query: delete its Job, or end its local process. */
+  /** Stop a running query: drop its worker request, delete its Job, or end its local process. */
   async cancelQueryExecution(runId: string): Promise<void> {
+    this.queryWorker?.cancel(runId);
     if (this.kubernetesCliJobService) {
       await this.kubernetesCliJobService
         .cancelQueryJob(runId)

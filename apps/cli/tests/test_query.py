@@ -237,6 +237,42 @@ def test_postgres_client_sql_runs_on_duckdb(folder: Path) -> None:
     assert payload["tables"] == ["files.local.customers", "files.local.orders"]
 
 
+def test_postgres_client_fully_qualified_columns_run_on_duckdb(folder: Path) -> None:
+    # Metabase's query builder names every column with its schema and table,
+    # `"src.sch"."tbl"."col"` (POC F10, BIC M2): the qualifier is the table's
+    # client name and must be rewritten with it.
+    payload, result = run_query(
+        _request(
+            folder,
+            'SELECT "files.local"."customers"."country" AS "country", count(*) AS "count" '
+            'FROM "files.local"."customers" '
+            'INNER JOIN "files.local"."orders" AS "Orders" '
+            'ON "files.local"."customers"."id" = "Orders"."customer_id" '
+            'WHERE lab."files.local"."customers"."country" = \'AT\' '
+            'GROUP BY "files.local"."customers"."country" '
+            'ORDER BY "files.local"."customers"."country" ASC LIMIT 2000',
+            dialect="postgres",
+            database="lab",
+            searchPath=["files.local"],
+        )
+    )
+    assert _rows(payload, result) == [{"country": "AT", "count": 100}]
+    assert payload["tables"] == ["files.local.customers", "files.local.orders"]
+
+
+def test_postgres_client_column_of_a_table_not_read_is_refused(folder: Path) -> None:
+    payload, _ = run_query(
+        _request(
+            folder,
+            'SELECT "files.local"."secret"."id" FROM "files.local"."customers"',
+            dialect="postgres",
+            database="lab",
+            searchPath=["files.local"],
+        )
+    )
+    assert payload["error"]["code"] == "table_not_available"
+
+
 def _masked(folder: Path, sql: str, masks: list[dict[str, Any]], **extra: Any) -> Any:
     request = _request(folder, sql, maskSalt="salt-1", **extra)
     request["tables"][0]["columns"] = masks
@@ -662,10 +698,10 @@ def _attach_mysql(
     ca: str | None = None,
     password: str = "s3cret",
 ) -> tuple[Any, list[str]]:
-    from src.query import bindings
     from src.query.bindings import SourceBinding, TableLocation
+    from src.query.connectors import base as connectors_base
 
-    monkeypatch.setattr(bindings, "load_extension", lambda *_args: None)
+    monkeypatch.setattr(connectors_base, "load_extension", lambda *_args: None)
     recipe: dict[str, Any] = {
         "type": "MYSQL",
         "required": {"host": "db.example.test", "port": 3306},
@@ -793,11 +829,11 @@ def test_geojson_geometry_reads_as_text(folder: Path) -> None:
 def _attach_databricks(
     monkeypatch: pytest.MonkeyPatch, workspace_url: str
 ) -> tuple[Any, list[str], list[str]]:
-    from src.query import bindings
     from src.query.bindings import SourceBinding, TableLocation
+    from src.query.connectors import base as connectors_base
 
     loaded: list[str] = []
-    monkeypatch.setattr(bindings, "load_extension", lambda _conn, name: loaded.append(name))
+    monkeypatch.setattr(connectors_base, "load_extension", lambda _conn, name: loaded.append(name))
     recipe = {
         "type": "DATABRICKS",
         "required": {"workspace_url": workspace_url, "warehouse_id": "w"},
@@ -862,11 +898,11 @@ def test_databricks_endpoint_is_named_like_the_scan_does() -> None:
 
 
 def _attach_odbc(monkeypatch: pytest.MonkeyPatch, qualified: str = '"sales"."orders"') -> Any:
-    from src.query import bindings
     from src.query.bindings import SourceBinding, TableLocation
+    from src.query.connectors import base as connectors_base
 
     loaded: list[str] = []
-    monkeypatch.setattr(bindings, "load_extension", lambda _conn, name: loaded.append(name))
+    monkeypatch.setattr(connectors_base, "load_extension", lambda _conn, name: loaded.append(name))
     recipe = {
         "type": "ODBC",
         "required": {"connection_string": "Driver={PostgreSQL Unicode};Server=db.test;Port=5432"},
@@ -902,10 +938,10 @@ def test_odbc_reads_through_the_scanner_with_the_credentials_in_a_variable(
 
 
 def test_odbc_without_a_recorded_name_asks_for_a_rescan(monkeypatch: pytest.MonkeyPatch) -> None:
-    from src.query import bindings
     from src.query.bindings import BindingError, SourceBinding, TableLocation
+    from src.query.connectors import base as connectors_base
 
-    monkeypatch.setattr(bindings, "load_extension", lambda *_a: None)
+    monkeypatch.setattr(connectors_base, "load_extension", lambda *_a: None)
     binding = SourceBinding("warehouse", 0, {"type": "ODBC"}, "src-1")
     with pytest.raises(BindingError, match="run a scan of the source again"):
         binding.relation(_RecordingConn(), TableLocation(kind="catalog", table="orders"))
@@ -1101,3 +1137,111 @@ def test_describe_marks_columns_no_table_feeds(folder: Path) -> None:
     )
     by_table = {entry["table"]: entry["fields"] for entry in payload["describe"]["lineage"]}
     assert {f["downstream"] for f in by_table[""]} >= {"n", "label"}
+
+
+def test_locked_session_reads_its_folder_and_no_other_local_path(
+    folder: Path, tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    """Behind the gate: once locked, DuckDB opens no local file but the
+    query's own (its source's folder, its spill directory), so a query that
+    got past the gate still cannot read another query's files or /proc."""
+    from src.query.session import QueryRequest, QuerySession
+
+    other = tmp_path_factory.mktemp("other-query")
+    (other / "secret.csv").write_text("a\n1\n")
+    session = QuerySession(QueryRequest.from_dict(_request(folder, "SELECT 1")))
+    try:
+        conn = session._open()
+        session._conn = conn
+        session._attach_tables_as_views(conn, set(session._tables))
+        session._lock_down(conn)
+        assert conn.execute('SELECT count(*) FROM "files"."local"."customers"').fetchone() == (30,)
+        for path in (str(other / "secret.csv"), "/etc/hosts", f"{folder}/../{other.name}/x"):
+            with pytest.raises(duckdb.PermissionException):
+                conn.execute(f"SELECT * FROM read_text('{path}')").fetchall()
+        # HTTP only to the query's own sources' endpoints: never an in-cluster
+        # service a source did not name (review of 383fd5c4, P15).
+        for url in ("http://classifyre-api.classifyre-dev.svc:8000/x", "https://example.com/x"):
+            with pytest.raises(duckdb.PermissionException):
+                conn.execute(f"SELECT * FROM read_text('{url}')").fetchall()
+        with pytest.raises(duckdb.Error):
+            conn.execute("SET enable_external_access = true")
+        # Writing out, attaching or installing are refused too (review of
+        # 383fd5c4, P8): the gate refuses them first, this is the wall behind.
+        for statement in (
+            f"COPY (SELECT 1) TO '{other}/leak.csv'",
+            f"ATTACH '{other}/x.duckdb' AS x",
+            "INSTALL spatial",
+            "LOAD 'spatial'",
+        ):
+            with pytest.raises(duckdb.Error):
+                conn.execute(statement)
+        assert not (other / "leak.csv").exists()
+    finally:
+        session.close()
+
+
+@pytest.mark.parametrize(
+    "root", ["/", "/tmp", "/proc", "/etc/ssl", "/run", "/var/lib/classifyre", "/app", "/opt"]
+)
+def test_a_local_root_that_opens_the_lockdown_is_refused(
+    folder: Path, root: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A workspace admin sets a local folder's path; a root of / or /tmp
+    would let its queries read every other query's private directory
+    (review of 383fd5c4, P15)."""
+    monkeypatch.delenv("CLASSIFYRE_QUERY_LOCAL_ROOTS", raising=False)
+    request = _request(folder, "SELECT count(*) FROM files.local.customers")
+    request["sources"][0]["recipe"]["required"]["path"] = root
+    payload, _ = run_query(request)
+    assert payload["status"] == "error"
+    assert payload["error"]["code"] == "source_unavailable"
+    # (A root this machine lacks, /proc on macOS, fails as missing first.)
+    message = payload["error"]["message"]
+    assert "may not be read by" in message or "does not exist" in message
+
+
+def test_a_local_root_inside_the_query_directories_is_refused(
+    folder: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("CLASSIFYRE_QUERY_LOCAL_ROOTS", raising=False)
+    other = tmp_path / "classifyre-queries" / "q-other"
+    other.mkdir(parents=True)
+    request = _request(folder, "SELECT count(*) FROM files.local.customers")
+    request["sources"][0]["recipe"]["required"]["path"] = str(other)
+    payload, _ = run_query(request)
+    assert payload["error"]["code"] == "source_unavailable", payload
+
+
+def test_with_an_allowlist_only_roots_inside_it_are_read(
+    folder: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("CLASSIFYRE_QUERY_LOCAL_ROOTS", str(folder))
+    ok, result = run_query(_request(folder, "SELECT count(*) AS n FROM files.local.customers"))
+    assert _rows(ok, result) == [{"n": 30}]
+    monkeypatch.setenv("CLASSIFYRE_QUERY_LOCAL_ROOTS", str(tmp_path / "elsewhere"))
+    refused, _ = run_query(_request(folder, "SELECT count(*) FROM files.local.customers"))
+    assert refused["error"]["code"] == "source_unavailable"
+    # Set but empty: the operator mounted no folders, so none is read.
+    monkeypatch.setenv("CLASSIFYRE_QUERY_LOCAL_ROOTS", "")
+    none, _ = run_query(_request(folder, "SELECT count(*) FROM files.local.customers"))
+    assert none["error"]["code"] == "source_unavailable"
+
+
+def test_a_source_s_own_http_endpoint_stays_open() -> None:
+    from src.query.session import recipe_endpoints
+
+    recipe = {
+        "type": "ICEBERG_REST",
+        "required": {"uri": "https://catalog.example.com:8181/api/catalog"},
+        "optional": {
+            "connection": {"endpoint_url": "http://lab-s3.svc:9000"},
+            "x": ["https://a.b/c"],
+        },
+        "masked": {"token": "https://not-a-place-to-open"},
+    }
+    assert recipe_endpoints(recipe) == [
+        "http://lab-s3.svc:9000/",
+        "https://a.b/",
+        "https://catalog.example.com:8181/",
+    ]

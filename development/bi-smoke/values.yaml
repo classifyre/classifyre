@@ -1,0 +1,28 @@
+# Throwaway BI tooling for the dev cluster only (namespace classifyre-dev).
+# scripts/dev/bi-smoke.sh installs it as release `bi-smoke`; bi_smoke.py drives it.
+
+metabase:
+  # The version the payload proof of concept found F3–F10 with. Bump it on
+  # purpose, with a corpus capture (BIC §6.4).
+  image: metabase/metabase:v0.65.6.2
+  # Metabase's own default is 15; the gateway allows 4 sessions per connection
+  # (sqlGateway.maxSessionsPerConnection), and a pool larger than that fails
+  # as a whole ("This SQL connection has 4 sessions open already", found
+  # 2026-11-21). 4 is what the docs tell Metabase admins to set; empty =
+  # Metabase's default, to reproduce the finding.
+  dataWarehousePoolSize: "4"
+  javaOpts: -Xmx1g
+  resources:
+    requests: { cpu: 200m, memory: 1Gi }
+    limits: { memory: 2Gi }
+  # The gateway's CA, written by bi_smoke.py (configmap bi-smoke-ca).
+  caConfigMap: bi-smoke-ca
+
+drivers:
+  # Rendered only by bi_smoke.py (helm template --show-only, then kubectl apply).
+  enabled: false
+  image: classifyre/bi-smoke-drivers:dev
+  # A new name per run: Jobs are immutable.
+  runId: manual
+  # Secret with spec.json and ca.crt, written by bi_smoke.py.
+  specSecret: bi-smoke-drivers-spec

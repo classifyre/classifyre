@@ -45,7 +45,7 @@ A table's or source's owner or steward can **give a connection** for it to someo
 
 Every connection uses TLS and checks the server's certificate (`sslmode=verify-full`). When your installation uses its own certificate authority, download it from the connection dialog (**Download the certificate authority**) and point your tool at it.
 
-<Tabs items={["psql", "DBeaver / JDBC", "Power BI", "Excel / ODBC", "Tableau"]}>
+<Tabs items={["psql", "DBeaver / JDBC", "Power BI", "Excel / ODBC", "Tableau", "Metabase"]}>
 <Tabs.Tab>
 ```bash
 psql "host=sql.example.com port=5432 dbname=finance user=ana_power_bi sslmode=verify-full sslrootcert=classifyre-sql-ca.crt"
@@ -68,9 +68,19 @@ Install the PostgreSQL ODBC driver (*psqlODBC*, "PostgreSQL Unicode"), then in E
 ```text
 Driver={PostgreSQL Unicode};Server=sql.example.com;Port=5432;Database=finance;Uid=ana_excel;Pwd=…;SSLMode=verify-full;
 ```
+
+*Use Declare/Fetch* (`UseDeclareFetch=1`, which reads a large result in pages) works; the driver's server-side prepare works either way.
 </Tabs.Tab>
 <Tabs.Tab>
 **Connect → PostgreSQL**: server, port, database, username and password; tick **Require SSL**. Tableau uses its bundled JDBC driver and the JDBC settings above.
+</Tabs.Tab>
+<Tabs.Tab>
+**Admin → Databases → Add database → PostgreSQL**. Host, port, database name (the workspace), username and password from the dialog; turn on **Use a secure connection (SSL)**, mode `verify-full`, and give the downloaded CA as the server SSL certificate. Then:
+
+- Set `MB_JDBC_DATA_WAREHOUSE_MAX_CONNECTION_POOL_SIZE=4` on the Metabase server (see [Tools that pool connections](#tools-that-pool-connections)).
+- Under **Scheduling**, scan field values *Only when adding a new filter widget* and turn refingerprinting off: every scan is a query against your sources.
+
+Table previews, the query builder (filters, groupings, joins, binning, median) and native SQL all work.
 </Tabs.Tab>
 </Tabs>
 
@@ -85,18 +95,27 @@ SELECT * FROM invoices WHERE amount > 1000;
 
 Without quotes, PostgreSQL reads `source.schema.table` as *database.schema.table* and refuses it; write `"source.schema".table`, or `"lakehouse-lab"."source.schema".table` with the workspace as the database.
 
+### Tools that pool connections
+
+Metabase, Tableau Server and application servers keep several connections open to the same database. A SQL connection allows **4 sessions at a time** (`sqlGateway.maxSessionsPerConnection`); a pool larger than that cannot open its extra connections, and some tools then give up on all of them. Set the tool's pool to 4 or fewer (Metabase: `MB_JDBC_DATA_WAREHOUSE_MAX_CONNECTION_POOL_SIZE=4`). Connections a pool opens at the same moment sign in one after the other (each waits up to 10 s for the one before it), so a pool of 4 opening at once is fine.
+
+Everyone using such a tool reads through its one SQL connection, with **its** person's access: give a shared BI tool a connection of a person (or a scope) whose access every user of that tool may have. Values the tool stores for its filters come through that connection too, masked as that person sees them.
+
 ## What happens to a query
 
-Catalog queries — the schemas, tables and columns tools read to show you what is there — are answered at once from a PostgreSQL catalog made for your session. A query that reads your tables runs as a SQL job, exactly like one from the Query data page: the same SQL gate (one read-only statement, only the tables you may read), the same time limit, recorded per table.
+Catalog queries — the schemas, tables and columns tools read to show you what is there — are answered at once from a PostgreSQL catalog made for your session. A query that reads your tables runs exactly like one from the Query data page: the same SQL gate (one read-only statement, only the tables you may read), the same time limit, recorded per table.
 
-- **Rows.** A result has at most the workspace's row limit (Settings → General, 10,000 by default), or its export limit if you may export (`data.export`). More is refused with an error, never cut silently: add a filter or a `LIMIT`.
-- **Read only.** Writes, temporary tables in your sources and settings that change data are refused.
-- **Cancel** in your tool stops the job.
+- **Rows.** A result has at most the workspace's row limit (Settings → General, 10,000 by default), or its export limit if you may export (`data.export`). More is refused with an error, never cut silently: add a filter or a `LIMIT`. A result your tool reads page by page (a JDBC fetch size, a Metabase download) arrives in full.
+- **Read only.** `INSERT`, `UPDATE`, `DELETE`, `MERGE`, `CREATE`, `COPY`, `DO` blocks and the like are refused before they run, with PostgreSQL's read-only error (`25006`).
+- **Cursors.** `DECLARE … CURSOR` and `FETCH` over your tables work as in PostgreSQL: a cursor ends with its transaction unless it is declared `WITH HOLD`, and one connection holds at most eight at once. Scrollable cursors, reading backward and cursors declared through a prepared statement are refused with a clear error, never answered with no rows.
+- **Not served.** `PREPARE`/`EXECUTE`, `CREATE TABLE … AS` and `EXPLAIN ANALYZE` over your tables are refused; tools that prepare statements through the protocol (JDBC, psqlODBC, Npgsql) are not affected.
+- **Busy.** When the gateway is short of memory it refuses new connections as busy rather than dropping the open ones; tools retry.
+- **Cancel** in your tool stops the query.
 - **Mixing.** One statement reads either your tables or the catalog (`pg_catalog`, `information_schema`), not both.
 
 ### Speed
 
-Each query starts a short-lived job, which takes seconds before the query itself runs. Tools that import data (Power BI import mode, Excel, extracts in Tableau) work well; tools that send a query for every click feel slow.
+A query runs in the warm query worker and usually answers in about a second, like one from the Query data page. Queries that read an [ODBC](/sources/odbc/) or [custom](/sources/custom-connectors/) source, and queries the worker has no room for, start a short-lived Job instead, which takes a few seconds before the query itself runs. Tools that import data (Power BI import mode, Excel, extracts in Tableau) work well with either; dashboards that send many queries at once are fastest on native sources.
 
 ## Opening a source or table
 

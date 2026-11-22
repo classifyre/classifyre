@@ -2,6 +2,7 @@ import {
   HEAP_GUARD_FRACTION,
   resolveHeapGuard,
   v8HeapLimitBytes,
+  rssGuardBytes,
 } from './heap-guard';
 
 const MB = 1024 * 1024;
@@ -79,5 +80,16 @@ describe('resolveHeapGuard', () => {
     // Default: the guard is live rather than opt-in, so a deployment that
     // configures nothing still sheds instead of aborting.
     expect(resolveHeapGuard({}).thresholdBytes).toBeLessThan(limit);
+  });
+});
+
+describe('rssGuardBytes', () => {
+  it('reads UNDER_PRESSURE_MAX_RSS_BYTES, null when unset or not a number', () => {
+    expect(rssGuardBytes({ UNDER_PRESSURE_MAX_RSS_BYTES: '1048576' })).toBe(
+      1048576,
+    );
+    expect(rssGuardBytes({})).toBeNull();
+    expect(rssGuardBytes({ UNDER_PRESSURE_MAX_RSS_BYTES: 'lots' })).toBeNull();
+    expect(rssGuardBytes({ UNDER_PRESSURE_MAX_RSS_BYTES: '0' })).toBeNull();
   });
 });

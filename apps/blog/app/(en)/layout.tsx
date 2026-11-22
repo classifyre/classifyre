@@ -29,7 +29,7 @@ const siteUrl = normalizeSiteUrl(
 );
 
 const siteDescription =
-    "Open-source data access governance platform: access by department and role across 40+ systems, masking by default, every read logged. Deploy on-premises, in your own cloud, or on AWS, Azure or Google Cloud. Made in Austria.";
+    "Open-source data governance platform for the systems you already run. Classify sensitive data, enforce row and column masking by group, publish governed data products, and serve SQL, Power BI, and Excel with full audit logging.";
 
 export const metadata: Metadata = {
     metadataBase: new URL(siteUrl),
@@ -99,7 +99,7 @@ const navbar = (
                 <div className="grid flex-1 text-left text-sm leading-tight">
                     <span className="truncate font-serif font-bold">Classifyre</span>
                     <span className="truncate font-mono text-[10px] text-muted-foreground">
-            Open-source data access governance
+            Open-source data governance
 </span>
                 </div>
             </div>
@@ -112,7 +112,7 @@ const navbar = (
 
 const footer = (
     <Footer className="classifyre-site-footer">
-        <SiteFooter topics={{heading: "Data access governance", links: topicLinks("en")}}/>
+        <SiteFooter topics={{heading: "Governance & comparisons", links: topicLinks("en")}}/>
     </Footer>
 );
 
@@ -140,6 +140,7 @@ export default async function RootLayout({
                 browser from `/` to `/de/` before first paint. `/de/…` URLs
                 and explicit cookie choices are never touched. */}
             <LocaleRedirectHeadScript/>
+            <link rel="alternate" type="text/plain" href="/llms.txt" title="LLMs.txt" />
             <link rel="dns-prefetch" href="//fonts.googleapis.com"/>
             <link
                 rel="preconnect"

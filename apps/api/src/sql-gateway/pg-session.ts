@@ -26,7 +26,44 @@ import {
   quoteLiteral,
   splitStatements,
   substituteParams,
+  parseCursorStatement,
+  stripComments,
+  type CursorStatement,
 } from './sql-text';
+
+/**
+ * A SQL connection only reads (DQ §5.7): these are refused before PGlite
+ * sees them. In PGlite they would write to or define over empty copies of
+ * your tables, and the SELECT that follows would answer 0 rows.
+ */
+const WRITE_VERBS = new Set([
+  'INSERT',
+  'UPDATE',
+  'DELETE',
+  'MERGE',
+  'UPSERT',
+  'CREATE',
+  'ALTER',
+  'DROP',
+  'TRUNCATE',
+  'DO',
+  'COPY',
+  'CALL',
+  'GRANT',
+  'REVOKE',
+  'COMMENT',
+  'SECURITY',
+  'REINDEX',
+  'CLUSTER',
+  'VACUUM',
+  'ANALYZE',
+  'ANALYSE',
+  'REFRESH',
+  'IMPORT',
+  'LOAD',
+  'REASSIGN',
+  'LOCK',
+]);
 
 /** A data statement failed: what the client is told, as PostgreSQL would. */
 export class DataError extends Error {
@@ -71,12 +108,45 @@ interface Statement {
 
 interface Portal {
   statement: string;
+  /**
+   * The statement as it was when bound. A portal keeps it, as in
+   * PostgreSQL: pgJDBC pages through a portal of the unnamed statement and
+   * re-parses that statement between pages (BIC J3, Metabase downloads M13).
+   */
+  parsed?: Statement;
+  /** Its parameter types, read when bound (for the same reason). */
+  paramTypes?: number[];
   bind: BindMessage;
   fields?: FieldDescription[];
   rows?: PlainValue[][];
   truncated?: boolean;
   offset: number;
 }
+
+/** A data cursor: its query ran once, as a job; FETCH reads it forward. */
+interface DataCursor {
+  description: Buffer | null;
+  fields: FieldDescription[];
+  rows: PlainValue[][];
+  truncated: boolean;
+  offset: number;
+  /** WITH HOLD: kept past its transaction, until CLOSE. */
+  hold: boolean;
+  /**
+   * Declared in the transaction still open: a rollback drops it, WITH HOLD
+   * or not, as PostgreSQL does; a commit keeps a WITH HOLD one.
+   */
+  pending: boolean;
+}
+
+/**
+ * What one session may hold in cursors over data: every row of every open
+ * one sits in the gateway's memory until CLOSE, so a session that never
+ * closed them would grow without bound (review of 493fba5d, c4).
+ */
+export const MAX_DATA_CURSORS = 8;
+/** Rows of all open data cursors of a session, in multiples of the row cap. */
+export const CURSOR_ROWS_PER_ROW_CAP = 2;
 
 /** Internal statement and portal names; clients never see them. */
 const READS = '__classifyre_reads';
@@ -151,9 +221,13 @@ export function readTables(
 export class PgSession {
   private readonly statements = new Map<string, Statement>();
   private readonly portals = new Map<string, Portal>();
+  /** Cursors over data (`DECLARE … FOR` a statement that reads tables), by name. */
+  private readonly cursors = new Map<string, DataCursor>();
   /** After an error in the extended protocol: ignore everything until Sync. */
   private skipping = false;
   private status = 'I';
+  /** A ROLLBACK completed since the last ReadyForQuery. */
+  private sawRollback = false;
   private queue: Promise<void> = Promise.resolve();
   private running: AbortController | null = null;
   private decoders = new Map<string, string>();
@@ -326,8 +400,16 @@ export class PgSession {
     const out: Buffer[] = [];
     for (const m of splitMessages(reply)) {
       if (m.type === 'E') failed = true;
+      // Kept on the session: through Parse/Execute the ROLLBACK's
+      // CommandComplete comes in the Execute reply, its ReadyForQuery only
+      // in the Sync reply (re-review 2026-11-22).
+      if (m.type === 'C' && /^ROLLBACK\b/.test(m.body.toString('utf8'))) {
+        this.sawRollback = true;
+      }
       if (m.type === 'Z') {
-        this.status = String.fromCharCode(m.body[0]);
+        const rolledBack = this.sawRollback;
+        this.sawRollback = false;
+        this.moveTo(String.fromCharCode(m.body[0]), rolledBack || failed);
         if (!keepReady) continue;
       }
       out.push(Buffer.from(m.raw));
@@ -335,6 +417,23 @@ export class PgSession {
     if (out.length) this.send(Buffer.concat(out));
     if (failed) this.skipping = true;
     return failed;
+  }
+
+  /**
+   * The transaction status PGlite reported. When a transaction block ends,
+   * its cursors end with it: those without HOLD always, those declared in it
+   * when it rolled back (a COMMIT in a failed block is a rollback too).
+   */
+  private moveTo(next: string, rolledBack: boolean): void {
+    const ended = this.status !== 'I' && next === 'I';
+    const aborted = this.status === 'E' || rolledBack;
+    this.status = next;
+    if (!ended) return;
+    for (const [name, cursor] of this.cursors) {
+      if (!cursor.hold || (cursor.pending && aborted))
+        this.cursors.delete(name);
+      else cursor.pending = false;
+    }
   }
 
   /**
@@ -362,6 +461,58 @@ export class PgSession {
     if (!READING_KEYWORDS.has(firstKeyword(sql)) || this.status === 'E') {
       return [];
     }
+    return (await this.readsOf(sql)) ?? [];
+  }
+
+  /**
+   * A statement other than a SELECT that would read your tables in PGlite,
+   * where they are empty, and answer 0 rows as if that were the result
+   * (re-reviews 2026-11-22). A SQL connection only reads, so writes and DDL
+   * are refused outright, whatever they would read; PREPARE, EXECUTE and
+   * EXPLAIN ANALYZE are planned first, and refused when they read your
+   * tables or cannot be planned (fail closed). Functions that run SQL text
+   * (`query_to_xml`, `ts_stat`, …) are revoked in PGlite itself.
+   */
+  private async unservedRead(sql: string): Promise<DataError | null> {
+    if (this.status === 'E') return null;
+    const text = stripComments(sql).trim();
+    const word = firstKeyword(text);
+    if (WRITE_VERBS.has(word)) {
+      return new DataError(
+        '25006',
+        `A SQL connection only reads: ${word} is not supported.`,
+      );
+    }
+    let probe: string | null = null;
+    if (word === 'PREPARE') {
+      probe =
+        /^prepare\s+(?:"(?:[^"]|"")+"|\S+?)(?:\s*\([^)]*\))?\s+as\s+([\s\S]+)$/i.exec(
+          text,
+        )?.[1] ?? '';
+    } else if (word === 'EXECUTE') {
+      probe = text;
+    } else if (
+      word === 'EXPLAIN' &&
+      /^explain\s*(?:\([^)]*\banaly[sz]e\b|analy[sz]e\b)/i.test(text)
+    ) {
+      probe = text.replace(
+        /^explain\s*(?:\([^)]*\)|(?:analy[sz]e|verbose|costs|buffers|timing|summary|settings|wal)\b\s*)*/i,
+        '',
+      );
+    }
+    if (probe === null) return null;
+    const tables = probe ? await this.readsOf(probe).catch(() => null) : null;
+    if (tables !== null && !tables.length) return null;
+    return new DataError(
+      '0A000',
+      tables === null
+        ? `This ${word} cannot be checked for what it reads, so it is not run on a SQL connection.`
+        : `${word} over your tables is not served on a SQL connection: run the SELECT itself.`,
+    );
+  }
+
+  /** Your tables a statement reads, from its plan in PGlite; null when it cannot be planned. */
+  private async readsOf(sql: string): Promise<string[] | null> {
     const nulls = substituteParams(
       sql,
       Array.from({ length: 100 }, () => 'NULL'),
@@ -372,11 +523,11 @@ export class PgSession {
       frontend.close('P', PROBE),
     );
     const row = reply.find((m) => m.type === 'D');
-    if (!row) return [];
+    if (!row) return null;
     const reader = new BodyReader(row.body);
     reader.int16();
     const length = reader.int32();
-    if (length < 0) return [];
+    if (length < 0) return null;
     const reads = JSON.parse(reader.bytes(length).toString('utf8')) as string[];
     const { data, other } = readTables(reads, this.dataSchemas);
     if (data.length && other.length) {
@@ -423,9 +574,21 @@ export class PgSession {
       return;
     }
     for (const statement of statements) {
+      const cursor = parseCursorStatement(statement);
+      if (cursor && this.status !== 'E') {
+        // In a failed transaction PGlite refuses everything (25P02), as
+        // PostgreSQL does: cursor statements included.
+        const handled = await this.cursorStatement(cursor);
+        if (handled === 'failed') return;
+        if (handled === 'served') continue;
+      }
       let tables: string[] = [];
       try {
         tables = await this.classify(statement);
+        if (!tables.length) {
+          const refusal = await this.unservedRead(statement);
+          if (refusal) throw refusal;
+        }
       } catch (error) {
         await this.failSimple(error);
         return;
@@ -460,7 +623,164 @@ export class PgSession {
       }
     }
     this.skipping = false;
+    if (this.status === 'I') {
+      // Declared outside a transaction block: a cursor without HOLD lasts
+      // only as long as its statement's own transaction.
+      for (const [name, cursor] of this.cursors) {
+        if (!cursor.hold) this.cursors.delete(name);
+        else cursor.pending = false;
+      }
+    }
     this.send(readyForQuery(this.status));
+  }
+
+  /**
+   * DECLARE, FETCH and CLOSE of a cursor over data (BIC D5): the query runs
+   * once as a job when declared, and FETCH reads its rows forward. A cursor
+   * over the catalog is PGlite's (`'pglite'`). A result over the row cap is
+   * refused when a FETCH reaches the cap, never cut short.
+   */
+  private async cursorStatement(
+    cursor: CursorStatement,
+  ): Promise<'served' | 'pglite' | 'failed'> {
+    if (cursor.kind === 'unsupported') {
+      // Never left to PGlite when it may concern data: there it would read
+      // empty tables and answer as if that were the result.
+      const refusal = this.unsupportedCursor(cursor);
+      if (!refusal) return 'pglite';
+      await this.failSimple(refusal);
+      return 'failed';
+    }
+    if (cursor.kind === 'declare') {
+      let tables: string[];
+      try {
+        tables = await this.classify(cursor.query);
+      } catch (error) {
+        await this.failSimple(error);
+        return 'failed';
+      }
+      if (!tables.length) return 'pglite';
+      const refusal = this.declareRefusal(cursor.name, cursor.scroll);
+      if (refusal) {
+        await this.failSimple(refusal);
+        return 'failed';
+      }
+      const described = await this.internal(
+        frontend.parse(PROBE, cursor.query),
+        frontend.describe('S', PROBE),
+        frontend.close('S', PROBE),
+      );
+      const error = described.find((m) => m.type === 'E');
+      if (error) {
+        this.send(Buffer.from(error.raw));
+        await this.forward(frontend.sync(), false);
+        return 'failed';
+      }
+      const description = described.find((m) => m.type === 'T');
+      try {
+        const result = await this.run(cursor.query, tables);
+        const budget = this.data.maxRows * CURSOR_ROWS_PER_ROW_CAP;
+        if (this.cursorRows() + result.rows.length > budget) {
+          throw new DataError(
+            '53400',
+            `Open cursors of this connection would hold more than ${budget} rows: close one (CLOSE) before declaring another.`,
+          );
+        }
+        this.cursors.set(cursor.name, {
+          description: description ? Buffer.from(description.raw) : null,
+          fields: description ? parseRowDescription(description.body) : [],
+          rows: result.rows,
+          truncated: result.truncated,
+          offset: 0,
+          hold: cursor.hold,
+          pending: this.status === 'T',
+        });
+      } catch (failure) {
+        await this.failSimple(failure);
+        return 'failed';
+      }
+      this.send(commandComplete('DECLARE CURSOR'));
+      return 'served';
+    }
+    if (cursor.kind === 'close') {
+      if (cursor.name === null) {
+        this.cursors.clear();
+        return 'pglite';
+      }
+      if (!this.cursors.delete(cursor.name)) return 'pglite';
+      this.send(commandComplete('CLOSE CURSOR'));
+      return 'served';
+    }
+    const open = this.cursors.get(cursor.name);
+    if (!open) return 'pglite';
+    if (cursor.count === 0) {
+      // PostgreSQL re-reads the current row; answering 0 rows would look
+      // like the end of the result.
+      await this.failSimple(
+        new DataError(
+          '0A000',
+          'Cursors over your tables read forward only: FETCH NEXT, FORWARD n (n > 0) or ALL.',
+        ),
+      );
+      return 'failed';
+    }
+    const start = open.offset;
+    const wanted =
+      cursor.count === 'all' ? Number.POSITIVE_INFINITY : cursor.count;
+    const end = Math.min(start + wanted, open.rows.length);
+    if (open.description) this.send(open.description);
+    this.sendRows(open.fields, open.rows, start, end);
+    open.offset = end;
+    if (open.truncated && start + wanted > open.rows.length) {
+      await this.failSimple(this.tooMany());
+      return 'failed';
+    }
+    this.send(commandComplete(`FETCH ${end - start}`));
+    return 'served';
+  }
+
+  /** Why a DECLARE over data cannot be served, if it cannot. */
+  private declareRefusal(name: string, scroll: boolean): DataError | null {
+    if (scroll) {
+      return new DataError(
+        '0A000',
+        'Cursors over your tables read forward only: declare it NO SCROLL (psqlODBC reads forward unless told otherwise).',
+      );
+    }
+    if (this.cursors.has(name)) {
+      return new DataError('42P03', `cursor "${name}" already exists`);
+    }
+    if (this.cursors.size >= MAX_DATA_CURSORS) {
+      return new DataError(
+        '53400',
+        `A connection may hold ${MAX_DATA_CURSORS} open cursors over your tables: close one (CLOSE) first.`,
+      );
+    }
+    return null;
+  }
+
+  /** A cursor statement the gateway does not serve, refused when it concerns data. */
+  private unsupportedCursor(cursor: {
+    verb: string;
+    name: string | null;
+  }): DataError | null {
+    if (cursor.verb === 'DECLARE') {
+      return new DataError(
+        '0A000',
+        'This form of DECLARE is not supported: DECLARE name [NO SCROLL] CURSOR [WITH HOLD] FOR query.',
+      );
+    }
+    if (cursor.name !== null && !this.cursors.has(cursor.name)) return null;
+    return new DataError(
+      '0A000',
+      `Cursors over your tables read forward only: ${cursor.verb} NEXT, FORWARD n or ALL.`,
+    );
+  }
+
+  private cursorRows(): number {
+    let rows = 0;
+    for (const cursor of this.cursors.values()) rows += cursor.rows.length;
+    return rows;
   }
 
   /** An error in a simple query, through PGlite so the transaction knows. */
@@ -479,6 +799,17 @@ export class PgSession {
   private async parse(message: Message): Promise<void> {
     if (this.skipping) return;
     const parsed = parseParse(message.body);
+    const refusal =
+      (await this.extendedCursorRefusal(parsed.sql)) ??
+      (READING_KEYWORDS.has(firstKeyword(parsed.sql))
+        ? null
+        : await this.unservedRead(parsed.sql).catch((error: unknown) =>
+            error instanceof DataError ? error : null,
+          ));
+    if (refusal) {
+      await this.failExtended(refusal);
+      return;
+    }
     if (await this.forward(message.raw)) return;
     let tables: string[] = [];
     try {
@@ -498,8 +829,14 @@ export class PgSession {
     if (this.skipping) return;
     const bind = parseBind(message.body);
     if (await this.forward(message.raw)) return;
+    const parsed = this.statements.get(bind.statement);
     this.portals.set(bind.portal, {
       statement: bind.statement,
+      parsed,
+      paramTypes:
+        parsed?.tables.length && bind.params.length
+          ? await this.paramTypes(parsed, bind)
+          : undefined,
       bind,
       offset: 0,
     });
@@ -525,9 +862,7 @@ export class PgSession {
     if (this.skipping) return;
     const { portal: name, maxRows } = parseExecute(message.body);
     const portal = this.portals.get(name);
-    const statement = portal
-      ? this.statements.get(portal.statement)
-      : undefined;
+    const statement = portal?.parsed;
     if (!portal || !statement?.tables.length) {
       await this.forward(message.raw);
       return;
@@ -541,7 +876,7 @@ export class PgSession {
           : [];
       }
       if (!portal.rows) {
-        const literals = await this.paramLiterals(statement, portal.bind);
+        const literals = await this.paramLiterals(portal);
         const result = await this.run(
           substituteParams(statement.sql, literals),
           statement.tables,
@@ -583,6 +918,40 @@ export class PgSession {
   }
 
   /** An error in the extended protocol: raised in PGlite, which then skips to Sync. */
+  /**
+   * Cursors over data are served in the simple query protocol only (where
+   * psqlODBC's UseDeclareFetch sends them). Sent through Parse, the
+   * statement would reach PGlite's empty tables and FETCH would answer 0
+   * rows, so it is refused (review of 493fba5d, c1).
+   */
+  private async extendedCursorRefusal(sql: string): Promise<DataError | null> {
+    const cursor = parseCursorStatement(sql);
+    if (!cursor || this.status === 'E') return null;
+    const unsupported = new DataError(
+      '0A000',
+      'Cursors over your tables work in the simple query protocol only (psqlODBC: UseServerSidePrepare=0, or turn UseDeclareFetch off).',
+    );
+    if (cursor.kind === 'declare') {
+      let tables: string[];
+      try {
+        tables = await this.classify(cursor.query);
+      } catch (error) {
+        return error instanceof DataError ? error : unsupported;
+      }
+      return tables.length ? unsupported : null;
+    }
+    if (cursor.kind === 'unsupported' && cursor.verb === 'DECLARE')
+      return unsupported;
+    if (cursor.kind === 'close') {
+      return cursor.name !== null && this.cursors.has(cursor.name)
+        ? unsupported
+        : null;
+    }
+    return cursor.name !== null && this.cursors.has(cursor.name)
+      ? unsupported
+      : null;
+  }
+
   private async failExtended(error: unknown): Promise<void> {
     const { sqlState, message } = this.errorOf(error);
     const reply = await this.internal(
@@ -596,12 +965,11 @@ export class PgSession {
 
   // ── Data ──────────────────────────────────────────────────────────────
 
-  /** The bound values as text, decoded by PGlite from whatever format the client used. */
-  private async paramLiterals(
+  /** The parameter types of a statement as PGlite inferred them, for its bound values. */
+  private async paramTypes(
     statement: Statement,
     bind: BindMessage,
-  ): Promise<string[]> {
-    if (!bind.params.length) return [];
+  ): Promise<number[]> {
     const described = await this.internal(
       frontend.describe('S', bind.statement),
     );
@@ -615,6 +983,15 @@ export class PgSession {
     while (types.length < bind.params.length) {
       types.push(statement.paramTypes[types.length] ?? OID.unknown);
     }
+    return types;
+  }
+
+  /** The bound values as text, decoded by PGlite from whatever format the client used. */
+  private async paramLiterals(portal: Portal): Promise<string[]> {
+    const { bind } = portal;
+    if (!bind.params.length) return [];
+    const types =
+      portal.paramTypes ?? (await this.paramTypes(portal.parsed!, bind));
     const key = types.join(',');
     let decoder = this.decoders.get(key);
     if (!decoder) {

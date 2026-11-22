@@ -1,151 +1,54 @@
-"""How each source reaches DuckDB: an attached catalog, or a scan of a path.
+"""How each source of a query reaches DuckDB.
 
-A binding turns one entry of the request's ``tables`` (where an asset's table
-lives, as the API knows it from the asset's metadata) into a DuckDB relation
-the session can put a view over. Every source is attached under a hidden name
-(``__src_<n>``) the SQL gate never lets a person type.
+A :class:`SourceBinding` is one entry of the request's ``sources``: the
+recipe, the alias the person typed, and the hidden name (``__src_<n>``) it is
+attached under, which the SQL gate never lets a person type. What reads its
+tables is the source type's :class:`~src.query.connectors.QueryBinding`
+(``src/query/connectors/<type>.py``), chosen from the ``x-query`` declaration
+in the source schema (docs/prd/QC-query-connectors.md §5.1, §5.2):
 
-What is reused rather than rewritten:
-
-* Iceberg REST and DuckLake attach exactly as their scans do
-  (``DuckDBAttachedSource._attach``), under their own alias.
-* Bucket sources (S3-compatible, Azure, GCS, local folder) give their
-  :class:`~src.utils.lakehouse_tables.TableStorage`: the URI of a key and the
-  body of the DuckDB secret their scans use for Delta and Iceberg.
-* PostgreSQL and MySQL are attached with DuckDB's own scanners, read-only, from
-  the same recipe fields their connectors read. Their Python drivers are not
-  needed, so a query never installs them.
-* Any database with an ODBC driver is read through DuckDB's official
-  ``odbc_scanner`` extension (``odbc_query``) over the same connection string the
-  ODBC source scans with. The string sits in a DuckDB variable, so a view holds
-  only the variable's name, and every scan of a view opens a connection of its
-  own (see :meth:`SourceBinding._odbc`). ``odbc_query`` is
-  a plain remote ``SELECT``: nothing is pushed down, so a query reads the whole
-  table unless a ``LIMIT`` ends the read early.
-* Databricks is attached through the ``unity_catalog`` extension with the token
-  the scan authenticates with (a personal access token, or the OAuth token of
-  its service principal). The extension asks Unity Catalog for short-lived
-  storage credentials itself, so no storage keys are involved.
+* PostgreSQL and MySQL: DuckDB's own scanners, read-only, from the recipe
+  fields their connectors read (no Python driver needed).
+* Databricks: ``unity_catalog`` with the token the scan authenticates with.
+* ODBC: the ``odbc_scanner`` extension over the source's connection string.
+* Iceberg REST and DuckLake: attached exactly as their scans do.
+* Buckets (S3-compatible, Azure, GCS, local folder): the source's
+  :class:`~src.utils.lakehouse_tables.TableStorage`.
+* Connectors (Meilisearch, Neo4j): read live through the source's client,
+  as Arrow (:mod:`.connectors.arrow`).
 """
 
 from __future__ import annotations
 
-import logging
-import os
-import tempfile
-from dataclasses import dataclass
-from pathlib import Path
+import math
 from typing import Any
-from urllib.parse import urlparse
 
-from ..utils.duckdb_engine import load_extension, quote_identifier, sql_literal
+from .connectors import BindingError, QueryBinding, TableLocation, binding_class, declared_sources
+from .connectors.arrow import ConnectorError, ScanStats
+from .connectors.object_storage import FILE_FORMATS, LAKEHOUSE_FORMATS, SPATIAL_FORMATS
 
-logger = logging.getLogger(__name__)
+__all__ = [
+    "ATTACHED_CATALOG_TYPES",
+    "FILE_FORMATS",
+    "LAKEHOUSE_FORMATS",
+    "OBJECT_STORAGE_TYPES",
+    "QUERYABLE_SOURCE_TYPES",
+    "SPATIAL_FORMATS",
+    "BindingError",
+    "ConnectorError",
+    "SourceBinding",
+    "TableLocation",
+]
 
-#: Formats DuckDB reads natively, by the ``format`` of a location.
-#: Keep in sync with ``LAKEHOUSE_FORMATS`` in apps/api/src/data-query/sql-names.ts.
-LAKEHOUSE_FORMATS = frozenset({"delta", "iceberg"})
-#: Geospatial files, read with the ``spatial`` extension (``ST_Read``); geometries
-#: come out as WKT text, so no spatial function has to be allowed in SQL.
-SPATIAL_FORMATS = frozenset({"geojson", "fgb", "dbf"})
-#: Keep in sync with ``FILE_FORMATS`` in apps/api/src/data-query/sql-names.ts
-#: (``json`` here is read via ``read_json_auto``).
-FILE_FORMATS = frozenset({"parquet", "csv", "tsv", "jsonl", "json", "avro", *SPATIAL_FORMATS})
-
+#: The source types a query can read: exactly those ``x-query`` declares
+#: (the API reads the same declaration, apps/api/src/data-query/sql-names.ts).
+QUERYABLE_SOURCE_TYPES = frozenset(declared_sources())
 OBJECT_STORAGE_TYPES = frozenset(
-    {"S3_COMPATIBLE_STORAGE", "AZURE_BLOB_STORAGE", "GOOGLE_CLOUD_STORAGE", "LOCAL_FOLDER"}
+    t for t, d in declared_sources().items() if d.address == "object_storage"
 )
-ATTACHED_CATALOG_TYPES = frozenset({"ICEBERG_REST", "DUCKLAKE"})
-#: Keep in sync with ``QUERYABLE_SOURCE_TYPES`` in
-#: apps/api/src/data-query/sql-names.ts (same ten values).
-QUERYABLE_SOURCE_TYPES = (
-    OBJECT_STORAGE_TYPES
-    | ATTACHED_CATALOG_TYPES
-    | frozenset({"POSTGRESQL", "MYSQL", "DATABRICKS", "ODBC"})
+ATTACHED_CATALOG_TYPES = frozenset(
+    t for t, d in declared_sources().items() if d.address == "catalog"
 )
-
-
-def _system_ca_bundle() -> str | None:
-    """The system's trusted roots as one PEM file, as the scan's TLS uses them."""
-    try:
-        import certifi
-
-        return str(certifi.where())
-    except ImportError:  # pragma: no cover - certifi ships with requests
-        pass
-    for path in (
-        "/etc/ssl/certs/ca-certificates.crt",
-        "/etc/pki/tls/certs/ca-bundle.crt",
-        "/etc/ssl/cert.pem",
-    ):
-        if Path(path).exists():
-            return path
-    return None
-
-
-class BindingError(RuntimeError):
-    """A source could not be reached or a table location is not readable."""
-
-
-@dataclass(frozen=True)
-class TableLocation:
-    """Where one table lives, from the request (built by the API)."""
-
-    kind: str  # "catalog" | "lakehouse" | "file"
-    database: str | None = None
-    schema: str | None = None
-    table: str | None = None
-    format: str | None = None
-    object_key: str | None = None
-    version: str | None = None
-    #: ODBC: the table as the driver's SQL names it (quoted), as the scan recorded it.
-    qualified_name: str | None = None
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> TableLocation:
-        def text(key: str) -> str | None:
-            value = data.get(key)
-            return str(value) if value not in (None, "") else None
-
-        return cls(
-            kind=str(data.get("kind") or ""),
-            database=text("database"),
-            schema=text("schema"),
-            table=text("table"),
-            format=(text("format") or "").lower() or None,
-            object_key=text("objectKey"),
-            version=text("version"),
-            qualified_name=text("qualifiedName"),
-        )
-
-
-# How the scan names an endpoint, per source type (see ``label``).
-_ENDPOINT_SCHEMES = {"MYSQL": "mysql", "POSTGRESQL": "postgresql"}
-
-
-def _conninfo(values: dict[str, Any]) -> str:
-    """A libpq-style ``key=value`` string for PostgreSQL's scanner.
-
-    (MySQL's scanner does not read quoted values — see ``_mysql``, which
-    connects through a secret instead.) Numbers and plain hostnames stay
-    bare; anything with whitespace, quotes or backslashes is quoted.
-    """
-    parts = []
-    for key, value in values.items():
-        if value is None or value == "":
-            continue
-        if isinstance(value, (int, float)) and not isinstance(value, bool):
-            parts.append(f"{key}={value}")
-            continue
-        text = str(value)
-        if key in ("host", "database", "dbname", "user") and not any(
-            ch in text for ch in " \t\n'\"\\"
-        ):
-            parts.append(f"{key}={text}")
-            continue
-        escaped = text.replace("\\", "\\\\").replace("'", "\\'")
-        parts.append(f"{key}='{escaped}'")
-    return " ".join(parts)
 
 
 class SourceBinding:
@@ -157,348 +60,81 @@ class SourceBinding:
         self.recipe = recipe
         self.source_id = source_id
         self.source_type = str(recipe.get("type") or "").upper()
-        self._hidden = f"__src_{index}"
-        self._attached: dict[str, str] = {}
         self._source: Any = None
-        self._storage: Any = None
-        self._ca_path: str | None = None
-        self._odbc_variable: str | None = None
+        self._reader: QueryBinding | None = None
+        #: Set by the session: when the query must be done.
+        self.deadline = math.inf
 
-    # ── recipe access ──────────────────────────────────────────────────
+    @property
+    def hidden(self) -> str:
+        return f"__src_{self.index}"
 
-    def label(self) -> str:
-        """What the source is called in errors: `mysql://host:port/`.
+    # ── what a binding may read (``SourceContext``) ────────────────────
 
-        Mirrors the scan's ``_source_label`` (`scheme://host:port/`, no
-        database): the query and the scan then name the same failing endpoint
-        the same way, so a person comparing the two sees one problem, not two
-        wordings. A source without a host (files, catalogs) is called by its
-        SQL name, the one the person typed.
-        """
-        required = self._section("required")
-        host = str(required.get("host") or "").strip()
-        port = str(required.get("port") or "").strip()
-        if self.source_type == "ODBC":
-            from ..utils.odbc_connection import build_connection_string, endpoint_label
-
-            try:
-                return f"odbc://{endpoint_label(build_connection_string(self.recipe))}/"
-            except ValueError:
-                return self.alias
-        if self.source_type == "DATABRICKS":
-            workspace = str(required.get("workspace_url") or "").strip()
-            netloc = urlparse(workspace).netloc or workspace.removeprefix("https://").strip("/")
-            return f"databricks://{netloc}/" if netloc else self.alias
-        scheme = _ENDPOINT_SCHEMES.get(self.source_type)
-        if host and scheme:
-            return f"{scheme}://{host}:{port}/" if port else f"{scheme}://{host}/"
-        return self.alias
-
-    def _section(self, name: str) -> dict[str, Any]:
+    def section(self, name: str) -> dict[str, Any]:
         value = self.recipe.get(name)
         return value if isinstance(value, dict) else {}
 
-    def _connection_option(self, name: str) -> Any:
-        connection = self._section("optional").get("connection")
+    def connection_option(self, name: str) -> Any:
+        connection = self.section("optional").get("connection")
         return connection.get(name) if isinstance(connection, dict) else None
 
-    def _instance(self) -> Any:
+    def instance(self) -> Any:
         if self._source is None:
             from ..sources import get_source
 
             self._source = get_source(self.recipe, source_id=self.source_id, runner_id="query")
         return self._source
 
-    # ── relations ──────────────────────────────────────────────────────
+    # ── the source's reader ────────────────────────────────────────────
+
+    def _binding(self) -> QueryBinding:
+        if self._reader is None:
+            self._reader = binding_class(self.source_type)(self)
+        return self._reader
+
+    def _known_binding(self) -> QueryBinding | None:
+        """The reader, or None for a type nothing reads (labels and explanations
+        must not fail for it: the refusal comes from :meth:`relation`)."""
+        try:
+            return self._binding()
+        except BindingError:
+            return None
+
+    def label(self) -> str:
+        """What the source is called in errors: `mysql://host:port/`.
+
+        Mirrors the scan's ``_source_label``, so the query and the scan name the
+        same failing endpoint the same way. A source without a host (files,
+        catalogs) is called by its SQL name, the one the person typed.
+        """
+        binding = self._known_binding()
+        return (binding.label() if binding else None) or self.alias
 
     def relation(self, conn: Any, location: TableLocation) -> str:
         """The DuckDB expression a view over this table selects from."""
-        if self.source_type == "POSTGRESQL":
-            return self._postgres(conn, location)
-        if self.source_type == "MYSQL":
-            return self._mysql(conn, location)
-        if self.source_type == "DATABRICKS":
-            return self._databricks(conn, location)
-        if self.source_type == "ODBC":
-            return self._odbc(conn, location)
-        if self.source_type in ATTACHED_CATALOG_TYPES:
-            return self._attached_catalog(conn, location)
-        if self.source_type in OBJECT_STORAGE_TYPES:
-            return self._object_storage(conn, location)
-        raise BindingError(f"Sources of type {self.source_type} cannot be queried yet.")
-
-    def _require_location_fields(self, location: TableLocation, *fields: str) -> list[str]:
-        values = [getattr(location, name) for name in fields]
-        missing = [name for name, value in zip(fields, values, strict=True) if not value]
-        if missing:
-            raise BindingError(
-                f"Could not open {self.label()}: the table's location is incomplete "
-                f"(needs {', '.join(missing)}): run a scan of the source again."
-            )
-        return [str(value) for value in values]
-
-    def _postgres(self, conn: Any, location: TableLocation) -> str:
-        database, schema, table = self._require_location_fields(
-            location, "database", "schema", "table"
-        )
-        alias = self._attached.get(database)
-        if alias is None:
-            load_extension(conn, "postgres")
-            required, masked = self._section("required"), self._section("masked")
-            dsn = _conninfo(
-                {
-                    "host": required.get("host"),
-                    "port": required.get("port"),
-                    "dbname": database,
-                    "user": masked.get("username"),
-                    "password": masked.get("password"),
-                    "sslmode": self._connection_option("ssl_mode") or "prefer",
-                    "connect_timeout": 10,
-                    "application_name": "classifyre-query",
-                }
-            )
-            alias = f"{self._hidden}_{len(self._attached)}"
-            conn.execute(
-                f"ATTACH {sql_literal(dsn)} AS {quote_identifier(alias)} (TYPE postgres, READ_ONLY)"
-            )
-            self._attached[database] = alias
-        return ".".join(quote_identifier(part) for part in (alias, schema, table))
-
-    def _mysql(self, conn: Any, location: TableLocation) -> str:
-        database, table = self._require_location_fields(location, "database", "table")
-        alias = self._attached.get(database)
-        if alias is None:
-            load_extension(conn, "mysql")
-            required, masked = self._section("required"), self._section("masked")
-            try:
-                port = int(str(required.get("port") or "").strip())
-            except (TypeError, ValueError):
-                raise BindingError(
-                    "The MySQL source has no usable port: check its configuration."
-                ) from None
-            alias = f"{self._hidden}_{len(self._attached)}"
-            # Connect through a DuckDB *secret*, not a connection string. The
-            # scanner's DSN parser takes values literally, quotes included
-            # (`ssl_mode='verify_ca'` answers "got ''verify_ca''", a quoted
-            # password is refused as wrong), so nothing with a space, a quote
-            # or a backslash in it (a password, a path) can be passed safely.
-            # Secret fields are SQL literals, escaped like any other.
-            fields = [
-                "TYPE mysql",
-                f"HOST {sql_literal(str(required.get('host') or ''))}",
-                f"PORT {port}",
-                f"DATABASE {sql_literal(database)}",
-                f"USER {sql_literal(str(masked.get('username') or ''))}",
-                f"PASSWORD {sql_literal(str(masked.get('password') or ''))}",
-                *self._mysql_tls_fields(),
-            ]
-            secret = quote_identifier(f"{alias}_secret")
-            conn.execute(f"CREATE OR REPLACE SECRET {secret} ({', '.join(fields)})")
-            conn.execute(
-                f"ATTACH '' AS {quote_identifier(alias)} (TYPE mysql, SECRET {secret}, READ_ONLY)"
-            )
-            self._attached[database] = alias
-        # The scanner names its schemas after the server's databases.
-        return ".".join(quote_identifier(part) for part in (alias, database, table))
-
-    def _mysql_tls_fields(self) -> list[str]:
-        """The secret's TLS fields, never weaker than what the scan does.
-
-        The scan (``MySQLSource._build_ssl_kwargs``) always uses TLS unless
-        the mode is *Disabled*, and verifies the certificate for *Verify CA* /
-        *Verify identity* against the source's CA, else the system roots.
-        So *Required* is sent as ``required`` with or without a CA (the
-        scanner's default, ``preferred``, would fall back to plain text when
-        the server, or someone between, offers no TLS), and the verifying
-        modes always get a CA file: the source's, else the system bundle.
-        The CA is a *file* to DuckDB, so the PEM is written to a private temp
-        file kept until :meth:`close` — parallel scan threads reconnect.
-        """
-        mode = str(self._connection_option("ssl_mode") or "").upper()
-        if mode == "DISABLED":
-            return ["SSL_MODE 'disabled'"]
-        if mode in ("VERIFY_CA", "VERIFY_IDENTITY"):
-            ca_path = self._ca_file() or _system_ca_bundle()
-            fields = [f"SSL_MODE '{mode.lower()}'"]
-            if ca_path:
-                fields.append(f"SSL_CA {sql_literal(ca_path)}")
-            return fields
-        if mode == "REQUIRED":
-            ca_path = self._ca_file()
-            fields = ["SSL_MODE 'required'"]
-            if ca_path:
-                fields.append(f"SSL_CA {sql_literal(ca_path)}")
-            return fields
-        return []
-
-    def _ca_file(self) -> str | None:
-        """The source's CA certificate as a file path, or None without one."""
-        pem = str(self._section("masked").get("ssl_ca") or "")
-        if not pem.strip():
-            return None
-        if self._ca_path is None:
-            # Same normalisation as the scan: escaped newlines and CRLF.
-            text = pem.replace("\\n", "\n").replace("\r\n", "\n").strip() + "\n"
-            fd, path = tempfile.mkstemp(prefix="classifyre-mysql-ca-", suffix=".pem")
-            with os.fdopen(fd, "w", encoding="utf-8") as handle:
-                handle.write(text)
-            self._ca_path = path
-        return self._ca_path
-
-    def _databricks(self, conn: Any, location: TableLocation) -> str:
-        catalog, schema, table = self._require_location_fields(
-            location, "database", "schema", "table"
-        )
-        alias = self._attached.get(catalog)
-        if alias is None:
-            source = self._instance()
-            endpoint = str(self._section("required").get("workspace_url") or "").rstrip("/")
-            # Delta files sit in S3 on AWS (httpfs) and in ADLS on Azure (azure).
-            storage = "azure" if "azuredatabricks.net" in endpoint else "httpfs"
-            for extension in ("unity_catalog", "delta", storage):
-                load_extension(conn, extension)
-            alias = f"{self._hidden}_{len(self._attached)}"
-            secret = quote_identifier(f"{alias}_secret")
-            conn.execute(
-                f"CREATE OR REPLACE SECRET {secret} (TYPE unity_catalog, "
-                f"TOKEN {sql_literal(source._access_token_value())}, "
-                f"ENDPOINT {sql_literal(endpoint)})"
-            )
-            conn.execute(
-                f"ATTACH {sql_literal(catalog)} AS {quote_identifier(alias)} "
-                f"(TYPE unity_catalog, SECRET {secret}, READ_ONLY)"
-            )
-            self._attached[catalog] = alias
-        return ".".join(quote_identifier(part) for part in (alias, schema, table))
-
-    def _odbc(self, conn: Any, location: TableLocation) -> str:
-        (qualified,) = self._require_location_fields(location, "qualified_name")
-        if self._odbc_variable is None:
-            from ..utils.odbc_connection import build_connection_string
-
-            load_extension(conn, "odbc_scanner")
-            variable = f"{self._hidden}_odbc"
-            # A variable, not a literal in the view: the view's own text (what
-            # DuckDB stores and prints) then carries a name, never a password.
-            conn.execute(
-                f"SET VARIABLE {quote_identifier(variable)} = "
-                f"{sql_literal(build_connection_string(self.recipe))}"
-            )
-            self._odbc_variable = variable
-        remote = sql_literal(f"SELECT * FROM {qualified}")
-        # `odbc_connect` inside the call: every scan of a view opens its own
-        # connection, which is what a query that reads two tables, or one table
-        # twice, needs. (Two scans on one handle fail, and the connection-string
-        # form of `odbc_query` frees a connection before its statement, which
-        # crashes unixODBC on Linux as soon as a query holds two scans.) The
-        # connections live until the query job exits.
-        return (
-            f"odbc_query(odbc_connect(getvariable({sql_literal(self._odbc_variable)})), {remote})"
-        )
+        return self._binding().relation(conn, location)
 
     def explain(self, exc: Exception) -> str | None:
         """What a failed read of this source's table means, when it is known."""
-        message = str(exc)
-        if self.source_type == "ODBC" and "Can't open lib" in message:
-            return (
-                "The ODBC driver named in the connection string is not installed where "
-                "queries run. Install it there, or use a DSN that exists on that host."
-            )
-        if self.source_type == "DATABRICKS" and "temporary-table-credentials" in message:
-            return (
-                "Databricks would not hand out storage credentials for the table. "
-                "An admin has to turn on External data access for the metastore, and the "
-                "source's principal needs the EXTERNAL USE SCHEMA privilege on the schema."
-            )
-        return None
+        binding = self._known_binding()
+        return binding.explain(exc) if binding else None
 
-    def _attached_catalog(self, conn: Any, location: TableLocation) -> str:
-        schema, table = self._require_location_fields(location, "schema", "table")
-        alias = self._attached.get("")
-        if alias is None:
-            source = self._instance()
-            alias = self._hidden
-            source._attach_alias = alias
-            source._attach(conn)
-            self._attached[""] = alias
-        return ".".join(quote_identifier(part) for part in (alias, schema, table))
+    def local_paths(self) -> list[str]:
+        """Local paths DuckDB reads for this source (none until it is opened)."""
+        return self._reader.local_paths() if self._reader is not None else []
 
-    def _object_storage(self, conn: Any, location: TableLocation) -> str:
-        (key,) = self._require_location_fields(location, "object_key")
-        fmt = location.format or ""
-        if self._storage is None:
-            storage = self._instance()._lakehouse_storage()
-            if storage is None:
-                raise BindingError("This source does not give table access to its storage.")
-            for extension in storage.duckdb_extensions:
-                load_extension(conn, extension)
-            if storage.duckdb_secret:
-                scope = storage.uri("")
-                conn.execute(
-                    f"CREATE OR REPLACE SECRET {quote_identifier(self._hidden + '_storage')} "
-                    f"({storage.duckdb_secret}, SCOPE {sql_literal(scope)})"
-                )
-            self._storage = storage
-        uri = sql_literal(self._storage.uri(key))
-        if location.kind == "lakehouse":
-            if fmt not in LAKEHOUSE_FORMATS:
-                raise BindingError(f"{fmt or 'This'} tables cannot be queried with SQL yet.")
-            load_extension(conn, fmt)
-            if fmt == "delta":
-                return f"delta_scan({uri})"
-            # A query reads the table as it is now, not as the last scan saw
-            # it: the version a scan recorded is gone once the table moves on.
-            # Without a version-hint file DuckDB finds the newest metadata by
-            # listing the root, which it calls "unsafe" because a writer could
-            # be mid-commit; for a read-only query that is the right trade.
-            conn.execute("SET unsafe_enable_version_guessing = true")
-            return f"iceberg_scan({uri}, allow_moved_paths = true)"
-        if location.kind == "file":
-            if fmt == "parquet":
-                return f"read_parquet({uri})"
-            if fmt == "csv":
-                return f"read_csv({uri}, auto_detect = true)"
-            if fmt == "tsv":
-                return f"read_csv({uri}, auto_detect = true, delim = '\\t')"
-            if fmt == "jsonl":
-                return f"read_json({uri}, format = 'newline_delimited')"
-            if fmt == "json":
-                return f"read_json_auto({uri})"
-            if fmt == "avro":
-                load_extension(conn, "avro")
-                return f"read_avro({uri})"
-            if fmt in SPATIAL_FORMATS:
-                return self._spatial(conn, uri)
-            raise BindingError(f"{fmt or 'These'} files cannot be queried with SQL yet.")
-        raise BindingError(f"Unknown table location kind '{location.kind}'.")
+    def scan_stats(self, relation: str) -> ScanStats | None:
+        """A connector table's reads (None for tables DuckDB reads itself)."""
+        return self._reader.stats(relation) if self._reader else None
 
-    def _spatial(self, conn: Any, uri: str) -> str:
-        """``ST_Read`` with every geometry column turned into WKT text.
-
-        The raw column is a binary geometry only spatial functions can read;
-        as text it shows in a result and compares like any string.
-        """
-        load_extension(conn, "spatial")
-        source = f"ST_Read({uri})"
-        columns = conn.execute(f"DESCRIBE SELECT * FROM {source}").fetchall()
-        geometries = [
-            name for name, kind, *_ in columns if str(kind).upper().startswith("GEOMETRY")
-        ]
-        if not geometries:
-            return source
-        replaced = ", ".join(
-            f"ST_AsText({quote_identifier(name)}) AS {quote_identifier(name)}"
-            for name in geometries
-        )
-        return f"(SELECT * REPLACE ({replaced}) FROM {source})"
+    def failure(self, relation: str) -> ConnectorError | None:
+        """Why a connector's scan of that table failed, as it said it."""
+        return self._reader.failure(relation) if self._reader else None
 
     def close(self) -> None:
-        if self._ca_path is not None:
-            try:
-                Path(self._ca_path).unlink()
-            except OSError:  # pragma: no cover - best effort
-                pass
-            self._ca_path = None
+        if self._reader is not None:
+            self._reader.close()
         if self._source is not None:
             try:
                 self._source.cleanup()

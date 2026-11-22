@@ -1,13 +1,8 @@
 /**
  * Navbar configuration for the marketing site.
  *
- * Nextra builds the navbar from this page map, so the "Product" dropdown is a
- * `type: 'menu'` entry rather than a hand-rolled one — it then renders with
- * the theme's own menu (HeadlessUI, the same primitive behind the search and
- * theme controls) and, below `md`, folds into Nextra's mobile drawer for free.
- *
- * The three marketing routes are `display: 'hidden'` so they appear once, in
- * the menu, instead of also sitting in the navbar as top-level entries.
+ * Nextra builds the navbar from this page map, so dropdowns use `type: 'menu'`
+ * and fold cleanly into Nextra's mobile drawer below `md`.
  */
 export default {
   index: {
@@ -15,21 +10,39 @@ export default {
     title: "Home",
     display: "hidden",
   },
-  product: {
+  platform: {
     type: "menu",
-    title: "Product",
+    title: "Platform",
     items: {
-      get: {
-        title: "Get Classifyre",
-        href: "/get",
+      governance: {
+        title: "Data Access Governance",
+        href: "/data-access-governance",
       },
       sources: {
-        title: "Sources",
+        title: "Supported Sources",
         href: "/sources",
       },
-      support: {
-        title: "Support",
-        href: "/support",
+      deploy: {
+        title: "Deploy & Self-Host",
+        href: "/get",
+      },
+      incident: {
+        title: "Incident Response",
+        href: "/use-cases/incident-response",
+      },
+    },
+  },
+  compare: {
+    type: "menu",
+    title: "Compare",
+    items: {
+      immuta: {
+        title: "vs Immuta",
+        href: "/immuta-alternative",
+      },
+      unity: {
+        title: "vs Unity Catalog",
+        href: "/unity-catalog-alternative",
       },
     },
   },
@@ -38,11 +51,11 @@ export default {
     title: "Blog",
     items: {
       overview: {
-        title: "Publication overview",
+        title: "All publications",
         href: "/blog",
       },
       articles: {
-        title: "Blog",
+        title: "Articles",
         href: "/blog/articles",
       },
       cases: {
@@ -58,12 +71,12 @@ export default {
   },
   documentation: {
     type: "page",
-    title: "Documentation",
+    title: "Docs",
     href: "https://docs.classifyre.com/",
   },
   get: {
     type: "page",
-    title: "Get Classifyre",
+    title: "Deploy Classifyre",
     display: "hidden",
   },
   download: {
@@ -83,12 +96,12 @@ export default {
   },
   "made-in-europe": {
     type: "page",
-    title: "Made in Austria",
+    title: "About Classifyre",
     display: "hidden",
   },
   "data-access-governance": {
     type: "page",
-    title: "Data access governance",
+    title: "Data Access Governance",
     display: "hidden",
   },
   "use-cases": {
@@ -106,8 +119,6 @@ export default {
     title: "Unity Catalog alternative",
     display: "hidden",
   },
-  // Reachable from the footer only — a legal page does not belong in the
-  // navbar, but it still needs a page-map entry to render inside the layout.
   privacy: {
     type: "page",
     title: "Privacy & cookie policy",

@@ -4,103 +4,114 @@ import { Marker, SectionHead, SectionShell } from "@/components/page-kit";
 import { Reveal } from "@/components/reveal";
 
 /**
- * "What Classifyre does" on the About page: the five pillars, in the order
- * the story is told everywhere (homepage, deck, LinkedIn). Each pillar is a
- * promise; the line under it is the proof. Discovery is the start of the
- * masking pillar and investigation is the last line, never a pillar.
+ * End-to-end platform pillars on the About page — aligned with the homepage
+ * governance flow (Integrate & Detect → Group Access → Multi-Level Masking →
+ * SQL & BI → Data Requests & Products → Audit & Quality).
  */
 
 type Pillar = { marker: string; title: string; body: string; href: string; hrefLabel: string };
 
 const COPY: Record<
   Locale,
-  { marker: string; title: string; lede: string; pillars: readonly Pillar[]; coda: string }
+  { marker: string; title: string; lede: string; pillars: readonly Pillar[] }
 > = {
   en: {
     marker: "What Classifyre does",
-    title: "One governed way into your data",
-    lede: "Five promises, each with the proof underneath.",
+    title: "End-to-end data governance on your own infrastructure",
+    lede: "Six connected capabilities that integrate with the systems and tools you already operate.",
     pillars: [
       {
-        marker: "01 · Access",
-        title: "Access follows your organisation",
-        body: "Groups, departments, roles and locations decide which sources, tables, rows and columns a person sees. Groups come from your directory; row filters work per group; grants carry end dates; workspace admins don't read clear data by default.",
-        href: docs.whoMayQuery,
-        hrefLabel: "Who may query what",
+        marker: "01 · Connect & detect",
+        title: "40+ sources and flexible detectors",
+        body: "Connect databases, Iceberg, Delta, Parquet, object storage, and collaboration platforms — or plug in custom sources. Detect personal data, secrets, and business-specific signals with regex, Python rules, local CPU AI models (GLiNER2), or LLMs.",
+        href: docs.detectors,
+        hrefLabel: "Explore detectors",
       },
       {
-        marker: "02 · Masking",
-        title: "Sensitive data is masked by default",
-        body: "Classification decides what is personal: 41 kinds of personal data, including Austrian, German and Swiss identifiers. Masks apply inside the query (redacted, last four, hashed, hidden), so WHERE and JOIN cannot leak. The hashed mask is pseudonymisation in the sense of the GDPR.",
+        marker: "02 · Group access",
+        title: "Permissions driven by your directory",
+        body: "Integrate Entra ID, Active Directory, Okta, or any OIDC/SAML directory. Grants apply to groups with optional expiration dates, owner-approved access requests, and row-level filters per department or region.",
+        href: docs.whoMayQuery,
+        hrefLabel: "How access control works",
+      },
+      {
+        marker: "03 · Multi-level masking",
+        title: "Column and row protection per group",
+        body: "Mask sensitive columns as redacted, last-four, deterministic hashed pseudonymisation, empty, or hidden — enforced inside the query engine on both source tables and shared datasets. Admins do not get unmasked values by default.",
         href: docs.masking,
         hrefLabel: "How masking works",
       },
       {
-        marker: "03 · Data products",
-        title: "Teams build data products on governed data",
-        body: "Yes — teams can build data products: shared datasets join sources live, with an owning group and readers per group. They are sharable assets, queried with the same governance as the sources underneath. The masks of every input travel with them as a floor. Owners, stewards, quality rules and ODCS contracts keep them reviewed.",
+        marker: "04 · SQL & BI access",
+        title: "Power BI, Excel, Tableau, and ODBC",
+        body: "Expose governed data over a standard PostgreSQL-compatible endpoint with personal, expiring TLS connections. Analysts query live in SQL, Power BI, Excel, or via MCP AI agents without shared database passwords.",
+        href: docs.sqlConnections,
+        hrefLabel: "SQL & BI connections",
+      },
+      {
+        marker: "05 · Requests & data products",
+        title: "Plain-language requests and Delta shares",
+        body: "Business users request combined datasets in natural language or via structured workflows. Owners review and publish governed live or Delta shared data products that automatically inherit source masking as a strict floor.",
         href: docs.sharedDatasets,
         hrefLabel: "Shared datasets",
       },
       {
-        marker: "04 · Tools",
-        title: "People use it in the tools they have",
-        body: "SQL, Excel, Power BI, Tableau and AI agents over MCP, each on a personal, expiring connection over the PostgreSQL protocol. No shared passwords, and an agent never reads more than the person behind it.",
-        href: docs.sqlConnections,
-        hrefLabel: "SQL connections",
-      },
-      {
-        marker: "05 · Proof",
-        title: "Every read is on record, and nothing leaves your infrastructure",
-        body: "The read log names the person, the table and the tool. Classifyre runs as one Docker image or a Helm chart — on-premises, in your own cloud, or on public cloud infrastructure like AWS, Azure or Google Cloud — offline if you like, under Apache-2.0.",
-        href: docs.deployment,
-        hrefLabel: "Deployment options",
+        marker: "06 · Audit & quality",
+        title: "Complete read log and data contracts",
+        body: "Every read, export, permission change, and approval is logged with user and tool. Named owners, scheduled data quality checks, and open data contracts make compliance reviews straightforward.",
+        href: docs.governance,
+        hrefLabel: "Governance & audit",
       },
     ],
-    coda: "And when something does leak, the same findings feed inquiries, fingerprints across systems and cases, with an autopilot doing the legwork.",
   },
   de: {
-    marker: "Was Classifyre tut",
-    title: "Ein kontrollierter Zugang zu Ihren Daten",
-    lede: "Fünf Versprechen, jedes mit dem Nachweis darunter.",
+    marker: "Was Classifyre leistet",
+    title: "Durchgängige Data Governance auf Ihrer eigenen Infrastruktur",
+    lede: "Sechs nahtlos verbundene Bausteine, die sich in Ihre bestehenden Systeme und Werkzeuge einfügen.",
     pillars: [
       {
-        marker: "01 · Zugriff",
-        title: "Der Zugriff folgt Ihrer Organisation",
-        body: "Gruppen, Abteilungen, Rollen und Standorte bestimmen, welche Quellen, Tabellen, Zeilen und Spalten eine Person sieht. Die Gruppen kommen aus Ihrem Verzeichnis; Zeilenfilter wirken pro Gruppe; Freigaben haben ein Ablaufdatum; Workspace-Admins lesen standardmäßig keinen Klartext.",
+        marker: "01 · Verbinden & erkennen",
+        title: "40+ Quellen und flexible Detektoren",
+        body: "Verbinden Sie Datenbanken, Iceberg, Delta, Parquet, Object Storage und Fachsysteme – oder eigene Konnektoren. Erkennen Sie PII, Secrets und Geschäftsregeln per Regex, Python, lokalen CPU-KI-Modellen (GLiNER2) oder LLMs.",
+        href: docs.detectors,
+        hrefLabel: "Detektoren ansehen",
+      },
+      {
+        marker: "02 · Gruppenrechte",
+        title: "Berechtigungen direkt aus Ihrem Verzeichnis",
+        body: "Integrieren Sie Entra ID, Active Directory, Okta oder OIDC/SAML. Freigaben gelten für Gruppen mit optionalem Ablaufdatum, Freigabe durch Data Owner und Zeilenfiltern je Abteilung oder Region.",
         href: docs.whoMayQuery,
-        hrefLabel: "Wer was abfragen darf",
+        hrefLabel: "Zugriffssteuerung ansehen",
       },
       {
-        marker: "02 · Maskierung",
-        title: "Sensible Daten sind standardmäßig maskiert",
-        body: "Die Klassifizierung entscheidet, was personenbezogen ist: 41 Arten personenbezogener Daten, darunter österreichische, deutsche und Schweizer Kennungen. Masken greifen in der Abfrage (geschwärzt, letzte vier, gehasht, ausgeblendet), also kann über WHERE und JOIN nichts abfließen. Die gehashte Maske ist Pseudonymisierung im Sinne der DSGVO.",
+        marker: "03 · Mehrstufige Maskierung",
+        title: "Spalten- und Zeilenschutz je Gruppe",
+        body: "Maskieren Sie sensible Spalten geschwärzt, mit den letzten vier Stellen, als deterministisch gehashte Pseudonymisierung, leer oder verborgen – direkt in der Abfrage auf Quelltabellen und Datenprodukten.",
         href: docs.masking,
-        hrefLabel: "So funktioniert die Maskierung",
+        hrefLabel: "Maskierung verstehen",
       },
       {
-        marker: "03 · Datenprodukte",
-        title: "Teams bauen Datenprodukte auf kontrollierten Daten",
-        body: "Ja — Teams können Datenprodukte bauen: Geteilte Datasets verknüpfen Quellen live, mit einer verantwortlichen Gruppe und Lesern pro Gruppe. Sie sind teilbare Assets und werden mit derselben Governance abgefragt wie die Quellen darunter. Die Masken jeder Eingangstabelle reisen als Untergrenze mit. Owner, Stewards, Qualitätsregeln und ODCS-Verträge halten sie geprüft.",
+        marker: "04 · SQL & BI-Zugriff",
+        title: "Power BI, Excel, Tableau und ODBC",
+        body: "Stellen Sie verwaltete Daten über einen PostgreSQL-kompatiblen Endpunkt mit persönlichen, befristeten TLS-Verbindungen bereit – für SQL, Power BI, Excel und KI-Agenten via MCP ohne geteilte Passwörter.",
+        href: docs.sqlConnections,
+        hrefLabel: "SQL- & BI-Verbindungen",
+      },
+      {
+        marker: "05 · Anfragen & Datenprodukte",
+        title: "Datenanfragen und Delta-Datenprodukte",
+        body: "Fachbereiche fordern kombinierte Datensätze in Alltagssprache an. Data Owner prüfen und veröffentlichen verwaltete Live- oder Delta-Datenprodukte, die alle Quellmasken automatisch als Untergrenze erben.",
         href: docs.sharedDatasets,
         hrefLabel: "Geteilte Datasets",
       },
       {
-        marker: "04 · Werkzeuge",
-        title: "Menschen nutzen es in ihren Werkzeugen",
-        body: "SQL, Excel, Power BI, Tableau und KI-Agenten über MCP, jeweils über eine persönliche, befristete Verbindung per PostgreSQL-Protokoll. Keine geteilten Passwörter, und ein Agent liest nie mehr als die Person dahinter.",
-        href: docs.sqlConnections,
-        hrefLabel: "SQL-Verbindungen",
-      },
-      {
-        marker: "05 · Nachweis",
-        title: "Jeder Zugriff protokolliert, nichts verlässt Ihre Server",
-        body: "Das Protokoll nennt Person, Tabelle und Werkzeug. Classifyre läuft als Docker-Image oder Helm-Chart — On-Premises, in Ihrer eigenen Cloud oder auf Public-Cloud-Infrastruktur wie AWS, Azure oder Google Cloud —, auf Wunsch offline, unter Apache-2.0.",
-        href: docs.deployment,
-        hrefLabel: "Betriebsvarianten",
+        marker: "06 · Audit & Qualität",
+        title: "Lückenloses Protokoll und Datenverträge",
+        body: "Jeder Lesezugriff, Export, jede Freigabe und Änderung wird mit Person und Werkzeug protokolliert. Klare Verantwortlichkeiten, geplante Qualitätsprüfungen und offene Datenverträge erleichtern jedes Audit.",
+        href: docs.governance,
+        hrefLabel: "Governance & Audit",
       },
     ],
-    coda: "Und wenn doch etwas abfließt, speisen dieselben Befunde Anfragen, Fingerabdrücke über Systeme und Fälle, und ein Autopilot erledigt die Laufarbeit.",
   },
 };
 
@@ -113,16 +124,15 @@ export function AboutPillars({ locale }: { locale: Locale }) {
           <SectionHead
             id="what-title"
             marker={copy.marker}
-            illustration="binders"
             title={copy.title}
             lede={copy.lede}
           />
           <ol className="grid gap-4 lg:grid-cols-2">
             {copy.pillars.map((pillar, index) => (
-              <Reveal key={pillar.marker} as="li" delayMs={index * 70} className="h-full">
+              <Reveal key={pillar.marker} as="li" delayMs={index * 60} className="h-full">
                 <div className="flex h-full flex-col items-start gap-3 border-2 border-border bg-background p-6 shadow-[6px_6px_0_var(--color-border)]">
                   <Marker label={pillar.marker} />
-                  <h3 className="font-serif text-lg font-black uppercase leading-tight tracking-[0.04em]">
+                  <h3 className="font-sans text-lg font-bold leading-snug text-foreground">
                     {pillar.title}
                   </h3>
                   <p className="text-sm leading-6 text-muted-foreground">{pillar.body}</p>
@@ -140,7 +150,6 @@ export function AboutPillars({ locale }: { locale: Locale }) {
               </Reveal>
             ))}
           </ol>
-          <p className="max-w-3xl text-sm leading-6 text-muted-foreground">{copy.coda}</p>
         </div>
       </SectionShell>
     </section>

@@ -450,6 +450,7 @@ docs/QueryRunDto.md
 docs/QueryRunErrorDto.md
 docs/QueryRunMaskDto.md
 docs/QueryRunRowFilterDto.md
+docs/QueryRunScanDto.md
 docs/QuickSearchAssetDto.md
 docs/QuickSearchFindingDto.md
 docs/QuickSearchRequestDto.md
@@ -1182,6 +1183,7 @@ src/models/QueryRunDto.ts
 src/models/QueryRunErrorDto.ts
 src/models/QueryRunMaskDto.ts
 src/models/QueryRunRowFilterDto.ts
+src/models/QueryRunScanDto.ts
 src/models/QuickSearchAssetDto.ts
 src/models/QuickSearchFindingDto.ts
 src/models/QuickSearchRequestDto.ts

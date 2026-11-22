@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Rebuilds classifyre/cli:dev-local (published cli:latest + unixODBC) and loads
+# Rebuilds classifyre/cli:dev-local (published cli:latest + unixODBC and the
+# query sources' clients, see development/cli-dev-image/Dockerfile) and loads
 # it into the k3d cluster. Re-run after a newer classifyre/cli:latest exists.
 #
 # PULL=always (default) fetches cli:latest first; PULL=missing fetches it only
@@ -10,5 +11,7 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 if [ "${PULL:-always}" = "always" ] || ! docker image inspect classifyre/cli:latest >/dev/null 2>&1; then
   docker pull classifyre/cli:latest
 fi
-docker build -t classifyre/cli:dev-local "${repo_root}/development/cli-dev-image"
+docker build -t classifyre/cli:dev-local \
+  --build-context cli="${repo_root}/apps/cli" \
+  "${repo_root}/development/cli-dev-image"
 k3d image import classifyre/cli:dev-local -c classifyre

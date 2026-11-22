@@ -1,11 +1,8 @@
 import type { Metadata } from "next";
-import type { ReactNode } from "react";
 
 import { Button } from "@workspace/ui/components";
-import { cn } from "@workspace/ui/lib/utils";
 
 import { AboutPillars } from "@/components/about-pillars";
-import { Illustration } from "@/components/illustration";
 import {
   DocsLink,
   Marker,
@@ -15,8 +12,14 @@ import {
 } from "@/components/page-kit";
 import { Reveal } from "@/components/reveal";
 import {
-  docs,
+  JsonLdScripts,
+  generateAboutPageSchema,
+  generateBreadcrumbSchema,
+  siteOrigin,
+} from "@/lib/seo";
+import {
   contactEmail,
+  docs,
   repoUrl,
   routes,
   showcaseUrl,
@@ -25,9 +28,9 @@ import {
 import "../../landing.css";
 
 export const metadata: Metadata = {
-  title: { absolute: "About Classifyre: Made in Austria, Open Source" },
+  title: { absolute: "About Classifyre — Open-Source Data Governance" },
   description:
-    "The governed way into your organisation's data: access by role, masking by default, every read on record. Built in Austria, Apache-2.0. Deploy on-premises, in your own cloud, or on AWS, Azure or Google Cloud.",
+    "Classifyre is an open-source data governance platform engineered in Austria to European privacy and security standards, deployed by organisations across Europe, North America, and worldwide.",
   alternates: {
     canonical: "/made-in-europe/",
     languages: {
@@ -37,28 +40,19 @@ export const metadata: Metadata = {
     },
   },
   openGraph: {
-    title: "About Classifyre: made in Austria, built in the open",
+    title: "About Classifyre — Built in Austria, deployed worldwide",
     description:
-      "Austrian, European, Apache-2.0 open-source data access governance platform. Your data never has to leave your infrastructure — on-premises, your own cloud, or AWS, Azure or Google Cloud — or the continent.",
+      "100% Apache-2.0 open-source data governance built in Austria to European standards and deployed globally on your own infrastructure.",
     type: "website",
     locale: "en_US",
   },
 };
 
-/**
- * The Austrian flag as three painted bars rather than an emoji or a PNG: the
- * site's whole visual language is 2px borders and flat blocks, and a glossy
- * flag graphic would read as a sticker dropped onto a case file. Decorative —
- * the surrounding copy already says "Austria" in words.
- */
-function AustrianFlag({ className }: { className?: string }) {
+function SubtleAustrianMark() {
   return (
     <span
       aria-hidden="true"
-      className={cn(
-        "inline-flex h-12 w-16 flex-col overflow-hidden border-2 border-border",
-        className,
-      )}
+      className="inline-flex h-3.5 w-5 shrink-0 flex-col overflow-hidden border border-white/25"
     >
       <span className="h-1/3 w-full bg-[#ed2939]" />
       <span className="h-1/3 w-full bg-white" />
@@ -67,52 +61,7 @@ function AustrianFlag({ className }: { className?: string }) {
   );
 }
 
-/**
- * The twelve stars, drawn on a circle rather than hand-placed. Real polygons
- * rather than the ★ glyph: a text star would land in the page's copied text
- * and in anything scraping it, twelve times over, for a purely decorative mark.
- */
-const STAR_POINTS = [
-  [0, -1],
-  [0.2245, -0.309],
-  [0.951, -0.309],
-  [0.363, 0.118],
-  [0.588, 0.809],
-  [0, 0.382],
-  [-0.588, 0.809],
-  [-0.363, 0.118],
-  [-0.951, -0.309],
-  [-0.2245, -0.309],
-]
-  .map(([x, y]) => `${x},${y}`)
-  .join(" ");
-
-function EuropeanStars({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 100 100"
-      aria-hidden="true"
-      className={cn("h-12 w-12", className)}
-    >
-      {Array.from({ length: 12 }, (_, index) => {
-        const angle = (index * Math.PI) / 6 - Math.PI / 2;
-        const x = 50 + 32 * Math.cos(angle);
-        const y = 50 + 32 * Math.sin(angle);
-        return (
-          <polygon
-            key={index}
-            points={STAR_POINTS}
-            fill="currentColor"
-            transform={`translate(${x.toFixed(2)} ${y.toFixed(2)}) scale(9)`}
-          />
-        );
-      })}
-    </svg>
-  );
-}
-
-/** What the address actually changes for someone running the software. */
-const consequences: readonly {
+const principles: readonly {
   marker: string;
   title: string;
   body: string;
@@ -120,168 +69,100 @@ const consequences: readonly {
   hrefLabel?: string;
 }[] = [
   {
-    marker: "Residency",
-    title: "Your data never has to leave the building",
-    body: "Classifyre is software you run, not a service you upload to. The Docker image keeps everything on one machine; the Helm chart keeps everything inside your cluster. There is no vendor tenancy to pick a region for, because there is no vendor tenancy.",
+    marker: "Integration first",
+    title: "Works with the stack you already run",
+    body: "Keep your existing ETL pipelines, databases, Iceberg and Delta lakehouses, identity provider, and BI tools. Classifyre integrates cleanly on top instead of forcing an expensive platform migration.",
+    href: routes.sources,
+    hrefLabel: "Explore supported sources",
+  },
+  {
+    marker: "Data sovereignty",
+    title: "Everything stays on your infrastructure",
+    body: "Classifyre is self-hosted software, not a multi-tenant SaaS upload. Run it locally with Docker or in production on Kubernetes and OpenShift — on-premises, in a private cloud, or in your AWS, Azure, or GCP account.",
     href: docs.deployment,
-    hrefLabel: "Deployment options",
+    hrefLabel: "Deployment architecture",
   },
   {
-    marker: "Sovereignty",
-    title: "No dependency on a non-EU cloud",
-    body: "Nothing in the stack requires a hyperscaler account. PostgreSQL and Kubernetes are the only hard dependencies, so the whole platform runs on an EU provider, on-premises hardware, or an air-gapped rack — the same build either way.",
-    href: docs.kubernetes,
-    hrefLabel: "Run it on Kubernetes",
-  },
-  {
-    marker: "AI on your terms",
-    title: "You choose the model, and where it runs",
-    body: "AI providers are configuration, not a hardwired vendor. Point the autopilot and the LLM detectors at a European endpoint, at a model you host yourself, or at nothing at all — the rule-based and local-model detectors work without any provider configured.",
+    marker: "European standards",
+    title: "Privacy and security built into the defaults",
+    body: "Engineered in Austria under GDPR, NIS2, DORA, and EU AI Act expectations. Personal columns are masked by default, admins never inherit clear values automatically, every read is logged, and AI models remain entirely your choice.",
     href: docs.aiProviders,
-    hrefLabel: "AI providers",
+    hrefLabel: "AI & model configuration",
   },
   {
-    marker: "Same rulebook",
-    title: "We work under the regulations you do",
-    body: "GDPR, NIS2, DORA, and the AI Act are not an export checklist for us — they are the law where we sit. That shapes the product's defaults: masked by default, a log of every read, encrypted credentials, workspace isolation, and telemetry you can switch off.",
-    href: docs.telemetry,
-    hrefLabel: "What telemetry sends",
+    marker: "Open by design",
+    title: "100% Apache-2.0, zero locked tiers",
+    body: "You can inspect every line of code, audit how masking and access control work, and deploy the full platform yourself with no per-seat licensing. When you want custom tailoring or rollout support, you work directly with our engineers.",
+    href: routes.support,
+    hrefLabel: "Support & tailoring",
   },
 ];
 
-/** Why the open-source part is a commitment rather than a marketing tier. */
 const openSourceFacts: readonly {
   label: string;
   value: string;
   detail: string;
 }[] = [
   {
-    label: "License",
+    label: "Licence",
     value: "Apache-2.0",
     detail:
-      "Permissive, patent-granting, and boring on purpose. Fork it, ship it, run it commercially.",
+      "Permissive open-source licence with explicit patent grant. Audit it, extend it, and run it commercially without vendor lock-in.",
   },
   {
-    label: "Scope",
-    value: "The whole engine",
+    label: "Complete core",
+    value: "Every capability included",
     detail:
-      "Connectors, SSO and roles, grants and row filters, masking, the SQL gateway, investigations, the Docker image and the Helm chart. Not a stripped demo.",
+      "SSO, roles, row filters, dynamic masking, SQL/BI gateway, shared datasets, audit logging, Docker image, and Kubernetes/OpenShift Helm chart.",
   },
   {
-    label: "Development",
-    value: "In the open",
+    label: "Engineering transparency",
+    value: "Developed in the open",
     detail:
-      "Issues, pull requests, and releases all happen on the public repository, in public.",
+      "Architecture, connectors, releases, and security fixes are visible directly on GitHub so your team can verify quality before adopting.",
   },
 ];
 
-function Fact({
-  label,
-  value,
-  detail,
-}: {
-  label: string;
-  value: string;
-  detail: string;
-}) {
-  return (
-    <div className="flex h-full flex-col gap-2 border-2 border-white/20 bg-white/[0.04] p-5">
-      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-white/50">
-        {label}
-      </span>
-      <p className="font-serif text-xl font-black uppercase leading-tight tracking-[0.04em] text-white">
-        {value}
-      </p>
-      <p className="text-sm leading-6 text-white/70">{detail}</p>
-    </div>
-  );
-}
-
-function Consequence({
-  marker,
-  title,
-  body,
-  href,
-  hrefLabel,
-}: {
-  marker: string;
-  title: string;
-  body: string;
-  href?: string;
-  hrefLabel?: string;
-}) {
-  return (
-    <div className="flex h-full flex-col items-start gap-3 border-2 border-border bg-background p-6 shadow-[6px_6px_0_var(--color-border)]">
-      <Marker label={marker} />
-      <h3 className="font-serif text-lg font-black uppercase leading-tight tracking-[0.04em]">
-        {title}
-      </h3>
-      <p className="text-sm leading-6 text-muted-foreground">{body}</p>
-      {href && hrefLabel ? (
-        <div className="mt-auto pt-2">
-          <a
-            href={href}
-            target="_blank"
-            rel="noreferrer"
-            className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground underline-offset-4 hover:text-accent-foreground hover:underline dark:hover:text-accent"
-          >
-            {hrefLabel} →
-          </a>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-/** One line of the "where we sit" card stack. */
-function Coordinate({
-  label,
-  value,
-  aside,
-}: {
-  label: string;
-  value: string;
-  aside: ReactNode;
-}) {
-  return (
-    <div className="flex items-center gap-5 border-2 border-border bg-background p-5">
-      <div className="shrink-0">{aside}</div>
-      <div className="space-y-1">
-        <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
-          {label}
-        </p>
-        <p className="font-serif text-lg font-black uppercase leading-tight tracking-[0.04em]">
-          {value}
-        </p>
-      </div>
-    </div>
-  );
-}
+const coordinates: readonly { label: string; value: string; accent?: boolean }[] = [
+  { label: "Engineering", value: "Austria, European Union", accent: true },
+  { label: "Global reach", value: "Europe, North America & Worldwide" },
+  { label: "Licence", value: "Apache-2.0 · 100% Open Source" },
+  { label: "Deployment", value: "Docker · Kubernetes · OpenShift" },
+];
 
 export default function MadeInEuropePage() {
+  const siteUrl = siteOrigin();
+
   return (
-    <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 sm:px-6 lg:px-8">
+    <>
+      <JsonLdScripts
+        schemas={[
+          generateBreadcrumbSchema(siteUrl, [
+            { name: "Classifyre", path: "/" },
+            { name: "About", path: "/made-in-europe/" },
+          ]),
+          generateAboutPageSchema(siteUrl, "/made-in-europe/", "en"),
+        ]}
+      />
+      <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 sm:px-6 lg:px-8">
       <PageHero
-        eyebrow="Servus"
+        eyebrow="About Classifyre"
         title={
           <>
-            Made in Austria.
+            Built in Austria.
             <br />
             <span className="inline-block bg-accent px-[0.12em] text-black">
-              Open to everyone.
+              Deployed worldwide.
             </span>
           </>
         }
         lede={
           <>
-            Classifyre is the one governed way into your organisation&apos;s
-            data: access follows your departments, roles and rules, personal
-            data stays masked until someone is cleared for it, and every read
-            is on record, on your own servers. It is built in Austria, in the
-            European Union, and released as open source under Apache-2.0. We
-            are not a European brand on top of somebody else&apos;s cloud: the
-            software runs on your machines, under the same rules we work under
-            ourselves.
+            Classifyre is an open-source data governance platform engineered in
+            Austria to European privacy and security standards, built for
+            organisations across Europe, North America, and beyond. We believe
+            critical data governance infrastructure should be transparent,
+            self-hosted, and free from proprietary vendor lock-in.
           </>
         }
         actions={
@@ -291,196 +172,163 @@ export default function MadeInEuropePage() {
               size="lg"
               className="border-2 border-accent bg-accent text-black hover:bg-accent/90"
             >
-              <a href={repoUrl} target="_blank" rel="noreferrer">
-                Read the source
-              </a>
+              <a href={routes.support}>Talk to our team</a>
             </Button>
             <Button
               asChild
               size="lg"
-              variant="secondary"
-              className="border-2 border-white/20 bg-white/10 text-white hover:bg-white/16"
+              variant="ghost"
+              className="border-2 border-white/35 bg-white/10 font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-white hover:border-accent hover:bg-white/15 hover:text-accent"
             >
-              <a href={routes.get}>Get Classifyre</a>
+              <a href={repoUrl} target="_blank" rel="noreferrer">
+                View source on GitHub
+              </a>
             </Button>
           </>
         }
         aside={
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-4 border-2 border-white/20 bg-white/[0.04] p-5">
-              <AustrianFlag className="shrink-0" />
-              <div className="space-y-1">
-                <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-white/50">
-                  Built in
-                </p>
-                <p className="font-serif text-xl font-black uppercase tracking-[0.04em] text-white">
-                  Austria
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4 border-2 border-white/20 bg-white/[0.04] p-5">
-              <EuropeanStars className="shrink-0 text-accent" />
-              <div className="space-y-1">
-                <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-white/50">
-                  Under the rules of
-                </p>
-                <p className="font-serif text-xl font-black uppercase tracking-[0.04em] text-white">
-                  The European Union
-                </p>
-              </div>
-            </div>
+          <div className="border-2 border-white/20 bg-white/[0.04] p-6">
+            <dl className="divide-y divide-white/15">
+              {coordinates.map((item) => (
+                <div key={item.label} className="py-3.5 first:pt-0 last:pb-0">
+                  <dt className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-white/50">
+                    {item.label}
+                  </dt>
+                  <dd className="mt-1 flex items-center gap-2.5 font-sans text-base font-semibold text-white">
+                    {item.accent ? <SubtleAustrianMark /> : null}
+                    <span>{item.value}</span>
+                  </dd>
+                </div>
+              ))}
+            </dl>
           </div>
         }
       />
 
-      {/* ── What Classifyre does: the five pillars ──────────────────────── */}
+      {/* ── End-to-end capabilities ───────────────────────────────────────── */}
       <AboutPillars locale="en" />
 
-      {/* ── Where we sit ─────────────────────────────────────────────────── */}
-      <section aria-labelledby="where-title">
+      {/* ── Engineering principles ────────────────────────────────────────── */}
+      <section aria-labelledby="principles-title">
         <SectionShell tone="plain">
           <div className="space-y-8">
             <SectionHead
-              id="where-title"
-              marker="Coordinates"
-              illustration="feet"
-              title="A small European team, working in public"
-              lede="No offshore development shop, no anonymous maintainer account."
-            />
-
-            <div className="flex flex-wrap items-center gap-4 border-2 border-border bg-muted/30 p-5">
-              <Marker label="Say hello" />
-              <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-                Questions about a rollout, a connector you need, or where the
-                project is going next? Write to us — the same address reaches
-                the people who wrote the code.
-              </p>
-              <Button
-                asChild
-                variant="secondary"
-                className="border-2 border-border"
-              >
-                <a href={`mailto:${contactEmail}`}>
-                  {contactEmail}
-                </a>
-              </Button>
-            </div>
-          </div>
-        </SectionShell>
-      </section>
-
-      {/* ── What it changes for you ──────────────────────────────────────── */}
-      <section aria-labelledby="consequences-title">
-        <SectionShell tone="plain">
-          <div className="space-y-8">
-            <SectionHead
-              id="consequences-title"
-              marker="What it changes"
-              illustration="binders"
-              title="Being European"
-              lede="Plenty of tools claim EU hosting and then ask you to ship your most sensitive data to them anyway. Classifyre is built the other way round: the software travels to the data."
+              id="principles-title"
+              marker="How we build"
+              title="Practical engineering, clear boundaries"
+              lede="Designed for organisations that need rigorous data governance without handing control of their data estate to a closed-source vendor."
             />
 
             <div className="grid gap-4 lg:grid-cols-2">
-              {consequences.map((item, index) => (
-                <Reveal key={item.marker} delayMs={index * 80} className="h-full">
-                  <Consequence {...item} />
-                </Reveal>
-              ))}
+              {principles.map((item, index) => {
+                const external = item.href?.startsWith("http");
+                return (
+                  <Reveal key={item.marker} delayMs={index * 70} className="h-full">
+                    <div className="flex h-full flex-col items-start gap-3 border-2 border-border bg-background p-6 shadow-[6px_6px_0_var(--color-border)]">
+                      <Marker label={item.marker} />
+                      <h3 className="font-sans text-lg font-bold leading-snug text-foreground">
+                        {item.title}
+                      </h3>
+                      <p className="text-sm leading-6 text-muted-foreground">{item.body}</p>
+                      {item.href && item.hrefLabel ? (
+                        <div className="mt-auto pt-2">
+                          <a
+                            href={item.href}
+                            {...(external ? { target: "_blank", rel: "noreferrer" } : null)}
+                            className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground underline-offset-4 hover:text-accent-foreground hover:underline dark:hover:text-accent"
+                          >
+                            {item.hrefLabel} →
+                          </a>
+                        </div>
+                      ) : null}
+                    </div>
+                  </Reveal>
+                );
+              })}
             </div>
 
-            <div className="flex flex-wrap items-center gap-4 border-2 border-border bg-background p-5">
-              <Marker label="Straight answer" />
-              <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-                We are not going to tell you a piece of software makes you
-                GDPR-compliant — no software does that. What we can say is that
-                Classifyre never needs a copy of your data, and that every
-                design decision above was made so a European compliance review
-                is a short conversation instead of a project.
-              </p>
-              <DocsLink href={docs.deployment}>Deployment docs</DocsLink>
+            <div className="flex flex-wrap items-center justify-between gap-4 border-2 border-border bg-muted/30 p-5 sm:p-6">
+              <div className="max-w-3xl space-y-1.5">
+                <Marker label="Compliance note" />
+                <p className="pt-1 text-sm leading-6 text-muted-foreground">
+                  No software tool makes an organisation compliant by itself.
+                  Classifyre gives your security, data, and legal teams the
+                  technical enforcement — group permissions, row filters,
+                  column masking, and verifiable read logs — that supports GDPR,
+                  NIS2, DORA, and internal governance frameworks.
+                </p>
+              </div>
+              <DocsLink href={docs.deployment}>Architecture docs</DocsLink>
             </div>
           </div>
         </SectionShell>
       </section>
 
-      {/* ── Open source ──────────────────────────────────────────────────── */}
+      {/* ── Open-source commitment ────────────────────────────────────────── */}
       <section aria-labelledby="open-source-title">
         <SectionShell tone="signal" fullWidth className="bg-black">
-          <div className="space-y-8 text-white">
+          <div className="mx-auto max-w-7xl space-y-8 text-white">
+            <div className="max-w-2xl space-y-3">
+              <Marker label="Open source" />
+              <h2
+                id="open-source-title"
+                className="font-hero text-[clamp(2.2rem,5vw,3.8rem)] uppercase leading-[0.9] tracking-[0.01em] text-white"
+              >
+                Inspect the quality yourself.
+              </h2>
+              <p className="text-base leading-7 text-white/70">
+                Evaluate Classifyre by reading the codebase, testing it on your
+                own databases, and deploying it in your environment — with zero
+                feature walls.
+              </p>
+            </div>
 
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-3">
               {openSourceFacts.map((fact) => (
-                <Fact key={fact.label} {...fact} />
+                <div
+                  key={fact.label}
+                  className="flex h-full flex-col gap-2 border-2 border-white/20 bg-white/[0.04] p-5"
+                >
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-white/50">
+                    {fact.label}
+                  </span>
+                  <p className="font-sans text-lg font-bold text-white">
+                    {fact.value}
+                  </p>
+                  <p className="text-sm leading-6 text-white/70">{fact.detail}</p>
+                </div>
               ))}
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-4 border-t border-white/15 pt-6">
               <Button
                 asChild
+                size="lg"
                 className="border-2 border-accent bg-accent text-black hover:bg-accent/90"
               >
-                <a href={repoUrl} target="_blank" rel="noreferrer">
-                  Browse the repository
-                </a>
+                <a href={routes.get}>Deploy Classifyre</a>
+              </Button>
+              <Button
+                asChild
+                size="lg"
+                variant="ghost"
+                className="border-2 border-white/35 bg-white/10 font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-white hover:border-accent hover:bg-white/15 hover:text-accent"
+              >
+                <a href={`mailto:${contactEmail}`}>{contactEmail}</a>
               </Button>
               <a
                 href={showcaseUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="font-mono text-[11px] uppercase tracking-[0.12em] text-white/50 underline-offset-4 hover:text-accent hover:underline"
+                className="font-mono text-[11px] uppercase tracking-[0.14em] text-white/75 underline-offset-4 hover:text-accent hover:underline"
               >
-                Or poke at the live showcase
+                Explore live demo →
               </a>
             </div>
           </div>
         </SectionShell>
       </section>
-
-      {/* ── Closing ──────────────────────────────────────────────────────── */}
-      <section aria-labelledby="europe-cta-title">
-        <SectionShell tone="signal" fullWidth className="bg-black">
-          <div className="mx-auto flex max-w-3xl flex-col items-center gap-6 py-4 text-center text-white">
-            <div className="flex items-center gap-4">
-              <AustrianFlag className="h-10 w-14 border-white/30" />
-              <EuropeanStars className="h-10 w-10 text-accent" />
-            </div>
-            <h2
-              id="europe-cta-title"
-              className="font-hero text-[clamp(2.5rem,7vw,5rem)] uppercase leading-[0.88] tracking-[0.01em]"
-            >
-              Built here.{" "}
-              <span className="inline-block bg-accent px-[0.12em] text-black">
-                Run anywhere.
-              </span>
-            </h2>
-            <p className="max-w-xl text-base leading-7 text-white/70">
-              Run it and point it at something real. Nothing
-              is uploaded, nothing phones a foreign cloud, and everything you
-              build carries over when you move to Kubernetes.
-            </p>
-            <div className="flex flex-wrap justify-center gap-3">
-              <Button
-                asChild
-                size="lg"
-                className="border-2 border-accent bg-accent text-black hover:bg-accent/90"
-              >
-                <a href={routes.get}>
-                  Get Classifyre
-                </a>
-              </Button>
-              <Button
-                asChild
-                size="lg"
-                variant="secondary"
-                className="border-2 border-white/20 bg-white/10 text-white hover:bg-white/16"
-              >
-                <a href={`mailto:${contactEmail}`}>Talk to us</a>
-              </Button>
-            </div>
-          </div>
-        </SectionShell>
-      </section>
-    </main>
+      </main>
+    </>
   );
 }

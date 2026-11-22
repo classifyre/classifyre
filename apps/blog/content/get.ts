@@ -107,159 +107,158 @@ export type GetCopy = {
 /* ── English ────────────────────────────────────────────────────────────── */
 
 const enHero = {
-  titleLead: "Get it running",
-  titleHighlight: "tonight.",
-  micro: "free · no signup",
+  titleLead: "Deploy in minutes.",
+  titleHighlight: "Scale on your cluster.",
+  micro: "100% Apache-2.0 open source · no signup",
   ctaDocker: "Docker",
-  ctaKubernetes: "Kubernetes",
+  ctaKubernetes: "Kubernetes & OpenShift",
 } as const;
 
 const enMascots = {
-  lookingAround:
-    "The Classifyre investigator glancing around, searching for the trail",
+  lookingAround: "Classifyre deployment overview",
 } as const;
 
 const enDocker = {
   marker: "Option 01 · Docker",
-  title: "Run it on your machine",
-  lede: "One image, the same on macOS, Windows and Linux. The database and the scan workers are already inside, so there is nothing to provision and nothing to connect.",
-  cardLabel: "Run it",
+  title: "Evaluate locally with Docker",
+  lede: "One self-contained image for macOS, Windows, and Linux. PostgreSQL and the scan/query workers are bundled inside, so you can test Classifyre on real data in minutes.",
+  cardLabel: "All-in-one container",
   footnote: {
     beforeHost: "Then open ",
     host: "localhost:3000",
     afterHost:
-      ". Needs Docker and 4 GB of memory. Those volumes are what keep your work across an upgrade: the ",
+      ". Requires Docker and 4 GB RAM. Mounted volumes preserve your configuration across upgrades — see the ",
     linkLabel: "Docker guide",
     afterLink:
-      " covers the environment variables, external databases and object storage.",
+      " for environment variables, external databases, and object storage.",
   },
   includes: [
     {
-      title: "PostgreSQL, inside",
-      body: "The database ships in the image, tuned at startup to the memory you gave the container. Point DATABASE_URL at your own server when you outgrow it.",
+      title: "Bundled PostgreSQL",
+      body: "Ships with PostgreSQL tuned automatically to container memory. Point DATABASE_URL at your managed database whenever you are ready to scale.",
     },
     {
-      title: "Scan workers, sandboxed",
-      body: "Extraction and detection run as separate processes that exit with the scan, the same code the cluster runs as Kubernetes Jobs.",
+      title: "Isolated scan & query workers",
+      body: "Extraction, detection, and SQL queries run in isolated short-lived workers — using the exact same engine that runs as Jobs on Kubernetes and OpenShift.",
     },
     {
-      title: "Mount a folder, scan it",
-      body: "Bind-mount a directory read-only and point a source at it. Nothing is copied out; the files are read where they sit.",
+      title: "Read local files in place",
+      body: "Mount a local directory read-only to test classification and Parquet/CSV queries without copying data out of your environment.",
     },
     {
-      title: "Everything stays put",
-      body: "Sources, credentials, findings, and cases live in volumes on your disk. Nothing is uploaded to us.",
+      title: "Everything stays on your machine",
+      body: "Sources, encrypted credentials, classifications, policies, and audit logs live strictly in your local volumes.",
     },
   ],
 } as const;
 
 const enFirstRun = {
-  marker: "First run",
-  title: "Four steps to governed access on one source",
-  lede: "Nothing here needs a config file. Every step is in the app, and each one has a page on the docs site when you want the detail.",
+  marker: "First steps",
+  title: "Four steps to governed access on your first source",
+  lede: "Every step runs straight in the web UI — no hand-written config files required.",
   action: { label: "Tour the app", href: docs.inTheApp },
   steps: [
     {
       step: "01",
-      title: "Run the image",
-      body: "One command, then open localhost:3000. The first boot initialises the database and creates a workspace; give it a few minutes on a laptop.",
+      title: "Start the container",
+      body: "Run the Docker command and open localhost:3000. On first boot, Classifyre initialises the database, identity service, and default workspace.",
     },
     {
       step: "02",
       title: "Connect a source",
-      body: "Point it at something you already run: a database, an S3 bucket, a Confluence space, or just a local folder. Credentials are encrypted at rest.",
+      body: "Point Classifyre at a database, Iceberg or Delta lakehouse, S3/Azure/GCS bucket, Confluence space, or local folder. Credentials are encrypted at rest.",
       href: docs.sourceConfiguration,
       hrefLabel: "Configuring sources",
     },
     {
       step: "03",
-      title: "Classify it",
-      body: "Switch on the built-in packs you care about: PII, secrets, quality. They work on the first scan with no model setup, and the classification they produce decides which columns are masked.",
+      title: "Run detectors & classify",
+      body: "Enable built-in PII and secret packs or add custom regex, Python, local CPU AI (GLiNER2), or LLM detectors. Classifications drive column masking automatically.",
       href: docs.preBuiltDetectors,
-      hrefLabel: "Pre-built detectors",
+      hrefLabel: "Detectors reference",
     },
     {
       step: "04",
-      title: "Give one group governed access",
-      body: "Grant a group Data reader on the source and add a row filter if it should see only its rows. Personal columns arrive masked. Query it on the SQL page or from Power BI, and watch the read land in the log.",
+      title: "Assign group access & query",
+      body: "Grant a group access with row filters and column masks, then query live from the SQL workbench, Power BI, Excel, or ODBC — with every read logged.",
       href: docs.whoMayQuery,
-      hrefLabel: "Who may query what",
+      hrefLabel: "Access & masking guide",
     },
   ],
 } as const;
 
 const enKubernetes = {
-  marker: "Option 02 · Kubernetes",
-  title: "Or scale it on your cluster",
-  lede: "The same open-source core as a Helm chart: web, API, worker, and ephemeral scan Jobs that fan out under load and scale to zero between runs.",
-  ctaDocs: "Full deployment guide",
-  ctaChartReadme: "Chart README on GitHub",
-  helmLabel: "No repo add step",
-  helmTitle: "Helm, OCI-native",
-  inspectLabel: "Inspect before installing",
-  installLabel: "Install",
+  marker: "Option 02 · Kubernetes & OpenShift",
+  title: "Run in production on your cluster",
+  lede: "The exact same Apache-2.0 open-source core packaged as a Helm chart for Kubernetes and OpenShift: web UI, API, and stateless scan and query workers that scale to zero between runs.",
+  ctaDocs: "Kubernetes & OpenShift guide",
+  ctaChartReadme: "Helm chart README on GitHub",
+  helmLabel: "OCI Helm chart",
+  helmTitle: "Production-ready on Kubernetes & OpenShift",
+  inspectLabel: "Inspect chart metadata",
+  installLabel: "Install with Helm",
   prerequisitesLabel: "Prerequisites",
   prerequisites: [
-    { label: "Kubernetes", value: "≥ 1.26" },
-    { label: "Helm", value: "≥ 3.8 (OCI native)" },
-    { label: "Ingress", value: "nginx by default" },
-    { label: "PostgreSQL", value: "14+ external, or embedded for demos" },
+    { label: "Kubernetes / OpenShift", value: "K8s ≥ 1.26 / OpenShift 4+" },
+    { label: "Helm", value: "≥ 3.8" },
+    { label: "Ingress / Route", value: "nginx or OpenShift Routes" },
+    { label: "PostgreSQL", value: "14+ external (or embedded for demos)" },
   ],
-  imagesLabel: "Images · multi-arch",
+  imagesLabel: "Container images · multi-arch",
   imagesValue: "linux/amd64 + linux/arm64",
   docsLinkLabel: "Read the docs",
   docs: [
     {
-      title: "Kubernetes deployment guide",
-      body: "Values files for k3s, an external database, and CloudNativePG; ingress, TLS, scaling, and storage.",
+      title: "Kubernetes & OpenShift guide",
+      body: "Production values files, external PostgreSQL, CloudNativePG, TLS ingress, autoscaling, and storage.",
       href: docs.kubernetes,
     },
     {
-      title: "Database",
-      body: "Schema layout, migrations on upgrade, and connecting managed PostgreSQL.",
+      title: "Database configuration",
+      body: "Schema layout, automated migrations on upgrade, and connecting managed PostgreSQL.",
       href: docs.database,
     },
     {
       title: "Object storage",
-      body: "Optional buckets for scan logs and uploaded artifacts.",
+      body: "Optional S3-compatible buckets for scan logs, exports, and governed data artifacts.",
       href: docs.storage,
     },
     {
       title: "Upgrades & versioning",
-      body: "How image tags track the chart appVersion, and what a version bump implies.",
+      body: "Predictable image tags aligned with chart versions and safe upgrade paths.",
       href: docs.upgrades,
     },
   ],
 } as const;
 
 const enWhich = {
-  marker: "Not sure which",
-  title: "Pick by where the data has to stay",
-  lede: "Both runtimes carry the same features and run the same images, so this is not a decision you are locked into.",
+  marker: "Choosing a runtime",
+  title: "Start locally, move to your cluster when ready",
+  lede: "Both distributions run the exact same open-source codebase and container images.",
   dockerHead: "Choose Docker when",
   dockerPoints: [
-    "You are evaluating, or you investigate alone.",
-    "The corpus is on your machine or reachable from it.",
-    "Nothing may leave the laptop.",
-    "You want to be scanning within ten minutes.",
+    "You are evaluating Classifyre or running a quick proof of concept.",
+    "You want to test classification, masking, and Power BI/SQL locally in minutes.",
+    "Everything needs to stay on a single workstation or VM.",
+    "You do not want to provision external infrastructure yet.",
   ],
-  kubernetesHead: "Choose Kubernetes when",
+  kubernetesHead: "Choose Kubernetes or OpenShift when",
   kubernetesPoints: [
-    "A team shares the instance, split into workspaces.",
-    "Scans need to run on a schedule, unattended.",
-    "The estate is large enough to need workers fanning out.",
-    "It has to sit inside your existing cluster and network.",
+    "Multiple departments and teams share the platform across workspaces.",
+    "Scans, quality checks, and shared datasets run continuously on a schedule.",
+    "You need elastic worker scaling across large databases and lakehouses.",
+    "Production security requires HA, TLS, and your existing cluster operations.",
   ],
   supportNote:
-    "No separate enterprise build, no gated features: SSO, roles and masking are all open source. If you need help with rollout, installation, a connector for your systems, or tailoring Classifyre to your organisation, contact us — you or your integrator can also run everything yourselves.",
-  supportCta: "How support works",
+    "Every feature is open source under Apache-2.0 — SSO, roles, row filters, dynamic masking, SQL/BI gateway, and data products. If you want help tailoring Classifyre to your IAM, security architecture, custom sources, or Delta data products, talk directly with our engineers.",
+  supportCta: "Support & tailored rollouts",
 } as const;
 
 const enClosing = {
-  titleLead: "Point it at something",
-  titleHighlight: "real.",
-  body: "The fastest honest test is a system you already run. Install it, connect one source, and see what the investigator turns up.",
-  ctaShowcase: "Try the live showcase",
+  titleLead: "Test it on",
+  titleHighlight: "real data.",
+  body: "The clearest way to evaluate Classifyre is against a database or lakehouse you already run. Deploy the container, connect one source, and verify row filters and column masking live.",
+  ctaShowcase: "Explore live demo",
   linkSource: "Source on GitHub",
   linkSources: "Supported sources",
   linkDocs: "Documentation",
@@ -272,8 +271,8 @@ const en: GetCopy = {
   mascots: enMascots,
   quickstart: {
     marker: "Quick start",
-    title: "Two commands. Two ways to run it.",
-    lede: "One Docker image tonight, the same core as a Helm chart when the estate grows. The details and requirements are below.",
+    title: "Two commands. Same open-source core.",
+    lede: "Evaluate with one Docker container or deploy directly to Kubernetes and OpenShift with Helm.",
   },
   docker: enDocker,
   firstRun: enFirstRun,

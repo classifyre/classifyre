@@ -20,6 +20,7 @@ import random
 import re
 import signal
 import sys
+import time
 from dataclasses import asdict
 from typing import Any
 
@@ -27,6 +28,17 @@ from ...graph.edges import edge_to_payload
 from ...notebook.contract import validate_module
 from ...notebook.execute import cell_filename
 from ...notebook.files import local_folders
+from ...notebook.query import (
+    QueryContractError,
+    ScanCall,
+    ScanRefusedError,
+    ScanRequest,
+    batch_to_wire,
+    chunks,
+    declared_tables,
+    encode_filters,
+    rows_to_batch,
+)
 from ...notebook.redact import RedactingStream, Redactor
 from ...notebook.sdk import (
     Asset,
@@ -54,6 +66,7 @@ ERROR = "error"
 READY = "ready"
 NEED = "need"
 PROVIDE = "provide"
+ROWS = "rows"
 
 #: Flipped from a signal handler, so it is a container rather than a rebindable
 #: module global.
@@ -109,6 +122,21 @@ def _relay(op: str, args: dict[str, Any]) -> Any:
     return _need(op, args)
 
 
+def _no_relay(op: str, _args: dict[str, Any]) -> Any:
+    """In a query: the namespace is not this process's to read or write.
+
+    A query runs ``scan()`` for whoever may read the table, with no scan run
+    to scope a call by, so ``ctx.query_assets()``, ``ctx.tag()`` and the rest
+    are refused (docs/prd/QC-query-connectors.md §5.8).
+    """
+    raise _QueryModeError(f"{op} is not available while a query reads this notebook's tables.")
+
+
+class _QueryModeError(AssetQueryError, ScanRefusedError):
+    """The platform's own refusal: what a notebook catches as an
+    ``AssetQueryError``, and safe to show as a ``ScanRefusedError``."""
+
+
 def _error_payload(exc: BaseException) -> dict[str, Any]:
     import traceback
 
@@ -144,6 +172,7 @@ class NotebookRuntime:
         cohort_weights: dict[str, Any] | None = None,
         *,
         config_changed: bool = False,
+        query: bool = False,
     ) -> None:
         self.recipe = recipe
         notebook = _section(recipe, "required", "notebook")
@@ -160,7 +189,7 @@ class NotebookRuntime:
             folders=local_folders(recipe),
             logger=self._log,
             should_abort=_aborted,
-            relay=_relay,
+            relay=_no_relay if query else _relay,
             cohort_weights=cohort_weights if isinstance(cohort_weights, dict) else None,
             config_changed=config_changed,
         )
@@ -393,6 +422,75 @@ class NotebookRuntime:
         raw, text = result
         return {"raw": str(raw), "text": str(text)}
 
+    def tables(self) -> list[dict[str, Any]]:
+        """The tables ``tables()`` declares, checked; none without ``scan()``."""
+        function = self.globals.get("tables")
+        if not callable(function) or not callable(self.globals.get("scan")):
+            return []
+        return [table.to_dict() for table in declared_tables(function())]
+
+    def scan(self, call: ScanCall) -> dict[str, Any]:
+        """Stream ``scan(table, request)``'s rows as Arrow batches.
+
+        Each page is converted here, against the columns ``tables()``
+        declared, so a wrong value is reported as the notebook's mistake with
+        the column it is in. Reading stops one row past ``max_rows``: the
+        query refuses the table then, and the source is asked for no more.
+
+        Only a message meant to be shown leaves this process: a
+        ``ScanRefusedError``'s, or the contract's own (which names a column,
+        never a value). Any other exception may hold the values it was raised
+        over, so the query is told its type and line, and the full text goes
+        to stderr (the query's log, redacted).
+        """
+        from ...query.connectors.arrow import declared_schema
+
+        function = self._require("scan")
+        schema = declared_schema(call.columns)
+        request = ScanRequest(
+            columns=call.projection,
+            filters=call.filters,
+            max_rows=call.max_rows,
+            deadline=time.monotonic() + max(0.0, call.seconds_left),
+        )
+        rows = 0
+        try:
+            for page in chunks(function(call.table, request)):
+                if _aborted():
+                    break
+                batch = rows_to_batch(page, schema, call.table)
+                if batch.num_rows:
+                    _emit({"type": ROWS, "ipc": batch_to_wire(batch)})
+                rows += batch.num_rows
+                if rows > call.max_rows:
+                    break
+        except (ScanRefusedError, QueryContractError) as exc:
+            raise ScanFailedError(str(exc)) from None
+        except Exception as exc:
+            import traceback
+
+            traceback.print_exception(exc, file=sys.stderr)
+            raise ScanFailedError(
+                f"scan() raised {type(exc).__name__}{_cell_line(exc)}; its message is in "
+                "the query's log (raise ScanRefusedError(...) to show one here)."
+            ) from None
+        return {"rows": rows, "used": encode_filters(request.used), "requests": request.requests}
+
+
+class ScanFailedError(RuntimeError):
+    """What the query is told about a failed ``scan()``: safe to show."""
+
+
+def _cell_line(exc: BaseException) -> str:
+    """`` at cell <id>, line <n>``: the innermost notebook frame, if any."""
+    import traceback
+
+    frames = [f for f in traceback.extract_tb(exc.__traceback__) if f.filename.startswith("<cell ")]
+    if not frames:
+        return ""
+    last = frames[-1]
+    return f" at {last.filename.strip('<>')}, line {last.lineno}"
+
 
 def _asset_to_dict(asset: Asset) -> dict[str, Any]:
     payload = asdict(asset)
@@ -427,6 +525,10 @@ def _handle(runtime: NotebookRuntime, request: dict[str, Any]) -> dict[str, Any]
         return {"result": runtime.relationships()}
     if command == "fetch_content":
         return {"result": runtime.fetch_content(str(request.get("assetId") or ""))}
+    if command == "tables":
+        return {"result": runtime.tables()}
+    if command == "scan":
+        return runtime.scan(ScanCall.from_wire(request))
     raise ValueError(f"Unknown command {command!r}")
 
 
@@ -457,6 +559,7 @@ def main() -> int:
         files_dir=payload.get("filesDir") or None,
         cohort_weights=payload.get("cohortWeights") or None,
         config_changed=bool(payload.get("configChanged")),
+        query=payload.get("mode") == "query",
     )
     try:
         runtime.load()

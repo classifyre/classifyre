@@ -3,166 +3,163 @@ import type { GetCopy } from "./get";
 import { docs } from "@/lib/site";
 
 /**
- * German /get copy: a full translation of `en` in `./get.ts`,
- * type-checked against `GetCopy` so a missing string fails the build.
- * Links reuse the same shared URL constants as the English copy.
+ * German /get copy, type-checked against `GetCopy`.
  */
 
 const deHero = {
-  titleLead: "Heute Nacht",
-  titleHighlight: "läuft es.",
-  micro: "kostenlos · keine Anmeldung",
+  titleLead: "In Minuten startklar.",
+  titleHighlight: "Skalierbar im Cluster.",
+  micro: "100 % Open Source (Apache-2.0) · ohne Registrierung",
   ctaDocker: "Docker",
-  ctaKubernetes: "Kubernetes",
+  ctaKubernetes: "Kubernetes & OpenShift",
 } as const;
 
 const deMascots = {
-  lookingAround:
-    "Der Classifyre-Ermittler schaut sich um und sucht die Spur",
+  lookingAround: "Classifyre Deployment-Übersicht",
 } as const;
 
 const deDocker = {
   marker: "Option 01 · Docker",
-  title: "Auf Ihrer Maschine betreiben",
-  lede: "Ein Image, identisch auf macOS, Windows und Linux. Datenbank und Scan-Worker sind schon drin; nichts zu provisionieren, nichts anzubinden.",
-  cardLabel: "Starten",
+  title: "Lokal mit Docker evaluieren",
+  lede: "Ein vollständiges Image für macOS, Windows und Linux. PostgreSQL sowie Scan- und Abfrage-Worker sind integriert – Sie testen Classifyre in wenigen Minuten mit echten Daten.",
+  cardLabel: "All-in-One-Container",
   footnote: {
-    beforeHost: "Dann ",
+    beforeHost: "Anschließend ",
     host: "localhost:3000",
     afterHost:
-      " öffnen. Braucht Docker und 4 GB Memory. Diese Volumes tragen Ihre Arbeit über Upgrades: der ",
-    linkLabel: "Docker-Guide",
+      " öffnen. Benötigt Docker und 4 GB RAM. Die Volumes erhalten Ihre Konfiguration über Upgrades hinweg – der ",
+    linkLabel: "Docker-Leitfaden",
     afterLink:
-      " deckt die Umgebungsvariablen, externen Datenbanken und Object Storage ab.",
+      " beschreibt Umgebungsvariablen, externe Datenbanken und Object Storage.",
   },
   includes: [
     {
-      title: "PostgreSQL, drinnen",
-      body: "Die Datenbank steckt im Image, beim Start abgestimmt auf das Memory, das Sie dem Container gegeben haben. Zeigen Sie mit DATABASE_URL auf Ihren eigenen Server, wenn Sie herauswachsen.",
+      title: "Integriertes PostgreSQL",
+      body: "PostgreSQL wird im Image mitgeliefert und automatisch auf den verfügbaren Speicher abgestimmt. Für größere Umgebungen wechseln Sie einfach per DATABASE_URL auf Ihren eigenen Datenbankserver.",
     },
     {
-      title: "Scan-Worker, gesandboxt",
-      body: "Extraktion und Detektion laufen als eigene Prozesse, die mit dem Scan enden, derselbe Code, den der Cluster als Kubernetes-Jobs fährt.",
+      title: "Isolierte Scan- & Abfrage-Worker",
+      body: "Extraktion, Erkennung und SQL-Abfragen laufen in kurzlebigen, isolierten Prozessen – mit exakt derselben Engine wie als Jobs auf Kubernetes und OpenShift.",
     },
     {
-      title: "Ordner mounten, scannen",
-      body: "Mounten Sie ein Verzeichnis read-only und zeigen Sie mit einer Quelle darauf. Nichts wird herauskopiert; die Dateien werden gelesen, wo sie liegen.",
+      title: "Lokale Dateien direkt lesen",
+      body: "Binden Sie lokale Ordner schreibgeschützt ein, um Klassifizierung und Parquet-/CSV-Abfragen zu testen, ohne Daten zu kopieren.",
     },
     {
-      title: "Alles bleibt liegen",
-      body: "Quellen, Credentials, Befunde und Fälle leben in Volumes auf Ihrer Platte. Nichts wird zu uns hochgeladen.",
+      title: "Alles bleibt auf Ihrem System",
+      body: "Quellen, verschlüsselte Zugangsdaten, Klassifizierungen, Regeln und Audit-Logs bleiben ausschließlich in Ihren lokalen Volumes.",
     },
   ],
 } as const;
 
 const deFirstRun = {
-  marker: "Erster Lauf",
-  title: "In vier Schritten zum kontrollierten Zugriff auf eine Quelle",
-  lede: "Nichts hier braucht eine Konfigurationsdatei. Jeder Schritt passiert in der App, und jeder hat eine Seite in der Doku, wenn Sie ins Detail wollen.",
-  action: { label: "App-Tour", href: docs.inTheApp },
+  marker: "Erste Schritte",
+  title: "In vier Schritten zum kontrollierten Datenzugriff",
+  lede: "Jeder Schritt erfolgt direkt in der Weboberfläche – ganz ohne manuelle Konfigurationsdateien.",
+  action: { label: "App-Tour ansehen", href: docs.inTheApp },
   steps: [
     {
       step: "01",
-      title: "Image starten",
-      body: "Ein Befehl, dann localhost:3000 öffnen. Der erste Boot initialisiert die Datenbank und legt einen Workspace an; geben Sie ihm auf einem Laptop ein paar Minuten.",
+      title: "Container starten",
+      body: "Docker-Befehl ausführen und localhost:3000 öffnen. Beim ersten Start richtet Classifyre Datenbank, Identity-Service und Standard-Workspace automatisch ein.",
     },
     {
       step: "02",
-      title: "Quelle anbinden",
-      body: "Zeigen Sie auf etwas, das Sie bereits betreiben: eine Datenbank, einen S3-Bucket, einen Confluence-Space oder einfach einen lokalen Ordner. Credentials sind at rest verschlüsselt.",
+      title: "Erste Quelle verbinden",
+      body: "Verbinden Sie eine Datenbank, ein Iceberg- oder Delta-Lakehouse, einen S3-/Azure-/GCS-Bucket, Confluence oder einen lokalen Ordner. Zugangsdaten werden verschlüsselt gespeichert.",
       href: docs.sourceConfiguration,
       hrefLabel: "Quellen konfigurieren",
     },
     {
       step: "03",
-      title: "Klassifizieren",
-      body: "Aktivieren Sie die Built-in-Packs, die Sie interessieren: PII, Secrets, Qualität. Sie greifen beim ersten Scan, ganz ohne Modell-Setup, und die entstehende Klassifizierung entscheidet, welche Spalten maskiert werden.",
+      title: "Detektoren aktivieren & klassifizieren",
+      body: "Aktivieren Sie fertige PII- und Secret-Pakete oder eigene Regex-, Python-, lokale CPU-KI- (GLiNER2) oder LLM-Detektoren. Die Klassifizierung steuert die Spaltenmaskierung automatisch.",
       href: docs.preBuiltDetectors,
-      hrefLabel: "Vorgefertigte Detektoren",
+      hrefLabel: "Detektor-Referenz",
     },
     {
       step: "04",
-      title: "Einer Gruppe kontrollierten Zugriff geben",
-      body: "Geben Sie einer Gruppe Data reader auf die Quelle und setzen Sie einen Zeilenfilter, wenn sie nur ihre Zeilen sehen soll. Personenbezogene Spalten kommen maskiert an. Fragen Sie auf der SQL-Seite oder aus Power BI ab und sehen Sie den Zugriff im Protokoll.",
+      title: "Gruppenrechte setzen & abfragen",
+      body: "Vergeben Sie Gruppenrechte mit Zeilenfiltern und Spaltenmasken und fragen Sie live über den SQL-Editor, Power BI, Excel oder ODBC ab – jeder Zugriff wird protokolliert.",
       href: docs.whoMayQuery,
-      hrefLabel: "Wer was abfragen darf",
+      hrefLabel: "Zugriff & Maskierung",
     },
   ],
 } as const;
 
 const deKubernetes = {
-  marker: "Option 02 · Kubernetes",
-  title: "Oder auf Ihrem Cluster skalieren",
-  lede: "Derselbe Open-Source-Kern als Helm-Chart: Web, API, Worker und ephemere Scan-Jobs, die unter Last auffächern und zwischen den Läufen auf null skalieren.",
-  ctaDocs: "Vollständige Deployment-Anleitung",
-  ctaChartReadme: "Chart-README auf GitHub",
-  helmLabel: "Kein Repo-Add-Schritt",
-  helmTitle: "Helm, OCI-nativ",
-  inspectLabel: "Vor dem Installieren prüfen",
-  installLabel: "Installieren",
+  marker: "Option 02 · Kubernetes & OpenShift",
+  title: "Produktiv auf Ihrem Cluster betreiben",
+  lede: "Exakt derselbe Apache-2.0-Kern als Helm-Chart für Kubernetes und OpenShift: Weboberfläche, API sowie zustandslose Scan- und Abfrage-Worker, die zwischen Läufen auf null skalieren.",
+  ctaDocs: "Kubernetes- & OpenShift-Anleitung",
+  ctaChartReadme: "Helm-Chart-README auf GitHub",
+  helmLabel: "OCI-Helm-Chart",
+  helmTitle: "Produktivbetrieb auf Kubernetes & OpenShift",
+  inspectLabel: "Chart-Metadaten prüfen",
+  installLabel: "Mit Helm installieren",
   prerequisitesLabel: "Voraussetzungen",
   prerequisites: [
-    { label: "Kubernetes", value: "≥ 1.26" },
-    { label: "Helm", value: "≥ 3.8 (OCI-nativ)" },
-    { label: "Ingress", value: "default: nginx" },
-    { label: "PostgreSQL", value: "14+, extern, oder eingebettet für Demos" },
+    { label: "Kubernetes / OpenShift", value: "K8s ≥ 1.26 / OpenShift 4+" },
+    { label: "Helm", value: "≥ 3.8" },
+    { label: "Ingress / Route", value: "nginx oder OpenShift Routes" },
+    { label: "PostgreSQL", value: "14+ extern (oder eingebettet für Demos)" },
   ],
-  imagesLabel: "Images · Multi-Arch",
+  imagesLabel: "Container-Images · Multi-Arch",
   imagesValue: "linux/amd64 + linux/arm64",
-  docsLinkLabel: "Doku lesen",
+  docsLinkLabel: "Dokumentation lesen",
   docs: [
     {
-      title: "Kubernetes-Deployment-Anleitung",
-      body: "Values-Files für k3s, externe Datenbank und CloudNativePG; Ingress, TLS, Skalierung und Storage.",
+      title: "Kubernetes- & OpenShift-Leitfaden",
+      body: "Values-Dateien für den Produktivbetrieb, externes PostgreSQL, CloudNativePG, TLS-Ingress, Skalierung und Storage.",
       href: docs.kubernetes,
     },
     {
-      title: "Datenbank",
-      body: "Schema-Layout, Migrationen bei Upgrades und Managed-PostgreSQL anbinden.",
+      title: "Datenbank-Konfiguration",
+      body: "Schema-Aufbau, automatische Migrationen bei Upgrades und Anbindung von Managed PostgreSQL.",
       href: docs.database,
     },
     {
       title: "Object Storage",
-      body: "Optionale Buckets für Scan-Logs und hochgeladene Artefakte.",
+      body: "Optionale S3-kompatible Buckets für Scan-Logs, Exporte und verwaltete Datenartefakte.",
       href: docs.storage,
     },
     {
       title: "Upgrades & Versionierung",
-      body: "Wie Image-Tags der Chart-appVersion folgen, und was ein Versionsbump bedeutet.",
+      body: "Nachvollziehbare Image-Tags passend zur Chart-Version und sichere Update-Pfade.",
       href: docs.upgrades,
     },
   ],
 } as const;
 
 const deWhich = {
-  marker: "Unschlüssig",
-  title: "Entscheiden Sie danach, wo die Daten bleiben müssen",
-  lede: "Beide Runtimes tragen dieselben Features und laufen mit denselben Images; an diese Entscheidung sind Sie also nicht gekettet.",
+  marker: "Entscheidungshilfe",
+  title: "Lokal starten, nahtlos im Cluster wachsen",
+  lede: "Beide Varianten nutzen denselben Open-Source-Code und dieselben Container-Images.",
   dockerHead: "Docker wählen, wenn",
   dockerPoints: [
-    "Sie evaluieren oder allein ermitteln.",
-    "Der Korpus liegt auf Ihrer Maschine oder ist von dort erreichbar.",
-    "Nichts darf den Laptop verlassen.",
-    "Sie wollen in zehn Minuten scannen.",
+    "Sie Classifyre evaluieren oder einen schnellen Proof of Concept durchführen.",
+    "Sie Klassifizierung, Maskierung sowie Power BI / SQL in wenigen Minuten lokal testen möchten.",
+    "Alles auf einer einzelnen Workstation oder VM laufen soll.",
+    "Sie noch keine externe Infrastruktur bereitstellen möchten.",
   ],
-  kubernetesHead: "Kubernetes wählen, wenn",
+  kubernetesHead: "Kubernetes oder OpenShift wählen, wenn",
   kubernetesPoints: [
-    "Ein Team teilt sich die Instanz, aufgeteilt in Workspaces.",
-    "Scans sollen nach Zeitplan laufen, unbeaufsichtigt.",
-    "Der Bestand ist groß genug, um auffächernde Worker zu brauchen.",
-    "Es muss in Ihrem bestehenden Cluster und Netz sitzen.",
+    "Mehrere Abteilungen und Teams die Plattform gemeinsam in Workspaces nutzen.",
+    "Scans, Qualitätsprüfungen und Datenprodukte zeitgesteuert im Dauerbetrieb laufen.",
+    "Große Datenbanken und Lakehouses elastische Worker-Skalierung erfordern.",
+    "Produktivsicherheit, Hochverfügbarkeit, TLS und Ihr bestehender Cluster-Betrieb maßgeblich sind.",
   ],
   supportNote:
-    "Kein separater Enterprise-Build, keine gesperrten Funktionen: SSO, Rollen und Maskierung sind Open Source. Wenn Sie Hilfe bei Einführung, Installation, einem Konnektor für Ihre Systeme oder Anpassung brauchen, kontaktieren Sie uns — Sie oder Ihr Integrator können auch alles selbst betreiben.",
-  supportCta: "So funktioniert Support",
+    "Alle Funktionen stehen unter Apache-2.0 im offenen Quellcode – SSO, Rollen, Zeilenfilter, dynamische Maskierung, SQL/BI-Gateway und Datenprodukte. Wenn Sie Unterstützung bei IAM-Integration, Sicherheitsarchitektur, eigenen Quellen oder Delta-Datenprodukten wünschen, sprechen Sie direkt mit unserem Engineering-Team.",
+  supportCta: "Support & individuelle Einführung",
 } as const;
 
 const deClosing = {
-  titleLead: "Richten Sie es auf etwas",
-  titleHighlight: "Echtes.",
-  body: "Der schnellste ehrliche Test ist ein System, das Sie bereits betreiben. Installieren Sie es, binden Sie eine Quelle an und sehen Sie, was der Ermittler zutage fördert.",
-  ctaShowcase: "Live-Showcase ausprobieren",
-  linkSource: "Source auf GitHub",
+  titleLead: "Testen Sie es mit",
+  titleHighlight: "echten Daten.",
+  body: "Der aussagekräftigste Test ist eine Datenbank oder ein Lakehouse aus Ihrem Alltag. Container starten, erste Quelle verbinden und Zeilenfilter sowie Spaltenmaskierung live prüfen.",
+  ctaShowcase: "Live-Demo ansehen",
+  linkSource: "Quellcode auf GitHub",
   linkSources: "Unterstützte Quellen",
   linkDocs: "Dokumentation",
 } as const;
@@ -172,8 +169,8 @@ const de: GetCopy = {
   mascots: deMascots,
   quickstart: {
     marker: "Schnellstart",
-    title: "Zwei Befehle. Zwei Wege zu betreiben.",
-    lede: "Heute Nacht ein Docker-Image, derselbe Kern als Helm-Chart, wenn der Bestand wächst. Details und Anforderungen finden Sie unten.",
+    title: "Zwei Befehle. Derselbe Open-Source-Kern.",
+    lede: "Mit einem Docker-Container lokal evaluieren oder per Helm direkt auf Kubernetes und OpenShift betreiben.",
   },
   docker: deDocker,
   firstRun: deFirstRun,

@@ -23,6 +23,9 @@ export const OPTIONAL_FUNCTIONS = [
   'fetch_content',
   'relationships',
   'augment_sources',
+  // SQL over the source (docs/prd/QC-query-connectors.md §5.8).
+  'tables',
+  'scan',
 ];
 
 export const AUGMENTATION_REQUIRED_FUNCTIONS = ['augment'];

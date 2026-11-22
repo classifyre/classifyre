@@ -8,9 +8,13 @@ import { getAllSourceDocs } from "@workspace/schemas/source-docs";
 import { getSourcesCopy } from "@/content/sources";
 import type { Locale } from "@/lib/locale";
 import { withLocalePrefix } from "@/lib/locale";
+import {
+  JsonLdScripts,
+  generateBreadcrumbSchema,
+  siteOrigin,
+} from "@/lib/seo";
 import { docs, contactEmail, repoUrl, routes } from "@/lib/site";
 import { ClosingBoard } from "@/components/closing-board";
-import { Mascot } from "@/components/mascot";
 import {
   DotRow,
   Enter,
@@ -75,9 +79,20 @@ export function SourcesPage({ locale }: { locale: Locale }) {
   /** Localized marketing routes keep the site's trailing-slash convention. */
   const getHref =
     locale === "de" ? `${withLocalePrefix("de", routes.get)}/` : routes.get;
+  const siteUrl = siteOrigin();
+  const homePath = locale === "de" ? "/de/" : "/";
+  const sourcesPath = locale === "de" ? "/de/sources/" : "/sources/";
 
   return (
     <>
+      <JsonLdScripts
+        schemas={[
+          generateBreadcrumbSchema(siteUrl, [
+            { name: "Classifyre", path: homePath },
+            { name: locale === "de" ? "Quellen" : "Sources", path: sourcesPath },
+          ]),
+        ]}
+      />
       {/* Without JS the in-view reveals never fire; show everything. */}
       <noscript>
         <style>{".cl-reveal{opacity:1 !important;transform:none !important}"}</style>
@@ -90,54 +105,42 @@ export function SourcesPage({ locale }: { locale: Locale }) {
         >
           <div className="landing-grid absolute inset-0 opacity-[0.10]" />
           <div className="relative mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-10 lg:py-24">
-            <div className="grid items-center gap-10 lg:grid-cols-12">
-              <div className="space-y-6 lg:col-span-8">
-                <ExhibitMark>{copy.hero.mark}</ExhibitMark>
-                <h1
-                  id="sources-hero-title"
-                  className="font-hero text-[clamp(3rem,8vw,6.5rem)] uppercase leading-[0.88] tracking-[0.01em] text-white"
-                >
-                  <span className="block">{copy.hero.titleA}</span>
-                  <span className="block">
-                    {copy.hero.titleBLead}{" "}
-                    <span className="inline-block bg-accent px-[0.12em] text-black">
-                      {copy.hero.titleBHighlight}
-                    </span>
+            <div className="max-w-4xl space-y-6">
+              <ExhibitMark>{copy.hero.mark}</ExhibitMark>
+              <h1
+                id="sources-hero-title"
+                className="font-hero text-[clamp(3rem,8vw,6.2rem)] uppercase leading-[0.88] tracking-[0.01em] text-white"
+              >
+                <span className="block">{copy.hero.titleA}</span>
+                <span className="block">
+                  {copy.hero.titleBLead}{" "}
+                  <span className="inline-block bg-accent px-[0.12em] text-black">
+                    {copy.hero.titleBHighlight}
                   </span>
-                </h1>
-                <p className="max-w-2xl text-base leading-7 text-white/75 sm:text-lg sm:leading-8">
-                  <strong className="text-white">
-                    {total} {copy.hero.lede.count}
-                  </strong>{" "}
-                  {copy.hero.lede.tail}
-                </p>
-                <Micro className="block text-white/40">
-                  {withCount(copy.hero.micro, total)}
-                </Micro>
-                <div className="flex flex-wrap items-center gap-3">
-                  <a
-                    href="#catalog"
-                    className="inline-flex items-center border-2 border-accent bg-accent px-5 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-black transition-colors hover:border-white hover:bg-white"
-                  >
-                    {copy.hero.ctaCatalog}
-                  </a>
-                  <a
-                    href={getHref}
-                    className="inline-flex items-center border-2 border-white/25 px-5 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-white transition-colors hover:border-accent hover:text-accent"
-                  >
-                    {copy.hero.ctaGet}
-                  </a>
-                </div>
-              </div>
-
-              {/* The investigator shows the hidden gem under the loupe. */}
-              <div className="flex justify-center lg:col-span-4 lg:justify-end">
-                <Mascot
-                  name="hidden-gem"
-                  alt={copy.mascots.hiddenGem}
-                  surface="dark"
-                  className="hidden h-56 w-auto lg:block"
-                />
+                </span>
+              </h1>
+              <p className="max-w-2xl text-base leading-7 text-white/75 sm:text-lg sm:leading-8">
+                <strong className="text-white">
+                  {total} {copy.hero.lede.count}
+                </strong>{" "}
+                {copy.hero.lede.tail}
+              </p>
+              <Micro className="block text-white/50">
+                {withCount(copy.hero.micro, total)}
+              </Micro>
+              <div className="flex flex-wrap items-center gap-3">
+                <a
+                  href="#catalog"
+                  className="inline-flex items-center border-2 border-accent bg-accent px-5 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-black transition-colors hover:border-white hover:bg-white"
+                >
+                  {copy.hero.ctaCatalog}
+                </a>
+                <a
+                  href={getHref}
+                  className="inline-flex items-center border-2 border-white/25 px-5 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-white transition-colors hover:border-accent hover:text-accent"
+                >
+                  {copy.hero.ctaGet}
+                </a>
               </div>
             </div>
           </div>

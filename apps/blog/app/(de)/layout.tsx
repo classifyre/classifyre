@@ -137,6 +137,7 @@ export default async function GermanRootLayout({
             {/* No-op on `/de/…` URLs by construction; kept so both locale
                 layouts emit the same head shape. */}
             <LocaleRedirectHeadScript/>
+            <link rel="alternate" type="text/plain" href="/llms.txt" title="LLMs.txt" />
             <link rel="dns-prefetch" href="//fonts.googleapis.com"/>
             <link
                 rel="preconnect"

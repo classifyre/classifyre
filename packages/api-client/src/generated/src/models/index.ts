@@ -422,6 +422,7 @@ export * from './QueryRunDto';
 export * from './QueryRunErrorDto';
 export * from './QueryRunMaskDto';
 export * from './QueryRunRowFilterDto';
+export * from './QueryRunScanDto';
 export * from './QuickSearchAssetDto';
 export * from './QuickSearchFindingDto';
 export * from './QuickSearchRequestDto';

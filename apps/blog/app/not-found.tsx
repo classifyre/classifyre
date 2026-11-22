@@ -74,11 +74,11 @@ export default function NotFound() {
             <Button
               asChild
               size="lg"
-              variant="secondary"
-              className="border-2 border-white/20 bg-white/10 text-white hover:bg-white/16"
+              variant="ghost"
+              className="border-2 border-white/35 bg-white/10 font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-white hover:border-accent hover:bg-white/15 hover:text-accent"
             >
               <a href={showcaseUrl} target="_blank" rel="noreferrer">
-                Try the live showcase
+                Explore live demo
               </a>
             </Button>
           </>

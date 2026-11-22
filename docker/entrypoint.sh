@@ -44,6 +44,12 @@ default() {
 : "${PLAYWRIGHT_BROWSERS_PATH:=/var/lib/classifyre/playwright}"
 export PG_MAJOR PGDATA PGPORT POSTGRES_USER POSTGRES_DB PORT_HTTP API_PORT WEB_PORT
 export TEMP_DIR RUNNER_LOG_DIR UV_CACHE_DIR EMBEDDING_CACHE_DIR PLAYWRIGHT_BROWSERS_PATH
+# The folders a local-folder source may point at, for scans and queries
+# (apps/cli/src/utils/local_roots.py): the data mounted under /data, never
+# /var/lib/classifyre, whose masked-config.key decrypts every workspace's
+# source credentials. Separate several with commas.
+: "${CLASSIFYRE_QUERY_LOCAL_ROOTS:=/data}"
+export CLASSIFYRE_QUERY_LOCAL_ROOTS
 
 # ── Detect the memory limit ───────────────────────────────────────────────────
 # cgroup v2 first, then v1, then the host. A cgroup file can hold "max", and an
@@ -259,6 +265,34 @@ if [ -z "${CLASSIFYRE_INTERNAL_KEY:-}" ]; then
   export CLASSIFYRE_INTERNAL_KEY="$(head -c 32 /dev/urandom | base64 | tr -d '\n')"
 fi
 
+# ── SQL query worker ──────────────────────────────────────────────────────────
+# SQL queries (the SQL page, exports, MCP, SQL connections) run in a warm worker
+# process (apps/cli/src/query/worker.py, s6 service `query-worker`) that forks
+# one process per query, instead of starting Python for every query. The API
+# finds it at QUERY_WORKER_URL and runs a query itself only when the worker has
+# no free slot. QUERY_WORKER_ENABLED=false goes back to a process per query.
+# The worker gets a quarter of the container to plan with (it shares it with
+# Postgres, the API and the identity server) and sizes DuckDB per query from
+# that itself (worker.py, engine_budget); its memory guard watches the whole
+# container.
+default QUERY_WORKER_ENABLED "true"
+if [ "${QUERY_WORKER_ENABLED}" = "true" ]; then
+  default QUERY_WORKER_PORT  "8090"
+  default QUERY_WORKER_URL   "http://127.0.0.1:${QUERY_WORKER_PORT}"
+  default QUERY_WORKER_SLOTS "$(( CPUS > 3 ? 4 : 2 ))"
+  default QUERY_WORKER_MEMORY_MB "$(( TOTAL_MB / 4 ))"
+  # The API and the worker share it as a file, not in their environments; a
+  # new one at every start is fine. One given as QUERY_WORKER_TOKEN goes there.
+  QUERY_WORKER_TOKEN_FILE="/run/classifyre/query-worker-token"
+  mkdir -p "$(dirname "$QUERY_WORKER_TOKEN_FILE")"
+  ( umask 077 && printf '%s' "${QUERY_WORKER_TOKEN:-$(head -c 32 /dev/urandom | base64 | tr -d '\n')}" > "$QUERY_WORKER_TOKEN_FILE" )
+  chown 10001:10001 "$QUERY_WORKER_TOKEN_FILE"
+  unset QUERY_WORKER_TOKEN
+  export QUERY_WORKER_TOKEN_FILE
+else
+  unset QUERY_WORKER_URL QUERY_WORKER_TOKEN QUERY_WORKER_TOKEN_FILE
+fi
+
 # ── Sign-in ───────────────────────────────────────────────────────────────────
 # Sign-in is always on, here too: the identity server runs beside the API, and
 # its realm is set up on every start (s6 service iam-setup). The address
@@ -372,6 +406,7 @@ log "memory=${TOTAL_MB}MB cpus=${CPUS} shm=${SHM_MB}MB"
 log "node heap=${EFFECTIVE_HEAP_MB}MB rss guard=${guard_mb}MB"
 log "postgres shared_buffers=${PG_SHARED_BUFFERS} work_mem=${PG_WORK_MEM} effective_cache_size=${PG_EFFECTIVE_CACHE_SIZE}"
 log "scans: ${MAX_CONCURRENT_RUNNERS} concurrent, ${CLASSIFYRE_MAX_POOL_WORKERS} worker(s) each"
+[ "${QUERY_WORKER_ENABLED}" = "true" ] && log "sql queries: ${QUERY_WORKER_SLOTS} at once on the query worker, planned in ${QUERY_WORKER_MEMORY_MB} MB"
 log "listening on :${PORT_HTTP}, for ${CLASSIFYRE_URL}"
 
 exec /init "$@"

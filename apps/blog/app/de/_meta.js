@@ -3,10 +3,7 @@
  *
  * Placement is load-bearing: Nextra keys `_meta` files by their raw directory
  * (`de/…`), while page routes inside `app/(de)/…` are normalized to the same
- * `de/…` keys (route groups are transparent). A `_meta` file *inside* the
- * `(de)` group would key as `(de)/de/…` and never match its pages — so the
- * German meta files live here, next to no pages, and the German pages live in
- * `app/(de)/de/…` with no meta files of their own.
+ * `de/…` keys (route groups are transparent).
  */
 export default {
   index: {
@@ -14,21 +11,39 @@ export default {
     title: "Start",
     display: "hidden",
   },
-  product: {
+  platform: {
     type: "menu",
-    title: "Produkt",
+    title: "Plattform",
     items: {
-      get: {
-        title: "Classifyre holen",
-        href: "/de/get",
+      governance: {
+        title: "Berechtigungskonzept umsetzen",
+        href: "/de/berechtigungskonzept-umsetzen",
       },
       sources: {
-        title: "Quellen",
+        title: "Unterstützte Quellen",
         href: "/de/sources",
       },
-      support: {
-        title: "Support",
-        href: "/de/support",
+      deploy: {
+        title: "Installation & Betrieb",
+        href: "/de/get",
+      },
+      incident: {
+        title: "Vorfallbearbeitung",
+        href: "/de/use-cases/incident-response",
+      },
+    },
+  },
+  compare: {
+    type: "menu",
+    title: "Vergleich",
+    items: {
+      immuta: {
+        title: "vs. Immuta",
+        href: "/de/immuta-alternative",
+      },
+      unity: {
+        title: "vs. Unity Catalog",
+        href: "/de/unity-catalog-alternative",
       },
     },
   },
@@ -37,11 +52,11 @@ export default {
     title: "Blog",
     items: {
       overview: {
-        title: "Publikationsübersicht",
+        title: "Alle Publikationen",
         href: "/de/blog",
       },
       articles: {
-        title: "Blog",
+        title: "Artikel",
         href: "/de/blog/articles",
       },
       cases: {
@@ -57,12 +72,12 @@ export default {
   },
   documentation: {
     type: "page",
-    title: "Dokumentation",
+    title: "Doku",
     href: "https://docs.classifyre.com/",
   },
   get: {
     type: "page",
-    title: "Classifyre holen",
+    title: "Installation",
     display: "hidden",
   },
   download: {
@@ -82,7 +97,7 @@ export default {
   },
   "made-in-europe": {
     type: "page",
-    title: "Made in Austria",
+    title: "Über Classifyre",
     display: "hidden",
   },
   "berechtigungskonzept-umsetzen": {
@@ -105,8 +120,6 @@ export default {
     title: "Unity-Catalog-Alternative",
     display: "hidden",
   },
-  // Reachable from the footer only — a legal page does not belong in the
-  // navbar, but it still needs a page-map entry to render inside the layout.
   privacy: {
     type: "page",
     title: "Datenschutz- & Cookie-Richtlinie",

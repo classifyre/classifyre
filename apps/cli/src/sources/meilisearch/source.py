@@ -166,7 +166,31 @@ class MeilisearchSource(BaseSource):
                 metadata["is_indexing"] = bool(stats["isIndexing"])
         else:
             metadata["doc_count"] = 0
+        columns = self._sample_columns(uid)
+        if columns:
+            metadata["columns"] = columns
         return metadata
+
+    #: Documents a scan reads to record an index's columns.
+    COLUMN_SAMPLE_SIZE = 100
+
+    def _sample_columns(self, index_uid: str) -> list[dict[str, str]]:
+        """The index's top-level fields over a sample, as SQL reads them
+        (docs/prd/QC-query-connectors.md §5.7). Best effort: an index whose
+        documents cannot be read has no recorded columns, so SQL asks for a
+        new scan rather than guessing them."""
+        from ...utils.document_columns import record_columns
+
+        try:
+            with self._session() as session:
+                data = self._get(
+                    session, f"/indexes/{index_uid}/documents", limit=self.COLUMN_SAMPLE_SIZE
+                )
+        except Exception as exc:
+            logger.debug("Could not sample documents of index %s: %s", index_uid, exc)
+            return []
+        docs = data.get("results") if isinstance(data, dict) else None
+        return record_columns(d for d in docs or [] if isinstance(d, dict))
 
     # ── Asset ────────────────────────────────────────────────────────────
 

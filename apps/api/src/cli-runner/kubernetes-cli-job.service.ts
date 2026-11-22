@@ -839,6 +839,17 @@ export class KubernetesCliJobService {
           String(duckThreads),
         );
       }
+      // The folders a local source may lie in (the chart's localFolders):
+      // set, even empty, it is the CLI's allowlist (session.check_local_root).
+      const localRoots = process.env.K8S_CLI_QUERY_LOCAL_ROOTS;
+      if (localRoots !== undefined) {
+        // Directly: setEnvValue skips an empty value, and empty here means
+        // "no folder mounted, so none may be read", not "no allowlist".
+        envMap.set('CLASSIFYRE_QUERY_LOCAL_ROOTS', {
+          name: 'CLASSIFYRE_QUERY_LOCAL_ROOTS',
+          value: localRoots,
+        });
+      }
       const spill = process.env.K8S_CLI_QUERY_JOB_MAX_SPILL;
       if (spill) {
         this.setEnvValue(envMap, 'CLASSIFYRE_QUERY_MAX_SPILL', spill);

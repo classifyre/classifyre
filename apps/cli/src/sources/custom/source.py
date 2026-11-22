@@ -20,13 +20,15 @@ import hashlib
 import json
 import logging
 import os
+import re
 import select
 import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
-from collections.abc import AsyncGenerator, Mapping
+from collections.abc import AsyncGenerator, Generator, Mapping
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -47,6 +49,7 @@ from ...models.generated_single_asset_scan_results import (
 from ...notebook.contract import NotebookContractError, validate_notebook
 from ...notebook.groups import warm_declared_groups
 from ...notebook.packages import install as install_packages
+from ...notebook.query import ScanCall
 from ...outputs.rest import internal_key_headers
 from ...utils.hashing import hash_id, unhash_id
 from ...utils.redaction import Redactor, redact_generic
@@ -80,7 +83,24 @@ ASSET_QUERY_TIMEOUT_SECONDS = 60
 
 
 class CustomSourceError(RuntimeError):
-    """The notebook could not be loaded or run."""
+    """The notebook could not be loaded or run.
+
+    ``shown`` is what a query may tell the person who ran it, when it is
+    known to hold no data: the error's own text can carry the values it was
+    raised over (docs/prd/QC-query-connectors.md §5.8). None: nothing but
+    that the notebook failed.
+    """
+
+    def __init__(self, message: str, *, shown: str | None = None) -> None:
+        super().__init__(message)
+        self.shown = shown
+
+
+class NotebookTimeoutError(CustomSourceError):
+    """A query's deadline passed while the notebook was still scanning."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message, shown=message)
 
 
 class CustomSource(BaseSource):
@@ -139,6 +159,9 @@ class CustomSource(BaseSource):
         #: What augment_sources() reported at the end of the run, if it ran.
         self.augmentation: dict[str, Any] = {}
         self._packages_installed = False
+        #: Set by a query (``query_scan``): the child refuses namespace calls
+        #: and gets no uploaded files.
+        self._query_mode = False
 
         logger.info(
             "Initialized CUSTOM source with %d cell(s), revision %s",
@@ -200,7 +223,7 @@ class CustomSource(BaseSource):
         self._install_packages()
 
         self._assert_folders_exist()
-        files_dir = self._materialize_uploaded_files()
+        files_dir = None if self._query_mode else self._materialize_uploaded_files()
 
         cli_root = Path(__file__).resolve().parents[3]
         process = subprocess.Popen(
@@ -224,13 +247,17 @@ class CustomSource(BaseSource):
                 # is not meant to have one.
                 "filesDir": str(files_dir) if files_dir else None,
                 "cohortWeights": self._cohort_weights(),
+                **({"mode": "query"} if self._query_mode else {}),
             }
         )
 
         frame = self._read_frame(timeout=STARTUP_TIMEOUT_SECONDS)
         if frame.get("type") == "error":
             self._terminate()
-            raise CustomSourceError(self._safe(_describe(frame.get("error"))))
+            error = frame.get("error")
+            raise CustomSourceError(
+                self._safe(_describe(error)), shown=_where_it_failed(error, "loading")
+            )
         if frame.get("type") != "ready":
             self._terminate()
             raise CustomSourceError(
@@ -419,6 +446,8 @@ class CustomSource(BaseSource):
         route = self._RELAYED_OPS.get(op)
         if route is None:
             raise CustomSourceError(f"Unsupported request {op!r}")
+        if self._query_mode:
+            raise CustomSourceError(f"{op} is not available while a query reads this notebook")
         if not self.runner_id:
             raise CustomSourceError(f"{op} needs a scan run")
         response = requests.post(
@@ -487,6 +516,11 @@ class CustomSource(BaseSource):
     async def extract_raw(self) -> AsyncGenerator[list[SingleAssetScanResults], None]:
         skip, limit, cursor_key, sampling = self._window()
         self._start()
+        # The tables a query can read, first: a run stopped or windowed early
+        # still records them (docs/prd/QC-query-connectors.md §5.8).
+        tables = self._table_assets()
+        if tables:
+            yield tables
         self._send(
             {
                 "command": "extract",
@@ -550,6 +584,103 @@ class CustomSource(BaseSource):
         logger.info("Notebook produced %d asset(s)", produced)
         if not self._aborted and self._notebook_defines("augment_sources"):
             self._augment()
+
+    def _table_assets(self) -> list[SingleAssetScanResults]:
+        """One ``table`` asset per table ``tables()`` declares (with ``scan()``).
+
+        Its columns are the table's schema for SQL; its rows are read live by
+        each query and never scanned, so the asset has no content.
+        """
+        if not (self._notebook_defines("tables") and self._notebook_defines("scan")):
+            return []
+        declared = self._call("tables") or []
+        assets = [
+            self._to_scan_result(
+                {
+                    "id": f"sql-table:{table['schema']}.{table['name']}",
+                    "name": table["name"],
+                    "kind": "table",
+                    "extract": False,
+                    "reference_reason": "Read live by SQL queries (scan()); its rows are not scanned",
+                    "metadata": {
+                        "table_name": table["name"],
+                        "schema": table["schema"],
+                        "columns": table["columns"],
+                        "query": "scan",
+                        **(
+                            {"description": table["description"]}
+                            if table.get("description")
+                            else {}
+                        ),
+                    },
+                }
+            )
+            for table in declared
+            if isinstance(table, dict)
+        ]
+        return [asset for asset in assets if asset is not None]
+
+    def query_scan(self, call: ScanCall, deadline: float) -> Generator[Any, None, dict[str, Any]]:
+        """Run ``scan(table, request)`` for a query; yield its Arrow batches.
+
+        Returns what the notebook reported at the end (``used``: the filters
+        it sent to its source, ``requests``: the calls it counted). A scan the
+        query stops reading early (a ``LIMIT``) leaves the child mid-stream,
+        so it is stopped: the next scan starts a fresh one rather than reading
+        the old one's rows.
+        """
+        from ...notebook.query import batch_from_wire
+
+        self._query_mode = True
+        self._start()
+        self._send(call.to_wire())
+        finished = False
+        # The deadline stops the child rather than timing out a read: frames
+        # already in this process's read buffer are invisible to select(), so
+        # a read with a timeout could give up on rows that have arrived.
+        expired: list[bool] = []
+        process = self._process
+
+        def expire() -> None:
+            expired.append(True)
+            if process is not None and process.poll() is None:
+                process.kill()
+
+        timer = threading.Timer(max(0.0, deadline - time.monotonic()), expire)
+        timer.daemon = True
+        timer.start()
+        try:
+            while True:
+                try:
+                    frame = self._read_frame()
+                except CustomSourceError:
+                    if expired:
+                        raise NotebookTimeoutError(
+                            "The query ran out of time reading the notebook."
+                        ) from None
+                    raise
+                kind = frame.get("type")
+                if kind == "rows":
+                    yield batch_from_wire(str(frame.get("ipc") or ""))
+                elif kind == "end":
+                    finished = True
+                    return frame
+                elif kind == "error":
+                    finished = True
+                    error = frame.get("error")
+                    if isinstance(error, dict) and error.get("type") == "ScanFailedError":
+                        # Already cut to what may be shown (runner.py, scan).
+                        message = self._safe(str(error.get("message") or ""))
+                        raise CustomSourceError(message, shown=message)
+                    raise CustomSourceError(
+                        self._safe(_describe(error)), shown=_where_it_failed(error, "scan()")
+                    )
+                elif kind == "need":
+                    self._serve_need(frame)
+        finally:
+            timer.cancel()
+            if not finished or expired:
+                self._terminate()
 
     def _augment(self) -> None:
         """Run the notebook's ``augment_sources()`` after its assets are scanned."""
@@ -1114,6 +1245,24 @@ def _cohort_weights_from_env() -> dict[str, Any] | None:
         logger.warning("Ignoring unreadable CLASSIFYRE_COHORT_WEIGHTS: %s", exc)
         return None
     return decoded if isinstance(decoded, dict) else None
+
+
+_CELL_FRAME = re.compile(r'File "<cell ([^>]+)>", line (\d+)')
+
+
+def _where_it_failed(error: Any, phase: str) -> str:
+    """What a query may say about a notebook error: its type and the
+    innermost notebook line, never its message (it may hold the values it
+    was raised over)."""
+    kind = str(error.get("type") or "an error") if isinstance(error, dict) else "an error"
+    frames = error.get("traceback") if isinstance(error, dict) else None
+    found = _CELL_FRAME.findall("".join(frames)) if isinstance(frames, list) else []
+    at = f" at cell {found[-1][0]}, line {found[-1][1]}" if found else ""
+    during = " while loading" if phase == "loading" else ""
+    return (
+        f"{'The notebook' if phase == 'loading' else 'scan()'} raised {kind}{at}{during}; "
+        "its message is in the query's log (raise ScanRefusedError(...) to show one here)."
+    )
 
 
 def _describe(error: Any) -> str:

@@ -1,7 +1,6 @@
 import { getLandingCopy } from "@/content/landing";
 import type { Locale } from "@/lib/locale";
 import { withLocalePrefix } from "@/lib/locale";
-import { Mascot } from "@/components/mascot";
 import {
   LandingHead,
   LandingSection,
@@ -9,10 +8,7 @@ import {
 } from "@/components/landing/motifs";
 
 /**
- * Sectors: the page's index. Same rules everywhere, so the sector only
- * decides which columns are personal and who reads them in clear, set as a paper index with three
- * columns and hairline rules, not as ten cards. The investigator watches
- * from the right margin while you scan the list.
+ * Real-world multi-group governance scenarios across industries and teams.
  */
 export function Sectors({ locale }: { locale: Locale }) {
   const copy = getLandingCopy(locale);
@@ -25,18 +21,10 @@ export function Sectors({ locale }: { locale: Locale }) {
           mark={copy.sectors.marker}
           title={copy.sectors.title}
           lede={copy.sectors.lede}
-          aside={
-            <Mascot
-              name="looking-at-you"
-              alt={copy.mascots.lookingAtYou}
-              className="hidden h-44 w-auto lg:block"
-            />
-          }
         />
 
         <div className="mt-12">
-          {/* Column heads, desktop only; mobile gets per-field labels. */}
-          <div className="hidden grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)_minmax(0,1.15fr)] gap-8 border-b-2 border-foreground/80 pb-2 lg:grid">
+          <div className="hidden grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1.4fr)] gap-8 border-b-2 border-foreground/80 pb-2.5 lg:grid">
             <Micro className="text-muted-foreground">
               {copy.sectors.columns.sector}
             </Micro>
@@ -52,9 +40,9 @@ export function Sectors({ locale }: { locale: Locale }) {
             {copy.sectors.rows.map((row) => (
               <li
                 key={row.sector}
-                className="grid gap-2 border-b border-foreground/20 py-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)_minmax(0,1.15fr)] lg:items-baseline lg:gap-8"
+                className="grid gap-2 border-b border-foreground/20 py-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1.4fr)] lg:items-baseline lg:gap-8"
               >
-                <span className="font-serif text-sm font-black uppercase leading-tight tracking-[0.03em]">
+                <span className="font-sans text-base font-bold leading-snug text-foreground">
                   {row.sector}
                 </span>
                 <span className="text-sm leading-6 text-muted-foreground">
@@ -63,7 +51,7 @@ export function Sectors({ locale }: { locale: Locale }) {
                   </Micro>
                   {row.data}
                 </span>
-                <span className="text-sm leading-6 text-foreground/85">
+                <span className="text-sm leading-6 text-foreground/90">
                   <Micro className="mr-2 lg:hidden">
                     {copy.sectors.columns.finds}
                   </Micro>
@@ -74,18 +62,16 @@ export function Sectors({ locale }: { locale: Locale }) {
           </ul>
         </div>
 
-        <p className="mt-6 max-w-3xl">
-          <Micro className="leading-5 text-muted-foreground/80">
-            {copy.sectors.footnote}
-          </Micro>
+        <p className="mt-6 max-w-3xl text-sm text-muted-foreground">
+          {copy.sectors.footnote}
         </p>
 
-        <nav aria-label={copy.sectors.marker} className="mt-6 flex flex-wrap gap-x-6 gap-y-2">
+        <nav aria-label={copy.sectors.marker} className="mt-6 flex flex-wrap gap-x-6 gap-y-2.5">
           {copy.sectors.links.map((link) => (
             <a
               key={link.href}
               href={`${withLocalePrefix(locale, link.href)}/`}
-              className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-accent-ink underline-offset-4 hover:underline dark:text-accent"
+              className="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-accent-ink underline-offset-4 hover:underline dark:text-accent"
             >
               {link.label} →
             </a>

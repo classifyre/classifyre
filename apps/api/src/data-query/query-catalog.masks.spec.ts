@@ -36,6 +36,8 @@ function service(input: {
   }[];
   /** Row rules of a-1, when it filters rows. */
   rowRules?: { principalRef: string; conditions: unknown }[];
+  /** Assets whose notebook declares what its columns hold (QC §5.8). */
+  declared?: { id: string; metadata: unknown }[];
 }) {
   const derived = [
     {
@@ -57,6 +59,7 @@ function service(input: {
       findMany: jest.fn().mockResolvedValue(input.notes ?? []),
     },
     sharedDataset: { findMany: jest.fn().mockResolvedValue([]) },
+    asset: { findMany: jest.fn().mockResolvedValue(input.declared ?? []) },
     assetRowPolicy: {
       findMany: jest.fn().mockResolvedValue(
         input.rowRules
@@ -137,6 +140,41 @@ describe('QueryCatalogService column masks', () => {
       { column: 'email', action: 'mask', mask: 'redact' },
       { column: 'api_key', action: 'hide' },
     ]);
+  });
+
+  it('masks what a notebook declares its table columns hold, never less than findings', async () => {
+    const { svc, prisma } = service({
+      declared: [
+        {
+          id: 'a-1',
+          metadata: {
+            query: 'scan',
+            columns: [
+              { name: 'country', type: 'VARCHAR', classification: 'personal' },
+              // Weaker than what the findings say: the findings win.
+              { name: 'email', type: 'VARCHAR', classification: 'public' },
+              { name: 'id', type: 'BIGINT', classification: 'not-a-class' },
+            ],
+          },
+        },
+      ],
+    });
+    const t = await table(svc);
+    expect(t.masks).toEqual([
+      { column: 'email', action: 'mask', mask: 'redact' },
+      { column: 'api_key', action: 'hide' },
+      { column: 'country', action: 'mask', mask: 'redact' },
+    ]);
+    // Only a custom source's tables: indexed columns first, so a workspace of
+    // millions of file assets never has its metadata read for this.
+    expect(prisma.asset.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          sourceType: 'CUSTOM',
+          assetType: 'table',
+        }),
+      }),
+    );
   });
 
   it("follows a steward's choice over the classification", async () => {

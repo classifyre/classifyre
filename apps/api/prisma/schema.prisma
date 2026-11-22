@@ -173,6 +173,9 @@ model QueryRun {
   columns           Json?
   /// `{ setupMs, executeMs, totalMs }` from the job; `queuedMs` from the API.
   timings           Json?
+  /// `[{ table, requests, rows, pushed, ms, scans }]`: what reading each
+  /// connector table cost (docs/prd/QC-query-connectors.md §5.9).
+  scanStats         Json?          @map("scan_stats")
   /// `{ code, message }` when it failed.
   error             Json?
   /// Arrow IPC stream, or the exported file. Dropped with the row when it expires.

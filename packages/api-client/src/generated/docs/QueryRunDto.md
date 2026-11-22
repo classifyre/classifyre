@@ -18,6 +18,7 @@ Name | Type
 `masks` | [Array&lt;QueryRunMaskDto&gt;](QueryRunMaskDto.md)
 `rowFilters` | [Array&lt;QueryRunRowFilterDto&gt;](QueryRunRowFilterDto.md)
 `timings` | { [key: string]: number; }
+`scans` | [Array&lt;QueryRunScanDto&gt;](QueryRunScanDto.md)
 `error` | [QueryRunErrorDto](QueryRunErrorDto.md)
 `resultBytes` | number
 `resultFormat` | string
@@ -44,6 +45,7 @@ const example = {
   "masks": null,
   "rowFilters": null,
   "timings": null,
+  "scans": null,
   "error": null,
   "resultBytes": null,
   "resultFormat": null,

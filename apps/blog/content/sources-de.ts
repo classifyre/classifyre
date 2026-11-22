@@ -10,17 +10,17 @@ import { docs } from "@/lib/site";
 
 const de: SourcesCopy = {
   hero: {
-    mark: "Quellen",
+    mark: "Unterstützte Quellen",
     titleA: "Steuern Sie die Systeme,",
     titleBLead: "die Sie",
     titleBHighlight: "schon betreiben.",
     lede: {
-      count: "Konnektoren",
-      tail: "über Datenbanken, Warehouses und Lakehouses, Streaming, Object Storage, Kollaborationstools, Analytics und öffentliche Inhalte, alle direkt an der Quelle gelesen. Jede wird nach personenbezogenen Daten und Secrets klassifiziert; Tabellen in PostgreSQL, MySQL, Databricks, ODBC-Quellen, Delta, Iceberg und Dateien in Buckets stehen zudem für SQL, Excel und Power BI bereit, mit denselben Freigaben, Zeilenfiltern und Masken.",
+      count: "integrierte Konnektoren",
+      tail: "für relationale Datenbanken, Lakehouses (Iceberg, Delta, Parquet), Cloud Object Storage, Streaming, Kollaborationstools und Analytics – ergänzt um eigene Konnektoren für Fachsysteme. Jede Quelle wird direkt an der Quelle auf personenbezogene Daten, Secrets und Geschäftsregeln klassifiziert; abfragbare Tabellen stehen mit Gruppenrechten, Zeilenfiltern und Spaltenmaskierung direkt für SQL, Power BI, Excel und ODBC bereit.",
     },
-    micro: "{count} Konnektoren · direkt aus dem Schema",
-    ctaCatalog: "Katalog durchstöbern",
-    ctaGet: "Betreiben und einen anbinden",
+    micro: "{count} Konnektoren · live aus dem Schema erzeugt",
+    ctaCatalog: "Quellenkatalog durchsuchen",
+    ctaGet: "Installieren & Quelle verbinden",
   },
   catalog: {
     marker: "Voller Katalog",

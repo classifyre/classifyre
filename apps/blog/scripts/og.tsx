@@ -15,13 +15,13 @@ import { TOPIC_IDS, getTopic } from "@/content/topics";
 import { renderOg } from "@/lib/og";
 import { ogImageName } from "@/lib/og-image";
 
-const KICKER = { en: "Open-source data access governance", de: "Open Source · Datenzugriff steuern" };
+const KICKER = { en: "Open-Source Data Governance", de: "Open-Source Data Governance" };
 
 const cards: { name: string; title: string; kicker: string }[] = [
-  { name: ogImageName("en", "home"), title: "Your access rules,\nenforced on every query.", kicker: KICKER.en },
-  { name: ogImageName("de", "home"), title: "Ihr Berechtigungskonzept.\nBei jeder Abfrage durchgesetzt.", kicker: KICKER.de },
-  { name: ogImageName("en", "incident-response"), title: "When something leaks,\nwork it as a case.", kicker: KICKER.en },
-  { name: ogImageName("de", "incident-response"), title: "Wenn etwas abfließt,\nals Fall bearbeiten.", kicker: KICKER.de },
+  { name: ogImageName("en", "home"), title: "Control who sees what.\nEnforced on every query.", kicker: KICKER.en },
+  { name: ogImageName("de", "home"), title: "Klare Datenregeln.\nDurchgesetzt bei jeder Abfrage.", kicker: KICKER.de },
+  { name: ogImageName("en", "incident-response"), title: "When sensitive data leaks,\ntrace it fast.", kicker: KICKER.en },
+  { name: ogImageName("de", "incident-response"), title: "Wenn sensible Daten abfließen,\nschnell aufklären.", kicker: KICKER.de },
 ];
 
 for (const locale of ["en", "de"] as const) {

@@ -85,17 +85,17 @@ export type SourcesCopy = {
 
 const en: SourcesCopy = {
   hero: {
-    mark: "Sources",
+    mark: "Supported sources",
     titleA: "Govern the systems",
     titleBLead: "you",
     titleBHighlight: "already run.",
     lede: {
-      count: "connectors",
-      tail: "across databases, warehouses and lakehouses, streaming, object storage, collaboration tools, analytics, and public content, all read in place. Every one is classified for personal data and secrets; tables in PostgreSQL, MySQL, Databricks, ODBC sources, Delta, Iceberg and files in buckets are also served to SQL, Excel and Power BI through the same grants, row filters and masks.",
+      count: "built-in connectors",
+      tail: "spanning relational databases, lakehouses (Iceberg, Delta, Parquet), cloud object storage, streaming, collaboration platforms, and analytics — plus custom connectors for proprietary systems. Every source is scanned in place for personal data, secrets, and custom business rules, and queryable tables are served directly to SQL, Power BI, Excel, and ODBC with group-based row filters and column masking.",
     },
-    micro: "{count} connectors · straight from the schema",
-    ctaCatalog: "Browse the catalog",
-    ctaGet: "Run it and connect one",
+    micro: "{count} connectors · generated live from the schema",
+    ctaCatalog: "Browse source catalog",
+    ctaGet: "Deploy & connect a source",
   },
   catalog: {
     marker: "Full catalog",

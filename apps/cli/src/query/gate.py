@@ -244,7 +244,55 @@ def validate(
         referenced.add(candidate)
         _write_name(table, candidate, rename)
 
+    if postgres:
+        _qualify_columns(
+            tree,
+            database=database,
+            search_path=path,
+            allowed=allowed_set,
+            referenced=referenced,
+            rename=rename,
+        )
     return Validated(sql=tree.sql(dialect="duckdb"), tables=referenced)
+
+
+def _qualify_columns(
+    tree: exp.Expression,
+    *,
+    database: str | None,
+    search_path: list[str],
+    allowed: set[TableName],
+    referenced: set[TableName],
+    rename: Mapping[TableName, tuple[str, str, str]] | None,
+) -> None:
+    """Rewrite columns a PostgreSQL client names by their table's full name.
+
+    BI tools qualify columns with the schema and table, ``"src.sch"."tbl"."col"``
+    (Metabase's query builder does it for every column, POC F10): the qualifier
+    is the table's client name, so it is mapped like the table and written as
+    the same full DuckDB name. A column qualified by just a table or an alias
+    stays as it is. A qualifier naming a table the statement does not read is
+    refused like that table.
+    """
+    for column in list(tree.find_all(exp.Column)):
+        if not column.args.get("db"):
+            continue
+        qualifier = exp.Table(
+            this=column.args.get("table"),
+            db=column.args.get("db"),
+            catalog=column.args.get("catalog"),
+        )
+        mapped = _postgres_name(qualifier, database, search_path, allowed)
+        if mapped is None or mapped not in referenced:
+            shown = mapped or qualifier.sql(dialect="postgres")
+            raise QueryRefusedError(
+                f"The table {shown} does not exist or you cannot query it.",
+                "table_not_available",
+            )
+        parts = (rename or {}).get(mapped) or (mapped.source, mapped.schema, mapped.table)
+        column.set("catalog", exp.to_identifier(parts[0], quoted=True))
+        column.set("db", exp.to_identifier(parts[1], quoted=True))
+        column.set("table", exp.to_identifier(parts[2], quoted=True))
 
 
 def _write_name(

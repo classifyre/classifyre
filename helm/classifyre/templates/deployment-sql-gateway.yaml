@@ -122,6 +122,8 @@ spec:
               value: {{ .Values.sqlGateway.maxSessionsPerConnection | quote }}
             - name: SQL_GATEWAY_IDLE_MINUTES
               value: {{ .Values.sqlGateway.idleMinutes | quote }}
+            - name: SQL_GATEWAY_SESSION_MEMORY_MB
+              value: {{ .Values.sqlGateway.sessionMemoryMb | quote }}
           {{- with .Values.api.extraEnvFrom }}
           envFrom:
             {{- toYaml . | nindent 12 }}
@@ -134,6 +136,7 @@ spec:
             - name: cli-job-template
               mountPath: /etc/classifyre/cli-job-template
               readOnly: true
+            {{- include "classifyre.queryWorker.tokenMount" . | trim | nindent 12 }}
             {{- end }}
             {{- with .Values.api.extraVolumeMounts }}
             {{- toYaml . | nindent 12 }}
@@ -179,6 +182,7 @@ spec:
         - name: cli-job-template
           configMap:
             name: {{ include "classifyre.api.fullname" . }}-cli-job-template
+        {{- include "classifyre.queryWorker.tokenVolume" . | trim | nindent 8 }}
         {{- end }}
         {{- with .Values.api.extraVolumes }}
         {{- toYaml . | nindent 8 }}

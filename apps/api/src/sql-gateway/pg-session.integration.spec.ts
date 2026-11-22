@@ -1,7 +1,20 @@
-import { type AddressInfo, createServer, type Server } from 'node:net';
+import {
+  type AddressInfo,
+  connect as connectRaw,
+  createServer,
+  type Server,
+} from 'node:net';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { Client, type QueryConfig } from 'pg';
 import { catalogDdl } from './catalog-ddl';
-import { MessageReader, authenticationOk, readyForQuery } from './pg-protocol';
+import {
+  MessageReader,
+  MessageWriter,
+  authenticationOk,
+  frontend,
+  readyForQuery,
+} from './pg-protocol';
 import { PgliteHost, type PgliteSession } from './pglite-host';
 import {
   DataError,
@@ -190,9 +203,11 @@ describe('PgSession over PGlite', () => {
 
   it('keeps the catalog read-only for the connection', async () => {
     const client = await connect();
+    // Refused before PGlite (a SQL connection only reads), and PGlite's
+    // role could not write anyway.
     await expect(
       client.query(`CREATE TABLE public.x (id int)`),
-    ).rejects.toThrow(/permission denied/);
+    ).rejects.toMatchObject({ code: '25006' });
     const who = await client.query(
       `SELECT current_user AS u, current_setting('is_superuser') AS su`,
     );
@@ -288,10 +303,415 @@ describe('PgSession over PGlite', () => {
     ]);
     await expect(
       client.query(`DELETE FROM "shop.public".orders`),
-    ).rejects.toMatchObject({ code: '42501' });
+    ).rejects.toMatchObject({ code: '25006' });
     await expect(
       client.query(`CREATE TABLE public.x (a int)`),
-    ).rejects.toMatchObject({ code: '42501' });
+    ).rejects.toMatchObject({ code: '25006' });
     await client.end();
   }, 60_000);
+
+  /**
+   * What pgJDBC does with a fetch size inside a transaction (BIC J3, and
+   * Metabase's downloads, M13): one Execute per page, each followed by Sync,
+   * on a named portal. Every page must arrive; the last ends the result.
+   * Spoken over a raw socket, message by message, as the driver does.
+   */
+  it('serves a portal page by page across Syncs in a transaction', async () => {
+    const { socket, untilReady } = await rawSession(port);
+    socket.write(frontend.query('BEGIN'));
+    await untilReady();
+    // pgJDBC binds the page portal to the *unnamed* statement…
+    socket.write(
+      Buffer.concat([
+        frontend.parse('', 'SELECT * FROM "shop.public".orders'),
+        frontend.bind('C_1', '', []),
+        frontend.describe('P', 'C_1'),
+        frontend.execute('C_1', 1),
+        frontend.sync(),
+      ]),
+    );
+    const rowsOf = (types: string[]) => types.filter((t) => t === 'D').length;
+    const first = await untilReady();
+    expect(rowsOf(first)).toBe(1);
+    expect(first).toContain('s'); // PortalSuspended
+    // …and between pages asks for column metadata through the unnamed
+    // statement again: the portal keeps the statement it was bound from.
+    socket.write(
+      Buffer.concat([
+        frontend.parse('', 'SELECT attname FROM pg_attribute LIMIT 1'),
+        frontend.bind('', '', []),
+        frontend.execute('', 0),
+        frontend.sync(),
+      ]),
+    );
+    expect(await untilReady()).not.toContain('E');
+    socket.write(Buffer.concat([frontend.execute('C_1', 1), frontend.sync()]));
+    let page = await untilReady();
+    let rows = rowsOf(first) + rowsOf(page);
+    // The page holding the last row may end the result, as here, or be
+    // suspended with an empty last page, as PostgreSQL does: clients take both.
+    while (page.includes('s')) {
+      socket.write(
+        Buffer.concat([frontend.execute('C_1', 1), frontend.sync()]),
+      );
+      page = await untilReady();
+      rows += rowsOf(page);
+    }
+    expect(page).toContain('C'); // CommandComplete
+    expect(page).not.toContain('E');
+    expect(rows).toBe(2);
+    socket.end();
+  }, 60_000);
+
+  /**
+   * What psqlODBC does with UseDeclareFetch=1 (BIC D5, and Excel through it):
+   * the SELECT runs in a cursor, read with FETCH, all in simple queries.
+   */
+  it('reads a data cursor with FETCH, as psqlODBC does', async () => {
+    const { socket, untilReady } = await rawSession(port);
+    const rowsOf = (types: string[]) => types.filter((t) => t === 'D').length;
+    socket.write(
+      frontend.query(
+        'BEGIN;declare "SQL_CUR0x1" cursor with hold for SELECT * FROM "shop.public".orders;fetch 1 in "SQL_CUR0x1"',
+      ),
+    );
+    const first = await untilReady();
+    expect(first).not.toContain('E');
+    expect(rowsOf(first)).toBe(1);
+    expect(first).toContain('T'); // the FETCH describes its rows
+    socket.write(frontend.query('fetch 100 in "SQL_CUR0x1"'));
+    const rest = await untilReady();
+    expect(rowsOf(rest)).toBe(1);
+    socket.write(frontend.query('fetch 100 in "SQL_CUR0x1"'));
+    expect(rowsOf(await untilReady())).toBe(0);
+    socket.write(frontend.query('close "SQL_CUR0x1";commit'));
+    expect(await untilReady()).not.toContain('E');
+    // A cursor over the catalog is still PGlite's own.
+    socket.write(
+      frontend.query(
+        'BEGIN;declare c cursor for SELECT relname FROM pg_class LIMIT 2;fetch all in c;close c;commit',
+      ),
+    );
+    const catalog = await untilReady();
+    expect(catalog).not.toContain('E');
+    expect(rowsOf(catalog)).toBe(2);
+    socket.end();
+  }, 60_000);
+
+  it('refuses cursor statements over data it cannot serve, never answering 0 rows', async () => {
+    const { socket, untilReady, codes } = await rawSession(port);
+    const rowsOf = (types: string[]) => types.filter((t) => t === 'D').length;
+    const orders = 'SELECT * FROM "shop.public".orders';
+    // After a comment, options in another order: served (review c1).
+    socket.write(
+      frontend.query(
+        `BEGIN;-- x\nDECLARE c1 BINARY NO SCROLL CURSOR FOR ${orders};fetch all in c1`,
+      ),
+    );
+    expect(rowsOf(await untilReady())).toBe(2);
+    expect(codes()).toEqual([]);
+    // A second cursor of the same name (42P03), SCROLL and BACKWARD (0A000).
+    socket.write(frontend.query(`declare c1 cursor for ${orders}`));
+    await untilReady();
+    expect(codes()).toEqual(['42P03']);
+    socket.write(frontend.query('rollback'));
+    await untilReady();
+    socket.write(
+      frontend.query(`BEGIN;declare c2 scroll cursor for ${orders}`),
+    );
+    await untilReady();
+    expect(codes()).toEqual(['0A000']);
+    socket.write(frontend.query('rollback'));
+    await untilReady();
+    socket.write(
+      frontend.query(
+        `BEGIN;declare c3 cursor for ${orders};fetch backward 1 from c3`,
+      ),
+    );
+    await untilReady();
+    expect(codes()).toEqual(['0A000']);
+    // A failed block refuses everything, cursors too (25P02).
+    socket.write(frontend.query('fetch 1 in c3'));
+    await untilReady();
+    expect(codes()).toEqual(['25P02']);
+    socket.write(frontend.query('rollback'));
+    await untilReady();
+    // Through Parse/Bind/Execute: refused, not read from empty tables.
+    socket.write(
+      Buffer.concat([
+        frontend.parse('', `declare c4 cursor with hold for ${orders}`),
+        frontend.bind('', '', []),
+        frontend.execute('', 0),
+        frontend.sync(),
+      ]),
+    );
+    await untilReady();
+    expect(codes()).toEqual(['0A000']);
+    socket.end();
+  }, 60_000);
+
+  it('ends cursors with their transaction, and caps them per connection', async () => {
+    const { socket, untilReady, codes } = await rawSession(port);
+    const rowsOf = (types: string[]) => types.filter((t) => t === 'D').length;
+    const orders = 'SELECT * FROM "shop.public".orders';
+    // WITH HOLD declared in a block that rolls back is gone, as in PostgreSQL.
+    socket.write(
+      frontend.query(
+        `BEGIN;declare h1 cursor with hold for ${orders};rollback`,
+      ),
+    );
+    await untilReady();
+    socket.write(frontend.query('fetch 1 in h1'));
+    await untilReady();
+    expect(codes()).toEqual(['34000']);
+    // Committed, it outlives the block; a cursor without HOLD does not.
+    socket.write(
+      frontend.query(
+        `BEGIN;declare h2 cursor with hold for ${orders};declare n1 cursor for ${orders};commit`,
+      ),
+    );
+    await untilReady();
+    socket.write(frontend.query('fetch all in h2'));
+    expect(rowsOf(await untilReady())).toBe(2);
+    socket.write(frontend.query('fetch 1 in n1'));
+    await untilReady();
+    expect(codes()).toEqual(['34000']);
+    // At most MAX_DATA_CURSORS open at once (53400).
+    const declares = Array.from(
+      { length: 8 },
+      (_, i) => `declare m${i} cursor with hold for ${orders}`,
+    ).join(';');
+    socket.write(frontend.query(declares));
+    await untilReady();
+    expect(codes()).toEqual(['53400']);
+    socket.end();
+  }, 60_000);
+
+  it('refuses statements that would answer from empty tables, and FETCH 0', async () => {
+    // Re-reviews 2026-11-22: each of these reached PGlite and answered 0 rows.
+    const { socket, untilReady, codes } = await rawSession(port);
+    const T = '"shop.public".orders';
+    const orders = `SELECT * FROM ${T}`;
+    const cases: [string, string][] = [
+      // A SQL connection only reads: writes and DDL, whatever they read.
+      [`CREATE TEMP TABLE x AS ${orders}`, '25006'],
+      [
+        `CREATE /*x*/ FUNCTION pg_temp.f() RETURNS bigint LANGUAGE sql AS 'SELECT count(*) FROM ${T}'`,
+        '25006',
+      ],
+      [
+        `CREATE OR REPLACE\n--c\nFUNCTION pg_temp.g() RETURNS int LANGUAGE sql AS 'SELECT 1'`,
+        '25006',
+      ],
+      [`COPY (${orders}) TO STDOUT`, '25006'],
+      [`COPY /*x*/ ${T} TO STDOUT`, '25006'],
+      [`DO $$ BEGIN PERFORM count(*) FROM ${T}; END $$`, '25006'],
+      [`INSERT INTO pg_temp.nope SELECT * FROM ${T} RETURNING *`, '25006'],
+      [`UPDATE u SET id = o.id FROM ${T} o RETURNING o.*`, '25006'],
+      [`DELETE FROM u USING ${T} o RETURNING o.*`, '25006'],
+      [
+        `MERGE INTO u USING ${T} o ON true WHEN NOT MATCHED THEN DO NOTHING`,
+        '25006',
+      ],
+      [`CREATE RULE r AS ON INSERT TO u DO ALSO SELECT 1`, '25006'],
+      // Planned first: refused when they read your tables.
+      [`PREPARE p AS ${orders}`, '0A000'],
+      [`EXPLAIN ANALYZE ${orders}`, '0A000'],
+      // Functions that run SQL text are revoked in PGlite.
+      [`SELECT table_to_xml('${T}'::regclass, false, false, '')`, '42501'],
+      [
+        `SELECT * FROM ts_stat('SELECT to_tsvector(customer) FROM ${T}')`,
+        '42501',
+      ],
+      [
+        `SELECT query_to_xml('${orders.replace(/'/g, "''")}', false, false, '')`,
+        '42501',
+      ],
+    ];
+    for (const [sql, code] of cases) {
+      socket.write(frontend.query(sql));
+      await untilReady();
+      expect([sql, codes()]).toEqual([sql, [code]]);
+    }
+    // Over the catalog they are PGlite's, as before.
+    socket.write(
+      frontend.query(
+        'PREPARE c AS SELECT relname FROM pg_class LIMIT 1; EXECUTE c',
+      ),
+    );
+    await untilReady();
+    expect(codes()).toEqual([]);
+    socket.write(
+      frontend.query(`BEGIN;declare f cursor for ${orders};fetch 0 in f`),
+    );
+    await untilReady();
+    expect(codes()).toEqual(['0A000']);
+    socket.write(frontend.query('rollback'));
+    await untilReady();
+    socket.end();
+  }, 60_000);
+
+  it('drops a WITH HOLD cursor when its block rolls back through Parse/Execute', async () => {
+    const { socket, untilReady, codes } = await rawSession(port);
+    socket.write(
+      frontend.query(
+        'BEGIN;declare h cursor with hold for SELECT * FROM "shop.public".orders',
+      ),
+    );
+    await untilReady();
+    socket.write(
+      Buffer.concat([
+        frontend.parse('', 'ROLLBACK'),
+        frontend.bind('', '', []),
+        frontend.execute('', 0),
+        frontend.sync(),
+      ]),
+    );
+    await untilReady();
+    socket.write(frontend.query('fetch all in h'));
+    await untilReady();
+    expect(codes()).toEqual(['34000']);
+    socket.end();
+  }, 60_000);
+
+  /**
+   * The client corpus (fixtures/client-corpus, BIC §6): what Metabase,
+   * psqlODBC and pgJDBC send, replayed statement by statement. A new driver
+   * version that breaks a statement shows here, not at a customer's.
+   */
+  it.each(corpusFiles())(
+    'replays the client corpus %s',
+    async (_file, entries) => {
+      const client = await connect();
+      const failures: string[] = [];
+      for (const entry of entries) {
+        const before = asked.length;
+        try {
+          const result = await client.query(entry.sql);
+          if (entry.kind === 'refused') {
+            failures.push(`${entry.label}: was not refused`);
+          } else if (entry.kind === 'data' && asked.length === before) {
+            failures.push(`${entry.label}: did not run as a query job`);
+          } else if (entry.kind !== 'data' && asked.length !== before) {
+            failures.push(`${entry.label}: ran as a query job`);
+          } else if (entry.minRows !== undefined && result.rowCount !== null) {
+            if ((result.rows?.length ?? 0) < entry.minRows) {
+              failures.push(
+                `${entry.label}: ${result.rows.length} rows, want ≥ ${entry.minRows}`,
+              );
+            }
+          }
+        } catch (error) {
+          if (entry.kind !== 'refused') {
+            failures.push(`${entry.label}: ${(error as Error).message}`);
+          }
+        }
+      }
+      await client.end();
+      expect(failures).toEqual([]);
+    },
+    60_000,
+  );
 });
+
+/** A protocol-3.0 StartupMessage, as every driver sends first. */
+function startupMessage(params: Record<string, string>): Buffer {
+  const w = new MessageWriter().int32(196608);
+  for (const [key, value] of Object.entries(params))
+    w.cstring(key).cstring(value);
+  return w.cstring('').build();
+}
+
+/**
+ * A raw protocol connection to the test listener: what a driver writes,
+ * message by message, and every reply up to each ReadyForQuery.
+ */
+async function rawSession(port: number) {
+  const socket = connectRaw(port);
+  const reader = new MessageReader();
+  const inbox: { type: string; body: Buffer }[] = [];
+  let wake: (() => void) | undefined;
+  /** The SQLSTATEs of the errors in the last reply untilReady returned. */
+  let codes: string[] = [];
+  socket.on('data', (chunk: Buffer) => {
+    inbox.push(...reader.push(chunk));
+    wake?.();
+  });
+  const untilReady = async () => {
+    const deadline = Date.now() + 20_000;
+    for (;;) {
+      const at = inbox.findIndex((m) => m.type === 'Z');
+      if (at >= 0) {
+        const reply = inbox.splice(0, at + 1);
+        codes = reply
+          .filter((m) => m.type === 'E')
+          .map((m) => errorCode(m.body));
+        return reply.map((m) => m.type);
+      }
+      if (Date.now() > deadline) {
+        throw new Error(
+          `no ReadyForQuery; got ${inbox.map((m) => m.type).join('')}`,
+        );
+      }
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, 200);
+        wake = () => {
+          clearTimeout(timer);
+          resolve();
+        };
+      });
+    }
+  };
+  socket.write(startupMessage({ user: 'ana_bi', database: 'lab' }));
+  await untilReady();
+  return { socket, untilReady, codes: () => codes };
+}
+
+/** The `C` (SQLSTATE) field of an ErrorResponse body. */
+function errorCode(body: Buffer): string {
+  let at = 0;
+  while (at < body.length && body[at] !== 0) {
+    const type = String.fromCharCode(body[at]);
+    const end = body.indexOf(0, at + 1);
+    if (type === 'C') return body.subarray(at + 1, end).toString('utf8');
+    at = end + 1;
+  }
+  return '';
+}
+
+interface CorpusEntry {
+  kind: 'session' | 'catalog' | 'data' | 'refused';
+  label: string;
+  minRows?: number;
+  sql: string;
+}
+
+/** fixtures/client-corpus/*.sql, as [file, statements] (format: its README). */
+function corpusFiles(): [string, CorpusEntry[]][] {
+  const folder = join(__dirname, 'fixtures', 'client-corpus');
+  return readdirSync(folder)
+    .filter((name) => name.endsWith('.sql'))
+    .sort()
+    .map((name) => {
+      const entries: CorpusEntry[] = [];
+      let current: CorpusEntry | undefined;
+      for (const line of readFileSync(join(folder, name), 'utf8').split('\n')) {
+        const head =
+          /^-- @@ (session|catalog|data|refused) (\S+)(?: rows>=(\d+))?/.exec(
+            line,
+          );
+        if (head) {
+          current = {
+            kind: head[1] as CorpusEntry['kind'],
+            label: head[2],
+            minRows: head[3] ? Number(head[3]) : undefined,
+            sql: '',
+          };
+          entries.push(current);
+        } else if (current && !line.startsWith('--')) {
+          current.sql = `${current.sql}\n${line}`.trim();
+        }
+      }
+      return [name, entries] as [string, CorpusEntry[]];
+    });
+}

@@ -1,0 +1,35 @@
+# Cluster names for compose.search-graph.yaml, as in k8s-services.yaml:
+#   kubectl --context k3d-classifyre apply -f k8s-services.search-graph.yaml
+---
+apiVersion: v1
+kind: Service
+metadata: {name: lab-meilisearch, namespace: classifyre-dev}
+spec:
+  ports: [{name: http, port: 7700, targetPort: 7700}]
+---
+apiVersion: v1
+kind: Endpoints
+metadata: {name: lab-meilisearch, namespace: classifyre-dev}
+subsets: [{addresses: [{ip: 172.18.10.50}], ports: [{name: http, port: 7700}]}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: lab-neo4j, namespace: classifyre-dev}
+spec:
+  ports: [{name: bolt, port: 7687, targetPort: 7687}]
+---
+apiVersion: v1
+kind: Endpoints
+metadata: {name: lab-neo4j, namespace: classifyre-dev}
+subsets: [{addresses: [{ip: 172.18.10.51}], ports: [{name: bolt, port: 7687}]}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: lab-shop-pg, namespace: classifyre-dev}
+spec:
+  ports: [{name: pg, port: 5432, targetPort: 5432}]
+---
+apiVersion: v1
+kind: Endpoints
+metadata: {name: lab-shop-pg, namespace: classifyre-dev}
+subsets: [{addresses: [{ip: 172.18.10.52}], ports: [{name: pg, port: 5432}]}]

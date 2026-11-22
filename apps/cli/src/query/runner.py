@@ -43,7 +43,7 @@ def _redactor(request_data: dict[str, Any]) -> Redactor:
     return Redactor(secrets)
 
 
-def _error(code: str, message: str) -> dict[str, Any]:
+def error_payload(code: str, message: str) -> dict[str, Any]:
     return {"status": "error", "error": {"code": code, "message": message}}
 
 
@@ -67,7 +67,16 @@ def _post(url: str, token: str | None, body: bytes, headers: dict[str, str]) -> 
     logger.error("Could not deliver the query result: %s", last)
 
 
-def _report(request: QueryRequest | None, payload: dict[str, Any], arrow: bytes | None) -> None:
+def report_result(
+    request: QueryRequest | None,
+    payload: dict[str, Any],
+    arrow: bytes | None,
+    *,
+    echo: bool = True,
+) -> None:
+    """Post the result to the API; with ``echo``, print the status line too
+    (a Job's log is how the API learns what happened when the callback did
+    not arrive; the query worker answers with the payload instead)."""
     if request is not None and request.callback_url:
         if arrow is not None:
             meta = base64.b64encode(json.dumps(payload).encode("utf-8")).decode("ascii")
@@ -89,14 +98,26 @@ def _report(request: QueryRequest | None, payload: dict[str, Any], arrow: bytes 
                 json.dumps(payload).encode("utf-8"),
                 {"Content-Type": "application/json"},
             )
-    print(f"{RESULT_MARKER} {json.dumps(payload)}", flush=True)
+    if echo:
+        print(f"{RESULT_MARKER} {json.dumps(payload)}", flush=True)
+
+
+#: The optional groups every query needs, and a module of each.
+QUERY_GROUPS: dict[str, tuple[str, ...]] = {
+    "file-processing": ("duckdb", "pyarrow"),
+    "lineage": ("sqlglot",),
+}
 
 
 def ensure_dependencies() -> None:
     """DuckDB and pyarrow (file-processing) and SQLGlot (lineage): optional
     groups of the CLI image, installed on first use into the shared uv cache."""
     from ..detectors.dependencies import require_module
+    from ..utils.uv_sync import keep_installed
 
+    # Installed with the image but never recorded: a source's own group
+    # synced later (Neo4j's) must not uninstall these.
+    keep_installed(QUERY_GROUPS)
     require_module("duckdb", "SQL query", ["file-processing"])
     require_module("pyarrow", "SQL query", ["file-processing"])
     require_module("sqlglot", "SQL query", ["lineage"])
@@ -108,7 +129,7 @@ def run_query(request_data: dict[str, Any]) -> tuple[dict[str, Any], QueryResult
     try:
         ensure_dependencies()
     except Exception as exc:
-        return _error("engine_unavailable", redact(str(exc).splitlines()[0][:500])), None
+        return error_payload("engine_unavailable", redact(str(exc).splitlines()[0][:500])), None
     from .bindings import BindingError
     from .gate import QueryRefusedError
     from .session import QueryRequest, QuerySession, QueryTimeoutError
@@ -118,18 +139,22 @@ def run_query(request_data: dict[str, Any]) -> tuple[dict[str, Any], QueryResult
         with QuerySession(request) as session:
             result = session.run()
     except QueryRefusedError as exc:
-        return _error(exc.code, redact(str(exc))), None
+        return error_payload(exc.code, redact(str(exc))), None
     except QueryTimeoutError as exc:
-        return _error("timeout", str(exc)), None
+        return error_payload("timeout", str(exc)), None
     except BindingError as exc:
-        return _error("source_unavailable", redact(str(exc))), None
+        from .connectors.arrow import ConnectorError
+
+        # A connector's refusal has its own code (connector_limit).
+        code = exc.code if isinstance(exc, ConnectorError) else "source_unavailable"
+        return error_payload(code, redact(str(exc))), None
     except Exception as exc:
         message = str(exc).strip().splitlines()
         text = message[0] if message else type(exc).__name__
         # DuckDB's own errors (a missing column, a type mismatch) are useful
         # to the person; they pass through the redactor in case a connection
         # string ever reaches one.
-        return _error("execution_error", redact(text[:2000])), None
+        return error_payload("execution_error", redact(text[:2000])), None
     if result.description is not None:
         # A describe: columns and lineage only, sent as JSON (no rows).
         return {
@@ -153,23 +178,25 @@ def run_query(request_data: dict[str, Any]) -> tuple[dict[str, Any], QueryResult
         "format": result.export_format or "arrow",
         "mediaType": result.media_type,
     }
+    if result.scans:
+        payload["scans"] = result.scans
     return payload, result
 
 
 def run_query_command(path: str | None) -> int:
     if not path:
-        print(f"{RESULT_MARKER} {json.dumps(_error('invalid_request', 'No request file.'))}")
+        print(f"{RESULT_MARKER} {json.dumps(error_payload('invalid_request', 'No request file.'))}")
         return 2
     try:
         request_data = json.loads(Path(path).read_text(encoding="utf-8"))
     except Exception as exc:
-        print(f"{RESULT_MARKER} {json.dumps(_error('invalid_request', str(exc)[:300]))}")
+        print(f"{RESULT_MARKER} {json.dumps(error_payload('invalid_request', str(exc)[:300]))}")
         return 2
     payload, result = run_query(request_data)
     from .session import QueryRequest
 
     request = QueryRequest.from_dict(request_data)
-    _report(request, payload, result.arrow if result is not None else None)
+    report_result(request, payload, result.arrow if result is not None else None)
     return 0 if payload["status"] == "success" else 1
 
 

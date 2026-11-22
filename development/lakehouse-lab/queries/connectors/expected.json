@@ -1,0 +1,267 @@
+{
+  "queries": {
+    "q1_meili_parquet_pg": [
+      {
+        "genre": "Drama",
+        "country": "ES",
+        "orders": 783,
+        "revenue": 17096.07
+      },
+      {
+        "genre": "Drama",
+        "country": "DE",
+        "orders": 734,
+        "revenue": 15457.09
+      },
+      {
+        "genre": "Drama",
+        "country": "NL",
+        "orders": 710,
+        "revenue": 15232.35
+      },
+      {
+        "genre": "Drama",
+        "country": "PL",
+        "orders": 721,
+        "revenue": 15083.57
+      },
+      {
+        "genre": "Drama",
+        "country": "AT",
+        "orders": 714,
+        "revenue": 14475.28
+      }
+    ],
+    "q2_neo4j_meili_pg": [
+      {
+        "title": "Paper Night 222",
+        "fans": 3
+      },
+      {
+        "title": "Summer Summer 11665",
+        "fans": 3
+      },
+      {
+        "title": "Echo Echo 8597",
+        "fans": 2
+      },
+      {
+        "title": "Echo Harbor 17739",
+        "fans": 2
+      },
+      {
+        "title": "Echo Harbor 18662",
+        "fans": 2
+      }
+    ],
+    "q3_all_four": [
+      {
+        "country": "AT",
+        "genre": "Sci-Fi",
+        "rated_orders": 3,
+        "avg_stars": 3.0
+      },
+      {
+        "country": "DE",
+        "genre": "Sci-Fi",
+        "rated_orders": 2,
+        "avg_stars": 1.0
+      }
+    ],
+    "q4_nested_masked": [
+      {
+        "order_id": 1,
+        "title": "Summer Signal 15857",
+        "studio": "{\"name\": \"Basalt\", \"country\": \"NL\"}",
+        "tags": [
+          "sequel"
+        ],
+        "email": "customer1207@shop.example"
+      }
+    ],
+    "q5_meili_self_join": [
+      {
+        "genre": "Action",
+        "pairs": 1225
+      },
+      {
+        "genre": "Comedy",
+        "pairs": 1540
+      },
+      {
+        "genre": "Documentary",
+        "pairs": 1891
+      },
+      {
+        "genre": "Drama",
+        "pairs": 1891
+      },
+      {
+        "genre": "Horror",
+        "pairs": 1770
+      },
+      {
+        "genre": "Romance",
+        "pairs": 1830
+      },
+      {
+        "genre": "Sci-Fi",
+        "pairs": 2016
+      },
+      {
+        "genre": "Thriller",
+        "pairs": 2145
+      }
+    ],
+    "q6_custom_pg": [
+      {
+        "country": "AT",
+        "priority": "high",
+        "tickets": 15,
+        "oldest": "2024-01-15"
+      },
+      {
+        "country": "AT",
+        "priority": "low",
+        "tickets": 13,
+        "oldest": "2024-02-23"
+      },
+      {
+        "country": "AT",
+        "priority": "normal",
+        "tickets": 21,
+        "oldest": "2024-01-18"
+      },
+      {
+        "country": "CH",
+        "priority": "high",
+        "tickets": 16,
+        "oldest": "2024-02-02"
+      },
+      {
+        "country": "CH",
+        "priority": "low",
+        "tickets": 25,
+        "oldest": "2024-01-25"
+      },
+      {
+        "country": "CH",
+        "priority": "normal",
+        "tickets": 14,
+        "oldest": "2024-01-23"
+      },
+      {
+        "country": "DE",
+        "priority": "high",
+        "tickets": 25,
+        "oldest": "2024-01-28"
+      },
+      {
+        "country": "DE",
+        "priority": "low",
+        "tickets": 30,
+        "oldest": "2024-01-01"
+      },
+      {
+        "country": "DE",
+        "priority": "normal",
+        "tickets": 23,
+        "oldest": "2024-02-29"
+      },
+      {
+        "country": "ES",
+        "priority": "high",
+        "tickets": 20,
+        "oldest": "2024-01-20"
+      },
+      {
+        "country": "ES",
+        "priority": "low",
+        "tickets": 29,
+        "oldest": "2024-01-16"
+      },
+      {
+        "country": "ES",
+        "priority": "normal",
+        "tickets": 19,
+        "oldest": "2024-01-12"
+      },
+      {
+        "country": "FR",
+        "priority": "high",
+        "tickets": 26,
+        "oldest": "2024-01-05"
+      },
+      {
+        "country": "FR",
+        "priority": "low",
+        "tickets": 21,
+        "oldest": "2024-03-05"
+      },
+      {
+        "country": "FR",
+        "priority": "normal",
+        "tickets": 22,
+        "oldest": "2024-01-23"
+      },
+      {
+        "country": "IT",
+        "priority": "high",
+        "tickets": 18,
+        "oldest": "2024-01-11"
+      },
+      {
+        "country": "IT",
+        "priority": "low",
+        "tickets": 14,
+        "oldest": "2024-03-01"
+      },
+      {
+        "country": "IT",
+        "priority": "normal",
+        "tickets": 17,
+        "oldest": "2024-02-02"
+      },
+      {
+        "country": "NL",
+        "priority": "high",
+        "tickets": 15,
+        "oldest": "2024-01-19"
+      },
+      {
+        "country": "NL",
+        "priority": "low",
+        "tickets": 25,
+        "oldest": "2024-01-31"
+      },
+      {
+        "country": "NL",
+        "priority": "normal",
+        "tickets": 20,
+        "oldest": "2024-01-24"
+      },
+      {
+        "country": "PL",
+        "priority": "high",
+        "tickets": 15,
+        "oldest": "2024-01-12"
+      },
+      {
+        "country": "PL",
+        "priority": "low",
+        "tickets": 21,
+        "oldest": "2024-01-24"
+      },
+      {
+        "country": "PL",
+        "priority": "normal",
+        "tickets": 19,
+        "oldest": "2024-03-03"
+      }
+    ]
+  },
+  "q1_documents": {
+    "pushed": 574,
+    "all": 20000
+  }
+}

@@ -133,6 +133,151 @@
       "$ref": "#/definitions/CustomInput"
     }
   ],
+  "x-query": {
+    "description": "Which source types can be queried with SQL and how (docs/prd/QC-query-connectors.md \u00a75.1). Single source of truth for the API's table names (apps/api/src/data-query/sql-names.ts) and the query job's bindings (apps/cli/src/query/connectors/). tier: native (a DuckDB core extension), extension (a DuckDB community or nightly extension), connector (a Python Arrow connector), custom (a CUSTOM notebook's scan()). assetKinds: the asset kinds that are tables. address: how a table's SQL name and location are made from its asset. extensions: the DuckDB extensions the binding loads.",
+    "sources": {
+      "MEILISEARCH": {
+        "tier": "connector",
+        "assetKinds": [
+          "index"
+        ],
+        "address": "search_index",
+        "extensions": []
+      },
+      "NEO4J": {
+        "tier": "connector",
+        "assetKinds": [
+          "label",
+          "relationship"
+        ],
+        "address": "graph",
+        "extensions": []
+      },
+      "POSTGRESQL": {
+        "tier": "native",
+        "assetKinds": [
+          "table"
+        ],
+        "address": "postgres",
+        "extensions": [
+          "postgres"
+        ]
+      },
+      "MYSQL": {
+        "tier": "native",
+        "assetKinds": [
+          "table"
+        ],
+        "address": "mysql",
+        "extensions": [
+          "mysql"
+        ]
+      },
+      "DATABRICKS": {
+        "tier": "native",
+        "assetKinds": [
+          "table"
+        ],
+        "address": "databricks",
+        "extensions": [
+          "unity_catalog",
+          "delta",
+          "httpfs",
+          "azure"
+        ]
+      },
+      "ODBC": {
+        "tier": "extension",
+        "assetKinds": [
+          "table"
+        ],
+        "address": "odbc",
+        "extensions": [
+          "odbc_scanner"
+        ]
+      },
+      "ICEBERG_REST": {
+        "tier": "native",
+        "assetKinds": [
+          "table"
+        ],
+        "address": "catalog",
+        "extensions": [
+          "httpfs",
+          "iceberg"
+        ]
+      },
+      "DUCKLAKE": {
+        "tier": "native",
+        "assetKinds": [
+          "table"
+        ],
+        "address": "catalog",
+        "extensions": [
+          "ducklake"
+        ]
+      },
+      "S3_COMPATIBLE_STORAGE": {
+        "tier": "native",
+        "assetKinds": [
+          "table",
+          "file"
+        ],
+        "address": "object_storage",
+        "extensions": [
+          "httpfs",
+          "delta",
+          "iceberg"
+        ]
+      },
+      "AZURE_BLOB_STORAGE": {
+        "tier": "native",
+        "assetKinds": [
+          "table",
+          "file"
+        ],
+        "address": "object_storage",
+        "extensions": [
+          "azure",
+          "delta",
+          "iceberg"
+        ]
+      },
+      "GOOGLE_CLOUD_STORAGE": {
+        "tier": "native",
+        "assetKinds": [
+          "table",
+          "file"
+        ],
+        "address": "object_storage",
+        "extensions": [
+          "httpfs",
+          "delta",
+          "iceberg"
+        ]
+      },
+      "LOCAL_FOLDER": {
+        "tier": "native",
+        "assetKinds": [
+          "table",
+          "file"
+        ],
+        "address": "object_storage",
+        "extensions": [
+          "delta",
+          "iceberg"
+        ]
+      },
+      "CUSTOM": {
+        "tier": "custom",
+        "assetKinds": [
+          "table"
+        ],
+        "address": "notebook",
+        "extensions": []
+      }
+    }
+  },
   "x-asset-metadata": {
     "description": "Declares the metadata each source attaches to every asset kind it produces, composed from reusable contentTypes. Single source of truth for docs rendering and CLI conformance (apps/cli/src/sources/asset_metadata.py).",
     "contentTypes": {
@@ -1580,10 +1725,78 @@
               "items": {
                 "type": "string"
               }
+            },
+            "columns": {
+              "type": "array",
+              "description": "The label's columns for SQL as {name, type} objects: element_id and the properties of a sample of its nodes (DuckDB type names)",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Column name"
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "Column type"
+                  }
+                }
+              }
             }
           },
           "required": [
             "label",
+            "database"
+          ]
+        },
+        "relationship": {
+          "properties": {
+            "relationship_type": {
+              "type": "string",
+              "description": "Relationship type"
+            },
+            "database": {
+              "type": "string",
+              "description": "Database name"
+            },
+            "relationship_count": {
+              "type": "integer",
+              "description": "Number of relationships of this type"
+            },
+            "source_labels": {
+              "type": "array",
+              "description": "Labels of the sampled start nodes",
+              "items": {
+                "type": "string"
+              }
+            },
+            "target_labels": {
+              "type": "array",
+              "description": "Labels of the sampled end nodes",
+              "items": {
+                "type": "string"
+              }
+            },
+            "columns": {
+              "type": "array",
+              "description": "The relationship type's columns for SQL as {name, type} objects: the endpoints' element ids (and their id property when every sampled endpoint has one), the relationship's properties, the endpoints' labels",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Column name"
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "Column type"
+                  }
+                }
+              }
+            }
+          },
+          "required": [
+            "relationship_type",
             "database"
           ]
         }
@@ -2732,6 +2945,23 @@
             "is_indexing": {
               "type": "boolean",
               "description": "Whether the index has an indexing operation in progress"
+            },
+            "columns": {
+              "type": "array",
+              "description": "Top-level document fields of a sample as {name, type} objects (DuckDB type names; objects and mixed lists JSON): the index's columns for SQL",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Field name"
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "Field type"
+                  }
+                }
+              }
             }
           },
           "required": [
@@ -3972,6 +4202,22 @@
             "columns": {
               "type": "array",
               "description": "Columns as [{name, type}] objects"
+            },
+            "table_name": {
+              "type": "string",
+              "description": "The table's SQL name, from the notebook's tables()"
+            },
+            "schema": {
+              "type": "string",
+              "description": "The middle part of the table's SQL name (main unless tables() says otherwise)"
+            },
+            "query": {
+              "type": "string",
+              "description": "scan: a table declared by tables(), which SQL queries read live through the notebook's scan()"
+            },
+            "description": {
+              "type": "string",
+              "description": "What the table holds, from tables()"
             }
           },
           "required": []

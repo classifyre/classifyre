@@ -13,6 +13,11 @@ import { getDockerNotes, getTranslationsForLocale } from "@/i18n";
 import type { Locale } from "@/lib/locale";
 import { withLocalePrefix } from "@/lib/locale";
 import {
+  JsonLdScripts,
+  generateBreadcrumbSchema,
+  siteOrigin,
+} from "@/lib/seo";
+import {
   docs,
   helmChartRef,
   helmInstallCommand,
@@ -21,7 +26,6 @@ import {
   showcaseUrlFor,
   softwareVersion,
 } from "@/lib/site";
-import { Mascot } from "@/components/mascot";
 import {
   DotRow,
   Enter,
@@ -103,9 +107,20 @@ export function GetPage({ locale }: { locale: Locale }) {
     locale === "de" ? `${withLocalePrefix("de", path)}/` : path;
   const dockerLines = dockerRunLines(softwareVersion, getDockerNotes(locale));
   const dockerCopy = getTranslationsForLocale(locale).docker;
+  const siteUrl = siteOrigin();
+  const homePath = locale === "de" ? "/de/" : "/";
+  const getPath = locale === "de" ? "/de/get/" : "/get/";
 
   return (
     <>
+      <JsonLdScripts
+        schemas={[
+          generateBreadcrumbSchema(siteUrl, [
+            { name: "Classifyre", path: homePath },
+            { name: locale === "de" ? "Installation" : "Deploy", path: getPath },
+          ]),
+        ]}
+      />
       {/* Without JS the in-view reveals never fire; show everything. */}
       <noscript>
         <style>{".cl-reveal{opacity:1 !important;transform:none !important}"}</style>
@@ -118,50 +133,37 @@ export function GetPage({ locale }: { locale: Locale }) {
         >
           <div className="landing-grid absolute inset-0 opacity-[0.10]" />
           <div className="relative mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-10 lg:py-24">
-            <div className="grid items-center gap-12 lg:grid-cols-12 lg:gap-10">
-              <div className="space-y-7 lg:col-span-8">
-                <h1
-                  id="get-hero-title"
-                  className="font-hero text-[clamp(3rem,8vw,6.5rem)] uppercase leading-[0.88] tracking-[0.01em] text-white"
-                >
-                  <span className="block">{copy.hero.titleLead}</span>
-                  <span className="block">
-                    <span className="inline-block bg-accent px-[0.12em] text-black">
-                      {copy.hero.titleHighlight}
-                    </span>
+            <div className="max-w-4xl space-y-7">
+              <h1
+                id="get-hero-title"
+                className="font-hero text-[clamp(3rem,8vw,6.2rem)] uppercase leading-[0.88] tracking-[0.01em] text-white"
+              >
+                <span className="block">{copy.hero.titleLead}</span>
+                <span className="block">
+                  <span className="inline-block bg-accent px-[0.12em] text-black">
+                    {copy.hero.titleHighlight}
                   </span>
-                </h1>
+                </span>
+              </h1>
 
-                <div className="flex flex-wrap items-center gap-3">
-                  <a
-                    href="#docker"
-                    className="inline-flex items-center border-2 border-accent bg-accent px-5 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-black transition-colors hover:border-white hover:bg-white"
-                  >
-                    {copy.hero.ctaDocker}
-                  </a>
-                  <a
-                    href="#kubernetes"
-                    className="inline-flex items-center border-2 border-white/25 px-5 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-white transition-colors hover:border-accent hover:text-accent"
-                  >
-                    {copy.hero.ctaKubernetes}
-                  </a>
-                </div>
-
-                <Micro className="block text-white/40">
-                  v{softwareVersion} · {copy.hero.micro}
-                </Micro>
+              <div className="flex flex-wrap items-center gap-3">
+                <a
+                  href="#docker"
+                  className="inline-flex items-center border-2 border-accent bg-accent px-5 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-black transition-colors hover:border-white hover:bg-white"
+                >
+                  {copy.hero.ctaDocker}
+                </a>
+                <a
+                  href="#kubernetes"
+                  className="inline-flex items-center border-2 border-white/25 px-5 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-white transition-colors hover:border-accent hover:text-accent"
+                >
+                  {copy.hero.ctaKubernetes}
+                </a>
               </div>
 
-              {/* The investigator on watch beside the headline. */}
-              <div className="flex justify-center lg:col-span-4 lg:justify-end">
-                <Mascot
-                  name="looking-around"
-                  alt={copy.mascots.lookingAround}
-                  surface="dark"
-                  eager
-                  className="hidden h-44 w-auto lg:block"
-                />
-              </div>
+              <Micro className="block text-white/50">
+                v{softwareVersion} · {copy.hero.micro}
+              </Micro>
             </div>
           </div>
         </section>

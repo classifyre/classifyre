@@ -1,3 +1,4 @@
+import { localFolderRefusal } from './utils/local-folder-path';
 import { Injectable, BadRequestException } from '@nestjs/common';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
@@ -79,6 +80,17 @@ export class ValidationService {
     // resolves is answered by the run, which reports a missing folder plainly,
     // rather than guessed at by the API.
     const normalized = normalizeSourceConfig(type, data);
+    // Not any absolute path: never the image's own state or the system
+    // (the run checks again, against the mounted folders too).
+    const folder = (normalized as { required?: { path?: unknown } })?.required
+      ?.path;
+    if (
+      String(type).toUpperCase() === 'LOCAL_FOLDER' &&
+      typeof folder === 'string'
+    ) {
+      const refusal = localFolderRefusal(folder);
+      if (refusal) throw new BadRequestException(refusal);
+    }
     const valid = this.inputValidator(normalized);
     if (!valid) {
       throw new BadRequestException(

@@ -20,6 +20,7 @@ from classifyre import (
     parse, pages,                                     # reading files
     Ref, FieldMapping, FlowType, urn_for,             # naming things
     flow, contains, references, same_as, uses,        # relationships
+    Table, ScanRefusedError,                          # SQL over the source
 )
 ```
 
@@ -57,6 +58,8 @@ def extract():
 | `discover() -> dict` | no | On demand, to summarise what the source can see |
 | `fetch_content(asset_id)` | no | Only for an asset whose content `extract()` did not supply |
 | `relationships()` | no | Once per scan, after `extract()` |
+| `tables()` | no, with `scan` | Once per scan, before `extract()`: the tables SQL can read |
+| `scan(table, request)` | no, with `tables` | Each time a SQL query reads one of those tables |
 
 They must be defined at the **top level of a code cell**. A function nested
 inside a class or another function is not found.
@@ -138,6 +141,137 @@ def relationships():
 Yield only edges built by `flow`, `contains`, `references`, `same_as` or `uses`.
 A raw dict is rejected on purpose — the value of this function is that you had to
 say *which* relationship you mean.
+
+---
+
+## SQL over the source: `tables()` and `scan()`
+
+Define both and the source's tables can be queried on the
+[Query data](/data-query/) page, through [SQL connections](/sql-connections/)
+and MCP, and joined with any other table, like a Meilisearch index or a Neo4j
+label. Nothing is copied into Classifyre first: each query calls `scan()`,
+which asks your API for the rows it needs while the query runs.
+
+```python
+from classifyre import ScanRefusedError, Table, ctx
+
+
+def tables():
+    return [
+        Table(
+            "companies",
+            {"fnr": "VARCHAR", "name": "VARCHAR", "employees": "BIGINT", "founded": "DATE"},
+            description="One row per company. Needs WHERE fnr = ... or fnr IN (...).",
+        ),
+        Table(
+            "officers",
+            {"fnr": "VARCHAR", "name": "VARCHAR", "birth_date": "DATE", "role": "VARCHAR"},
+            classify={"name": "personal", "birth_date": "personal"},
+        ),
+    ]
+
+
+def scan(table, request):
+    fns = request.values("fnr")          # the fnr values the query asks for, or None
+    if fns is None:
+        raise ScanRefusedError(f"{table} needs WHERE fnr = '...' or fnr IN (...)")
+    for fn in fns:
+        request.count_request()
+        row = api.company(fn, timeout=request.seconds_left())
+        if row:
+            yield {"fnr": fn, "name": row["name"], "employees": row["staff"],
+                   "founded": row["founded"]}
+```
+
+```sql
+SELECT name, employees FROM firmenbuch.main.companies WHERE fnr IN ('606601k', '247579m')
+```
+
+### `tables() -> list[Table]`
+
+The tables a query can read. Each scan records them as `table` assets of
+the source, with their columns, so they appear in the **Tables** tab as
+`<source>.main.<name>` (`Table(..., schema="other")` puts one under another
+middle name). A table added or changed here reaches SQL with the next scan.
+
+| `Table` field | |
+| --- | --- |
+| `name` | The table's SQL name: lower-case letters, digits and `_`, unique in the notebook. `scan()` is called with it. |
+| `columns` | `{"column": "TYPE"}`. Types: `VARCHAR`, `BIGINT`, `INTEGER`, `DOUBLE`, `BOOLEAN`, `DATE`, `TIMESTAMP`, `TIMESTAMPTZ`, `JSON` (a dict or list, as its JSON text), or a list of one of them (`VARCHAR[]`). |
+| `description` | Shown with the table. Say which condition the table needs. |
+| `schema` | The middle part of the name, `main` by default. |
+| `classify` | What columns hold: `{"birth_date": "personal"}`. One of `public`, `internal`, `confidential`, `personal`, `sensitive`, `secret`. |
+
+**Say what your columns hold.** A custom table's rows are read by each query
+and never scanned, so no detector can find personal data in them. `classify`
+is what [masks](/data-query/#masked-and-hidden-columns) a column by default:
+`personal` and `sensitive` columns are masked and `secret` ones hidden for
+everyone who does not read the table in clear. A column you leave out stays
+clear until a steward marks it. Row filters and access work as on any other
+table, and a column `tables()` does not declare does not exist for SQL.
+
+### `scan(table, request)`
+
+Yield the table's rows as dicts (one per row), or return a list of them, or
+yield Arrow `RecordBatch`es or `Table`s. A key that is not a declared column
+is ignored; a missing one is `NULL`. ISO text (`"2024-01-31"`) is read as a
+date or timestamp in such a column. Any other value of another type than the
+column declares fails the query, naming the column, never the value.
+
+`request` says what the query needs:
+
+| `request.` | |
+| --- | --- |
+| `columns` | The columns the query reads, or `None` for all. Fetch only these when your API can. |
+| `filters` | The conditions every row the query keeps meets, as `Filter(column, op, value)`: `op` is `=`, `!=`, `<`, `<=`, `>`, `>=` or `in` (then `value` is a tuple). Values are typed: a date is a `datetime.date`. |
+| `values(column)` | The values `column` is limited to by `column = x` or `column IN (...)`, as a tuple, or `None`. |
+| `value(column)` | The value of `column = x`, or `None`. |
+| `use(*filters)` | Say which filters you sent to your API (`values()` and `value()` do this for you). |
+| `count_request(n=1)` | Count the calls you make to your API. |
+| `max_rows` | The most rows one scan may return; more and the query is refused. Stop fetching past it. |
+| `seconds_left()` | Time left before the query is stopped. Give each call to your API at most this. |
+
+The filters you use and the requests you count are shown under the query:
+*1 live table · 2 requests · 2 rows*, and on hover, *sent fnr IN ('247579m', '606601k')*.
+
+<Callout type="info">
+  **Returning more rows than the filters select is always correct; returning
+  fewer never is.** Every row `scan()` returns is checked against the query's
+  conditions again, so a notebook that ignores `request.filters` still gives
+  the right answer, only slower. Never drop a row a condition would keep: when
+  your API cannot answer a query cheaply, raise an error that says which
+  condition the table needs, rather than returning part of the table.
+</Callout>
+
+What a query reads, and how it runs:
+
+- **Where it runs.** In the notebook's own process, like a scan: with the
+  source's variables, secrets and packages, and no access to Classifyre's
+  credentials. On Kubernetes every query that reads a custom source runs as a
+  Job of its own, never in the shared query worker, so a notebook never shares
+  a process host with another workspace's queries. That Job takes a few
+  seconds to start, and the notebook's packages are installed in it first.
+- **What it cannot do.** `ctx.query_assets()`, `ctx.tag()`, `ctx.link()` and
+  the other calls that read or write the workspace are refused while a query
+  runs, and `ctx.files` is empty: a query reads your API, not the workspace.
+- **Limits.** The query's time limit (Settings → General, 120 s by default)
+  covers the whole scan, and a scan still running then is stopped; one scan
+  returns at most 1,000,000 rows.
+- **Errors.** `raise ScanRefusedError("…")` fails the query with your message,
+  so write it for the person who ran the query and keep values out of it. Any
+  other error, in `scan()` or in a cell while the notebook loads for the
+  query, fails it with only its type and line (*scan() raised KeyError at cell
+  sql-tables, line 42*): its text may hold the values it was raised over, so
+  it goes to the query's log instead, secrets redacted.
+- **Joins read each table on its own.** `JOIN companies c ON c.fnr = x.fnr`
+  does not hand `scan()` the keys of the other side. Give the custom table a
+  condition of its own (`WHERE c.fnr IN (...)`).
+- **Each read calls `scan()`.** A table read twice in one query (a self-join)
+  is scanned twice, in two processes. Nothing is cached between queries.
+
+`tables()` and `scan()` come as a pair: a notebook that defines one without
+the other, or a `scan` that does not take `(table, request)`, fails the
+contract check before it runs or scans, like a missing `extract()`.
 
 ---
 
@@ -807,6 +941,11 @@ each, and may declare at most **50 packages**.
 | _"Tag '…' matches no Tag detector"_ | The key in `tags` has no Tag detector. The warning lists the keys that do exist. |
 | _"uses unknown kind …"_ | A typo in `kind`. The asset was recorded as `record`; the warning names the valid kinds. |
 | `••••` where you expected a value | Working as intended — that is a secret being redacted from output. |
+| _"… is read live …: add WHERE …"_ in a query | Your own `scan()` refused (`ScanRefusedError`): the table needs the condition it names. |
+| _"scan() raised KeyError at cell …, line …"_ | An exception in `scan()`; its message is in the query's log. Catch it and raise `ScanRefusedError` to tell people what to do. |
+| _"… returned a value for companies.x that is not a date …"_ | `scan()` yielded a value of another type than `tables()` declares for that column. |
+| _"query_assets is not available while a query reads …"_ | `scan()` called a workspace function; those work in scans only. |
+| A new table is not in the **Tables** tab | `tables()` is read by a scan: run one. |
 | A scan is slower each run | Under **Automatic**, `extract()` is probably producing and discarding earlier items. Use `ctx.offset`. |
 
 ---

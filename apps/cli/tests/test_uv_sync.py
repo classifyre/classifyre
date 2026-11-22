@@ -130,3 +130,17 @@ def test_warm_groups_noop_when_auto_install_disabled(monkeypatch):
         ok, _ = uv_sync.warm_groups(["privacy"])
     assert ok
     run.assert_not_called()
+
+
+@pytest.mark.usefixtures("fresh_uv_sync")
+def test_groups_already_installed_are_kept_by_a_later_sync():
+    # An image ships some groups installed but never recorded as synced: a
+    # later sync of another group (the query worker's on-demand neo4j) must
+    # pass them too, or uv uninstalls them under running queries.
+    missing = uv_sync.keep_installed({"lake": ("json",), "graph": ("no_such_module_xyz",)})
+    assert missing == ["graph"]
+    with patch("src.utils.uv_sync.subprocess.run", return_value=_ok_run()) as run:
+        ok, _ = uv_sync.sync_group("graph")
+    assert ok
+    cmd = run.call_args.args[0]
+    assert "lake" in cmd and "graph" in cmd

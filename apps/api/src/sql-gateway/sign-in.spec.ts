@@ -4,6 +4,7 @@ import {
   scramVerifier,
 } from '../sql-connections/scram';
 import {
+  MAX_WAITERS,
   SignInLockout,
   challengeVerifier,
   decoyVerifier,
@@ -140,13 +141,96 @@ describe('malformed CIDRs', () => {
 });
 
 describe('one sign-in at a time per key', () => {
-  it('refuses a second sign-in while the first holds a key', () => {
+  const here = ['u:ns:bi:1.2.3.4', 'ip:1.2.3.4'];
+
+  it('lets a second sign-in from the same place wait for the first, never run beside it', async () => {
+    // A BI tool's connection pool opens several connections at once
+    // (Metabase's c3p0, BIC M0): they sign in one after another.
     const lockout = new SignInLockout();
-    expect(lockout.begin(['u:ns:bi:1.2.3.4', 'ip:1.2.3.4'])).toBe(true);
-    expect(lockout.begin(['u:ns:bi:1.2.3.4', 'ip:1.2.3.4'])).toBe(false);
-    expect(lockout.begin(['u:ns:other:1.2.3.4', 'ip:1.2.3.4'])).toBe(false);
-    expect(lockout.begin(['u:ns:bi:5.6.7.8', 'ip:5.6.7.8'])).toBe(true);
-    lockout.end(['u:ns:bi:1.2.3.4', 'ip:1.2.3.4']);
-    expect(lockout.begin(['u:ns:bi:1.2.3.4', 'ip:1.2.3.4'])).toBe(true);
+    const order: string[] = [];
+    expect(await lockout.begin(here)).toBe(true);
+    const second = lockout.begin(here).then((ok) => {
+      order.push(`second ${ok}`);
+      return ok;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    order.push('first ends');
+    lockout.end(here);
+    expect(await second).toBe(true);
+    expect(order).toEqual(['first ends', 'second true']);
+    lockout.end(here);
+  });
+
+  it('counts the first sign-in’s failure before the waiting one is checked', async () => {
+    const lockout = new SignInLockout(15 * 60_000, 1);
+    expect(await lockout.begin(here)).toBe(true);
+    const second = lockout.begin(here);
+    lockout.fail(here[0]);
+    lockout.end(here);
+    expect(await second).toBe(true);
+    expect(lockout.isLocked(here[0])).toBe(true);
+    lockout.end(here);
+  });
+
+  it('gives up when the sign-in ahead takes too long', async () => {
+    const lockout = new SignInLockout();
+    expect(await lockout.begin(here)).toBe(true);
+    expect(await lockout.begin(here, 30)).toBe(false);
+    lockout.end(here);
+    expect(await lockout.begin(here, 30)).toBe(true);
+    lockout.end(here);
+  });
+
+  it('does not make other places wait', async () => {
+    const lockout = new SignInLockout();
+    expect(await lockout.begin(here)).toBe(true);
+    expect(await lockout.begin(['u:ns:bi:5.6.7.8', 'ip:5.6.7.8'], 10)).toBe(
+      true,
+    );
+    lockout.end(here);
+  });
+
+  it('lets only a few wait on one key; the rest are refused at once', async () => {
+    // One address must not hold the sign-in slots every tenant shares.
+    const lockout = new SignInLockout();
+    expect(await lockout.begin(here)).toBe(true);
+    const waiting = [1, 2].map(() => lockout.begin(here, 5_000, 2));
+    const started = Date.now();
+    expect(await lockout.begin(here, 5_000, 2)).toBe(false);
+    expect(Date.now() - started).toBeLessThan(1_000);
+    lockout.end(here);
+    expect(await waiting[0]).toBe(true);
+    lockout.end(here);
+    expect(await waiting[1]).toBe(true);
+    lockout.end(here);
+  });
+
+  it('tells the caller while a sign-in waits, so it can give its slot back', async () => {
+    const lockout = new SignInLockout();
+    const seen: boolean[] = [];
+    expect(await lockout.begin(here)).toBe(true);
+    const second = lockout.begin(here, 5_000, 8, (on) => seen.push(on));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(seen).toEqual([true]);
+    lockout.end(here);
+    expect(await second).toBe(true);
+    expect(seen).toEqual([true, false]);
+    lockout.end(here);
+  });
+
+  it('lets at most MAX_WAITERS sign-ins wait in all', async () => {
+    const lockout = new SignInLockout();
+    expect(await lockout.begin(['k'])).toBe(true);
+    const waiting = Array.from({ length: MAX_WAITERS }, () =>
+      lockout.begin(['k'], 200, MAX_WAITERS + 1),
+    );
+    // Refused at once, not after the wait: every waiting place is taken.
+    const started = Date.now();
+    expect(await lockout.begin(['k'], 200, MAX_WAITERS + 1)).toBe(false);
+    expect(Date.now() - started).toBeLessThan(100);
+    expect(await Promise.all(waiting)).toEqual(
+      Array<boolean>(MAX_WAITERS).fill(false),
+    );
+    lockout.end(['k']);
   });
 });

@@ -6,7 +6,8 @@ time the person asked for (the proof of concept's review, finding F02):
 1. validate the SQL against the request's tables (:mod:`.gate`);
 2. attach only the sources the SQL reads, and create a view
    ``"<source>"."<schema>"."<table>"`` over each table it names;
-3. lock the configuration, so nothing the query does can change a setting;
+3. lock it down: no local path but its own and its sources', no new extension,
+   no setting the query could change back (:meth:`QuerySession._lock_down`);
 4. run ``SELECT * FROM (<sql>) LIMIT max_rows + 1`` and return Arrow, cut to
    ``max_rows`` and ``max_result_bytes`` with ``truncated`` set.
 """
@@ -16,17 +17,19 @@ from __future__ import annotations
 import io
 import logging
 import os
+import re
 import tempfile
 import threading
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
 from ..utils.duckdb_engine import connect, load_extension, quote_identifier, require_duckdb
-from .bindings import BindingError, SourceBinding, TableLocation
+from ..utils.local_roots import LocalRootRefusedError, refuse_local_root
+from .bindings import BindingError, ConnectorError, SourceBinding, TableLocation
 from .gate import QueryRefusedError, TableName, validate
 from .masks import ColumnMask, ColumnsHiddenError, masked_projection
 from .rows import RowFilter, row_predicate
@@ -36,6 +39,71 @@ logger = logging.getLogger(__name__)
 DEFAULT_MAX_ROWS = 10_000
 DEFAULT_MAX_RESULT_BYTES = 32 * 1024 * 1024
 DEFAULT_TIMEOUT_SECONDS = 120
+
+
+#: URL schemes a query's views may read once the session is locked down
+#: (:meth:`QuerySession._lock_down`); each source's secret scopes what it reaches.
+REMOTE_PREFIXES = (
+    "s3://",
+    "s3a://",
+    "s3n://",
+    "r2://",
+    "gcs://",
+    "gs://",
+    "az://",
+    "azure://",
+    "abfs://",
+    "abfss://",
+)
+#: Schemes opened only for the endpoints a query's own sources name
+#: (``recipe_endpoints``): an open ``http://`` would let a view reach any
+#: in-cluster service (review of 383fd5c4, P15).
+_HTTP_URL = re.compile(r"^(https?)://([^/\s?#@]+)", re.IGNORECASE)
+
+
+def recipe_endpoints(recipe: dict[str, Any]) -> list[str]:
+    """``scheme://host:port/`` of every HTTP(S) URL in a recipe's settings
+    (not its masked values: those are secrets, never places to open)."""
+    found: set[str] = set()
+
+    def walk(value: Any) -> None:
+        if isinstance(value, dict):
+            for item in value.values():
+                walk(item)
+        elif isinstance(value, list):
+            for item in value:
+                walk(item)
+        elif isinstance(value, str):
+            match = _HTTP_URL.match(value.strip())
+            if match:
+                found.add(f"{match.group(1).lower()}://{match.group(2).lower()}/")
+
+    for key, value in recipe.items():
+        if key != "masked":
+            walk(value)
+    return sorted(found)
+
+
+def check_local_root(path: str) -> None:
+    """A source's local folder, refused when queries must not read it
+    (``src.utils.local_roots``)."""
+    try:
+        refuse_local_root(path, "queries")
+    except LocalRootRefusedError as exc:
+        raise BindingError(str(exc)) from None
+
+
+def _as_directory(path: str) -> str:
+    """A directory for ``allowed_directories``: real path, trailing slash, so
+    ``/data/a`` does not also open ``/data/ab``."""
+    if "://" in path:
+        return path
+    resolved = os.path.realpath(path)
+    return resolved if resolved.endswith("/") or not Path(resolved).is_dir() else resolved + "/"
+
+
+def _sql_list(values: list[str]) -> str:
+    return "[" + ", ".join("'" + v.replace("'", "''") + "'" for v in values) + "]"
 
 
 #: Formats a query can be exported as, and their media types.
@@ -145,6 +213,9 @@ class QueryResult:
     export_format: str | None = None
     #: For a describe request: output columns and column lineage, no rows.
     description: dict[str, Any] | None = None
+    #: What reading each connector table cost (QC §5.3): table, requests,
+    #: rows, filters sent, ms, scans.
+    scans: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -157,6 +228,17 @@ class _Dataset:
     inputs: dict[TableName, _Table]
     #: The hidden catalog its inputs are attached under (``__ds_<n>``).
     catalog: str
+
+
+@dataclass(frozen=True)
+class _Relation:
+    """What one view reads, and the name its reads are reported under."""
+
+    binding: SourceBinding
+    relation: str
+    shown: str
+    #: A shared dataset's input: its filters are the owning group's.
+    private: bool = False
 
 
 @dataclass
@@ -197,6 +279,8 @@ class QuerySession:
                 self._bindings[alias] = SourceBinding(
                     alias, index, recipe, str(entry.get("sourceId") or "")
                 )
+        #: Each source table's view reads this binding's relation.
+        self._relations: dict[str, _Relation] = {}
         self._tables: dict[TableName, _Table] = {}
         for entry in request.tables:
             dataset = entry.get("dataset")
@@ -288,6 +372,45 @@ class QuerySession:
             conn.execute(f"SET max_temp_directory_size = '{spill.replace(chr(39), '')}'")
         return conn
 
+    def _lock_down(self, conn: Any) -> None:
+        """Once the views exist: no new extension, no local path but the
+        query's own, and no setting the query could change back.
+
+        The SQL gate already refuses table functions and file names; this is
+        the second wall behind it. A query process shares its host with other
+        queries (the query worker), so a query that got past the gate must
+        still not read another's spill files or ``/proc``. Bucket URLs stay
+        open (what a query reaches there is what its sources' secrets allow);
+        HTTP(S) only to the endpoints its sources name. A source's local
+        folder is checked first (``check_local_root``).
+        """
+        conn.execute("SET autoinstall_known_extensions = false")
+        conn.execute("SET autoload_known_extensions = false")
+        allowed = [*REMOTE_PREFIXES, _as_directory(self._spill.name)]
+        for binding in self._bindings.values():
+            allowed += recipe_endpoints(binding.recipe)
+        # Not the allowlist itself: only the folders the query's sources read.
+        for binding in self._bindings.values():
+            for path in binding.local_paths():
+                check_local_root(path)
+                allowed.append(_as_directory(path))
+        try:
+            rows = conn.execute(
+                "SELECT path FROM duckdb_databases() WHERE path IS NOT NULL AND path <> ''"
+            ).fetchall()
+        except Exception:  # pragma: no cover - older DuckDB
+            rows = []
+        allowed_files = [str(row[0]) for row in rows if "://" not in str(row[0])]
+        # An attached catalog's file (a DuckLake's) is a source's path too.
+        for path in allowed_files:
+            if path.startswith("/"):  # not a DuckLake's "ducklake:postgres:…"
+                check_local_root(path)
+        conn.execute(f"SET allowed_directories = {_sql_list(sorted(set(allowed)))}")
+        if allowed_files:
+            conn.execute(f"SET allowed_paths = {_sql_list(sorted(set(allowed_files)))}")
+        conn.execute("SET enable_external_access = false")
+        conn.execute("SET lock_configuration = true")
+
     def _attach_tables_as_views(self, conn: Any, tables: set[TableName]) -> None:
         created_catalogs: set[str] = set()
         created_schemas: set[tuple[str, str]] = set()
@@ -308,15 +431,26 @@ class QuerySession:
             entry = self._tables[name]
             target = target_of(name.source, name.schema, name.table)
             if entry.dataset is not None:
-                relation = self._dataset_relation(conn, entry.dataset, target_of)
+                relation = self._dataset_relation(conn, entry.dataset, target_of, str(name))
                 self._create_view(conn, target, relation, entry, label=str(name), binding=None)
             else:
                 self._source_view(conn, target, entry)
 
-    def _source_view(self, conn: Any, target: str, entry: _Table) -> None:
+    def _source_view(
+        self, conn: Any, target: str, entry: _Table, *, dataset: str | None = None
+    ) -> None:
+        """``dataset``: the shared dataset this table is an input of. Its
+        reads are reported under the dataset's name, never with the filters
+        sent: those hold the owning group's row filter (DQ §5.10)."""
         binding = self._bindings[entry.source_alias]
+        # A masked column is never a filter sent to its source (QC §5.11);
+        # masks match columns without case.
+        location = replace(
+            entry.location,
+            withheld=frozenset(m.column.lower() for m in entry.masks),
+        )
         try:
-            relation = binding.relation(conn, entry.location)
+            relation = binding.relation(conn, location)
         except BindingError as exc:
             # Scan wording: "Failed to connect to <label>: <cause>".
             # The binding already names the endpoint in its message, so
@@ -326,11 +460,17 @@ class QuerySession:
             raise BindingError(
                 f"Failed to connect to {binding.label()}: {_first_line(exc)}"
             ) from exc
+        # Before the view reads anything (DESCRIBE opens the files).
+        for path in binding.local_paths():
+            check_local_root(path)
         if binding.source_type == "POSTGRESQL":
             _postgres_settings(conn)
+        self._relations[target] = _Relation(
+            binding, relation, dataset or str(entry.name), private=dataset is not None
+        )
         self._create_view(conn, target, relation, entry, label=str(entry.name), binding=binding)
 
-    def _dataset_relation(self, conn: Any, dataset: _Dataset, target_of: Any) -> str:
+    def _dataset_relation(self, conn: Any, dataset: _Dataset, target_of: Any, shown: str) -> str:
         """A shared dataset's SQL over its inputs (§5.12), as a relation.
 
         Each input becomes a view ``"__ds_<n>"."main"."t<j>"``, masked and
@@ -344,7 +484,12 @@ class QuerySession:
         validated = validate(dataset.sql, dataset.inputs.keys(), rename=hidden)
         for input_name in sorted(validated.tables, key=str):
             catalog, schema, table = hidden[input_name]
-            self._source_view(conn, target_of(catalog, schema, table), dataset.inputs[input_name])
+            self._source_view(
+                conn,
+                target_of(catalog, schema, table),
+                dataset.inputs[input_name],
+                dataset=shown,
+            )
         return f"({validated.sql}) AS __dataset"
 
     def _create_view(
@@ -476,6 +621,7 @@ class QuerySession:
         with self._deadline(conn, self.request.timeout_seconds) as fired:
             try:
                 self._attach_tables_as_views(conn, validated.tables)
+                self._lock_down(conn)
                 described = conn.execute(
                     f"DESCRIBE SELECT * FROM ({validated.sql}) AS __result"
                 ).fetchall()
@@ -523,27 +669,30 @@ class QuerySession:
         )
         conn = self._open()
         self._conn = conn
+        for binding in self._bindings.values():
+            binding.deadline = started + self.request.timeout_seconds
         with self._deadline(conn, self.request.timeout_seconds) as fired:
             try:
                 self._attach_tables_as_views(conn, validated.tables)
                 setup_done = time.monotonic()
                 if self.request.export_format == "xlsx":
                     load_extension(conn, "excel")
-                conn.execute("SET autoinstall_known_extensions = false")
-                conn.execute("SET autoload_known_extensions = false")
-                conn.execute("SET lock_configuration = true")
+                self._lock_down(conn)
                 if self.request.export_format:
                     exported = self._export(conn, validated.sql)
                 else:
                     limit = int(self.request.max_rows) + 1
                     wrapped = f"SELECT * FROM ({validated.sql}) AS __result LIMIT {limit}"
                     table = _fetch_arrow(conn.sql(wrapped))
-            except Exception:
-                if fired.is_set():
+            except Exception as exc:
+                failed = self._connector_failure()
+                if fired.is_set() or (failed is not None and failed.code == "timeout"):
                     raise QueryTimeoutError(
                         f"The query took longer than {self.request.timeout_seconds} s "
                         "and was stopped."
                     ) from None
+                if failed is not None and failed is not exc:
+                    raise failed from None
                 raise
         executed = time.monotonic()
         if self.request.export_format:
@@ -556,7 +705,40 @@ class QuerySession:
             "totalMs": int((time.monotonic() - started) * 1000),
         }
         result.tables = sorted(str(t) for t in validated.tables)
+        result.scans = self._scan_stats()
         return result
+
+    def _connector_failure(self) -> ConnectorError | None:
+        """The error a connector raised, named for its table: DuckDB hands it
+        on wrapped in its own text."""
+        for _, read in sorted(self._relations.items()):
+            error = read.binding.failure(read.relation)
+            if error is None:
+                continue
+            if error.code == "connector_limit":
+                return ConnectorError(f"{read.shown} {error}", error.code)
+            return ConnectorError(f"Failed to read {read.shown}: {error}", error.code)
+        return None
+
+    def _scan_stats(self) -> list[dict[str, Any]]:
+        """Per table the person named: what its live reads cost. A shared
+        dataset's inputs add up under the dataset, without their filters."""
+        out: dict[str, dict[str, Any]] = {}
+        for _, read in sorted(self._relations.items()):
+            stats = read.binding.scan_stats(read.relation)
+            if stats is None or not stats.scans:
+                continue
+            entry = out.setdefault(
+                read.shown,
+                {"table": read.shown, "requests": 0, "rows": 0, "pushed": [], "ms": 0, "scans": 0},
+            )
+            entry["requests"] += stats.requests
+            entry["rows"] += stats.rows
+            entry["ms"] += stats.ms
+            entry["scans"] += stats.scans
+            if not read.private:
+                entry["pushed"] += [p for p in stats.pushed if p not in entry["pushed"]]
+        return [out[name] for name in sorted(out)]
 
 
 def _export_columns(conn: Any, sql: str, fmt: str) -> str:

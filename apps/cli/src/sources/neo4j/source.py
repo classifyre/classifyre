@@ -37,6 +37,11 @@ _DEFAULT_EXCLUDED_LABELS = {
     "__Neo4jMigration",
 }
 
+#: Nodes or relationships a scan reads to record a table's columns (QC §5.7).
+_COLUMN_SAMPLE_SIZE = 100
+#: Marks a relationship type's raw asset id (``<db>_#_rel_#_<TYPE>``).
+_RELATIONSHIP_MARK = "_#_rel_#_"
+
 # Maximum relationship targets to query per label (avoids unbounded DISTINCT scans)
 _RELATIONSHIP_SCAN_LIMIT = 1000
 
@@ -229,6 +234,9 @@ class Neo4jSource(BaseSource):
             asset_metadata["node_count"] = node_count
         if property_keys:
             asset_metadata["sample_property_keys"] = property_keys
+        columns = self._label_columns(ref)
+        if columns:
+            asset_metadata["columns"] = columns
 
         return SingleAssetScanResults(
             hash=asset_hash,
@@ -262,6 +270,131 @@ class Neo4jSource(BaseSource):
         except Exception as exc:
             logger.debug("Could not read stats for label %s: %s", ref.label, exc)
         return node_count, keys
+
+    def _label_columns(self, ref: LabelRef) -> list[dict[str, str]]:
+        """The label's columns for SQL: ``element_id`` and the properties of
+        a sample of its nodes (docs/prd/QC-query-connectors.md §5.6, §5.7).
+        Best effort: none when the nodes cannot be read."""
+        from ...utils.document_columns import record_columns
+
+        try:
+            with self._session() as session:
+                rows = session.run(
+                    f"MATCH (n:{_escape_label(ref.label)}) WITH n LIMIT {_COLUMN_SAMPLE_SIZE} "
+                    "RETURN properties(n) AS p"
+                )
+                props = [dict(row["p"]) for row in rows if row["p"] is not None]
+        except Exception as exc:
+            logger.debug("Could not sample nodes of label %s: %s", ref.label, exc)
+            return []
+        from ...query.connectors.neo4j import ELEMENT_ID
+
+        columns = [c for c in record_columns(props) if c["name"] != ELEMENT_ID]
+        return [{"name": ELEMENT_ID, "type": "VARCHAR"}, *columns]
+
+    # ── Relationship types: tables of their own (QC §5.6) ──────────────
+
+    def _discover_relationship_types(self) -> list[str]:
+        try:
+            with self._session() as session:
+                rows = session.run(
+                    "CALL db.relationshipTypes() YIELD relationshipType "
+                    "RETURN relationshipType ORDER BY relationshipType"
+                )
+                return [
+                    row["relationshipType"]
+                    for row in rows
+                    if isinstance(row["relationshipType"], str) and row["relationshipType"]
+                ]
+        except Exception as exc:
+            logger.warning("Could not list relationship types: %s", exc)
+            return []
+
+    def _relationship_raw_id(self, relationship_type: str) -> str:
+        return f"{self._database()}{_RELATIONSHIP_MARK}{relationship_type}"
+
+    def _relationship_to_asset(
+        self, relationship_type: str, label_hash_map: dict[str, str]
+    ) -> SingleAssetScanResults | None:
+        """One relationship type as a table: its endpoints' ids, its
+        properties and its endpoints' labels, sampled."""
+        from ...utils.document_columns import record_columns, value_type
+
+        escaped = _escape_label(relationship_type)
+        try:
+            with self._session() as session:
+                sample = list(
+                    session.run(
+                        f"MATCH (a)-[r:{escaped}]->(b) WITH a, r, b LIMIT {_COLUMN_SAMPLE_SIZE} "
+                        "RETURN properties(r) AS p, labels(a) AS al, labels(b) AS bl, "
+                        "a.id AS aid, b.id AS bid"
+                    )
+                )
+                record = session.run(f"MATCH ()-[r:{escaped}]->() RETURN count(r) AS c").single()
+        except Exception as exc:
+            logger.warning("Could not sample relationship type %s: %s", relationship_type, exc)
+            return None
+        if not sample:
+            return None
+        source_labels = sorted({lbl for row in sample for lbl in row["al"] or []})
+        target_labels = sorted({lbl for row in sample for lbl in row["bl"] or []})
+        from ...query.connectors.neo4j import (
+            RELATIONSHIP_COLUMNS,
+            SOURCE_ELEMENT_ID,
+            SOURCE_ID,
+            SOURCE_LABEL,
+            TARGET_ELEMENT_ID,
+            TARGET_ID,
+            TARGET_LABEL,
+        )
+
+        columns = [
+            {"name": SOURCE_ELEMENT_ID, "type": "VARCHAR"},
+            {"name": TARGET_ELEMENT_ID, "type": "VARCHAR"},
+        ]
+        # The endpoints' own ``id``, when every one sampled has it: what a
+        # relationship joins other sources' tables on.
+        for side, key in ((SOURCE_ID, "aid"), (TARGET_ID, "bid")):
+            types = {value_type(row[key]) for row in sample}
+            if None not in types and len(types) == 1:
+                columns.append({"name": side, "type": str(types.pop())})
+        reserved = {c["name"] for c in columns} | set(RELATIONSHIP_COLUMNS)
+        properties = [dict(row["p"]) for row in sample if row["p"] is not None]
+        columns += [c for c in record_columns(properties) if c["name"] not in reserved]
+        columns += [
+            {"name": SOURCE_LABEL, "type": "VARCHAR"},
+            {"name": TARGET_LABEL, "type": "VARCHAR"},
+        ]
+        metadata: dict[str, Any] = {
+            "relationship_type": relationship_type,
+            "database": self._database(),
+            "source_labels": source_labels,
+            "target_labels": target_labels,
+            "columns": columns,
+        }
+        if record is not None and record["c"] is not None:
+            metadata["relationship_count"] = int(record["c"])
+        raw_id = self._relationship_raw_id(relationship_type)
+        now = datetime.now(UTC)
+        links = sorted(
+            {label_hash_map[lbl] for lbl in source_labels + target_labels if lbl in label_hash_map}
+        )
+        return SingleAssetScanResults(
+            hash=self.generate_hash_id(raw_id),
+            checksum=self.calculate_checksum(metadata),
+            name=f"{self._database()}:[{relationship_type}]",
+            external_url=self.ensure_location(
+                f"{self._uri()}/{self._database()}/{relationship_type}",
+                fallback=f"neo4j://{self._database()}/{relationship_type}",
+            ),
+            links=links,
+            asset_type=OutputAssetType.TXT,
+            source_id=self.source_id,
+            created_at=now,
+            updated_at=now,
+            runner_id=self.runner_id,
+            **self.metadata_fields("relationship", metadata),
+        )
 
     def test_connection(self) -> dict[str, Any]:
         logger.info("Testing connection to Neo4j at %s...", self._uri())
@@ -325,6 +458,18 @@ class Neo4jSource(BaseSource):
                 yield batch
                 batch = []
 
+        if include_rels and not self._aborted:
+            for relationship_type in self._discover_relationship_types():
+                if self._aborted:
+                    return
+                relationship = self._relationship_to_asset(relationship_type, label_hash_map)
+                if relationship is None:
+                    continue
+                batch.append(relationship)
+                if len(batch) >= self.BATCH_SIZE:
+                    yield batch
+                    batch = []
+
         if not self._aborted and not self._scope_options().node_limit_per_label:
             self.declare_listing_complete()
 
@@ -347,6 +492,9 @@ class Neo4jSource(BaseSource):
                 decoded = unhash_id(asset_id)
             except Exception:
                 decoded = asset_id
+        if _RELATIONSHIP_MARK in decoded:
+            # A relationship type: a table for SQL, no node content to scan.
+            return None
 
         parts = decoded.split("_#_")
         if len(parts) >= 2:

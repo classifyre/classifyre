@@ -12,6 +12,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { tableFromIPC } from 'apache-arrow';
 import { PrismaService } from '../prisma.service';
 import { CliRunnerService } from '../cli-runner/cli-runner.service';
+import { QUERY_RESULT_MARKER } from '../cli-runner/query-worker.client';
 import { MaskedConfigCryptoService } from '../masked-config-crypto.service';
 import { ActorContextService } from '../identity/actor-context.service';
 import {
@@ -27,6 +28,7 @@ import {
   datasetResource,
   tableReadResources,
 } from '../identity/audit-resources';
+import { scanStatsOf, type ScanStat } from './scan-stats';
 import {
   QueryCatalogService,
   type CatalogTable,
@@ -72,12 +74,81 @@ export const EXPORT_MEDIA_TYPES: Record<ExportFormat, string> = {
   csv: 'text/csv; charset=utf-8',
   parquet: 'application/vnd.apache.parquet',
 };
-/** Queries one person may have waiting or running at once. */
-const MAX_ACTIVE_PER_ACTOR = 3;
+/**
+ * Queries one person may have waiting or running at once, whichever way they
+ * came (app, MCP, SQL connections). A guard against one runaway client, not a
+ * capacity limit: the query worker's slots and the Jobs it overflows to are
+ * that. `QUERY_MAX_ACTIVE_PER_PERSON` (Helm `queryWorker.maxActivePerPerson`,
+ * set only with the worker); without a worker every query is a Job, and the
+ * default stays the one Jobs were sized for (DQ §5.4).
+ */
+export const DEFAULT_MAX_ACTIVE_PER_PERSON = 100;
+export const DEFAULT_MAX_ACTIVE_PER_PERSON_JOBS = 20;
+/**
+ * Queries one workspace may have waiting or running at once, so one
+ * workspace cannot take every slot of a worker pool other workspaces share.
+ * `QUERY_MAX_ACTIVE_PER_WORKSPACE` (Helm `queryWorker.maxActivePerWorkspace`).
+ */
+export const DEFAULT_MAX_ACTIVE_PER_WORKSPACE = 200;
+/**
+ * Overflow Jobs one workspace may have running at once: a query the worker
+ * pool has no room for is refused as busy past this, rather than each one
+ * starting a pod. `QUERY_MAX_OVERFLOW_JOBS_PER_WORKSPACE`.
+ */
+export const DEFAULT_MAX_OVERFLOW_JOBS_PER_WORKSPACE = 10;
+
+function positiveInt(raw: string | undefined, fallback: number): number {
+  const value = Number.parseInt(raw ?? '', 10);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+export function maxActivePerPerson(
+  env: NodeJS.ProcessEnv = process.env,
+): number {
+  const fallback = env.QUERY_WORKER_URL?.trim()
+    ? DEFAULT_MAX_ACTIVE_PER_PERSON
+    : DEFAULT_MAX_ACTIVE_PER_PERSON_JOBS;
+  return positiveInt(env.QUERY_MAX_ACTIVE_PER_PERSON, fallback);
+}
+
+export function maxActivePerWorkspace(
+  env: NodeJS.ProcessEnv = process.env,
+): number {
+  return positiveInt(
+    env.QUERY_MAX_ACTIVE_PER_WORKSPACE,
+    DEFAULT_MAX_ACTIVE_PER_WORKSPACE,
+  );
+}
+
+export function maxOverflowJobsPerWorkspace(
+  env: NodeJS.ProcessEnv = process.env,
+): number {
+  return positiveInt(
+    env.QUERY_MAX_OVERFLOW_JOBS_PER_WORKSPACE,
+    DEFAULT_MAX_OVERFLOW_JOBS_PER_WORKSPACE,
+  );
+}
+
+const MAX_ACTIVE_PER_ACTOR = maxActivePerPerson();
+const MAX_ACTIVE_PER_WORKSPACE = maxActivePerWorkspace();
+const MAX_OVERFLOW_JOBS_PER_WORKSPACE = maxOverflowJobsPerWorkspace();
 /** System queries (quality rules) running at once per workspace. */
 const MAX_ACTIVE_SYSTEM = 2;
+/** `jobName` of a run about to start a Job: counted by the overflow cap. */
+const JOB_CLAIM = 'claimed';
 const RESULT_TTL_MS = 24 * 60 * 60 * 1000;
-const RESULT_MARKER = '__CLASSIFYRE_QUERY_RESULT__';
+/**
+ * A run still waiting or running this long after it was created is taken for
+ * lost: the longest timeout a workspace may set is 900 s, and a Job adds its
+ * pod's start. It happens when the API restarts mid-run (nothing is left to
+ * settle it); such a run would otherwise count against its person's cap for
+ * good. A lost run keeps its callback token: if its result does arrive after
+ * all, it is recorded (and the read audited) like any other.
+ */
+const LOST_AFTER_MS = 30 * 60 * 1000;
+/** The sweep runs at most this often per workspace and API process. */
+const LOST_SWEEP_EVERY_MS = 60 * 1000;
+const LOST_CODE = 'lost';
 
 const TERMINAL: QueryRunStatus[] = [
   QueryRunStatus.SUCCESS,
@@ -101,6 +172,8 @@ export interface QueryRunView {
   /** Row filters of the tables it names (DQ §5.10). */
   rowFilters: RunRowFilter[];
   timings: Record<string, number> | null;
+  /** What each connector table cost (QC §5.9); empty for other tables. */
+  scans: ScanStat[];
   error: { code: string; message: string } | null;
   resultBytes: number | null;
   /** Null for rows shown in the app; the file format for an export. */
@@ -119,6 +192,8 @@ export interface QueryCallbackMeta {
   columns?: { name: string; type: string }[];
   timings?: Record<string, number>;
   tables?: string[];
+  /** Connector tables (QC §5.3): requests, rows and filters sent per table. */
+  scans?: unknown;
   error?: { code?: string; message?: string };
   /** A describe run's answer (§5.12): output columns and their lineage. */
   describe?: {
@@ -264,6 +339,8 @@ function tokenHash(token: string): string {
 @Injectable()
 export class QueryRunService {
   private readonly logger = new Logger(QueryRunService.name);
+  /** When each workspace's lost runs were last swept, by this process. */
+  private readonly lostSweptAt = new Map<string, number>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -541,23 +618,37 @@ export class QueryRunService {
         table,
       })),
     );
-    const { run, done } = await this.launch({
-      actor,
-      origin,
-      sql: input.sql,
-      used: used.map((entry) => entry.source),
-      tables,
-      namedAssetIds: tables.map(({ table }) => table.assetId),
-      maxRows: input.maxRows,
-      maxResultBytes: MAX_EXPORT_BYTES,
-      timeoutSeconds: settings.timeoutSeconds,
-      extra: {
-        dialect: 'postgres',
-        database: input.database,
-        searchPath: input.searchPath,
-      },
-    });
-    return { runId: run.id, done };
+    let launched: Awaited<ReturnType<QueryRunService['launch']>>;
+    try {
+      launched = await this.launch({
+        actor,
+        origin,
+        sql: input.sql,
+        used: used.map((entry) => entry.source),
+        tables,
+        namedAssetIds: tables.map(({ table }) => table.assetId),
+        maxRows: input.maxRows,
+        maxResultBytes: MAX_EXPORT_BYTES,
+        timeoutSeconds: settings.timeoutSeconds,
+        extra: {
+          dialect: 'postgres',
+          database: input.database,
+          searchPath: input.searchPath,
+        },
+      });
+    } catch (error) {
+      if (error instanceof ConflictException) {
+        return {
+          refused: {
+            code: 'too_many_queries',
+            sqlState: '53000',
+            message: (error.getResponse() as { message: string }).message,
+          },
+        };
+      }
+      throw error;
+    }
+    return { runId: launched.run.id, done: launched.done };
   }
 
   /**
@@ -628,7 +719,38 @@ export class QueryRunService {
     return maskSalt(resolveApplicationSecretKey(), workspaceId);
   }
 
+  /** Settle runs nothing will settle any more (see {@link LOST_AFTER_MS}). */
+  private async expireLostRuns(): Promise<void> {
+    // The workspace's own schema; once a minute is plenty for runs this old.
+    const key = this.actors.workspaceId() ?? '';
+    const now = Date.now();
+    if (now - (this.lostSweptAt.get(key) ?? 0) < LOST_SWEEP_EVERY_MS) return;
+    this.lostSweptAt.set(key, now);
+    await this.prisma.queryRun
+      .updateMany({
+        where: {
+          status: { in: [QueryRunStatus.PENDING, QueryRunStatus.RUNNING] },
+          createdAt: { lt: new Date(Date.now() - LOST_AFTER_MS) },
+        },
+        data: {
+          status: QueryRunStatus.ERROR,
+          error: {
+            code: LOST_CODE,
+            message:
+              'The query never finished: the service running it restarted. Run it again.',
+          },
+          finishedAt: new Date(),
+        },
+      })
+      .catch((error: unknown) =>
+        this.logger.warn(
+          `Could not settle lost query runs: ${error instanceof Error ? error.message : String(error)}`,
+        ),
+      );
+  }
+
   private async activeRuns(origin: RunOrigin): Promise<number> {
+    await this.expireLostRuns();
     return this.prisma.queryRun.count({
       where: {
         ...(origin.personRef
@@ -643,11 +765,58 @@ export class QueryRunService {
    * One person's queries at once, whichever way they came (app, MCP, SQL
    * connection): the refusal text when the person is at the cap, else null.
    */
-  private async capRefusal(origin: RunOrigin): Promise<string | null> {
+  private async capRefusal(
+    origin: RunOrigin,
+    /** Runs of this request already counted (1 once it is inserted). */
+    own = 0,
+  ): Promise<string | null> {
     const active = await this.activeRuns(origin);
-    return active >= MAX_ACTIVE_PER_ACTOR
-      ? `You have ${active} queries running. Wait for one to finish or cancel it.`
+    if (active - own >= MAX_ACTIVE_PER_ACTOR) {
+      return `You have ${active} queries running. Wait for one to finish or cancel it.`;
+    }
+    // Runs live in the workspace's own schema: this counts the workspace.
+    const workspace = await this.prisma.queryRun.count({
+      where: {
+        status: { in: [QueryRunStatus.PENDING, QueryRunStatus.RUNNING] },
+      },
+    });
+    return workspace - own >= MAX_ACTIVE_PER_WORKSPACE
+      ? `This workspace has ${workspace - own} queries running, as many as it may. Run yours again in a moment.`
       : null;
+  }
+
+  /**
+   * Whether a query the worker pool did not take may start a Job: null, or
+   * why not. Counts the workspace's runs that have a Job.
+   */
+  private async overflowRefusal(runId: string): Promise<string | null> {
+    // Claimed before counting, so a burst of runs sees each other: the Job's
+    // real name replaces the claim in onJobCreated (review of 383fd5c4, P6).
+    await this.prisma.queryRun.updateMany({
+      where: { id: runId, jobName: null },
+      data: { jobName: JOB_CLAIM },
+    });
+    const jobs = await this.prisma.queryRun.count({
+      where: {
+        status: { in: [QueryRunStatus.PENDING, QueryRunStatus.RUNNING] },
+        jobName: { not: null },
+      },
+    });
+    if (jobs <= MAX_OVERFLOW_JOBS_PER_WORKSPACE) return null;
+    await this.prisma.queryRun.updateMany({
+      where: { id: runId, jobName: JOB_CLAIM },
+      data: { jobName: null },
+    });
+    return 'Every query slot is taken. Run the query again in a moment.';
+  }
+
+  /** True once the run was cancelled (by any API replica). */
+  private async isCancelled(runId: string): Promise<boolean> {
+    const run = await this.prisma.queryRun.findUnique({
+      where: { id: runId },
+      select: { status: true },
+    });
+    return run?.status === QueryRunStatus.CANCELLED;
   }
 
   private async assertBelowCap(origin: RunOrigin): Promise<void> {
@@ -740,6 +909,27 @@ export class QueryRunService {
         expiresAt: new Date(Date.now() + RESULT_TTL_MS),
       },
     });
+    // Checked again now that this run counts: requests checked before any
+    // of them was inserted would all pass (review of 383fd5c4, P6). Runs
+    // racing here may each refuse; none goes past the cap.
+    const over = await this.capRefusal(input.origin, 1);
+    if (over) {
+      await this.prisma.queryRun.update({
+        where: { id: run.id },
+        data: {
+          status: QueryRunStatus.ERROR,
+          error: { code: 'too_many_queries', message: over },
+          finishedAt: new Date(),
+          callbackTokenHash: null,
+        },
+      });
+      throw new ConflictException({
+        statusCode: 409,
+        error: 'Conflict',
+        code: 'TOO_MANY_QUERIES',
+        message: over,
+      });
+    }
 
     const sources = await this.prisma.source.findMany({
       where: { id: { in: attached.map((source) => source.id) } },
@@ -761,6 +951,8 @@ export class QueryRunService {
       ...(input.exportFormat ? { exportFormat: input.exportFormat } : {}),
       ...(input.extra ?? {}),
       timeoutSeconds: input.timeoutSeconds,
+      // The query worker gives each workspace its share of its slots.
+      workspaceId: this.actors.workspaceId(),
       callbackUrl: `${this.cliRunner.queryCallbackBaseUrl(this.actors.workspaceId())}/query-runs/${run.id}/result`,
       callbackToken: token,
       sources: attached.map((source) => ({
@@ -860,6 +1052,7 @@ export class QueryRunService {
     }
     const source = cached.sources.find((s) => s.id === table.sourceId);
     if (!source) return { refused: 'The table has no source.' };
+    await this.expireLostRuns();
     const active = await this.prisma.queryRun.count({
       where: {
         purpose: input.purpose,
@@ -921,6 +1114,8 @@ export class QueryRunService {
       maxResultBytes: MAX_RESULT_BYTES,
       exportFormat: 'csv',
       timeoutSeconds: settings.timeoutSeconds,
+      // The query worker gives each workspace its share of its slots.
+      workspaceId: this.actors.workspaceId(),
       callbackUrl: `${this.cliRunner.queryCallbackBaseUrl(this.actors.workspaceId())}/query-runs/${run.id}/result`,
       callbackToken: token,
       sources: attach.map((a) => ({
@@ -1005,14 +1200,18 @@ export class QueryRunService {
     timeoutSeconds: number,
   ): Promise<void> {
     try {
-      await this.prisma.queryRun.update({
-        where: { id: runId },
+      // Only a run still waiting starts: one cancelled meanwhile stays so.
+      const { count } = await this.prisma.queryRun.updateMany({
+        where: { id: runId, status: QueryRunStatus.PENDING },
         data: { status: QueryRunStatus.RUNNING, startedAt: new Date() },
       });
+      if (count === 0) return;
       const { output, exitCode } = await this.cliRunner.runQueryExecution({
         runId,
         request,
         timeoutSeconds,
+        mayStartJob: () => this.overflowRefusal(runId),
+        isCancelled: () => this.isCancelled(runId),
         onJobCreated: async ({ jobName, namespace }) => {
           await this.prisma.queryRun.update({
             where: { id: runId },
@@ -1045,11 +1244,11 @@ export class QueryRunService {
     const line = output
       .split('\n')
       .reverse()
-      .find((l) => l.startsWith(RESULT_MARKER));
+      .find((l) => l.startsWith(QUERY_RESULT_MARKER));
     let meta: QueryCallbackMeta | null = null;
     if (line) {
       try {
-        meta = JSON.parse(line.slice(RESULT_MARKER.length).trim());
+        meta = JSON.parse(line.slice(QUERY_RESULT_MARKER.length).trim());
       } catch {
         meta = null;
       }
@@ -1100,6 +1299,7 @@ export class QueryRunService {
       select: {
         callbackTokenHash: true,
         status: true,
+        error: true,
         sourceIds: true,
         actorRef: true,
         resultFormat: true,
@@ -1118,7 +1318,20 @@ export class QueryRunService {
     ) {
       throw new UnauthorizedException('Unknown query run or token.');
     }
-    if (TERMINAL.includes(run.status)) return;
+    // A run taken for lost whose result came after all is recorded (and its
+    // read audited); any other settled run keeps what settled it.
+    const lost = (run.error as { code?: string } | null)?.code === LOST_CODE;
+    if (TERMINAL.includes(run.status) && !lost) return;
+    // Checked again in the write itself: a cancel (or another replica's
+    // result) that lands between the read above and this write wins, and
+    // nothing is recorded or audited (review of 383fd5c4, P7).
+    const settleable: Prisma.QueryRunWhereInput = {
+      id: runId,
+      OR: [
+        { status: { notIn: TERMINAL } },
+        { error: { path: ['code'], equals: LOST_CODE } },
+      ],
+    };
 
     if (
       !Buffer.isBuffer(body) &&
@@ -1133,8 +1346,8 @@ export class QueryRunService {
         tables: (meta.tables ?? []).map((t) => t.toLowerCase()),
       };
       const bytes = Buffer.from(JSON.stringify(description), 'utf8');
-      await this.prisma.queryRun.update({
-        where: { id: runId },
+      await this.prisma.queryRun.updateMany({
+        where: settleable,
         data: {
           status: QueryRunStatus.SUCCESS,
           result: new Uint8Array(bytes),
@@ -1159,11 +1372,12 @@ export class QueryRunService {
         meta = {};
       }
       const tables = (meta.tables ?? []).map((t) => t.toLowerCase());
+      const scans = scanStatsOf(meta.scans);
       const assetIds = tables.length
         ? await this.assetIdsFor(tables)
         : undefined;
-      await this.prisma.queryRun.update({
-        where: { id: runId },
+      const settled = await this.prisma.queryRun.updateMany({
+        where: settleable,
         data: {
           status: QueryRunStatus.SUCCESS,
           result: new Uint8Array(body),
@@ -1173,11 +1387,15 @@ export class QueryRunService {
           truncatedReason: meta.truncatedReason ?? null,
           columns: meta.columns ?? [],
           timings: meta.timings ?? {},
+          ...(scans.length
+            ? { scanStats: scans as unknown as Prisma.InputJsonValue }
+            : {}),
           ...(assetIds ? { assetIds } : {}),
           finishedAt: new Date(),
           callbackTokenHash: null,
         },
       });
+      if (settled.count === 0) return;
       // R6: audit exactly the tables the job validated and read, attributed
       // to the run's actor. Refusals and failures read nothing, so they
       // record no per-table event; the run row itself keeps the attribution.
@@ -1344,6 +1562,7 @@ export class QueryRunService {
         masks: true,
         rowFilters: true,
         timings: true,
+        scanStats: true,
         error: true,
         resultBytes: true,
         resultFormat: true,
@@ -1358,16 +1577,22 @@ export class QueryRunService {
   async cancel(runId: string): Promise<QueryRunView> {
     const run = await this.own(runId);
     if (TERMINAL.includes(run.status)) return this.view(run);
-    await this.cliRunner.cancelQueryExecution(runId).catch(() => undefined);
-    const updated = await this.prisma.queryRun.update({
-      where: { id: runId },
+    // Cancelled first, and only if nothing settled it meanwhile (a result
+    // that arrived first stands); then the query stopped. Another replica
+    // running it on the worker sees the status and drops its request.
+    await this.prisma.queryRun.updateMany({
+      where: { id: runId, status: { notIn: TERMINAL } },
       data: {
         status: QueryRunStatus.CANCELLED,
         finishedAt: new Date(),
         callbackTokenHash: null,
       },
     });
-    return this.view(updated);
+    await this.cliRunner.cancelQueryExecution(runId).catch(() => undefined);
+    const current = await this.prisma.queryRun.findUnique({
+      where: { id: runId },
+    });
+    return this.view(current ?? run);
   }
 
   /** Drop expired results; called by the scheduler. */
@@ -1400,6 +1625,7 @@ export class QueryRunService {
     masks: Prisma.JsonValue;
     rowFilters: Prisma.JsonValue;
     timings: Prisma.JsonValue;
+    scanStats: Prisma.JsonValue;
     error: Prisma.JsonValue;
     resultBytes: number | null;
     resultFormat: string | null;
@@ -1420,6 +1646,7 @@ export class QueryRunService {
       masks: parseRunMasks(run.masks),
       rowFilters: parseRunRowFilters(run.rowFilters),
       timings: (run.timings as QueryRunView['timings']) ?? null,
+      scans: scanStatsOf(run.scanStats),
       error: (run.error as QueryRunView['error']) ?? null,
       resultBytes: run.resultBytes,
       resultFormat: run.resultFormat,

@@ -1,0 +1,1 @@
+Metabase and other BI tools that open several connections at once can now connect through SQL connections; before, every connection after the first was refused with "Another sign-in from here is under way".

@@ -37,10 +37,14 @@ from src.notebook.sdk import (  # noqa: E402
     Context,
     Entity,
     FieldMapping,
+    Filter,
     FlowType,
     NotebookFile,
     ParsedContent,
     Ref,
+    ScanRefusedError,
+    ScanRequest,
+    Table,
     Tag,
     contains,
     flow,
@@ -288,6 +292,20 @@ def build() -> dict[str, Any]:
                 "documentation": _summary(FlowType),
                 "insertText": "FlowType",
             },
+            {
+                "label": "ScanRefusedError",
+                "kind": "class",
+                "detail": 'raise ScanRefusedError("companies needs WHERE fnr = ...")',
+                "documentation": _summary(ScanRefusedError),
+                "insertText": "ScanRefusedError",
+            },
+            {
+                "label": "Table",
+                "kind": "class",
+                "detail": 'Table(name, {"column": "VARCHAR", ...}, description="")',
+                "documentation": _summary(Table),
+                "insertText": "Table",
+            },
             *(_function_entry(name, func) for name, func in MODULE_FUNCTIONS),
         ],
         "objects": {
@@ -334,6 +352,20 @@ def build() -> dict[str, Any]:
             "FieldMapping": {
                 "documentation": _summary(FieldMapping),
                 "fields": _fields(FieldMapping),
+            },
+            # SQL over the source: tables() returns these, scan() gets a request.
+            "Table": {
+                "documentation": _summary(Table),
+                "fields": _fields(Table),
+            },
+            "Filter": {
+                "documentation": _summary(Filter),
+                "fields": _fields(Filter),
+            },
+            "ScanRequest": {
+                "documentation": _summary(ScanRequest),
+                "fields": _fields(ScanRequest),
+                "members": _members(ScanRequest),
             },
         },
         "contract": {

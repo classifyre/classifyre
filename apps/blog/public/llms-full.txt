@@ -1,0 +1,88 @@
+# Classifyre — Full Technical & Comparison Reference (llms-full.txt)
+
+Canonical site: https://www.classifyre.com/
+Documentation: https://docs.classifyre.com/
+Source code: https://github.com/classifyre/classifyre
+Live demo: https://showcase.classifyre.com/
+Contact: contact@classifyre.com
+Licence: Apache-2.0 (100% open source; no enterprise tier or gated features)
+Origin & reach: Built in Austria (European Union) to European privacy and security standards; deployed worldwide across Europe, North America, and other regions.
+
+---
+
+## 1. What Classifyre Is
+
+Classifyre is an end-to-end open-source data governance platform you run on your own infrastructure (Docker, Kubernetes, or OpenShift — on-premises, air-gapped, private cloud, or AWS/Azure/GCP).
+
+Instead of replacing an organisation's existing ETL pipelines, databases, lakehouses, identity provider, or BI tools, Classifyre integrates on top of them to provide:
+1. **In-place source connection & detection** across 40+ structured and unstructured systems plus custom connector plugins.
+2. **Directory-backed group governance** integrating Entra ID, Active Directory (LDAP), Okta, or any OIDC/SAML provider.
+3. **Multi-level column masking and row-level security** enforced inside the query engine on both original tables and shared data products.
+4. **Governed SQL, Power BI, Excel, Tableau, and ODBC access** over personal, expiring, revocable TLS connections (PostgreSQL wire protocol), plus AI agents via MCP under the signed-in user's permissions.
+5. **Self-service plain-language dataset requests and governed shared data products** (live cross-source datasets and Delta shared data assets) that automatically inherit source masking and classification rules as a strict floor.
+6. **Complete audit logging, scheduled data quality rules, and open data contracts (ODCS)**.
+
+---
+
+## 2. Detection & Classification Spectrum
+
+Reference: https://docs.classifyre.com/detectors/
+
+- **Pre-built packs**: 41 personal-data (PII) entity types including Austrian, German, Swiss, EU, US, and global identifiers; 27 secret/credential patterns; YARA, broken links, and code security packs.
+- **Custom business detectors**:
+  - **Regex**: Deterministic IDs, internal codes, structured formats.
+  - **Python code detectors**: Custom validation rules (totals, cross-column co-occurrence, checksums, sanctions lists).
+  - **GLiNER2 extraction**: Lightweight zero-shot extraction and classification running on CPU with no external API key.
+  - **Text & image classification / object detection**: Local Hugging Face models.
+  - **Decision detectors & LLM detectors**: Structured probability answers or nuanced classification using any configured provider — including self-hosted or European endpoints.
+
+Every finding carries a confidence/importance score and a written explanation. Classifications drive default column masking automatically.
+
+---
+
+## 3. Multi-Level Masking & Row-Level Security
+
+Reference: https://docs.classifyre.com/data-query/
+
+- **Column masking modes**:
+  - `redacted` (`****`)
+  - `partial / last four` (`••••1234`)
+  - `hashed` (deterministic salted 16-hex pseudonymisation per workspace — supports GDPR pseudonymisation while preserving `JOIN` and `COUNT(DISTINCT)` accuracy)
+  - `empty` (`NULL`)
+  - `hidden` (column omitted from schema and query results)
+- **Enforcement**: Applied inside the query engine so `WHERE`, `JOIN`, and `GROUP BY` cannot bypass or infer masked values.
+- **Row-level filtering**: Fail-closed per group (e.g., regional analysts only see rows matching their region; no rule = no rows).
+- **Admin separation**: Workspace admins do not receive clear personal values by default; clear reading is always an explicit, auditable, time-limited grant.
+- **Shared dataset floor**: Masks and classifications on source tables travel automatically onto shared datasets as a strict minimum floor — downstream shares can tighten rules further, never loosen them.
+
+---
+
+## 4. Honest Comparison: Classifyre vs Immuta
+
+Canonical page: https://www.classifyre.com/immuta-alternative/
+
+- **Architecture**: Immuta compiles and pushes policies natively down into supported cloud warehouses (Snowflake, Databricks, Redshift, BigQuery, Starburst). Classifyre enforces policies inside its own self-hosted query and governance layer across 40+ heterogeneous sources (PostgreSQL, MySQL, ODBC, Iceberg, Delta, Parquet, S3/Azure/GCS, Databricks, wikis, files).
+- **Where Immuta excels**: Native policy pushdown inside Snowflake/Databricks notebooks and warehouse compute with zero extra query hop; mature commercial ABAC and managed cloud SaaS.
+- **Where Immuta falls short**: Proprietary commercial licensing and vendor lock-in; focused narrowly on cloud data warehouses rather than on-prem databases, object-storage files, unstructured systems, or air-gapped networks.
+- **Where Classifyre excels**: 100% Apache-2.0 open source with zero per-seat fees; unifies 40+ on-prem and cloud sources; includes custom regex/Python/local-CPU-AI/LLM detectors, personal Power BI/Excel/ODBC connections, and plain-language dataset requests + Delta shared data products; runs offline on Docker, Kubernetes, and OpenShift.
+- **Honest limitations of Classifyre**: Does not push policies down into direct Snowflake or Databricks internal compute bypassing Classifyre; DuckDB query workers are built for interactive analytics (tens of millions of rows), not petabyte-scale Spark ETL; smaller partner ecosystem than a decade-old commercial vendor.
+
+---
+
+## 5. Honest Comparison: Classifyre vs Databricks Unity Catalog
+
+Canonical page: https://www.classifyre.com/unity-catalog-alternative/
+
+- **Architecture**: Unity Catalog is the native metastore and governance engine inside the Databricks Lakehouse (with a core LF AI & Data OSS server subset). Classifyre is a vendor-neutral, 100% Apache-2.0 governance platform spanning 40+ sources including on-prem databases, Iceberg, Delta, Parquet, cloud storage, wikis, and Databricks Delta tables.
+- **Where Unity Catalog excels**: Zero-hop native governance for Databricks Spark jobs, Python/SQL notebooks, SQL Warehouses, MLflow models, and petabyte-scale Databricks pipelines.
+- **Where Unity Catalog falls short**: Full governance UI, automated classification, rich lineage, and audit system tables require commercial Databricks cloud rather than the OSS server alone; architecturally centered on Databricks; masking/filtering commonly relies on per-column SQL UDFs.
+- **Where Classifyre excels**: Vendor-neutral, 100% Apache-2.0 full stack (UI, SSO, masking, row filters, SQL/BI gateway, shared datasets, audit logs); zero-code classification-driven masking across 40+ heterogeneous systems; runs self-hosted on Docker, Kubernetes, and OpenShift including air-gapped networks.
+- **Honest limitations of Classifyre**: Does not govern Databricks notebooks, Spark ETL clusters, or MLflow models inside Databricks compute; reads Databricks Delta tables (not SQL views) via Unity Catalog external data access; complementary to Unity Catalog in hybrid Databricks + on-prem environments.
+
+---
+
+## 6. Deployment & Tailored Collaboration
+
+- **Self-hosted Docker evaluation**: `classifyre/all-in-one` container with bundled PostgreSQL and workers (https://www.classifyre.com/get/).
+- **Production cluster**: Official OCI Helm chart (`oci://registry-1.docker.io/classifyre/classifyre-core`) for Kubernetes (>= 1.26) and OpenShift 4+, with stateless scan/query Jobs scaling to zero between runs.
+- **Support & tailoring** (https://www.classifyre.com/support/): All software features are open source. Organisations needing custom IAM/org design, proprietary source connectors, Delta data product workflows, bespoke business detectors/AI models, or architecture reviews work directly with Classifyre's engineers on an individually agreed scope via contact@classifyre.com.

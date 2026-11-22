@@ -3,20 +3,20 @@
 
 # Classifyre
 
-## Open-Source Data Access Governance
+## Open-Source Data Governance Platform
 
-**Your access rules, enforced on every query.**
+**Control who sees what. Enforced on every query.**
 
 [![CI](https://img.shields.io/github/actions/workflow/status/classifyre/classifyre/ci.yml?branch=develop&style=flat-square&label=CI&logo=github)](https://github.com/classifyre/classifyre/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/classifyre/classifyre?sort=semver&style=flat-square&label=release)](https://github.com/classifyre/classifyre/releases/latest)
 [![License](https://img.shields.io/github/license/classifyre/classifyre?style=flat-square)](LICENSE)
 [![Docs](https://img.shields.io/badge/docs-classifyre.com-1f6feb?style=flat-square)](https://docs.classifyre.com/)
 
-Open-source data access governance you run yourself. Classifyre enforces who sees which tables, rows and columns across 40+ systems, **masks personal data inside the query**, and logs every read.
+End-to-end open-source data governance you run on your own infrastructure. Classifyre integrates with the databases, lakehouses (Iceberg, Delta, Parquet), ETL pipelines, and identity provider you already run — **enforcing group access, row filters, and multi-level column masking on every query** across SQL, Power BI, Excel, ODBC, and governed data products.
 
-Departments, roles and locations from your directory decide what each person sees; personal data stays masked until someone is cleared for it; teams build data products on top and use them in SQL, Excel, Power BI and AI agents. Nothing leaves your servers. All of it is Apache-2.0, including SSO, roles, row filters and masking.
+100% Apache-2.0 open source — including SSO, roles, row-level security, dynamic masking, SQL/BI gateway, dataset requests, shared data products, and audit logging. Built in Austria to European privacy and security standards, deployed worldwide on Docker, Kubernetes, and OpenShift.
 
-[Documentation](https://docs.classifyre.com/) · [Live Showcase](https://showcase.classifyre.com/)
+[Website](https://www.classifyre.com/) · [Documentation](https://docs.classifyre.com/) · [Live Showcase](https://showcase.classifyre.com/) · [Support & Tailoring](https://www.classifyre.com/support/)
 
 </div>
 
@@ -24,53 +24,50 @@ Departments, roles and locations from your directory decide what each person see
 
 ## What Classifyre does
 
-Classifyre is the one governed way into your organisation's data. Five promises, each with the feature that proves it:
+Classifyre integrates cleanly between your existing data estate and the tools your teams already use — without replacing your ETL, IAM, or BI stack:
 
-| Promise                                        | What it means                                                                                                                                                                                                                                               | Docs                                                                       |
-| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| **Access follows your organisation**           | Groups from Entra ID, Active Directory, Okta or any OIDC/SAML directory decide which sources, tables, rows and columns a person sees. Grants with end dates, row filters per group, access requests decided by owners. SSO and roles included.              | [Access](https://docs.classifyre.com/access/)                              |
-| **Sensitive data is masked by default**        | Classification decides what is personal (41 PII types incl. AT/DE/CH identifiers, 27 secret patterns, custom detectors). Masks apply inside the query (redacted, last four, hashed, empty, hidden), so `WHERE`, `JOIN` and `GROUP BY` cannot see past them. | [Query data & masking](https://docs.classifyre.com/data-query/)            |
-| **Teams build data products on governed data** | Shared datasets join sources live, with an owning group and readers per group; the masks of every input travel with them as a floor. Owners, stewards, quality rules, ODCS contracts.                                                                       | [Shared datasets](https://docs.classifyre.com/data-query/#shared-datasets) |
-| **People use it in the tools they have**       | A SQL page, exports, and a PostgreSQL-protocol endpoint for Power BI, Excel, Tableau and DBeaver on personal, expiring connections, plus AI agents over MCP that read as the person who connected them.                                                     | [SQL connections](https://docs.classifyre.com/sql-connections/)            |
-| **Every read is on record, nothing leaves**    | Every read, per table and person, with the channel used. Runs as one Docker image or a Helm chart on your own infrastructure, offline if you like.                                                                                                          | [Roles](https://docs.classifyre.com/access/roles/)                         |
+| Capability                                       | What it does                                                                                                                                                                                                                                | Docs                                                                       |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| **Connect & detect**                             | Connect 40+ known sources (PostgreSQL, MySQL, Databricks, ODBC, Iceberg, Delta, Parquet, S3/Azure/GCS, Confluence, Jira) or custom connectors in place. Built-in PII & secret packs plus custom business detectors from regex and Python to local CPU AI (GLiNER2) and LLMs. | [Sources](https://docs.classifyre.com/sources/) · [Detectors](https://docs.classifyre.com/detectors/) |
+| **Govern by organisation**                       | Sync groups from Entra ID, Active Directory, Okta, or any OIDC/SAML directory. Assign owners, stewards, expiring grants, owner-approved access requests, and row-level filters per department or region.                                     | [Access](https://docs.classifyre.com/access/)                              |
+| **Multi-level column & row masking**             | Mask sensitive columns as redacted, last four, deterministic hashed pseudonymisation (joins and counts still work), empty, or hidden — enforced inside the query engine on original tables and shared datasets. Admins never get clear data by default. | [Query data & masking](https://docs.classifyre.com/data-query/)            |
+| **Governed SQL, Power BI, Excel & ODBC**         | PostgreSQL-compatible TLS endpoint with personal, expiring, revocable connections for Power BI, Excel, Tableau, DBeaver, and ODBC clients, plus AI agents over MCP inheriting the user's own permissions.                                     | [SQL connections](https://docs.classifyre.com/sql-connections/)            |
+| **Dataset requests & Delta data products**       | Business users request combined datasets in plain language or via structured workflows; owners approve and publish live or Delta shared data products whose inherited source masks act as a strict floor.                                    | [Shared datasets](https://docs.classifyre.com/data-query/#shared-datasets) |
+| **Audit trail, quality & self-hosted scale**     | Every read, export, grant, and approval is logged with user and tool. Scheduled quality rules and open data contracts (ODCS). Runs locally with Docker or in production on Kubernetes and OpenShift.                                        | [Deployment](https://docs.classifyre.com/deployment/)                      |
 
-Underneath: 40+ [sources](https://docs.classifyre.com/sources/) read in place (databases, lakehouses, storage, collaboration tools, content platforms; image OCR and audio/video transcription run automatically), [detectors](https://docs.classifyre.com/detectors/) from a regex to an LLM, and [findings](https://docs.classifyre.com/detectors/findings/) with severity, confidence and a lifecycle across scans.
+Need Classifyre tailored to your organisation (custom IAM or security architecture, bespoke connectors, Delta data products, or custom detectors and AI models)? Contact us at [contact@classifyre.com](mailto:contact@classifyre.com) or visit [classifyre.com/support](https://www.classifyre.com/support/).
 
-### When something leaks
+### Incident response (optional)
 
-Findings also feed an investigation layer for the cases that need a human to dig in:
+When sensitive data or credentials leak, the same connectors and findings also power structured incident response:
 
 | Capability             | What it means                                                                                                                     | Docs                                                                          |
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| **Inquiries**          | Saved questions that keep surfacing matching findings, scan after scan.                                                           | [Inquiries](https://docs.classifyre.com/flow/investigations/inquiry/)         |
-| **Fingerprints**       | Deterministic duplicate and similarity detection that links the same entity across systems into clusters.                         | [Fingerprints](https://docs.classifyre.com/flow/investigations/fingerprints/) |
-| **Cases & hypotheses** | Workspaces that collect evidence, weigh competing explanations, and reach a conclusion.                                           | [Cases](https://docs.classifyre.com/flow/investigations/cases/)               |
-| **Autopilot**          | AI agents that open inquiries, maintain fingerprints, build cases, and draft hypotheses after every scan — explaining every move. | [Autopilot](https://docs.classifyre.com/flow/investigations/autopilot/)       |
+| **Inquiries**          | Saved questions that keep surfacing matching findings across scans.                                                               | [Inquiries](https://docs.classifyre.com/investigations/inquiry/)              |
+| **Fingerprints**       | Deterministic duplicate and similarity detection that links the same file or entity across systems.                               | [Fingerprints](https://docs.classifyre.com/duplicates/)                       |
+| **Cases & hypotheses** | Structured workspaces to collect evidence, weigh competing explanations, and record conclusions.                                  | [Cases](https://docs.classifyre.com/investigations/cases/)                    |
+| **Autopilot**          | Supervised agents that maintain fingerprints and draft case summaries between scans — logging every step.                         | [Autopilot](https://docs.classifyre.com/investigations/autopilot/)            |
 
-## How it all connects
+## How it connects
 
 ```mermaid
 flowchart LR
-    O["Organisation<br/>groups · roles · departments"] --> P["Policies<br/>grants · row filters · masks"]
-    S[Sources] --> C["Classification<br/>detectors · findings"]
+    O["Existing IAM<br/>Entra ID · AD · Okta"] --> P["Governance Layer<br/>groups · row filters · masks"]
+    S["40+ & Custom Sources<br/>DBs · Iceberg · Delta · Files"] --> C["Detectors<br/>PII · secrets · regex · local AI · LLM"]
     C --> P
-    P --> D["Governed data<br/>tables · shared datasets"]
-    D --> T["SQL · Excel · Power BI · MCP"]
-    T --> L[Read log]
-
-    C -.->|when something leaks| H["Inquiries · Fingerprints · Cases"]
-    I[Autopilot] -.-> H
+    P --> D["Governed Tables &<br/>Delta Data Products"]
+    D --> T["SQL · Power BI · Excel · ODBC · MCP"]
+    T --> L["Audit Log & Quality"]
 ```
 
-1. **Connect and classify.** A scan reads each source in place into **assets**; **detectors** raise **findings**, and the classification decides what is protected.
-2. **Organise.** Groups from your directory get **grants**, **row filters** and, where needed, clear reading of personal columns, each with an end date if you like.
-3. **Protect.** Personal columns are **masked inside the query** for everyone not cleared to read them, workspace admins included.
-4. **Build.** Teams share **datasets** that join sources live; the masks of every input travel with them.
-5. **Use.** People read the data through the SQL page, exports, a PostgreSQL endpoint or MCP, always through their own grants and masks.
-6. **Audit.** **Every read is logged**, per table and person.
-7. **Investigate (optional).** When something does leak, **inquiries**, **fingerprints** and **cases** turn findings into an investigation, with **Autopilot** doing the legwork.
+1. **Connect & detect.** Read existing sources in place and classify personal data, secrets, and business-specific rules.
+2. **Govern.** Map directory groups to workspaces, sources, tables, row filters, and time-limited grants.
+3. **Mask.** Enforce multi-level column masking and row filtering inside the query engine — across both source tables and shared datasets.
+4. **Query.** Connect Power BI, Excel, Tableau, ODBC clients, SQL workbench, or MCP agents over personal, expiring credentials.
+5. **Request & share.** Let business users request new datasets in plain language; owners approve and publish governed live or Delta data products.
+6. **Audit.** Track every read, export, permission change, and quality check in one verifiable trail.
 
-The end-to-end journey is documented in [Flow](https://docs.classifyre.com/flow/).
+The full walkthrough is documented in [How Classifyre Works](https://docs.classifyre.com/how-it-works/).
 
 ---
 

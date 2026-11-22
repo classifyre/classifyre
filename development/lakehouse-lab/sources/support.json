@@ -1,0 +1,28 @@
+{
+  "type": "CUSTOM",
+  "name": "Lab · Support",
+  "config": {
+    "type": "CUSTOM",
+    "required": {
+      "notebook": {
+        "revision": 1,
+        "cells": [
+          {
+            "id": "support-desk",
+            "type": "code",
+            "source": "# The notebook of the lab's CUSTOM source \"Lab · Support\" (docs/prd/QC-query-connectors.md §6, QC4).\n#\n# A support desk's tickets for the shop's 5,000 customers (lab_shop.public.customers),\n# made up deterministically per customer, as an API that pages them 500 at a time\n# would hand them out. seed/connectors.py turns this file into\n# sources/support.json (one code cell) and runs tickets_for() itself for the\n# expected answer of queries/connectors/q6_custom_pg.sql.\n#\n# Not a module: it runs as a notebook, where `classifyre` is the SDK.\n\nimport datetime\nimport random\n\nfrom classifyre import Asset, ScanRefusedError, Table\n\nCUSTOMERS = 5_000\nPAGE = 500\nSUBJECTS = (\"Refund\", \"Late delivery\", \"Wrong film\", \"Account locked\", \"Invoice\")\nSTART = datetime.date(2024, 1, 1)\n\n\ndef tickets_for(customer_id):\n    \"\"\"The tickets of one customer: the same every time.\"\"\"\n    rng = random.Random(customer_id * 7919)\n    return [\n        {\n            \"ticket_id\": f\"T-{customer_id}-{n}\",\n            \"customer_id\": customer_id,\n            \"opened\": (START + datetime.timedelta(days=rng.randint(0, 600))).isoformat(),\n            \"status\": rng.choice((\"open\", \"pending\", \"closed\", \"closed\")),\n            \"priority\": rng.choice((\"low\", \"normal\", \"high\")),\n            \"subject\": f\"{rng.choice(SUBJECTS)} for customer{customer_id}@shop.example\",\n        }\n        for n in range(rng.randint(0, 4))\n    ]\n\n\ndef test_connection():\n    return {\"status\": \"SUCCESS\", \"message\": \"The lab's support desk needs no connection.\"}\n\n\ndef extract():\n    # The tickets are read by SQL queries; the scan records only the table.\n    yield Asset(id=\"desk\", name=\"Support desk\", content=\"The lab's support desk.\")\n\n\ndef tables():\n    return [\n        Table(\n            \"tickets\",\n            {\n                \"ticket_id\": \"VARCHAR\",\n                \"customer_id\": \"BIGINT\",\n                \"opened\": \"DATE\",\n                \"status\": \"VARCHAR\",\n                \"priority\": \"VARCHAR\",\n                \"subject\": \"VARCHAR\",\n            },\n            description=\"One row per ticket. customer_id and status are filtered at the desk.\",\n            classify={\"subject\": \"personal\"},\n        )\n    ]\n\n\ndef scan(table, request):\n    if table != \"tickets\":\n        raise ScanRefusedError(f\"no table {table}\")\n    customers = _customers(request)\n    status = request.value(\"status\")\n    page = []\n    for customer_id in customers:\n        page.extend(t for t in tickets_for(customer_id) if status is None or t[\"status\"] == status)\n        if len(page) >= PAGE:\n            request.count_request()\n            yield from page\n            page = []\n    request.count_request()\n    yield from page\n\n\ndef _customers(request):\n    \"\"\"The customers the query's conditions on customer_id allow.\"\"\"\n    ids = request.values(\"customer_id\")\n    if ids is not None:\n        return sorted(i for i in ids if isinstance(i, int) and 1 <= i <= CUSTOMERS)\n    low, high = 1, CUSTOMERS\n    for item in request.filters:\n        if item.column != \"customer_id\" or not isinstance(item.value, int):\n            continue\n        if item.op in (\"<\", \"<=\"):\n            high = min(high, item.value - (item.op == \"<\"))\n            request.use(item)\n        elif item.op in (\">\", \">=\"):\n            low = max(low, item.value + (item.op == \">\"))\n            request.use(item)\n    return range(low, high + 1)\n"
+          }
+        ]
+      }
+    },
+    "masked": {
+      "secrets": {}
+    },
+    "optional": {
+      "variables": {}
+    },
+    "sampling": {
+      "strategy": "ALL"
+    }
+  }
+}

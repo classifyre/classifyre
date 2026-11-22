@@ -95,19 +95,7 @@ export function RedactionSheet({ locale, badge = true }: { locale: Locale; badge
   };
 
   return (
-    <div className="relative">
-      {/* The badge, pinned over the sheet's corner (hero only). */}
-      {badge ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-        src="/clasifyre_icon.png"
-        alt="Classifyre"
-        width={288}
-        height={288}
-        className="cl-float pointer-events-none absolute -top-16 right-4 z-20 w-24 drop-shadow-[0_0_50px_rgba(183,255,0,0.35)] sm:-top-20 sm:w-32"
-        />
-      ) : null}
-
+    <div className="relative pb-7">
       <figure
         key={run}
         className="cl-sheet relative border-2 border-white/25 bg-white text-[#0a0a0a] shadow-[0_30px_60px_-20px_rgba(0,0,0,0.9)]"
@@ -115,12 +103,24 @@ export function RedactionSheet({ locale, badge = true }: { locale: Locale; badge
         data-intro={intro ? "" : undefined}
         aria-labelledby="sheet-caption"
       >
-        <div className="flex items-center gap-3 border-b-2 border-[#0a0a0a] px-4 py-2.5 sm:px-5">
-          <code className="block min-w-0 truncate font-mono text-[12px] text-[#0a0a0a]/80 sm:text-[13px]">
-            <span className="font-semibold text-[#0a0a0a]">SELECT</span> *{" "}
-            <span className="font-semibold text-[#0a0a0a]">FROM</span> crm.customers
-          </code>
-          <span className="cl-filter-tag shrink-0 whitespace-nowrap border border-[#0a0a0a] bg-accent px-1.5 py-px font-mono text-[10px] text-black">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-[#0a0a0a] bg-[#f7f7f5] px-4 py-2.5 sm:px-5">
+          <div className="flex min-w-0 items-center gap-2.5">
+            {badge ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src="/clasifyre_icon.png"
+                alt=""
+                width={20}
+                height={20}
+                className="size-5 shrink-0 rounded-[4px]"
+              />
+            ) : null}
+            <code className="block min-w-0 truncate font-mono text-[12px] text-[#0a0a0a]/85 sm:text-[13px]">
+              <span className="font-semibold text-[#0a0a0a]">SELECT</span> *{" "}
+              <span className="font-semibold text-[#0a0a0a]">FROM</span> crm.customers
+            </code>
+          </div>
+          <span className="cl-filter-tag shrink-0 whitespace-nowrap border border-[#0a0a0a] bg-accent px-1.5 py-px font-mono text-[10px] font-semibold text-black">
             {copy.rowFilter}
           </span>
         </div>
@@ -263,7 +263,7 @@ export function RedactionSheet({ locale, badge = true }: { locale: Locale; badge
       <button
         type="button"
         onClick={replay}
-        className="absolute -bottom-8 right-0 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-white/50 underline-offset-4 hover:text-accent hover:underline"
+        className="absolute bottom-0 right-0 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-white/55 underline-offset-4 hover:text-accent hover:underline"
       >
         {copy.replay} ↺
       </button>
