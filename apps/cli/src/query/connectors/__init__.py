@@ -42,6 +42,7 @@ _BINDINGS: dict[str, tuple[str, str]] = {
     "LOCAL_FOLDER": ("object_storage", "ObjectStorageBinding"),
     "MEILISEARCH": ("meilisearch", "MeilisearchConnector"),
     "NEO4J": ("neo4j", "Neo4jConnector"),
+    "CUSTOM": ("custom", "CustomConnector"),
 }
 
 
@@ -64,6 +65,10 @@ _SOURCE_GROUPS: dict[str, tuple[str, ...]] = {
     "LOCAL_FOLDER": (),
     "MEILISEARCH": (),
     "NEO4J": ("neo4j",),
+    # A notebook's own imports are warmed when its process starts
+    # (``warm_declared_groups``), in the query Job: CUSTOM never runs in the
+    # worker.
+    "CUSTOM": (),
 }
 
 

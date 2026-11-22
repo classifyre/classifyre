@@ -53,6 +53,7 @@ from ..utils.sampling_frontier import ListFrontier
 from ..utils.urn import Urn
 from .cohort import CohortItem, normalize_bands, select_cohort
 from .files import DEFAULT_PAGE_SIZE, ParsedContent, pages, parse
+from .query import Filter, ScanRequest, Table
 
 MODULE_NAME = "classifyre"
 
@@ -1638,6 +1639,10 @@ def build_module(context: Context) -> types.ModuleType:
     module.FindingPage = FindingPage  # type: ignore[attr-defined]
     module.DetectorPage = DetectorPage  # type: ignore[attr-defined]
     module.ParsedContent = ParsedContent  # type: ignore[attr-defined]
+    # SQL over this source (docs/prd/QC-query-connectors.md §5.8).
+    module.Table = Table  # type: ignore[attr-defined]
+    module.Filter = Filter  # type: ignore[attr-defined]
+    module.ScanRequest = ScanRequest  # type: ignore[attr-defined]
     module.ctx = context  # type: ignore[attr-defined]
     module.parse = parse  # type: ignore[attr-defined]
     module.pages = pages  # type: ignore[attr-defined]
@@ -1654,6 +1659,9 @@ def build_module(context: Context) -> types.ModuleType:
         "ParsedContent",
         "Ref",
         "ReferenceType",
+        "ScanRequest",
+        "Filter",
+        "Table",
         "Tag",
         "UsageType",
         "contains",

@@ -1354,7 +1354,7 @@ spec:
             - name: CLASSIFYRE_QUERY_WORKER_MEMORY_GUARD_PERCENT
               value: "90"
             - name: CLASSIFYRE_QUERY_WORKER_JOB_ONLY_SOURCES
-              value: "ODBC"
+              value: "ODBC,CUSTOM"
             - name: CLASSIFYRE_QUERY_WORKER_DRAIN_SECONDS
               value: "960"
             - name: CLASSIFYRE_QUERY_WORKER_WORKSPACE_SHARE_PERCENT

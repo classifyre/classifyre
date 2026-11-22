@@ -379,13 +379,14 @@
 | queryWorker.drainSeconds | int | `960` | Seconds a stopping pod lets running queries finish before it stops them. The default outlasts the longest query timeout a workspace may set (900 s) plus the worker's backstop, so a rollout or scale-down stops no query; the pod takes no new query meanwhile. |
 | queryWorker.enabled | bool | `true` | Run SQL queries (the SQL page, exports, MCP, SQL connections) on a warm pool instead of starting a Job per query (docs/prd/DQ-data-query.md §5.3). It is the CLI image (`api.cliJobs.image`) running `query-worker`: one process per query, forked from a process that has already imported DuckDB and every source, so a query starts in milliseconds instead of waiting for a pod. Needs `api.cliJobs.enabled`. |
 | queryWorker.extraEnv | list | `[]` | Extra environment for the worker (after `api.cliJobs.extraEnv`). |
-| queryWorker.jobOnlySourceTypes | list | `["ODBC"]` | Source types whose queries always run as Jobs, never in the shared worker: they load native code the source names (an ODBC `Driver=` path). |
+| queryWorker.jobOnlySourceTypes | list | `["ODBC","CUSTOM"]` | Source types whose queries always run as Jobs, never in the shared worker: they load native code the source names (an ODBC `Driver=` path) or run code the source's editors wrote (a CUSTOM notebook's `scan()`). |
 | queryWorker.maxActivePerPerson | int | `100` | Queries one person may have waiting or running at once (the SQL page, exports, MCP and SQL connections together: a BI tool's pool counts). A guard against a runaway client, not a capacity limit: slots, replicas and overflow Jobs are. With the worker off the API keeps its default of 20. |
 | queryWorker.maxActivePerWorkspace | int | `200` | Queries one workspace may have waiting or running at once, so one workspace cannot take every slot of a pool other workspaces share. |
 | queryWorker.maxMemoryPerQuery | string | `"1536Mi"` | Most memory one query process may use before the worker stops it (the query fails as "out of memory", nothing else does): DuckDB's share plus an export at its 256 MB limit. Empty: no cap per query. |
 | queryWorker.maxOverflowJobsPerWorkspace | int | `10` | Overflow Jobs one workspace may have running at once. Past this, a query the pool has no room for fails as "busy" instead of starting another pod. |
 | queryWorker.memoryGuardPercent | int | `90` | When the pod's memory use passes this share of its limit, the worker stops its largest query. Without it the kernel would stop every query in the pod (Kubernetes sets memory.oom.group on cgroup v2). 0: off. |
 | queryWorker.memoryPerQuery | string | `"384Mi"` | Memory planned per running query when `slots` is 0: Python and Arrow in the query process plus DuckDB's share. Larger sorts and joins spill to /tmp. |
+| queryWorker.networkPolicy.clusterCidrs | list | `[]` | Set this (the install notes warn while it is empty): the cluster's pod and service networks (e.g. k3s `10.42.0.0/16`, `10.43.0.0/16`; on EKS or GKE the VPC's or the cluster's ranges). Taken out of the "anywhere" rule, so on a CNI that matches pod IPs with ipBlock a query reaches pods only through the rule above (never this release's database or identity server). The Kubernetes API (its endpoint and the nodes' addresses, port 6443/10250) and an external database are not pods: list their addresses in `deniedEgressCidrs`. |
 | queryWorker.networkPolicy.deniedEgressCidrs | list | `["169.254.0.0/16","fe80::/10","fd00:ec2::254/128"]` | Egress the worker never gets: link-local, where cloud metadata endpoints hand out the node's credentials. |
 | queryWorker.networkPolicy.enabled | bool | `true` | A NetworkPolicy for the worker pods, on by default (unlike the chart's `networkPolicy`): ingress only from this release's API, worker and SQL gateway pods; egress anywhere but `deniedEgressCidrs`. |
 | queryWorker.networkPolicy.extraIngress | list | `[]` | More ingress rules (NetworkPolicyIngressRule), e.g. from Prometheus to port `queryWorker.port` for /metrics. |
@@ -404,6 +405,7 @@
 | queryWorker.token.existingSecret | string | `""` | Existing Secret with the token the API signs worker requests with. Empty: the chart creates one and keeps it across `helm upgrade`. With `helm template` or a GitOps tool that renders without cluster access, set this (or `value`), or each render makes a new token; the API and the worker read the mounted file again when it changes, so a new one is picked up within the kubelet's sync period, without restarts. |
 | queryWorker.token.value | string | `""` | Token value when the chart creates the Secret; empty: generated. |
 | queryWorker.tolerations | list | `[]` | Tolerations; empty: `api.cliJobs.tolerations`. |
+| queryWorker.workspaceSharePercent | int | `75` | The share of one pod's query slots one workspace may hold at once (%); its queries past that go to another pod or to a Job, so workspaces sharing the pool always find room. 100: no share. |
 | rbac.create | bool | `true` | Create Role/RoleBinding for API CLI job orchestration. |
 | serviceAccount.annotations | object | `{}` | Extra annotations for the API service account. |
 | serviceAccount.automount | bool | `true` | Mount service account token into API pods (required for Kubernetes CLI jobs). |
@@ -413,7 +415,7 @@
 | sqlGateway.enabled | bool | `false` | audited with the connection. |
 | sqlGateway.idleMinutes | int | `30` | Minutes a session may sit idle before it is closed. |
 | sqlGateway.maxOldSpaceSizeMb | int | `1024` | JS heap (WebAssembly), so this stays small. |
-| sqlGateway.maxSessions | int | `16` | 150 MB per session on top of the process. |
+| sqlGateway.maxSessions | int | `16` | sessions: raise the limit along with this. |
 | sqlGateway.maxSessionsPerConnection | int | `4` | Sessions one SQL connection may have open at once. |
 | sqlGateway.port | int | `5432` | Port the gateway listens on inside the pod and on its Service. |
 | sqlGateway.proxyProtocol | bool | `false` | every connection comes through such a proxy. |
@@ -428,6 +430,7 @@
 | sqlGateway.service.loadBalancerSourceRanges | list | `[]` | For a LoadBalancer: the client networks it accepts. |
 | sqlGateway.service.nodePort | string | `nil` | Fixed node port for `NodePort`/`LoadBalancer`. |
 | sqlGateway.service.type | string | `"ClusterIP"` | reverse proxy is needed at all. |
+| sqlGateway.sessionMemoryMb | int | `450` | room for it (MB; measured 2026-11-21 with Metabase, BIC M5). |
 | sqlGateway.tls.allowPlaintext | bool | `false` | Development only: accept connections without TLS. |
 | sqlGateway.tls.certManager.enabled | bool | `false` | Let cert-manager issue the certificate for `publicHost`. |
 | sqlGateway.tls.certManager.issuerRef.kind | string | `"ClusterIssuer"` |  |

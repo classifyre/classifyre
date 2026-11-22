@@ -23,7 +23,9 @@ export type AddressStrategy =
   /** Search indexes read live: `<source>.indexes.<index>`. */
   | 'search_index'
   /** Graphs read live: `<source>.nodes.<label>`, `<source>.relationships.<type>`. */
-  | 'graph';
+  | 'graph'
+  /** A CUSTOM notebook's `tables()`, read by its `scan()`: `<source>.main.<table>`. */
+  | 'notebook';
 
 /** One source type's `x-query` entry (docs/prd/QC-query-connectors.md §5.1). */
 export interface QueryDeclaration {
@@ -401,6 +403,21 @@ export function tableAddress(
     }
     const label = text(metadata.label) ?? name;
     return connectorAddress('nodes', label, metadata, database);
+  }
+  if (address === 'notebook') {
+    // Only what tables() declared is read by scan(); a `table` asset the
+    // notebook yields itself (a CSV it fetched) has no reader.
+    const table = text(metadata.table_name) ?? name;
+    if (metadata.query !== 'scan') {
+      return {
+        schema: schema ?? 'main',
+        table,
+        location: null,
+        reason:
+          'Only tables the notebook declares in tables() and reads in scan() can be queried.',
+      };
+    }
+    return connectorAddress(schema ?? 'main', table, metadata);
   }
   if (sourceType === SHARED_DATASET_SOURCE_TYPE) {
     const datasetId = text(metadata.dataset_id);

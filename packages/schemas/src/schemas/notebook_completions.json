@@ -52,6 +52,13 @@
       "insertText": "FlowType"
     },
     {
+      "label": "Table",
+      "kind": "class",
+      "detail": "Table(name, {\"column\": \"VARCHAR\", ...}, description=\"\")",
+      "documentation": "One table a query can read from this source.\n\n``columns`` maps each column to its type: ``VARCHAR``, ``BIGINT``,\n``INTEGER``, ``DOUBLE``, ``BOOLEAN``, ``DATE``, ``TIMESTAMP``,\n``TIMESTAMPTZ``, ``JSON`` (objects and lists as JSON text), or a list of\none of them (``VARCHAR[]``). The table is ``<source>.main.<name>`` in SQL\n(``schema`` picks another middle part).",
+      "insertText": "Table"
+    },
+    {
       "label": "parse",
       "kind": "function",
       "detail": "(source: 'Any', *, name: 'str' = '', mime_type: 'str | None' = None) -> 'ParsedContent'",
@@ -1081,6 +1088,123 @@
           "insertText": "steps="
         }
       ]
+    },
+    "Table": {
+      "documentation": "One table a query can read from this source.\n\n``columns`` maps each column to its type: ``VARCHAR``, ``BIGINT``,\n``INTEGER``, ``DOUBLE``, ``BOOLEAN``, ``DATE``, ``TIMESTAMP``,\n``TIMESTAMPTZ``, ``JSON`` (objects and lists as JSON text), or a list of\none of them (``VARCHAR[]``). The table is ``<source>.main.<name>`` in SQL\n(``schema`` picks another middle part).",
+      "fields": [
+        {
+          "label": "name",
+          "kind": "field",
+          "detail": "str",
+          "required": true,
+          "insertText": "name="
+        },
+        {
+          "label": "columns",
+          "kind": "field",
+          "detail": "Mapping[str, str]",
+          "required": true,
+          "insertText": "columns="
+        },
+        {
+          "label": "description",
+          "kind": "field",
+          "detail": "str",
+          "required": false,
+          "insertText": "description="
+        },
+        {
+          "label": "schema",
+          "kind": "field",
+          "detail": "str",
+          "required": false,
+          "insertText": "schema="
+        }
+      ]
+    },
+    "ScanRequest": {
+      "documentation": "What the query needs from one ``scan()`` call.\n\nRead ``columns`` and ``filters`` to fetch less; call :meth:`values` (or\n:meth:`use`) for the filters you sent to your source, so the person sees\nthem under the query as filtered at the source.",
+      "fields": [
+        {
+          "label": "columns",
+          "kind": "field",
+          "detail": "tuple[str, ...] | None",
+          "required": true,
+          "insertText": "columns="
+        },
+        {
+          "label": "filters",
+          "kind": "field",
+          "detail": "tuple[Filter, ...]",
+          "required": true,
+          "insertText": "filters="
+        },
+        {
+          "label": "max_rows",
+          "kind": "field",
+          "detail": "int",
+          "required": true,
+          "insertText": "max_rows="
+        },
+        {
+          "label": "deadline",
+          "kind": "field",
+          "detail": "float",
+          "required": true,
+          "insertText": "deadline="
+        },
+        {
+          "label": "used",
+          "kind": "field",
+          "detail": "list[Filter]",
+          "required": false,
+          "insertText": "used="
+        },
+        {
+          "label": "requests",
+          "kind": "field",
+          "detail": "int",
+          "required": false,
+          "insertText": "requests="
+        }
+      ],
+      "members": [
+        {
+          "label": "count_request",
+          "kind": "method",
+          "detail": "(n: 'int' = 1) -> 'None'",
+          "documentation": "Count calls made to the source (shown with the query's result).",
+          "insertText": "count_request()"
+        },
+        {
+          "label": "seconds_left",
+          "kind": "method",
+          "detail": "() -> 'float'",
+          "documentation": "Time left before the query is stopped; give each call at most this.",
+          "insertText": "seconds_left()"
+        },
+        {
+          "label": "use",
+          "kind": "method",
+          "detail": "(*filters: 'Filter') -> 'None'",
+          "documentation": "Say which filters ``scan()`` sent to its source.",
+          "insertText": "use()"
+        },
+        {
+          "label": "value",
+          "kind": "method",
+          "detail": "(column: 'str') -> 'Any'",
+          "documentation": "The value of ``column = x``, or None. Marks that filter as used.",
+          "insertText": "value(${1:column})"
+        },
+        {
+          "label": "values",
+          "kind": "method",
+          "detail": "(column: 'str') -> 'tuple[Any, ...] | None'",
+          "documentation": "The values ``column`` is limited to by ``column = x`` or\n``column IN (...)``, or None when the query does not limit it so.\nMarks that filter as used.",
+          "insertText": "values(${1:column})"
+        }
+      ]
     }
   },
   "contract": {
@@ -1092,7 +1216,9 @@
       "discover",
       "fetch_content",
       "relationships",
-      "augment_sources"
+      "augment_sources",
+      "tables",
+      "scan"
     ],
     "augmentation": {
       "required": [

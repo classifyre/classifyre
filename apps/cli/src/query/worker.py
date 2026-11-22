@@ -32,8 +32,9 @@ Processes::
 What is not here: a query process runs as the same user as the main process,
 so it could signal it; what keeps another workspace's credentials out of its
 reach is that it cannot read the memory or /proc files of any other process.
-Sources that load native code chosen by the source (ODBC drivers) never run
-here: the worker answers ``job_only`` and the API starts a Job.
+Sources that load native code chosen by the source (ODBC drivers) or run a
+notebook's code (CUSTOM ``scan()``) never run here: the worker answers
+``job_only`` and the API starts a Job.
 
 The API talks to it over HTTP (``POST /v1/queries``). The request body is the
 same JSON a query Job receives; the response is the status payload the Job
@@ -101,9 +102,10 @@ GUARD_INTERVAL_SECONDS = 0.1
 DEFAULT_DRAIN_SECONDS = 960
 DEFAULT_WORKSPACE_SHARE_PERCENT = 75
 #: Source types whose queries always run as Jobs: they load native code the
-#: source names (an ODBC ``Driver=`` path), which must not share a process
-#: host with other workspaces' queries.
-DEFAULT_JOB_ONLY_SOURCES = frozenset({"ODBC"})
+#: source names (an ODBC ``Driver=`` path) or run code its editors wrote (a
+#: CUSTOM notebook's ``scan()``), which must not share a process host with
+#: other workspaces' queries.
+DEFAULT_JOB_ONLY_SOURCES = frozenset({"ODBC", "CUSTOM"})
 #: Native thread pools that start when a library loads (numpy's OpenBLAS starts
 #: one thread per core on import, and pyarrow imports numpy when it is there):
 #: one thread each, so the fork server stays single-threaded. A query's own

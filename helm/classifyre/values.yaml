@@ -719,9 +719,11 @@ queryWorker:
   # the pod (Kubernetes sets memory.oom.group on cgroup v2). 0: off.
   memoryGuardPercent: 90
   # -- Source types whose queries always run as Jobs, never in the shared
-  # worker: they load native code the source names (an ODBC `Driver=` path).
+  # worker: they load native code the source names (an ODBC `Driver=` path)
+  # or run code the source's editors wrote (a CUSTOM notebook's `scan()`).
   jobOnlySourceTypes:
     - ODBC
+    - CUSTOM
   # -- When every slot of the pod the query reached is taken: `job` runs the
   # query as a Job (the query-Job settings in `api.cliJobs.query`), `refuse`
   # fails it at once with "busy".

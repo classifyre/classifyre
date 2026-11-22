@@ -267,6 +267,14 @@
           "delta",
           "iceberg"
         ]
+      },
+      "CUSTOM": {
+        "tier": "custom",
+        "assetKinds": [
+          "table"
+        ],
+        "address": "notebook",
+        "extensions": []
       }
     }
   },
@@ -4194,6 +4202,22 @@
             "columns": {
               "type": "array",
               "description": "Columns as [{name, type}] objects"
+            },
+            "table_name": {
+              "type": "string",
+              "description": "The table's SQL name, from the notebook's tables()"
+            },
+            "schema": {
+              "type": "string",
+              "description": "The middle part of the table's SQL name (main unless tables() says otherwise)"
+            },
+            "query": {
+              "type": "string",
+              "description": "scan: a table declared by tables(), which SQL queries read live through the notebook's scan()"
+            },
+            "description": {
+              "type": "string",
+              "description": "What the table holds, from tables()"
             }
           },
           "required": []

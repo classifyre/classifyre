@@ -20,6 +20,7 @@ import random
 import re
 import signal
 import sys
+import time
 from dataclasses import asdict
 from typing import Any
 
@@ -27,6 +28,15 @@ from ...graph.edges import edge_to_payload
 from ...notebook.contract import validate_module
 from ...notebook.execute import cell_filename
 from ...notebook.files import local_folders
+from ...notebook.query import (
+    ScanRequest,
+    batch_to_wire,
+    chunks,
+    declared_tables,
+    decode_filters,
+    encode_filters,
+    rows_to_batch,
+)
 from ...notebook.redact import RedactingStream, Redactor
 from ...notebook.sdk import (
     Asset,
@@ -54,6 +64,7 @@ ERROR = "error"
 READY = "ready"
 NEED = "need"
 PROVIDE = "provide"
+ROWS = "rows"
 
 #: Flipped from a signal handler, so it is a container rather than a rebindable
 #: module global.
@@ -109,6 +120,16 @@ def _relay(op: str, args: dict[str, Any]) -> Any:
     return _need(op, args)
 
 
+def _no_relay(op: str, _args: dict[str, Any]) -> Any:
+    """In a query: the namespace is not this process's to read or write.
+
+    A query runs ``scan()`` for whoever may read the table, with no scan run
+    to scope a call by, so ``ctx.query_assets()``, ``ctx.tag()`` and the rest
+    are refused (docs/prd/QC-query-connectors.md §5.8).
+    """
+    raise AssetQueryError(f"{op} is not available while a query reads this notebook's tables.")
+
+
 def _error_payload(exc: BaseException) -> dict[str, Any]:
     import traceback
 
@@ -144,6 +165,7 @@ class NotebookRuntime:
         cohort_weights: dict[str, Any] | None = None,
         *,
         config_changed: bool = False,
+        query: bool = False,
     ) -> None:
         self.recipe = recipe
         notebook = _section(recipe, "required", "notebook")
@@ -160,7 +182,7 @@ class NotebookRuntime:
             folders=local_folders(recipe),
             logger=self._log,
             should_abort=_aborted,
-            relay=_relay,
+            relay=_no_relay if query else _relay,
             cohort_weights=cohort_weights if isinstance(cohort_weights, dict) else None,
             config_changed=config_changed,
         )
@@ -393,6 +415,52 @@ class NotebookRuntime:
         raw, text = result
         return {"raw": str(raw), "text": str(text)}
 
+    def tables(self) -> list[dict[str, Any]]:
+        """The tables ``tables()`` declares, checked; none without ``scan()``."""
+        function = self.globals.get("tables")
+        if not callable(function) or not callable(self.globals.get("scan")):
+            return []
+        return [table.to_dict() for table in declared_tables(function())]
+
+    def scan(
+        self,
+        *,
+        table: str,
+        columns: list[list[str]],
+        read: list[str] | None,
+        filters: Any,
+        max_rows: int,
+        seconds_left: float,
+    ) -> dict[str, Any]:
+        """Stream ``scan(table, request)``'s rows as Arrow batches.
+
+        Each page is converted here, against the columns ``tables()``
+        declared, so a wrong value is reported as the notebook's mistake with
+        the column it is in. Reading stops one row past ``max_rows``: the
+        query refuses the table then, and the source is asked for no more.
+        """
+        from ...query.connectors.arrow import declared_schema
+
+        function = self._require("scan")
+        schema = declared_schema(tuple((str(n), str(t)) for n, t in columns))
+        request = ScanRequest(
+            columns=tuple(read) if read is not None else None,
+            filters=decode_filters(filters),
+            max_rows=max_rows,
+            deadline=time.monotonic() + max(0.0, seconds_left),
+        )
+        rows = 0
+        for page in chunks(function(table, request)):
+            if _aborted():
+                break
+            batch = rows_to_batch(page, schema, table)
+            if batch.num_rows:
+                _emit({"type": ROWS, "ipc": batch_to_wire(batch)})
+            rows += batch.num_rows
+            if rows > max_rows:
+                break
+        return {"rows": rows, "used": encode_filters(request.used), "requests": request.requests}
+
 
 def _asset_to_dict(asset: Asset) -> dict[str, Any]:
     payload = asdict(asset)
@@ -427,6 +495,18 @@ def _handle(runtime: NotebookRuntime, request: dict[str, Any]) -> dict[str, Any]
         return {"result": runtime.relationships()}
     if command == "fetch_content":
         return {"result": runtime.fetch_content(str(request.get("assetId") or ""))}
+    if command == "tables":
+        return {"result": runtime.tables()}
+    if command == "scan":
+        read = request.get("read")
+        return runtime.scan(
+            table=str(request.get("table") or ""),
+            columns=list(request.get("columns") or []),
+            read=[str(c) for c in read] if isinstance(read, list) else None,
+            filters=request.get("filters"),
+            max_rows=int(request.get("maxRows") or 0),
+            seconds_left=float(request.get("secondsLeft") or 0),
+        )
     raise ValueError(f"Unknown command {command!r}")
 
 
@@ -457,6 +537,7 @@ def main() -> int:
         files_dir=payload.get("filesDir") or None,
         cohort_weights=payload.get("cohortWeights") or None,
         config_changed=bool(payload.get("configChanged")),
+        query=payload.get("mode") == "query",
     )
     try:
         runtime.load()

@@ -487,10 +487,14 @@ def test_a_query_that_dies_takes_no_other_query_with_it(running: _Running, folde
     assert status == 200 and body["payload"]["status"] == "success"
 
 
-def test_sources_that_load_native_drivers_run_as_jobs(running: _Running, folder: Path) -> None:
+@pytest.mark.parametrize("source_type", ["ODBC", "CUSTOM"])
+def test_sources_that_load_their_own_code_run_as_jobs(
+    running: _Running, folder: Path, source_type: str
+) -> None:
+    # ODBC loads the driver the source names; CUSTOM runs its notebook's scan().
     request = _request(folder, "SELECT 1")
     request["sources"].append(
-        {"alias": "erp", "sourceId": "src-2", "recipe": {"type": "ODBC", "required": {}}}
+        {"alias": "erp", "sourceId": "src-2", "recipe": {"type": source_type, "required": {}}}
     )
     status, body = running.post(request)
     assert status == 503

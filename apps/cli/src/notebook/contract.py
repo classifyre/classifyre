@@ -25,7 +25,18 @@ from .serialize import ModuleSource, cell_id_of, to_module_source
 REQUIRED_FUNCTIONS = ("test_connection", "extract")
 
 #: Implemented when the source can support them; absence is not an error.
-OPTIONAL_FUNCTIONS = ("discover", "fetch_content", "relationships", "augment_sources")
+OPTIONAL_FUNCTIONS = (
+    "discover",
+    "fetch_content",
+    "relationships",
+    "augment_sources",
+    "tables",
+    "scan",
+)
+
+#: SQL queries read a notebook's tables live: ``tables()`` declares them and
+#: ``scan(table, request)`` reads one (docs/prd/QC-query-connectors.md §5.8).
+QUERY_FUNCTIONS = ("tables", "scan")
 
 #: A notebook that only enriches other sources has nothing to extract.
 AUGMENT_ENTRY_POINT = "augment_sources"
@@ -35,6 +46,9 @@ SYNTAX_ERROR = "syntax_error"
 DUPLICATE_CELL_ID = "duplicate_cell_id"
 EMPTY_NOTEBOOK = "empty_notebook"
 NOT_A_FUNCTION = "not_a_function"
+#: ``tables()`` without ``scan()`` or the other way round, or a ``scan`` that
+#: does not take ``(table, request)``.
+QUERY_CONTRACT = "query_contract"
 
 #: A later cell rebinds a name an earlier cell defined. A warning, never a
 #: violation: shadowing is legal Python and occasionally deliberate.
@@ -244,11 +258,43 @@ def validate_module(
             )
         )
 
+    violations.extend(_query_violations(functions))
+
     return ContractReport(
         violations=tuple(violations),
         defined_functions=frozenset(functions),
         warnings=tuple(warnings),
     )
+
+
+def _query_violations(functions: dict[str, ast.stmt]) -> list[ContractViolation]:
+    """``tables()`` and ``scan(table, request)`` come as a pair."""
+    defined = [name for name in QUERY_FUNCTIONS if name in functions]
+    if len(defined) == 1:
+        (present,) = defined
+        other = "scan" if present == "tables" else "tables"
+        return [
+            ContractViolation(
+                kind=QUERY_CONTRACT,
+                message=(
+                    f"'{present}()' is defined without '{other}()'. SQL queries read a "
+                    "notebook's tables with both: tables() declares them, "
+                    "scan(table, request) reads one."
+                ),
+            )
+        ]
+    scan = functions.get("scan")
+    if isinstance(scan, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        args = scan.args
+        positional = len(args.posonlyargs) + len(args.args)
+        if isinstance(scan, ast.AsyncFunctionDef) or (positional < 2 and args.vararg is None):
+            return [
+                ContractViolation(
+                    kind=QUERY_CONTRACT,
+                    message="'scan' must be 'def scan(table, request):' (not async).",
+                )
+            ]
+    return []
 
 
 def validate_notebook(

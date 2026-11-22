@@ -31,15 +31,18 @@ const LOCATED = {
   index_name: 'orders',
   label: 'Order',
   relationship_type: 'PLACED',
+  // A notebook's table: declared by tables(), read by scan().
+  query: 'scan',
 };
 
 describe('x-query declaration', () => {
   const declared = queryDeclarations();
 
-  it('declares the ten source types DQ built and the connectors', () => {
+  it('declares the ten source types DQ built, the connectors and notebooks', () => {
     expect([...declared.keys()].sort()).toEqual(
       [
         'AZURE_BLOB_STORAGE',
+        'CUSTOM',
         'DATABRICKS',
         'DUCKLAKE',
         'GOOGLE_CLOUD_STORAGE',
@@ -112,6 +115,40 @@ describe('x-query declaration', () => {
         columns,
       },
     });
+  });
+
+  it('names a notebook table <source>.<schema>.<table> from what tables() declared', () => {
+    const columns = [
+      { name: 'fnr', type: 'VARCHAR' },
+      { name: 'registered_on', type: 'DATE' },
+    ];
+    expect(
+      tableAddress('CUSTOM', 'table', 'companies', {
+        table_name: 'companies',
+        schema: 'main',
+        query: 'scan',
+        columns,
+      }),
+    ).toEqual({
+      schema: 'main',
+      table: 'companies',
+      location: {
+        kind: 'connector',
+        schema: 'main',
+        table: 'companies',
+        columns,
+      },
+    });
+  });
+
+  it('keeps a notebook table that scan() does not read locked, saying why', () => {
+    const address = tableAddress('CUSTOM', 'table', 'export.csv', {
+      columns: [{ name: 'a', type: 'VARCHAR' }],
+    });
+    expect(address.location).toBeNull();
+    expect(address.reason).toBe(
+      'Only tables the notebook declares in tables() and reads in scan() can be queried.',
+    );
   });
 
   it('asks for a new scan of an index whose columns were never recorded', () => {

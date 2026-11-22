@@ -1,0 +1,1 @@
+Custom sources can now be queried with SQL: a notebook that defines `tables()` and `scan(table, request)` gets its tables in the SQL catalog, read live from its API on each query, with masks, row filters and audit applied as for every other table.

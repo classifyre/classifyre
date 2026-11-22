@@ -25,8 +25,9 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
-from collections.abc import AsyncGenerator, Mapping
+from collections.abc import AsyncGenerator, Iterator, Mapping
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -139,6 +140,9 @@ class CustomSource(BaseSource):
         #: What augment_sources() reported at the end of the run, if it ran.
         self.augmentation: dict[str, Any] = {}
         self._packages_installed = False
+        #: Set by a query (``query_scan``): the child refuses namespace calls
+        #: and gets no uploaded files.
+        self._query_mode = False
 
         logger.info(
             "Initialized CUSTOM source with %d cell(s), revision %s",
@@ -200,7 +204,7 @@ class CustomSource(BaseSource):
         self._install_packages()
 
         self._assert_folders_exist()
-        files_dir = self._materialize_uploaded_files()
+        files_dir = None if self._query_mode else self._materialize_uploaded_files()
 
         cli_root = Path(__file__).resolve().parents[3]
         process = subprocess.Popen(
@@ -224,6 +228,7 @@ class CustomSource(BaseSource):
                 # is not meant to have one.
                 "filesDir": str(files_dir) if files_dir else None,
                 "cohortWeights": self._cohort_weights(),
+                **({"mode": "query"} if self._query_mode else {}),
             }
         )
 
@@ -419,6 +424,8 @@ class CustomSource(BaseSource):
         route = self._RELAYED_OPS.get(op)
         if route is None:
             raise CustomSourceError(f"Unsupported request {op!r}")
+        if self._query_mode:
+            raise CustomSourceError(f"{op} is not available while a query reads this notebook")
         if not self.runner_id:
             raise CustomSourceError(f"{op} needs a scan run")
         response = requests.post(
@@ -487,6 +494,11 @@ class CustomSource(BaseSource):
     async def extract_raw(self) -> AsyncGenerator[list[SingleAssetScanResults], None]:
         skip, limit, cursor_key, sampling = self._window()
         self._start()
+        # The tables a query can read, first: a run stopped or windowed early
+        # still records them (docs/prd/QC-query-connectors.md §5.8).
+        tables = [asset for asset in self._table_assets() if asset is not None]
+        if tables:
+            yield tables
         self._send(
             {
                 "command": "extract",
@@ -550,6 +562,115 @@ class CustomSource(BaseSource):
         logger.info("Notebook produced %d asset(s)", produced)
         if not self._aborted and self._notebook_defines("augment_sources"):
             self._augment()
+
+    def _table_assets(self) -> list[SingleAssetScanResults | None]:
+        """One ``table`` asset per table ``tables()`` declares (with ``scan()``).
+
+        Its columns are the table's schema for SQL; its rows are read live by
+        each query and never scanned, so the asset has no content.
+        """
+        if not (self._notebook_defines("tables") and self._notebook_defines("scan")):
+            return []
+        declared = self._call("tables") or []
+        return [
+            self._to_scan_result(
+                {
+                    "id": f"sql-table:{table['schema']}.{table['name']}",
+                    "name": table["name"],
+                    "kind": "table",
+                    "extract": False,
+                    "reference_reason": "Read live by SQL queries (scan()); its rows are not scanned",
+                    "metadata": {
+                        "table_name": table["name"],
+                        "schema": table["schema"],
+                        "columns": table["columns"],
+                        "query": "scan",
+                        **(
+                            {"description": table["description"]}
+                            if table.get("description")
+                            else {}
+                        ),
+                    },
+                }
+            )
+            for table in declared
+            if isinstance(table, dict)
+        ]
+
+    def query_scan(
+        self,
+        table: str,
+        *,
+        columns: list[tuple[str, str]],
+        read: list[str] | None,
+        filters: list[dict[str, Any]],
+        max_rows: int,
+        deadline: float,
+        outcome: dict[str, Any],
+    ) -> Iterator[Any]:
+        """Run ``scan(table, request)`` for a query; yield its Arrow batches.
+
+        ``outcome`` is filled at the end with what the notebook reported (the
+        filters it used, the requests it made). A scan the query stops reading
+        early (a ``LIMIT``) leaves the child mid-stream, so it is stopped: the
+        next scan starts a fresh one rather than reading the old one's rows.
+        """
+        from ...notebook.query import batch_from_wire
+
+        self._query_mode = True
+        self._start()
+        self._send(
+            {
+                "command": "scan",
+                "table": table,
+                "columns": [list(c) for c in columns],
+                "read": read,
+                "filters": filters,
+                "maxRows": max_rows,
+                "secondsLeft": max(0.0, deadline - time.monotonic()),
+            }
+        )
+        finished = False
+        # The deadline stops the child rather than timing out a read: frames
+        # already in this process's read buffer are invisible to select(), so
+        # a read with a timeout could give up on rows that have arrived.
+        expired: list[bool] = []
+        process = self._process
+
+        def expire() -> None:
+            expired.append(True)
+            if process is not None and process.poll() is None:
+                process.kill()
+
+        timer = threading.Timer(max(0.0, deadline - time.monotonic()), expire)
+        timer.daemon = True
+        timer.start()
+        try:
+            while True:
+                try:
+                    frame = self._read_frame()
+                except CustomSourceError:
+                    if expired:
+                        raise CustomSourceError(
+                            "The query ran out of time reading the notebook."
+                        ) from None
+                    raise
+                kind = frame.get("type")
+                if kind == "rows":
+                    yield batch_from_wire(str(frame.get("ipc") or ""))
+                elif kind == "end":
+                    outcome.update(frame)
+                    finished = True
+                    return
+                elif kind == "error":
+                    finished = True
+                    raise CustomSourceError(self._safe(_describe(frame.get("error"))))
+                elif kind == "need":
+                    self._serve_need(frame)
+        finally:
+            timer.cancel()
+            if not finished or expired:
+                self._terminate()
 
     def _augment(self) -> None:
         """Run the notebook's ``augment_sources()`` after its assets are scanned."""
