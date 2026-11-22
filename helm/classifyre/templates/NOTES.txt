@@ -48,6 +48,15 @@ Database mode: {{ .Values.postgres.mode }}
   !! HPA will report <unknown> metrics and autoscaling will not function.
   !! Install: kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
 {{- end }}
+{{- if and (include "classifyre.queryWorker.enabled" .) .Values.queryWorker.networkPolicy.enabled (not .Values.queryWorker.networkPolicy.clusterCidrs) }}
+  !! WARNING: queryWorker.networkPolicy.clusterCidrs is empty. On CNIs that match
+  !! pod IPs with ipBlock (Calico and others), SQL queries can then reach every pod,
+  !! this release's database and identity server included. Set it to the cluster's
+  !! pod and service networks (k3s: 10.42.0.0/16, 10.43.0.0/16), and list the
+  !! Kubernetes API's, the nodes' and an external database's addresses in
+  !! queryWorker.networkPolicy.deniedEgressCidrs. Required before workspaces that
+  !! do not trust each other share one installation.
+{{- end }}
 {{- if and .Values.telemetry.enabled (not .Values.telemetry.otlpEndpoint) }}
   !! NOTE: Telemetry is enabled but telemetry.otlpEndpoint is empty.
   !! Set telemetry.otlpEndpoint to the URL of your OTel Collector or disable telemetry.

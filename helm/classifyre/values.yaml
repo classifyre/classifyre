@@ -801,7 +801,7 @@ queryWorker:
       - 169.254.0.0/16
       - fe80::/10
       - fd00:ec2::254/128
-    # -- Required with the policy on (the render fails without it): the
+    # -- Set this (the install notes warn while it is empty): the
     # cluster's pod and service networks (e.g. k3s `10.42.0.0/16`,
     # `10.43.0.0/16`; on EKS or GKE the VPC's or the cluster's ranges). Taken
     # out of the "anywhere" rule, so on a CNI that matches pod IPs with
