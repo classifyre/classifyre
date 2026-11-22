@@ -1,1 +1,0 @@
-SQL connections now refuse writes and definitions (INSERT, UPDATE, DELETE, MERGE, CREATE, COPY, DO blocks and the like) with a read-only error before they run: a SQL connection only reads, and such statements could only ever answer with empty results there.

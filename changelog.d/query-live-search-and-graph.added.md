@@ -1,1 +1,0 @@
-Meilisearch indexes and Neo4j node labels and relationship types can now be queried with SQL and joined with any other table: they are read live through the source's own API, filters are sent to the source where it can apply them, and the SQL page shows how many requests and rows each live table took.
