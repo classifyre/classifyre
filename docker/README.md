@@ -223,6 +223,7 @@ accordingly. Override any of these only if you have a reason to.
 | `PG_SHARED_BUFFERS`, `PG_WORK_MEM`, `PG_EFFECTIVE_CACHE_SIZE`, `PG_MAX_CONNECTIONS` | PostgreSQL memory. |
 | `MAX_CONCURRENT_RUNNERS` | Scans running at once. |
 | `CLASSIFYRE_MAX_POOL_WORKERS` | Detector worker processes per scan. |
+| `CLASSIFYRE_QUERY_LOCAL_ROOTS` | `/data`: the folders a Mounted Folder source may point at (comma-separated). Anything else is refused, and so is the image's own state (`/var/lib/classifyre`, `/app`), whatever this says. |
 | `QUERY_WORKER_ENABLED`, `QUERY_WORKER_SLOTS`, `QUERY_WORKER_MEMORY_MB` | The warm SQL query worker (on by default), how many queries it runs at once, and the memory it plans them in (a quarter of the container by default; DuckDB gets a share of it per query). |
 | `CLASSIFYRE_MIN_MEMORY_MB` | The 4 GB startup floor. Lower it at your own risk. |
 

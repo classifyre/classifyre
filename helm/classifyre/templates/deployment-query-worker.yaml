@@ -276,6 +276,12 @@ spec:
       stabilizationWindowSeconds: {{ $qw.autoscaling.scaleDownStabilizationSeconds }}
 {{- end }}
 {{- if and (include "classifyre.queryWorker.enabled" .) .Values.queryWorker.networkPolicy.enabled }}
+{{- /* Without the cluster's networks the "anywhere" rule below also matches
+     pod IPs on CNIs that apply ipBlock to them (Calico, …), and the pod rule's
+     exclusions (this release's database, identity server) mean nothing. */}}
+{{- if not .Values.queryWorker.networkPolicy.clusterCidrs }}
+{{- fail "queryWorker.networkPolicy.clusterCidrs must list the cluster's pod and service networks (e.g. k3s: 10.42.0.0/16, 10.43.0.0/16; EKS: the VPC CIDR): without them the query worker can reach every pod, this release's database included. Also list the Kubernetes API's, the nodes' and an external database's addresses in deniedEgressCidrs. Set queryWorker.networkPolicy.enabled=false to render without the policy." }}
+{{- end }}
 {{- /*
 On by default, unlike the chart-wide `networkPolicy`: queries of every
 workspace share these pods. Ingress: only this release's pods that send

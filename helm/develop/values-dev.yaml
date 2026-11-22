@@ -498,6 +498,12 @@ api:
 # its next restart (kubectl rollout restart deploy/classifyre-query-worker).
 queryWorker:
   enabled: true
+  # k3s's pod and service networks; the k3d nodes' Docker network stays
+  # reachable for the lakehouse lab's containers.
+  networkPolicy:
+    clusterCidrs:
+      - 10.42.0.0/16
+      - 10.43.0.0/16
   slots: 0
   priorityClassName: ""
   tmpSizeLimit: 4Gi

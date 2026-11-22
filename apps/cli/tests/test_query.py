@@ -1181,7 +1181,9 @@ def test_locked_session_reads_its_folder_and_no_other_local_path(
         session.close()
 
 
-@pytest.mark.parametrize("root", ["/", "/tmp", "/proc", "/etc/ssl", "/run"])
+@pytest.mark.parametrize(
+    "root", ["/", "/tmp", "/proc", "/etc/ssl", "/run", "/var/lib/classifyre", "/app", "/opt"]
+)
 def test_a_local_root_that_opens_the_lockdown_is_refused(
     folder: Path, root: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1196,7 +1198,7 @@ def test_a_local_root_that_opens_the_lockdown_is_refused(
     assert payload["error"]["code"] == "source_unavailable"
     # (A root this machine lacks, /proc on macOS, fails as missing first.)
     message = payload["error"]["message"]
-    assert "may not be read by queries" in message or "does not exist" in message
+    assert "may not be read by" in message or "does not exist" in message
 
 
 def test_a_local_root_inside_the_query_directories_is_refused(

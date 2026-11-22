@@ -44,6 +44,12 @@ default() {
 : "${PLAYWRIGHT_BROWSERS_PATH:=/var/lib/classifyre/playwright}"
 export PG_MAJOR PGDATA PGPORT POSTGRES_USER POSTGRES_DB PORT_HTTP API_PORT WEB_PORT
 export TEMP_DIR RUNNER_LOG_DIR UV_CACHE_DIR EMBEDDING_CACHE_DIR PLAYWRIGHT_BROWSERS_PATH
+# The folders a local-folder source may point at, for scans and queries
+# (apps/cli/src/utils/local_roots.py): the data mounted under /data, never
+# /var/lib/classifyre, whose masked-config.key decrypts every workspace's
+# source credentials. Separate several with commas.
+: "${CLASSIFYRE_QUERY_LOCAL_ROOTS:=/data}"
+export CLASSIFYRE_QUERY_LOCAL_ROOTS
 
 # ── Detect the memory limit ───────────────────────────────────────────────────
 # cgroup v2 first, then v1, then the host. A cgroup file can hold "max", and an

@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import Any
 
 from ..utils.duckdb_engine import connect, load_extension, quote_identifier, require_duckdb
+from ..utils.local_roots import LocalRootRefusedError, refuse_local_root
 from .bindings import BindingError, ConnectorError, SourceBinding, TableLocation
 from .gate import QueryRefusedError, TableName, validate
 from .masks import ColumnMask, ColumnsHiddenError, masked_projection
@@ -83,49 +84,13 @@ def recipe_endpoints(recipe: dict[str, Any]) -> list[str]:
     return sorted(found)
 
 
-#: The local roots a source's folder may lie in (the chart sets it to the
-#: ``api.localFolders`` mount paths), separated by ``os.pathsep`` or commas.
-#: Set, even empty, it is an allowlist: a folder outside it is refused. Unset
-#: (a laptop, tests), any folder is allowed but the ones below.
-LOCAL_ROOTS_ENV = "CLASSIFYRE_QUERY_LOCAL_ROOTS"
-
-#: Never a source's local root, nor inside one: other queries' private and
-#: spill directories, the process's own view of the machine, its secrets.
-_CONTAINS_NOT = ("/tmp", "/var/tmp", "/dev/shm")
-_INSIDE_NOT = ("/proc", "/sys", "/dev", "/etc", "/run", "/var/run", "/root")
-#: Directory names of query workspaces (worker.QUERY_DIRS, the spill prefix).
-_PRIVATE_NAMES = ("classifyre-queries", "classifyre-query-")
-
-
-def _real(path: str) -> Path:
-    return Path(os.path.realpath(path))
-
-
-def _within(path: Path, root: Path) -> bool:
-    return path == root or root in path.parents
-
-
 def check_local_root(path: str) -> None:
-    """Refuse a source's local folder that would open the query's lockdown
-    to what it must not read (review of 383fd5c4, P15): a workspace admin
-    sets that path, so ``/`` or ``/tmp`` would expose every other query's
-    private directory on the same worker."""
-    real = _real(path)
-    refused = f"The folder {path} may not be read by queries"
-    temp_roots = {_real(p) for p in (*_CONTAINS_NOT, tempfile.gettempdir())}
-    if any(_within(root, real) for root in temp_roots):
-        raise BindingError(f"{refused}: it holds the query engine's temporary files.")
-    if any(_within(real, _real(p)) or _within(_real(p), real) for p in _INSIDE_NOT):
-        raise BindingError(f"{refused}: it is part of the system.")
-    if any(part.startswith(_PRIVATE_NAMES) for part in real.parts):
-        raise BindingError(f"{refused}: it is a query's private directory.")
-    if LOCAL_ROOTS_ENV in os.environ:
-        allowed = [_real(p) for p in _env_paths(LOCAL_ROOTS_ENV)]
-        if not any(_within(real, root) for root in allowed):
-            raise BindingError(
-                f"{refused}: it is not under a folder mounted for queries "
-                "(the chart's api.localFolders)."
-            )
+    """A source's local folder, refused when queries must not read it
+    (``src.utils.local_roots``)."""
+    try:
+        refuse_local_root(path, "queries")
+    except LocalRootRefusedError as exc:
+        raise BindingError(str(exc)) from None
 
 
 def _env_paths(name: str) -> list[str]:
@@ -441,6 +406,10 @@ class QuerySession:
         except Exception:  # pragma: no cover - older DuckDB
             rows = []
         allowed_files = [str(row[0]) for row in rows if "://" not in str(row[0])]
+        # An attached catalog's file (a DuckLake's) is a source's path too.
+        for path in allowed_files:
+            if path.startswith("/"):  # not a DuckLake's "ducklake:postgres:…"
+                check_local_root(path)
         conn.execute(f"SET allowed_directories = {_sql_list(sorted(set(allowed)))}")
         if allowed_files:
             conn.execute(f"SET allowed_paths = {_sql_list(sorted(set(allowed_files)))}")
