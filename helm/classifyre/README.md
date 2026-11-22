@@ -180,7 +180,7 @@ helm upgrade --install classifyre ./helm/classifyre \
 | api.autoscaling.targetMemoryUtilizationPercentage | int | `75` | Target average memory utilization for API HPA. |
 | api.cliJobs.activeDeadlineSeconds | int | `86400` | Max runtime per CLI job (seconds). Increase for large data sources. |
 | api.cliJobs.affinity | object | `{}` | CLI job scheduling: affinity rules. |
-| api.cliJobs.autoInstallOptionalDeps | bool | `true` | lock + cross-process group accumulation + self-heal in uv_sync.py. |
+| api.cliJobs.autoInstallOptionalDeps | bool | `true` | Allow CLI to auto-install optional detector dependencies at runtime. The slim cli image installs detector/source groups on demand into a per-pod venv; concurrent/interrupted syncs are made safe by the file lock + cross-process group accumulation + self-heal in uv_sync.py. |
 | api.cliJobs.automountServiceAccountToken | bool | `false` | Mount service account token into CLI job pods. |
 | api.cliJobs.backoffLimit | int | `2` | Retry attempts for failed CLI jobs. |
 | api.cliJobs.cleanupPolicy | string | `"always"` | Cleanup policy for CLI jobs: none, failed, or always. |
@@ -201,46 +201,46 @@ helm upgrade --install classifyre ./helm/classifyre \
 | api.cliJobs.outputRestTimeoutSec | int | `120` | HTTP read timeout (seconds) for CLI→API REST calls (bulk ingest, finalize, status updates). The API processes each batch in a Postgres transaction that can take 30-60 s under load; this must be set higher than the API's transaction timeout to avoid spurious read-timeout failures. |
 | api.cliJobs.podSecurityContext | object | `{"fsGroup":10001,"runAsGroup":10001,"runAsNonRoot":true,"runAsUser":10001,"seccompProfile":{"type":"RuntimeDefault"}}` | Pod security context for CLI job pods. |
 | api.cliJobs.pollIntervalMs | int | `2000` | Poll interval while waiting for job completion (milliseconds). |
-| api.cliJobs.priorityClassName | string | `"batch-low-priority"` | so a pending Job waits for room instead of displacing a service pod. |
+| api.cliJobs.priorityClassName | string | `"batch-low-priority"` | CLI job priority class. Batch by default: CLI Jobs are the workload that spikes, and this is what tells the kubelet to evict a scan rather than Postgres when the node runs short. Its preemptionPolicy is Never, so a pending Job waits for room instead of displacing a service pod. |
 | api.cliJobs.query | object | `{"cpu":"1","maxSpill":"10GiB","memory":"2Gi","priorityClassName":"interactive"}` | SQL query jobs (docs/prd/DQ-data-query.md). Each query is one short-lived Job. |
 | api.cliJobs.query.cpu | string | `"1"` | CPU limit of one query Job; DuckDB uses as many threads as whole cores. |
 | api.cliJobs.query.maxSpill | string | `"10GiB"` | How much a query may spill to the pod's disk before it is stopped. |
-| api.cliJobs.query.memory | string | `"2Gi"` | and spills the rest of a large sort, join or aggregate to disk. |
+| api.cliJobs.query.memory | string | `"2Gi"` | Memory of one query Job (request = limit). DuckDB is given 70 % of it and spills the rest of a large sort, join or aggregate to disk. |
 | api.cliJobs.query.priorityClassName | string | `"interactive"` | Priority class of query Jobs (`priorityClasses.interactiveName` by default). |
 | api.cliJobs.resources.limits | object | `{"cpu":"2","ephemeral-storage":"20Gi","memory":"4Gi"}` | CLI job resource limits. Memory must equal the request above. |
 | api.cliJobs.resources.requests | object | `{"cpu":"500m","ephemeral-storage":"6Gi","memory":"4Gi"}` | CLI job resource requests. |
 | api.cliJobs.serviceAccountName | string | `""` | Service account for CLI jobs. Empty uses API service account. |
 | api.cliJobs.tolerations | list | `[]` | CLI job scheduling: tolerations. |
 | api.cliJobs.ttlSecondsAfterFinished | int | `1800` | TTL for completed CLI jobs (seconds). Ignored when cleanup policy deletes jobs immediately. |
-| api.cliJobs.uvCache.accessModes | list | `["ReadWriteOnce"]` | Use ReadWriteMany only if your cluster has a shared filesystem StorageClass (e.g. EFS, NFS). |
+| api.cliJobs.uvCache.accessModes | list | `["ReadWriteOnce"]` | Access modes for uv cache PVC. ReadWriteOnce works on any standard StorageClass. Use ReadWriteMany only if your cluster has a shared filesystem StorageClass (e.g. EFS, NFS). |
 | api.cliJobs.uvCache.enabled | bool | `true` | Enable shared PVC for uv cache (pip package cache shared across CLI jobs). |
 | api.cliJobs.uvCache.existingClaim | string | `""` | Existing PVC name for uv cache. Empty creates a new PVC. |
 | api.cliJobs.uvCache.mountPath | string | `"/cache/uv"` | Mount path for uv cache in CLI job container. |
 | api.cliJobs.uvCache.prune.enabled | bool | `true` | Enable a CronJob that keeps the uv cache bounded on a schedule. |
 | api.cliJobs.uvCache.prune.image | string | `""` | Image used by the prune CronJob (defaults to the CLI job image). |
-| api.cliJobs.uvCache.prune.maxMB | int | `8000` | the soft `uv cache prune`. Keep below the PVC `size` above. |
-| api.cliJobs.uvCache.prune.schedule | string | `"0 2 * * *"` | The job hard-clears the cache once it exceeds `maxMB` (see below). |
+| api.cliJobs.uvCache.prune.maxMB | int | `8000` | Hard size cap (MiB). When the cache exceeds this, the job runs `uv cache clean` (full bust; wheels re-download on next job) instead of the soft `uv cache prune`. Keep below the PVC `size` above. |
+| api.cliJobs.uvCache.prune.schedule | string | `"0 2 * * *"` | Cron schedule for cache pruning. Default: daily at 02:00. `uv cache prune` alone only evicts *unreferenced* entries, so a cache holding many large dependency groups (e.g. ML/LLM extras) grows unbounded. The job hard-clears the cache once it exceeds `maxMB` (see below). |
 | api.cliJobs.uvCache.prune.ttlSecondsAfterFinished | int | `3600` | TTL for completed prune jobs (seconds). |
-| api.cliJobs.uvCache.size | string | `"10Gi"` | to avoid jobs hanging with "Multi-Attach error" when two jobs land on different nodes. |
+| api.cliJobs.uvCache.size | string | `"10Gi"` | Requested size for uv cache PVC. IMPORTANT: ReadWriteOnce (default) only works on single-node clusters or when all CLI jobs are guaranteed to land on the same node. On multi-node clusters with concurrent jobs, set accessModes: [ReadWriteMany] and use a shared StorageClass (EFS, NFS, etc.) to avoid jobs hanging with "Multi-Attach error" when two jobs land on different nodes. |
 | api.cliJobs.uvCache.storageClassName | string | `""` | Storage class for uv cache PVC. |
 | api.cliJobs.waitTimeoutSeconds | int | `87300` | Max time API waits for job completion (seconds). Should exceed activeDeadlineSeconds. |
 | api.cliJobs.workDir | string | `"/app/apps/cli"` | Working directory inside CLI job container. |
 | api.command | list | `[]` | Optional API container command override. |
 | api.containerSecurityContext.allowPrivilegeEscalation | bool | `false` | Disallow privilege escalation in API container. |
 | api.containerSecurityContext.capabilities.drop | list | `["ALL"]` | Drop all Linux capabilities in API container. |
-| api.containerSecurityContext.readOnlyRootFilesystem | bool | `false` | path the app writes to at runtime (e.g. /tmp, log dirs). Hardening step for advanced users. |
+| api.containerSecurityContext.readOnlyRootFilesystem | bool | `false` | Keep root filesystem writable. Enable only after mounting emptyDir volumes over every path the app writes to at runtime (e.g. /tmp, log dirs). Hardening step for advanced users. |
 | api.database.connectionTimeoutMs | int | `10000` | Give up acquiring a connection after this long (ms). |
 | api.database.idleTimeoutMs | int | `10000` | Close a pooled connection after this much idle time (ms). |
 | api.database.interactivePoolMax | int | `10` | Connections reserved for interactive requests in API-capable pods, so a scan cannot occupy every connection needed to render the UI. The remainder of `poolMax` serves authenticated CLI callbacks and in-process workers. Capped at `poolMax - 1` so the background lane always keeps one. |
-| api.database.maxResidentNamespaces | int | `20` | this are disconnected. |
+| api.database.maxResidentNamespaces | int | `20` | Max workspace pools kept in memory; least-recently-used pools beyond this are disconnected. |
 | api.database.poolMax | int | `16` | Total Postgres connections per workspace, split across the interactive and background pools. Background-only worker pods use the full value as a single pool. Raised from 10 to 16 when the background lane was added, so that the lane is funded on top of the interactive budget rather than carved out of it: at 10 total the UI was left with 4, near the 3 that made overview pages fail with `P2028`. |
-| api.database.retryAttempts | int | `3` | transient database error. Set to 1 to disable retrying. |
-| api.database.transactionMaxWaitMs | int | `10000` | own default is 2000, which a busy pool exceeds routinely. |
+| api.database.retryAttempts | int | `3` | Attempts (including the first) for read-only requests that fail with a transient database error. Set to 1 to disable retrying. |
+| api.database.transactionMaxWaitMs | int | `10000` | How long a transaction may wait for a free connection (ms). Prisma's own default is 2000, which a busy pool exceeds routinely. |
 | api.database.transactionTimeoutMs | int | `30000` | Max duration of a single interactive transaction (ms). |
 | api.embedding.allowRemoteModels | bool | `true` |  |
 | api.embedding.audio | bool | `false` | Embed audio files as sound when the embedding model can. No effect on a text-only model. |
-| api.embedding.autoBackfill | bool | `true` | embedding space on API startup. Existing vectors are hash-skipped. |
-| api.embedding.batchSize | int | `16` | backfill burst cannot spike the worker heap into an OOM. |
+| api.embedding.autoBackfill | bool | `true` | Reconcile all stored findings and asset chunks into the configured embedding space on API startup. Existing vectors are hash-skipped. |
+| api.embedding.batchSize | int | `16` | Rows embedded per inference batch on the worker. Larger batches are faster but hold more tensors in memory at once; keep this modest so a backfill burst cannot spike the worker heap into an OOM. |
 | api.embedding.cacheDir | string | `"/var/cache/classifyre/transformers"` |  |
 | api.embedding.cacheSizeLimit | string | `"2Gi"` |  |
 | api.embedding.device | string | `"cpu"` |  |
@@ -263,16 +263,16 @@ helm upgrade --install classifyre ./helm/classifyre \
 | api.embedding.retrySeconds | int | `30` |  |
 | api.embedding.revision | string | `"751bff37182d3f1213fa05d7196b954e230abad9"` | Immutable model revision. Change it to create a new embedding space. |
 | api.embedding.workerConcurrency | int | `1` | Maximum embedding batches processed concurrently across all API replicas. |
-| api.env.CLI_JOB_REAP_CRON | string | `"*/5 * * * *"` | MAX_CONCURRENT_RUNNERS because that cap counts runner rows, not pods. |
+| api.env.CLI_JOB_REAP_CRON | string | `"*/5 * * * *"` | Cron (UTC) for the orphaned CLI Job reaper, which deletes Kubernetes Jobs whose runner already reached a terminal state. Far more frequent than the nightly cleanup on purpose: an orphan is not stale history, it is a pod holding CPU and memory right now, and one that is invisible to MAX_CONCURRENT_RUNNERS because that cap counts runner rows, not pods. |
 | api.env.ENVIRONMENT | string | `"kubernetes"` | Execution mode used by API. |
-| api.env.MAX_CONCURRENT_RUNNERS | string | `"3"` | in Settings. |
-| api.env.MAX_RUNNERS_PER_SOURCE | string | `"5"` | exceeds this value. Set to "0" to disable cleanup. |
-| api.env.NAMESPACE_IDLE_AFTER_DAYS | string | `"7"` | for testing. Set to "0" to disable cold mode. |
-| api.env.NAMESPACE_IDLE_CHECK_MS | string | `"60000"` | and wake sleeping namespaces. Code default when unset: 60000. |
+| api.env.MAX_CONCURRENT_RUNNERS | string | `"3"` |  Scans running at once across the whole installation (every workspace together); each workspace can set a lower limit of its own in Settings. |
+| api.env.MAX_RUNNERS_PER_SOURCE | string | `"5"` | Maximum number of completed/failed runs to keep per source. Older runs are deleted (including their logs) when a new run is triggered and the count exceeds this value. Set to "0" to disable cleanup. |
+| api.env.NAMESPACE_IDLE_AFTER_DAYS | string | `"7"` | Days without any scan before a namespace's background workers are put to sleep (cold mode): its pg-boss instance stops polling, its cron ticks stop contending for global worker slots, and its DB pools are released. Scans define activity — workers wake automatically on the next scan or schedule change. Namespaces with CRON/AUTO schedules of their own never sleep. Code default when unset: 7. Accepts fractions for testing. Set to "0" to disable cold mode. |
+| api.env.NAMESPACE_IDLE_CHECK_MS | string | `"60000"` | How often (milliseconds) worker pods re-evaluate namespace idleness and wake sleeping namespaces. Code default when unset: 60000. |
 | api.env.NODE_ENV | string | `"production"` | Runtime environment passed to API container. |
 | api.env.PORT | string | `"8000"` | API listen port. |
 | api.env.RUNNER_CLEANUP_CRON | string | `"0 3 * * *"` | Cron (UTC) for that nightly cleanup. Code default when unset: "0 3 * * *". |
-| api.env.RUNNER_RETENTION_DAYS | string | `"14"` | this along with their logs. Code default when unset: 14. |
+| api.env.RUNNER_RETENTION_DAYS | string | `"14"` | Days of scan history kept. The nightly cleanup deletes runs older than this along with their logs. Code default when unset: 14. |
 | api.env.TEMP_DIR | string | `"/tmp"` | Temporary directory used by API. |
 | api.extraEnv | list | `[]` | Extra environment variables for API container. |
 | api.extraEnvFrom | list | `[]` | Extra envFrom sources for API container. |
@@ -281,13 +281,13 @@ helm upgrade --install classifyre ./helm/classifyre \
 | api.image.pullPolicy | string | `"IfNotPresent"` | API image pull policy. |
 | api.image.repository | string | `"classifyre/api"` | API container image repository. |
 | api.image.tag | string | `""` | API container image tag. Defaults to the chart appVersion when empty. |
-| api.internalApiKey | object | `{"autoGenerate":true,"existingSecret":"","secretKey":"CLASSIFYRE_INTERNAL_KEY","secretName":"","value":""}` | autopilot agents keep working while nobody signed in can write. |
-| api.internalApiKey.autoGenerate | bool | `true` | Generated key is persisted via Kubernetes Secret lookup across upgrades. |
-| api.internalApiKey.existingSecret | string | `""` | When set, chart will not create or manage this secret. |
+| api.internalApiKey | object | `{"autoGenerate":true,"existingSecret":"","secretKey":"CLASSIFYRE_INTERNAL_KEY","secretName":"","value":""}` |  The API has no user authentication, so the CLI's write-back endpoints (bulk asset ingest, runner status, discovered assets, graph edges, embedding chunks) are restricted to callers presenting this key. It is injected into the API and worker pods, forwarded by them into every CLI job's environment, and stripped from inbound requests by the web proxy so a browser can never present it. It also exempts those CLI callbacks from the read-only guard, which is what lets scheduled scans and the autopilot agents keep working while nobody signed in can write. |
+| api.internalApiKey.autoGenerate | bool | `true` | Generate a random 48-character key when value is empty. Generated key is persisted via Kubernetes Secret lookup across upgrades. |
+| api.internalApiKey.existingSecret | string | `""` | Existing secret name that contains the internal API key. When set, chart will not create or manage this secret. |
 | api.internalApiKey.secretKey | string | `"CLASSIFYRE_INTERNAL_KEY"` | Secret key name used for CLASSIFYRE_INTERNAL_KEY. |
 | api.internalApiKey.secretName | string | `""` | Secret name created by this chart when existingSecret is empty. |
 | api.internalApiKey.value | string | `""` | Explicit key value to store in the chart-managed secret. |
-| api.lifecycle | object | `{"preStop":{"exec":{"command":["/bin/sh","-c","sleep 5"]}}}` | during rolling updates by giving kube-proxy time to drain in-flight requests. |
+| api.lifecycle | object | `{"preStop":{"exec":{"command":["/bin/sh","-c","sleep 5"]}}}` | Lifecycle hooks for the API container. The default preStop delay avoids dropped connections during rolling updates by giving kube-proxy time to drain in-flight requests. |
 | api.livenessProbe.enabled | bool | `true` | Enable API liveness probe. |
 | api.livenessProbe.failureThreshold | int | `6` | API liveness failure threshold. |
 | api.livenessProbe.initialDelaySeconds | int | `30` | Delay before starting API liveness checks. |
@@ -295,16 +295,16 @@ helm upgrade --install classifyre ./helm/classifyre \
 | api.livenessProbe.periodSeconds | int | `15` | API liveness check period. |
 | api.livenessProbe.timeoutSeconds | int | `5` | API liveness check timeout. |
 | api.localFolders | list | `[]` | Folders mounted into every CLI job pod for folder-backed sources. |
-| api.maskedConfigEncryption.autoGenerate | bool | `true` | Generated key is persisted via Kubernetes Secret lookup across upgrades. |
-| api.maskedConfigEncryption.existingSecret | string | `""` | When set, chart will not create or manage this secret. |
+| api.maskedConfigEncryption.autoGenerate | bool | `true` | Generate a random 32-character key when value is empty. Generated key is persisted via Kubernetes Secret lookup across upgrades. |
+| api.maskedConfigEncryption.existingSecret | string | `""` | Existing secret name that contains API masked-config encryption key. When set, chart will not create or manage this secret. |
 | api.maskedConfigEncryption.secretKey | string | `"CLASSIFYRE_MASKED_CONFIG_KEY"` | Secret key name used for CLASSIFYRE_MASKED_CONFIG_KEY. |
 | api.maskedConfigEncryption.secretName | string | `""` | Secret name created by this chart when existingSecret is empty. |
-| api.maskedConfigEncryption.value | string | `""` | Must be exactly 32 chars when using raw string format. |
-| api.maxOldSpaceSizeMb | int | `1536` | limit. Rule of thumb: heap ≈ 0.75 × the memory limit (in MB). |
+| api.maskedConfigEncryption.value | string | `""` | Explicit encryption key value to store in chart-managed secret. Must be exactly 32 chars when using raw string format. |
+| api.maxOldSpaceSizeMb | int | `1536` |  Node caps the old-space heap at ~512 MB by default regardless of the container memory limit, so without this the process hits `FATAL ERROR: JavaScript heap out of memory` and SIGSEGV-restarts long before it uses the memory the pod was granted. Keep this comfortably below `resources.limits.memory`: the container also holds native allocations (Prisma, the transformers.js/onnxruntime embedding model, Buffers) that live outside the V8 heap, so `heap + native` must fit the limit. Rule of thumb: heap ≈ 0.75 × the memory limit (in MB). |
 | api.maxRssMb | string | `""` | Total process RSS (MB) above which the six CLI ingestion endpoints shed with 503 and the CLI retries. This is under-pressure's second threshold, alongside the JS-heap one derived from `maxOldSpaceSizeMb`.  It MUST be set, and set above the heap cap. under-pressure's own default is a flat 1 GB that ignores the pod's memory limit, and with a 1536 MB heap the JS heap alone grows past it — RSS never comes back down, the pressure flag latches on, and every scan then fails with "Server is under load" on an API using a third of its limit. That is what a 4Gi API pod measured: VmRSS 1558 MB against the 1024 MB default.  LEAVE EMPTY. Empty means "derive it from `resources.limits.memory`" (0.875 x the limit), which is what you want: the guard then follows the limit automatically instead of being a third number to keep in sync by hand. Set it only to override that derivation.  Sizing it near the heap cap instead of near the limit is the failure mode: RSS is heap PLUS native (Prisma, Buffers, the embedding model), so a guard close to the heap fires during healthy operation. The chart fails to render if the heap cap ever lands at or above this value. |
 | api.maxRssMbFallback | int | `1792` | Fallback RSS guard (MB) used only when `maxRssMb` is empty AND the memory limit is absent or not a whole Gi/Mi quantity (e.g. "1.5Gi"). Never leave this at under-pressure's own 1 GB library default, which ignores the pod limit entirely. |
-| api.migration.containerSecurityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}}` | Override with runAsUser/runAsNonRoot: false if the migration toolchain requires root (e.g. Prisma on Bun). |
-| api.migration.enabled | bool | `true` | API applies pending migrations itself before NestJS startup. |
+| api.migration.containerSecurityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}}` | Security context for the migration init container. Override with runAsUser/runAsNonRoot: false if the migration toolchain requires root (e.g. Prisma on Bun). |
+| api.migration.enabled | bool | `true` | Run database migrations as an API init container. When disabled, the API applies pending migrations itself before NestJS startup. |
 | api.migration.script | string | `"node -e \"require('./dist/src/database-migrations.js').applyAllPendingMigrations().catch((error) => { console.error(error); process.exit(1); })\""` | Migration command/script. |
 | api.namespaceRetentionDays | int | `7` | Days a deleted workspace stays recoverable before it is dropped for good. Deleting a workspace only marks it and stops serving it; its schema and all its data survive until this many days later, when a background sweep drops the schema and the registry row. That deletion is irreversible and there is no backup step, so raise this if your recovery process needs longer. Set 0 to keep deleted workspaces forever (the behaviour before this existed), at the cost of their disk. |
 | api.nodeSelector | object | `{}` | API scheduling: node selector. |
@@ -317,7 +317,7 @@ helm upgrade --install classifyre ./helm/classifyre \
 | api.podSecurityContext.runAsNonRoot | bool | `true` | Require API container to run as non-root. |
 | api.podSecurityContext.runAsUser | int | `10001` | API pod user ID. |
 | api.podSecurityContext.seccompProfile.type | string | `"RuntimeDefault"` | API pod seccomp profile type. |
-| api.priorityClassName | string | `"service-standard"` | worker outrank batch CLI Jobs under node pressure (see priorityClasses). |
+| api.priorityClassName | string | `"service-standard"` | API pod priority class. Defaults to the chart's service class so API and worker outrank batch CLI Jobs under node pressure (see priorityClasses). |
 | api.readinessProbe.enabled | bool | `true` | Enable API readiness probe. |
 | api.readinessProbe.failureThreshold | int | `6` | API readiness failure threshold. |
 | api.readinessProbe.initialDelaySeconds | int | `10` | Delay before starting API readiness checks. |
@@ -325,7 +325,7 @@ helm upgrade --install classifyre ./helm/classifyre \
 | api.readinessProbe.periodSeconds | int | `10` | API readiness check period. |
 | api.readinessProbe.timeoutSeconds | int | `3` | API readiness check timeout. |
 | api.replicaCount | int | `2` | Number of API replicas when autoscaling is disabled. |
-| api.resources.limits | object | `{"cpu":"1","memory":"2Gi"}` | leaves ~512 MB for native memory before the kernel OOM-kills the pod. |
+| api.resources.limits | object | `{"cpu":"1","memory":"2Gi"}` | API resource limits. Must leave headroom above `maxOldSpaceSizeMb` (the JS heap) for native allocations — Prisma, the embedding model, and Buffers all live outside the V8 heap. With a 1536 MB heap, 2Gi leaves ~512 MB for native memory before the kernel OOM-kills the pod. |
 | api.resources.requests | object | `{"cpu":"250m","memory":"768Mi"}` | API resource requests. |
 | api.service.annotations | object | `{}` | Additional API service annotations. |
 | api.service.clusterIP | string | `""` | Fixed cluster IP, for a reverse proxy outside the cluster that must reach the API (e.g. its socket.io path) without a public nodePort. Immutable once the Service exists: set it to the current IP, or recreate. |
@@ -355,7 +355,7 @@ helm upgrade --install classifyre ./helm/classifyre \
 | frontend.command | list | `[]` | Optional web container command override. |
 | frontend.containerSecurityContext.allowPrivilegeEscalation | bool | `false` | Disallow privilege escalation in web container. |
 | frontend.containerSecurityContext.capabilities.drop | list | `["ALL"]` | Drop all Linux capabilities in web container. |
-| frontend.containerSecurityContext.readOnlyRootFilesystem | bool | `false` | path the app writes to at runtime. Hardening step for advanced users. |
+| frontend.containerSecurityContext.readOnlyRootFilesystem | bool | `false` | Keep root filesystem writable. Enable only after mounting emptyDir volumes over every path the app writes to at runtime. Hardening step for advanced users. |
 | frontend.cookieConsent.enabled | bool | `false` | Show the cookie consent banner in the web app (COOKIE_CONSENT_ENABLED). |
 | frontend.cookieConsent.policyUrl | string | `"https://www.classifyre.com/privacy/"` | Policy the banner links to (COOKIE_CONSENT_POLICY_URL). Point this at your own privacy policy when self-hosting. |
 | frontend.enabled | bool | `true` | Deploy the web app in-cluster. Set false to run it externally (e.g. a local `next dev` pointed at this cluster's API) instead of building and deploying an image for it. |
@@ -390,10 +390,10 @@ helm upgrade --install classifyre ./helm/classifyre \
 | frontend.podSecurityContext.runAsUser | int | `10001` | Web pod user ID. |
 | frontend.podSecurityContext.seccompProfile.type | string | `"RuntimeDefault"` | Web pod seccomp profile type. |
 | frontend.posthog.enabled | bool | `false` | Enable PostHog analytics. When false, no env vars are injected. |
-| frontend.posthog.host | string | `"/classifyre-usr"` | subdomain (e.g. https://e.yourcompany.com) for extra reliability. |
-| frontend.posthog.ingestHost | string | `"https://us.i.posthog.com"` | Use https://eu.i.posthog.com for EU Cloud, or your managed proxy CNAME. |
+| frontend.posthog.host | string | `"/classifyre-usr"` | Client-side ingest host sent to the browser SDK (NEXT_PUBLIC_POSTHOG_HOST). Defaults to /classifyre-usr so requests are proxied through the web container, bypassing ad-blockers. Override with a managed reverse proxy subdomain (e.g. https://e.yourcompany.com) for extra reliability. |
+| frontend.posthog.ingestHost | string | `"https://us.i.posthog.com"` | Upstream PostHog ingest endpoint used server-side by the proxy route (POSTHOG_INGEST_HOST). Never exposed to the browser. Use https://eu.i.posthog.com for EU Cloud, or your managed proxy CNAME. |
 | frontend.posthog.token | string | `""` | PostHog project token (phc_...). Required when enabled=true. |
-| frontend.posthog.uiHost | string | `"https://us.posthog.com"` | Use https://eu.posthog.com for EU Cloud. |
+| frontend.posthog.uiHost | string | `"https://us.posthog.com"` | PostHog UI host for toolbar links etc. (NEXT_PUBLIC_POSTHOG_UI_HOST). Use https://eu.posthog.com for EU Cloud. |
 | frontend.priorityClassName | string | `"service-standard"` | Web pod priority class. |
 | frontend.readinessProbe.enabled | bool | `true` | Enable web readiness probe. |
 | frontend.readinessProbe.failureThreshold | int | `6` | Web readiness failure threshold. |
@@ -482,8 +482,8 @@ helm upgrade --install classifyre ./helm/classifyre \
 | postgres.cnpg.database | string | `"classifyre"` | Database bootstrapped by CNPG. |
 | postgres.cnpg.imageName | string | `"ghcr.io/cloudnative-pg/postgresql:18-standard-trixie"` | CNPG Postgres image. |
 | postgres.cnpg.instances | int | `3` | Number of CNPG instances. |
-| postgres.cnpg.postgresql.parameters | object | `{"autovacuum_naptime":"15s","autovacuum_vacuum_cost_limit":"2000","effective_cache_size":"6GB","idle_in_transaction_session_timeout":"300000","maintenance_work_mem":"256MB","pg_stat_statements.max":"10000","pg_stat_statements.track":"top","random_page_cost":"1.1","shared_buffers":"2GB","work_mem":"16MB"}` | Postgres itself uses the memory already granted to each instance. |
-| postgres.cnpg.postgresql.sharedPreloadLibraries | list | `["pg_stat_statements"]` | cluster (CNPG performs a rolling restart). |
+| postgres.cnpg.postgresql.parameters | object | `{"autovacuum_naptime":"15s","autovacuum_vacuum_cost_limit":"2000","effective_cache_size":"6GB","idle_in_transaction_session_timeout":"300000","maintenance_work_mem":"256MB","pg_stat_statements.max":"10000","pg_stat_statements.track":"top","random_page_cost":"1.1","shared_buffers":"2GB","work_mem":"16MB"}` | postgresql.conf parameters merged into the CNPG Cluster's `spec.postgresql.parameters`. Tune these for the workload rather than raising CNPG resource limits — shared_buffers/work_mem control how Postgres itself uses the memory already granted to each instance. |
+| postgres.cnpg.postgresql.sharedPreloadLibraries | list | `["pg_stat_statements"]` | Libraries preloaded at postmaster start. Changing this restarts the cluster (CNPG performs a rolling restart). |
 | postgres.cnpg.storage.size | string | `"20Gi"` | CNPG storage size per instance. |
 | postgres.cnpg.storage.storageClassName | string | `""` | CNPG storage class name. |
 | postgres.cnpg.superuserSecretName | string | `""` | Existing CNPG superuser secret name. |
@@ -497,14 +497,14 @@ helm upgrade --install classifyre ./helm/classifyre \
 | postgres.embedded.image.pullPolicy | string | `"IfNotPresent"` | Embedded Postgres image pull policy. |
 | postgres.embedded.image.repository | string | `"pgvector/pgvector"` | Embedded Postgres image repository. |
 | postgres.embedded.image.tag | string | `"0.8.7-pg18-bookworm"` | Embedded Postgres image tag. |
-| postgres.embedded.livenessProbe | object | `{"enabled":false,"failureThreshold":10,"initialDelaySeconds":10,"periodSeconds":30,"timeoutSeconds":15}` | already parks traffic on a wedged instance without that risk. |
+| postgres.embedded.livenessProbe | object | `{"enabled":false,"failureThreshold":10,"initialDelaySeconds":10,"periodSeconds":30,"timeoutSeconds":15}` | Liveness probe for embedded Postgres. Disabled by default: this is a single instance with no failover, so a restart can only lose in-flight work, never repair anything. `pg_isready` also measures the node's ability to fork under load, so a busy node (a heavy scan, an embedding batch) reads as a dead database and the kubelet kills it. Readiness already parks traffic on a wedged instance without that risk. |
 | postgres.embedded.nodeSelector | object | `{}` | Embedded Postgres scheduling: node selector. |
-| postgres.embedded.parameters | object | `{"shared_buffers":"512MB","work_mem":"16MB"}` | how Postgres itself uses the memory already granted to it. |
+| postgres.embedded.parameters | object | `{"shared_buffers":"512MB","work_mem":"16MB"}` | postgresql.conf parameters passed to the server as `-c key=value` container args. Tune these for the workload rather than raising Postgres resource limits (see postgres.embedded.resources) — shared_buffers/work_mem control how Postgres itself uses the memory already granted to it. |
 | postgres.embedded.password | string | `""` | Embedded Postgres password (required when existingSecret is empty). |
 | postgres.embedded.persistence.accessModes | list | `["ReadWriteOnce"]` | Access modes for embedded Postgres PVC. |
 | postgres.embedded.persistence.enabled | bool | `true` | Enable persistent volume for embedded Postgres data. |
 | postgres.embedded.persistence.existingClaim | string | `""` | Existing PVC name for embedded Postgres data. |
-| postgres.embedded.persistence.keepOnUninstall | bool | `false` | with the PVC on `helm uninstall`. |
+| postgres.embedded.persistence.keepOnUninstall | bool | `false` | Keep the PVC (and its data) when the release is uninstalled, via the helm.sh/resource-policy annotation. The default storage class's reclaim policy otherwise deletes the underlying volume's data along with the PVC on `helm uninstall`. |
 | postgres.embedded.persistence.size | string | `"20Gi"` | Requested size for embedded Postgres PVC. |
 | postgres.embedded.persistence.storageClassName | string | `""` | Storage class for embedded Postgres PVC. |
 | postgres.embedded.podAnnotations | object | `{}` | Additional annotations for embedded Postgres pod. |
@@ -512,11 +512,11 @@ helm upgrade --install classifyre ./helm/classifyre \
 | postgres.embedded.podSecurityContext | object | `{"fsGroup":999,"runAsGroup":999,"runAsUser":999,"seccompProfile":{"type":"RuntimeDefault"}}` | Embedded Postgres pod security context. |
 | postgres.embedded.port | int | `5432` | Embedded Postgres service and container port. |
 | postgres.embedded.priorityClassName | string | `"service-standard"` | Embedded Postgres pod priority class. |
-| postgres.embedded.readinessProbe | object | `{"failureThreshold":6,"initialDelaySeconds":5,"periodSeconds":10,"timeoutSeconds":10}` | that flaps under load churns every consumer's connection pool. |
+| postgres.embedded.readinessProbe | object | `{"failureThreshold":6,"initialDelaySeconds":5,"periodSeconds":10,"timeoutSeconds":10}` | Readiness probe for embedded Postgres. Failing readiness only removes the pod from the Service, so the thresholds can be generous: a probe that flaps under load churns every consumer's connection pool. |
 | postgres.embedded.resources.limits | object | `{"cpu":"2","memory":"4Gi"}` | Embedded Postgres resource limits. Must equal requests (see above). |
-| postgres.embedded.resources.requests | object | `{"cpu":"2","memory":"4Gi"}` | demotes the pod to Burstable. |
+| postgres.embedded.resources.requests | object | `{"cpu":"2","memory":"4Gi"}` | Embedded Postgres resources. Requests deliberately equal limits, which puts the pod in the Guaranteed QoS class. This is the whole point: in cgroup v2 the CPU *request* is the scheduling weight, and the memory request drives both `oom_score_adj` and kubelet's node-pressure eviction order. With the old 100m/256Mi request Postgres carried the same CPU weight as a docling PDF pipeline and, sitting far above its request, ranked as a prime kill candidate -- the one process in the cluster that must not be lost had the weakest guarantee in the chart. Guaranteed makes it the last thing the kernel and the kubelet touch. Keep these two blocks identical when tuning; splitting them silently demotes the pod to Burstable. |
 | postgres.embedded.service.annotations | object | `{}` | Additional annotations for embedded Postgres service. |
-| postgres.embedded.shmSize | string | `"1Gi"` | to fall back to the runtime default. |
+| postgres.embedded.shmSize | string | `"1Gi"` | Size of the tmpfs mounted at /dev/shm. Parallel query workers allocate their exchange buffers there, and the container runtime default (64Mi) is far too small: a parallel aggregate over a large table fails with `could not resize shared memory segment ... No space left on device` (SQLSTATE 53100). Counts against the pod's memory limit, so keep it comfortably below postgres.embedded.resources.limits.memory. Set to "" to fall back to the runtime default. |
 | postgres.embedded.terminationGracePeriodSeconds | string | `nil` | Embedded Postgres pod termination grace period (seconds). Set to null to use Kubernetes default. |
 | postgres.embedded.tolerations | list | `[]` | Embedded Postgres scheduling: tolerations. |
 | postgres.embedded.username | string | `"postgres"` | Embedded Postgres user name. |
@@ -532,8 +532,8 @@ helm upgrade --install classifyre ./helm/classifyre \
 | postgres.mode | string | `"embedded"` | PostgreSQL mode: external, cnpg, or embedded. |
 | priorityClasses.batchName | string | `"batch-low-priority"` | Priority class name for batch workloads. |
 | priorityClasses.batchValue | int | `1000` | Numeric priority value for batch workloads. |
-| priorityClasses.create | bool | `true` |  |
-| priorityClasses.interactiveName | string | `"interactive"` | evicts a running scan to get its place. |
+| priorityClasses.create | bool | `true` | Create service and batch priority classes. On by default: without them every pod sits at priority 0, so under node pressure the kubelet has no way to prefer Postgres over a batch scan. `batch-low-priority` also sets preemptionPolicy: Never, so a queued CLI Job can never displace a running service pod -- it waits for room instead. |
+| priorityClasses.interactiveName | string | `"interactive"` | Priority class name for interactive CLI Jobs: SQL queries someone is waiting for in the browser. Between service and batch, so a query is scheduled before queued scans; preemptionPolicy Never, so it never evicts a running scan to get its place. |
 | priorityClasses.interactiveValue | int | `5000` | Numeric priority value for interactive CLI Jobs. |
 | priorityClasses.serviceName | string | `"service-standard"` | Priority class name for service workloads. |
 | priorityClasses.serviceValue | int | `10000` | Numeric priority value for service workloads. |
@@ -548,7 +548,7 @@ helm upgrade --install classifyre ./helm/classifyre \
 | queryWorker.drainSeconds | int | `960` | Seconds a stopping pod lets running queries finish before it stops them. The default outlasts the longest query timeout a workspace may set (900 s) plus the worker's backstop, so a rollout or scale-down stops no query; the pod takes no new query meanwhile. |
 | queryWorker.enabled | bool | `true` | Run SQL queries (the SQL page, exports, MCP, SQL connections) on a warm pool instead of starting a Job per query (docs/prd/DQ-data-query.md §5.3). It is the CLI image (`api.cliJobs.image`) running `query-worker`: one process per query, forked from a process that has already imported DuckDB and every source, so a query starts in milliseconds instead of waiting for a pod. Needs `api.cliJobs.enabled`. |
 | queryWorker.extraEnv | list | `[]` | Extra environment for the worker (after `api.cliJobs.extraEnv`). |
-| queryWorker.jobOnlySourceTypes | list | `["ODBC","CUSTOM"]` | Source types whose queries always run as Jobs, never in the shared worker: they load native code the source names (an ODBC `Driver=` path) or run code the source's editors wrote (a CUSTOM notebook's `scan()`). |
+| queryWorker.jobOnlySourceTypes | list | `["ODBC","CUSTOM"]` | Source types whose queries always run as Jobs, never in the shared worker. ODBC (it loads the driver the source names) and CUSTOM (it runs the notebook's `scan()`) are always among them, whatever this lists; add more here. |
 | queryWorker.maxActivePerPerson | int | `100` | Queries one person may have waiting or running at once (the SQL page, exports, MCP and SQL connections together: a BI tool's pool counts). A guard against a runaway client, not a capacity limit: slots, replicas and overflow Jobs are. With the worker off the API keeps its default of 20. |
 | queryWorker.maxActivePerWorkspace | int | `200` | Queries one workspace may have waiting or running at once, so one workspace cannot take every slot of a pool other workspaces share. |
 | queryWorker.maxMemoryPerQuery | string | `"1536Mi"` | Most memory one query process may use before the worker stops it (the query fails as "out of memory", nothing else does): DuckDB's share plus an export at its 256 MB limit. Empty: no cap per query. |
@@ -580,17 +580,17 @@ helm upgrade --install classifyre ./helm/classifyre \
 | serviceAccount.automount | bool | `true` | Mount service account token into API pods (required for Kubernetes CLI jobs). |
 | serviceAccount.create | bool | `true` | Create the API service account. |
 | serviceAccount.name | string | `""` | Existing service account name to use when `create=false`. |
-| sqlGateway.allowedCidrs | list | `[]` | `service.loadBalancerSourceRanges` for a LoadBalancer. |
-| sqlGateway.enabled | bool | `false` | audited with the connection. |
+| sqlGateway.allowedCidrs | list | `[]` | Client networks allowed to connect (CIDRs, checked in the gateway on the real client address). Empty: any. Also set `service.loadBalancerSourceRanges` for a LoadBalancer. |
+| sqlGateway.enabled | bool | `false` | SQL connections (docs/prd/DQ-data-query.md §5.7): a PostgreSQL endpoint for BI tools and drivers (psql, DBeaver, Power BI, Excel, Tableau, JDBC, ODBC). Runs the API image with SERVICE_ROLE=sql. People sign in with a SQL connection made in the app; every query runs as a query job and is audited with the connection. |
 | sqlGateway.idleMinutes | int | `30` | Minutes a session may sit idle before it is closed. |
-| sqlGateway.maxOldSpaceSizeMb | int | `1024` | JS heap (WebAssembly), so this stays small. |
-| sqlGateway.maxSessions | int | `16` | sessions: raise the limit along with this. |
+| sqlGateway.maxOldSpaceSizeMb | int | `1024` | V8 heap cap (MB) of the gateway process. The catalogs live outside the JS heap (WebAssembly), so this stays small. |
+| sqlGateway.maxSessions | int | `16` | Sessions one gateway pod holds at once. Each is a PGlite of its own: about 150 MB idle, about 450 MB while a BI tool syncs and queries. Memory bounds it too: a new session is refused as busy (53300) unless the pod's memory, plus `sessionMemoryMb` for it and for each session still starting, stays under the RSS guard (87.5 % of `resources.limits.memory`). At the default 4Gi that is about 6 busy sessions: raise the limit along with this. |
 | sqlGateway.maxSessionsPerConnection | int | `4` | Sessions one SQL connection may have open at once. |
 | sqlGateway.port | int | `5432` | Port the gateway listens on inside the pod and on its Service. |
-| sqlGateway.proxyProtocol | bool | `false` | every connection comes through such a proxy. |
-| sqlGateway.publicHost | string | `""` | connection details; e.g. `sql.example.com`. |
-| sqlGateway.publicPort | int | `5432` | entrypoint's). |
-| sqlGateway.replicaCount | int | `1` | spread sessions (each holds an in-memory catalog of ~150 MB). |
+| sqlGateway.proxyProtocol | bool | `false` | Expect a PROXY protocol header (v1 or v2) on every connection, so the gateway sees the real client behind a TCP proxy (Traefik, HAProxy, a cloud load balancer) for lockouts and `allowedCidrs`. Turn on only when every connection comes through such a proxy. |
+| sqlGateway.publicHost | string | `""` | The host name people connect to, shown in the app next to each connection, and put in the generated certificate. Required to show connection details; e.g. `sql.example.com`. |
+| sqlGateway.publicPort | int | `5432` | The port people connect to (the Service's, a NodePort, or a Traefik entrypoint's). |
+| sqlGateway.replicaCount | int | `1` | Gateway replicas. A client session stays on one pod; more replicas spread sessions (each holds an in-memory catalog of ~150 MB). |
 | sqlGateway.resources.limits.memory | string | `"4Gi"` |  |
 | sqlGateway.resources.requests.cpu | string | `"250m"` |  |
 | sqlGateway.resources.requests.memory | string | `"1Gi"` |  |
@@ -598,24 +598,24 @@ helm upgrade --install classifyre ./helm/classifyre \
 | sqlGateway.service.externalTrafficPolicy | string | `""` | `Local` keeps the client address for `allowedCidrs` without PROXY protocol. |
 | sqlGateway.service.loadBalancerSourceRanges | list | `[]` | For a LoadBalancer: the client networks it accepts. |
 | sqlGateway.service.nodePort | string | `nil` | Fixed node port for `NodePort`/`LoadBalancer`. |
-| sqlGateway.service.type | string | `"ClusterIP"` | reverse proxy is needed at all. |
-| sqlGateway.sessionMemoryMb | int | `450` | room for it (MB; measured 2026-11-21 with Metabase, BIC M5). |
+| sqlGateway.service.type | string | `"ClusterIP"` | `ClusterIP` when a TCP proxy (Traefik) exposes it; `LoadBalancer` or `NodePort` to expose it directly — the gateway does its own TLS, so no reverse proxy is needed at all. |
+| sqlGateway.sessionMemoryMb | int | `450` | What one more session is allowed for when deciding whether the pod has room for it (MB; measured 2026-11-21 with Metabase, BIC M5). |
 | sqlGateway.tls.allowPlaintext | bool | `false` | Development only: accept connections without TLS. |
 | sqlGateway.tls.certManager.enabled | bool | `false` | Let cert-manager issue the certificate for `publicHost`. |
 | sqlGateway.tls.certManager.issuerRef.kind | string | `"ClusterIssuer"` |  |
 | sqlGateway.tls.certManager.issuerRef.name | string | `""` |  |
-| sqlGateway.tls.existingSecret | string | `""` | the app, so clients can use `sslmode=verify-full`). |
-| sqlGateway.tls.extraSans | list | `[]` | `localhost` and the Service's names). |
-| sqlGateway.traefik.enabled | bool | `false` | entrypoint for it (e.g. `--entryPoints.postgres.address=:5432`). |
+| sqlGateway.tls.existingSecret | string | `""` | A `kubernetes.io/tls` Secret (`tls.crt`, `tls.key`, optionally `ca.crt`) for `publicHost`. Empty: cert-manager below, or a CA and certificate the chart makes once and keeps (its CA is downloadable in the app, so clients can use `sslmode=verify-full`). |
+| sqlGateway.tls.extraSans | list | `[]` | Extra names for the generated certificate (besides `publicHost`, `localhost` and the Service's names). |
+| sqlGateway.traefik.enabled | bool | `false` | Expose through Traefik (v3) as an IngressRouteTCP. Needs a Traefik entrypoint for it (e.g. `--entryPoints.postgres.address=:5432`). |
 | sqlGateway.traefik.entryPoints[0] | string | `"postgres"` |  |
-| sqlGateway.traefik.tls | string | `"none"` | the TLS stream through. TLS always ends at the gateway (TLS 1.3). |
-| sqlGateway.trustedProxies | list | `[]` | start without it, and a malformed CIDR also stops it. |
+| sqlGateway.traefik.tls | string | `"none"` | `none`: Traefik forwards raw TCP from a dedicated entrypoint (`HostSNI(*)`) and TLS is negotiated with the gateway, end to end — works with every client. `passthrough`: route by `publicHost` (SNI) on a shared entrypoint; Traefik answers PostgreSQL's SSLRequest and passes the TLS stream through. TLS always ends at the gateway (TLS 1.3). |
+| sqlGateway.trustedProxies | list | `[]` | With `proxyProtocol`: the networks of the proxies themselves (pod or node CIDRs of Traefik, a load balancer). A PROXY header from anywhere else is refused, so a client reaching the pod directly cannot claim another address. Required with `proxyProtocol`: the gateway does not start without it, and a malformed CIDR also stops it. |
 | telemetry.deployEnv | string | `"production"` | Deployment environment tag attached to every span/metric/log. |
-| telemetry.enabled | bool | `false` | Opt out (already default): set enabled=false, or set TELEMETRY_DISABLED=1 / DO_NOT_TRACK=1 at runtime. |
+| telemetry.enabled | bool | `false` | Enable OpenTelemetry instrumentation for API, web, and CLI components. Disabled by default. When enabled, traces/metrics/logs are exported via OTLP to telemetry.otlpEndpoint. Opt out (already default): set enabled=false, or set TELEMETRY_DISABLED=1 / DO_NOT_TRACK=1 at runtime. |
 | telemetry.instanceId.configMapKey | string | `"instance-id"` | Key inside the ConfigMap that holds the UUID string. |
 | telemetry.instanceId.enabled | bool | `true` | Persist a stable anonymous instance UUID in a ConfigMap so it survives upgrades. |
 | telemetry.instanceId.existingConfigMap | string | `""` | Use an existing ConfigMap instead of creating one. Must contain instanceId.configMapKey. |
-| telemetry.otlpEndpoint | string | `""` | otlpEndpoint: "http://otel-receiver-opentelemetry-collector.monitoring:4318" |
+| telemetry.otlpEndpoint | string | `""` | OTLP endpoint all components export to (traces, metrics, logs). Required when telemetry.enabled=true. Deploy helm/otel-receiver in your own cluster and point at it, e.g.:   otlpEndpoint: "http://otel-receiver-opentelemetry-collector.monitoring:4318" |
 | telemetry.otlpProtocol | string | `"http/protobuf"` | OTLP export protocol: "http/protobuf" (default) or "grpc". |
 | worker.autoscaling.enabled | bool | `false` | Enable the worker HPA. OFF by default, and not a default you should flip without looking at your node pool first.  More replicas add throughput safely — pg-boss gives each job to one consumer, and the job-slot semaphore is a Postgres advisory lock shared across replicas. What more replicas do NOT add is capacity: on a single-node cluster a second 3Gi worker competes with the first for the same RAM, and the usual result is eviction rather than throughput. Scale out only when there is somewhere for the pod to go, and soak two replicas manually — a scan for a few minutes — before turning this on. |
 | worker.autoscaling.maxReplicas | int | `3` | Maximum worker replicas under HPA. |
@@ -627,6 +627,6 @@ helm upgrade --install classifyre ./helm/classifyre \
 | worker.maxOldSpaceSizeMb | int | `2304` | V8 old-space (JS heap) cap in MB for the WORKER pods, overriding `api.maxOldSpaceSizeMb`. Leave empty to inherit the API's value.  The worker needs its own number because it has its own memory limit. With the shared 1536 MB cap inside a 3Gi worker the container stopped being OOMKilled and started dying of `FATAL ERROR: Reached heap limit` (SIGSEGV, exit 139) roughly 40s after boot instead — the cgroup was no longer the binding constraint, the heap cap was, and 1.5 GB of the pod's 3 GB simply went unused. Same 0.75x rule of thumb as the API: 2304 ≈ 0.75 × 3072. |
 | worker.maxRssMb | string | `""` | Total process RSS (MB) for the WORKER pods. Leave empty to derive it from the worker's OWN `resources.limits.memory` (0.875 x), which is almost always what you want — the worker holds the forked onnxruntime child on top of everything the API holds, and its limit differs from the API's. |
 | worker.namespaceJobSlotTimeoutSeconds | int | `900` | Seconds a job batch may wait for a concurrency slot before it gives up. An unbounded wait is indistinguishable from a hang: the handler never runs, never fails and never reports. On timeout the batch throws, pg-boss retries it later, and the stall becomes visible in the worker queue view instead of silent. Set 0 to wait forever (the previous behaviour). |
-| worker.replicaCount | int | `1` | background work no longer competes with api pods for their memory limit. |
-| worker.resources.limits | object | `{"cpu":"1","memory":"3Gi"}` | felt pressure. 3Gi leaves ~1.5 GB for native allocations. |
+| worker.replicaCount | int | `1` | Number of worker replicas. The worker runs the same image as the API (SERVICE_ROLE=worker) to process background pg-boss queue jobs and embedding inference outside the HTTP-serving api pods, so heavy background work no longer competes with api pods for their memory limit. |
+| worker.resources.limits | object | `{"cpu":"1","memory":"3Gi"}` | Worker resource limits. The worker holds one Prisma query engine and pg-boss pool per resident namespace plus the forked onnxruntime child, all outside the V8 heap, so `api.maxOldSpaceSizeMb` (1536) + native exceeded a 2Gi limit and the cgroup OOM-killed the pod before V8 ever felt pressure. 3Gi leaves ~1.5 GB for native allocations. |
 | worker.resources.requests | object | `{"cpu":"100m","memory":"512Mi"}` | Worker resource requests. |
