@@ -1,42 +1,25 @@
-import { DockerRunBlock } from "@workspace/ui/components";
-
 import { getLandingCopy } from "@/content/landing";
 import type { Locale } from "@/lib/locale";
 import { withLocalePrefix } from "@/lib/locale";
-import {
-  docs,
-  contactEmail,
-  routes,
-  showcaseUrlFor,
-  softwareVersion,
-} from "@/lib/site";
+import { routes, showcaseUrlFor } from "@/lib/site";
 import { ClosingBoard } from "@/components/closing-board";
 import { ExhibitMark, Micro, Pin } from "@/components/landing/motifs";
 import { GovernancePath } from "@/components/landing/governance-path";
 import { RedactionSheet } from "@/components/landing/redaction-sheet";
 
 /**
- * Hero: the governance board.
+ * Hero: asymmetric composition pairing an executive headline on the left with
+ * a live interactive multi-group masking & row-filter table on the right.
  *
- * Composition stays asymmetric: display type holds the left of the grid
- * like a poster, the redaction sheet sits on the right with the badge
- * pinned to it. The backdrop is the string board, drawn as the path data
- * takes through Classifyre (connected, found, governed, granted, shared,
- * connected to BI, logged), with a pulse travelling it.
- *
- * Two readers, two buttons: the buyer plans a pilot mapped onto their own
- * organisation, the engineer jumps to the Docker command. The showcase is a
- * quiet text link, and the proof line sits under all of it.
- *
- * The bottom edge is the install strip, so the page answers "how do I run
- * it" before the first scroll ends. No signup, no form.
+ * Below the fold line: the six-step end-to-end governance flow and a clean
+ * four-column architecture proof strip (Docker/Helm commands live in the
+ * Deployment section and /get, keeping the hero clean for business leaders).
  */
 export function Hero({ locale }: { locale: Locale }) {
   const copy = getLandingCopy(locale);
   const showcase = showcaseUrlFor(locale);
-  const pilot = `mailto:${contactEmail}?subject=${encodeURIComponent(
-    locale === "de" ? "Classifyre-Pilot" : "Classifyre pilot",
-  )}`;
+  const deployHref = `${withLocalePrefix(locale, routes.get)}/`;
+  const supportHref = `${withLocalePrefix(locale, routes.support)}/`;
 
   return (
     <section
@@ -45,9 +28,9 @@ export function Hero({ locale }: { locale: Locale }) {
     >
       <ClosingBoard locale={locale} />
 
-      <div className="relative mx-auto flex w-full max-w-7xl flex-col gap-12 px-4 py-12 sm:px-6 lg:gap-16 lg:px-10 lg:py-16">
-        <div className="grid items-center gap-14 xl:grid-cols-12 xl:gap-10">
-          {/* Poster column */}
+      <div className="relative mx-auto flex w-full max-w-7xl flex-col gap-12 px-4 py-12 sm:px-6 lg:gap-14 lg:px-10 lg:py-16">
+        <div className="grid items-center gap-12 xl:grid-cols-12 xl:gap-10">
+          {/* Headline & value proposition */}
           <div className="relative z-10 min-w-0 space-y-7 xl:col-span-5">
             <div className="flex flex-wrap items-center gap-2">
               {copy.hero.chips.map((chip) => (
@@ -58,7 +41,7 @@ export function Hero({ locale }: { locale: Locale }) {
             <h1
               id="hero-title"
               lang={locale}
-              className="font-hero text-[clamp(3rem,7vw,5.4rem)] uppercase leading-[0.88] tracking-[0.01em] text-white [hyphens:manual]"
+              className="font-hero text-[clamp(3.1rem,7vw,5.4rem)] uppercase leading-[0.88] tracking-[0.01em] text-white [hyphens:manual]"
             >
               {copy.hero.titleA.split(/(?<=\.)\s+/).map((line) => (
                 <span key={line} className="block">
@@ -73,19 +56,19 @@ export function Hero({ locale }: { locale: Locale }) {
               </span>
             </h1>
 
-            <p className="max-w-2xl text-base leading-7 text-white/75 sm:text-lg sm:leading-8">
+            <p className="max-w-xl text-base leading-7 text-white/80 sm:text-lg sm:leading-8">
               {copy.hero.lede}
             </p>
 
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3 pt-1">
               <a
-                href={pilot}
+                href={deployHref}
                 className="inline-flex items-center border-2 border-accent bg-accent px-5 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-black transition-colors hover:border-white hover:bg-white"
               >
                 {copy.hero.ctaPrimary}
               </a>
               <a
-                href="#run-it"
+                href={supportHref}
                 className="inline-flex items-center border-2 border-white/25 px-5 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-white transition-colors hover:border-accent hover:text-accent"
               >
                 {copy.hero.ctaSecondary}
@@ -94,57 +77,38 @@ export function Hero({ locale }: { locale: Locale }) {
                 href={showcase}
                 target="_blank"
                 rel="noreferrer"
-                className="group inline-flex items-center gap-2 py-2.5"
+                className="group inline-flex items-center gap-2 py-2.5 pl-1"
               >
                 <Pin solid={false} />
-                <Micro className="text-white/60 transition-colors group-hover:text-accent">
+                <Micro className="text-white/65 transition-colors group-hover:text-accent">
                   {copy.hero.ctaShowcase} →
                 </Micro>
               </a>
             </div>
-
           </div>
 
-          {/* The exhibit: a customer table, redacted as you watch. */}
-          <div className="relative min-w-0 pt-14 xl:col-span-7 xl:pt-16">
+          {/* Interactive multi-group row-filter & column-masking preview */}
+          <div className="relative min-w-0 xl:col-span-7">
             <RedactionSheet locale={locale} />
           </div>
         </div>
 
-        {/* The path data takes, station by station. */}
+        {/* End-to-end flow: Integrate → Detect → Govern → Mask → Query & BI → Request & Share */}
         <div className="border-t-2 border-white/15 pt-8">
           <GovernancePath locale={locale} />
         </div>
 
-        {/* Install strip: the answer to "how do I run it", above the fold's
-            end. One command, three ways onward, no form. */}
-        <div className="grid gap-6 border-t-2 border-white/15 pt-6 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)] lg:items-center lg:gap-10">
-          <div className="min-w-0">
-            <Micro className="text-white/60">{copy.install.marker}</Micro>
-            <DockerRunBlock tone="dark" tag={softwareVersion} className="mt-2" />
-          </div>
-          <nav aria-label={copy.install.marker} className="flex flex-col gap-2">
-            {[
-              { label: copy.install.dockerCta, href: `${withLocalePrefix(locale, routes.get)}/` },
-              { label: copy.install.helmCtaDocs, href: docs.kubernetes },
-              { label: copy.hero.ctaShowcase, href: showcase },
-            ].map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                {...(link.href === showcase
-                  ? { target: "_blank", rel: "noreferrer" }
-                  : null)}
-                className="group flex items-center gap-2 py-1.5"
-              >
-                <Pin solid={false} />
-                <Micro className="text-white/60 transition-colors group-hover:text-accent">
-                  {link.label} →
-                </Micro>
-              </a>
-            ))}
-          </nav>
-        </div>
+        {/* Architectural proof strip */}
+        <dl className="grid gap-6 border-t border-white/15 pt-6 sm:grid-cols-2 lg:grid-cols-4">
+          {copy.hero.proofBar.map((item) => (
+            <div key={item.label} className="space-y-1">
+              <dt>
+                <Micro className="text-accent">{item.label}</Micro>
+              </dt>
+              <dd className="text-sm font-medium text-white/85">{item.value}</dd>
+            </div>
+          ))}
+        </dl>
       </div>
     </section>
   );

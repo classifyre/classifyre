@@ -11,32 +11,32 @@ const PIPELINE: Array<{
   {
     step: "01",
     name: "Connect",
-    blurb: "Point Classifyre at systems you already run. Data stays in place.",
+    blurb: "Integrate 40+ databases, lakehouses (Iceberg, Delta, Parquet), and file stores in place.",
     href: "/sources/",
   },
   {
     step: "02",
-    name: "Scan",
-    blurb: "Each run registers every table, document and file as an asset.",
-    href: "/flow/",
-  },
-  {
-    step: "03",
     name: "Detect",
-    blurb: "Detectors read every asset and flag personal data and secrets.",
+    blurb: "Classify PII, secrets, and custom business rules with regex, Python, local AI, or LLMs.",
     href: "/detectors/",
   },
   {
+    step: "03",
+    name: "Govern & mask",
+    blurb: "Map directory groups to row filters, multi-level column masks, and time-limited grants.",
+    href: "/access/",
+  },
+  {
     step: "04",
-    name: "Mask & grant",
-    blurb: "Classified columns are masked by default; groups get the access they need.",
-    href: "/data-query/",
+    name: "Query & BI",
+    blurb: "Serve live SQL, Power BI, Excel, ODBC, and MCP agents through personal connections.",
+    href: "/sql-connections/",
   },
   {
     step: "05",
-    name: "Query",
-    blurb: "SQL, Excel, Power BI and AI agents read through the masks. Every read is logged.",
-    href: "/sql-connections/",
+    name: "Share & audit",
+    blurb: "Publish governed shared datasets with inherited masks and log every read automatically.",
+    href: "/data-query/#shared-datasets",
   },
 ];
 
@@ -50,39 +50,36 @@ const START_HERE: Array<{
     label: "New here",
     title: "Understand it",
     blurb:
-      "The whole platform in plain English — no setup, no jargon, just how a pile of scattered data becomes three leads worth your time.",
+      "How Classifyre governs data end to end — from connecting existing systems and directory groups to masking, SQL/BI access, and governed data products.",
     links: [
       { text: "How Classifyre works", href: "/how-it-works/" },
       { text: "Isolated workspaces", href: "/how-it-works/workspaces/" },
       { text: "A tour of the app", href: "/how-it-works/in-the-app/" },
-      {
-        text: "From documents to findings",
-        href: "/how-it-works/documents-to-findings/",
-      },
+      { text: "Roles & directory access", href: "/access/" },
     ],
   },
   {
     label: "Setting it up",
-    title: "Run it",
+    title: "Deploy it",
     blurb:
-      "Stand the platform up, connect your first system, and watch the first scan land — on a laptop or in production.",
+      "Evaluate locally with Docker or deploy to Kubernetes and OpenShift with Helm — on-premises or in your own cloud.",
     links: [
       { text: "Run it with Docker", href: "/deployment/docker/" },
-      { text: "Deploy with Kubernetes", href: "/deployment/kubernetes/" },
+      { text: "Deploy on Kubernetes & OpenShift", href: "/deployment/kubernetes/" },
       { text: "Connect a source", href: "/sources/" },
-      { text: "Your first scan", href: "/flow/" },
+      { text: "Configure detectors", href: "/detectors/" },
     ],
   },
   {
-    label: "Using the data",
-    title: "Govern it",
+    label: "Governing data",
+    title: "Use it",
     blurb:
-      "Findings decide what is masked. Grant access per group, give people SQL, Excel and Power BI, and see who read what. If something leaks, investigate it.",
+      "Apply group-based row filters and column masks, connect Power BI and Excel, publish shared datasets, and review the audit log.",
     links: [
-      { text: "Query data & masking", href: "/data-query/" },
-      { text: "SQL connections", href: "/sql-connections/" },
-      { text: "Roles & access", href: "/access/" },
-      { text: "Investigate a leak", href: "/investigations/" },
+      { text: "SQL, masking & shared datasets", href: "/data-query/" },
+      { text: "Power BI, Excel & ODBC connections", href: "/sql-connections/" },
+      { text: "Organizing groups & roles", href: "/access/organizing/" },
+      { text: "Incident response", href: "/investigations/" },
     ],
   },
 ];
@@ -154,19 +151,19 @@ export function DocsHome() {
           className="text-[17vw] leading-[0.88] uppercase sm:text-7xl md:text-8xl"
           style={{ fontFamily: "var(--font-hero)" }}
         >
-          Your access rules,
+          Control who sees what.
           <br />
-          enforced on{" "}
+          Enforced on{" "}
           <span className="bg-accent px-2 text-accent-foreground">
             every query.
           </span>
         </h1>
         <p className="mt-6 max-w-2xl text-lg leading-7 text-muted-foreground">
-          Classifyre is the one governed way into your organisation&apos;s
-          data: access follows your departments, roles and rules, personal
-          data stays masked until someone is cleared for it, and every read is
-          on record, on your own servers. All of it is open source. These docs
-          explain how the application works, section by section.
+          Classifyre is an open-source data governance platform you run on your
+          own infrastructure. Integrate your existing sources and directory
+          groups, detect sensitive and business-specific data, enforce column
+          and row masking, publish governed data products, and give teams live
+          SQL, Power BI, and Excel access with every read logged.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <a

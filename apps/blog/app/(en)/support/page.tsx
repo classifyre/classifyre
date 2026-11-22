@@ -15,9 +15,9 @@ import { contactEmail, docs, routes } from "@/lib/site";
 import "../../landing.css";
 
 export const metadata: Metadata = {
-  title: "Support",
+  title: "Support & Tailored Deployments",
   description:
-    "Classifyre is open source with every feature included. If you need help with setup, installation, a connector, or tailoring Classifyre to your organisation, contact us.",
+    "Classifyre is 100% Apache-2.0 open source with no enterprise tiers. Work directly with our engineering team when you need custom IAM integration, bespoke connectors, Delta data products, or custom detectors.",
   alternates: {
     canonical: "/support/",
     languages: {
@@ -27,33 +27,43 @@ export const metadata: Metadata = {
     },
   },
   openGraph: {
-    title: "Classifyre support",
+    title: "Classifyre Support & Tailored Rollouts",
     description:
-      "No tiers, no enterprise build. Help with setup, connectors and tailoring, on request.",
+      "100% open source with direct engineering support for IAM, custom sources, Delta data products, detectors, and Kubernetes/OpenShift rollouts.",
     type: "website",
   },
 };
 
 const topics: readonly { marker: string; title: string; body: string }[] = [
   {
-    marker: "Setup",
-    title: "Setup and installation",
-    body: "One Docker image tonight, or the Helm chart on Kubernetes — on-premises, in your own cloud, or on public cloud infrastructure like AWS, Azure or Google Cloud. If you get stuck, or want someone to look over the setup, write to us.",
+    marker: "IAM & org design",
+    title: "Identity, security, and organisational fit",
+    body: "Align Classifyre with complex Active Directory, Entra ID, Okta, or custom IAM architectures, multi-tenant workspace models, and your internal security and data protection policies.",
   },
   {
-    marker: "Connectors",
-    title: "A connector for your systems",
-    body: "Connectors are plugins and the project is open source, so a pull request is always welcome. If you need a connector for your industry's systems and would rather we build it, tell us which systems.",
+    marker: "Custom sources",
+    title: "Connectors for proprietary or legacy systems",
+    body: "Connectors are open-source plugins. When your organisation relies on industry-specific databases, custom APIs, or legacy systems not yet in the catalogue, we can build and maintain the connector with you.",
   },
   {
-    marker: "Tailoring",
-    title: "Fitting your organisation",
-    body: "Mapping your directory groups and access rules, row filters per team, masks on the right columns, the first Power BI connection, an access report your DPO can sign off. A four-to-six-week pilot covers all of it on a real system.",
+    marker: "Data products",
+    title: "Delta data products and sharing workflows",
+    body: "Design governed shared datasets, Delta Sharing pipelines, and plain-language business request workflows with owner approval and inherited column and row masking.",
   },
   {
-    marker: "Questions",
-    title: "Questions about the product",
-    body: "How the masking holds in your tools, which detectors fit your data, where something should live. The same address reaches the people who wrote the code.",
+    marker: "Detectors & AI",
+    title: "Business-specific detectors and models",
+    body: "Go beyond standard PII: build custom regex and Python checks, fine-tune lightweight local CPU AI models (such as GLiNER2), or configure domain-specific LLM classifiers inside your own environment.",
+  },
+  {
+    marker: "Infrastructure",
+    title: "Kubernetes, OpenShift, and air-gapped setup",
+    body: "Architecture review and production rollout on Kubernetes, OpenShift, on-premises data centres, or private/public clouds (AWS, Azure, GCP), including sizing, TLS, and performance tuning.",
+  },
+  {
+    marker: "Guided pilot",
+    title: "4–6 week pilot on your real data",
+    body: "Connect priority sources, map your directory groups, verify row filters and column masks in Power BI and Excel, publish your first governed data product, and produce an audit report for leadership.",
   },
 ];
 
@@ -61,23 +71,23 @@ export default function SupportPage() {
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 sm:px-6 lg:px-8">
       <PageHero
-        eyebrow="Support"
+        eyebrow="Support & Tailoring"
         title={
           <>
-            Need help?
+            Open source by default.
             <br />
             <span className="inline-block bg-accent px-[0.12em] text-black">
-              Write to us.
+              Tailored for your org.
             </span>
           </>
         }
         lede={
           <>
-            Classifyre is open source and every feature is included — there is
-            no enterprise edition and nothing to switch to. If you need help
-            with setup or installation, a connector for your systems, or
-            tailoring Classifyre to fit your organisation, contact us. You or
-            your integrator can also run everything yourselves.
+            Every feature in Classifyre is open source under Apache-2.0 — there
+            is no gated enterprise edition. Deploy and operate everything
+            yourself, or work directly with the engineers who build Classifyre
+            when you need custom IAM integration, proprietary sources, Delta
+            data products, or tailored detectors and models.
           </>
         }
         actions={
@@ -87,7 +97,9 @@ export default function SupportPage() {
               size="lg"
               className="border-2 border-accent bg-accent text-black hover:bg-accent/90"
             >
-              <a href={`mailto:${contactEmail}?subject=${encodeURIComponent("Classifyre support")}`}>
+              <a
+                href={`mailto:${contactEmail}?subject=${encodeURIComponent("Tailored Classifyre rollout")}`}
+              >
                 {contactEmail}
               </a>
             </Button>
@@ -97,7 +109,7 @@ export default function SupportPage() {
               variant="secondary"
               className="border-2 border-white/20 bg-white/10 text-white hover:bg-white/16"
             >
-              <a href={routes.get}>Get Classifyre</a>
+              <a href={routes.get}>Deployment guide</a>
             </Button>
           </>
         }
@@ -108,16 +120,16 @@ export default function SupportPage() {
           <div className="space-y-8">
             <SectionHead
               id="support-topics-title"
-              marker="What we help with"
-              title="Setup, connectors, tailoring, questions"
-              lede="Support is a conversation, not a tier. Everything below is help on request, on the same open-source product."
+              marker="How we help"
+              title="Direct engineering support, scoped to your needs"
+              lede="Whether you are in Europe, North America, or elsewhere, you speak directly with the engineers who write and maintain Classifyre."
             />
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {topics.map((item, index) => (
-                <Reveal key={item.marker} delayMs={index * 80} className="h-full">
+                <Reveal key={item.marker} delayMs={index * 60} className="h-full">
                   <div className="flex h-full flex-col items-start gap-3 border-2 border-border bg-background p-6 shadow-[6px_6px_0_var(--color-border)]">
                     <Marker label={item.marker} />
-                    <h3 className="font-serif text-lg font-black uppercase leading-tight tracking-[0.04em]">
+                    <h3 className="font-sans text-lg font-bold leading-snug text-foreground">
                       {item.title}
                     </h3>
                     <p className="text-sm leading-6 text-muted-foreground">{item.body}</p>
@@ -136,14 +148,15 @@ export default function SupportPage() {
               id="support-cta-title"
               className="font-hero text-[clamp(2.5rem,7vw,5rem)] uppercase leading-[0.88] tracking-[0.01em]"
             >
-              Same product.{" "}
+              Same open-source core.{" "}
               <span className="inline-block bg-accent px-[0.12em] text-black">
-                Help on request.
+                Built around your team.
               </span>
             </h2>
-            <p className="max-w-xl text-base leading-7 text-white/70">
-              No tiers, no gated features. Run it yourself tonight, or write
-              to us first — either way you are running the same Classifyre.
+            <p className="max-w-xl text-base leading-7 text-white/75">
+              Start by evaluating the open-source release on your own
+              infrastructure, or write to us to scope a pilot or custom
+              integration.
             </p>
             <div className="flex flex-wrap justify-center gap-3">
               <Button
@@ -151,7 +164,7 @@ export default function SupportPage() {
                 size="lg"
                 className="border-2 border-accent bg-accent text-black hover:bg-accent/90"
               >
-                <a href={`mailto:${contactEmail}`}>Contact us</a>
+                <a href={`mailto:${contactEmail}`}>Contact our team</a>
               </Button>
               <DocsLink href={docs.deployment} tone="signal">
                 Deployment docs

@@ -105,15 +105,15 @@ export interface SiteFooterCopy {
 }
 
 const DEFAULT_COPY: SiteFooterCopy = {
-  tagline: "Open-source data access governance platform",
+  tagline: "Open-source data governance",
   blurb:
-    "Classifyre is the governed way into your organisation's data. Access follows your departments and roles, personal data stays masked until someone is cleared, and every read is on record. Apache-2.0, made in Austria. Deploy on-premises, in your own cloud, or on AWS, Azure or Google Cloud.",
+    "End-to-end open-source data governance for the systems you already run. Connect your sources, classify sensitive data, enforce row and column masking by group, publish governed data products, and give teams live SQL, Power BI, and Excel access with every read logged.",
   navHeading: "Navigate",
   navHome: "Home",
-  navAbout: "About · Made in Austria",
-  navGet: "Get Classifyre",
+  navAbout: "About",
+  navGet: "Deploy",
   navSources: "Sources",
-  navSupport: "Support",
+  navSupport: "Support & Tailoring",
   navBlog: "Blog",
   navDocumentation: "Documentation",
   navShowcase: "Live showcase",
@@ -124,7 +124,7 @@ const DEFAULT_COPY: SiteFooterCopy = {
   releaseNotes: "Release notes",
   cookieSettings: "Cookie settings",
   contact: "Contact",
-  baselineTagline: "Masked by default · every read on record",
+  baselineTagline: "Built in Austria · Apache-2.0 · Deployed worldwide",
 };
 
 export function SiteFooter({
@@ -234,7 +234,7 @@ export function SiteFooter({
           </ul>
 
           <p className="mt-6 font-mono text-[10px] uppercase tracking-[0.18em] text-white/60">
-            Docker · Kubernetes · Apache-2.0
+            Docker · Kubernetes · OpenShift · Apache-2.0
           </p>
         </div>
 

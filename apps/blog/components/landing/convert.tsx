@@ -9,7 +9,6 @@ import type { Locale } from "@/lib/locale";
 import { withLocalePrefix } from "@/lib/locale";
 import {
   docs,
-  contactEmail,
   helmInstallCommand,
   repoUrl,
   routes,
@@ -24,14 +23,16 @@ import {
 } from "@/components/landing/motifs";
 
 /**
- * Conversion: "start with one department and one source" on the governance
- * board. Three honest paths (a pilot, the laptop, the cluster) and no form
- * anywhere: the buyer writes to plan a pilot, the engineer copies the
- * Docker command on the left.
+ * Open source & tailored support section:
+ * Left: self-host the complete Apache-2.0 platform via Docker, Kubernetes, or OpenShift.
+ * Right: engage the Classifyre engineering team when you need custom IAM, org design,
+ * proprietary sources, Delta data products, or bespoke detectors and AI models.
  */
 export function Convert({ locale }: { locale: Locale }) {
   const copy = getLandingCopy(locale);
   const showcase = showcaseUrlFor(locale);
+  const supportHref = `${withLocalePrefix(locale, routes.support)}/`;
+  const deployHref = `${withLocalePrefix(locale, routes.get)}/`;
 
   return (
     <section
@@ -51,19 +52,19 @@ export function Convert({ locale }: { locale: Locale }) {
         />
 
         <div className="mt-14 grid gap-12 lg:grid-cols-12 lg:gap-10">
-          {/* The two ways to run it */}
-          <div className="space-y-6 lg:col-span-7">
+          {/* Left: Self-hosted deployment (Docker + Kubernetes/OpenShift) */}
+          <div className="space-y-6 lg:col-span-6">
             <div className="space-y-2">
-              <h3 className="font-serif text-lg font-black uppercase tracking-[0.04em] sm:text-xl">
+              <h3 className="font-sans text-xl font-bold text-white">
                 {copy.install.title}
               </h3>
-              <p className="max-w-2xl text-sm leading-7 text-white/60 sm:text-base sm:leading-8">
+              <p className="max-w-2xl text-sm leading-7 text-white/70 sm:text-base">
                 {copy.install.lede}
               </p>
             </div>
 
             <div className="border-2 border-white/20 bg-white/[0.04] p-5 sm:p-6">
-              <Micro className="text-white/45">{copy.install.dockerLabel}</Micro>
+              <Micro className="text-white/55">{copy.install.dockerLabel}</Micro>
               <DockerRunBlock
                 tone="dark"
                 tag={softwareVersion}
@@ -74,21 +75,21 @@ export function Convert({ locale }: { locale: Locale }) {
 
             <div className="border-2 border-white/20 bg-white/[0.04] p-5 sm:p-6">
               <Micro className="text-accent">{copy.install.helmLabel}</Micro>
-              <h4 className="mt-2 font-serif text-base font-black uppercase tracking-[0.04em]">
+              <h4 className="mt-2 font-sans text-base font-bold text-white">
                 {copy.install.helmTitle}
               </h4>
-              <p className="mt-2 text-sm leading-7 text-white/60">
+              <p className="mt-2 text-sm leading-6 text-white/70">
                 {copy.install.helmCopy}
               </p>
-              <div className="mt-4 flex items-center gap-6 border-2 border-white/15 bg-white/[0.04] px-5 py-4">
-                <KubernetesLogo className="h-10 w-10 text-accent" />
-                <span aria-hidden="true" className="h-8 w-px bg-white/20" />
-                <HelmLogo className="h-10 w-10 text-accent" />
-                <pre className="min-w-0 flex-1 overflow-x-auto font-mono text-[11px] leading-6 text-white/70">
+              <div className="mt-4 flex items-center gap-5 border-2 border-white/15 bg-black/40 px-4 py-3.5">
+                <KubernetesLogo className="h-9 w-9 shrink-0 text-accent" />
+                <span aria-hidden="true" className="h-7 w-px bg-white/20" />
+                <HelmLogo className="h-9 w-9 shrink-0 text-accent" />
+                <pre className="min-w-0 flex-1 overflow-x-auto font-mono text-[11px] leading-6 text-white/80">
                   <code>{helmInstallCommand.join("\n")}</code>
                 </pre>
               </div>
-              <div className="mt-4 flex flex-wrap gap-4">
+              <div className="mt-4 flex flex-wrap gap-5">
                 <a
                   href={docs.kubernetes}
                   target="_blank"
@@ -109,54 +110,71 @@ export function Convert({ locale }: { locale: Locale }) {
             </div>
           </div>
 
-          {/* Three paths, one thread */}
-          <div className="flex flex-col gap-10 lg:col-span-5">
-            <ol className="space-y-6 border-l-2 border-accent/40 pl-5">
-              {copy.convert.paths.map((path) => (
-                <li key={path.label} className="relative">
-                  <span aria-hidden="true" className="absolute -left-[1.72rem] top-1.5">
-                    <Pin />
-                  </span>
-                  <Micro className="text-white/85">{path.label}</Micro>
-                  <p className="mt-1 text-sm leading-6 text-white/60">
-                    {path.text}
-                  </p>
-                </li>
-              ))}
-            </ol>
+          {/* Right: Tailored rollout & custom engineering */}
+          <div className="flex flex-col justify-between gap-8 border-2 border-white/20 bg-white/[0.03] p-6 sm:p-8 lg:col-span-6">
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <Micro className="text-accent">{copy.convert.marker}</Micro>
+                <h3 className="font-sans text-xl font-bold text-white">
+                  {copy.convert.tailoringTitle}
+                </h3>
+                <p className="text-sm leading-7 text-white/70 sm:text-base">
+                  {copy.convert.tailoringLede}
+                </p>
+              </div>
 
-            <div className="flex flex-col gap-3">
-              <a
-                href={`mailto:${contactEmail}?subject=${encodeURIComponent(
-                  locale === "de" ? "Classifyre-Pilot" : "Classifyre pilot",
-                )}`}
-                className="inline-flex w-fit items-center border-2 border-accent bg-accent px-5 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-black transition-colors hover:border-white hover:bg-white"
-              >
-                {copy.convert.ctaPrimary}
-              </a>
-              <a
-                href={`${withLocalePrefix(locale, routes.get)}/`}
-                className="inline-flex w-fit items-center border-2 border-white/25 px-5 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-white transition-colors hover:border-accent hover:text-accent"
-              >
-                {copy.convert.ctaSecondary}
-              </a>
-              <a
-                href={showcase}
-                target="_blank"
-                rel="noreferrer"
-                className="group mt-2 flex items-center gap-2"
-              >
-                <Pin solid={false} />
-                <Micro className="text-white/55 transition-colors group-hover:text-accent">
-                  {copy.convert.ctaShowcase} →
-                </Micro>
-              </a>
-              <a href={`${withLocalePrefix(locale, routes.blog)}/`} className="group flex items-center gap-2">
-                <Pin solid={false} />
-                <Micro className="text-white/55 transition-colors group-hover:text-accent">
-                  {copy.convert.ctaBlog} →
-                </Micro>
-              </a>
+              <ol className="space-y-5 border-l-2 border-accent/40 pl-5">
+                {copy.convert.paths.map((path) => (
+                  <li key={path.label} className="relative">
+                    <span aria-hidden="true" className="absolute -left-[1.72rem] top-1.5">
+                      <Pin />
+                    </span>
+                    <p className="font-sans text-sm font-bold text-white">
+                      {path.label}
+                    </p>
+                    <p className="mt-1 text-sm leading-6 text-white/65">
+                      {path.text}
+                    </p>
+                  </li>
+                ))}
+              </ol>
+            </div>
+
+            <div className="space-y-4 border-t border-white/15 pt-6">
+              <div className="flex flex-wrap gap-3">
+                <a
+                  href={supportHref}
+                  className="inline-flex items-center border-2 border-accent bg-accent px-5 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-black transition-colors hover:border-white hover:bg-white"
+                >
+                  {copy.convert.ctaPrimary}
+                </a>
+                <a
+                  href={deployHref}
+                  className="inline-flex items-center border-2 border-white/25 px-5 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-white transition-colors hover:border-accent hover:text-accent"
+                >
+                  {copy.convert.ctaSecondary}
+                </a>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-1">
+                <a
+                  href={showcase}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="group flex items-center gap-2"
+                >
+                  <Pin solid={false} />
+                  <Micro className="text-white/60 transition-colors group-hover:text-accent">
+                    {copy.convert.ctaShowcase} →
+                  </Micro>
+                </a>
+                <a href={`${withLocalePrefix(locale, routes.blog)}/`} className="group flex items-center gap-2">
+                  <Pin solid={false} />
+                  <Micro className="text-white/60 transition-colors group-hover:text-accent">
+                    {copy.convert.ctaBlog} →
+                  </Micro>
+                </a>
+              </div>
             </div>
           </div>
         </div>

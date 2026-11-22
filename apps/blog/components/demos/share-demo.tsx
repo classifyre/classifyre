@@ -15,109 +15,120 @@ import {
 } from "@/components/demos/timeline";
 
 /**
- * Sharing a dataset, played out: a query that joins three systems is
- * typed, saved as a shared dataset with a name, shared with one group as
- * Data reader for 90 days, and the group's first read shows the masks from
- * the input tables came along.
+ * Dataset request & governed data product flow:
+ * 1. A business user submits a plain-language dataset request joining CRM,
+ *    lakehouse orders, and finance invoices.
+ * 2. The data owner reviews and publishes it as a governed shared dataset
+ *    (live or Delta-backed) for the requesting group.
+ * 3. Downstream consumers query the published data product with all source
+ *    column masks automatically inherited as a strict floor.
  */
 
-const SQL = [
-  "SELECT c.email AS customer, c.city,",
-  "  count(o.id) AS orders, sum(i.amount) AS revenue",
-  "FROM crm.customers c",
-  "JOIN lake.orders o ON o.customer_id = c.id",
-  "JOIN finance.invoices i ON i.order_id = o.id",
-  "GROUP BY 1, 2;",
-];
-
 const NAME = "shared.sales.customer_revenue";
-const CPS = 70;
+const CPS = 58;
 
 const L = {
   en: {
-    title: "Query data · New shared dataset",
-    save: "Save as shared dataset",
-    saved: "Saved",
-    name: "Name",
-    share: "Share",
-    shared: "Shared",
+    title: "Data requests · Governed data product",
+    requestTag: "Business request · Regional Sales",
+    requestPrompt:
+      "Join active CRM customers with Delta lakehouse orders and finance invoices by city, without customer names.",
+    routed: "Routed to Finance owner · 3 sources verified",
+    publish: "Approve & publish",
+    published: "Published",
+    name: "Asset",
+    format: "Delta & Live SQL",
     group: "Regional sales",
-    access: "Data reader · 90 days",
-    masks: "Masks kept from the inputs: customer hashed (crm.customers.email)",
+    access: "Masked · 90 days",
+    masks: "Inherited mask floor: customer email hashed (crm.customers.email), names excluded",
     sources: "3 sources",
-    preview: "Regional sales reads it",
+    preview: "Regional sales queries it",
   },
   de: {
-    title: "Daten abfragen · Neues geteiltes Dataset",
-    save: "Als geteiltes Dataset speichern",
-    saved: "Gespeichert",
-    name: "Name",
-    share: "Teilen",
-    shared: "Geteilt",
+    title: "Datenanfragen · Verwaltetes Datenprodukt",
+    requestTag: "Fachliche Anfrage · Vertrieb Regionen",
+    requestPrompt:
+      "Verknüpfe aktive CRM-Kunden mit Delta-Lakehouse-Bestellungen und Rechnungen nach Stadt, ohne Kundennamen.",
+    routed: "An Finance Owner weitergeleitet · 3 Quellen geprüft",
+    publish: "Prüfen & veröffentlichen",
+    published: "Veröffentlicht",
+    name: "Asset",
+    format: "Delta & Live-SQL",
     group: "Vertrieb Regionen",
-    access: "Data reader · 90 Tage",
-    masks: "Masken aus den Eingängen behalten: customer gehasht (crm.customers.email)",
+    access: "Maskiert · 90 Tage",
+    masks: "Vererbte Masken-Untergrenze: E-Mail gehasht (crm.customers.email), Namen ausgeschlossen",
     sources: "3 Quellen",
-    preview: "Vertrieb Regionen liest es",
+    preview: "Vertrieb Regionen fragt es ab",
   },
 } as const;
 
 export function ShareDemo({ locale, caption }: { locale: Locale; caption?: string }) {
   const l = L[locale];
-  let at = 300;
-  const lines = SQL.map((line) => {
-    const start = at;
-    at = typedEnd(line, start, CPS) + 60;
-    return { line, start };
-  });
-  const saveAt = at + 300;
-  const nameAt = saveAt + 250;
-  const shareAt = typedEnd(NAME, nameAt, 40) + 900;
-  const previewAt = shareAt + 700;
-  const timeline = useTimeline(previewAt + 1400);
+  const reqStart = 250;
+  const reqEnd = typedEnd(l.requestPrompt, reqStart, CPS);
+  const routeAt = reqEnd + 250;
+  const publishAt = routeAt + 850;
+  const previewAt = publishAt + 750;
+  const timeline = useTimeline(previewAt + 1600);
   const { t } = timeline;
 
   return (
     <DemoFrame timeline={timeline} title={l.title} caption={caption} locale={locale}>
-      <pre className="overflow-x-auto border-2 border-[#0a0a0a] bg-[#f6f6f6] p-3 font-mono text-[11.5px] leading-5">
-        {lines.map(({ line, start }) => (
-          <div key={line}>
-            {typed(line, t, start, CPS) || " "}
-            <Caret on={t >= start && t < typedEnd(line, start, CPS) + 60} />
-          </div>
-        ))}
-      </pre>
+      {/* Step 1: Plain-language request from a business user */}
+      <div className="border-2 border-[#0a0a0a] bg-[#f6f6f6] p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-[#0a0a0a]/65">
+            {l.requestTag}
+          </span>
+          <span
+            className="font-mono text-[10px] text-[#0a0a0a]/60"
+            style={{ opacity: step(t, routeAt, 250) }}
+          >
+            {l.routed}
+          </span>
+        </div>
+        <p className="mt-2 min-h-[42px] font-sans text-[13px] leading-5 text-[#0a0a0a]">
+          “{typed(l.requestPrompt, t, reqStart, CPS)}
+          <Caret on={t >= reqStart && t < reqEnd + 60} />”
+        </p>
+      </div>
 
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <div className="space-y-2">
-          <PressButton t={t} at={saveAt} label={l.save} done={l.saved} />
-          <div className="grid grid-cols-[3.5rem_1fr] items-center gap-2" style={{ opacity: step(t, saveAt, 250) }}>
-            <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#0a0a0a]/55">{l.name}</span>
-            <span className="min-h-[26px] border border-[#0a0a0a]/30 px-2 py-1 font-mono text-[11.5px]">
-              {typed(NAME, t, nameAt, 40)}
-              <Caret on={t >= nameAt && t < typedEnd(NAME, nameAt, 40)} />
+      {/* Step 2: Owner review & governed data product publication */}
+      <div
+        className="mt-3 grid gap-3 sm:grid-cols-2"
+        style={{ opacity: step(t, routeAt, 300) }}
+      >
+        <div className="space-y-2 border border-[#0a0a0a]/25 p-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#0a0a0a]/55">
+              {l.name}
+            </span>
+            <span className="border border-[#0a0a0a]/30 px-1.5 py-px font-mono text-[9.5px] uppercase tracking-[0.1em]">
+              {l.format}
             </span>
           </div>
+          <p className="font-mono text-[11.5px] font-semibold">{NAME}</p>
         </div>
 
-        <div className="border-2 border-[#0a0a0a] p-2.5" style={{ opacity: step(t, typedEnd(NAME, nameAt, 40), 300) }}>
+        <div className="flex flex-col justify-between gap-2 border-2 border-[#0a0a0a] p-2.5">
           <div className="flex flex-wrap items-center gap-2">
             <span
               className={cn(
                 "border px-2 py-0.5 text-[12px] font-semibold transition-colors",
-                t >= shareAt - 500 ? "border-[#0a0a0a] bg-accent/50" : "border-[#0a0a0a]/30",
+                t >= publishAt - 400 ? "border-[#0a0a0a] bg-accent/50" : "border-[#0a0a0a]/30",
               )}
             >
               {l.group}
             </span>
             <span className="font-mono text-[11px] text-[#0a0a0a]/65">{l.access}</span>
           </div>
-          <div className="mt-2.5">
-            <PressButton t={t} at={shareAt} label={l.share} done={`✓ ${l.shared}`} />
+          <div>
+            <PressButton t={t} at={publishAt} label={l.publish} done={`✓ ${l.published}`} />
           </div>
         </div>
       </div>
 
+      {/* Step 3: Consumer preview with inherited masks */}
       <div className="mt-4" style={{ opacity: step(t, previewAt, 400) }}>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <span className="font-mono text-[11px] font-semibold">{NAME}</span>

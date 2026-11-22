@@ -23,8 +23,8 @@ export function generateBlogSiteSchema(
     name: "Classifyre",
     description:
       locale === "de"
-        ? "Open Source: Classifyre setzt Ihr Berechtigungskonzept auf 40+ Systemen durch, mit Maskierung und Protokollierung jedes Zugriffs. On-Premises, aus Österreich."
-        : "Open-source data access governance platform: access by department and role across 40+ systems, masking by default, every read logged. Deploy on-premises, in your own cloud, or on AWS, Azure or Google Cloud. Made in Austria.",
+        ? "Open-Source Data Governance für Ihre bestehenden Systeme. Sensible Daten klassifizieren, Zeilen- und Spaltenmaskierung nach Gruppen durchsetzen, Datenprodukte teilen und SQL, Power BI sowie Excel protokollieren."
+        : "Open-source data governance platform for the systems you already run. Classify sensitive data, enforce row and column masking by group, publish governed data products, and serve SQL, Power BI, and Excel with full audit logging.",
     url: siteUrl,
     inLanguage: locale === "de" ? "de-DE" : "en-US",
   };
@@ -42,11 +42,11 @@ export function generateOrganizationSchema(
     url: siteUrl,
     description:
       locale === "de"
-        ? "Classifyre entwickelt Open-Source-Software, mit der Organisationen den Datenzugriff steuern: Zugriff nach Rolle, Datenmaskierung und Protokollierung jedes Zugriffs, selbst betrieben. Gebaut in Österreich."
-        : "Classifyre builds an open-source data access governance platform: one governed way into an organisation's data, with access by role, data masking and a log of every read. Deploy on-premises, in your own cloud, or on AWS, Azure or Google Cloud. Built in Austria.",
+        ? "Classifyre entwickelt eine Open-Source Data-Governance-Plattform unter Apache-2.0. Entwickelt in Österreich nach europäischen Datenschutz- und Sicherheitsstandards, im Einsatz in Europa, Nordamerika und weltweit."
+        : "Classifyre develops an open-source data governance platform under Apache-2.0. Built in Austria to European privacy and security standards, deployed by organisations across Europe, North America, and worldwide.",
     // Where the project is built. Search and AI answer engines read this to
-    // answer "who makes it / where are they", which the /made-in-europe page
-    // says in prose — the two must not drift apart.
+    // answer "who makes it / where are they", which the About page says in
+    // prose — the two must not drift apart.
     foundingLocation: {
       "@type": "Place",
       address: {
@@ -58,7 +58,7 @@ export function generateOrganizationSchema(
       "@type": "PostalAddress",
       addressCountry: "AT",
     },
-    areaServed: "EU",
+    areaServed: ["EU", "US", "Worldwide"],
     sameAs: ["https://github.com/classifyre/classifyre"],
   };
 }
@@ -103,8 +103,8 @@ export function generateSoftwareSchema(
     "@id": `${siteUrl}/#software`,
     name: "Classifyre",
     applicationCategory: "BusinessApplication",
-    applicationSubCategory: de ? "Datenzugriffssteuerung" : "Data access governance",
-    operatingSystem: "Docker, Linux, macOS, Windows, Kubernetes",
+    applicationSubCategory: de ? "Open-Source Data Governance" : "Open-source data governance",
+    operatingSystem: "Docker, Linux, macOS, Windows, Kubernetes, OpenShift",
     url: de ? `${siteUrl}/de/` : `${siteUrl}/`,
     inLanguage: de ? "de" : "en",
     license: "https://www.apache.org/licenses/LICENSE-2.0",
@@ -112,30 +112,28 @@ export function generateSoftwareSchema(
     downloadUrl: "https://hub.docker.com/r/classifyre/all-in-one",
     codeRepository: "https://github.com/classifyre/classifyre",
     description: de
-      ? "Classifyre setzt Ihr Berechtigungskonzept auf allen Datenquellen durch: Zugriff nach Abteilung, Rolle und Regel, personenbezogene Daten maskiert, jeder Zugriff protokolliert, im eigenen Rechenzentrum. Open Source unter Apache-2.0, über 40+ Systeme."
-      : "Classifyre is the one governed way into your organisation's data: access follows your departments, roles and rules, personal data stays masked until someone is cleared for it, and every read is on record, on your own servers. Open source under Apache-2.0, across 40+ systems.",
+      ? "Durchgängige Open-Source Data Governance für Ihre bestehenden Systeme: Quellen verbinden, sensible und fachspezifische Daten erkennen, Zeilen- und Spaltenmaskierung nach Gruppen durchsetzen, Datenprodukte anfordern und teilen sowie SQL, Power BI und Excel lückenlos protokollieren."
+      : "End-to-end open-source data governance for the systems you already run: connect sources, classify sensitive and business-specific data, enforce row and column masking by group, request and publish governed data products, and serve SQL, Power BI, Excel, and ODBC with full audit logging.",
     featureList: de
       ? [
-          "Zugriff nach Organisation: AD-Gruppen aus Entra ID, Active Directory, Okta, OIDC und SAML",
-          "Freigaben pro Gruppe, Quelle und Tabelle mit Ablaufdatum",
-          "Zeilenfilter pro Gruppe und Zugriffsanfragen",
-          "Dynamische Datenmaskierung: geschwärzt, letzte vier, gehasht, leer, ausgeblendet",
-          "Datenklassifizierung personenbezogener Daten mit Score und Begründung",
-          "Datenprodukte als geteilte Datasets über mehrere Quellen",
-          "PostgreSQL-Endpunkt für Power BI, Excel und Tableau, KI-Agenten über MCP",
-          "Protokollierung jedes Lesezugriffs",
-          "SSO, Rollen, Mandanten und Workspaces, alles Open Source",
+          "Integration mit bestehenden Systemen (40+ Datenbanken, Iceberg, Delta, Parquet, Cloud-Speicher) und bestehendem IAM (Entra ID, Active Directory, Okta, OIDC/SAML)",
+          "Flexible Detektoren: PII, Secrets und eigene Geschäftsregeln von Regex bis zu lokalen KI-Modellen und LLMs",
+          "Gruppenbasierte Zugriffssteuerung mit zeitlich begrenzten Freigaben und Zeilenfiltern",
+          "Mehrstufige Datenmaskierung (geschwärzt, letzte vier, gehasht, leer, ausgeblendet) auf Tabellen und geteilten Datenprodukten",
+          "Direkter SQL-, Power-BI-, Excel-, Tableau- und ODBC-Zugriff über persönliche Verbindungen",
+          "Self-Service-Datenanfragen und verwaltete Datenprodukte (inkl. Delta-Freigabe) mit vererbten Masken",
+          "Lückenlose Protokollierung jedes Lesezugriffs, Datenqualität und offene Datenverträge",
+          "100 % Open Source unter Apache-2.0 für Docker, Kubernetes und OpenShift",
         ]
       : [
-          "Access by organisation: groups from Entra ID, Active Directory, Okta, OIDC and SAML",
-          "Grants per group, source and table, with end dates",
-          "Row filters per group and access requests",
-          "Dynamic data masking: redacted, last four, hashed, empty, hidden",
-          "Classification of personal data with a score and a reason",
-          "Data products as shared datasets across sources",
-          "PostgreSQL endpoint for Power BI, Excel and Tableau; AI agents over MCP",
-          "Audit log of every read",
-          "SSO, roles, tenants and workspaces, all open source",
+          "Integrates with existing systems (40+ databases, Iceberg, Delta, Parquet, cloud storage) and existing IAM (Entra ID, Active Directory, Okta, OIDC/SAML)",
+          "Flexible detection: built-in PII and secret packs plus custom business detectors from regex to local AI models and LLMs",
+          "Group-based access control with time-limited grants and row-level filtering",
+          "Multi-level column and row masking (redacted, last four, hashed pseudonymisation, empty, hidden) on source tables and shared datasets",
+          "Governed SQL, Power BI, Excel, Tableau, and ODBC access over personal expiring connections",
+          "Plain-language dataset requests and governed Delta / live shared data products with inherited masking",
+          "Complete audit trail of every read, scheduled data quality checks, and open data contracts",
+          "100% open source under Apache-2.0 for Docker, Kubernetes, and OpenShift",
         ],
     offers: {
       "@type": "Offer",

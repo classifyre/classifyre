@@ -19,15 +19,15 @@ import "../../landing.css";
  */
 
 const description =
-  "Classifyre setzt Ihr Berechtigungskonzept auf 40+ Systemen durch: Zugriff nach Rolle, Maskierung, Protokollierung. Open Source, im eigenen Rechenzentrum.";
+  "Open-Source Data Governance für Ihre bestehenden Systeme: sensible Daten erkennen, Zeilen- und Spaltenmaskierung nach Gruppen durchsetzen, Datenprodukte teilen und SQL, Power BI sowie Excel lückenlos protokollieren.";
 
-const ogTitle = "Classifyre: Ihr Berechtigungskonzept, bei jeder Abfrage durchgesetzt.";
+const ogTitle = "Classifyre: Klare Datenregeln. Durchgesetzt bei jeder Abfrage.";
 const ogDescription =
-  "Ein kontrollierter Zugang zu allen Daten. Zugriff nach Organisationsstruktur, maskierte personenbezogene Daten, lückenlose Protokollierung, alles on-prem.";
+  "Durchgängige Open-Source Data Governance über 40+ Systeme: Zeilen- und Spaltenmaskierung nach Gruppen, verwaltete Datenprodukte, SQL-, Power-BI- und Excel-Zugriff auf eigener Infrastruktur.";
 
 export const metadata: Metadata = {
   title: {
-    absolute: "Classifyre: Datenzugriff steuern, Open Source, On-Premises",
+    absolute: "Classifyre — Open-Source Data Governance Plattform",
   },
   description,
   keywords: [
