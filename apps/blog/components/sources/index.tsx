@@ -8,6 +8,11 @@ import { getAllSourceDocs } from "@workspace/schemas/source-docs";
 import { getSourcesCopy } from "@/content/sources";
 import type { Locale } from "@/lib/locale";
 import { withLocalePrefix } from "@/lib/locale";
+import {
+  JsonLdScripts,
+  generateBreadcrumbSchema,
+  siteOrigin,
+} from "@/lib/seo";
 import { docs, contactEmail, repoUrl, routes } from "@/lib/site";
 import { ClosingBoard } from "@/components/closing-board";
 import {
@@ -74,9 +79,20 @@ export function SourcesPage({ locale }: { locale: Locale }) {
   /** Localized marketing routes keep the site's trailing-slash convention. */
   const getHref =
     locale === "de" ? `${withLocalePrefix("de", routes.get)}/` : routes.get;
+  const siteUrl = siteOrigin();
+  const homePath = locale === "de" ? "/de/" : "/";
+  const sourcesPath = locale === "de" ? "/de/sources/" : "/sources/";
 
   return (
     <>
+      <JsonLdScripts
+        schemas={[
+          generateBreadcrumbSchema(siteUrl, [
+            { name: "Classifyre", path: homePath },
+            { name: locale === "de" ? "Quellen" : "Sources", path: sourcesPath },
+          ]),
+        ]}
+      />
       {/* Without JS the in-view reveals never fire; show everything. */}
       <noscript>
         <style>{".cl-reveal{opacity:1 !important;transform:none !important}"}</style>

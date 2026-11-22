@@ -13,6 +13,11 @@ import { getDockerNotes, getTranslationsForLocale } from "@/i18n";
 import type { Locale } from "@/lib/locale";
 import { withLocalePrefix } from "@/lib/locale";
 import {
+  JsonLdScripts,
+  generateBreadcrumbSchema,
+  siteOrigin,
+} from "@/lib/seo";
+import {
   docs,
   helmChartRef,
   helmInstallCommand,
@@ -102,9 +107,20 @@ export function GetPage({ locale }: { locale: Locale }) {
     locale === "de" ? `${withLocalePrefix("de", path)}/` : path;
   const dockerLines = dockerRunLines(softwareVersion, getDockerNotes(locale));
   const dockerCopy = getTranslationsForLocale(locale).docker;
+  const siteUrl = siteOrigin();
+  const homePath = locale === "de" ? "/de/" : "/";
+  const getPath = locale === "de" ? "/de/get/" : "/get/";
 
   return (
     <>
+      <JsonLdScripts
+        schemas={[
+          generateBreadcrumbSchema(siteUrl, [
+            { name: "Classifyre", path: homePath },
+            { name: locale === "de" ? "Installation" : "Deploy", path: getPath },
+          ]),
+        ]}
+      />
       {/* Without JS the in-view reveals never fire; show everything. */}
       <noscript>
         <style>{".cl-reveal{opacity:1 !important;transform:none !important}"}</style>

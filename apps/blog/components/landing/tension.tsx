@@ -1,4 +1,4 @@
-import { ArrowRight, Database, KeyRound, ShieldCheck, BarChart3 } from "lucide-react";
+import { ArrowRight, Database, ShieldCheck, BarChart3 } from "lucide-react";
 
 import { getLandingCopy } from "@/content/landing";
 import type { Locale } from "@/lib/locale";
@@ -10,96 +10,81 @@ import {
 } from "@/components/landing/motifs";
 
 /**
- * Why Classifyre: architectural clarity instead of detective metaphors.
- *
- * Shows how Classifyre integrates cleanly between an organisation's existing
- * data sources & identity provider and the BI/SQL/data-product tools teams
- * already use — no migration, no vendor lock-in.
+ * Why Classifyre: architectural clarity showing how Classifyre sits cleanly
+ * between existing data sources and governed consumption tools without
+ * forcing a stack migration.
  */
 function ArchitectureDiagram({ locale }: { locale: Locale }) {
   const { diagram, figureCaption } = getLandingCopy(locale).tension;
 
   return (
     <figure className="flex h-full flex-col justify-between border-2 border-foreground/80 bg-card p-5 sm:p-7 shadow-[6px_6px_0_var(--color-border)]">
-      <div className="space-y-6">
-        {/* Existing IAM bar across the top */}
-        <div className="flex flex-wrap items-center justify-between gap-2 border-2 border-foreground/20 bg-muted/40 px-4 py-3">
+      {/* 3-stage architecture flow */}
+      <div className="my-auto grid gap-4 md:grid-cols-[1fr_auto_1.2fr_auto_1fr] md:items-stretch">
+        {/* Left: existing sources */}
+        <div className="flex flex-col border-2 border-foreground/25 bg-background p-4">
           <div className="flex items-center gap-2">
-            <KeyRound className="size-4 text-accent-ink dark:text-accent" aria-hidden="true" />
-            <Micro className="text-foreground">{diagram.iamLabel}</Micro>
+            <Database className="size-4 text-muted-foreground" aria-hidden="true" />
+            <Micro className="text-muted-foreground">{diagram.leftLabel}</Micro>
           </div>
-          <span className="font-mono text-[11px] text-muted-foreground">
-            {diagram.iamSystems}
-          </span>
+          <ul className="mt-3 space-y-2 text-xs leading-5 text-foreground/85">
+            {diagram.leftSources.map((src) => (
+              <li
+                key={src}
+                className="border border-foreground/15 bg-muted/30 px-2.5 py-1.5 font-mono text-[11px]"
+              >
+                {src}
+              </li>
+            ))}
+          </ul>
         </div>
 
-        {/* 3-stage architecture flow */}
-        <div className="grid gap-4 md:grid-cols-[1fr_auto_1.2fr_auto_1fr] md:items-stretch">
-          {/* Left: existing sources */}
-          <div className="flex flex-col border-2 border-foreground/25 bg-background p-4">
-            <div className="flex items-center gap-2">
-              <Database className="size-4 text-muted-foreground" aria-hidden="true" />
-              <Micro className="text-muted-foreground">{diagram.leftLabel}</Micro>
-            </div>
-            <ul className="mt-3 space-y-2 text-xs leading-5 text-foreground/85">
-              {diagram.leftSources.map((src) => (
-                <li
-                  key={src}
-                  className="border border-foreground/15 bg-muted/30 px-2.5 py-1.5 font-mono text-[11px]"
-                >
-                  {src}
-                </li>
-              ))}
-            </ul>
-          </div>
+        <div className="hidden items-center justify-center text-muted-foreground md:flex" aria-hidden="true">
+          <ArrowRight className="size-4" />
+        </div>
 
-          <div className="hidden items-center justify-center text-muted-foreground md:flex" aria-hidden="true">
-            <ArrowRight className="size-4" />
+        {/* Center: Classifyre Governance Layer */}
+        <div className="flex flex-col border-2 border-black bg-black p-4 text-white dark:border-accent">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="size-4 text-accent" aria-hidden="true" />
+            <Micro className="text-accent">{diagram.centerSub}</Micro>
           </div>
+          <p className="mt-2 font-serif text-base font-black uppercase leading-tight tracking-[0.03em] text-white">
+            {diagram.centerTitle}
+          </p>
+          <ul className="mt-4 space-y-2">
+            {diagram.centerPillars.map((pillar) => (
+              <li
+                key={pillar}
+                className="flex items-center gap-2 border border-white/15 bg-white/[0.06] px-2.5 py-1.5 font-mono text-[11px] text-white/90"
+              >
+                <span aria-hidden="true" className="size-1.5 shrink-0 bg-accent" />
+                {pillar}
+              </li>
+            ))}
+          </ul>
+        </div>
 
-          {/* Center: Classifyre Governance Layer */}
-          <div className="flex flex-col border-2 border-black bg-black p-4 text-white dark:border-accent">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="size-4 text-accent" aria-hidden="true" />
-              <Micro className="text-accent">{diagram.centerSub}</Micro>
-            </div>
-            <p className="mt-2 font-serif text-base font-black uppercase leading-tight tracking-[0.03em] text-white">
-              {diagram.centerTitle}
-            </p>
-            <ul className="mt-4 space-y-2">
-              {diagram.centerPillars.map((pillar) => (
-                <li
-                  key={pillar}
-                  className="flex items-center gap-2 border border-white/15 bg-white/[0.06] px-2.5 py-1.5 font-mono text-[11px] text-white/90"
-                >
-                  <span aria-hidden="true" className="size-1.5 shrink-0 bg-accent" />
-                  {pillar}
-                </li>
-              ))}
-            </ul>
-          </div>
+        <div className="hidden items-center justify-center text-muted-foreground md:flex" aria-hidden="true">
+          <ArrowRight className="size-4" />
+        </div>
 
-          <div className="hidden items-center justify-center text-muted-foreground md:flex" aria-hidden="true">
-            <ArrowRight className="size-4" />
+        {/* Right: governed consumption */}
+        <div className="flex flex-col border-2 border-foreground/25 bg-background p-4">
+          <div className="flex items-center gap-2">
+            <BarChart3 className="size-4 text-muted-foreground" aria-hidden="true" />
+            <Micro className="text-muted-foreground">{diagram.rightLabel}</Micro>
           </div>
-
-          {/* Right: governed consumption */}
-          <div className="flex flex-col border-2 border-foreground/25 bg-background p-4">
-            <div className="flex items-center gap-2">
-              <BarChart3 className="size-4 text-muted-foreground" aria-hidden="true" />
-              <Micro className="text-muted-foreground">{diagram.rightLabel}</Micro>
-            </div>
-            <ul className="mt-3 space-y-2 text-xs leading-5 text-foreground/85">
-              {diagram.rightTools.map((tool) => (
-                <li
-                  key={tool}
-                  className="border border-foreground/15 bg-muted/30 px-2.5 py-1.5 font-mono text-[11px]"
-                >
-                  {tool}
-                </li>
-              ))}
-            </ul>
-          </div>
+          <ul className="mt-3 space-y-2 text-xs leading-5 text-foreground/85">
+            {diagram.rightTools.map((tool) => (
+              <li
+                key={tool}
+                className="border border-foreground/15 bg-muted/30 px-2.5 py-1.5 font-mono text-[11px]"
+              >
+                {tool}
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
 

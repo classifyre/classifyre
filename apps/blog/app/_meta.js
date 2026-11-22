@@ -46,16 +46,6 @@ export default {
       },
     },
   },
-  about: {
-    type: "page",
-    title: "About",
-    href: "/made-in-europe",
-  },
-  supportLink: {
-    type: "page",
-    title: "Support",
-    href: "/support",
-  },
   journal: {
     type: "menu",
     title: "Blog",

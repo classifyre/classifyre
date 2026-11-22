@@ -517,7 +517,7 @@ const enConvert = {
   ],
   tailoringTitle: "Need Classifyre tailored to your organisation?",
   tailoringLede:
-    "There is no separate enterprise edition with locked features. You can self-host everything yourself or engage our engineering team for a guided 4–6 week pilot and custom implementation.",
+    "There is no separate enterprise edition with locked features. You can self-host everything yourself or work directly with our engineering team on an individual scope agreed around your infrastructure, security model, and timelines.",
   ctaPrimary: "Talk to our team",
   ctaSecondary: "Deployment guide",
   ctaShowcase: "Explore live demo",
