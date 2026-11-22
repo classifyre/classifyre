@@ -1,103 +1,86 @@
 ---
 title: The Big Picture
-description: A plain-English map of how Classifyre turns connected data sources into a finished investigation — for operators, investigators, and managers.
+description: A clear overview of how Classifyre governs data end to end — from connecting existing sources and directory groups to multi-level masking, SQL/BI access, governed data products, and full audit logging.
 ---
 
 # How Classifyre Works
 
-This section explains Classifyre the way an **operator or investigator** would
-describe it — not a developer. If you want the full technical detail on any
-piece, each section links to the deeper docs.
+Classifyre is an **open-source data governance platform** that integrates with
+the systems your organisation already operates — databases, lakehouses
+(Iceberg, Delta, Parquet), cloud storage, collaboration platforms, and your
+existing identity provider — without requiring you to replace your ETL
+pipelines or BI tools.
 
-At its core, Classifyre does one thing: it turns the data scattered across the
-systems you already run into a small number of **leads worth a human's time**,
-and gives you a structured place to work them.
+Prefer to explore screen by screen? See **[A Tour of the
+App](/how-it-works/in-the-app/)** for a map of every section in the web UI.
 
-Prefer to learn screen by screen? Take **[A Tour of the
-App](/how-it-works/in-the-app/)** — it maps every item in the app's navigation
-to what it's for.
-
-Everything below happens inside a **[workspace](/how-it-works/workspaces/)** —
-an isolated investigation with its own sources, findings, cases, and AI memory.
-One Classifyre instance can hold many of them (a client, a region, a business
-unit), and nothing is shared between them.
+Everything below runs inside a **[workspace](/how-it-works/workspaces/)** — an
+isolated domain (such as a business unit, region, or subsidiary) with its own
+sources, classifications, access grants, shared datasets, and audit trail.
 
 ```mermaid
-graph TD
-    Sources["Sources<br/>systems you connect"] --> Scans["Scans<br/>crawl each source"]
-    Scans --> Assets["Assets<br/>documents & files found"]
-    Assets --> Findings["Findings<br/>sensitive matches"]
-    Findings --> Ranking["Ranking<br/>importance score"]
-    Ranking --> Inquiries["Inquiries<br/>standing questions"]
-    Ranking --> Duplicates["Duplicate review<br/>shared-value links"]
-    Inquiries --> Cases["Cases<br/>the investigation case file"]
-    Duplicates --> Cases
-    Glossary["Glossary"] -.-> Cases
-    Autopilot["Autopilot"] -.-> Ranking
-    Autopilot -.-> Cases
+flowchart LR
+    IAM["Existing IAM<br/>Entra ID · AD · Okta"] --> Policy["Governance Layer<br/>groups · row filters · masks"]
+    Sources["40+ & Custom Sources<br/>DBs · Iceberg · Delta · Files"] --> Detect["Detectors<br/>PII · secrets · regex · local AI · LLM"]
+    Detect --> Policy
+    Policy --> Assets["Governed Tables &<br/>Shared Data Products"]
+    Assets --> Tools["SQL · Power BI · Excel · ODBC · MCP"]
+    Tools --> Audit["Audit Trail & Quality"]
 ```
 
 ---
 
-## The journey, in plain English
+## The end-to-end governance flow
 
-**1. Connect a source.** Point Classifyre at a system you already run —
-SharePoint, Confluence, Jira, a file share, a local folder. Nothing is moved
-out of your control; Classifyre reads it in place.
+**1. Connect sources in place.** Point Classifyre at the systems you already
+run — PostgreSQL, MySQL, Databricks, ODBC databases, Iceberg and Delta
+lakehouses, Parquet files in S3/Azure/GCS, Confluence, Jira, or custom
+connectors. Classifyre reads metadata and data in place rather than copying
+your estate into another vendor warehouse. See [Sources](/sources/).
 
-**2. Scan it.** A scan crawls the source and registers every document or file
-as an **asset**, with metadata like owner, location, and last-changed date.
+**2. Detect sensitive and business-specific data.** Built-in packs classify
+personal data (PII across EU, US, and global identifiers) and secrets out of
+the box. Custom detectors extend this to any business rule — from regex and
+Python checks to lightweight on-CPU AI models (GLiNER2, text/image
+classification), decision models, and LLMs. Every finding carries a score and
+written explanation. See [Detectors](/detectors/).
 
-**3. Detect.** **Detectors** — pattern rules, ML models, tags, or AI-based
-custom detectors — read each asset and raise a **finding** whenever something's
-worth a look, each carrying a **priority** (how much it matters, shown in the
-API as `severity`) and a **confidence** (how sure the detector is).
+**3. Govern access by organisation.** Connect Entra ID, Active Directory, Okta,
+or any OIDC/SAML directory. Access is always granted to **groups** — per
+workspace, source, table, or shared dataset — with optional expiration dates,
+named owners and stewards, and owner-approved access requests. See
+[Access & Sign-in](/access/).
 
-**4. Rank.** Priority alone doesn't say what to look at *first*. A ranking
-pass scores each finding's **importance** — how much it looks like a genuine
-lead, independent of the priority the detector assigned — using signals like
-recurrence across documents, context quality, and whether it looks like test
-data. See [Ranking & the Semantic Layer](/how-it-works/ranking-and-semantics/).
+**4. Enforce multi-level column and row masking.** Classified columns are
+masked automatically inside the query engine — redacted, last-four,
+deterministic hashed pseudonymisation (so joins and distinct counts still
+work), empty, or completely hidden — and row-level filters restrict each group
+to its own rows. Different groups querying the exact same table receive
+different rows and clearance levels, and workspace admins do not read clear
+personal data by default. See [SQL & Masking](/data-query/).
 
-**5. Watch and connect.** **Inquiries** are saved questions that keep watching
-for matching findings; **duplicate matching** links assets sharing concrete values
-like an email or ID — revealing when the same record shows up in several
-systems. See [Connections & Duplicates](/how-it-works/duplicates-and-similarity/).
+**5. Query in SQL, Power BI, Excel, ODBC, and MCP.** Teams continue working in
+the tools they already know. Classifyre exposes a PostgreSQL-compatible TLS
+endpoint with personal, expiring, revocable connections — eliminating shared
+database passwords. AI agents connected over MCP inherit the exact permissions
+and masks of the signed-in user. See [SQL Connections](/sql-connections/).
 
-**6. Investigate.** A **case** is where the real work happens. Promising
-findings arrive as **leads** — a triage queue you accept into **evidence** or
-dismiss. You record dated **events** to build a chronology, and write a
-**conclusion** when resolved. See [Leads, Evidence & Events](/how-it-works/investigating/).
+**6. Publish governed data products.** Teams combine data across sources into
+governed **shared datasets** (live cross-source queries or shared data
+products) with named owners and audiences. Every shared dataset inherits the
+masking and classification rules of its underlying tables as a strict floor,
+and supports additional group-level masks and row filters. See
+[Shared Datasets](/data-query/#shared-datasets).
 
-**7. Keep a shared vocabulary.** A **glossary** of people, organisations, and
-terms keeps everyone — human and AI — talking about the same entities. See
-[Glossary & Shared Vocabulary](/how-it-works/glossary/).
+**7. Audit every read and verify quality.** Every SQL query, export, grant,
+and approval is recorded with who accessed what and through which tool.
+Scheduled data quality checks and open data contracts (ODCS) keep governed
+tables trustworthy and audit-ready.
 
-**8. Let AI help.** **Autopilot** agents can do this legwork for you —
-triaging findings, proposing leads and events, tuning detectors — always
-logging why, and always subject to the supervision level you choose. See
-[Autopilot & AI Assistance](/how-it-works/autopilot/).
-
----
-
-## Why it's built this way
-
-Two ideas run through the whole product:
-
-- **Priority is not importance.** Priority is what the detector asserted about
-  a match — how much this kind of thing matters to you. Ranking says how much
-  this particular finding, in context, looks like a genuine lead. A "critical"
-  finding repeated as boilerplate everywhere isn't where you start.
-
-  Priority is *not* a danger scale. A finding is critical because it is
-  important to the question you are asking — a company approaching insolvency,
-  a shipment routed to the wrong address, a credential where it should not be
-  — not because it is dangerous. The stored values are still
-  `CRITICAL … INFO`; only what they mean changed.
-- **Similarity is not proof.** Two things looking alike — semantically or by
-  shared values — is a reason to *look*, not to *conclude*. Every automated
-  suggestion, from a ranked finding to an Autopilot-proposed lead, is a
-  candidate for a human to accept or dismiss.
+**8. Incident response (optional).** When sensitive data or credentials leak
+outside governed paths, the same connectors and findings feed standing
+inquiries, cross-system duplicate fingerprints, and structured cases — with an
+optional supervised Autopilot. See [Investigations](/investigations/).
 
 ---
 
@@ -105,13 +88,10 @@ Two ideas run through the whole product:
 
 | Page | What it covers |
 |---|---|
-| [A Tour of the App](/how-it-works/in-the-app/) | Every screen in the app, what it's for, and where to learn more. |
-| [From Documents to Findings](/how-it-works/documents-to-findings/) | Sources, scans, assets, detectors. |
-| [Ranking & the Semantic Layer](/how-it-works/ranking-and-semantics/) | Importance vs priority, recalibration. |
-| [Connections & Duplicates](/how-it-works/duplicates-and-similarity/) | Shared-value matching vs semantic similarity, and what lineage adds. |
-| [Leads, Evidence & Events](/how-it-works/investigating/) | Ranked finding to case conclusion. |
-| [Glossary & Shared Vocabulary](/how-it-works/glossary/) | Shared vocabulary for people and AI. |
-| [Autopilot & AI Assistance](/how-it-works/autopilot/) | What the AI agents do, and how to supervise them. |
-
-Technical reference: [Scans](/flow/), [Sources](/sources/),
-[Detectors](/detectors/), [Investigations](/investigations/).
+| [A Tour of the App](/how-it-works/in-the-app/) | Every screen in the app and what it is for. |
+| [Access & Sign-in](/access/) | Directory integration, groups, roles, grants, and audit trails. |
+| [SQL, Masking & Shared Datasets](/data-query/) | Cross-source SQL, column masks, row filters, and shared data products. |
+| [SQL Connections](/sql-connections/) | Connecting Power BI, Excel, Tableau, DBeaver, and ODBC tools. |
+| [Sources](/sources/) | All built-in connectors and custom connector authoring. |
+| [Detectors](/detectors/) | Pre-built PII/secret packs and custom detectors from regex to AI. |
+| [Deploy](/deployment/) | Local Docker evaluation and production Kubernetes/OpenShift Helm deployment. |

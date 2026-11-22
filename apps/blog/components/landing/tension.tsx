@@ -1,5 +1,6 @@
+import { ArrowRight, Database, KeyRound, ShieldCheck, BarChart3 } from "lucide-react";
+
 import { getLandingCopy } from "@/content/landing";
-import { Mascot } from "@/components/mascot";
 import type { Locale } from "@/lib/locale";
 import {
   LandingHead,
@@ -9,101 +10,101 @@ import {
 } from "@/components/landing/motifs";
 
 /**
- * The problem, told as a scene rather than a list of pains: six systems,
- * personal data in all of them, and no line saying who may see what. The "unlinked board" is the hero
- * motif's dark twin: same pins and dashes, except here the threads stop
- * short of each other and the question stays open.
+ * Why Classifyre: architectural clarity instead of detective metaphors.
+ *
+ * Shows how Classifyre integrates cleanly between an organisation's existing
+ * data sources & identity provider and the BI/SQL/data-product tools teams
+ * already use — no migration, no vendor lock-in.
  */
+function ArchitectureDiagram({ locale }: { locale: Locale }) {
+  const { diagram, figureCaption } = getLandingCopy(locale).tension;
 
-/** Scattered systems around the one who cannot answer: a board before the
-    strings, with the investigator stuck in the middle of it. */
-const NODES: readonly { x: number; y: number; w: number }[] = [
-  { x: 20, y: 26, w: 104 },
-  { x: 20, y: 150, w: 104 },
-  { x: 28, y: 274, w: 104 },
-  { x: 488, y: 26, w: 116 },
-  { x: 500, y: 150, w: 104 },
-  { x: 452, y: 274, w: 132 },
-];
-
-/** Threads that aim at the middle and give up just short of it. */
-const BROKEN: readonly string[] = [
-  "M 112 66 C 150 88, 172 104, 196 122",
-  "M 124 190 C 158 196, 184 202, 212 212",
-  "M 120 294 C 156 286, 184 278, 214 268",
-  "M 488 66 C 452 88, 430 104, 406 122",
-  "M 500 190 C 468 196, 442 202, 412 212",
-  "M 452 294 C 420 286, 396 278, 366 268",
-];
-
-function UnlinkedBoard({
-  caption,
-  mascotAlt,
-  labels,
-}: {
-  caption: string;
-  mascotAlt: string;
-  labels: readonly string[];
-}) {
   return (
-    <figure>
-      {/* Fixed aspect box so the SVG and the ink drawing scale together at
-          every width. The mascot stands exactly where the question mark
-          used to be. */}
-      <div className="relative aspect-[640/340] w-full">
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 640 340"
-            className="absolute inset-0 size-full text-foreground"
-          >
-            <g fill="none" strokeLinecap="round">
-              {BROKEN.map((d) => (
-                <path
-                  key={d}
-                  d={d}
-                  stroke="currentColor"
-                  strokeOpacity="0.3"
-                  strokeWidth="1.5"
-                  strokeDasharray="6 8"
-                />
-              ))}
-            </g>
-            {NODES.map((node, index) => (
-              <g key={index}>
-                <rect
-                  x={node.x}
-                  y={node.y}
-                  width={node.w}
-                  height={40}
-                  fill="none"
-                  stroke="currentColor"
-                  strokeOpacity="0.55"
-                  strokeWidth="2"
-                />
-                <text
-                  x={node.x + node.w / 2}
-                  y={node.y + 25}
-                  textAnchor="middle"
-                  className="font-mono"
-                  fontSize="16"
-                  fontWeight="700"
-                  letterSpacing="2"
-                  fill="currentColor"
-                  fillOpacity="0.75"
-                >
-                  {labels[index]}
-                </text>
-              </g>
-            ))}
-          </svg>
-          <Mascot
-            name="questioning"
-            alt={mascotAlt}
-            className="absolute bottom-0 left-1/2 h-[88%] w-auto -translate-x-1/2"
-          />
+    <figure className="flex h-full flex-col justify-between border-2 border-foreground/80 bg-card p-5 sm:p-7 shadow-[6px_6px_0_var(--color-border)]">
+      <div className="space-y-6">
+        {/* Existing IAM bar across the top */}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-2 border-foreground/20 bg-muted/40 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <KeyRound className="size-4 text-accent-ink dark:text-accent" aria-hidden="true" />
+            <Micro className="text-foreground">{diagram.iamLabel}</Micro>
+          </div>
+          <span className="font-mono text-[11px] text-muted-foreground">
+            {diagram.iamSystems}
+          </span>
         </div>
-      <figcaption className="mt-4">
-        <Micro className="text-muted-foreground">{caption}</Micro>
+
+        {/* 3-stage architecture flow */}
+        <div className="grid gap-4 md:grid-cols-[1fr_auto_1.2fr_auto_1fr] md:items-stretch">
+          {/* Left: existing sources */}
+          <div className="flex flex-col border-2 border-foreground/25 bg-background p-4">
+            <div className="flex items-center gap-2">
+              <Database className="size-4 text-muted-foreground" aria-hidden="true" />
+              <Micro className="text-muted-foreground">{diagram.leftLabel}</Micro>
+            </div>
+            <ul className="mt-3 space-y-2 text-xs leading-5 text-foreground/85">
+              {diagram.leftSources.map((src) => (
+                <li
+                  key={src}
+                  className="border border-foreground/15 bg-muted/30 px-2.5 py-1.5 font-mono text-[11px]"
+                >
+                  {src}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="hidden items-center justify-center text-muted-foreground md:flex" aria-hidden="true">
+            <ArrowRight className="size-4" />
+          </div>
+
+          {/* Center: Classifyre Governance Layer */}
+          <div className="flex flex-col border-2 border-black bg-black p-4 text-white dark:border-accent">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="size-4 text-accent" aria-hidden="true" />
+              <Micro className="text-accent">{diagram.centerSub}</Micro>
+            </div>
+            <p className="mt-2 font-serif text-base font-black uppercase leading-tight tracking-[0.03em] text-white">
+              {diagram.centerTitle}
+            </p>
+            <ul className="mt-4 space-y-2">
+              {diagram.centerPillars.map((pillar) => (
+                <li
+                  key={pillar}
+                  className="flex items-center gap-2 border border-white/15 bg-white/[0.06] px-2.5 py-1.5 font-mono text-[11px] text-white/90"
+                >
+                  <span aria-hidden="true" className="size-1.5 shrink-0 bg-accent" />
+                  {pillar}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="hidden items-center justify-center text-muted-foreground md:flex" aria-hidden="true">
+            <ArrowRight className="size-4" />
+          </div>
+
+          {/* Right: governed consumption */}
+          <div className="flex flex-col border-2 border-foreground/25 bg-background p-4">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="size-4 text-muted-foreground" aria-hidden="true" />
+              <Micro className="text-muted-foreground">{diagram.rightLabel}</Micro>
+            </div>
+            <ul className="mt-3 space-y-2 text-xs leading-5 text-foreground/85">
+              {diagram.rightTools.map((tool) => (
+                <li
+                  key={tool}
+                  className="border border-foreground/15 bg-muted/30 px-2.5 py-1.5 font-mono text-[11px]"
+                >
+                  {tool}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <figcaption className="mt-6 border-t border-foreground/15 pt-4">
+        <Micro className="text-muted-foreground">{figureCaption}</Micro>
       </figcaption>
     </figure>
   );
@@ -121,33 +122,22 @@ export function Tension({ locale }: { locale: Locale }) {
           lede={copy.tension.lede}
         />
 
-        <div className="mt-14 grid gap-12 lg:grid-cols-12 lg:gap-10">
-          {/* `min-w-0` on the grid items is load-bearing: the diagram keeps a
-              legible minimum width and scrolls sideways, and without it the
-              grid item's automatic minimum size drags the whole page wide. */}
+        <div className="mt-14 grid gap-10 lg:grid-cols-12 lg:items-stretch">
           <div className="min-w-0 lg:col-span-7">
-            <UnlinkedBoard
-              caption={
-                copy.tension.figureCaption ??
-                "Fig. 01: six systems, one story, no line between the facts"
-              }
-              mascotAlt={copy.mascots.questioning}
-              labels={copy.tension.nodes}
-            />
+            <ArchitectureDiagram locale={locale} />
           </div>
 
-          {/* Margin notes: the annotator's voice, hung in the right column. */}
-          <ul className="min-w-0 space-y-8 lg:col-span-5">
+          <ul className="min-w-0 grid gap-6 sm:grid-cols-2 lg:col-span-5 lg:grid-cols-1">
             {copy.tension.notes.map((note, index) => (
-              <Enter key={note.label} as="li" delayMs={index * 90}>
+              <Enter key={note.label} as="li" delayMs={index * 80}>
                 <div className="border-t-2 border-foreground/80 pt-4">
                   <Micro className="text-accent-ink dark:text-accent">
                     {note.label}
                   </Micro>
-                  <h3 className="mt-2 font-serif text-base font-black uppercase leading-tight tracking-[0.04em]">
+                  <h3 className="mt-2 font-sans text-base font-bold leading-snug text-foreground">
                     {note.title}
                   </h3>
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  <p className="mt-1.5 text-sm leading-6 text-muted-foreground">
                     {note.body}
                   </p>
                 </div>
@@ -156,13 +146,9 @@ export function Tension({ locale }: { locale: Locale }) {
           </ul>
         </div>
 
-        {/* The pattern, written out: one memo, not another card grid. */}
-        <Enter className="mt-14">
-          <div className="border-2 border-foreground/25 bg-muted/50 p-6 sm:p-8">
-            <Micro className="text-accent-ink dark:text-accent">
-              {copy.tension.marker}
-            </Micro>
-            <p className="mt-3 max-w-4xl text-base leading-8 sm:text-lg sm:leading-9">
+        <Enter className="mt-12">
+          <div className="border-2 border-foreground/20 bg-muted/40 p-6 sm:p-8">
+            <p className="max-w-4xl text-base font-medium leading-8 text-foreground sm:text-lg">
               {copy.tension.kicker}
             </p>
           </div>

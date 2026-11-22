@@ -2,72 +2,51 @@
 
 import * as React from "react";
 
-import { useCyclingTags } from "@/components/finding-tags";
-import { translateList } from "@/i18n";
 import type { Locale } from "@/lib/locale";
 
 /**
- * Interactive backdrop for the closing CTA and the hero: a detective's
- * string board: evidence pins joined by dashed threads on the black signal
- * panel.
- *
- * The pins breathe on a staggered loop and the classification labels rotate
- * through the steps data takes through Classifyre (connected, found,
- * masked, granted, shared, connected to BI, logged) every few seconds, so the panel feels alive
- * without any pointer interaction (the lime spotlight that used to follow
- * the pointer is gone on purpose). Everything is decorative and
- * pointer-transparent; the CTAs stay clickable.
+ * Subtle architectural backdrop for dark sections: fine structural lines and
+ * muted accent intersections that give depth without competing with headlines
+ * or interactive product previews.
  */
 
-const PINS: readonly { x: number; y: number }[] = [
-  { x: 70, y: 80 },
-  { x: 215, y: 195 },
-  { x: 140, y: 365 },
-  { x: 335, y: 110 },
-  { x: 465, y: 250 },
-  { x: 415, y: 435 },
-  { x: 600, y: 130 },
-  { x: 705, y: 320 },
-  { x: 620, y: 455 },
-  { x: 815, y: 175 },
-  { x: 905, y: 365 },
-  { x: 950, y: 95 },
+const NODES: readonly { x: number; y: number }[] = [
+  { x: 110, y: 95 },
+  { x: 290, y: 205 },
+  { x: 190, y: 390 },
+  { x: 470, y: 120 },
+  { x: 640, y: 265 },
+  { x: 520, y: 430 },
+  { x: 810, y: 145 },
+  { x: 910, y: 340 },
 ];
 
-/** Pins that carry a (rotating) classification label, by pin index. */
-const TAGGED: readonly number[] = [0, 2, 3, 4, 6, 7, 9];
-
-const THREADS: readonly (readonly [number, number])[] = [
+const LINKS: readonly (readonly [number, number])[] = [
   [0, 1],
   [0, 3],
+  [1, 2],
+  [1, 3],
   [1, 4],
-  [2, 1],
-  [2, 5],
   [3, 4],
+  [3, 6],
+  [4, 5],
   [4, 6],
   [4, 7],
-  [5, 7],
-  [5, 8],
-  [6, 9],
-  [7, 9],
-  [7, 10],
-  [8, 10],
-  [9, 11],
+  [6, 7],
 ];
 
-export function ClosingBoard({ locale = "en" }: { locale?: Locale }) {
-  const tags = useCyclingTags(TAGGED.length, translateList(locale, "governanceTags"));
-
+export function ClosingBoard({ locale: _locale = "en" }: { locale?: Locale }) {
   return (
     <div aria-hidden="true" className="cl-net pointer-events-none absolute inset-0">
+      <div className="landing-grid absolute inset-0 opacity-[0.07]" />
       <svg
         viewBox="0 0 1000 520"
         preserveAspectRatio="xMidYMid slice"
-        className="cl-net-svg absolute inset-x-0 top-0 h-full max-h-[820px] w-full"
+        className="cl-net-svg absolute inset-x-0 top-0 h-full max-h-[820px] w-full opacity-55"
       >
-        {THREADS.flatMap(([from, to], index) => {
-          const a = PINS[from];
-          const b = PINS[to];
+        {LINKS.flatMap(([from, to], index) => {
+          const a = NODES[from];
+          const b = NODES[to];
           if (!a || !b) return [];
           return [
             <line
@@ -78,44 +57,24 @@ export function ClosingBoard({ locale = "en" }: { locale?: Locale }) {
               y2={b.y}
               className="cl-thread"
               stroke="currentColor"
-              strokeWidth="1.5"
+              strokeWidth="1"
             />,
           ];
         })}
-        {PINS.map((pin, index) => {
-          const slot = TAGGED.indexOf(index);
-          const label = slot >= 0 ? (tags[slot] ?? "") : "";
-          return (
-            <g key={index}>
-              <rect
-                x={pin.x - 6}
-                y={pin.y - 6}
-                width={12}
-                height={12}
-                className="cl-pin-pulse"
-                style={
-                  { "--cl-delay": `${index * 380}ms` } as React.CSSProperties
-                }
-                fill="var(--color-accent)"
-              />
-              {label ? (
-                <text
-                  key={label}
-                  x={pin.x + 12}
-                  y={pin.y + 4}
-                  className="cl-tag-swap"
-                  fontFamily="var(--font-mono, monospace)"
-                  fontSize="13"
-                  letterSpacing="0.14em"
-                  fill="currentColor"
-                  opacity="0.5"
-                >
-                  {label}
-                </text>
-              ) : null}
-            </g>
-          );
-        })}
+        {NODES.map((node, index) => (
+          <rect
+            key={index}
+            x={node.x - 4}
+            y={node.y - 4}
+            width={8}
+            height={8}
+            className="cl-pin-pulse"
+            style={
+              { "--cl-delay": `${index * 450}ms` } as React.CSSProperties
+            }
+            fill="var(--color-accent)"
+          />
+        ))}
       </svg>
     </div>
   );

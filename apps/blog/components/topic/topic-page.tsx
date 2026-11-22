@@ -20,7 +20,6 @@ import {
 } from "@/lib/seo";
 import {
   docs,
-  contactEmail,
   helmInstallCommand,
   routes,
   softwareVersion,
@@ -36,7 +35,6 @@ import {
   Pin,
 } from "@/components/landing/motifs";
 import { Demo } from "@/components/demos";
-import { Mascot } from "@/components/mascot";
 
 /**
  * One page per search term, same shape in both languages, in the landing
@@ -54,7 +52,6 @@ export function TopicPage({ locale, id }: { locale: Locale; id: TopicId }) {
   const siteUrl = siteOrigin();
   const home = withLocalePrefix(locale, routes.home);
   const homeHref = home === "/" ? "/" : `${home}/`;
-  const pilot = `mailto:${contactEmail}?subject=Classifyre%20pilot`;
 
   return (
     <>
@@ -89,42 +86,30 @@ export function TopicPage({ locale, id }: { locale: Locale; id: TopicId }) {
               <Micro className="text-white/80">{topic.name}</Micro>
             </nav>
 
-            <div className="mt-8 grid items-center gap-10 lg:grid-cols-12">
-              <div className="space-y-7 lg:col-span-9">
-                <ExhibitMark>{chrome.chip}</ExhibitMark>
-                <h1
-                  id="topic-title"
-                  className="max-w-[20ch] font-hero text-[clamp(3rem,7.4vw,6.2rem)] uppercase leading-[0.88] tracking-[0.01em]"
+            <div className="mt-8 max-w-4xl space-y-7">
+              <ExhibitMark>{chrome.chip}</ExhibitMark>
+              <h1
+                id="topic-title"
+                className="max-w-[20ch] font-hero text-[clamp(3rem,7.4vw,6rem)] uppercase leading-[0.88] tracking-[0.01em]"
+              >
+                {topic.h1}
+              </h1>
+              <p className="max-w-2xl text-base leading-7 text-white/75 sm:text-lg sm:leading-8">
+                {topic.lede}
+              </p>
+              <div className="flex flex-wrap items-center gap-3">
+                <a
+                  href="#run-it"
+                  className="inline-flex items-center border-2 border-accent bg-accent px-5 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-black transition-colors hover:border-white hover:bg-white"
                 >
-                  {topic.h1}
-                </h1>
-                <p className="max-w-2xl text-base leading-7 text-white/75 sm:text-lg sm:leading-8">
-                  {topic.lede}
-                </p>
-                <div className="flex flex-wrap items-center gap-3">
-                  <a
-                    href="#run-it"
-                    className="inline-flex items-center border-2 border-accent bg-accent px-5 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-black transition-colors hover:border-white hover:bg-white"
-                  >
-                    {chrome.runTitle}
-                  </a>
-                  <a
-                    href={pilot}
-                    className="inline-flex items-center border-2 border-white/25 px-5 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-white transition-colors hover:border-accent hover:text-accent"
-                  >
-                    {chrome.pilotCta}
-                  </a>
-                </div>
-              </div>
-              <div className="hidden justify-end lg:col-span-3 lg:flex">
-                <Mascot
-                  name={topic.mascot}
-                  alt={topic.mascotAlt}
-                  surface="dark"
-                  tilt="right"
-                  eager
-                  className="h-52 w-auto"
-                />
+                  {chrome.runTitle}
+                </a>
+                <a
+                  href={`${withLocalePrefix(locale, routes.support)}/`}
+                  className="inline-flex items-center border-2 border-white/25 px-5 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-white transition-colors hover:border-accent hover:text-accent"
+                >
+                  {chrome.pilotCta}
+                </a>
               </div>
             </div>
           </div>
@@ -319,7 +304,7 @@ export function TopicPage({ locale, id }: { locale: Locale; id: TopicId }) {
                   </div>
                   <p className="mt-2 text-sm leading-6 text-white/65">{chrome.pilotBody}</p>
                   <a
-                    href={pilot}
+                    href={`${withLocalePrefix(locale, routes.support)}/`}
                     className="mt-6 inline-flex items-center border-2 border-accent bg-accent px-5 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-black transition-colors hover:border-white hover:bg-white"
                   >
                     {chrome.pilotCta}

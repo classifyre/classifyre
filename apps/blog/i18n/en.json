@@ -1,27 +1,27 @@
 {
   "nav": {
-    "product": "Product",
-    "get": "Get Classifyre",
+    "product": "Platform",
+    "get": "Deploy",
     "sources": "Sources",
     "support": "Support",
     "blog": "Blog",
-    "overview": "Publication overview",
-    "articles": "Blog",
+    "overview": "All publications",
+    "articles": "Articles",
     "cases": "Case files",
-    "documentation": "Documentation",
-    "getCta": "Get Classifyre",
-    "showcase": "Showcase",
+    "documentation": "Docs",
+    "getCta": "Deploy",
+    "showcase": "Live demo",
     "githubLabel": "Classifyre on GitHub"
   },
   "footer": {
-    "tagline": "Open-source data access governance platform",
-    "blurb": "Classifyre is the governed way into your organisation's data. Access follows your departments and roles, personal data stays masked until someone is cleared, and every read is on record. Apache-2.0, made in Austria. Deploy on-premises, in your own cloud, or on AWS, Azure or Google Cloud.",
+    "tagline": "Open-source data governance",
+    "blurb": "End-to-end open-source data governance for the systems you already run. Connect your sources, classify sensitive data, enforce row and column masking by group, publish governed data products, and give teams live SQL, Power BI, and Excel access with every read logged.",
     "navHeading": "Navigate",
     "navHome": "Home",
-    "navAbout": "About · Made in Austria",
-    "navGet": "Get Classifyre",
+    "navAbout": "About",
+    "navGet": "Deploy",
     "navSources": "Sources",
-    "navSupport": "Support",
+    "navSupport": "Support & Tailoring",
     "navBlog": "Blog",
     "navDocumentation": "Documentation",
     "navShowcase": "Live showcase",
@@ -32,9 +32,9 @@
     "releaseNotes": "Release notes",
     "cookieSettings": "Cookie settings",
     "contact": "Contact",
-    "madeIn": "Made in Austria",
-    "baselineTagline": "Masked by default · every read on record",
-    "topicsHeading": "Data access governance"
+    "madeIn": "Built in Austria",
+    "baselineTagline": "Built in Austria · Apache-2.0 · Deployed worldwide",
+    "topicsHeading": "Governance & comparisons"
   },
   "cookie": {
     "message": "We use analytics cookies to see which pages get read, nothing else. No ads, no profiling, no data sold. Decline and the site works exactly the same.",
@@ -163,10 +163,10 @@
   },
   "site": {
     "title": "Classifyre",
-    "description": "Open-source data access governance platform: access by department and role across 40+ systems, masking by default, every read logged. Deploy on-premises, in your own cloud, or on AWS, Azure or Google Cloud. Made in Austria.",
-    "websiteDescription": "Open-source data access governance platform: access by department and role across 40+ systems, masking by default, every read logged. Deploy on-premises, in your own cloud, or on AWS, Azure or Google Cloud. Made in Austria.",
-    "blogDescription": "Product updates, engineering notes, deployment guidance, and detector design write-ups from Classifyre.",
-    "orgDescription": "Classifyre builds an open-source data access governance platform: one governed way into an organisation's data, with access by role, data masking and a log of every read. Deploy on-premises, in your own cloud, or on AWS, Azure or Google Cloud. Built in Austria."
+    "description": "Open-source data governance platform for the systems you already run. Classify sensitive data, enforce row and column masking by group, publish governed data products, and serve SQL, Power BI, and Excel with full audit logging.",
+    "websiteDescription": "Open-source data governance platform for the systems you already run. Classify sensitive data, enforce row and column masking by group, publish governed data products, and serve SQL, Power BI, and Excel with full audit logging.",
+    "blogDescription": "Product updates, data governance architecture notes, deployment guides, and detector write-ups from Classifyre.",
+    "orgDescription": "Classifyre develops an open-source data governance platform under Apache-2.0. Built in Austria to European privacy and security standards, deployed by organisations across Europe, North America, and worldwide."
   },
   "findingTags": [
     "leaked email",

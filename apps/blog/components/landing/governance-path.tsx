@@ -7,7 +7,6 @@ import {
   EyeOff,
   FileSearch,
   GitMerge,
-  ScrollText,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -19,15 +18,8 @@ import type { Locale } from "@/lib/locale";
 import { Micro } from "@/components/landing/motifs";
 
 /**
- * The path data takes through Classifyre, as a thread with seven stations:
- * connect, classify, organise (groups and grants), mask, build (data
- * products), use (BI, Excel, agents), log.
- *
- * A lime pulse runs along the thread; the station it reaches lights up, and
- * on every lap each station moves on to its next example (another source,
- * another finding, another tool), so the band keeps telling new versions of
- * the same story. Server HTML shows the first example of every station;
- * reduced motion keeps it that way.
+ * The six-stage end-to-end governance flow:
+ * Integrate → Detect → Govern → Mask → Query & BI → Request & Share.
  */
 
 const ICONS: readonly LucideIcon[] = [
@@ -35,12 +27,11 @@ const ICONS: readonly LucideIcon[] = [
   FileSearch,
   Users,
   EyeOff,
-  GitMerge,
   BarChart3,
-  ScrollText,
+  GitMerge,
 ];
 
-const BEAT_MS = 1100;
+const BEAT_MS = 1200;
 
 export function GovernancePath({ locale }: { locale: Locale }) {
   const steps = getLandingCopy(locale).path.steps;
@@ -60,12 +51,12 @@ export function GovernancePath({ locale }: { locale: Locale }) {
   return (
     <ol
       aria-label={getLandingCopy(locale).path.label}
-      className="relative grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-4 lg:grid-cols-7 lg:gap-x-3"
+      className="relative grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-6 lg:gap-x-3"
     >
-      {/* The thread, and the pulse running it (wide screens). */}
+      {/* The connecting line and pulse (wide screens). */}
       <span
         aria-hidden="true"
-        className="cl-path-line absolute left-[7%] right-[7%] top-[18px] hidden lg:block"
+        className="cl-path-line absolute left-[8%] right-[8%] top-[18px] hidden lg:block"
       />
       {moving ? (
         <span
@@ -94,14 +85,14 @@ export function GovernancePath({ locale }: { locale: Locale }) {
             <Micro
               className={cn(
                 "mt-3 transition-colors duration-300",
-                lit ? "text-accent" : "text-white/80",
+                lit ? "text-accent" : "text-white/85",
               )}
             >
               {step.verb}
             </Micro>
             <span
               key={example}
-              className="cl-tag-swap mt-1 block font-mono text-[11px] leading-4 text-white/55"
+              className="cl-tag-swap mt-1 block font-mono text-[11px] leading-4 text-white/60"
             >
               {example}
             </span>

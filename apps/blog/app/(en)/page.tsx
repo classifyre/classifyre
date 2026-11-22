@@ -22,15 +22,15 @@ import "../landing.css";
  */
 
 const description =
-  "Control who sees which data across 40+ systems: access by department and role, masking by default, every read logged. Open source, on your own infrastructure — on-premises, your own cloud, or AWS, Azure or Google Cloud.";
+  "Open-source data governance for the systems you already run: classify sensitive data, enforce row and column masking by group, publish governed data products, and query via SQL, Power BI, and Excel with every read logged.";
 
-const ogTitle = "Classifyre: Your access rules, enforced on every query.";
+const ogTitle = "Classifyre: Control who sees what. Enforced on every query.";
 const ogDescription =
-  "One governed way into all your data. Access follows your org structure, personal data stays masked, every read is logged, nothing leaves your servers.";
+  "End-to-end open-source data governance across 40+ systems. Row and column masking by group, governed data products, live SQL/Power BI/Excel access, and full audit logging on your own infrastructure.";
 
 export const metadata: Metadata = {
   title: {
-    absolute: "Classifyre: Open-Source Data Access Governance Platform",
+    absolute: "Classifyre — Open-Source Data Governance Platform",
   },
   description,
   keywords: [

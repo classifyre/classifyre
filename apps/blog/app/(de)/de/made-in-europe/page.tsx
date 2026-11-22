@@ -1,11 +1,8 @@
 import type { Metadata } from "next";
-import type { ReactNode } from "react";
 
 import { Button } from "@workspace/ui/components";
-import { cn } from "@workspace/ui/lib/utils";
 
 import { AboutPillars } from "@/components/about-pillars";
-import { Illustration } from "@/components/illustration";
 import {
   DocsLink,
   Marker,
@@ -15,8 +12,8 @@ import {
 } from "@/components/page-kit";
 import { Reveal } from "@/components/reveal";
 import {
-  docs,
   contactEmail,
+  docs,
   repoUrl,
   routes,
   showcaseUrlFor,
@@ -26,9 +23,9 @@ import { withLocalePrefix } from "@/lib/locale";
 import "../../../landing.css";
 
 export const metadata: Metadata = {
-  title: { absolute: "Über Classifyre: Made in Austria, Open Source" },
+  title: { absolute: "Über Classifyre — Open-Source Data Governance" },
   description:
-    "Classifyre ist der kontrollierte Zugang zu den Daten Ihrer Organisation: Zugriff nach Rolle, Maskierung, Protokollierung. Aus Österreich, Apache-2.0, On-Premises.",
+    "Classifyre ist eine Open-Source Data-Governance-Plattform aus Österreich, entwickelt nach europäischen Datenschutz- und Sicherheitsstandards und weltweit im Einsatz.",
   alternates: {
     canonical: "/de/made-in-europe/",
     languages: {
@@ -38,28 +35,19 @@ export const metadata: Metadata = {
     },
   },
   openGraph: {
-    title: "Über Classifyre: Made in Austria, offen gebaut",
+    title: "Über Classifyre — Entwickelt in Österreich, weltweit im Einsatz",
     description:
-      "Österreichische, europäische Open-Source-Software zur Steuerung des Datenzugriffs, unter Apache-2.0. Ihre Daten müssen Ihre Infrastruktur, oder den Kontinent, nie verlassen.",
+      "100 % Apache-2.0 Open-Source Data Governance aus Österreich nach europäischen Standards – weltweit selbst betrieben auf eigener Infrastruktur.",
     type: "website",
     locale: "de_AT",
   },
 };
 
-/**
- * The Austrian flag as three painted bars rather than an emoji or a PNG: the
- * site's whole visual language is 2px borders and flat blocks, and a glossy
- * flag graphic would read as a sticker dropped onto a case file. Decorative —
- * the surrounding copy already says "Austria" in words.
- */
-function AustrianFlag({ className }: { className?: string }) {
+function SubtleAustrianMark() {
   return (
     <span
       aria-hidden="true"
-      className={cn(
-        "inline-flex h-12 w-16 flex-col overflow-hidden border-2 border-border",
-        className,
-      )}
+      className="inline-flex h-3.5 w-5 shrink-0 flex-col overflow-hidden border border-white/25"
     >
       <span className="h-1/3 w-full bg-[#ed2939]" />
       <span className="h-1/3 w-full bg-white" />
@@ -68,52 +56,7 @@ function AustrianFlag({ className }: { className?: string }) {
   );
 }
 
-/**
- * The twelve stars, drawn on a circle rather than hand-placed. Real polygons
- * rather than the ★ glyph: a text star would land in the page's copied text
- * and in anything scraping it, twelve times over, for a purely decorative mark.
- */
-const STAR_POINTS = [
-  [0, -1],
-  [0.2245, -0.309],
-  [0.951, -0.309],
-  [0.363, 0.118],
-  [0.588, 0.809],
-  [0, 0.382],
-  [-0.588, 0.809],
-  [-0.363, 0.118],
-  [-0.951, -0.309],
-  [-0.2245, -0.309],
-]
-  .map(([x, y]) => `${x},${y}`)
-  .join(" ");
-
-function EuropeanStars({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 100 100"
-      aria-hidden="true"
-      className={cn("h-12 w-12", className)}
-    >
-      {Array.from({ length: 12 }, (_, index) => {
-        const angle = (index * Math.PI) / 6 - Math.PI / 2;
-        const x = 50 + 32 * Math.cos(angle);
-        const y = 50 + 32 * Math.sin(angle);
-        return (
-          <polygon
-            key={index}
-            points={STAR_POINTS}
-            fill="currentColor"
-            transform={`translate(${x.toFixed(2)} ${y.toFixed(2)}) scale(9)`}
-          />
-        );
-      })}
-    </svg>
-  );
-}
-
-/** What the address actually changes for someone running the software. */
-const consequences: readonly {
+const principles: readonly {
   marker: string;
   title: string;
   body: string;
@@ -121,36 +64,35 @@ const consequences: readonly {
   hrefLabel?: string;
 }[] = [
   {
-    marker: "Residenz",
-    title: "Ihre Daten müssen das Haus nie verlassen",
-    body: "Classifyre ist Software, die Sie betreiben, kein Dienst, zu dem Sie hochladen. Das Docker-Image hält alles auf einer Maschine; der Helm-Chart hält alles in Ihrem Cluster. Es gibt keine Anbieter-Mandantschaft, für die man eine Region wählen müsste — denn es gibt keine Anbieter-Mandantschaft.",
+    marker: "Integration zuerst",
+    title: "Passt in Ihre bestehende Architektur",
+    body: "Behalten Sie Ihre ETL-Pipelines, Datenbanken, Iceberg- und Delta-Lakehouses, Ihren Verzeichnisdienst und Ihre BI-Werkzeuge. Classifyre integriert sich direkt darüber, statt eine kostspielige Migration zu erzwingen.",
+    href: "/de/sources/",
+    hrefLabel: "Unterstützte Quellen ansehen",
+  },
+  {
+    marker: "Datensouveränität",
+    title: "Alles bleibt auf Ihrer Infrastruktur",
+    body: "Classifyre ist selbst betriebene Software, kein mandantenübergreifender SaaS-Upload. Betreiben Sie es lokal mit Docker oder produktiv auf Kubernetes und OpenShift – On-Premises, in Ihrer Private Cloud oder auf AWS, Azure und GCP.",
     href: docs.deployment,
-    hrefLabel: "Deployment-Optionen",
+    hrefLabel: "Deployment-Architektur",
   },
   {
-    marker: "Souveränität",
-    title: "Keine Abhängigkeit von einer Nicht-EU-Cloud",
-    body: "Nichts im Stack verlangt ein Hyperscaler-Konto. PostgreSQL und Kubernetes sind die einzigen harten Abhängigkeiten — die gesamte Plattform läuft bei einem EU-Anbieter, auf eigener Hardware oder in einem air-gapped Rack, immer derselbe Build.",
-    href: docs.kubernetes,
-    hrefLabel: "Auf Kubernetes betreiben",
-  },
-  {
-    marker: "KI zu Ihren Bedingungen",
-    title: "Sie wählen das Modell — und wo es läuft",
-    body: "KI-Anbieter sind Konfiguration, kein fest verdrahteter Hersteller. Richten Sie Autopilot und LLM-Detektoren auf einen europäischen Endpunkt, auf ein selbst gehostetes Modell oder auf gar nichts — die regelbasierten Detektoren und die lokalen Modelle arbeiten ohne jeden konfigurierten Anbieter.",
+    marker: "Europäische Standards",
+    title: "Datenschutz und Sicherheit als Standard",
+    body: "Entwickelt in Österreich im Umfeld von DSGVO, NIS2, DORA und EU AI Act. Personenbezogene Spalten sind standardmäßig maskiert, Admins erhalten nicht automatisch Klartext, jeder Zugriff wird protokolliert und die Wahl der KI-Modelle bleibt bei Ihnen.",
     href: docs.aiProviders,
-    hrefLabel: "KI-Anbieter",
+    hrefLabel: "KI- & Modellkonfiguration",
   },
   {
-    marker: "Gleiches Regelwerk",
-    title: "Wir arbeiten unter den Regeln, unter denen Sie arbeiten",
-    body: "DSGVO, NIS2, DORA und der AI Act sind für uns keine Export-Checkliste — sie sind das Recht, wo wir sitzen. Das prägt die Produkt-Defaults: standardmäßig maskiert, ein Protokoll jedes Zugriffs, verschlüsselte Zugangsdaten, Workspace-Isolierung und Telemetrie zum Abschalten.",
-    href: docs.telemetry,
-    hrefLabel: "Was die Telemetrie sendet",
+    marker: "Offen konzipiert",
+    title: "100 % Apache-2.0, ohne gesperrte Stufen",
+    body: "Prüfen Sie jede Zeile Code, verifizieren Sie Maskierung und Zugriffssteuerung und betreiben Sie die gesamte Plattform ohne Nutzerlizenzen selbst. Wenn Sie individuelle Anpassungen benötigen, arbeiten Sie direkt mit unserem Engineering-Team.",
+    href: "/de/support/",
+    hrefLabel: "Support & Anpassung",
   },
 ];
 
-/** Why the open-source part is a commitment rather than a marketing tier. */
 const openSourceFacts: readonly {
   label: string;
   value: string;
@@ -160,130 +102,53 @@ const openSourceFacts: readonly {
     label: "Lizenz",
     value: "Apache-2.0",
     detail:
-      "Permissiv, mit Patentgrant und absichtlich langweilig. Forken, ausliefern, kommerziell betreiben.",
+      "Permissive Open-Source-Lizenz mit Patentklausel. Prüfen, erweitern und kommerziell betreiben – ohne Herstellerbindung.",
   },
   {
-    label: "Umfang",
-    value: "Die ganze Engine",
+    label: "Vollständiger Kern",
+    value: "Alle Funktionen enthalten",
     detail:
-      "Konnektoren, SSO und Rollen, Freigaben und Zeilenfilter, Maskierung, das SQL-Gateway, Ermittlungen, das Docker-Image und das Helm-Chart. Keine abgespeckte Demo.",
+      "SSO, Rollen, Zeilenfilter, dynamische Maskierung, SQL/BI-Gateway, geteilte Datenprodukte, Audit-Log, Docker-Image sowie Kubernetes- & OpenShift-Helm-Chart.",
   },
   {
-    label: "Entwicklung",
-    value: "In der Öffentlichkeit",
+    label: "Transparenz",
+    value: "Offen entwickelt",
     detail:
-      "Issues, Pull Requests und Releases passieren alle im öffentlichen Repository, öffentlich.",
+      "Architektur, Konnektoren, Releases und Sicherheits-Updates sind öffentlich auf GitHub einsehbar – maximale Nachvollziehbarkeit vor dem Einsatz.",
   },
 ];
 
-function Fact({
-  label,
-  value,
-  detail,
-}: {
-  label: string;
-  value: string;
-  detail: string;
-}) {
-  return (
-    <div className="flex h-full flex-col gap-2 border-2 border-white/20 bg-white/[0.04] p-5">
-      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-white/50">
-        {label}
-      </span>
-      <p className="font-serif text-xl font-black uppercase leading-tight tracking-[0.04em] text-white">
-        {value}
-      </p>
-      <p className="text-sm leading-6 text-white/70">{detail}</p>
-    </div>
-  );
-}
-
-function Consequence({
-  marker,
-  title,
-  body,
-  href,
-  hrefLabel,
-}: {
-  marker: string;
-  title: string;
-  body: string;
-  href?: string;
-  hrefLabel?: string;
-}) {
-  return (
-    <div className="flex h-full flex-col items-start gap-3 border-2 border-border bg-background p-6 shadow-[6px_6px_0_var(--color-border)]">
-      <Marker label={marker} />
-      <h3 className="font-serif text-lg font-black uppercase leading-tight tracking-[0.04em]">
-        {title}
-      </h3>
-      <p className="text-sm leading-6 text-muted-foreground">{body}</p>
-      {href && hrefLabel ? (
-        <div className="mt-auto pt-2">
-          <a
-            href={href}
-            target="_blank"
-            rel="noreferrer"
-            className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground underline-offset-4 hover:text-accent-foreground hover:underline dark:hover:text-accent"
-          >
-            {hrefLabel} →
-          </a>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-/** One line of the "where we sit" card stack. */
-function Coordinate({
-  label,
-  value,
-  aside,
-}: {
-  label: string;
-  value: string;
-  aside: ReactNode;
-}) {
-  return (
-    <div className="flex items-center gap-5 border-2 border-border bg-background p-5">
-      <div className="shrink-0">{aside}</div>
-      <div className="space-y-1">
-        <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
-          {label}
-        </p>
-        <p className="font-serif text-lg font-black uppercase leading-tight tracking-[0.04em]">
-          {value}
-        </p>
-      </div>
-    </div>
-  );
-}
+const coordinates: readonly { label: string; value: string; accent?: boolean }[] = [
+  { label: "Entwicklung", value: "Österreich, Europäische Union", accent: true },
+  { label: "Einsatzgebiet", value: "Europa, Nordamerika & weltweit" },
+  { label: "Lizenz", value: "Apache-2.0 · 100 % Open Source" },
+  { label: "Betrieb", value: "Docker · Kubernetes · OpenShift" },
+];
 
 export default function MadeInEuropePageDe() {
   const getHref = `${withLocalePrefix("de", routes.get)}/`;
+  const supportHref = `${withLocalePrefix("de", routes.support)}/`;
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 sm:px-6 lg:px-8">
       <PageHero
-        eyebrow="Servus"
+        eyebrow="Über Classifyre"
         title={
           <>
-            Made in Austria.
+            Entwickelt in Österreich.
             <br />
             <span className="inline-block bg-accent px-[0.12em] text-black">
-              Offen für alle.
+              Weltweit im Einsatz.
             </span>
           </>
         }
         lede={
           <>
-            Classifyre setzt Ihr Berechtigungskonzept auf allen Datenquellen
-            durch: Zugriff nach Abteilung, Rolle und Regel, personenbezogene
-            Daten maskiert, jeder Zugriff protokolliert, im eigenen
-            Rechenzentrum. Es wird in Österreich, in der Europäischen Union,
-            gebaut und als Open Source unter Apache-2.0 veröffentlicht. Wir sind keine
-            europäische Marke auf fremder Cloud — die Software läuft auf Ihren
-            Maschinen, unter denselben Regeln, unter denen wir selbst arbeiten.
+            Classifyre ist eine Open-Source Data-Governance-Plattform, entwickelt
+            in Österreich nach europäischen Datenschutz- und Sicherheitsstandards
+            – für Organisationen in Österreich, der EU, Nordamerika und weltweit.
+            Zentrale Data-Governance-Infrastruktur sollte transparent, selbst
+            betreibbar und frei von proprietärer Herstellerbindung sein.
           </>
         }
         actions={
@@ -293,9 +158,7 @@ export default function MadeInEuropePageDe() {
               size="lg"
               className="border-2 border-accent bg-accent text-black hover:bg-accent/90"
             >
-              <a href={repoUrl} target="_blank" rel="noreferrer">
-                Quellcode lesen
-              </a>
+              <a href={supportHref}>Mit unserem Team sprechen</a>
             </Button>
             <Button
               asChild
@@ -303,176 +166,133 @@ export default function MadeInEuropePageDe() {
               variant="secondary"
               className="border-2 border-white/20 bg-white/10 text-white hover:bg-white/16"
             >
-              <a href={getHref}>Classifyre holen</a>
+              <a href={repoUrl} target="_blank" rel="noreferrer">
+                Quellcode auf GitHub
+              </a>
             </Button>
           </>
         }
         aside={
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-4 border-2 border-white/20 bg-white/[0.04] p-5">
-              <AustrianFlag className="shrink-0" />
-              <div className="space-y-1">
-                <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-white/50">
-                  Gebaut in
-                </p>
-                <p className="font-serif text-xl font-black uppercase tracking-[0.04em] text-white">
-                  Österreich
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4 border-2 border-white/20 bg-white/[0.04] p-5">
-              <EuropeanStars className="shrink-0 text-accent" />
-              <div className="space-y-1">
-                <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-white/50">
-                  Nach den Regeln von
-                </p>
-                <p className="font-serif text-xl font-black uppercase tracking-[0.04em] text-white">
-                  Der Europäischen Union
-                </p>
-              </div>
-            </div>
+          <div className="border-2 border-white/20 bg-white/[0.04] p-6">
+            <dl className="divide-y divide-white/15">
+              {coordinates.map((item) => (
+                <div key={item.label} className="py-3.5 first:pt-0 last:pb-0">
+                  <dt className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-white/50">
+                    {item.label}
+                  </dt>
+                  <dd className="mt-1 flex items-center gap-2.5 font-sans text-base font-semibold text-white">
+                    {item.accent ? <SubtleAustrianMark /> : null}
+                    <span>{item.value}</span>
+                  </dd>
+                </div>
+              ))}
+            </dl>
           </div>
         }
       />
 
-      {/* ── Was Classifyre tut: die fünf Säulen ─────────────────────────── */}
+      {/* ── Durchgängige Funktionen ───────────────────────────────────────── */}
       <AboutPillars locale="de" />
 
-      {/* ── Where we sit ─────────────────────────────────────────────────── */}
-      <section aria-labelledby="where-title">
+      {/* ── Engineering-Prinzipien ────────────────────────────────────────── */}
+      <section aria-labelledby="principles-title">
         <SectionShell tone="plain">
           <div className="space-y-8">
             <SectionHead
-              id="where-title"
-              marker="Koordinaten"
-              illustration="feet"
-              title="Ein kleines europäisches Team, arbeitet öffentlich"
-              lede="Keine Offshore-Entwicklungsfabrik, kein anonymes Maintainer-Konto."
-            />
-
-            <div className="flex flex-wrap items-center gap-4 border-2 border-border bg-muted/30 p-5">
-              <Marker label="Hallo sagen" />
-              <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-                Fragen zu einem Rollout, einem Konnektor, den Sie brauchen, oder
-                dazu, wohin sich das Projekt entwickelt? Schreiben Sie uns —
-                dieselbe Adresse erreicht die Menschen, die den Code geschrieben
-                haben.
-              </p>
-              <Button
-                asChild
-                variant="secondary"
-                className="border-2 border-border"
-              >
-                <a href={`mailto:${contactEmail}`}>
-                  {contactEmail}
-                </a>
-              </Button>
-            </div>
-          </div>
-        </SectionShell>
-      </section>
-
-      {/* ── What it changes for you ──────────────────────────────────────── */}
-      <section aria-labelledby="consequences-title">
-        <SectionShell tone="plain">
-          <div className="space-y-8">
-            <SectionHead
-              id="consequences-title"
-              marker="Was es ändert"
-              illustration="binders"
-              title="Europäisch sein"
-              lede="Viele Tools behaupten EU-Hosting und bitten Sie dann trotzdem, Ihre sensibelsten Daten zu ihnen zu schicken. Classifyre ist andersherum gebaut: Die Software reist zu den Daten."
+              id="principles-title"
+              marker="Wie wir bauen"
+              title="Praxisnahes Engineering, klare Grenzen"
+              lede="Gebaut für Organisationen, die konsequente Data Governance brauchen, ohne die Kontrolle über ihre Datenlandschaft an einen proprietären Anbieter abzugeben."
             />
 
             <div className="grid gap-4 lg:grid-cols-2">
-              {consequences.map((item, index) => (
-                <Reveal key={item.marker} delayMs={index * 80} className="h-full">
-                  <Consequence {...item} />
-                </Reveal>
-              ))}
+              {principles.map((item, index) => {
+                const external = item.href?.startsWith("http");
+                return (
+                  <Reveal key={item.marker} delayMs={index * 70} className="h-full">
+                    <div className="flex h-full flex-col items-start gap-3 border-2 border-border bg-background p-6 shadow-[6px_6px_0_var(--color-border)]">
+                      <Marker label={item.marker} />
+                      <h3 className="font-sans text-lg font-bold leading-snug text-foreground">
+                        {item.title}
+                      </h3>
+                      <p className="text-sm leading-6 text-muted-foreground">{item.body}</p>
+                      {item.href && item.hrefLabel ? (
+                        <div className="mt-auto pt-2">
+                          <a
+                            href={item.href}
+                            {...(external ? { target: "_blank", rel: "noreferrer" } : null)}
+                            className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground underline-offset-4 hover:text-accent-foreground hover:underline dark:hover:text-accent"
+                          >
+                            {item.hrefLabel} →
+                          </a>
+                        </div>
+                      ) : null}
+                    </div>
+                  </Reveal>
+                );
+              })}
             </div>
 
-            <div className="flex flex-wrap items-center gap-4 border-2 border-border bg-background p-5">
-              <Marker label="Klare Antwort" />
-              <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-                Wir werden Ihnen nicht erzählen, eine Software mache Sie
-                DSGVO-konform — das tut keine Software. Was wir sagen können:
-                Classifyre braucht nie eine Kopie Ihrer Daten, und jede
-                Designentscheidung oben wurde so getroffen, dass eine
-                europäische Compliance-Prüfung ein kurzes Gespräch statt eines
-                Projekts ist.
-              </p>
-              <DocsLink href={docs.deployment}>Deployment-Doku</DocsLink>
+            <div className="flex flex-wrap items-center justify-between gap-4 border-2 border-border bg-muted/30 p-5 sm:p-6">
+              <div className="max-w-3xl space-y-1.5">
+                <Marker label="Hinweis zur Compliance" />
+                <p className="pt-1 text-sm leading-6 text-muted-foreground">
+                  Keine Software allein macht eine Organisation rechtskonform.
+                  Classifyre liefert den technischen Unterbau – Gruppenrechte,
+                  Zeilenfilter, Spaltenmaskierung und nachvollziehbare
+                  Zugriffsprotokolle –, der DSGVO, NIS2, DORA und interne
+                  Governance-Vorgaben wirksam unterstützt.
+                </p>
+              </div>
+              <DocsLink href={docs.deployment}>Architektur-Doku</DocsLink>
             </div>
           </div>
         </SectionShell>
       </section>
 
-      {/* ── Open source ──────────────────────────────────────────────────── */}
+      {/* ── Open-Source-Versprechen ───────────────────────────────────────── */}
       <section aria-labelledby="open-source-title">
         <SectionShell tone="signal" fullWidth className="bg-black">
-          <div className="space-y-8 text-white">
+          <div className="mx-auto max-w-7xl space-y-8 text-white">
+            <div className="max-w-2xl space-y-3">
+              <Marker label="Open Source" />
+              <h2
+                id="open-source-title"
+                className="font-hero text-[clamp(2.2rem,5vw,3.8rem)] uppercase leading-[0.9] tracking-[0.01em] text-white"
+              >
+                Prüfen Sie die Qualität selbst.
+              </h2>
+              <p className="text-base leading-7 text-white/70">
+                Evaluieren Sie Classifyre direkt anhand des Quellcodes, testen Sie
+                es auf Ihren eigenen Datenbanken und betreiben Sie es in Ihrer
+                Umgebung – ohne Funktionssperren.
+              </p>
+            </div>
 
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-3">
               {openSourceFacts.map((fact) => (
-                <Fact key={fact.label} {...fact} />
+                <div
+                  key={fact.label}
+                  className="flex h-full flex-col gap-2 border-2 border-white/20 bg-white/[0.04] p-5"
+                >
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-white/50">
+                    {fact.label}
+                  </span>
+                  <p className="font-sans text-lg font-bold text-white">
+                    {fact.value}
+                  </p>
+                  <p className="text-sm leading-6 text-white/70">{fact.detail}</p>
+                </div>
               ))}
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
-              <Button
-                asChild
-                className="border-2 border-accent bg-accent text-black hover:bg-accent/90"
-              >
-                <a href={repoUrl} target="_blank" rel="noreferrer">
-                  Repository durchstöbern
-                </a>
-              </Button>
-              <a
-                href={showcaseUrlFor("de")}
-                target="_blank"
-                rel="noreferrer"
-                className="font-mono text-[11px] uppercase tracking-[0.12em] text-white/50 underline-offset-4 hover:text-accent hover:underline"
-              >
-                Oder die Live-Showcase ausprobieren
-              </a>
-            </div>
-          </div>
-        </SectionShell>
-      </section>
-
-      {/* ── Closing ──────────────────────────────────────────────────────── */}
-      <section aria-labelledby="europe-cta-title">
-        <SectionShell tone="signal" fullWidth className="bg-black">
-          <div className="mx-auto flex max-w-3xl flex-col items-center gap-6 py-4 text-center text-white">
-            <div className="flex items-center gap-4">
-              <AustrianFlag className="h-10 w-14 border-white/30" />
-              <EuropeanStars className="h-10 w-10 text-accent" />
-            </div>
-            <h2
-              id="europe-cta-title"
-              className="font-hero text-[clamp(2.5rem,7vw,5rem)] uppercase leading-[0.88] tracking-[0.01em]"
-            >
-              Hier gebaut.{" "}
-              <span className="inline-block bg-accent px-[0.12em] text-black">
-                Läuft überall.
-              </span>
-            </h2>
-            <p className="max-w-xl text-base leading-7 text-white/70">
-              Betreiben Sie es und richten Sie es auf etwas Echtes. Nichts wird
-              hochgeladen, nichts telefoniert mit einer ausländischen Cloud, und
-              alles, was Sie aufbauen, tragen Sie mit, wenn Sie zu Kubernetes
-              wechseln.
-            </p>
-            <div className="flex flex-wrap justify-center gap-3">
+            <div className="flex flex-wrap items-center gap-4 border-t border-white/15 pt-6">
               <Button
                 asChild
                 size="lg"
                 className="border-2 border-accent bg-accent text-black hover:bg-accent/90"
               >
-                <a href={getHref}>
-                  Classifyre holen
-                </a>
+                <a href={getHref}>Installation & Betrieb</a>
               </Button>
               <Button
                 asChild
@@ -480,8 +300,16 @@ export default function MadeInEuropePageDe() {
                 variant="secondary"
                 className="border-2 border-white/20 bg-white/10 text-white hover:bg-white/16"
               >
-                <a href={`mailto:${contactEmail}`}>Sprechen Sie mit uns</a>
+                <a href={`mailto:${contactEmail}`}>{contactEmail}</a>
               </Button>
+              <a
+                href={showcaseUrlFor("de")}
+                target="_blank"
+                rel="noreferrer"
+                className="font-mono text-[11px] uppercase tracking-[0.14em] text-white/60 underline-offset-4 hover:text-accent hover:underline"
+              >
+                Live-Demo ansehen →
+              </a>
             </div>
           </div>
         </SectionShell>

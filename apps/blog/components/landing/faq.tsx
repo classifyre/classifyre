@@ -52,8 +52,8 @@ export function FaqList({
                 value={`faq-${index}`}
                 className="rounded-none border-0 border-t-2 border-foreground/80 bg-transparent last:border-b-2"
               >
-                <AccordionTrigger className="border-0 bg-transparent px-0 py-5 text-foreground hover:bg-transparent [&_.accordion-chevron]:text-accent-ink dark:[&_.accordion-chevron]:text-accent">
-                  <AccordionTitle className="font-mono text-[11px] uppercase tracking-[0.16em] text-foreground sm:text-xs">
+                <AccordionTrigger className="border-0 bg-transparent px-0 py-5 text-left text-foreground hover:bg-transparent [&_.accordion-chevron]:text-accent-ink dark:[&_.accordion-chevron]:text-accent">
+                  <AccordionTitle className="font-sans text-base font-semibold leading-snug text-foreground sm:text-lg">
                     {item.q}
                   </AccordionTitle>
                 </AccordionTrigger>

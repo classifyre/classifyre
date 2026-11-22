@@ -18,7 +18,6 @@ import type { Locale } from "@/lib/locale";
 import { Demo, type DemoId } from "@/components/demos";
 import { LandingHead, Micro } from "@/components/landing/motifs";
 import { ReadersPanel } from "@/components/landing/readers-panel";
-import { Mascot } from "@/components/mascot";
 
 /**
  * How it works, as one thread running down the page.
@@ -101,14 +100,6 @@ export function Journey({ locale }: { locale: Locale }) {
           title={j.title}
           lede={j.lede}
           tone="dark"
-          aside={
-            <Mascot
-              name="looking-around"
-              alt={copy.mascots.lookingAround}
-              surface="dark"
-              className="hidden h-44 w-auto lg:block"
-            />
-          }
         />
 
         <ol ref={listRef} className="relative mt-16">

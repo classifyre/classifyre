@@ -1,37 +1,37 @@
 # Classifyre
 
-> Open-source data access governance you run yourself. Classifyre is the one governed way into an organisation's data: access follows departments, roles and rules, personal data stays masked until someone is cleared for it, teams build data products on top, and every read is on record. Apache-2.0, self-hosted, made in Austria.
+> Open-source data governance platform you run on your own infrastructure. Control who sees what — enforced on every query. Built in Austria to European privacy and security standards, deployed by organisations across Europe, North America, and worldwide. Apache-2.0.
 
-Classifyre is one product with every feature open source, including SSO, roles, tenants, row filters, masking and the SQL gateway. There is no separate enterprise build. If you need help with rollout, installation or tailoring, contact us: contact@classifyre.com.
+Classifyre is 100% open source under Apache-2.0 with every capability included (SSO, roles, row filters, dynamic column masking, SQL/BI gateway, dataset requests, shared data products, audit logging, Docker image, and Kubernetes/OpenShift Helm chart). There is no gated enterprise edition. Organisations that want help tailoring Classifyre to their IAM, security architecture, custom sources, Delta data products, or bespoke detectors and AI models can contact our team directly at contact@classifyre.com.
 
-## What it does
+## End-to-end capabilities
 
-1. Access follows the organisation. Groups come from the company directory (Entra ID, Active Directory over LDAP, Okta, any OIDC or SAML provider) through the bundled Keycloak identity server. Access always goes to groups: Data reader or Data reader, unmasked per workspace, source or table, with end dates; row filters per group (a district sees only its rows, no row without a rule); access requests decided by owners and stewards. Workspace admins do not read clear values by default.
-2. Personal data is masked by default. Classification (41 personal-data entity types including Austrian, German and Swiss identifiers, 27 secret patterns, custom detectors by regex, model or prompt) decides what is protected. Masks: redacted (****), last four (••••1234), hashed (joins and counts still work; pseudonymisation, not anonymisation), empty, or hidden. Masks apply inside the query, so WHERE, JOIN and GROUP BY cannot see past them.
-3. Yes — teams can build data products on governed data. Shared datasets are governed, sharable, saved queries that join up to eight sources live, with an owning group and readers per group; teams query them with the same governance as the sources underneath, and the masks of every input travel with them as a floor. Owners, stewards, quality rules and ODCS data contracts.
-4. People use it in the tools they have: the SQL page, exports (Excel, CSV, Parquet), a PostgreSQL-protocol endpoint for Power BI, Excel, Tableau and DBeaver on personal, expiring connections, and AI agents over MCP, which read as the person who connected them.
-5. Every read is on record per table and person, with the channel used, and nothing leaves your infrastructure: run it on-premises, in your own cloud, or on public cloud infrastructure (AWS, Azure, Google Cloud). Runs as one Docker image or a Helm chart on Kubernetes. Runs offline.
+1. **Integrate & detect**: Connect 40+ known sources (PostgreSQL, MySQL, Databricks, ODBC, Iceberg, Delta, Parquet, S3/Azure/GCS, wikis, tickets) or custom connectors in place — without replacing existing ETL pipelines. Built-in PII and secret packs plus custom business detectors from regex and Python rules to lightweight local CPU AI models (GLiNER2, text/image classification) and LLMs.
+2. **Group-based governance**: Integrates directly with Entra ID, Active Directory, Okta, or any OIDC/SAML directory. Permissions apply to groups with expiration dates, named owners and stewards, owner-approved access requests, and row-level security per department or region. Admins do not get unmasked values by default.
+3. **Multi-level column & row masking**: Mask sensitive columns as redacted, last-four, deterministic hashed pseudonymisation (joins and distinct counts still work), empty, or hidden — enforced inside the query engine on both original source tables and shared datasets, with different clearance levels for different groups.
+4. **Governed SQL, Power BI, Excel & ODBC**: Standard PostgreSQL-compatible TLS endpoint with personal, expiring, revocable connections for Power BI, Excel, Tableau, DBeaver, and ODBC/JDBC clients, plus AI agents over MCP inheriting the user's own permissions.
+5. **Self-service dataset requests & Delta data products**: Business users request combined datasets in plain language or via structured workflows. Owners review and publish live or Delta shared data products that automatically inherit source masking and classification rules as a strict floor.
+6. **Complete audit trail & quality**: Every read, export, grant, and approval is logged with user and tool. Scheduled data quality checks and open data contracts (ODCS) support GDPR, NIS2, DORA, and internal audits.
 
-When something leaks, the same findings feed an investigation layer: standing inquiries, fingerprints across systems, cases with evidence and hypotheses, and an autopilot.
+## Deployment
 
-Classifyre supports GDPR data minimisation, accountability (Art. 5) and data protection by design (Art. 25); it does not make an organisation compliant on its own.
+- Self-hosted via Docker (all-in-one evaluation container) or Helm chart for Kubernetes and OpenShift.
+- Runs on-premises, in private clouds, air-gapped networks, or AWS, Azure, and Google Cloud.
 
-## Pages
+## Key pages
 
-- [Home](https://classifyre.com/): overview
-- [Data access governance](https://classifyre.com/data-access-governance/)
-- [Incident response](https://classifyre.com/use-cases/incident-response/)
-- [Immuta alternative](https://classifyre.com/immuta-alternative/)
-- [Unity Catalog alternative](https://classifyre.com/unity-catalog-alternative/)
-- [Made in Austria](https://classifyre.com/made-in-europe/)
-- [German site](https://classifyre.com/de/) · [Berechtigungskonzept umsetzen](https://classifyre.com/de/berechtigungskonzept-umsetzen/)
+- [Home](https://www.classifyre.com/)
+- [Data Access Governance](https://www.classifyre.com/data-access-governance/)
+- [Supported Sources](https://www.classifyre.com/sources/)
+- [Deploy & Self-Host](https://www.classifyre.com/get/)
+- [Support & Tailored Rollouts](https://www.classifyre.com/support/)
+- [About Classifyre](https://www.classifyre.com/made-in-europe/)
+- [Immuta Alternative](https://www.classifyre.com/immuta-alternative/)
+- [Unity Catalog Alternative](https://www.classifyre.com/unity-catalog-alternative/)
+- [Incident Response](https://www.classifyre.com/use-cases/incident-response/)
+- [German site](https://www.classifyre.com/de/) · [Berechtigungskonzept umsetzen](https://www.classifyre.com/de/berechtigungskonzept-umsetzen/)
 
-## Docs
+## Documentation & source
 
 - [Documentation](https://docs.classifyre.com/)
-- [Access](https://docs.classifyre.com/access/)
-- [Organizing people with groups](https://docs.classifyre.com/access/organizing/)
-- [Query data and masking](https://docs.classifyre.com/data-query/)
-- [SQL connections](https://docs.classifyre.com/sql-connections/)
-- [Roles](https://docs.classifyre.com/access/roles/)
-- [Source code](https://github.com/classifyre/classifyre)
+- [Source code on GitHub](https://github.com/classifyre/classifyre)

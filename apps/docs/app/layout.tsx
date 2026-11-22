@@ -198,7 +198,7 @@ export const metadata: Metadata = {
     template: "%s | Classifyre Docs",
   },
   description:
-    "Documentation for Classifyre, open-source data access governance: access by department and role across 40+ systems, personal data masked by default, every read on record.",
+    "Documentation for Classifyre, the open-source data governance platform: integrate 40+ sources, classify sensitive data, enforce row and column masking by group, publish governed data products, and serve SQL, Power BI, and Excel with full audit logging.",
   keywords: [
     "classifyre",
     "documentation",
@@ -226,7 +226,7 @@ export const metadata: Metadata = {
     type: "website",
     title: "Classifyre Docs",
     description:
-      "Documentation for Classifyre, open-source data access governance: access by department and role across 40+ systems, personal data masked by default, every read on record.",
+      "Documentation for Classifyre, the open-source data governance platform: integrate 40+ sources, classify sensitive data, enforce row and column masking by group, publish governed data products, and serve SQL, Power BI, and Excel with full audit logging.",
     url: docsSiteUrl,
     siteName: "Classifyre Docs",
   },
@@ -234,7 +234,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Classifyre Docs",
     description:
-      "Documentation for Classifyre, open-source data access governance: access by department and role across 40+ systems, personal data masked by default, every read on record.",
+      "Documentation for Classifyre, the open-source data governance platform: integrate 40+ sources, classify sensitive data, enforce row and column masking by group, publish governed data products, and serve SQL, Power BI, and Excel with full audit logging.",
   },
 };
 
