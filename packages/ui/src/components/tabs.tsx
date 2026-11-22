@@ -47,14 +47,19 @@ function Tabs({
     [urlHistory, urlParam],
   );
 
+  // Set when the person picks a tab: a deep link still waiting for its
+  // trigger (below) must not take the tab back from them.
+  const picked = React.useRef(false);
+
   React.useEffect(() => {
     if (!urlParam) return;
 
-    const readUrl = () => {
+    /** Applies the URL's tab; false while its trigger is not rendered yet. */
+    const readUrl = (): boolean => {
       const nextValue = new URL(window.location.href).searchParams.get(
         urlParam,
       );
-      if (!nextValue || !rootRef.current) return;
+      if (!nextValue || !rootRef.current) return true;
 
       const valid = Array.from(
         rootRef.current.querySelectorAll<HTMLElement>(
@@ -65,15 +70,37 @@ function Tabs({
           trigger.closest('[data-slot="tabs"]') === rootRef.current &&
           trigger.dataset.urlTabValue === nextValue,
       );
-      if (!valid || latest.current.selectedValue === nextValue) return;
+      if (!valid) return false;
+      if (latest.current.selectedValue === nextValue) return true;
 
       if (!latest.current.isControlled) setLocalValue(nextValue);
       latest.current.onValueChange?.(nextValue);
+      return true;
     };
 
-    readUrl();
-    window.addEventListener("popstate", readUrl);
-    return () => window.removeEventListener("popstate", readUrl);
+    // A tab gated on something still loading (Settings → Access waits for
+    // the person's permissions) renders its trigger after this effect ran:
+    // wait for it instead of leaving the deep link on the default tab.
+    let observer: MutationObserver | null = null;
+    const stopWaiting = () => {
+      observer?.disconnect();
+      observer = null;
+    };
+    if (!readUrl() && rootRef.current) {
+      observer = new MutationObserver(() => {
+        if (picked.current || readUrl()) stopWaiting();
+      });
+      observer.observe(rootRef.current, { childList: true, subtree: true });
+    }
+    const onPopState = () => {
+      stopWaiting();
+      readUrl();
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => {
+      stopWaiting();
+      window.removeEventListener("popstate", onPopState);
+    };
   }, [urlParam]);
 
   const mounted = React.useRef(false);
@@ -88,6 +115,7 @@ function Tabs({
 
   const handleValueChange = React.useCallback(
     (nextValue: string) => {
+      picked.current = true;
       if (!isControlled) setLocalValue(nextValue);
       writeUrl(nextValue);
       onValueChange?.(nextValue);
