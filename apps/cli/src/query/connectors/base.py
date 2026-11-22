@@ -20,9 +20,12 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, ClassVar, Protocol
+from typing import TYPE_CHECKING, Any, ClassVar, Protocol
 
 from ...utils.duckdb_engine import load_extension
+
+if TYPE_CHECKING:
+    from .arrow import ConnectorError, ScanStats
 
 
 class BindingError(RuntimeError):
@@ -143,12 +146,12 @@ class QueryBinding(ABC):
         remote URLs stay open, scoped by the source's own credentials."""
         return []
 
-    def stats(self, relation: str) -> Any:
+    def stats(self, relation: str) -> ScanStats | None:
         """What reading ``relation`` cost (``ScanStats``); None for tables
         DuckDB reads itself."""
         return None
 
-    def failure(self, relation: str) -> Any:
+    def failure(self, relation: str) -> ConnectorError | None:
         """The error a scan of ``relation`` raised, as its source said it
         (``ConnectorError``); None for tables DuckDB reads itself."""
         return None

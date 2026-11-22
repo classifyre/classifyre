@@ -318,6 +318,7 @@ def test_a_server_before_1_2_is_read_without_filters(meili: FakeMeilisearch) -> 
         _request("SELECT count(*) AS n FROM search.indexes.movies WHERE genre = 'Horror'")
     )
     assert _rows(payload, result) == [{"n": 833}]
+    assert payload["scans"][0]["pushed"] == []
     pages = [params for url, params in meili.gets if url.endswith("/documents")]
     assert [p["offset"] for p in pages] == [0, 1000, 2000]
     assert "genre" in pages[0]["fields"].split(",")

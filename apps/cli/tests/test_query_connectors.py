@@ -487,3 +487,36 @@ def test_the_row_limit_holds_per_scan(folder: Path, monkeypatch: pytest.MonkeyPa
     )
     assert payload["status"] == "success", payload
     assert payload["scans"][0]["rows"] == 600
+
+
+@pytest.mark.parametrize(
+    ("kind", "value"),
+    [
+        ("BIGINT", 5.5),
+        ("BIGINT", True),
+        ("DOUBLE", True),
+        ("DATE", __import__("datetime").datetime(2020, 1, 1, 12)),
+        (
+            "TIMESTAMP",
+            __import__("datetime").datetime(2020, 1, 1, tzinfo=__import__("datetime").UTC),
+        ),
+        ("BOOLEAN", 1),
+        ("BIGINT[]", [1, 2.5]),
+    ],
+)
+def test_a_value_pyarrow_would_quietly_convert_is_refused(kind: str, value: Any) -> None:
+    from src.query.connectors.arrow import declared_schema, to_batch
+
+    schema = declared_schema((("x", kind),))
+    with pytest.raises(ConnectorError, match="Column x holds values of another type"):
+        to_batch([{"x": value}], schema)
+
+
+def test_values_that_read_as_their_column_unchanged_are_kept() -> None:
+    import datetime
+
+    from src.query.connectors.arrow import declared_schema, to_batch
+
+    schema = declared_schema((("i", "BIGINT"), ("f", "DOUBLE"), ("d", "DATE")))
+    batch = to_batch([{"i": 5.0, "f": 2, "d": datetime.date(2020, 1, 1)}], schema)
+    assert batch.to_pylist() == [{"i": 5, "f": 2.0, "d": datetime.date(2020, 1, 1)}]

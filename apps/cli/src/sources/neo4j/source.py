@@ -346,7 +346,9 @@ class Neo4jSource(BaseSource):
             types = {value_type(row[key]) for row in sample}
             if None not in types and len(types) == 1:
                 columns.append({"name": side, "type": str(types.pop())})
-        reserved = {c["name"] for c in columns} | {"source_label", "target_label"}
+        from ...query.connectors.neo4j import RELATIONSHIP_COLUMNS
+
+        reserved = {c["name"] for c in columns} | set(RELATIONSHIP_COLUMNS)
         properties = [dict(row["p"]) for row in sample if row["p"] is not None]
         columns += [c for c in record_columns(properties) if c["name"] not in reserved]
         columns += [

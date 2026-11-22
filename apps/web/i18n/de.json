@@ -7419,7 +7419,7 @@
     "elapsed": "{{seconds}} s",
     "liveScans": {
       "summary": "live: Tabellen {{tables}} · Anfragen {{requests}} · Zeilen {{rows}}",
-      "table": "{{table}}: Anfragen {{requests}}, gelesene Zeilen {{rows}}; hier gefiltert, nichts an die Quelle gesendet",
+      "table": "{{table}}: Anfragen {{requests}}, gelesene Zeilen {{rows}}; jede Zeile hier geprüft",
       "tableFiltered": "{{table}}: Anfragen {{requests}}, gelesene Zeilen {{rows}}; an die Quelle gesendete Filter: {{filters}}"
     },
     "timings": "Vorbereitung {{setup}} s · Abfrage {{query}} s",

@@ -126,13 +126,11 @@ class SourceBinding:
 
     def scan_stats(self, relation: str) -> ScanStats | None:
         """A connector table's reads (None for tables DuckDB reads itself)."""
-        stats: ScanStats | None = self._reader.stats(relation) if self._reader else None
-        return stats
+        return self._reader.stats(relation) if self._reader else None
 
     def failure(self, relation: str) -> ConnectorError | None:
         """Why a connector's scan of that table failed, as it said it."""
-        error: ConnectorError | None = self._reader.failure(relation) if self._reader else None
-        return error
+        return self._reader.failure(relation) if self._reader else None
 
     def close(self) -> None:
         if self._reader is not None:

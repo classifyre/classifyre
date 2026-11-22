@@ -367,16 +367,49 @@ def to_batch(chunk: Any, schema: Any) -> Any:
     arrays = []
     for f in schema:
         values = [row.get(f.name) if isinstance(row, dict) else None for row in rows]
+        drifted = ConnectorError(
+            f"Column {f.name} holds values of another type than the last scan "
+            "recorded: scan the source again."
+        )
         if pa.types.is_string(f.type):
             values = [_as_text(v) for v in values]
+        elif not all(_fits(v, f.type) for v in values):
+            # pyarrow would convert these quietly (5.5 to 5, True to 1.0, a
+            # datetime to its date), and a condition sent to the source would
+            # then disagree with what SQL reads (QC re-review, c4).
+            raise drifted
         try:
             arrays.append(pa.array(values, type=f.type))
         except (pa.ArrowInvalid, pa.ArrowTypeError, TypeError, ValueError, OverflowError):
-            raise ConnectorError(
-                f"Column {f.name} holds values of another type than the last scan "
-                "recorded: scan the source again."
-            ) from None
+            raise drifted from None
     return pa.RecordBatch.from_arrays(arrays, schema=schema)
+
+
+def _fits(value: Any, kind: Any) -> bool:
+    """Whether ``value`` reads as ``kind`` without changing what it is."""
+    import datetime as dt
+
+    import pyarrow as pa
+
+    if value is None:
+        return True
+    if pa.types.is_integer(kind):
+        if isinstance(value, bool):
+            return False
+        return isinstance(value, int) or (isinstance(value, float) and value.is_integer())
+    if pa.types.is_floating(kind):
+        return isinstance(value, (int, float)) and not isinstance(value, bool)
+    if pa.types.is_boolean(kind):
+        return isinstance(value, bool)
+    if pa.types.is_date(kind):
+        return isinstance(value, dt.date) and not isinstance(value, dt.datetime)
+    if pa.types.is_timestamp(kind):
+        if not isinstance(value, dt.datetime):
+            return False
+        return (value.tzinfo is None) == (kind.tz is None)
+    if pa.types.is_list(kind):
+        return isinstance(value, (list, tuple)) and all(_fits(v, kind.value_type) for v in value)
+    return True
 
 
 def _as_text(value: Any) -> Any:

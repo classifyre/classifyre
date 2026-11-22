@@ -397,7 +397,20 @@ def test_only_conditions_compared_as_sql_reads_them_go_to_neo4j() -> None:
     types = {"id": "BIGINT", "name": "VARCHAR", "meta": "JSON", "at": "TIMESTAMP", "ok": "BOOLEAN"}
     assert [c for c in ("id", "name", "meta", "at", "ok") if pushable(c, types)] == [
         "id",
-        "at",
         "ok",
     ]
     assert pushable("element_id", types) and pushable("source_label", types)
+
+
+@pytest.mark.usefixtures("driver")
+def test_a_node_of_another_type_than_the_sample_is_an_error_never_a_missing_row() -> None:
+    # The scan sampled integer stars; this node, not sampled, holds 4.5. Read
+    # as BIGINT it would quietly become 4 (re-review, c4): it is refused.
+    FakeDriver.tables = {**FakeDriver.tables, "[r:`RATED`]": [*RATED, {**RATED[0], "stars": 4.5}]}
+    try:
+        payload, _ = run_query(_request("SELECT count(*) FROM graph.relationships.rated"))
+    finally:
+        FakeDriver.tables = {**FakeDriver.tables, "[r:`RATED`]": RATED}
+    assert payload["status"] == "error"
+    assert "stars" in payload["error"]["message"]
+    assert "scan the source again" in payload["error"]["message"]

@@ -7419,7 +7419,7 @@
     "elapsed": "{{seconds}} s",
     "liveScans": {
       "summary": "live: tables {{tables}} · requests {{requests}} · rows {{rows}}",
-      "table": "{{table}}: requests {{requests}}, rows read {{rows}}; filtered here, nothing sent to the source",
+      "table": "{{table}}: requests {{requests}}, rows read {{rows}}; every row checked here",
       "tableFiltered": "{{table}}: requests {{requests}}, rows read {{rows}}; filters sent to the source: {{filters}}"
     },
     "timings": "setup {{setup}} s · query {{query}} s",

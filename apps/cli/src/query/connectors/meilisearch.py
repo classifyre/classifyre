@@ -58,7 +58,6 @@ class MeilisearchConnector(ArrowConnector):
         fields = list(request.columns) if request.columns is not None else None
         allowed = self._filterable(base, request, timeout)
         filter_text, sent = meilisearch_filter(request.predicates, allowed)
-        request.sent(sent)
         offset = 0
         fetch = True
         while True:
@@ -72,9 +71,12 @@ class MeilisearchConnector(ArrowConnector):
                     "post", f"{base}/documents/fetch", request, timeout, json=body
                 )
                 if response.status_code == 404 and offset == 0:
-                    # Before Meilisearch 1.2: no fetch, no filter.
+                    # Before Meilisearch 1.2: no fetch, no filter (and none
+                    # reported as sent).
                     fetch = False
                     continue
+                if offset == 0 and response.status_code < 400:
+                    request.sent(sent)
             else:
                 params: dict[str, Any] = {"offset": offset, "limit": PAGE_SIZE}
                 if fields is not None:

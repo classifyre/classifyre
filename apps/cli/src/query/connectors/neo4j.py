@@ -40,32 +40,41 @@ def escape(name: str) -> str:
     return "`" + name.replace("`", "``") + "`"
 
 
+#: The columns Neo4j computes for a node table and a relationship table,
+#: and their Cypher. One list: the scan records them
+#: (``Neo4jSource._label_columns``, ``_relationship_to_asset``), the
+#: connector reads and filters them.
+NODE_COLUMNS = {"element_id": "elementId(n)"}
+RELATIONSHIP_COLUMNS = {
+    "source_element_id": "elementId(a)",
+    "target_element_id": "elementId(b)",
+    "source_id": "a.`id`",
+    "target_id": "b.`id`",
+    "source_label": "head(labels(a))",
+    "target_label": "head(labels(b))",
+}
+
+
 def _column_expression(kind: str, column: str) -> str:
     if kind == NODES:
-        if column == "element_id":
-            return "elementId(n)"
-        return f"n.{escape(column)}"
-    special = {
-        "source_element_id": "elementId(a)",
-        "target_element_id": "elementId(b)",
-        "source_id": "a.`id`",
-        "target_id": "b.`id`",
-        "source_label": "head(labels(a))",
-        "target_label": "head(labels(b))",
-    }
-    return special.get(column) or f"r.{escape(column)}"
+        return NODE_COLUMNS.get(column) or f"n.{escape(column)}"
+    return RELATIONSHIP_COLUMNS.get(column) or f"r.{escape(column)}"
 
 
-#: Columns Neo4j computes: always text, whatever the graph stores.
+#: Computed columns that are text whatever the graph stores (ids, labels);
+#: the endpoints' ``id`` properties are typed like any property.
 _COMPUTED = {
-    "element_id",
-    "source_element_id",
-    "target_element_id",
-    "source_label",
-    "target_label",
+    name
+    for name, cypher in {**NODE_COLUMNS, **RELATIONSHIP_COLUMNS}.items()
+    if not cypher.endswith("`id`")
 }
-#: Recorded types a property is compared as in Cypher exactly as SQL reads it.
-_COMPARABLE = {"BIGINT", "DOUBLE", "BOOLEAN", "DATE", "TIMESTAMP", "TIMESTAMP WITH TIME ZONE"}
+#: Recorded types a property is compared as in Cypher exactly as SQL reads
+#: it: numbers (Cypher compares 5 and 5.0 as equal, as SQL does once read)
+#: and booleans. Not dates and times: a node holding a datetime where the
+#: sample saw dates is not equal to date(...) in Cypher, while it is a
+#: value of another type to SQL (an error, ``to_batch``), so the two would
+#: disagree on whether the query fails (QC re-review, c4).
+_COMPARABLE = {"BIGINT", "DOUBLE", "BOOLEAN"}
 
 
 def pushable(column: str, types: dict[str, str]) -> bool:
