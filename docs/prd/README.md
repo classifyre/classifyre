@@ -42,7 +42,7 @@ These PRDs turn the findings of [palantir-use-case-gap-analysis.md](../../palant
 | [G5 · Entities](G5-entities.md) | Shipped on this branch, 2026-10-03 ([as built](G5-entities.md#13-as-built)) |
 | [DQ · Data query](DQ-data-query.md) | Phases 0–4 built 2026-11-09/14, phase 6 being built, query worker 2026-11-21 ([as built](DQ-data-query.md#9-as-built)); phase 5 moved to QC |
 | [GOV · Governed data assets](GOV-governed-data-assets.md) | Proposed, 2026-11-12 |
-| [QC · Query connectors](QC-query-connectors.md) | QC0–QC3 built 2026-11-21 (interface, connector runtime, Meilisearch, Neo4j, lab joins on skaffold); QC4–QC5 proposed |
+| [QC · Query connectors](QC-query-connectors.md) | QC0–QC3 built 2026-11-21 (interface, connector runtime, Meilisearch, Neo4j, lab joins on skaffold); QC4 built 2026-11-22 (custom sources: `tables()`/`scan()`, tried on the live Firmenbuch); QC5 proposed |
 | [BIC · BI clients over SQL connections](BIC-bi-client-compatibility.md) | BIC0–BIC2 built and run 2026-11-21 (30/30 checks); BIC3 open |
 | All others | Proposed, 2026-09-30 |
 

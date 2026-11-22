@@ -24,7 +24,7 @@ There is nothing to switch on: who may query which table follows roles and grant
 
 ## What you can query
 
-SQL runs on DuckDB. A source is queryable when DuckDB has a built-in way to reach it, or when Classifyre reads it live through the source's own API (search and graph sources, see [Live sources](#live-sources)). Scan a source first: SQL only knows the tables a scan found.
+SQL runs on DuckDB. A source is queryable when DuckDB has a built-in way to reach it, or when Classifyre reads it live through the source's own API (search and graph sources, see [Live sources](#live-sources), and custom sources whose notebook can [read its tables](#custom-sources)). Scan a source first: SQL only knows the tables a scan found.
 
 | Source | What becomes a table |
 | --- | --- |
@@ -35,6 +35,7 @@ SQL runs on DuckDB. A source is queryable when DuckDB has a built-in way to reac
 | S3-compatible storage, Azure Blob, Google Cloud Storage, Local folder | Delta and Iceberg tables, and the [files](#files-in-a-bucket-or-folder) below |
 | Meilisearch | Every scanned index, as `<source>.indexes.<index>` — read live, see [Live sources](#live-sources) |
 | Neo4j | Every node label, as `<source>.nodes.<label>`, and every relationship type, as `<source>.relationships.<type>` — read live |
+| Custom (notebook) | The tables its notebook declares in `tables()`, as `<source>.main.<table>` — read live by its `scan()`, see [Custom sources](#custom-sources) |
 
 ### Files in a bucket or folder
 
@@ -86,6 +87,17 @@ Meilisearch and Neo4j have no files or SQL engine for DuckDB to read, so a query
 - **What it cost is shown.** After the query the toolbar says how many live tables, requests and rows it took; hover for each table and the filters sent to it.
 
 Measured on the development stack, through the query worker: films from a 20,000-document Meilisearch index joined with 200,000 orders in Parquet and 5,000 PostgreSQL customers in 1.2 s (574 documents read, the rest filtered at the source; 1.7 s when the index cannot filter); a join that reads all 50,000 relationships of a Neo4j type takes about 4.4 s, most of it reading the relationships.
+
+### Custom sources
+
+A [custom source](/sources/custom-connectors/) is queryable when its notebook defines `tables()`, which declares tables and their columns, and `scan(table, request)`, which returns a table's rows. A scan records the tables; each query then runs `scan()` in the notebook's own process, with the source's secrets and packages, and reads the rows from the notebook's API while the query runs. Everything said about [live sources](#live-sources) holds: the columns are the declared ones, `scan()` gets the query's conditions and the toolbar shows the ones it sent and the requests it made, every row is checked again, a condition on a masked column never reaches the notebook, and more than 1,000,000 rows is refused.
+
+- **The notebook decides what a table needs.** An API that answers one record at a time (a company register looked up by its number) cannot list everything cheaply, so its `scan()` refuses a query without the condition it needs, with a message that names it: add it (`WHERE fnr IN ('606601k', '247579m')`).
+- **A join does not hand the keys to the notebook.** Give the custom table its own condition.
+- **It runs as a Job.** On Kubernetes, a query that reads a custom source always starts a Job of its own (a few seconds), never the shared query worker, so the notebook's code never shares a process host with another workspace's queries (`queryWorker.jobOnlySourceTypes`).
+- **No workspace calls.** While a query runs, the notebook cannot read or tag other assets, and its uploaded files are not there.
+
+How to write the two functions: [SQL over the source](/sources/custom-connectors/reference/#sql-over-the-source-tables-and-scan).
 
 ### Sources that cannot be queried
 

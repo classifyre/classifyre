@@ -35,6 +35,7 @@ A connector answers two questions, so your notebook defines two functions:
 | `extract()`               | _What is there to scan?_                                | Yes      |
 | `discover()`              | _What can this source see?_ — for a richer overview     | No       |
 | `fetch_content(asset_id)` | _Give me one asset's content on demand_                 | No       |
+| `tables()` + `scan(table, request)` | _What can SQL read, and give me its rows now_ — see [Query it with SQL](#query-it-with-sql) | No |
 
 You don't start from an empty page. A new Custom source opens on a **starter
 notebook** that already defines both required functions and already runs, so
@@ -395,6 +396,31 @@ magics like `%time` or `!pip install` are rejected, because they wouldn't
 survive the trip.
 
 ---
+
+## Query it with SQL
+
+A notebook that also defines `tables()` and `scan(table, request)` can be
+queried with SQL, from the [Query data](/data-query/) page, BI tools over
+[SQL connections](/sql-connections/) and MCP, and joined with every other
+table. `tables()` declares the tables and their columns; a scan records them,
+so they show up in the **Tables** tab as `<source>.main.<table>`. Each query
+then calls `scan()`, which reads the rows from your API while the query runs,
+with the source's own secrets:
+
+```sql
+SELECT c.name, c.legal_form, o.name AS officer, o.role
+FROM firmenbuch_register.main.companies AS c
+JOIN firmenbuch_register.main.officers AS o USING (fnr)
+WHERE c.fnr IN ('606601k', '247579m') AND o.fnr IN ('606601k', '247579m')
+```
+
+`scan()` gets the query's columns and conditions, sends what your API can
+filter on, and says so; every row is checked against the query again, so the
+answer is right even when it sends nothing. Masks, row filters and access
+apply as on any other table. On Kubernetes, a query that reads a custom source
+always runs as a Job of its own. The
+[reference](/sources/custom-connectors/reference/#sql-over-the-source-tables-and-scan)
+has the full contract and an example.
 
 ## Working with someone else
 
