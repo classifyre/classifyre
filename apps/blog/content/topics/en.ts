@@ -22,10 +22,10 @@ export const enChrome: TopicChrome = {
   runBody:
     "Evaluate locally with one Docker container or deploy to Kubernetes and OpenShift with Helm. 100% Apache-2.0 open source — your data stays inside your network.",
   runDocs: "Deployment guide",
-  tailoringTitle: "Need Classifyre tailored to your environment?",
+  tailoringTitle: "Questions about your setup?",
   tailoringBody:
-    "Work directly with our engineering team on an individual scope agreed around your IAM, security architecture, custom sources, Delta data products, or bespoke detectors and AI models.",
-  tailoringCta: "Talk to our team",
+    "If you're evaluating Classifyre and your sources, identity provider or infrastructure don't quite match what the docs cover, write to us. We're happy to answer questions and to hear about setups we haven't seen yet.",
+  tailoringCta: "Get in touch",
   relatedTitle: "Related comparisons & guides",
   faqTitle: "Common questions",
   sourcesLabel: "Sources",
@@ -88,8 +88,8 @@ const accessGovernance: TopicCopy = {
     ],
   },
   notDo: {
-    title: "Scope and boundaries",
-    body: "Classifyre enforces rules on reads routed through Classifyre (SQL workbench, Power BI/Excel/ODBC gateway, exports, shared datasets, and MCP). Users who bypass Classifyre with direct database or cloud warehouse credentials remain governed by those underlying systems. Classifyre also does not replace your identity provider or ETL tools.",
+    title: "Scope, boundaries & production enforcement",
+    body: "Classifyre enforces rules on reads routed through Classifyre (SQL workbench, Power BI/Excel/ODBC gateway, exports, shared datasets, and MCP). In production, organisations prevent bypass by revoking direct analyst database credentials and restricting source read ports at the network/firewall layer to Classifyre's dedicated service account — so BI, SQL, and AI tools flow exclusively through Classifyre's TLS gateway. Classifyre does not replace your identity provider or ETL tools.",
   },
   faq: [
     {
@@ -139,7 +139,7 @@ const immuta: TopicCopy = {
     },
     {
       title: "Integrated flexible detection vs. platform-scoped discovery",
-      body: "Classifyre includes built-in PII and secret packs plus custom business detectors (regex, Python code, local CPU AI models like GLiNER2, and LLMs) across both structured tables and unstructured wikis, tickets, and files — feeding column masks automatically.",
+      body: "Classifyre includes built-in PII and secret packs plus custom business detectors (regex, Python code, local CPU zero-shot AI models, and private LLMs) across both structured tables and unstructured wikis, tickets, and files — feeding column masks automatically.",
       href: docs.detectors,
       linkLabel: "Explore detectors",
     },
@@ -262,7 +262,7 @@ const immuta: TopicCopy = {
         items: [
           "100% open source under Apache-2.0 — full code auditability, zero per-seat licensing, and no gated enterprise tiers.",
           "Unifies 40+ heterogeneous sources (on-prem DBs, Iceberg, Delta, Parquet, Databricks, S3/Azure/GCS, wikis, custom sources) under one masking, row-filter, and audit layer.",
-          "Combines built-in PII/secret packs with custom business detectors (regex, Python, local CPU AI like GLiNER2, LLMs), personal Power BI/Excel/ODBC connections, and plain-language data product requests.",
+          "Combines built-in PII/secret packs with custom business detectors (regex, Python, local CPU AI extraction, private LLMs), personal Power BI/Excel/ODBC connections, and plain-language data product requests.",
           "Runs anywhere — Docker, Kubernetes, OpenShift, air-gapped on-premises, or your own cloud — with full data sovereignty.",
         ],
       },
@@ -314,7 +314,7 @@ const immuta: TopicCopy = {
       {
         aspect: "Sensitive & custom detection",
         them: "Sensitive data discovery on connected cloud platforms",
-        us: "Built-in PII & secret packs + custom regex, Python, local CPU AI (GLiNER2), text/image classifiers, and LLMs",
+        us: "Built-in PII & secret packs + custom regex, Python, local CPU AI extraction, text/image classifiers, and private LLMs",
       },
       {
         aspect: "Masking & row security",
@@ -332,9 +332,9 @@ const immuta: TopicCopy = {
         us: "Plain-language dataset requests, owner approval workflow, and live or Delta shared data products with inherited mask floors",
       },
       {
-        aspect: "Pricing & support",
+        aspect: "Licensing & cost",
         them: "Commercial enterprise subscription",
-        us: "Free Apache-2.0 open source; optional individually agreed engineering support & tailoring",
+        us: "100% Apache-2.0, no per-seat licences and no locked tiers; self-hosted by your own team or integrator, with community support on GitHub",
       },
     ],
     note: "Vendor capabilities evolve frequently; verify current Immuta specifications in their official documentation. Factual corrections are always welcome at contact@classifyre.com.",
@@ -358,8 +358,8 @@ const immuta: TopicCopy = {
     ],
   },
   notDo: {
-    title: "What Classifyre does not do",
-    body: "Classifyre does not rewrite or push masking policies into Snowflake, Redshift, or Databricks internal compute engines. If users query those cloud warehouses directly outside Classifyre, those platforms enforce their own native permissions.",
+    title: "What Classifyre does not do — and how production prevents bypass",
+    body: "Classifyre does not rewrite or push masking policies into Snowflake, Redshift, or Databricks internal compute engines. In production, organisations enforce non-bypass on analytical reads by revoking direct analyst database credentials and restricting source network access to Classifyre's service principal so Power BI, Excel, SQL, and MCP agents route exclusively through Classifyre's TLS gateway.",
   },
   faq: [
     {
@@ -376,7 +376,7 @@ const immuta: TopicCopy = {
     },
     {
       q: "How does total cost compare at 500+ users?",
-      a: "Classifyre is 100% Apache-2.0 open source with zero per-seat or per-source licensing fees — you pay only for the infrastructure you run it on (and any optional custom engineering you choose to commission). Immuta is licensed commercially.",
+      a: "The Classifyre core platform is 100% Apache-2.0 open source with zero per-seat licensing fees. Your cost is the infrastructure it runs on and the time your team or integrator spends operating it. Immuta is licensed commercially per platform/scale.",
     },
   ],
   related: ["data-access-governance", "unity-catalog-alternative"],
@@ -536,7 +536,7 @@ const unity: TopicCopy = {
         items: [
           "Vendor-neutral and 100% Apache-2.0 open source: full UI, SSO, roles, masking, SQL/BI gateway, shared datasets, and audit logs included with no commercial lock-in.",
           "Governs 40+ heterogeneous sources — on-prem PostgreSQL/MySQL/ODBC, Iceberg, Delta, Parquet, Databricks, cloud buckets, and unstructured wikis/documents — in one place.",
-          "Built-in PII and secret packs plus custom business detectors (regex, Python, local CPU AI like GLiNER2, LLMs) automatically drive multi-level column masking.",
+          "Built-in PII and secret packs plus custom business detectors (regex, Python, local CPU AI extraction, private LLMs) automatically drive multi-level column masking.",
           "Self-hosted on Docker, Kubernetes, or OpenShift — including completely offline and sovereign European or North American environments.",
         ],
       },
@@ -592,7 +592,7 @@ const unity: TopicCopy = {
       {
         aspect: "Detection & classification",
         them: "Data classification for Databricks tables (commercial platform)",
-        us: "Built-in PII & secrets + custom regex, Python, local CPU AI (GLiNER2), and LLM detectors across tables and documents",
+        us: "Built-in PII & secrets + custom regex, Python, local CPU AI extraction, and private LLM detectors across tables and documents",
       },
       {
         aspect: "Notebooks & ML governance",
@@ -626,8 +626,8 @@ const unity: TopicCopy = {
     ],
   },
   notDo: {
-    title: "What Classifyre does not do",
-    body: "Classifyre does not enforce masks inside Databricks compute clusters or replace Unity Catalog for Databricks notebooks and Spark jobs. Notebooks reading Delta tables directly inside Databricks continue to follow Unity Catalog's rules.",
+    title: "What Classifyre does not do — and how hybrid enforcement works",
+    body: "Classifyre does not enforce masks inside Databricks compute clusters or replace Unity Catalog for Databricks notebooks and Spark jobs. In hybrid deployments, Unity Catalog governs Databricks engineering compute while organisations revoke direct analyst DB logins on PostgreSQL, Oracle, ODBC, and storage sources so BI, SQL, and MCP AI access flows exclusively through Classifyre's TLS gateway.",
   },
   faq: [
     {

@@ -288,6 +288,19 @@ test.describe.serial("smoke with sign-in", () => {
     await expect(page.getByTestId("query-row-count")).toContainText("3", { timeout: 5 * 60_000 });
     await expect(page.getByTestId("query-results")).toContainText("north");
 
+    // "Connect a tool" is there, and stays: SQL connections are on by default,
+    // and when no public address is set it says what is missing instead of
+    // vanishing. The all-in-one image always has one (localhost).
+    await expect(page.getByTestId("connect-tool")).toBeVisible();
+    await page.waitForTimeout(1_000); // a button that is taken back after the endpoint loads would be gone by now
+    await expect(page.getByTestId("connect-tool")).toBeVisible();
+    await page.getByTestId("connect-tool").click();
+    await expect(page.getByTestId("connect-tool-dialog")).toBeVisible();
+    if (process.env.SMOKE_TARGET === "docker") {
+      await expect(page.getByTestId("sql-endpoint-notice")).toHaveCount(0);
+    }
+    await page.keyboard.press("Escape");
+
     // The same table as Excel, from the menu, downloaded by the browser.
     const download = page.waitForEvent("download", { timeout: 5 * 60_000 });
     await page.getByTestId("export-query").click();

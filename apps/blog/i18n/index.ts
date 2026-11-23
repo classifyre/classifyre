@@ -13,15 +13,15 @@ export function getTranslationsForLocale(locale: Locale): Translations {
   return translationMap[locale] ?? enTranslations;
 }
 
-/** Docker command notes in order: port, shm, pgdata, data, cache. */
+/** Docker command notes in order: web port, SQL port, shm, pgdata, data, cache. */
 export function getDockerNotes(
   locale: Locale,
-): readonly [string, string, string, string, string] {
+): readonly [string, string, string, string, string, string] {
   const notes = getTranslationsForLocale(locale).docker.notes;
   const fallback = enTranslations.docker.notes;
-  return [0, 1, 2, 3, 4].map(
+  return [0, 1, 2, 3, 4, 5].map(
     (index) => notes[index] ?? fallback[index],
-  ) as unknown as readonly [string, string, string, string, string];
+  ) as unknown as readonly [string, string, string, string, string, string];
 }
 
 type PathsOf<T, Prefix extends string = ""> = {

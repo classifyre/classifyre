@@ -10,10 +10,10 @@ for extension in ("ducklake", "postgres", "httpfs"):
     conn.execute(f"INSTALL {extension}; LOAD {extension}")
 conn.execute(
     "CREATE SECRET lab_s3 (TYPE S3, KEY_ID 'lab-access-key', SECRET 'lab-secret-key-0123456789', "
-    "REGION 'us-east-1', ENDPOINT '172.19.10.10:9000', URL_STYLE 'path', USE_SSL false)"
+    "REGION 'us-east-1', ENDPOINT '172.18.10.10:9000', URL_STYLE 'path', USE_SSL false)"
 )
 conn.execute(
-    "ATTACH 'ducklake:postgres:dbname=lake host=172.19.10.40 user=lab password=lab-ducklake' "
+    "ATTACH 'ducklake:postgres:dbname=lake host=172.18.10.40 user=lab password=lab-ducklake' "
     "AS lake (DATA_PATH 's3://lake/ducklake/')"
 )
 conn.execute("CREATE SCHEMA IF NOT EXISTS lake.crm")

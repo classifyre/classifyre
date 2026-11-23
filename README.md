@@ -3,18 +3,18 @@
 
 # Classifyre
 
-## Open-Source Data Governance Platform
+## Self-Hosted Open-Source Data Governance Platform
 
-**Control who sees what. Enforced on every query.**
+**Find it. Govern it. Use it safely.**
 
 [![CI](https://img.shields.io/github/actions/workflow/status/classifyre/classifyre/ci.yml?branch=develop&style=flat-square&label=CI&logo=github)](https://github.com/classifyre/classifyre/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/classifyre/classifyre?sort=semver&style=flat-square&label=release)](https://github.com/classifyre/classifyre/releases/latest)
 [![License](https://img.shields.io/github/license/classifyre/classifyre?style=flat-square)](LICENSE)
 [![Docs](https://img.shields.io/badge/docs-classifyre.com-1f6feb?style=flat-square)](https://docs.classifyre.com/)
 
-End-to-end open-source data governance you run on your own infrastructure. Classifyre integrates with the databases, lakehouses (Iceberg, Delta, Parquet), ETL pipelines, and identity provider you already run — **enforcing group access, row filters, and multi-level column masking on every query** across SQL, Power BI, Excel, ODBC, and governed data products.
+Classifyre connects directly to your existing databases, lakehouses (Iceberg, Delta, Parquet), file stores, and identity directory — governing data from source to consumption without migration. **Discover and classify sensitive data in place, enforce live masking and access controls across SQL, Power BI, Excel, and AI agents, publish trusted data products with built-in quality checks and usage tracking, and resolve data leaks as auditable cases** — on your own infrastructure.
 
-100% Apache-2.0 open source — including SSO, roles, row-level security, dynamic masking, SQL/BI gateway, dataset requests, shared data products, and audit logging. Built in Austria to European privacy and security standards, deployed worldwide on Docker, Kubernetes, and OpenShift.
+100% Apache-2.0 open source — including SSO, access control, row and column masking, browser SQL workbench, BI/ODBC/MCP connections, scheduled quality checks, usage analytics, shared data products, and leak case management. Built in Austria to European privacy and security standards, deployed worldwide on Docker, Kubernetes, and OpenShift.
 
 [Website](https://www.classifyre.com/) · [Documentation](https://docs.classifyre.com/) · [Live Showcase](https://showcase.classifyre.com/) · [Support & Tailoring](https://www.classifyre.com/support/)
 
@@ -28,14 +28,14 @@ Classifyre integrates cleanly between your existing data estate and the tools yo
 
 | Capability                                       | What it does                                                                                                                                                                                                                                | Docs                                                                       |
 | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| **Connect & detect**                             | Connect 40+ known sources (PostgreSQL, MySQL, Databricks, ODBC, Iceberg, Delta, Parquet, S3/Azure/GCS, Confluence, Jira) or custom connectors in place. Built-in PII & secret packs plus custom business detectors from regex and Python to local CPU AI (GLiNER2) and LLMs. | [Sources](https://docs.classifyre.com/sources/) · [Detectors](https://docs.classifyre.com/detectors/) |
+| **Connect & detect**                             | Connect 41 built-in sources (PostgreSQL, MySQL, Databricks, ODBC, Iceberg, Delta, Parquet, S3/Azure/GCS, Confluence, Jira) plus a custom connector SDK in place. Built-in PII & secret packs plus custom business detectors from regex and Python to local CPU AI extraction models and private LLMs. | [Sources](https://docs.classifyre.com/sources/) · [Detectors](https://docs.classifyre.com/detectors/) |
 | **Govern by organisation**                       | Sync groups from Entra ID, Active Directory, Okta, or any OIDC/SAML directory. Assign owners, stewards, expiring grants, owner-approved access requests, and row-level filters per department or region.                                     | [Access](https://docs.classifyre.com/access/)                              |
 | **Multi-level column & row masking**             | Mask sensitive columns as redacted, last four, deterministic hashed pseudonymisation (joins and counts still work), empty, or hidden — enforced inside the query engine on original tables and shared datasets. Admins never get clear data by default. | [Query data & masking](https://docs.classifyre.com/data-query/)            |
 | **Governed SQL, Power BI, Excel & ODBC**         | PostgreSQL-compatible TLS endpoint with personal, expiring, revocable connections for Power BI, Excel, Tableau, DBeaver, and ODBC clients, plus AI agents over MCP inheriting the user's own permissions.                                     | [SQL connections](https://docs.classifyre.com/sql-connections/)            |
-| **Dataset requests & Delta data products**       | Business users request combined datasets in plain language or via structured workflows; owners approve and publish live or Delta shared data products whose inherited source masks act as a strict floor.                                    | [Shared datasets](https://docs.classifyre.com/data-query/#shared-datasets) |
-| **Audit trail, quality & self-hosted scale**     | Every read, export, grant, and approval is logged with user and tool. Scheduled quality rules and open data contracts (ODCS). Runs locally with Docker or in production on Kubernetes and OpenShift.                                        | [Deployment](https://docs.classifyre.com/deployment/)                      |
+| **Dataset requests & Delta-backed data products** | Business users request combined datasets in plain language or via structured workflows; owners approve and publish live or Delta-backed shared data products (external Delta Sharing protocol planned for 2027) whose inherited source masks act as a strict floor. | [Shared datasets](https://docs.classifyre.com/data-query/#shared-datasets) |
+| **Data quality, usage & audit trail** | Scheduled quality checks (missing/null/invalid values, duplicates, freshness, detector findings, custom SQL) with Draft → Certified lifecycle and auto-opened findings on failure, live usage & export analytics by tool, before/after policy change diffs, and open data contract (ODCS) import/export. | [Deployment](https://docs.classifyre.com/deployment/) |
 
-Need Classifyre tailored to your organisation (custom IAM or security architecture, bespoke connectors, Delta data products, or custom detectors and AI models)? Contact us at [contact@classifyre.com](mailto:contact@classifyre.com) or visit [classifyre.com/support](https://www.classifyre.com/support/).
+Questions about your setup, or a source or environment we haven't covered yet? Open an [issue](https://github.com/classifyre/classifyre/issues) or write to [contact@classifyre.com](mailto:contact@classifyre.com) — we're happy to hear from you.
 
 ### Incident response (optional)
 
@@ -63,7 +63,7 @@ flowchart LR
 1. **Connect & detect.** Read existing sources in place and classify personal data, secrets, and business-specific rules.
 2. **Govern.** Map directory groups to workspaces, sources, tables, row filters, and time-limited grants.
 3. **Mask.** Enforce multi-level column masking and row filtering inside the query engine — across both source tables and shared datasets.
-4. **Query.** Connect Power BI, Excel, Tableau, ODBC clients, SQL workbench, or MCP agents over personal, expiring credentials.
+4. **Query.** Connect Power BI, Excel, Tableau, ODBC clients, SQL workbench, or MCP agents over personal, expiring credentials. In production, revoke direct analyst and shared BI logins on the underlying database and restrict network reachability to Classifyre's service principal so every BI, SQL, and AI query passes exclusively through Classifyre's TLS gateway.
 5. **Request & share.** Let business users request new datasets in plain language; owners approve and publish governed live or Delta data products.
 6. **Audit.** Track every read, export, permission change, and quality check in one verifiable trail.
 
@@ -100,12 +100,16 @@ stack — API, web UI, scan workers and PostgreSQL — in one container:
 
 ```bash
 docker run -d --name classifyre \
-  -p 3000:3000 --shm-size=1g \
+  -p 3000:3000 -p 5433:5433 --shm-size=1g \
   -v classifyre-pgdata:/var/lib/postgresql/data \
   -v classifyre-data:/var/lib/classifyre \
   -v classifyre-uv-cache:/cache/uv \
   classifyre/all-in-one:latest
 ```
+
+`-p 5433:5433` publishes SQL connections (Power BI, Excel, DBeaver and `psql`
+over the PostgreSQL protocol), on 5433 because the container's own PostgreSQL
+holds 5432; it is on by default and `-e SQL_GATEWAY_ENABLED=false` turns it off.
 
 See [`docker/README.md`](docker/README.md) for configuration, external
 databases, object storage and resource tuning.

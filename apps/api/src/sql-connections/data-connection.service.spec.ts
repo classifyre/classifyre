@@ -171,6 +171,69 @@ describe('DataConnectionService', () => {
     });
   });
 
+  describe('endpoint', () => {
+    const keys = [
+      'SQL_GATEWAY_ENABLED',
+      'SQL_GATEWAY_PUBLIC_HOST',
+      'SQL_GATEWAY_PUBLIC_PORT',
+    ] as const;
+    const saved: Partial<Record<string, string | undefined>> = {};
+    beforeEach(() => {
+      for (const key of keys) {
+        saved[key] = process.env[key];
+        delete process.env[key];
+      }
+    });
+    afterEach(() => {
+      for (const key of keys) {
+        if (saved[key] === undefined) delete process.env[key];
+        else process.env[key] = saved[key];
+      }
+    });
+
+    it('is off when the deployment has no gateway', () => {
+      const { service } = setup();
+      expect(service.endpoint()).toMatchObject({
+        enabled: false,
+        configured: false,
+        host: null,
+      });
+    });
+
+    it('is on but not configured while no public host is set', () => {
+      process.env.SQL_GATEWAY_ENABLED = 'true';
+      process.env.SQL_GATEWAY_PUBLIC_HOST = '  ';
+      const { service } = setup();
+      expect(service.endpoint()).toMatchObject({
+        enabled: true,
+        configured: false,
+        host: null,
+      });
+    });
+
+    it('is configured with a public host, on the port given', () => {
+      process.env.SQL_GATEWAY_ENABLED = 'true';
+      process.env.SQL_GATEWAY_PUBLIC_HOST = 'sql.example.com';
+      process.env.SQL_GATEWAY_PUBLIC_PORT = '5433';
+      const { service } = setup();
+      expect(service.endpoint()).toMatchObject({
+        enabled: true,
+        configured: true,
+        host: 'sql.example.com',
+        port: 5433,
+      });
+    });
+
+    it('is not on just because a host is set: the gateway has to be on', () => {
+      process.env.SQL_GATEWAY_PUBLIC_HOST = 'sql.example.com';
+      const { service } = setup();
+      expect(service.endpoint()).toMatchObject({
+        enabled: false,
+        configured: true,
+      });
+    });
+  });
+
   it('refuses a person outside the tenant', async () => {
     const { service } = setup({
       canManage: true,

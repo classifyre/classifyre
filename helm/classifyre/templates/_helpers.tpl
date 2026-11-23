@@ -667,7 +667,11 @@ which each deployment sets on its own after including this block.
       name: {{ include "classifyre.iam.secretName" . }}
       key: api-client-secret
 {{- if .Values.sqlGateway.enabled }}
-{{- /* Where tools connect, shown in the app (every role: the API answers it). */}}
+{{- /* What the app says about SQL connections (every role: the API answers it). The gateway's own pod sets SQL_GATEWAY_ENABLED itself. */}}
+{{- if ne $role "sql" }}
+- name: SQL_GATEWAY_ENABLED
+  value: "true"
+{{- end }}
 - name: SQL_GATEWAY_PUBLIC_HOST
   value: {{ .Values.sqlGateway.publicHost | quote }}
 - name: SQL_GATEWAY_PUBLIC_PORT

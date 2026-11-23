@@ -13,8 +13,10 @@ import {
 import { useTranslation } from "@/hooks/use-translation";
 import {
   connectionStrings,
+  endpointState,
   type DataConnectionEndpointDto,
 } from "@/lib/sql-connections";
+import { SqlEndpointNotice } from "./endpoint-notice";
 
 function CopyLine({ value, label }: { value: string; label: string }) {
   const { t } = useTranslation();
@@ -66,19 +68,20 @@ export function ConnectDetails({
   endpoint,
   username,
   password,
+  showNotice = true,
 }: {
   endpoint: DataConnectionEndpointDto | null;
   username: string;
   password?: string;
+  /** Say what is missing when the endpoint is off or has no public address; off where the caller already does. */
+  showNotice?: boolean;
 }) {
   const { t } = useTranslation();
-  if (!endpoint) return null;
-  if (!endpoint.enabled) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        {t("sqlConnections.gatewayOff")}
-      </p>
-    );
+  const state = endpointState(endpoint);
+  if (!endpoint || state === "loading") return null;
+  // No host to put in the strings: say what to set instead of showing `<host>`.
+  if (state !== "ready") {
+    return showNotice ? <SqlEndpointNotice endpoint={endpoint} /> : null;
   }
   const strings = connectionStrings(endpoint, username, password);
   const facts: [string, string][] = [

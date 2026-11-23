@@ -163,3 +163,76 @@ export function ActiveNamespacesFlowHarness() {
     </ActiveNamespacesProvider>
   );
 }
+
+const PINNED_ITEMS: NamespaceTabItem[] = [
+  { id: "query", label: "SQL Query", closable: false },
+  { id: "source:crm", label: "CRM DB", href: "/sources/crm" },
+  { id: "asset:orders", label: "orders", href: "/assets/orders" },
+];
+
+export function PinnedNamespaceTabsHarness() {
+  const [items, setItems] = React.useState(PINNED_ITEMS);
+  const [activeId, setActiveId] = React.useState("query");
+
+  const close = (id: string) => {
+    const target = items.find((item) => item.id === id);
+    if (!target || target.closable === false) return;
+    const index = items.findIndex((item) => item.id === id);
+    const next = items.filter((item) => item.id !== id);
+    setItems(next);
+    if (id === activeId) {
+      setActiveId(next[index]?.id ?? next[index - 1]?.id ?? "query");
+    }
+  };
+
+  const closeOthers = (id: string) => {
+    setItems((current) =>
+      current.filter((item) => item.id === id || item.closable === false),
+    );
+    setActiveId(id);
+  };
+
+  const closeLeft = (id: string) => {
+    const index = items.findIndex((item) => item.id === id);
+    if (index <= 0) return;
+    const next = items.filter(
+      (item, idx) => idx >= index || item.closable === false,
+    );
+    setItems(next);
+    if (!next.some((item) => item.id === activeId)) setActiveId(id);
+  };
+
+  const closeRight = (id: string) => {
+    const index = items.findIndex((item) => item.id === id);
+    if (index === -1) return;
+    const next = items.filter(
+      (item, idx) => idx <= index || item.closable === false,
+    );
+    setItems(next);
+    if (!next.some((item) => item.id === activeId)) setActiveId(id);
+  };
+
+  return (
+    <>
+      <NamespaceTabs
+        items={items}
+        activeId={activeId}
+        ariaLabel="Query workspace tabs"
+        closeLabel={(item) => `Close ${item.label}`}
+        onActivate={setActiveId}
+        onClose={close}
+        onCloseOthers={closeOthers}
+        onCloseLeft={closeLeft}
+        onCloseRight={closeRight}
+        menuLabels={{
+          openInNewTab: "Open in new tab",
+          close: () => "Close",
+          closeOthers: "Close other tabs",
+          closeLeft: "Close tabs to the left",
+          closeRight: "Close tabs to the right",
+        }}
+      />
+      <output data-testid="active-tab">{activeId}</output>
+    </>
+  );
+}

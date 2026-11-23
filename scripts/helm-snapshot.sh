@@ -69,11 +69,13 @@ render_snapshot() {
   local values_file="$1"
   local output_file="$2"
   # The identity server's secrets are generated on first install (and read
-  # back from the cluster afterwards); mask them so the snapshot is stable.
+  # back from the cluster afterwards), and so are the SQL gateway's CA and
+  # certificate (on by default); mask them so the snapshot is stable.
   helm template classifyre "${CHART_DIR}" -f "${values_file}" "${HELM_COMMON_ARGS[@]}" \
     | sed -E \
         -e 's/^(  (admin-password|password|web-client-secret|api-client-secret|bootstrap-admin-password|tenant-database-key): )"[A-Za-z0-9]{40}"$/\1"<generated>"/' \
         -e 's/^( +checksum\/secret: )[0-9a-f]{64}$/\1<generated>/' \
+        -e 's/^(  (tls\.crt|tls\.key|ca\.crt): )[A-Za-z0-9+\/=]{200,}$/\1<generated>/' \
     > "${output_file}"
 }
 

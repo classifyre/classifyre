@@ -23,9 +23,9 @@ import { contactEmail, docs, repoUrl, showcaseUrlFor } from "@/lib/site";
 import "../../../landing.css";
 
 export const metadata: Metadata = {
-  title: "Support & individuelle Anpassung",
+  title: "Support & Kontakt",
   description:
-    "Self-Service-Ressourcen, Community-Kanäle und direkte Engineering-Zusammenarbeit für Classifyre. 100 % Open Source (Apache-2.0) mit individuell vereinbarter Anpassung für IAM, eigene Quellen, Delta-Datenprodukte und Detektoren.",
+    "Dokumentation, GitHub-Issues, Live-Demo und Release Notes für den Eigenbetrieb von Classifyre – und ein direkter Draht zu den Entwicklern bei Fragen zu Ihrer Umgebung.",
   alternates: {
     canonical: "/de/support/",
     languages: {
@@ -35,9 +35,9 @@ export const metadata: Metadata = {
     },
   },
   openGraph: {
-    title: "Classifyre Support & individuelle Einführung",
+    title: "Classifyre Support & Kontakt",
     description:
-      "Dokumentation, GitHub-Community und direkte Engineering-Unterstützung mit individuell vereinbartem Umfang.",
+      "Self-Service-Ressourcen für den Eigenbetrieb und ein direkter Draht zu den Entwicklern bei Fragen.",
     type: "website",
   },
 };
@@ -83,80 +83,84 @@ const selfService: readonly {
   },
 ];
 
-const tailoringAreas: readonly { marker: string; title: string; body: string }[] = [
+const questionTopics: readonly { marker: string; title: string; body: string }[] = [
   {
-    marker: "IAM & Organisation",
-    title: "Verzeichnisdienst, Sicherheit & Organisationsdesign",
-    body: "Anbindung an komplexe Active-Directory-, Entra-ID-, Okta- oder eigene IAM-Hierarchien, Mandantenstrukturen sowie interne Sicherheits- und Datenschutzrichtlinien.",
+    marker: "Evaluierung",
+    title: "Passt es zu Ihrer Umgebung?",
+    body: "Unsicher, ob Classifyre Ihre Quellen, Ihren Identity Provider oder Ihre Maskierungsregeln abdeckt? Fragen Sie vor der Installation – wir antworten lieber ehrlich, als dass Sie raten müssen.",
   },
   {
-    marker: "Eigene Quellen",
-    title: "Konnektoren für Fach- und Bestandssysteme",
-    body: "Entwicklung, Absicherung und Pflege von Konnektoren für branchenspezifische Datenbanken, interne APIs oder gewachsene Systeme außerhalb des Standardkatalogs.",
+    marker: "Quellen",
+    title: "Systeme, die wir noch nicht kennen",
+    body: "Proprietäre oder ältere Systeme, interne APIs, EDI-Strecken oder Dateiformate, die nicht im Quellenkatalog stehen – erzählen Sie uns davon. Das fließt in die Weiterentwicklung ein.",
   },
   {
-    marker: "Datenprodukte",
-    title: "Delta-Datenprodukte & Freigabeprozesse",
-    body: "Aufbau verwalteter geteilter Datasets, Delta-Sharing-Strecken sowie fachlicher Datenanfragen in Alltagssprache mit Owner-Freigabe und vererbter Maskierung.",
-  },
-  {
-    marker: "Detektoren & KI",
-    title: "Geschäftsspezifische Detektoren & Modelle",
-    body: "Umsetzung eigener Regex- oder Python-Regeln, lokaler CPU-KI-Modelle (wie GLiNER2) sowie privater LLM-Klassifikatoren direkt in Ihrer Umgebung.",
+    marker: "Identität",
+    title: "Ungewöhnliche Verzeichnis- und Gruppenstrukturen",
+    body: "Verschachtelte Active-Directory-Gruppen, mehrere Entra-ID-Mandanten, Okta- oder Keycloak-Setups, die nicht direkt auf Workspaces und Rollen passen – beschreiben Sie Ihres, wir sagen Ihnen, wie es sich abbilden lässt.",
   },
   {
     marker: "Infrastruktur",
-    title: "Kubernetes, OpenShift & Air-Gapped-Betrieb",
-    body: "Architektur-Review und Produktivbetrieb auf Kubernetes, OpenShift, On-Premises-Clustern oder Ihrer Cloud – inklusive TLS, Dimensionierung und Tuning.",
+    title: "Air-Gapped, OpenShift & abgeschottete Cluster",
+    body: "Fragen zum Betrieb ohne ausgehenden Datenverkehr, mit Images aus einer internen Registry oder wenn BI- und KI-Werkzeuge ausschließlich über das Gateway laufen sollen.",
   },
   {
-    marker: "Architektur-Review",
-    title: "Prüfung von Sicherheit, Maskierung & Audit",
-    body: "Gemeinsame Verifikation von Zeilenfiltern, Spaltenmasken, Power-BI-/Excel-/ODBC-Anbindung und Audit-Protokollierung mit Ihren Security- und Datenschutzteams.",
+    marker: "Detektoren & KI",
+    title: "Fachspezifische Erkennung",
+    body: "Eigene Regex- oder Python-Detektoren, Klassifizierungsmodelle auf der CPU oder ein privates LLM in Ihrem Netz – fragen Sie, wenn die Dokumentation nicht weiterhilft.",
+  },
+  {
+    marker: "Feedback",
+    title: "Was fehlt oder unklar ist",
+    body: "Etwas hat nicht wie erwartet funktioniert, in der Doku fehlt ein Schritt oder Ihnen fehlt eine Funktion – all das hilft uns weiter.",
   },
 ];
 
 const collaborationSteps: readonly { step: string; title: string; body: string }[] = [
   {
     step: "01",
-    title: "Ausgangslage & Ziele teilen",
-    body: "Schildern Sie uns Ihre Datenquellen, Ihr IAM, Ihre Ziel-Infrastruktur und Ihre Governance-Ziele. Sie sprechen direkt mit den Entwicklern von Classifyre.",
+    title: "Schreiben Sie uns",
+    body: "Erzählen Sie, was Sie vorhaben und wo Sie hängen. Eine kurze Nachricht genügt – kein Formular, nichts zu unterschreiben.",
   },
   {
     step: "02",
-    title: "Umfang individuell vereinbaren",
-    body: "Keine starren Pakete und keine künstlichen Stufen. Wir vereinbaren Umfang, Ergebnisse und Zeitplan individuell nach Ihrem Bedarf – vom gezielten Review bis zur maßgeschneiderten Einführung.",
+    title: "Ein Entwickler liest mit",
+    body: "Nachrichten landen bei den Menschen, die Classifyre entwickeln. Wir antworten so bald wie möglich und verweisen auf Doku oder Issue, wenn es die Antwort schon gibt.",
   },
   {
     step: "03",
-    title: "Saubere Umsetzung & Übergabe",
-    body: "Alles läuft auf Ihrer eigenen Infrastruktur unter Apache-2.0 oder als vereinbartes privates Modul – sauber dokumentiert, damit Ihr Team oder Integrator langfristig unabhängig bleibt.",
+    title: "Alle profitieren",
+    body: "Zeigt Ihre Frage eine Lücke, landet die Korrektur im Open-Source-Repository oder in der Dokumentation – damit die nächste Person nicht darüber stolpert.",
   },
 ];
 
 const inquiryChecklist: readonly string[] = [
-  "Beteiligte Datenquellen & Formate (z. B. PostgreSQL, Oracle/ODBC, Databricks, Iceberg, Delta, Parquet, S3/Azure/GCS)",
-  "Identity Provider & Gruppenstruktur (z. B. Entra ID, Active Directory, Okta, Keycloak, OIDC/SAML)",
-  "Ziel-Infrastruktur (Docker, Kubernetes, OpenShift, On-Premises, Air-Gapped oder Cloud)",
-  "Wichtigste Ziele (Gruppenmaskierung, Power-BI-/Excel-Zugriff, Delta-Datenprodukte, eigene Quellen oder Detektoren)",
+  "Beteiligte Datenquellen und Formate (z. B. PostgreSQL, Oracle/ODBC, Databricks, Iceberg, Delta, Parquet, S3/Azure/GCS oder ein proprietäres System)",
+  "Identity Provider und Gruppenstruktur (z. B. Entra ID, Active Directory, Okta, Keycloak, OIDC/SAML)",
+  "Wo es läuft (Docker, Kubernetes, OpenShift, Air-Gapped)",
+  "Was Sie erreichen möchten und wo Sie nicht weiterkommen",
 ];
 
 const supportFaq: readonly { q: string; a: string }[] = [
   {
-    q: "Ist irgendeine Funktion hinter einem Supportvertrag oder einer Enterprise-Edition gesperrt?",
-    a: "Nein. Jede Funktion – SSO, Rollen, Zeilenfilter, dynamische Spaltenmaskierung, SQL-/BI-Gateway, Datenanfragen, geteilte Datenprodukte, Audit-Log und Helm-Chart – steht zu 100 % unter Apache-2.0. Sie beauftragen uns nur dann, wenn Sie direkte Engineering-Unterstützung oder maßgeschneiderte Erweiterungen wünschen.",
+    q: "Ist irgendeine Funktion hinter einer kostenpflichtigen Edition gesperrt?",
+    a: "Nein. Jede Funktion – SSO, Rollen, Zeilenfilter, dynamische Spaltenmaskierung, SQL-/BI-Gateway, Datenanfragen, geteilte Datenprodukte, Audit-Log und Helm-Chart – steht zu 100 % unter Apache-2.0. Es gibt keine Enterprise-Edition.",
   },
   {
-    q: "Wie werden individuelle Anpassungen und Zusammenarbeit vereinbart?",
-    a: "Jede Zusammenarbeit wird individuell nach Ihren technischen Anforderungen, Ihrem Zeitrahmen und Ihren internen Ressourcen abgestimmt – vom kompakten Architektur-Review oder eigenen Konnektor bis zur begleiteten Einführung.",
+    q: "Gibt es Classifyre als SaaS?",
+    a: "Nein. Classifyre ist niemals Multi-Tenant-SaaS. Es läuft auf Ihrer eigenen Infrastruktur – Docker zur Evaluierung, Kubernetes oder OpenShift per Helm im Betrieb – betrieben von Ihrem eigenen Team oder dem Integrator, mit dem Sie bereits arbeiten.",
+  },
+  {
+    q: "Kann ich eine Frage stellen, ohne mich zu irgendetwas zu verpflichten?",
+    a: "Ja. Fragen, ob Classifyre zu Ihren Quellen, Ihrem Identity Provider oder Ihrer Infrastruktur passt, sind willkommen – ebenso Beschreibungen von Umgebungen, die die Dokumentation nicht abdeckt. Eine Nachricht an uns startet keinen Verkaufsprozess.",
   },
   {
     q: "Können eigene Konnektoren oder Detektoren intern und privat bleiben?",
     a: "Ja. Konnektoren und Detektoren sind modulare Plugins. Allgemeine Verbesserungen können gern ins Open-Source-Repository einfließen, während unternehmensspezifische Integrationen und Geschäftsregeln vollständig privat in Ihrer Umgebung bleiben.",
   },
   {
-    q: "Arbeiten Sie unter NDA und mit üblichen Beschaffungsprozessen?",
-    a: "Ja. Wir arbeiten mit Organisationen in Österreich, der EU, Nordamerika und weltweit unter üblichen Vertraulichkeitsvereinbarungen (NDA) und direkten Projektverträgen.",
+    q: "Wo melde ich Fehler oder Funktionswünsche?",
+    a: "Eröffnen Sie ein Issue im öffentlichen GitHub-Repository, damit andere mitlesen und ergänzen können. Sind die Details vertraulich, schreiben Sie stattdessen an contact@classifyre.com.",
   },
   {
     q: "Wie melde ich eine Sicherheitslücke?",
@@ -181,23 +185,23 @@ export default function SupportPageDe() {
       />
       <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 sm:px-6 lg:px-8">
         <PageHero
-          eyebrow="Support & Anpassung"
+          eyebrow="Support & Kontakt"
           title={
             <>
               Offen im Kern.
               <br />
               <span className="inline-block bg-accent px-[0.12em] text-black">
-                Individuell abgestimmt.
+                Fragen willkommen.
               </span>
             </>
           }
           lede={
             <>
               Jede Funktion von Classifyre steht offen unter Apache-2.0 – ohne
-              gesperrte Stufen. Nutzen Sie unsere Dokumentation und das
-              öffentliche Repository für den Eigenbetrieb oder arbeiten Sie
-              direkt mit unseren Entwicklern zu individuell vereinbartem Umfang
-              für IAM, eigene Quellen, Delta-Datenprodukte oder Detektoren.
+              gesperrte Stufen – und läuft auf Ihrer eigenen Infrastruktur.
+              Wenn Sie es evaluieren, auf etwas stoßen, das die Dokumentation
+              nicht abdeckt, oder eine Umgebung haben, die wir noch nicht
+              kennen: Schreiben Sie uns – wir lesen jede Nachricht.
             </>
           }
           actions={
@@ -208,7 +212,7 @@ export default function SupportPageDe() {
                 className="border-2 border-accent bg-accent font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-black hover:bg-accent/90"
               >
                 <a
-                  href={`mailto:${contactEmail}?subject=${encodeURIComponent("Classifyre Anfrage")}`}
+                  href={`mailto:${contactEmail}?subject=${encodeURIComponent("Frage zu Classifyre")}`}
                 >
                   {contactEmail}
                 </a>
@@ -259,18 +263,18 @@ export default function SupportPageDe() {
           </SectionShell>
         </section>
 
-        {/* ── Individuelle Engineering-Unterstützung ───────────────────── */}
+        {/* ── Fragen, die wir gern hören ───────────────────────────────── */}
         <section aria-labelledby="support-topics-title">
           <SectionShell tone="plain">
             <div className="space-y-8">
               <SectionHead
                 id="support-topics-title"
-                marker="Direktes Engineering"
-                title="Wobei wir Organisationen unterstützen"
-                lede="Umfang, Ergebnisse und Zeitplan werden individuell mit Ihrem Team vereinbart – ohne starre Pakete und ohne Herstellerbindung."
+                marker="Fragen willkommen"
+                title="Worüber wir gern von Ihnen hören"
+                lede="Keine Frage ist zu früh oder zu speziell. Diese hier bekommen wir am häufigsten."
               />
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {tailoringAreas.map((item, index) => (
+                {questionTopics.map((item, index) => (
                   <Reveal key={item.marker} delayMs={index * 60} className="h-full">
                     <div className="flex h-full flex-col items-start gap-3 border-2 border-border bg-background p-6 shadow-[6px_6px_0_var(--color-border)]">
                       <Marker label={item.marker} />
@@ -286,7 +290,7 @@ export default function SupportPageDe() {
           </SectionShell>
         </section>
 
-        {/* ── Ablauf & Checkliste für Anfragen ─────────────────────────── */}
+        {/* ── Ablauf & Checkliste für Nachrichten ──────────────────────── */}
         <section aria-labelledby="how-we-work-title">
           <SectionShell tone="signal" fullWidth className="bg-black">
             <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-12">
@@ -297,7 +301,7 @@ export default function SupportPageDe() {
                     id="how-we-work-title"
                     className="font-hero text-[clamp(2.2rem,5vw,3.8rem)] uppercase leading-[0.9] tracking-[0.01em] text-white"
                   >
-                    Direkt mit den Entwicklern. Individuell vereinbart.
+                    Direkt zu den Entwicklern. Kein Verkaufsprozess.
                   </h2>
                 </div>
                 <ol className="space-y-6">
@@ -322,13 +326,13 @@ export default function SupportPageDe() {
 
               <div className="flex flex-col justify-between gap-6 border-2 border-white/25 bg-white/[0.04] p-6 sm:p-8 lg:col-span-5">
                 <div className="space-y-4">
-                  <Marker label="Schnellster Einstieg" />
+                  <Marker label="Ihre Nachricht" />
                   <h3 className="font-sans text-xl font-bold text-white">
                     Was bei Ihrer Nachricht hilft
                   </h3>
                   <p className="text-sm leading-6 text-white/75">
-                    Ein paar kurze Stichpunkte zu folgenden Angaben helfen uns,
-                    sofort konkret und technisch fundiert zu antworten:
+                    Nichts davon ist Pflicht, aber ein Satz zu diesen Punkten
+                    hilft uns, konkret zu antworten:
                   </p>
                   <ul className="space-y-3 pt-1">
                     {inquiryChecklist.map((line) => (
@@ -353,7 +357,7 @@ export default function SupportPageDe() {
                     className="border-2 border-accent bg-accent font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-black hover:bg-accent/90"
                   >
                     <a
-                      href={`mailto:${contactEmail}?subject=${encodeURIComponent("Classifyre technische Anfrage")}`}
+                      href={`mailto:${contactEmail}?subject=${encodeURIComponent("Frage zu Classifyre")}`}
                     >
                       E-Mail an {contactEmail}
                     </a>
@@ -371,7 +375,7 @@ export default function SupportPageDe() {
         <FaqList
           id="support-faq-title"
           mark="Support-FAQ"
-          title="Fragen zur Zusammenarbeit."
+          title="Fragen rund um Unterstützung."
           items={supportFaq}
           locale="de"
         />

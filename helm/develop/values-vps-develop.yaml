@@ -145,3 +145,14 @@ queryWorker:
     clusterCidrs:
       - 10.42.0.0/16
       - 10.43.0.0/16
+
+# SQL connections are on by default. Same shared-node diet as the query worker
+# (requests only; the chart's 1Gi request would be counted by the scheduler and
+# starve the extract jobs). No publicHost and no exposed port here (single-node
+# k3s without a TCP ingress): the app shows "not configured" with a link to the
+# setup guide. To use it, set publicHost and `service.type: NodePort`.
+sqlGateway:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi

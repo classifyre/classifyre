@@ -72,3 +72,12 @@ Sign-in: the identity server answers through the web app at {{ include "classify
   Members) and get access through that organization's groups, not realm groups.
   !! Back up the {{ include "classifyre.iam.dbName" . }} database before upgrading iam.image.tag across a minor version:
   !! the identity server cannot roll its database back.
+{{- if and .Values.sqlGateway.enabled (not .Values.sqlGateway.publicHost) }}
+
+SQL connections are on but not configured:
+  !! sqlGateway.publicHost is empty, so the app cannot tell people where to connect
+  !! Power BI, Excel, DBeaver or psql, and the gateway's certificate carries no public name.
+  !! Set sqlGateway.publicHost and expose the port (service.type LoadBalancer or NodePort,
+  !! or sqlGateway.traefik), or turn the gateway off with sqlGateway.enabled=false.
+  !! Guide: https://docs.classifyre.com/sql-connections/#making-the-endpoint-reachable
+{{- end }}

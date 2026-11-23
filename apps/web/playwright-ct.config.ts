@@ -44,6 +44,9 @@ export default defineConfig({
   use: {
     trace: "on-first-retry",
     ctViteConfig: {
+      esbuild: {
+        jsx: "automatic",
+      },
       plugins: [tsconfigPaths()],
       worker: {
         format: "es",

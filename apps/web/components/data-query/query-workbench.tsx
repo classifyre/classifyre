@@ -61,6 +61,7 @@ export function QueryWorkbench({
   onSaved,
   onShare,
   shareLabel,
+  fill = false,
   ref,
 }: {
   catalog: QueryCatalog | null;
@@ -74,6 +75,11 @@ export function QueryWorkbench({
   /** Share the SQL as it stands as a dataset (DQ §5.12). */
   onShare?: (sql: string) => void;
   shareLabel?: string;
+  /**
+   * Fill the parent's height: editor and toolbar stay fixed, the result grid
+   * takes the rest and is the only thing that scrolls.
+   */
+  fill?: boolean;
   ref?: React.Ref<QueryWorkbenchHandle>;
 }) {
   const { t } = useTranslation();
@@ -222,34 +228,38 @@ export function QueryWorkbench({
   );
 
   return (
-    <div className="space-y-3">
-      <SqlEditor
-        ref={editor}
-        value={sql}
-        onChange={setSql}
-        onRun={() => void execute()}
-        onFormat={() => void format()}
-        catalog={catalog}
-        height={editorHeight}
-        path={editorPath}
-      />
-      <QueryToolbar
-        busy={busy}
-        canRun={!disabled && Boolean(sql.trim())}
-        run={run}
-        elapsed={elapsed}
-        disabled={disabled}
-        onRun={() => void execute()}
-        onStop={() => void stop()}
-        onFormat={() => void format()}
-        onSave={() => setSaveOpen(true)}
-        onShare={onShare ? () => onShare(sql) : undefined}
-        shareLabel={shareLabel}
-      />
+    <div className={fill ? "flex h-full min-h-0 flex-1 flex-col gap-3" : "space-y-3"}>
+      <div className="shrink-0">
+        <SqlEditor
+          ref={editor}
+          value={sql}
+          onChange={setSql}
+          onRun={() => void execute()}
+          onFormat={() => void format()}
+          catalog={catalog}
+          height={editorHeight}
+          path={editorPath}
+        />
+      </div>
+      <div className="shrink-0">
+        <QueryToolbar
+          busy={busy}
+          canRun={!disabled && Boolean(sql.trim())}
+          run={run}
+          elapsed={elapsed}
+          disabled={disabled}
+          onRun={() => void execute()}
+          onStop={() => void stop()}
+          onFormat={() => void format()}
+          onSave={() => setSaveOpen(true)}
+          onShare={onShare ? () => onShare(sql) : undefined}
+          shareLabel={shareLabel}
+        />
+      </div>
 
       {error && (
         <div
-          className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm"
+          className="flex max-h-48 shrink-0 items-start gap-2 overflow-auto rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm"
           data-testid="query-error"
         >
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
@@ -265,11 +275,13 @@ export function QueryWorkbench({
       )}
 
       {rows && (
-        <div className="space-y-2">
+        <div
+          className={fill ? "flex min-h-0 flex-1 flex-col gap-2" : "space-y-2"}
+        >
           <RunMasksNote masks={run?.masks} />
           <RunRowsNote filters={run?.rowFilters} />
           {run?.truncated && (
-            <p className="text-xs text-amber-600 dark:text-amber-400">
+            <p className="shrink-0 text-xs text-amber-600 dark:text-amber-400">
               {run.truncatedReason === "bytes"
                 ? t("dataQuery.truncatedBytes", { count: rows.rows.length })
                 : t("dataQuery.truncatedRows", { count: rows.rows.length })}
@@ -279,11 +291,12 @@ export function QueryWorkbench({
             <ResultsGrid
               result={rows}
               height={resultHeight}
+              fill={fill}
               canExport
               onExport={(fileFormat) => void exportAs(fileFormat)}
             />
           ) : (
-            <div className="rounded-md border p-6 text-center text-sm text-muted-foreground">
+            <div className="shrink-0 rounded-md border p-6 text-center text-sm text-muted-foreground">
               {t("dataQuery.emptyResult")}
             </div>
           )}
@@ -291,7 +304,7 @@ export function QueryWorkbench({
       )}
 
       {!rows && !error && !busy && (
-        <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+        <div className="shrink-0 rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
           {t("dataQuery.noResult")}
         </div>
       )}
@@ -313,13 +326,13 @@ export function QueryWorkbench({
  * `****` never reads as the data itself.
  */
 /** "Rows filtered for you": the row filters of the tables the run names (DQ §5.10). */
-function RunRowsNote({ filters }: { filters?: QueryRunRowFilterDto[] }) {
+export function RunRowsNote({ filters }: { filters?: QueryRunRowFilterDto[] }) {
   const { t } = useTranslation();
   const words = useRowWords();
   if (!filters?.length) return null;
   return (
     <p
-      className="flex items-start gap-1.5 text-xs text-muted-foreground"
+      className="flex shrink-0 items-start gap-1.5 text-xs text-muted-foreground"
       data-testid="run-row-filters"
     >
       <Filter className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
@@ -337,7 +350,7 @@ function RunRowsNote({ filters }: { filters?: QueryRunRowFilterDto[] }) {
   );
 }
 
-function RunMasksNote({ masks }: { masks?: QueryRunMaskDto[] }) {
+export function RunMasksNote({ masks }: { masks?: QueryRunMaskDto[] }) {
   const { t } = useTranslation();
   if (!masks?.length) return null;
   const name = (mask: QueryRunMaskDto) =>
@@ -347,7 +360,7 @@ function RunMasksNote({ masks }: { masks?: QueryRunMaskDto[] }) {
   const hidden = masks.filter((mask) => mask.action === "hide").length;
   return (
     <p
-      className="flex items-start gap-1.5 text-xs text-muted-foreground"
+      className="flex shrink-0 items-start gap-1.5 text-xs text-muted-foreground"
       data-testid="run-masks"
     >
       <VenetianMask className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />

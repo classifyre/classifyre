@@ -22,6 +22,7 @@ runs the same code as separate, independently scalable workloads.
 ```bash
 docker run -d --name classifyre \
   -p 3000:3000 \
+  -p 5433:5433 \
   --shm-size=1g \
   -v classifyre-pgdata:/var/lib/postgresql/data \
   -v classifyre-data:/var/lib/classifyre \
@@ -85,7 +86,8 @@ no emulation on either.
 
 | Process | Port | What it is |
 |---|---|---|
-| Caddy | **3000** | the only published port; routes to the two servers below |
+| Caddy | **3000** | the app and its API; routes to the two servers below |
+| SQL gateway | **5433** | SQL connections for Power BI, Excel, DBeaver, `psql` (PostgreSQL protocol, TLS) |
 | Web UI | 3100 (internal) | Next.js, and the bundled documentation at `/docs` |
 | API + worker | 8000 (internal) | REST, WebSockets, job queues, embeddings, and the parent of every scan |
 | Identity server (Keycloak) | 8180 (internal) | sign-in, people, groups and tenants; reached through the web UI at `/iam` |
@@ -95,8 +97,8 @@ They are supervised by [s6-overlay](https://github.com/just-containers/s6-overla
 which restarts anything that dies and makes `docker stop` and `docker restart`
 behave the way you expect.
 
-Only port 3000 is reachable (plus the SQL gateway, if you publish it). Postgres binds to loopback inside the container's
-own network namespace and is not exposed, deliberately.
+Two ports are published: 3000 (the app) and 5433 (SQL connections). Postgres binds to loopback inside the container's
+own network namespace and is not exposed, deliberately — which is also why the SQL gateway is on 5433, not 5432.
 
 The Python scan workers are not a service: the API starts one process per scan
 and it exits when the scan does — the same lifecycle the Helm chart gets from
@@ -110,16 +112,29 @@ The API also runs a SQL gateway: BI tools, `psql`, JDBC and ODBC clients connect
 with a **SQL connection** made in the app, and read through the same masks and
 grants as the SQL page. Every read lands in the activity log.
 
-The bundled PostgreSQL already holds 5432 inside the container, so the gateway
-listens on **5433**. Publish it when you start the container:
+The gateway is on by default and listens on **5433** — not 5432, which the
+bundled PostgreSQL holds inside the container (and a laptop often has its own).
+Every command above publishes it:
 
 ```bash
--p 5432:5433
+-p 5433:5433
 ```
 
-The connection is always TLS. Without a mounted certificate, the container makes
-a CA and a certificate for the address in `CLASSIFYRE_URL` once, keeps them
-beside the data, and the app offers the CA for download.
+Make a connection in the app (**Settings → SQL connections**), then connect a
+tool to `localhost:5433`. The connection is always TLS 1.3. Without a mounted
+certificate, the container makes a CA and a certificate for the address in
+`CLASSIFYRE_URL` once, keeps them beside the data, and the app offers the CA for
+download.
+
+| You want | Do this |
+|---|---|
+| Another host port, e.g. `15433` | `-p 15433:5433 -e SQL_GATEWAY_PUBLIC_PORT=15433` (the app shows tools the port to use) |
+| Another port inside the container | `-e PORT_SQL=6543 -p 6543:6543` |
+| Another name than `CLASSIFYRE_URL`'s host | `-e SQL_GATEWAY_PUBLIC_HOST=sql.example.com` (remove `/var/lib/classifyre/sql-tls` to make the certificate again) |
+| Your own certificate | `tls.crt` and `tls.key` in `/var/lib/classifyre/sql-tls` before the first start |
+| No SQL connections | `-e SQL_GATEWAY_ENABLED=false` |
+
+Full guide, tools and troubleshooting: <https://docs.classifyre.com/deployment/docker/#sql-connections>.
 
 ---
 
@@ -129,7 +144,7 @@ Mount it, then point a source at the path *inside* the container:
 
 ```bash
 docker run -d --name classifyre \
-  -p 3000:3000 --shm-size=1g \
+  -p 3000:3000 -p 5433:5433 --shm-size=1g \
   -v classifyre-pgdata:/var/lib/postgresql/data \
   -v classifyre-data:/var/lib/classifyre \
   -v classifyre-uv-cache:/cache/uv \
@@ -160,6 +175,10 @@ Pass them with `-e NAME=value`, or put them in a file and use `--env-file`.
 | `DEMO_MODE` | `false` | Read-only mode. Blocks every write; for a shared demo instance. |
 | `TELEMETRY_DISABLED` / `DO_NOT_TRACK` | unset | Set either to `1` to disable anonymous usage telemetry. |
 | `CORS_ORIGIN` | same-origin | Only needed if you serve the UI from another host. |
+| `SQL_GATEWAY_ENABLED` | `true` | `false` runs without SQL connections. |
+| `PORT_SQL` | `5433` | Port of the SQL gateway inside the container. Publish it: `-p 5433:5433`. |
+| `SQL_GATEWAY_PUBLIC_PORT` | `PORT_SQL` | Port the app tells tools to use; set it when you publish another host port. |
+| `SQL_GATEWAY_PUBLIC_HOST` | host of `CLASSIFYRE_URL` | Name tools connect to and the certificate carries. |
 
 ### Database
 

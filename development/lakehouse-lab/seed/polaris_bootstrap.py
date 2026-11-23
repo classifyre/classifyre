@@ -1,6 +1,6 @@
 """Create the lab catalog in Polaris and let the root principal manage it.
 
-    python polaris_bootstrap.py http://172.19.10.21:8181
+    python polaris_bootstrap.py http://172.18.10.21:8181
 
 The catalog stores tables in the lab's S3 (SeaweedFS) without STS, so Polaris
 cannot vend credentials: a reader brings its own storage keys.
@@ -25,7 +25,7 @@ catalog = {
         "storageConfigInfo": {
             "storageType": "S3",
             "allowedLocations": ["s3://lake/polaris/"],
-            "endpoint": "http://172.19.10.10:9000",
+            "endpoint": "http://172.18.10.10:9000",
             "pathStyleAccess": True,
             "stsUnavailable": True,
             "region": "us-east-1",

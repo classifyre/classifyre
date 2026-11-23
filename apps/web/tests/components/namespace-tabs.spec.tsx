@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/experimental-ct-react";
 import {
   ActiveNamespacesFlowHarness,
   NamespaceTabsHarness,
+  PinnedNamespaceTabsHarness,
 } from "./fixtures/namespace-tabs-harness";
 
 test("keeps the first namespace active after opening a second from the directory", async ({
@@ -151,4 +152,31 @@ test("disables bulk-close entries with no tabs in that direction", async ({
   await expect(
     page.getByRole("menuitem", { name: "Close tabs to the right" }),
   ).toBeDisabled();
+});
+
+test("keeps pinned (non-closable) tabs open and omits their close button", async ({
+  mount,
+  page,
+}) => {
+  const component = await mount(<PinnedNamespaceTabsHarness />);
+
+  await expect(
+    component.getByRole("button", { name: "Close SQL Query" }),
+  ).toHaveCount(0);
+  await expect(
+    component.getByRole("button", { name: "Close CRM DB" }),
+  ).toBeVisible();
+
+  await component
+    .getByRole("tab", { name: "CRM DB" })
+    .click({ button: "right" });
+  // Only the pinned SQL Query tab is to the left of CRM DB, so Close left is disabled.
+  await expect(
+    page.getByRole("menuitem", { name: "Close tabs to the left" }),
+  ).toBeDisabled();
+  await page.getByRole("menuitem", { name: "Close other tabs" }).click();
+
+  await expect(component.getByRole("tab", { name: "SQL Query" })).toBeVisible();
+  await expect(component.getByRole("tab", { name: "CRM DB" })).toBeVisible();
+  await expect(component.getByRole("tab", { name: "orders" })).toHaveCount(0);
 });

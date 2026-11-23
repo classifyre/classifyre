@@ -18,6 +18,7 @@
 # Environment:
 #   IMAGE      image to test          (default classifyre/all-in-one:local)
 #   PORT       host port to bind      (default 3300)
+#   SQL_PORT   host port of the SQL gateway (default 5433, the image's own)
 #   KEEP       1 to leave the container running afterwards, for poking at
 #   BOOT_WAIT  seconds to wait for first boot (default 900)
 
@@ -25,6 +26,7 @@ set -euo pipefail
 
 IMAGE="${IMAGE:-classifyre/all-in-one:local}"
 PORT="${PORT:-3300}"
+SQL_PORT="${SQL_PORT:-5433}"
 CONTAINER="${CONTAINER:-classifyre-smoke}"
 BOOT_WAIT="${BOOT_WAIT:-900}"
 NS="${NS:-default}"
@@ -41,7 +43,7 @@ step()  { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 ok()    { printf '    \033[32mok\033[0m  %s\n' "$*"; }
 fail()  { printf '    \033[31mFAIL\033[0m %s\n' "$*" >&2; exit 1; }
 
-for tool in docker curl python3 bun; do
+for tool in docker curl python3 bun openssl; do
   command -v "$tool" >/dev/null 2>&1 || fail "$tool is required"
 done
 
@@ -99,7 +101,9 @@ chmod -R 0777 "${TMP_DIR}"
 
 docker run -d --name "${CONTAINER}" \
   -p "${PORT}:3000" \
+  -p "${SQL_PORT}:5433" \
   -e CLASSIFYRE_URL="${BASE}" \
+  -e SQL_GATEWAY_PUBLIC_PORT="${SQL_PORT}" \
   --shm-size=1g \
   -v "${TMP_DIR}/pgdata:/var/lib/postgresql/data" \
   -v "${TMP_DIR}/data:/var/lib/classifyre" \
@@ -139,6 +143,17 @@ status="$(curl -s -o /dev/null -w '%{http_code}' "${API}/${NS}/sources")"
 [ "${status}" = "401" ] || fail "/api/${NS}/sources answered ${status} without a session, not 401"
 ok "without a session nothing is listed and a workspace asks to sign in"
 
+# ── SQL connections ───────────────────────────────────────────────────────────
+# On by default, on its own port (5433: the bundled PostgreSQL holds 5432 inside
+# the container). Always TLS 1.3, with the certificate the container made for the
+# host in CLASSIFYRE_URL; the Playwright smoke test below covers the app's side.
+step "Checking the SQL gateway"
+wait_for "the SQL gateway" 120 sh -c "echo | openssl s_client -connect localhost:${SQL_PORT} -tls1_3 -alpn postgresql 2>&1 | grep -q 'TLSv1.3'"
+sql_tls="$(echo | openssl s_client -connect "localhost:${SQL_PORT}" -tls1_3 -alpn postgresql -showcerts 2>/dev/null)"
+printf '%s\n' "${sql_tls}" | grep -q 'TLSv1.3' || fail "the SQL gateway on :${SQL_PORT} did not negotiate TLS 1.3"
+printf '%s\n' "${sql_tls}" | grep -q 'CN *= *localhost' || fail "the SQL gateway's certificate is not for localhost (CLASSIFYRE_URL's host)"
+ok "SQL gateway answers on :${SQL_PORT} with TLS 1.3 and a certificate for localhost"
+
 # ── Database ──────────────────────────────────────────────────────────────────
 step "Checking the databases"
 tenant_db="$(psql_in classifyre_control "SELECT database_name FROM iam_tenants WHERE alias = 'default'")"
@@ -155,7 +170,7 @@ SMOKE_TARGET=docker CONTAINER="${CONTAINER}" BASE_URL="${BASE}" \
   bash "${ROOT}/scripts/smoke/seed.sh"
 
 step "Running the Playwright smoke test"
-(cd "${ROOT}/apps/e2e" && SMOKE_RUN="${RUN}" SMOKE_KEEP_WORKSPACE=1 bunx playwright test)
+(cd "${ROOT}/apps/e2e" && SMOKE_TARGET=docker SMOKE_RUN="${RUN}" SMOKE_KEEP_WORKSPACE=1 bunx playwright test)
 ok "smoke test passed"
 
 docker exec "${CONTAINER}" sh -c '[ -n "$(ls -A /var/lib/classifyre/runner-logs 2>/dev/null)" ]' \
@@ -175,6 +190,8 @@ wait_for "the realm after a restart" "${BOOT_WAIT}" \
 [ "${secrets_before}" = "$(docker exec "${CONTAINER}" cat /var/lib/classifyre/iam.secrets)" ] \
   || fail "the sign-in secrets were regenerated — tenant databases would no longer open"
 ok "keys survived the restart"
+wait_for "the SQL gateway after a restart" 120 sh -c "echo | openssl s_client -connect localhost:${SQL_PORT} -tls1_3 -alpn postgresql 2>&1 | grep -q 'TLSv1.3'"
+ok "SQL gateway answers again after the restart"
 
 (cd "${ROOT}/apps/e2e" && SMOKE_RUN="${RUN}" SMOKE_AFTER_RESTART=1 bunx playwright test --grep @after-restart)
 ok "the workspace and its findings survived the restart"

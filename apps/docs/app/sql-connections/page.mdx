@@ -147,33 +147,50 @@ The **Data reader** role includes `data.connect`; a Data reader grant on one tab
 
 ## Making the endpoint reachable
 
-Administrators: the endpoint is the **SQL gateway**, a separate service of the same image (Helm `sqlGateway`, off by default). It always does TLS itself and speaks to clients directly, so it needs a plain TCP path, not an HTTP ingress.
+Administrators: the endpoint is the **SQL gateway**, a separate service of the same image. It is **on by default** (Helm `sqlGateway.enabled: true`; the all-in-one image runs it too), but until you tell it where people reach it, the app shows a warning instead of connection details:
 
-<Tabs items={["No proxy", "Traefik", "ingress-nginx", "Docker"]}>
+> **SQL connections are not configured yet.** The SQL gateway is running, but it has no public address.
+
+You see it on **Connect a tool** (which also carries a warning icon), on **Settings → SQL connections** and on a table's or source's **Governance** tab, each with a link to this section. Two things clear it:
+
+1. **A public host**: the name your tools connect to (`sqlGateway.publicHost`, or `SQL_GATEWAY_PUBLIC_HOST` in Docker). It is shown in the app next to every connection and put in the gateway's certificate. `sqlGateway.publicPort` is the port as your tools see it (the default 5432; a NodePort's or an entrypoint's port otherwise).
+2. **A TCP path to the gateway's port.** The gateway does its own TLS (TLS 1.3 only) and speaks the PostgreSQL protocol, so a plain HTTP Ingress or an HTTPRoute **cannot** carry it. Pick the row that matches your cluster:
+
+| Where it runs | Use | `publicHost` | `publicPort` |
+| --- | --- | --- | --- |
+| A cloud cluster (EKS, GKE, AKS) or MetalLB | a `LoadBalancer` Service | the DNS name you point at the load balancer | the Service port (`sqlGateway.port`, 5432) |
+| One node, no load balancer (k3s, a VPS) | a `NodePort` Service | the node's DNS name or IP | the node port (`sqlGateway.service.nodePort`, 30000–32767) |
+| Traefik v3 | an `IngressRouteTCP` | the DNS name of Traefik's address | the Traefik entrypoint's port |
+| ingress-nginx | its `tcp-services` ConfigMap | the DNS name of the controller's address | the port you list there |
+| Another TCP proxy (HAProxy, Envoy, a Gateway API `TCPRoute` or `TLSRoute`) | forward TCP, **passing TLS through** | the proxy's DNS name | the proxy's port |
+| A laptop cluster (k3d, kind, minikube) | `kubectl port-forward` | `localhost` | the local port you forward |
+| Docker (all-in-one) | `-p 5433:5433` | the host of `CLASSIFYRE_URL` (default `localhost`) | `5433` |
+
+<Tabs items={["LoadBalancer / NodePort", "Traefik", "ingress-nginx", "Other TCP proxy", "Local cluster", "Docker"]}>
 <Tabs.Tab>
-Without any TCP-capable proxy, give the gateway its own address:
+Without a TCP-capable proxy, give the gateway its own address:
 
 ```yaml
 sqlGateway:
-  enabled: true
   publicHost: sql.example.com
   publicPort: 5432
   service:
-    type: LoadBalancer           # or NodePort
+    type: LoadBalancer           # or NodePort (then publicPort is the node port)
+    # nodePort: 30543            # NodePort: a fixed port in 30000-32767
     loadBalancerSourceRanges: [203.0.113.0/24]
     externalTrafficPolicy: Local # keeps client addresses for allowedCidrs
   allowedCidrs: [203.0.113.0/24]
 ```
 
-The chart makes a certificate authority and a certificate for `publicHost` and keeps them across upgrades; people download the CA from the app. To use your own certificate, set `sqlGateway.tls.existingSecret` (a `kubernetes.io/tls` Secret) or let cert-manager issue one (`sqlGateway.tls.certManager`).
+For a `NodePort`, set `publicPort` to the node port and open that port in the node's firewall. The chart makes a certificate authority and a certificate for `publicHost` and keeps them across upgrades; people download the CA from the app. To use your own certificate, set `sqlGateway.tls.existingSecret` (a `kubernetes.io/tls` Secret) or let cert-manager issue one (`sqlGateway.tls.certManager`).
 </Tabs.Tab>
 <Tabs.Tab>
 Traefik v3 routes PostgreSQL with an `IngressRouteTCP`. Give it an entrypoint (`--entryPoints.postgres.address=:5432`) and:
 
 ```yaml
 sqlGateway:
-  enabled: true
   publicHost: sql.example.com
+  publicPort: 5432     # the entrypoint's port
   traefik:
     enabled: true
     entryPoints: [postgres]
@@ -181,7 +198,7 @@ sqlGateway:
   proxyProtocol: true  # optional: real client addresses for lockouts and allowedCidrs
 ```
 
-`tls: passthrough` routes by host name (SNI) on a shared entrypoint: Traefik answers PostgreSQL's SSL request and passes the encrypted stream to the gateway, which still holds the certificate. TLS always ends at the gateway (TLS 1.3); Traefik never sees the plain protocol.
+`tls: passthrough` routes by host name (SNI) on a shared entrypoint: Traefik answers PostgreSQL's SSL request and passes the encrypted stream to the gateway, which still holds the certificate. It needs `publicHost` (the chart refuses to render without it). TLS always ends at the gateway (TLS 1.3); Traefik never sees the plain protocol.
 
 With `proxyProtocol: true`, also set `trustedProxies` to Traefik's pod or node networks: the gateway then accepts a PROXY header only from there, so nobody reaching the pod directly can claim another client address.
 </Tabs.Tab>
@@ -191,23 +208,95 @@ ingress-nginx forwards TCP ports through its `tcp-services` ConfigMap (no host n
 ```yaml
 # ingress-nginx values
 tcp:
-  "5432": "classifyre/classifyre-sql-gateway:5432"
+  "5432": "classifyre/classifyre-sql-gateway:5432"   # <namespace>/<release>-sql-gateway:<sqlGateway.port>
 ```
 
-Keep `sqlGateway.service.type: ClusterIP`; TLS still ends at the gateway.
+```yaml
+# Classifyre values
+sqlGateway:
+  publicHost: sql.example.com   # the controller's DNS name
+  publicPort: 5432
+```
+
+Keep `sqlGateway.service.type: ClusterIP`; TLS still ends at the gateway. The controller's own Service has to expose that port too (its `LoadBalancer` or `NodePort`).
 </Tabs.Tab>
 <Tabs.Tab>
-The all-in-one image runs the gateway too, on port 5433 inside the container (its own PostgreSQL holds 5432). Publish it and, when people reach it under another name than `CLASSIFYRE_URL`'s host, say which:
+Anything that forwards raw TCP works, as long as it does **not** terminate TLS. Point it at the Service `<release>-sql-gateway` (for release `classifyre`: `classifyre-sql-gateway`, port `sqlGateway.port`), forward the stream untouched, and set `publicHost` and `publicPort` to what clients reach:
+
+- **HAProxy** in `mode tcp`, **Envoy** with a TCP proxy filter, or a Gateway API **`TCPRoute`**, or a **`TLSRoute`** in passthrough mode, route by port (or by SNI with `TLSRoute`).
+- To keep real client addresses for lockouts and `allowedCidrs`, have the proxy send the PROXY protocol (v1 or v2) and set `sqlGateway.proxyProtocol: true` together with `trustedProxies` (the proxy's networks). Never turn `proxyProtocol` on when some connections arrive without it.
+</Tabs.Tab>
+<Tabs.Tab>
+On k3d, kind or minikube, forward the Service to your machine:
 
 ```bash
-docker run -p 3000:3000 -p 5432:5433 \
-  -e CLASSIFYRE_URL=https://classifyre.example.com \
-  -e SQL_GATEWAY_PUBLIC_HOST=sql.example.com \
-  classifyre/classifyre
+kubectl -n classifyre port-forward svc/classifyre-sql-gateway 25432:5432
 ```
 
-It makes a certificate authority and a certificate under `/var/lib/classifyre/sql-tls` on first start unless `tls.crt` and `tls.key` are already there (mount your own). `SQL_GATEWAY_ENABLED=false` turns it off.
+```yaml
+sqlGateway:
+  publicHost: localhost
+  publicPort: 25432
+```
+
+The generated certificate always carries `localhost`, so `sslmode=verify-full` works with the downloaded CA. This is how the repository's own development cluster is set up (Skaffold forwards the gateway to `localhost:25432`).
+</Tabs.Tab>
+<Tabs.Tab>
+The all-in-one image runs the gateway too, on port **5433** inside the container (its own PostgreSQL holds 5432, and a laptop often has one on the host). Every `docker run` in this documentation publishes it:
+
+```bash
+docker run -d --name classifyre \
+  -p 3000:3000 \
+  -p 5433:5433 \
+  --shm-size=1g \
+  -v classifyre-pgdata:/var/lib/postgresql/data \
+  -v classifyre-data:/var/lib/classifyre \
+  -v classifyre-uv-cache:/cache/uv \
+  classifyre/all-in-one:latest
+```
+
+With nothing else set, tools connect to `localhost:5433`. When people reach the container under another name than `CLASSIFYRE_URL`'s host, or on another port, say so:
+
+```bash
+docker run -p 3000:3000 -p 15433:5433 \
+  -e CLASSIFYRE_URL=https://classifyre.example.com \
+  -e SQL_GATEWAY_PUBLIC_HOST=sql.example.com \
+  -e SQL_GATEWAY_PUBLIC_PORT=15433 \
+  classifyre/all-in-one
+```
+
+It makes a certificate authority and a certificate under `/var/lib/classifyre/sql-tls` on first start unless `tls.crt` and `tls.key` are already there (mount your own). `SQL_GATEWAY_ENABLED=false` turns it off; `PORT_SQL` changes the port inside the container. All variables are in the [Docker guide](/deployment/docker/#sql-connections).
 </Tabs.Tab>
 </Tabs>
 
+### Check that it works
+
+From a machine outside the cluster (or the Docker host), the handshake tells you whether the path is open and the certificate carries the name you set:
+
+```bash
+echo | openssl s_client -connect sql.example.com:5432 -tls1_3 -alpn postgresql 2>/dev/null | grep -E "Protocol|subject"
+# Protocol: TLSv1.3
+# subject=CN=sql.example.com
+```
+
+Then reload the app: the warning is gone and **Connect a tool** shows the host and port. Troubleshooting:
+
+- **The warning stays**: `publicHost` is empty. Check the API pod: `kubectl exec deploy/classifyre-api -- printenv SQL_GATEWAY_PUBLIC_HOST`.
+- **Connection refused or a timeout**: the port is not exposed. Check the Service type, the node's or cloud firewall and `allowedCidrs`.
+- **A certificate error with `verify-full`**: the name you connect to is not the one on the certificate. After changing `publicHost`, delete the kept certificate so the chart makes it again (`kubectl -n <namespace> delete secret <release>-sql-tls`, then `helm upgrade`; the gateway restarts) and download the new CA.
+- **Sessions refused as busy**: the gateway pod is out of memory for another session; see `maxSessions` and the pod's memory limit below.
+
+### Turning it off, and what it costs
+
+If you do not want SQL connections, set `sqlGateway.enabled: false`: no pod, no Service, and the app says they are switched off. With it on, the gateway pod requests 250m CPU and 1 GiB (limit 4 GiB); on a small or shared node lower `sqlGateway.resources.requests`.
+
 Connections use TLS 1.3 only. Other settings: `maxSessions` per gateway pod (each session holds a catalog of about 150 MB), `maxSessionsPerConnection`, `idleMinutes`. Ten failed sign-ins within 15 minutes lock a user name, and an address, out for 15 minutes.
+
+## Preventing direct database bypass in production
+
+Classifyre enforces row filters, column masking, and audit logging on every query that passes through its SQL workbench, SQL gateway, and MCP server. Because Classifyre does not replace your underlying databases, production deployments enforce non-bypass operationally in two steps:
+
+1. **Revoke direct analyst and shared BI credentials on the source systems.** Analysts, BI dashboards, and AI agents authenticate only with personal, expiring Classifyre SQL connections or MCP tokens — never with raw database accounts.
+2. **Restrict source network reachability to Classifyre's service principal.** Use firewall rules, VPC security groups, or Kubernetes `NetworkPolicy` so source database ports (e.g., PostgreSQL `5432`, SQL Server `1433`, Oracle `1521`) accept analytical traffic exclusively from Classifyre's dedicated query workers and application backends — never from analyst laptops, BI desktops, or AI agent hosts.
+
+With those two controls in place, Power BI, Excel, Tableau, DBeaver, ODBC clients, and MCP AI agents have no alternative path to raw tables: every analytical read is governed, masked, and logged by Classifyre.

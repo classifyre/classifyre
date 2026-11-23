@@ -78,7 +78,7 @@ const principles: readonly {
   {
     marker: "Data sovereignty",
     title: "Everything stays on your infrastructure",
-    body: "Classifyre is self-hosted software, not a multi-tenant SaaS upload. Run it locally with Docker or in production on Kubernetes and OpenShift — on-premises, in a private cloud, or in your AWS, Azure, or GCP account.",
+    body: "Classifyre is self-hosted software — never a multi-tenant SaaS upload. Run it locally with Docker, on Kubernetes and OpenShift on-premises or in your own cloud — operated by your own team or integrator.",
     href: docs.deployment,
     hrefLabel: "Deployment architecture",
   },
@@ -92,9 +92,9 @@ const principles: readonly {
   {
     marker: "Open by design",
     title: "100% Apache-2.0, zero locked tiers",
-    body: "You can inspect every line of code, audit how masking and access control work, and deploy the full platform yourself with no per-seat licensing. When you want custom tailoring or rollout support, you work directly with our engineers.",
+    body: "Inspect every line of code, audit how masking and access control work, and deploy the full platform yourself with no per-seat licensing. Questions about your setup are always welcome.",
     href: routes.support,
-    hrefLabel: "Support & tailoring",
+    hrefLabel: "Support & contact",
   },
 ];
 
@@ -172,7 +172,7 @@ export default function MadeInEuropePage() {
               size="lg"
               className="border-2 border-accent bg-accent text-black hover:bg-accent/90"
             >
-              <a href={routes.support}>Talk to our team</a>
+              <a href={routes.support}>Get in touch</a>
             </Button>
             <Button
               asChild

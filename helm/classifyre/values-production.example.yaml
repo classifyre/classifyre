@@ -42,6 +42,20 @@ ingress:
         - classifyre.example.com
       secretName: classifyre-tls
 
+# ── SQL connections (Power BI, Excel, DBeaver, psql) ─────────────────────────
+# On by default. Without a public host the app warns "SQL connections are not
+# configured yet" and shows no connection details. An HTTP Ingress cannot carry
+# the PostgreSQL protocol: expose the gateway with a LoadBalancer, a NodePort or
+# Traefik. Every option: https://docs.classifyre.com/sql-connections/#making-the-endpoint-reachable
+# Not wanted? sqlGateway.enabled: false
+sqlGateway:
+  publicHost: sql.example.com # <REQUIRED> the name tools connect to
+  publicPort: 5432
+  service:
+    type: LoadBalancer
+    # loadBalancerSourceRanges: [203.0.113.0/24]
+  # allowedCidrs: [203.0.113.0/24]
+
 # ── Database ──────────────────────────────────────────────────────────────────
 # Use mode=cnpg (CloudNativePG) or mode=external for production.
 # mode=embedded has no HA, no backups, and data is lost if the pod is rescheduled.

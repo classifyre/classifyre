@@ -32,8 +32,8 @@ Reference: https://docs.classifyre.com/detectors/
 - **Custom business detectors**:
   - **Regex**: Deterministic IDs, internal codes, structured formats.
   - **Python code detectors**: Custom validation rules (totals, cross-column co-occurrence, checksums, sanctions lists).
-  - **GLiNER2 extraction**: Lightweight zero-shot extraction and classification running on CPU with no external API key.
-  - **Text & image classification / object detection**: Local Hugging Face models.
+  - **Local CPU zero-shot extraction**: Lightweight zero-shot entity extraction and classification running on CPU with no external API key.
+  - **Text & image classification / object detection**: Local on-premises classification models.
   - **Decision detectors & LLM detectors**: Structured probability answers or nuanced classification using any configured provider — including self-hosted or European endpoints.
 
 Every finding carries a confidence/importance score and a written explanation. Classifications drive default column masking automatically.
@@ -51,6 +51,7 @@ Reference: https://docs.classifyre.com/data-query/
   - `empty` (`NULL`)
   - `hidden` (column omitted from schema and query results)
 - **Enforcement**: Applied inside the query engine so `WHERE`, `JOIN`, and `GROUP BY` cannot bypass or infer masked values.
+- **Production non-bypass pattern**: Revoke direct analyst database logins and restrict source read ports at the network/firewall layer to Classifyre's dedicated service principal so Power BI, Excel, SQL, and MCP AI agents flow exclusively through Classifyre's TLS gateway.
 - **Row-level filtering**: Fail-closed per group (e.g., regional analysts only see rows matching their region; no rule = no rows).
 - **Admin separation**: Workspace admins do not receive clear personal values by default; clear reading is always an explicit, auditable, time-limited grant.
 - **Shared dataset floor**: Masks and classifications on source tables travel automatically onto shared datasets as a strict minimum floor — downstream shares can tighten rules further, never loosen them.
@@ -85,4 +86,4 @@ Canonical page: https://www.classifyre.com/unity-catalog-alternative/
 
 - **Self-hosted Docker evaluation**: `classifyre/all-in-one` container with bundled PostgreSQL and workers (https://www.classifyre.com/get/).
 - **Production cluster**: Official OCI Helm chart (`oci://registry-1.docker.io/classifyre/classifyre-core`) for Kubernetes (>= 1.26) and OpenShift 4+, with stateless scan/query Jobs scaling to zero between runs.
-- **Support & tailoring** (https://www.classifyre.com/support/): All software features are open source. Organisations needing custom IAM/org design, proprietary source connectors, Delta data product workflows, bespoke business detectors/AI models, or architecture reviews work directly with Classifyre's engineers on an individually agreed scope via contact@classifyre.com.
+- **Support & contact** (https://www.classifyre.com/support/): All software features are 100% Apache-2.0 open source and never multi-tenant SaaS. Organisations self-host with their own team or integrator, using the documentation, GitHub issues, and release notes. Questions about a specific setup are welcome at contact@classifyre.com.

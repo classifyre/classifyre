@@ -532,6 +532,21 @@ queryWorker:
 - **Network.** The worker has its own NetworkPolicy: ingress only from this release's API, worker and SQL gateway; egress anywhere but link-local addresses (cloud metadata). Set `queryWorker.networkPolicy.clusterCidrs` to the cluster's pod and service networks, so a query cannot reach other pods (such as the database) directly; the install notes warn while it is empty.
 - **GitOps.** With `helm template` or a tool that renders without cluster access, set `queryWorker.token.existingSecret` (or `value`), or each render makes a new token.
 
+### SQL connections: the SQL gateway
+
+[SQL connections](/sql-connections/) let Power BI, Excel, DBeaver and `psql` read the tables people may query, over the PostgreSQL protocol. They are served by the **SQL gateway** (`sqlGateway`), a second deployment of the API image. It is **on by default**, and it runs without a public address, but nobody can reach it from outside until you set one: the app shows *SQL connections are not configured yet*, with a link to the guide, until you do.
+
+```yaml
+sqlGateway:
+  enabled: true              # the default; false removes the gateway, and the app says it is switched off
+  publicHost: sql.example.com  # the name tools connect to; also on the gateway's certificate
+  publicPort: 5432
+  service:
+    type: LoadBalancer       # or NodePort; or sqlGateway.traefik for Traefik v3
+```
+
+An HTTP Ingress cannot carry the PostgreSQL protocol, and the gateway does its own TLS, so it needs a TCP path of its own. [Making the endpoint reachable](/sql-connections/#making-the-endpoint-reachable) has the recipe for each: LoadBalancer, NodePort, Traefik, ingress-nginx, any other TCP proxy, a local cluster, and a check that it works. The gateway pod requests 250m CPU and 1 GiB (limit 4 GiB); on a small node lower `sqlGateway.resources.requests`, or set `sqlGateway.enabled: false` if you do not need it.
+
 ---
 
 ## Storage

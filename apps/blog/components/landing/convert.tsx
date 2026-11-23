@@ -23,10 +23,10 @@ import {
 } from "@/components/landing/motifs";
 
 /**
- * Open source & tailored support section:
+ * Open source closing section:
  * Left: self-host the complete Apache-2.0 platform via Docker, Kubernetes, or OpenShift.
- * Right: engage the Classifyre engineering team when you need custom IAM, org design,
- * proprietary sources, Delta data products, or bespoke detectors and AI models.
+ * Right: an invitation to ask questions or describe an unusual setup. Deliberately not
+ * an offer: no plans, prices, subscriptions or services are advertised here.
  */
 export function Convert({ locale }: { locale: Locale }) {
   const copy = getLandingCopy(locale);
@@ -110,7 +110,7 @@ export function Convert({ locale }: { locale: Locale }) {
             </div>
           </div>
 
-          {/* Right: Tailored rollout & custom engineering */}
+          {/* Right: questions & contact (not a sales offer) */}
           <div className="flex flex-col justify-between gap-8 border-2 border-white/20 bg-white/[0.03] p-6 sm:p-8 lg:col-span-6">
             <div className="space-y-6">
               <div className="space-y-2">

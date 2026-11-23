@@ -41430,7 +41430,11 @@
         "properties": {
           "enabled": {
             "type": "boolean",
-            "description": "The SQL gateway runs in this deployment."
+            "description": "This deployment runs the SQL gateway (Helm `sqlGateway.enabled`; on in the all-in-one image)."
+          },
+          "configured": {
+            "type": "boolean",
+            "description": "The gateway has a public address (`sqlGateway.publicHost` / `SQL_GATEWAY_PUBLIC_HOST`). Without one it runs but nobody can be told where to connect."
           },
           "host": {
             "type": "string",
@@ -41459,6 +41463,7 @@
         },
         "required": [
           "enabled",
+          "configured",
           "host",
           "port",
           "database",

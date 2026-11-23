@@ -22,10 +22,10 @@ export const deChrome: TopicChrome = {
   runBody:
     "Lokal mit einem Docker-Container evaluieren oder mit Helm produktiv auf Kubernetes und OpenShift betreiben. 100 % Open Source (Apache-2.0) – Ihre Daten bleiben in Ihrem Netz.",
   runDocs: "Installationsleitfaden",
-  tailoringTitle: "Individuelle Anpassung für Ihre Umgebung?",
+  tailoringTitle: "Fragen zu Ihrer Umgebung?",
   tailoringBody:
-    "Arbeiten Sie direkt mit unserem Engineering-Team zu individuell vereinbartem Umfang – für IAM-Integration, Sicherheitsarchitektur, eigene Quellen, Delta-Datenprodukte oder maßgeschneiderte Detektoren und KI-Modelle.",
-  tailoringCta: "Mit unserem Team sprechen",
+    "Wenn Sie Classifyre evaluieren und Ihre Quellen, Ihr Identity Provider oder Ihre Infrastruktur nicht ganz zur Dokumentation passen, schreiben Sie uns. Wir beantworten gern Fragen und hören von Umgebungen, die wir noch nicht kennen.",
+  tailoringCta: "Kontakt aufnehmen",
   relatedTitle: "Weitere Vergleiche & Leitfäden",
   faqTitle: "Häufige Fragen",
   sourcesLabel: "Quellen",
@@ -88,8 +88,8 @@ const accessGovernance: TopicCopy = {
     ],
   },
   notDo: {
-    title: "Abgrenzung",
-    body: "Classifyre regelt alle Zugriffe, die über Classifyre laufen (SQL-Arbeitsbereich, Power BI/Excel/ODBC-Gateway, Exporte, geteilte Datenprodukte und MCP). Wer Datenbanken oder Cloud-Warehouses direkt mit eigenen Zugangsdaten abfragt, unterliegt den Regeln des jeweiligen Zielsystems. Classifyre ersetzt weder Ihr IAM noch Ihre ETL-Tools.",
+    title: "Abgrenzung & Durchsetzung im Produktivbetrieb",
+    body: "Classifyre regelt alle Zugriffe, die über Classifyre laufen (SQL-Arbeitsbereich, Power BI/Excel/ODBC-Gateway, Exporte, geteilte Datenprodukte und MCP). Im Produktivbetrieb schließen Organisationen direkte Umgehungen, indem direkte Analysten-DB-Logins entzogen und Lese-Ports netzwerkseitig auf das dedizierte Classifyre-Servicekonto beschränkt werden – so laufen BI, SQL und KI-Agenten ausschließlich über das Classifyre-TLS-Gateway. Classifyre ersetzt weder Ihr IAM noch Ihre ETL-Tools.",
   },
   faq: [
     {
@@ -138,7 +138,7 @@ const immuta: TopicCopy = {
     },
     {
       title: "Integrierte flexible Detektoren vs. Cloud-Plattform-Discovery",
-      body: "Classifyre kombiniert fertige PII- und Secret-Pakete mit eigenen Geschäftsdetektoren (Regex, Python-Code, lokale CPU-KI wie GLiNER2 und LLMs) über Tabellen und unstrukturierte Dokumente hinweg – und steuert damit die Maskierung automatisch.",
+      body: "Classifyre kombiniert fertige PII- und Secret-Pakete mit eigenen Geschäftsdetektoren (Regex, Python-Code, lokale CPU-KI-Extraktion und private LLMs) über Tabellen und unstrukturierte Dokumente hinweg – und steuert damit die Maskierung automatisch.",
       href: docs.detectors,
       linkLabel: "Detektoren ansehen",
     },
@@ -261,7 +261,7 @@ const immuta: TopicCopy = {
         items: [
           "100 % Open Source unter Apache-2.0 – prüfbarer Code, keine Lizenzkosten pro Nutzer und keine gesperrten Enterprise-Stufen.",
           "Vereint 40+ heterogene Quellen (On-Prem-DBs, Iceberg, Delta, Parquet, Databricks, S3/Azure/GCS, Wikis, eigene Systeme) unter einer Maskierungs-, Zeilenfilter- und Audit-Schicht.",
-          "Kombiniert fertige PII-/Secret-Pakete mit eigenen Geschäftsdetektoren (Regex, Python, lokale CPU-KI wie GLiNER2, LLMs), persönlichen Power-BI-/Excel-/ODBC-Verbindungen und fachlichen Datenprodukt-Anfragen.",
+          "Kombiniert fertige PII-/Secret-Pakete mit eigenen Geschäftsdetektoren (Regex, Python, lokale CPU-KI-Extraktion, private LLMs), persönlichen Power-BI-/Excel-/ODBC-Verbindungen und fachlichen Datenprodukt-Anfragen.",
           "Läuft überall – Docker, Kubernetes, OpenShift, abgeschottet On-Premises oder in Ihrer eigenen Cloud – bei voller Datensouveränität.",
         ],
       },
@@ -313,7 +313,7 @@ const immuta: TopicCopy = {
       {
         aspect: "Erkennung & Klassifizierung",
         them: "Erkennung sensibler Daten in angebundenen Cloud-Plattformen",
-        us: "Standard-PII & Secrets + eigene Regex-, Python-, lokale CPU-KI- (GLiNER2), Bild-/Textklassifikations- und LLM-Detektoren",
+        us: "Standard-PII & Secrets + eigene Regex-, Python-, lokale CPU-KI-Extraktions-, Bild-/Textklassifikations- und private LLM-Detektoren",
       },
       {
         aspect: "Maskierung & Zeilenfilter",
@@ -331,9 +331,9 @@ const immuta: TopicCopy = {
         us: "Datenanfragen in Alltagssprache, Owner-Freigabe und Live- oder Delta-Datenprodukte mit vererbter Masken-Untergrenze",
       },
       {
-        aspect: "Kosten & Unterstützung",
+        aspect: "Lizenz & Kosten",
         them: "Kommerzielle Enterprise-Subskription",
-        us: "Kostenloses Apache-2.0 Open Source; individuelle Engineering-Unterstützung nach Vereinbarung",
+        us: "100 % Apache-2.0, keine Nutzerlizenzen und keine gesperrten Stufen; selbst betrieben durch Ihr Team oder Ihren Integrator, Community-Support auf GitHub",
       },
     ],
     note: "Herstellerfunktionen ändern sich laufend; prüfen Sie den aktuellen Stand in der offiziellen Immuta-Dokumentation. Fachliche Korrekturen gerne an contact@classifyre.com.",
@@ -357,8 +357,8 @@ const immuta: TopicCopy = {
     ],
   },
   notDo: {
-    title: "Was Classifyre nicht tut",
-    body: "Classifyre schiebt keine Maskierungsrichtlinien in interne Snowflake-, Redshift- oder Databricks-Compute-Engines. Direkte Abfragen außerhalb von Classifyre unterliegen den jeweiligen Rechten dieser Plattformen.",
+    title: "Was Classifyre nicht tut – und wie Umgehung im Betrieb verhindert wird",
+    body: "Classifyre schiebt keine Maskierungsrichtlinien in interne Snowflake-, Redshift- oder Databricks-Compute-Engines. Im Produktivbetrieb stellen Organisationen die lückenlose Durchsetzung sicher, indem direkte Analysten-Logins auf Quelldatenbanken entzogen und Netzwerkzugriffe auf das Classifyre-Servicekonto beschränkt werden – sodass Power BI, Excel, SQL und MCP-Agenten ausschließlich über das TLS-Gateway zugreifen.",
   },
   faq: [
     {
@@ -375,7 +375,7 @@ const immuta: TopicCopy = {
     },
     {
       q: "Wie vergleichen sich die Kosten bei 500+ Nutzern?",
-      a: "Classifyre ist 100 % Apache-2.0 Open Source ohne Nutzer- oder Quellenlizenzen – es fallen nur Ihre eigenen Infrastrukturkosten (und optional vereinbarte individuelle Anpassungen) an. Immuta wird kommerziell lizenziert.",
+      a: "Die Classifyre-Kernplattform steht zu 100 % unter Apache-2.0 ohne Nutzer- oder Sitzplatzlizenzen. Ihre Kosten sind die Infrastruktur, auf der es läuft, und die Zeit, die Ihr Team oder Ihr Integrator für den Betrieb aufwendet. Immuta wird kommerziell lizenziert.",
     },
   ],
   related: ["data-access-governance", "unity-catalog-alternative"],
@@ -534,7 +534,7 @@ const unity: TopicCopy = {
         items: [
           "Herstellerunabhängig und 100 % Apache-2.0 Open Source: komplette Weboberfläche, SSO, Rollen, Maskierung, SQL-/BI-Gateway, Datenprodukte und Audit-Logs ohne Cloud-Bindung.",
           "Steuert 40+ heterogene Quellen – On-Prem PostgreSQL/MySQL/ODBC, Iceberg, Delta, Parquet, Databricks, Buckets und unstrukturierte Dokumente – aus einer Oberfläche.",
-          "Integrierte PII- und Secret-Pakete plus eigene Geschäftsdetektoren (Regex, Python, lokale CPU-KI wie GLiNER2, LLMs) steuern die mehrstufige Maskierung automatisch.",
+          "Integrierte PII- und Secret-Pakete plus eigene Geschäftsdetektoren (Regex, Python, lokale CPU-KI-Extraktion, private LLMs) steuern die mehrstufige Maskierung automatisch.",
           "Vollständig selbst betreibbar auf Docker, Kubernetes oder OpenShift – auch komplett offline oder im eigenen Rechenzentrum.",
         ],
       },
@@ -590,7 +590,7 @@ const unity: TopicCopy = {
       {
         aspect: "Erkennung & Klassifizierung",
         them: "Datenklassifizierung für Databricks-Tabellen (kommerzielle Plattform)",
-        us: "Standard-PII & Secrets + eigene Regex-, Python-, lokale CPU-KI- (GLiNER2) und LLM-Detektoren für Tabellen und Dokumente",
+        us: "Standard-PII & Secrets + eigene Regex-, Python-, lokale CPU-KI-Extraktions- und private LLM-Detektoren für Tabellen und Dokumente",
       },
       {
         aspect: "Notebooks & ML-Governance",
@@ -624,8 +624,8 @@ const unity: TopicCopy = {
     ],
   },
   notDo: {
-    title: "Was Classifyre nicht tut",
-    body: "Classifyre setzt keine Masken innerhalb von Databricks-Compute-Clustern durch und ersetzt Unity Catalog nicht für Databricks-Notebooks und Spark-Jobs. Direkte Notebook-Zugriffe in Databricks folgen weiterhin den Regeln von Unity Catalog.",
+    title: "Was Classifyre nicht tut – und wie hybride Durchsetzung funktioniert",
+    body: "Classifyre setzt keine Masken innerhalb von Databricks-Compute-Clustern durch und ersetzt Unity Catalog nicht für Databricks-Notebooks und Spark-Jobs. In hybriden Landschaften regelt Unity Catalog die Databricks-Engineering-Jobs, während Organisationen direkte Analysten-Logins auf PostgreSQL, Oracle, ODBC und Storage entziehen, sodass BI-, SQL- und MCP-Zugriffe ausschließlich über Classifyre laufen.",
   },
   faq: [
     {

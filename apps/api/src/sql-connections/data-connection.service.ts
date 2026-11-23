@@ -197,7 +197,12 @@ export class DataConnectionService {
       ? (this.cls.get<string>(CLS_SLUG) ?? '')
       : '';
     return {
-      enabled: Boolean(host),
+      // On: this deployment runs a gateway (the chart's `sqlGateway.enabled`,
+      // the all-in-one image's default). Configured: people also have an
+      // address to reach it at. A gateway with no public host is running but
+      // cannot be reached from outside: the app says so and links the setup.
+      enabled: /^(1|true|yes|on)$/i.test(process.env.SQL_GATEWAY_ENABLED ?? ''),
+      configured: Boolean(host),
       host,
       port: Number(process.env.SQL_GATEWAY_PUBLIC_PORT) || 5432,
       database: slug,

@@ -20,11 +20,17 @@ import { mapValues } from '../runtime';
  */
 export interface DataConnectionEndpointDto {
     /**
-     * The SQL gateway runs in this deployment.
+     * This deployment runs the SQL gateway (Helm `sqlGateway.enabled`; on in the all-in-one image).
      * @type {boolean}
      * @memberof DataConnectionEndpointDto
      */
     enabled: boolean;
+    /**
+     * The gateway has a public address (`sqlGateway.publicHost` / `SQL_GATEWAY_PUBLIC_HOST`). Without one it runs but nobody can be told where to connect.
+     * @type {boolean}
+     * @memberof DataConnectionEndpointDto
+     */
+    configured: boolean;
     /**
      * 
      * @type {string}
@@ -74,6 +80,7 @@ export type DataConnectionEndpointDtoSslModeEnum = typeof DataConnectionEndpoint
  */
 export function instanceOfDataConnectionEndpointDto(value: object): value is DataConnectionEndpointDto {
     if (!('enabled' in value) || value['enabled'] === undefined) return false;
+    if (!('configured' in value) || value['configured'] === undefined) return false;
     if (!('host' in value) || value['host'] === undefined) return false;
     if (!('port' in value) || value['port'] === undefined) return false;
     if (!('database' in value) || value['database'] === undefined) return false;
@@ -93,6 +100,7 @@ export function DataConnectionEndpointDtoFromJSONTyped(json: any, ignoreDiscrimi
     return {
         
         'enabled': json['enabled'],
+        'configured': json['configured'],
         'host': json['host'],
         'port': json['port'],
         'database': json['database'],
@@ -113,6 +121,7 @@ export function DataConnectionEndpointDtoToJSONTyped(value?: DataConnectionEndpo
     return {
         
         'enabled': value['enabled'],
+        'configured': value['configured'],
         'host': value['host'],
         'port': value['port'],
         'database': value['database'],

@@ -7,6 +7,7 @@
 Name | Type
 ------------ | -------------
 `enabled` | boolean
+`configured` | boolean
 `host` | string
 `port` | number
 `database` | string
@@ -21,6 +22,7 @@ import type { DataConnectionEndpointDto } from '@workspace/api-client'
 // TODO: Update the object below with actual values
 const example = {
   "enabled": null,
+  "configured": null,
   "host": null,
   "port": null,
   "database": null,

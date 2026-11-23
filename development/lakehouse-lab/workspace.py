@@ -19,6 +19,18 @@ from pathlib import Path
 
 BASE = os.environ.get("API_BASE", "http://127.0.0.1:8811")
 NS = os.environ.get("NS", "lakehouse-lab")
+# Sign-in is always on: POST/PUT and scans need a user token, and creating a
+# workspace needs the id of a group you may create workspaces for.
+#   export API_TOKEN=$(curl -s -d client_id=lab-cli -d username=<you> \
+#     -d password='<pw>' -d grant_type=password \
+#     -d scope="openid organization:default" \
+#     http://localhost:8280/iam/realms/classifyre/protocol/openid-connect/token \
+#     | python3 -c "import json,sys; print(json.load(sys.stdin)['access_token'])")
+#   export OWNER_GROUP_ID=$(curl -s -H "Authorization: Bearer $API_TOKEN" \
+#     http://127.0.0.1:8811/namespaces/owning-groups \
+#     | python3 -c "import json,sys; print(json.load(sys.stdin)[0]['id'])")
+TOKEN = os.environ.get("API_TOKEN", "")
+OWNER_GROUP_ID = os.environ.get("OWNER_GROUP_ID", "")
 HERE = Path(__file__).parent
 WORKSPACE = {
     "name": "Lakehouse Lab",
@@ -37,9 +49,10 @@ class ApiError(Exception):
 def call(method: str, path: str, body: object = None, ns: bool = True) -> object:
     url = f"{BASE}/{NS}{path}" if ns else f"{BASE}{path}"
     data = json.dumps(body).encode() if body is not None else None
-    request = urllib.request.Request(
-        url, data=data, method=method, headers={"content-type": "application/json"} if data else {}
-    )
+    headers = {"content-type": "application/json"} if data else {}
+    if TOKEN:
+        headers["authorization"] = f"Bearer {TOKEN}"
+    request = urllib.request.Request(url, data=data, method=method, headers=headers)
     try:
         with urllib.request.urlopen(request, timeout=300) as response:
             payload = response.read()
@@ -48,12 +61,27 @@ def call(method: str, path: str, body: object = None, ns: bool = True) -> object
     return json.loads(payload) if payload else None
 
 
+def owner_group_id() -> str:
+    if OWNER_GROUP_ID:
+        return OWNER_GROUP_ID
+    groups = call("GET", "/namespaces/owning-groups", ns=False)
+    if len(groups) == 1:
+        return groups[0]["id"]
+    if not groups:
+        sys.exit(
+            "no owning group: export API_TOKEN (a signed-in user token, see above), "
+            "and OWNER_GROUP_ID if you may create for more than one group"
+        )
+    listing = ", ".join(f"{g['path']} ({g['id']})" for g in groups)
+    sys.exit(f"several owning groups: export OWNER_GROUP_ID, one of: {listing}")
+
+
 def workspace() -> None:
     found = next((n for n in call("GET", "/namespaces", ns=False) if n["slug"] == NS), None)
     if found:
         call("PATCH", f"/namespaces/{found['id']}", WORKSPACE, ns=False)
         return
-    call("POST", "/namespaces", {**WORKSPACE, "slug": NS}, ns=False)
+    call("POST", "/namespaces", {**WORKSPACE, "slug": NS, "ownerGroupId": owner_group_id()}, ns=False)
     print(f"created workspace {NS}; waiting for its migrations")
     for _ in range(60):
         try:

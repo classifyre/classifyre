@@ -14,10 +14,16 @@ import {
 import { cn } from "@workspace/ui/lib/utils";
 
 export interface NamespaceTabItem {
-  /** Stable namespace identifier. */
+  /** Stable tab identifier. */
   id: string;
-  /** Human-readable namespace name. */
+  /** Human-readable tab label. */
   label: string;
+  /** Optional tooltip text; defaults to `label`. */
+  title?: string;
+  /** Optional leading icon rendered inside the tab trigger. */
+  icon?: React.ReactNode;
+  /** Whether the tab can be closed. Defaults to `true`. */
+  closable?: boolean;
   /** Last URL of the tab. Enables the "open in new tab" menu entry. */
   href?: string;
 }
@@ -95,41 +101,53 @@ function NamespaceTabs({
           className="h-10 w-full justify-start overflow-x-auto overflow-y-hidden rounded-none bg-transparent p-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {items.map((item, index) => {
+            const isClosable = item.closable !== false;
             const tab = (
               <div
                 role="presentation"
-                className="group relative h-10 min-w-36 max-w-56 shrink basis-48"
+                className="group relative h-10 min-w-32 max-w-56 shrink basis-48"
               >
                 <TabsTrigger
                   value={item.id}
-                  title={item.label}
+                  title={item.title ?? item.label}
                   className={cn(
-                    "my-1 h-8 w-full justify-start rounded-sm border-0 px-3 pr-9 text-xs font-medium",
+                    "my-1 h-8 w-full justify-start gap-1.5 rounded-sm border-0 px-3 text-xs font-medium",
+                    isClosable ? "pr-9" : "pr-3",
                     "hover:bg-accent/10 hover:text-accent-foreground dark:hover:bg-accent/20",
                     "after:hidden",
                     "data-[state=active]:bg-background data-[state=active]:font-semibold data-[state=active]:shadow-sm data-[state=active]:hover:bg-background",
                     "dark:data-[state=active]:border-0 dark:data-[state=active]:bg-background dark:data-[state=active]:hover:bg-background",
                   )}
                 >
+                  {item.icon && (
+                    <span
+                      className="flex shrink-0 items-center"
+                      aria-hidden="true"
+                    >
+                      {item.icon}
+                    </span>
+                  )}
                   <span className="truncate">{item.label}</span>
                 </TabsTrigger>
-                <button
-                  type="button"
-                  aria-label={closeLabel(item)}
-                  title={closeLabel(item)}
-                  className={cn(
-                    "absolute right-2 top-1/2 flex size-5 -translate-y-1/2 items-center justify-center rounded-sm",
-                    "text-muted-foreground opacity-70 transition hover:bg-muted hover:text-foreground hover:opacity-100",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                  )}
-                  onPointerDown={(event) => event.stopPropagation()}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onClose(item.id);
-                  }}
-                >
-                  <X className="size-3" />
-                </button>
+                {isClosable && (
+                  <button
+                    type="button"
+                    aria-label={closeLabel(item)}
+                    title={closeLabel(item)}
+                    className={cn(
+                      "absolute right-2 top-1/2 flex size-5 -translate-y-1/2 items-center justify-center rounded-sm",
+                      "text-muted-foreground opacity-70 transition hover:bg-muted hover:text-foreground hover:opacity-100",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    )}
+                    onPointerDown={(event) => event.stopPropagation()}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onClose(item.id);
+                    }}
+                  >
+                    <X className="size-3" />
+                  </button>
+                )}
               </div>
             );
 
@@ -149,9 +167,15 @@ function NamespaceTabs({
               );
             }
 
-            const isFirst = index === 0;
-            const isLast = index === items.length - 1;
-            const isOnly = items.length < 2;
+            const hasClosableOthers = items.some(
+              (other) => other.id !== item.id && other.closable !== false,
+            );
+            const hasClosableLeft = items
+              .slice(0, index)
+              .some((other) => other.closable !== false);
+            const hasClosableRight = items
+              .slice(index + 1)
+              .some((other) => other.closable !== false);
 
             return (
               <React.Fragment key={item.id}>
@@ -175,24 +199,27 @@ function NamespaceTabs({
                         </a>
                       </ContextMenuItem>
                     )}
-                    <ContextMenuItem onSelect={() => onClose(item.id)}>
+                    <ContextMenuItem
+                      disabled={!isClosable}
+                      onSelect={() => isClosable && onClose(item.id)}
+                    >
                       {menuLabels.close(item)}
                     </ContextMenuItem>
                     <ContextMenuSeparator />
                     <ContextMenuItem
-                      disabled={!onCloseOthers || isOnly}
+                      disabled={!onCloseOthers || !hasClosableOthers}
                       onSelect={() => onCloseOthers?.(item.id)}
                     >
                       {menuLabels.closeOthers}
                     </ContextMenuItem>
                     <ContextMenuItem
-                      disabled={!onCloseLeft || isFirst}
+                      disabled={!onCloseLeft || !hasClosableLeft}
                       onSelect={() => onCloseLeft?.(item.id)}
                     >
                       {menuLabels.closeLeft}
                     </ContextMenuItem>
                     <ContextMenuItem
-                      disabled={!onCloseRight || isLast}
+                      disabled={!onCloseRight || !hasClosableRight}
                       onSelect={() => onCloseRight?.(item.id)}
                     >
                       {menuLabels.closeRight}

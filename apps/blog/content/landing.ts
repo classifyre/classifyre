@@ -20,11 +20,11 @@ import { docs, routes } from "@/lib/site";
 /* ── Hero ───────────────────────────────────────────────────────────────── */
 
 const enHero = {
-  chips: ["Open-Source Data Governance · Apache-2.0"],
-  titleA: "Control who sees what.",
-  titleBLead: "Enforced on",
-  titleBHighlight: "every query.",
-  lede: "Classifyre integrates with your existing databases, lakehouses, and identity provider to govern data from source to consumption. Classify sensitive and business-specific data, apply row and column masking by group, publish governed data products, and give teams live SQL, Power BI, and Excel access with every read logged.",
+  chips: ["Open-Source Data Governance Platform · Apache-2.0"],
+  titleA: "Find it. Govern it.",
+  titleBLead: "Use it",
+  titleBHighlight: "safely.",
+  lede: "Classifyre connects directly to your existing databases, lakehouses, file stores, and identity directory — governing data from source to consumption without migration. Discover and classify sensitive data in place, enforce live masking and access controls across SQL, Power BI, Excel, and AI agents, publish trusted data products with built-in quality checks and usage tracking, and resolve data leaks as auditable cases — on your own infrastructure.",
   ctaPrimary: "Deploy open source",
   ctaSecondary: "Plan a tailored rollout",
   ctaShowcase: "Explore live demo",
@@ -131,8 +131,8 @@ const enInstall = {
 
 const enTension = {
   marker: "Why Classifyre",
-  title: "Govern your data without replacing your stack.",
-  lede: "You already invested in databases, lakehouses, ETL pipelines, and an identity directory. Closed-source governance suites demand expensive per-seat licences or force you into one cloud vendor, while manual exports and shared database accounts leave audits unanswerable.",
+  title: "End data paralysis — without CSV leaks or US cloud lock-in.",
+  lede: "When sensitive data sits across six or more databases and file stores, IT is forced into a bad choice: block BI and AI agents for months, or hand out untracked CSV exports and shared passwords. Classifyre travels to your data so teams query live in Power BI, Excel, SQL, and MCP AI tools under one open-source masking and audit layer.",
   diagram: {
     leftLabel: "Your existing stack",
     leftSources: ["PostgreSQL · MySQL · Oracle", "Iceberg · Delta · Parquet", "S3 · Azure · GCS · Files", "Custom & SaaS sources"],
@@ -192,7 +192,7 @@ const enJourney = {
       title: "Connect any source and detect what matters to your business",
       body: [
         "Connect 40+ known sources — relational databases, Iceberg, Delta, Parquet, cloud object storage, wikis, and collaboration tools — or add custom connectors for proprietary systems. Data is read in place without copying it into another warehouse.",
-        "Start immediately with built-in packs for personal data (EU, US, and global identifiers) and secrets, then add business-specific detectors: simple regex patterns, custom Python checks, lightweight local AI models running on CPU (such as GLiNER2 and text or image classifiers), decision models, or your preferred LLM.",
+        "Start immediately with built-in packs for personal data (EU, US, and global identifiers) and secrets, then add business-specific detectors: simple regex patterns, custom Python checks, lightweight local AI extraction and classification models running on CPU, decision models, or your preferred private LLM.",
       ],
       facts: [
         "40+ built-in & custom sources",
@@ -283,22 +283,22 @@ const enJourney = {
     },
     {
       id: "govern",
-      step: "Audit & quality",
-      title: "Verifiable ownership, data quality, and a complete read log",
+      step: "Quality, usage & audit",
+      title: "Verifiable ownership, data quality, and live usage tracking",
       body: [
-        "Every governed table and shared dataset carries named owners, stewards, and custodians, column-level classifications, certification status, and scheduled data quality checks for missing values, invalid identifiers, duplicates, or custom SQL rules.",
-        "Every read, export, permission change, and dataset approval is recorded with the person, timestamp, and tool used. Compliance reviews for GDPR, NIS2, DORA, or internal audit become a filtered view instead of a manual investigation.",
+        "Every governed table and shared dataset carries named owners, stewards, and custodians, certification status (Draft to Certified), and scheduled data quality checks for missing values, invalid identifiers, duplicates, freshness, or custom SQL — where failures automatically open findings for the asset owner and export cleanly as open data contracts (ODCS).",
+        "Every read, export, permission change, and dataset approval is recorded with the person, timestamp, and tool used (Workbench, Power BI, Excel, SQL, or MCP), giving CDOs live usage and export analytics while turning GDPR, EU AI Act, NIS2, and DORA reviews into a filtered view.",
       ],
       facts: [
         "Owners, stewards & certification lifecycle",
-        "Scheduled data quality checks",
-        "Open data contracts (ODCS)",
-        "Complete audit trail of every read",
+        "Scheduled quality checks & auto-findings",
+        "Live usage, exports & policy change diffs",
+        "Open data contracts (ODCS) & full read log",
       ],
       href: docs.governance,
       linkLabel: "Governance & audit docs",
       media: "govern",
-      caption: "Ownership assigned, column masks reviewed, quality checks passing, and open data contract exported.",
+      caption: "Ownership assigned, column masks reviewed, quality checks passing, live usage tracked, and open data contract exported.",
     },
   ],
 } as const;
@@ -307,7 +307,7 @@ const enJourney = {
 
 const enReaders = {
   readers: {
-    masked: { name: "Lena · Regional Analyst", role: "Masked access" },
+    masked: { name: "Lena · BI Analyst (EU)", role: "Masked · all regions" },
     clear: { name: "Tom · Finance Steward", role: "Cleared access" },
   },
   rowsLabel: (n: number) => (n === 1 ? "1 row" : `${n} rows`),
@@ -450,34 +450,24 @@ const enSectors = {
   },
   rows: [
     {
-      sector: "Financial services & banking",
-      data: "Core customer tables, transactions, KYC records, Delta & Iceberg lakes",
-      finds: "Analysts work with last-four IBANs and hashed customer IDs in Power BI; compliance teams receive time-limited clear access with a regulator-ready read log.",
+      sector: "Public sector & critical infrastructure",
+      data: "Municipal utilities, case registers, billing DBs (Oracle/PostgreSQL), SAP & open-data exports",
+      finds: "Each district or agency queries only its own jurisdiction via row filters; citizen identifiers and IBANs stay masked; DPOs and CISOs audit every read under NIS2 and GDPR.",
     },
     {
-      sector: "Public sector & regional agencies",
-      data: "Case registers, procurement databases, statistical warehouses",
-      finds: "Each regional office queries only its own jurisdiction via row filters; citizen identifiers stay masked; data protection officers audit every read.",
+      sector: "Healthcare, hospitals & universities",
+      data: "Admissions, lab feeds, clinical & research cohorts, billing tables, document archives",
+      finds: "Analysts and researchers count cohorts and join records on deterministic hashed IDs without ever viewing patient names or national social security numbers.",
     },
     {
-      sector: "Healthcare & life sciences",
-      data: "Admissions, lab feeds, clinical cohorts, billing tables",
-      finds: "Research and analytics groups count cohorts and join records on hashed IDs without ever viewing patient names or national health numbers.",
+      sector: "Regulated mid-market & hybrid BI / AI",
+      data: "On-premises PostgreSQL/Oracle/ODBC, Iceberg/Delta/Parquet lakes, EDI feeds, Power BI & MCP agents",
+      finds: "Replaces untracked CSV exports and shared database passwords with personal, expiring BI, Excel, and AI-agent connections governed by directory groups.",
     },
     {
-      sector: "Insurance & actuarial",
-      data: "Claims databases, policy schedules, underwriting files",
-      finds: "Actuaries build models in SQL and Excel over live claims tables while policyholder identities and health fields remain redacted or hidden.",
-    },
-    {
-      sector: "Enterprise BI & data products",
-      data: "PostgreSQL, Databricks, Iceberg, Parquet in S3/Azure/GCS",
-      finds: "Business teams request cross-source datasets in plain language; owners approve and publish governed Delta or live shared datasets with inherited masks.",
-    },
-    {
-      sector: "Security & internal audit",
-      data: "Access logs, payroll systems, Git, wikis, shared drives",
-      finds: "One audit view answers who queried which table or dataset, from which tool, and when — while secret detectors flag leaked keys before exposure spreads.",
+      sector: "Banking, insurance & actuarial",
+      data: "Core customer tables, claims databases, KYC records, Delta & Iceberg lakes",
+      finds: "Actuaries and analysts query live tables with redacted names and last-four IBANs while compliance holds time-limited clear grants with regulator-ready DORA audit logs.",
     },
   ],
   footnote:
@@ -491,34 +481,34 @@ const enSectors = {
   ],
 } as const;
 
-/* ── Conversion: Open Source + Tailored Rollout (NO Enterprise Tier) ────── */
+/* ── Conversion: Open source, run by you (no offer, questions welcome) ─── */
 
 const enConvert = {
-  marker: "Open source & tailored support",
-  title: "100% open source. Tailored when you need it.",
-  lede: "Every capability in Classifyre is open source under Apache-2.0 — so your engineers and security teams can inspect code quality directly and run it yourself with zero vendor lock-in. When your organisation needs a custom fit, our team works directly with yours.",
+  marker: "Open source, run by you",
+  title: "100% open source. Yours to run.",
+  lede: "Every capability in Classifyre is open source under Apache-2.0 and runs on your own servers — never multi-tenant SaaS. Install it yourself, with your own team or the integrator you already work with.",
   paths: [
     {
-      label: "Custom IAM, security & organisation design",
-      text: "Aligning Classifyre with complex directory topologies, multi-tenant structures, and internal security or compliance policies.",
+      label: "Evaluating Classifyre",
+      text: "Not sure it fits your sources, identity provider or masking rules? Ask before you install — we'd rather give you an honest answer than have you guess.",
     },
     {
-      label: "Custom data sources & connectors",
-      text: "Building and hardening connectors for industry-specific, legacy, or proprietary internal systems.",
+      label: "Sources and setups we haven't seen",
+      text: "A legacy system, an internal API, an unusual directory structure or an air-gapped cluster — tell us about it. It shapes what we build next.",
     },
     {
-      label: "Delta data products & sharing workflows",
-      text: "Designing governed Delta shared data assets, cross-team publishing approvals, and business dataset request pipelines.",
+      label: "Bugs and feature requests",
+      text: "Open an issue on GitHub so others can follow along, or write to us if you'd rather not post publicly.",
     },
     {
-      label: "Bespoke detectors & domain AI models",
-      text: "Authoring business-specific rules, compliance classifiers, or custom local AI and LLM models tuned to your data.",
+      label: "Security reports",
+      text: "Send vulnerabilities by email with “Security” in the subject instead of opening a public issue.",
     },
   ],
-  tailoringTitle: "Need Classifyre tailored to your organisation?",
+  tailoringTitle: "Questions, or an unusual setup?",
   tailoringLede:
-    "There is no separate enterprise edition with locked features. You can self-host everything yourself or work directly with our engineering team on an individual scope agreed around your infrastructure, security model, and timelines.",
-  ctaPrimary: "Talk to our team",
+    "There is no enterprise edition and no locked features. If you're trying Classifyre and something isn't clear, or your environment looks different from what the docs assume, we're happy to hear from you.",
+  ctaPrimary: "Get in touch",
   ctaSecondary: "Deployment guide",
   ctaShowcase: "Explore live demo",
   ctaBlog: "Read engineering articles",
@@ -549,7 +539,7 @@ const enFaq = {
     },
     {
       q: "What detectors are included, and can we detect business-specific data?",
-      a: "Classifyre ships with ready-made detectors for personal data (including EU, US, and international identifiers) and secrets. Beyond PII, you can define custom business detectors ranging from fast regex patterns and Python checks to lightweight on-CPU AI models (such as GLiNER2 and text or image classifiers), decision models, and LLMs — including self-hosted models.",
+      a: "Classifyre ships with ready-made detectors for personal data (including EU, US, and international identifiers) and secrets. Beyond PII, you can define custom business detectors ranging from fast regex patterns and Python checks to lightweight on-CPU zero-shot AI extraction and classification models, decision models, and private LLMs.",
     },
     {
       q: "How do teams connect Power BI, Excel, SQL, and ODBC tools?",
@@ -557,7 +547,7 @@ const enFaq = {
     },
     {
       q: "Is there a separate Enterprise edition, or is everything truly open source?",
-      a: "Everything is open source under Apache-2.0 — SSO, roles, row filters, dynamic masking, SQL/BI gateway, shared datasets, audit logging, and the Helm chart. We do not gate security features behind an enterprise tier. Organisations engage us when they want help tailoring Classifyre to their IAM, security design, custom sources, Delta data products, or bespoke detectors.",
+      a: "Everything is open source under Apache-2.0 — SSO, roles, row filters, dynamic masking, SQL/BI gateway, shared datasets, audit logging, and the Helm chart. We do not gate security features behind an enterprise tier or offer multi-tenant SaaS. You run it yourself, with your own team or the integrator you already work with.",
     },
     {
       q: "Where does Classifyre run? Does data ever leave our environment?",

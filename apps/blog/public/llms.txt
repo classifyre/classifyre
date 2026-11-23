@@ -6,13 +6,13 @@ Full technical & comparison reference for AI assistants: [llms-full.txt](https:/
 
 ## Overview
 
-Classifyre is a 100% open-source (Apache-2.0) data governance platform that integrates with the databases, lakehouses (Iceberg, Delta, Parquet), ETL pipelines, and identity provider an organisation already operates. There is no gated enterprise edition: SSO, roles, row-level security, dynamic column masking, SQL/BI gateway, dataset requests, shared data products, audit logging, and the Kubernetes/OpenShift Helm chart are all Apache-2.0.
+Classifyre is a 100% open-source (Apache-2.0), self-hosted data governance platform and BI/AI gateway (never multi-tenant SaaS) that integrates with the databases, lakehouses (Iceberg, Delta, Parquet), ETL pipelines, and identity provider an organisation already operates. There is no gated enterprise edition: SSO, roles, row-level security, dynamic column masking, SQL/BI & MCP gateway, dataset requests, shared data products, audit logging, and the Kubernetes/OpenShift Helm chart are all Apache-2.0.
 
-When an organisation wants direct engineering collaboration — custom IAM or security architecture integration, proprietary data sources, Delta data products, or bespoke detectors and AI models — scope and terms are agreed individually at contact@classifyre.com.
+Organisations run Classifyre themselves, with their own team or integrator. Questions about a specific setup are welcome at contact@classifyre.com.
 
 ## Core capabilities
 
-- **Integrate & detect**: Connect 40+ known sources (PostgreSQL, MySQL, Databricks, ODBC, Iceberg, Delta, Parquet, S3/Azure/GCS, Confluence, Jira) or custom connectors in place. Built-in PII & secret packs plus custom business detectors from regex and Python rules to lightweight local CPU AI models (GLiNER2, text/image classifiers) and LLMs.
+- **Integrate & detect**: Connect 40+ known sources (PostgreSQL, MySQL, Databricks, ODBC, Iceberg, Delta, Parquet, S3/Azure/GCS, Confluence, Jira) or custom connectors in place. Built-in PII & secret packs plus custom business detectors from regex and Python rules to lightweight local CPU zero-shot AI extraction/classification models and private LLMs.
 - **Group-based governance**: Syncs with Entra ID, Active Directory, Okta, or any OIDC/SAML directory. Permissions target groups with expiration dates, named owners and stewards, owner-approved access requests, and fail-closed row filters per department or region. Workspace admins do not receive clear personal values by default.
 - **Multi-level column & row masking**: Five column masking modes — redacted, last-four, deterministic hashed pseudonymisation (safe for joins and distinct counts), empty, and hidden — enforced inside the query engine on both original source tables and shared datasets.
 - **Governed SQL, Power BI, Excel & ODBC**: PostgreSQL-compatible TLS endpoint with personal, expiring, revocable connections for Power BI, Excel, Tableau, DBeaver, and ODBC/JDBC tools, plus MCP for AI agents inheriting the user's permissions.
