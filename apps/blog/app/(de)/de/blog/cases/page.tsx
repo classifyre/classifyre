@@ -4,9 +4,9 @@ import { BlogSectionPage } from "@/components/blog-section-page";
 import { getPostsBySection } from "@/lib/posts";
 
 export const metadata: Metadata = {
-  title: "Ermittlungs-Fallakten",
+  title: "Fallakten",
   description:
-    "Beweisgeführte Classifyre-Feldnotizen aus Ermittlungen in echten öffentlichen Datensätzen.",
+    "Praxisnahe Classifyre-Fallbeispiele und Feldnotizen zu echten öffentlichen Datensätzen und Governance-Szenarien.",
   alternates: {
     canonical: "/de/blog/cases/",
     languages: {
@@ -23,8 +23,8 @@ export default async function CaseFilesPageDe() {
   return (
     <BlogSectionPage
       eyebrow="Fallakten"
-      title="Ermittlungen, die Sie prüfen können."
-      description="Feldnotizen aus echten öffentlichen Datensätzen: was Classifyre gefunden hat, welche Fragen es eröffnet hat und wo menschliches Urteil weiterhin zählt."
+      title="Echte Datensätze. Klare Beispiele."
+      description="Konkrete Beispiele mit echten öffentlichen Datensätzen und Governance-Szenarien – Schritt für Schritt nachvollziehbar."
       posts={posts}
       locale="de"
     />

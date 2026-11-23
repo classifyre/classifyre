@@ -16,6 +16,7 @@ import {
   SearchCheck,
   Settings,
   Sun,
+  TerminalSquare,
   type LucideIcon,
 } from "lucide-react";
 import { Img } from "remotion";
@@ -74,9 +75,10 @@ export const PAGE = {
 
 export type Section =
   | "discovery"
-  | "findings"
   | "assets"
+  | "query"
   | "investigations"
+  | "findings"
   | "duplicates"
   | "sources"
   | "detectors"
@@ -91,14 +93,15 @@ const NAV: {
     label: T("nav.group.intelligence"),
     items: [
       { id: "discovery", title: T("nav.dashboard"), icon: LayoutDashboard },
-      { id: "findings", title: T("nav.findings"), icon: SearchCheck },
       { id: "assets", title: T("nav.assets"), icon: FileText },
+      { id: "query", title: T("nav.query"), icon: TerminalSquare },
     ],
   },
   {
     label: T("nav.group.casework"),
     items: [
       { id: "investigations", title: T("nav.investigations"), icon: Search },
+      { id: "findings", title: T("nav.findings"), icon: SearchCheck },
       { id: "duplicates", title: T("nav.fingerprints"), icon: Fingerprint },
     ],
   },

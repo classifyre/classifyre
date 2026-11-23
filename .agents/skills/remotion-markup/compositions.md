@@ -17,12 +17,17 @@ Programmatic registration is suitable when the generated compositions are
 intentionally controlled as one source template and do not need to be
 reordered, duplicated, deleted or edited individually in the Studio.
 
-```tsx
+```tsx title="src/MyComposition.tsx"
 type Props = {
   readonly title: string;
 };
 
 export const MyComposition = ({title}: Props) => <h1>{title}</h1>;
+```
+
+```tsx title="src/Root.tsx"
+import {Composition} from 'remotion';
+import {MyComposition} from './MyComposition';
 
 export const RemotionRoot = () => {
   return (
@@ -62,48 +67,46 @@ Use `defaultProps` for composition-wide values that should be visible and editab
 Keep data owned by a child editor on that child's JSX node. For example,
 captions that should remain editable in the Caption editor belong as an inline
 array on `<BasicCaptions>`, not in composition `defaultProps` or a component
-prop. See Displaying captions.
+prop. See Displaying captions (`display-captions.md` in the `remotion-captions` skill).
 
 For Studio editing, keep `defaultProps` as an inline object literal on `<Composition>` or `<Still>`.
 Keep values that should be written back directly in the object instead of deriving them from a loop variable.
 Do not store it in a variable, import it, spread it, create it with a helper, or wrap it in `satisfies`.
-When scaffolding, keep the component and `<Composition>` registration in the same file so `width`, `height`, `fps`, `durationInFrames`, and `defaultProps` are visible next to the code that uses them.
 Use `type` declarations for props rather than `interface` to ensure `defaultProps` type safety.
 
-```tsx
-type Props = {
-  readonly title: string;
-};
-
-export const MyComposition = ({ title }: Props) => (
-  <h1>
-    {title}
-  </h1>
-);
+```tsx title="src/Root.tsx"
+import {Composition} from 'remotion';
+import {MyComposition} from './MyComposition';
 
 const defaultProps = { title: "Hello World" };
 
-// 👍 Inline metadata and defaults
-<Composition
-  id="MyComposition"
-  component={MyComposition}
-  durationInFrames={100}
-  fps={30}
-  width={1080}
-  height={1080}
-  defaultProps={{ title: "Hello World" }}
-/>;
+export const RemotionRoot = () => {
+  return (
+    <>
+      {/* 👍 Inline metadata and defaults */}
+      <Composition
+        id="MyComposition"
+        component={MyComposition}
+        durationInFrames={100}
+        fps={30}
+        width={1080}
+        height={1080}
+        defaultProps={{ title: "Hello World" }}
+      />
 
-// 👎 Hidden defaults cannot be saved back by Studio
-<Composition
-  id="OtherComposition"
-  component={MyComposition}
-  durationInFrames={100}
-  fps={30}
-  width={1080}
-  height={1080}
-  defaultProps={defaultProps}
-/>;
+      {/* 👎 Hidden defaults cannot be saved back by Studio */}
+      <Composition
+        id="OtherComposition"
+        component={MyComposition}
+        durationInFrames={100}
+        fps={30}
+        width={1080}
+        height={1080}
+        defaultProps={defaultProps}
+      />
+    </>
+  );
+};
 ```
 
 ## Folders
@@ -111,7 +114,7 @@ const defaultProps = { title: "Hello World" };
 Use `<Folder>` to organize compositions in the sidebar.  
 Folder names can only contain letters, numbers, and hyphens.
 
-```tsx
+```tsx title="src/Root.tsx"
 import { Composition, Folder } from "remotion";
 
 export const RemotionRoot = () => {
@@ -136,7 +139,7 @@ export const RemotionRoot = () => {
 
 Use `<Still>` for single-frame images. It does not require `durationInFrames` or `fps`.
 
-```tsx
+```tsx title="src/Root.tsx"
 import { Still } from "remotion";
 import { Thumbnail } from "./Thumbnail";
 

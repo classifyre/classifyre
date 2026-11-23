@@ -1,4 +1,5 @@
 import { getInputProps, Html5Audio, Sequence, useCurrentFrame } from "remotion";
+import { Fyre2DActor, type Fyre2DCue } from "./mascot-2d";
 import { MrFyreActor, type FyreCue } from "./mr-fyre";
 import { captionParts, type SceneCue } from "./narration";
 import { during } from "./timing";
@@ -75,7 +76,20 @@ export function Bed({ src, volume = 0.8 }: { src: string; volume?: number }) {
   return <Html5Audio src={src} volume={volume} />;
 }
 
-/** Mr. Fyre as the narrator: `MrFyreActor`, unless the render asked for the product alone. */
+/** Legacy 3D Blender Mr. Fyre narrator, hidden when `--props='{"fyre":false}'`. */
 export function Narrator({ cues }: { cues: FyreCue[] }) {
   return asked.fyre === false ? null : <MrFyreActor cues={cues} />;
+}
+
+/** Hand-drawn 2D Procreate Mr. Fyre narrator, hidden when `--props='{"fyre":false}'`. */
+export function MascotNarrator({
+  cues,
+  bounce = true,
+}: {
+  cues: Fyre2DCue[];
+  bounce?: boolean;
+}) {
+  return asked.fyre === false ? null : (
+    <Fyre2DActor cues={cues} bounce={bounce} />
+  );
 }

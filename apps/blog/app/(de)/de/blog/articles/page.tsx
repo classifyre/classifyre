@@ -6,7 +6,7 @@ import { getPostsBySection } from "@/lib/posts";
 export const metadata: Metadata = {
   title: "Blog",
   description:
-    "Ideen von Classifyre über Ermittlungsarbeit, Beweise und wie aus verstreuten Daten bessere Entscheidungen werden.",
+    "Praxisnahe Artikel von Classifyre zu Zugriffssteuerung, Datenmaskierung, Datenqualität und selbst betriebenem Self-Service.",
   alternates: {
     canonical: "/de/blog/articles/",
     languages: {
@@ -23,8 +23,8 @@ export default async function BlogArticlesPageDe() {
   return (
     <BlogSectionPage
       eyebrow="Blog"
-      title="Bessere Fragen. Klarere Beweise. Stärkere Entscheidungen."
-      description="Ideen für Führungskräfte und Ermittlungsteams, die verstreute Organisationsdaten in Beweise verwandeln wollen, die sie verstehen und nach denen sie handeln können."
+      title="Klare Regeln. Maskierte Daten. Sicherer Zugriff."
+      description="Praxisnahe Artikel für Daten-, IT- und Sicherheitsteams: Zugriff nach Rollen steuern, sensible Daten maskieren und geprüfte Datensätze sicher teilen."
       posts={posts}
       locale="de"
     />

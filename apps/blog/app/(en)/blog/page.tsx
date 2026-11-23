@@ -9,7 +9,7 @@ import { getAllPosts } from "@/lib/posts";
 export const metadata: Metadata = {
   title: "Blog and case files",
   description:
-    "Notes from Classifyre on investigation work and evidence-led case files from real public-data investigations.",
+    "Practical guides on self-hosted data governance, access control, masking, and data products, plus hands-on case files.",
   alternates: { canonical: "/blog" },
 };
 
@@ -39,8 +39,8 @@ export default async function BlogOverviewPage() {
             Blog
           </h1>
           <p className="mt-2 max-w-2xl text-base leading-7 text-muted-foreground">
-            Notes on investigation work, plus case files from real public
-            datasets.
+            Practical guides on data governance, access control, masking, and
+            data products — plus hands-on case files.
           </p>
         </div>
         <nav aria-label="Blog sections" className="flex gap-2">

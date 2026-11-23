@@ -6,7 +6,7 @@ import { getPostsBySection } from "@/lib/posts";
 export const metadata: Metadata = {
   title: "Blog",
   description:
-    "Ideas from Classifyre about investigation work, evidence, and turning scattered data into better decisions.",
+    "Practical guides from Classifyre on data access governance, dynamic masking, data quality, and self-hosted analytics.",
   alternates: { canonical: "/blog/articles" },
 };
 
@@ -16,8 +16,8 @@ export default async function BlogArticlesPage() {
   return (
     <BlogSectionPage
       eyebrow="Blog"
-      title="Better questions. Clearer evidence. Stronger decisions."
-      description="Ideas for leaders and investigation teams working to turn scattered organizational data into evidence they can understand and act on."
+      title="Clear rules. Masked data. Safe self-service."
+      description="Practical guides for data, IT, and security teams on controlling access by role, masking sensitive data, and sharing governed datasets."
       posts={posts}
     />
   );

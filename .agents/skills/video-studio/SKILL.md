@@ -1,83 +1,66 @@
 ---
 name: video-studio
-description: Make, edit, preview or render a Classifyre product video in the monorepo's Remotion studio (apps/studio). Use whenever asked to turn a scenario, script or storyboard into a video, to animate or film product UI, to change an existing video under apps/studio/videos, or to render/export one. Covers where videos live, how they reuse @workspace/ui components and the product theme, and the rules that keep renders deterministic.
+description: Make, edit, preview, or render a Classifyre product video in the monorepo's Remotion studio (apps/studio), and prepare its companion YouTube sheet and EN/DE blog post. Use whenever asked to turn a scenario, script, or storyboard into a video, animate or capture product UI, update a video under apps/studio/videos, or render/export one.
 ---
 
 # Video studio
 
-`apps/studio` is a Remotion app inside the monorepo so that videos import the
-product's real components, theme, fonts, logo and mascot. Read
-`apps/studio/README.md` first — it is the committed source of truth for layout,
-commands and rules. This file is the working procedure.
+`apps/studio` is a Remotion app inside the monorepo so videos reuse Classifyre's real UI components, theme, fonts, logo, and mascot (Mr. Fyre).
 
-For a narrated product video (Mr. Fyre telling a use case, the kind that ends
-up on YouTube with a blog post next to it) read `apps/studio/PLAYBOOK.md` as
-well, before writing anything: it is the house style and the whole pipeline,
-from script and voice to export, subtitles, upload sheet and blog post. Start
-from the kit it describes (`Desktop`, `Browser`, `Cursor`, `Camera`,
-`AppShell`, `FilmBoard`, `cut`, `Captions`, `Narrator`, `Chip`/`Headline`, and
-the paper table in `src/kit/paper`) rather than drawing a laptop, a caption, a
-title card or a sheet of paper again, and from the tools in
-`apps/studio/tools/` (voice, its two checks, the music bed, subtitles, the
-export) rather than writing a one-off script.
+Read these two files before writing code or copy:
 
-For Remotion itself (sequencing, transitions, audio, captions, API lookups) use
-the `remotion-best-practices` skill and its references. Where they say to
-scaffold a project or run `npx remotion ...`, do not: the project exists, and
-the commands here are `bun run studio` / `bun run studio:render <id>`.
+1. `apps/studio/README.md` — layout, commands, kit overview, and rendering rules.
+2. `apps/studio/PLAYBOOK.md` — product positioning (data governance), simple/clear writing style, Mr. Fyre voice and visual guidelines, full video pipeline, YouTube packaging, and companion EN/DE blog post guidelines.
 
-## From scenario to video
+## Product focus and tone
 
-1. Save the scenario verbatim as `apps/studio/videos/<name>/scenario.md`.
-   `videos/` and `out/` are gitignored on purpose — never `git add -f` them.
-2. Break it into scenes with a frame budget each (30 fps). State the budget back
-   to the user in one short table before building anything long.
-3. Find the real components for what each scene shows:
-   `packages/ui/src/components/` first, then `packages/case-board`, then
-   `apps/web/components`. Import them. A component that lives only in
-   `apps/web` or `apps/blog` and takes everything it needs as props is
-   imported where it lives, through `apps/studio/src/borrow/` (its README says
-   how). One that fetches its own data or needs the router cannot be: say so,
-   and ask before moving its drawing part into `packages/ui`. If the answer is
-   to go ahead without that, build the page from the same `@workspace/ui`
-   parts with the app's own wording and class names, and list in the hand-over
-   which screens were built that way.
-4. Write `apps/studio/videos/<name>/video.tsx` default-exporting
-   `defineVideo({ id, component, durationInFrames })`. One file per scene once
-   there are more than two or three.
-5. Open the preview (`studio` configuration in `.claude/launch.json`, or
-   `bun run studio`) so the user can watch and steer.
-6. Check your own work with stills before saying it is done, and look at them:
-   `bun run --cwd apps/studio still <id> out/<id>-<frame>.png --frame=<n>`
-   at one frame per scene plus one mid-transition.
-7. Render only when asked: `bun run studio:render <id>` → `apps/studio/out/<id>.mp4`.
-   For YouTube: `sh apps/studio/tools/youtube.sh <id>` (1080p and 4K, sound
-   levelled). After stopping a render by hand, `pkill -9 -f chrome-headless-shell`:
-   its browsers outlive it and take the machine with them.
+Classifyre is a self-hosted, open-source **data governance platform** (Apache-2.0). Videos and blog posts focus on practical data governance work:
 
-## Rules
+- **Access by organisation:** syncing Entra ID / AD / Keycloak groups, setting roles, row filters, and expiring grants (admins do not get clear data by default).
+- **Dynamic column masking:** masking PII inside the query engine (redacted, last four, deterministic hash, empty, hidden) so `WHERE` and `JOIN` cannot leak hidden values.
+- **Governed BI, SQL, and AI access:** personal, expiring TLS connections for Power BI, Excel, Tableau, DBeaver, browser SQL workbench, and MCP AI agents — replacing shared passwords and emailed CSVs.
+- **Governed data assets, quality, and data products:** owners, stewards, Draft → Certified lifecycle, scheduled quality checks, ODCS v3.2 contracts, live/Delta shared datasets, and usage analytics.
+- **Cross-source queries in place:** joining databases, lakehouses, files, search/graph, and custom legacy connectors without migration.
+- **Closed-loop leak cases (optional):** used when a topic is specifically about exposed PII, leaked secrets, shadow duplicates, or failing quality rules — not as the default framing for every video.
 
-- Every scene is wrapped in `Stage` (theme + fonts). Product UI goes inside
-  `Viewport` so it is legible at 1080p without restyling.
-- Motion comes from the frame: the kit's `Rise`, `Pop`, `useEnter`, `useCount`,
-  or `interpolate`/`spring`. CSS transitions, `animate-*` utilities and hover
-  states do not render.
-- Data is fixed. No `Date.now()`, no `Math.random()`; write the fixture in the
-  video file. `packages/ui/src/mocks` is stale in places (lower-case source
-  types, dates relative to now) — do not spread it into components unchecked.
-- Radix overlays portal outside the `Stage` and lose theme and fonts; pass a
-  `container` inside the stage or render the open state inline.
-- A motion helper needed by more than one video belongs in `src/kit/`
-  (committed); anything specific to one video stays in its folder.
-- Check every claim a narration makes against the docs and the code before it
-  is spoken, and render a check reel of the whole video before saying it is
-  done (`PLAYBOOK.md`, "From scenario to upload").
-- After touching `src/`, run `bun run --cwd apps/studio lint` and
-  `bun run --cwd apps/studio check-types`, and re-render `ReuseCheck`.
+Writing and narration rules:
+
+- **Keep language simple and clear.** Use short sentences, plain everyday words, and concrete examples. Avoid fancy, poetic, or salesy phrasing.
+- **Keep Mr. Fyre as presenter.** Calm, steady, helpful technical guide — not a noir detective running a case.
+- **No forced "what it does not do" closer.** Be accurate and transparent (label demo data, verify claims against code and docs), and mention scope only when it actually helps the viewer. End on the practical takeaway or next step.
+
+## Using the kit and Remotion skills
+
+- Reuse `apps/studio/src/kit/` (`Desktop`, `Browser`, `Cursor`, `Camera`, `AppShell`, `FilmBoard`, `cut`, `Captions`, `MascotNarrator`/`Fyre2D`/`Fyre2DActor`, `Chip`/`Headline`, and `src/kit/paper`) instead of rebuilding frames, laptops, captions, or callouts. Prefer `MascotNarrator` (`mascot/poses/*.png`, 26 hand-drawn Procreate poses, zero Blender needed) and check the pose selection guide in `apps/studio/PLAYBOOK.md` (Section 6).
+- Reuse `apps/studio/tools/` (`voice.ts`, `hear.ts`, `stops.ts`, `bed.sh`, `loop.sh`, `subtitles.ts`, `youtube.sh`) instead of writing one-off scripts.
+- Use `remotion-best-practices` and its sibling `remotion-*` skills for Remotion APIs, timing, transitions, audio, and rendering. Ignore any advice to scaffold a new project or run `npx remotion ...` directly; use `bun run studio` / `bun run studio:render <id>` (or `bun run --cwd apps/studio ...`).
+
+## Workflow: from scenario to video
+
+1. **Save the scenario** verbatim as `apps/studio/videos/<name>/scenario.md`. (`videos/` and `out/` are gitignored — never `git add -f` them.)
+2. **Plan the scenes and length.** Break the scenario into scenes with a frame budget (30 fps) and check word count (~140 words/minute with pauses). Share a short scene table with the user before building anything long.
+3. **Choose how each screen is built** (in this order):
+   - Import directly from `packages/ui/src/components/` (and `packages/case-board` when showing cases).
+   - Borrow prop-driven components from `apps/web` or `apps/blog` through `apps/studio/src/borrow/` (see `src/borrow/README.md`).
+   - Capture real running app screens with Playwright (`film/shots/capture.mjs`) for read-only or step-by-step workflow pages — fast, zero UI drift, and easy to overlay marks on.
+   - Only rebuild a page from `@workspace/ui` + `T()` (`src/kit/app-shell`) when interactive typing or animation inside the page is required (and list those screens in your hand-over).
+4. **Create `apps/studio/videos/<name>/video.tsx`** default-exporting `defineVideo({ id, component, durationInFrames })`. Split scenes into `scenes/*.tsx` once there are more than two or three.
+5. **Open the preview** (`studio` config in `.claude/launch.json` or `bun run studio`) so the user can review and steer.
+6. **Inspect stills and a check reel** before calling the video done:
+   - Take stills (`bun run --cwd apps/studio still <id> out/<id>-<frame>.png --frame=<n>`) at the end of each scene plus mid-transition.
+   - Render a low-res check reel (`--every-nth-frame=15 --scale=0.25 --muted`) and inspect contact sheets for layout overlaps or errors.
+7. **Render when asked:** `bun run studio:render <id>` → `apps/studio/out/<id>.mp4`, or `sh apps/studio/tools/youtube.sh <id> 1080p` first, inspect and check audio levels, then `4k`. If you stop a render manually, run `pkill -9 -f chrome-headless-shell` so stray browser processes do not linger.
+
+## Technical rules
+
+- Wrap every scene in `Stage` (supplies theme and fonts). Put product UI inside `Viewport` so it stays readable at 1080p without restyling.
+- Drive all animation from the frame (`Rise`, `Pop`, `useEnter`, `useCount`, `glide`, `interpolate`, `spring`). CSS transitions, `animate-*` classes, and `:hover` states do not render reliably.
+- Keep all data fixed and deterministic. Never use `Date.now()` or `Math.random()`. Do not spread stale `packages/ui/src/mocks` unchecked.
+- Radix overlays portal outside `Stage` and lose theme/fonts; pass a `container` inside `Stage` or render the open state inline.
+- Put helpers shared by multiple videos in `src/kit/` (committed); keep single-video assets and fixtures inside `videos/<name>/`.
+- Verify every product claim against both docs and code before generating voiceover.
+- After editing anything in `apps/studio/src/`, run `bun run --cwd apps/studio lint`, `bun run --cwd apps/studio check-types`, and re-render `ReuseCheck`.
 
 ## Licence boundary
 
-Free Remotion core only (`remotion`, `@remotion/cli`, `transitions`,
-`google-fonts`, `tailwind-v4`, and other free `@remotion/*` packages at the same
-pinned version). Do not add Editor Starter or other paid products, and keep all
-`@remotion/*` versions identical and exact (no `^`).
+Use free Remotion core packages only (`remotion`, `@remotion/cli`, `@remotion/transitions`, `@remotion/google-fonts`, `@remotion/tailwind-v4`, `@remotion/eslint-plugin`, and other free core packages). Do not add Editor Starter, Lambda, or other paid Remotion products. Keep every `remotion` and `@remotion/*` version identical and exact (no `^`).

@@ -9,7 +9,7 @@ import { getAllPosts } from "@/lib/posts";
 export const metadata: Metadata = {
   title: "Blog und Fallakten",
   description:
-    "Notizen von Classifyre über Ermittlungsarbeit und beweisgeführte Fallakten aus echten Public-Data-Ermittlungen.",
+    "Praxisnahe Artikel zu selbst betriebener Data Governance, Zugriffssteuerung, Datenmaskierung und Datenprodukten sowie konkrete Fallbeispiele.",
   alternates: {
     canonical: "/de/blog/",
     languages: {
@@ -46,8 +46,8 @@ export default async function BlogOverviewPageDe() {
             Blog
           </h1>
           <p className="mt-2 max-w-2xl text-base leading-7 text-muted-foreground">
-            Notizen über Ermittlungsarbeit, plus Fallakten aus echten
-            öffentlichen Datensätzen.
+            Praxisnahe Artikel zu Data Governance, Zugriffssteuerung,
+            Datenmaskierung und Datenprodukten – plus konkrete Fallbeispiele.
           </p>
         </div>
         <nav aria-label="Blog-Rubriken" className="flex gap-2">

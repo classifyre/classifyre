@@ -3,6 +3,7 @@ export * from "./desktop";
 export * from "./dom";
 export * from "./fonts";
 export * from "./lettering";
+export * from "./mascot-2d";
 export * from "./motion";
 export * from "./mr-fyre";
 export * from "./narration";
