@@ -133,7 +133,9 @@ ENV UV_LINK_MODE=copy \
 # and the table readers use are downloaded here too, into a read-only directory
 # the CLI loads from before it tries the shared extension cache or INSTALL.
 # ODBC is in the same list: pyodbc (group `odbc`) and DuckDB's ODBC scanner, which
-# DuckDB publishes only in its nightly repository (`INSTALL odbc FROM core_nightly`).
+# is in the core repository (`INSTALL odbc_scanner`). It used to come from
+# `core_nightly`, which only holds the current nightly's version: that 403'd the
+# release build the day DuckDB moved on (v2.0.1).
 # The clients of every source a query can read (src/query/connectors/__init__.py,
 # _SOURCE_GROUPS) are baked in for the same reason, and so that the query worker
 # runs with installing turned off on a read-only root filesystem: a query never
@@ -150,8 +152,7 @@ RUN uv venv --python /usr/local/bin/python3 .venv \
     && UV_COMPILE_BYTECODE=1 uv sync --locked --no-dev $(printf -- '--group %s ' ${CLI_BAKED_GROUPS}) \
     && printf '%s\n' ${CLI_BAKED_GROUPS} | .venv/bin/python -c "import json, sys; json.dump(sorted(sys.stdin.read().split()), open('.venv/.classifyre-uv-sync-groups.json', 'w'))" \
     && .venv/bin/python -m compileall -q -j 0 src \
-    && .venv/bin/python -c "import duckdb; c = duckdb.connect(); c.execute(\"SET extension_directory = '/opt/duckdb-extensions'\"); [c.execute('INSTALL ' + e) for e in ('httpfs', 'postgres', 'mysql', 'sqlite', 'delta', 'iceberg', 'ducklake', 'azure', 'avro', 'excel', 'unity_catalog', 'spatial')]" \
-    && .venv/bin/python -c "import duckdb; c = duckdb.connect(); c.execute(\"SET extension_directory = '/opt/duckdb-extensions'\"); c.execute('INSTALL odbc FROM core_nightly')"
+    && .venv/bin/python -c "import duckdb; c = duckdb.connect(); c.execute(\"SET extension_directory = '/opt/duckdb-extensions'\"); [c.execute('INSTALL ' + e) for e in ('httpfs', 'postgres', 'mysql', 'sqlite', 'delta', 'iceberg', 'ducklake', 'azure', 'avro', 'excel', 'unity_catalog', 'spatial', 'odbc_scanner')]"
 
 # ── web-final: standalone Next.js server ──────────────────────────────────────
 FROM node:${NODE_VERSION}-bookworm-slim AS web-final

@@ -1,1 +1,0 @@
-SQL connections refuse cursor statements over your tables that they cannot serve (scrollable cursors, reading backward, cursors sent as prepared statements) with a clear error, instead of answering them with no rows; cursors now end with their transaction as in PostgreSQL, and one connection can hold at most eight open at once.

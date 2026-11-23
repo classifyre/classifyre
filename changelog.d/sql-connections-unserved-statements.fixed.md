@@ -1,1 +1,0 @@
-SQL connections refuse statements over your tables they cannot answer, such as PREPARE/EXECUTE, CREATE TABLE … AS, COPY … TO and DO blocks, instead of answering them with no rows; behind a load balancer, the limit on connections signing in now applies to each client rather than to everyone behind the same proxy.

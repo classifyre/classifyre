@@ -30,7 +30,7 @@
     },
     {
       "name": "boto3",
-      "version": "1.44.6",
+      "version": "1.44.9",
       "modules": [
         "boto3"
       ],
@@ -84,7 +84,7 @@
     },
     {
       "name": "duckdb",
-      "version": "2.0.0",
+      "version": "2.0.1",
       "modules": [
         "duckdb"
       ],
@@ -119,7 +119,7 @@
     },
     {
       "name": "google-auth",
-      "version": "2.62.2",
+      "version": "2.63.1",
       "modules": [
         "google.auth"
       ],
@@ -190,7 +190,7 @@
     },
     {
       "name": "litellm",
-      "version": "1.110.1",
+      "version": "1.110.2",
       "modules": [
         "litellm"
       ],
@@ -243,7 +243,7 @@
     },
     {
       "name": "pdfplumber",
-      "version": "0.11.10",
+      "version": "0.11.11",
       "modules": [
         "pdfplumber"
       ],
@@ -350,7 +350,7 @@
     },
     {
       "name": "pymongo",
-      "version": "4.20.0",
+      "version": "4.20.1",
       "modules": [
         "pymongo"
       ],
@@ -439,7 +439,7 @@
     },
     {
       "name": "slack-sdk",
-      "version": "3.47.0",
+      "version": "3.48.0",
       "modules": [
         "slack_sdk"
       ],

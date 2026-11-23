@@ -133,6 +133,14 @@ iam:
 # fails without them): the VPS is a single-node k3s, with k3s's default pod
 # and service networks.
 queryWorker:
+  # Shared-node diet, requests only (limits stay at the chart default): the
+  # chart's 2Gi / 500m request is what the scheduler counts, and next to prod
+  # it left the smoke scan's extract job Pending for good. An idle warm worker
+  # holds about 400Mi.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
   networkPolicy:
     clusterCidrs:
       - 10.42.0.0/16

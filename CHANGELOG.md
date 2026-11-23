@@ -5,6 +5,31 @@ compiled at release time from per-PR fragments in `changelog.d/` (see
 `changelog.d/README.md`). Commit messages and PR titles are never used as
 release notes.
 
+## [0.9.1] - 2026-11-22
+
+### Added
+
+- Custom sources can now be queried with SQL: a notebook that defines `tables()` and `scan(table, request)` gets its tables in the SQL catalog, read live from its API on each query, with row filters and audit applied as for every other table. Columns the notebook declares as personal or secret (`Table(classify=...)`) are masked or hidden by default, `ScanRefusedError` tells people which condition a table needs, and such queries always run as a Job of their own, never in the shared query worker.
+- Meilisearch indexes and Neo4j node labels and relationship types can now be queried with SQL and joined with any other table: they are read live through the source's own API, filters are sent to the source where it can apply them, and the SQL page shows how many requests and rows each live table took.
+
+### Changed
+
+- Scan Meilisearch and Neo4j sources again after upgrading: scans now record an index's or label's columns, and list each Neo4j relationship type as an asset of its own, which SQL needs before it can read them.
+- SQL connections now refuse writes and definitions (INSERT, UPDATE, DELETE, MERGE, CREATE, COPY, DO blocks and the like) with a read-only error before they run: a SQL connection only reads, and such statements could only ever answer with empty results there.
+- SQL queries (the SQL page, exports, MCP and SQL connections from BI tools) answer in about a second instead of five to ten: a warm query worker runs each query in its own process instead of starting a Kubernetes Job for it, and a query it has no room for still runs as a Job. The Helm chart deploys it by default (`queryWorker`), sizes its slots from the pod's memory and scales it on CPU. Queries of different workspaces share it safely: each query sees only its own sources' credentials and files, the worker runs on a read-only file system behind its own network policy, one query that runs out of memory fails alone, and each workspace has its own share (`queryWorker.maxActivePerWorkspace`, `queryWorker.maxOverflowJobsPerWorkspace`). One person may now run up to 100 queries at once instead of 3 (`queryWorker.maxActivePerPerson`); without the worker the limit is 20. Queries over ODBC sources still run as Jobs.
+
+### Fixed
+
+- A link to a tab that appears only once your permissions have loaded, such as Settings → Access, now opens that tab instead of sometimes falling back to the first one.
+- Date and timestamp conditions sent to a live source now show on the SQL page as SQL writes them (`day >= DATE '2026-11-20'`), not as a bare date.
+- SQL connections refuse cursor statements over your tables that they cannot serve (scrollable cursors, reading backward, cursors sent as prepared statements) with a clear error, instead of answering them with no rows; cursors now end with their transaction as in PostgreSQL, and one connection can hold at most eight open at once.
+- When the SQL gateway is short of memory it now refuses new connections as busy, so tools retry, instead of being restarted and dropping every open connection.
+- Metabase's query builder (table previews, filters, groupings and joins) now works over SQL connections; before, it failed with "Referenced table not found".
+- Metabase and other BI tools that open several connections at once can now connect through SQL connections; before, every connection after the first was refused with "Another sign-in from here is under way".
+- Excel, Power BI and other tools using the PostgreSQL ODBC driver with "Use Declare/Fetch" turned on now get the rows of their queries; before, they received empty results.
+- Results read page by page over SQL connections, such as Metabase downloads and DBeaver or Tableau with a fetch size, now arrive in full; before, they could silently stop after the first page.
+- SQL connections refuse statements over your tables they cannot answer, such as PREPARE/EXECUTE, CREATE TABLE … AS, COPY … TO and DO blocks, instead of answering them with no rows; behind a load balancer, the limit on connections signing in now applies to each client rather than to everyone behind the same proxy.
+
 ## [0.9.0] - 2026-11-19
 
 ### Added

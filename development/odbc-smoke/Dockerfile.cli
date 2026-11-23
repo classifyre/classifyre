@@ -16,6 +16,6 @@ RUN apt-get update \
 # never a failure). The real image gets it from the lock (root Dockerfile).
 WORKDIR /app/apps/cli
 RUN uv pip install --python .venv/bin/python "pyodbc>=5.2.0,<6.0.0" \
-    && .venv/bin/python -c "import duckdb; c = duckdb.connect(); c.execute(\"SET extension_directory = '/opt/duckdb-extensions'\"); c.execute('INSTALL odbc FROM core_nightly')" \
+    && .venv/bin/python -c "import duckdb; c = duckdb.connect(); c.execute(\"SET extension_directory = '/opt/duckdb-extensions'\"); c.execute('INSTALL odbc_scanner')" \
     && chown -R 10001:10001 /app /opt/duckdb-extensions
 USER 10001
