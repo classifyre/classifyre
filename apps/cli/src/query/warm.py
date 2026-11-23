@@ -93,6 +93,22 @@ def _other_threads() -> list[str]:
     return others[1:]  # one of them is this thread
 
 
+#: How long to wait for threads that are already ending (DuckDB's background
+#: threads stop asynchronously after the connection closes, and a loaded host
+#: can take a second or two to schedule them out).
+THREAD_SETTLE_SECONDS = 5.0
+
+
+def _settled_other_threads(timeout: float = THREAD_SETTLE_SECONDS, poll: float = 0.05) -> list[str]:
+    """`_other_threads()`, once the threads that are on their way out are gone."""
+    deadline = time.monotonic() + timeout
+    others = _other_threads()
+    while others and time.monotonic() < deadline:
+        time.sleep(poll)
+        others = _other_threads()
+    return others
+
+
 def warm_up() -> dict[str, float]:
     """Run every warm-up step once; return how long each took."""
     if timings:
@@ -152,7 +168,7 @@ def warm_up() -> dict[str, float]:
             _duckdb.default_connection().close()
         except Exception:  # older DuckDB: no default connection to close
             pass
-        others = _other_threads()
+        others = _settled_other_threads()
         if others:
             logger.warning(
                 "Query worker fork server has other threads before forking (%s); "
