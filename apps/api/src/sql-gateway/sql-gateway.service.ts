@@ -1,4 +1,4 @@
-import { roomForSession, sessionMemoryConfig } from './memory-guard';
+import { admitSession, sessionMemoryConfig } from './memory-guard';
 import { SignInSlots, type SignInTicket } from './sign-in-slots';
 import {
   Inject,
@@ -87,6 +87,8 @@ const STARTUP_SETTINGS = new Set([
 
 const SWEEP_MS = 30_000;
 const SIGN_IN_MS = 20_000;
+/** How long a sign-in waits for sessions still starting (within SIGN_IN_MS). */
+const SESSION_START_WAIT_MS = 10_000;
 /**
  * A socket must have sent its startup packet (after TLS, if any) by then: a
  * socket that stalls before it holds a sign-in slot others need (re-review
@@ -760,17 +762,27 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
     const row = found.row;
     // Counted before the session's PGlite starts (about a second): sign-ins
     // racing each other would all pass a check of the live sessions alone.
-    const opening = [...this.opening.values()];
-    if (
-      this.live.size + opening.length >= config.maxSessions ||
-      !roomForSession(
-        process.memoryUsage().rss,
-        opening.length,
-        this.sessionMemory,
-      )
-    ) {
-      throw new Refusal('53300', 'The SQL gateway is busy; try again shortly.');
+    // Sessions still starting are reserved at their peak; a sign-in that
+    // only they keep out waits for them to settle (admitSession).
+    const waitUntil = Date.now() + SESSION_START_WAIT_MS;
+    for (;;) {
+      const decision = admitSession({
+        rss: process.memoryUsage().rss,
+        starting: this.opening.size,
+        live: this.live.size,
+        maxSessions: config.maxSessions,
+        limits: this.sessionMemory,
+      });
+      if (decision === 'open') break;
+      if (decision === 'busy' || Date.now() >= waitUntil || socket.destroyed) {
+        throw new Refusal(
+          '53300',
+          'The SQL gateway is busy; try again shortly.',
+        );
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
+    const opening = [...this.opening.values()];
     if (
       [...this.live.values()].filter((l) => l.connectionId === row.id).length +
         opening.filter((id) => id === row.id).length >=

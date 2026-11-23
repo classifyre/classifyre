@@ -118,6 +118,11 @@ class QueryBinding(ABC):
     #: (``uv sync --group``); the query worker installs them before it forks
     #: a query, so no query syncs the environment under another.
     dependency_groups: ClassVar[tuple[str, ...]] = ()
+    #: The reader cannot work with DuckDB's ``enable_external_access`` off
+    #: (``odbc_scanner`` refuses every connection then). The session leaves it
+    #: on for such a query and locks everything else; it runs only in a Job,
+    #: never in the shared query worker (``DEFAULT_JOB_ONLY_SOURCES``).
+    needs_external_access: ClassVar[bool] = False
 
     def __init__(self, source: SourceContext) -> None:
         self.source = source

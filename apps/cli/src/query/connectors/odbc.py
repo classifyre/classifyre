@@ -17,6 +17,10 @@ from .base import QueryBinding, SourceContext, TableLocation
 
 class OdbcBinding(QueryBinding):
     tier = "extension"
+    # odbc_scanner opens no connection with external access off, not even
+    # through a handle made before: "ODBC connections cannot be opened when
+    # external access is disabled".
+    needs_external_access = True
 
     def __init__(self, source: SourceContext) -> None:
         super().__init__(source)

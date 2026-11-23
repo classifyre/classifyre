@@ -41,3 +41,25 @@ export function roomForSession(
   if (!limits.ceiling) return true;
   return rss + (starting + 1) * limits.perSession <= limits.ceiling;
 }
+
+/**
+ * Whether a signed-in client gets its session now, after the sessions still
+ * starting have settled, or not at all (53300).
+ *
+ * A session still starting is reserved at `perSession` (its peak under a BI
+ * tool's sync); once started it is counted by what the pod really holds,
+ * usually far less. Refusing a sign-in only because others are still starting
+ * broke every BI dashboard: it opens its pool's sessions at once, and JDBC
+ * pools do not retry 53300. Such a sign-in waits for them instead.
+ */
+export function admitSession(input: {
+  rss: number;
+  starting: number;
+  live: number;
+  maxSessions: number;
+  limits: SessionMemory;
+}): 'open' | 'wait' | 'busy' {
+  if (input.live + input.starting >= input.maxSessions) return 'busy';
+  if (roomForSession(input.rss, input.starting, input.limits)) return 'open';
+  return input.starting > 0 ? 'wait' : 'busy';
+}

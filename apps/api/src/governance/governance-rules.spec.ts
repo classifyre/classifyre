@@ -336,6 +336,28 @@ describe('column classification (GOV R6)', () => {
     );
   });
 
+  it('classifies European national ids as sensitive, like US ones (GOV §5)', () => {
+    for (const type of [
+      'AT_SVNR',
+      'DE_TAX_ID',
+      'CH_AHV',
+      'PL_PESEL',
+      'FI_PERSONAL_IDENTITY_CODE',
+      'ES_NIF',
+      'ES_NIE',
+      'IT_FISCAL_CODE',
+      'IT_PASSPORT',
+      'IT_IDENTITY_CARD',
+      'EU_NATIONAL_ID',
+    ]) {
+      expect(deriveClassification([group('PII', type)])).toBe('sensitive');
+    }
+    // Company and vehicle registrations are not a person's identifier.
+    for (const type of ['IT_VAT_CODE', 'AU_ABN', 'SG_UEN']) {
+      expect(deriveClassification([group('PII', type)])).toBe('personal');
+    }
+  });
+
   it('counts a column reviewed only when findings classify it', () => {
     expect(
       classificationReviewed([

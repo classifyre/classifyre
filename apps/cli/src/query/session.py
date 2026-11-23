@@ -43,6 +43,9 @@ DEFAULT_TIMEOUT_SECONDS = 120
 
 #: URL schemes a query's views may read once the session is locked down
 #: (:meth:`QuerySession._lock_down`); each source's secret scopes what it reaches.
+#: Set in every query process of the shared query worker (``worker._harden``).
+SHARED_HOST_ENV = "CLASSIFYRE_QUERY_SHARED_HOST"
+
 REMOTE_PREFIXES = (
     "s3://",
     "s3a://",
@@ -408,7 +411,22 @@ class QuerySession:
         conn.execute(f"SET allowed_directories = {_sql_list(sorted(set(allowed)))}")
         if allowed_files:
             conn.execute(f"SET allowed_paths = {_sql_list(sorted(set(allowed_files)))}")
-        conn.execute("SET enable_external_access = false")
+        external = sorted(
+            alias for alias, binding in self._bindings.items() if binding.needs_external_access()
+        )
+        if not external:
+            conn.execute("SET enable_external_access = false")
+        elif os.environ.get(SHARED_HOST_ENV):
+            # The worker answers job_only for these sources; never run one
+            # without the file wall in a process that shares its host.
+            raise RuntimeError(
+                f"Sources {', '.join(external)} run only as a Job, not in the query worker."
+            )
+        else:
+            # A Job of its own: the SQL gate (no file or table functions) and
+            # the settings below stay; DuckDB's own file wall cannot, or the
+            # ODBC driver opens no connection.
+            logger.info("external access left on for %s (a Job of its own)", ", ".join(external))
         conn.execute("SET lock_configuration = true")
 
     def _attach_tables_as_views(self, conn: Any, tables: set[TableName]) -> None:

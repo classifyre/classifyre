@@ -406,6 +406,15 @@
       ]
     },
     {
+      "key": "data-consumer",
+      "title": "Data consumer",
+      "scope": "workspace",
+      "capabilities": [
+        "workspace.view",
+        "notification.view"
+      ]
+    },
+    {
       "key": "data-reader",
       "title": "Data reader",
       "scope": "workspace",

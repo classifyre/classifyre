@@ -32,6 +32,8 @@ import { QualityTrendCard } from "@/components/dashboard/quality-trend-card";
 import { WaitingOnYouCard } from "@/components/dashboard/waiting-on-you-card";
 import { assetsHref, type AssetsLink } from "@/lib/dashboard-links";
 import { useNsPath } from "@/lib/ns-path";
+import { useMe } from "@/hooks/use-me";
+import { NamespaceRedirect } from "@/components/namespace-redirect";
 
 const PERIODS = [7, 30, 90] as const;
 const ALL_SOURCES = "ALL";
@@ -47,7 +49,19 @@ function periodOf(value: string | null): number {
  * it, and what waits on them — for the assets they answer for, or all of
  * them. Every number opens the assets behind it on the assets page.
  */
+/**
+ * The dashboard is about assets: someone who sees none (a Data consumer given
+ * one shared dataset) goes to the SQL page instead of a page of refusals.
+ */
 export default function DashboardPage() {
+  const me = useMe();
+  if (me && !(me.capabilities as string[]).includes("asset.view")) {
+    return <NamespaceRedirect to="/query" />;
+  }
+  return <DashboardContent />;
+}
+
+function DashboardContent() {
   const { t } = useTranslation();
   const { searchParams, setParams } = useUrlParams();
   const [scope, setScope] = useState<DashboardScope>(() =>

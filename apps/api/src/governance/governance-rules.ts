@@ -215,6 +215,25 @@ const SENSITIVE_PII = new Set([
   'UK_NHS',
   'MEDICAL_LICENSE',
   'CRYPTO',
+  // National ids of people the PII detector knows (G2 adds more member states).
+  'AT_SVNR',
+  'CH_AHV',
+  'DE_TAX_ID',
+  'EU_NATIONAL_ID',
+  'ES_NIF',
+  'ES_NIE',
+  'FI_PERSONAL_IDENTITY_CODE',
+  'IT_FISCAL_CODE',
+  'IT_PASSPORT',
+  'IT_IDENTITY_CARD',
+  'IT_DRIVER_LICENSE',
+  'PL_PESEL',
+  'SG_NRIC_FIN',
+  'AU_TFN',
+  'AU_MEDICARE',
+  'IN_AADHAAR',
+  'IN_PAN',
+  'IN_VOTER',
 ]);
 
 export interface ColumnFindingGroup {

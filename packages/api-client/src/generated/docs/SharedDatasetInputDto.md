@@ -13,6 +13,7 @@ Name | Type
 `sourceName` | string
 `answeredBy` | [Array&lt;SharedDatasetActorDto&gt;](SharedDatasetActorDto.md)
 `groupCanQuery` | boolean
+`groupRows` | string
 `youGovern` | boolean
 `blocked` | boolean
 
@@ -30,6 +31,7 @@ const example = {
   "sourceName": null,
   "answeredBy": null,
   "groupCanQuery": null,
+  "groupRows": null,
   "youGovern": null,
   "blocked": null,
 } satisfies SharedDatasetInputDto

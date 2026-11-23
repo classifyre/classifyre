@@ -166,12 +166,22 @@ queryWorker:
       - 10.42.0.0/16
       - 10.43.0.0/16
 
-# SQL connections are on by default. Same shared-node diet as the query worker
-# (requests only; the chart's 1Gi request would be counted by the scheduler and
-# starve the extract jobs). No publicHost and no exposed port here (single-node
-# k3s without a TCP ingress): the app shows "not configured" with a link to the
-# setup guide. To use it, set publicHost and `service.type: NodePort`.
+# SQL connections (the chart's default is on). Same shared-node diet as the
+# query worker (requests only; the chart's 1Gi request would be counted by the
+# scheduler and starve the extract jobs).
+#
+# Reached through the host's Traefik (a Docker Swarm service, outside k3s;
+# /srv/wordpress/traefik.yml + host-services.yml on the VPS): its `postgres`
+# entrypoint (:5432, raw TCP, TLS stays end to end with the gateway) forwards
+# to this NodePort. DNS: showcase-sql.classifyre.com (A + AAAA, DNS only: the
+# Cloudflare proxy does not carry 5432). Changing publicHost later means
+# deleting the kept certificate Secret first (classifyre-sql-tls).
 sqlGateway:
+  publicHost: showcase-sql.classifyre.com
+  publicPort: 5432
+  service:
+    type: NodePort
+    nodePort: 30432   # Traefik's tcp service targets host-gateway:30432
   resources:
     requests:
       cpu: 50m

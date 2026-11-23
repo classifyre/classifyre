@@ -103,6 +103,14 @@ export class SharedDatasetInputDto {
   })
   groupCanQuery: boolean | null;
 
+  @ApiPropertyOptional({
+    enum: ['all', 'filtered', 'none'],
+    nullable: true,
+    description:
+      'Which of its rows the owning group reads: every row, the rows its row rules select, or none (filtering is on and no rule is for the group). Null: no group given.',
+  })
+  groupRows: 'all' | 'filtered' | 'none' | null;
+
   @ApiProperty({ description: 'You own or steward it, or its source.' })
   youGovern: boolean;
 

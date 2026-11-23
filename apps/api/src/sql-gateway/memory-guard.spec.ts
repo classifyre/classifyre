@@ -1,4 +1,8 @@
-import { roomForSession, sessionMemoryConfig } from './memory-guard';
+import {
+  admitSession,
+  roomForSession,
+  sessionMemoryConfig,
+} from './memory-guard';
 
 const MB = 1024 * 1024;
 
@@ -38,5 +42,44 @@ describe('room for one more SQL session', () => {
       ceiling: 0,
       perSession: 450 * MB,
     });
+  });
+});
+
+describe('admitting a session while others are still starting', () => {
+  // A Metabase dashboard opens its pool's four sessions at once. Each one
+  // still starting is reserved at the full 450 MB, so with 1.6 GB resident
+  // the third and fourth were refused "busy" (53300), which pgJDBC under a
+  // connection pool does not retry: 4 of 5 dashboard cards failed (Kestrel &
+  // Finch battle test, 2026-11-23). Started, a session settles near 240 MB.
+  const limits = { ceiling: 2818 * MB, perSession: 450 * MB };
+  const base = { live: 2, maxSessions: 16, limits };
+
+  it('opens when there is room', () => {
+    expect(admitSession({ ...base, rss: 1600 * MB, starting: 1 })).toBe('open');
+  });
+
+  it('waits when only sessions still starting take the room', () => {
+    expect(admitSession({ ...base, rss: 1600 * MB, starting: 2 })).toBe('wait');
+  });
+
+  it('is busy when nothing is starting and there is no room', () => {
+    expect(admitSession({ ...base, rss: 2500 * MB, starting: 0 })).toBe('busy');
+  });
+
+  it('is busy at the session limit, whatever the memory', () => {
+    expect(
+      admitSession({ ...base, live: 15, rss: 100 * MB, starting: 1 }),
+    ).toBe('busy');
+  });
+
+  it('opens without a memory ceiling', () => {
+    expect(
+      admitSession({
+        ...base,
+        rss: 64_000 * MB,
+        starting: 9,
+        limits: { ceiling: 0, perSession: 450 * MB },
+      }),
+    ).toBe('open');
   });
 });

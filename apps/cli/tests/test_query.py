@@ -1245,3 +1245,72 @@ def test_a_source_s_own_http_endpoint_stays_open() -> None:
         "https://a.b/",
         "https://catalog.example.com:8181/",
     ]
+
+
+def _locked_with_odbc(folder: Path, monkeypatch: pytest.MonkeyPatch) -> Any:
+    """A session over a folder table plus an opened ODBC binding, locked down."""
+    from src.query.bindings import SourceBinding, TableLocation
+    from src.query.connectors import base as connectors_base
+    from src.query.session import QueryRequest, QuerySession
+
+    monkeypatch.setattr(connectors_base, "load_extension", lambda _conn, _name: None)
+    session = QuerySession(QueryRequest.from_dict(_request(folder, "SELECT 1")))
+    conn = session._open()
+    session._conn = conn
+    session._attach_tables_as_views(conn, set(session._tables))
+    odbc = SourceBinding(
+        "billing",
+        9,
+        {
+            "type": "ODBC",
+            "required": {"connection_string": "Driver={PostgreSQL Unicode};Server=db.test"},
+        },
+        "src-odbc",
+    )
+    odbc.relation(
+        conn, TableLocation(kind="catalog", schema="b", table="i", qualified_name='"b"."i"')
+    )
+    session._bindings["billing"] = odbc
+    return session, conn
+
+
+def test_odbc_session_keeps_external_access_but_still_locks_the_rest(
+    folder: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """DuckDB's odbc_scanner opens no connection, not even through a handle made
+    beforehand, once enable_external_access is off ("ODBC connections cannot be
+    opened when external access is disabled"): every query over an ODBC source
+    failed after the lockdown of 383fd5c4. ODBC queries run as Jobs only (a pod
+    of their own, never the shared worker), so the session leaves external
+    access on for them, and keeps everything else locked."""
+    monkeypatch.delenv("CLASSIFYRE_QUERY_SHARED_HOST", raising=False)
+    session, conn = _locked_with_odbc(folder, monkeypatch)
+    try:
+        session._lock_down(conn)
+        assert conn.execute("SELECT current_setting('enable_external_access')").fetchone() == (
+            True,
+        )
+        with pytest.raises(duckdb.Error):
+            conn.execute("SET enable_external_access = false")  # configuration is locked
+        assert conn.execute("SELECT current_setting('autoload_known_extensions')").fetchone() == (
+            False,
+        )
+        # DuckDB's own file wall is off here (a Job of its own); the SQL gate,
+        # which refuses file and table functions and INSTALL, is the wall.
+    finally:
+        session.close()
+
+
+def test_odbc_source_is_refused_in_a_shared_query_process(
+    folder: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Defence in depth: the worker answers job_only for ODBC, but should a
+    query process of the shared worker ever get one, it refuses rather than
+    run without the file wall."""
+    monkeypatch.setenv("CLASSIFYRE_QUERY_SHARED_HOST", "1")
+    session, conn = _locked_with_odbc(folder, monkeypatch)
+    try:
+        with pytest.raises(RuntimeError, match="Job"):
+            session._lock_down(conn)
+    finally:
+        session.close()

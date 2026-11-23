@@ -114,6 +114,17 @@ export const BUILT_IN_ROLES = [
     capabilities: WORKSPACE_ADMIN,
   },
   {
+    // Opens a workspace for what Data reader grants give and nothing else: no
+    // findings (their matched content is every value the scans found), no
+    // assets, sources, cases or activity. For people outside the team who
+    // receive one table or shared dataset (an agency, an auditor, a partner
+    // department); the catalog lists only what they may query.
+    key: 'data-consumer',
+    title: 'Data consumer',
+    scope: 'workspace',
+    capabilities: ['workspace.view', 'notification.view'],
+  },
+  {
     // Add-on to Viewer (or any role with workspace.view): reading table rows
     // with SQL. Granted on a workspace, a group's workspaces, or one source or
     // table (docs/prd/DQ-data-query.md §4).

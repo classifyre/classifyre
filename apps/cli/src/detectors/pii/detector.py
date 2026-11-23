@@ -240,10 +240,6 @@ class PIIDetector(BaseDetector):
     _TABULAR_CELL_RE: ClassVar[re.Pattern[str]] = re.compile(r"^  ([^:]+):(?: ?(.*))?$")
     _TABULAR_CONTINUATION_RE: ClassVar[re.Pattern[str]] = re.compile(r"^    (.*)$")
 
-    # Fall back to full-text analysis when a page has more than this many cells.
-    # Per-cell analysis at scale causes O(rowsxcolumns) Presidio calls per page.
-    _TABULAR_CELL_LIMIT: ClassVar[int] = 200
-
     # spaCy's own ceiling when nlp.max_length is not overridden.
     _SPACY_DEFAULT_MAX_LENGTH: ClassVar[int] = 1_000_000
 
@@ -616,7 +612,10 @@ class PIIDetector(BaseDetector):
     # ------------------------------------------------------------------
 
     def _normalize_column_name(self, column_name: str) -> str:
-        return re.sub(r"[^a-z0-9]+", " ", column_name.lower()).strip()
+        # camelCase and PascalCase are words too (FirstName, MobilePhone,
+        # HTTPReferrerURL): CRM exports name their columns that way.
+        split = re.sub(r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])", " ", column_name)
+        return re.sub(r"[^a-z0-9]+", " ", split.lower()).strip()
 
     def _column_tokens(self, column_name: str) -> set[str]:
         normalized = self._normalize_column_name(column_name)
@@ -760,7 +759,8 @@ class PIIDetector(BaseDetector):
     # ------------------------------------------------------------------
 
     def _extract_tabular_cells(self, content: str) -> list[_TabularCell]:
-        if "row_1:" not in content:
+        # Any row header: a page of a sweep starts at its own row (row_101:).
+        if not any(self._TABULAR_ROW_RE.match(line) for line in content.splitlines()):
             return []
 
         cells: list[_TabularCell] = []
@@ -845,35 +845,52 @@ class PIIDetector(BaseDetector):
         return [deduped[k] for k in ordered_keys]
 
     def _detect_tabular_content(self, content: str) -> list[DetectionResult] | None:
+        """Findings of a tabular page, each tagged with its row and column.
+
+        The page is analysed one column at a time: the column's cells become
+        one text of ``<column>: <value>`` blocks, and each result is mapped
+        back to the cell it falls in. That is one Presidio call per column
+        rather than per cell, so pages of any size keep their columns (they
+        used to fall back to full text past 200 cells, losing every column,
+        so nothing was classified or masked), and every value is read beside
+        its column's name — the context that lifts a phone number or a
+        national id over the threshold, which a bare cell lacked.
+        """
         cells = self._extract_tabular_cells(content)
         if not cells:
             return None
 
-        # For very wide/long pages fall back to full-text analysis to avoid O(N) Presidio calls.
-        if len(cells) > self._TABULAR_CELL_LIMIT:
-            logger.debug(
-                "Page has %d cells (> %d limit); using full-text analysis instead of per-cell",
-                len(cells),
-                self._TABULAR_CELL_LIMIT,
-            )
-            return None
-
         threshold = self._cfg.confidence_threshold or 0.7
         results: list[DetectionResult] = []
-
+        by_column: dict[str, list[_TabularCell]] = {}
         for cell in cells:
-            allowed = self._allowed_entities_for_column(cell.column_name)
+            by_column.setdefault(cell.column_name, []).append(cell)
+
+        for column_name, column_cells in by_column.items():
+            allowed = self._allowed_entities_for_column(column_name)
             if not allowed:
                 continue
-
-            for result in self._analyze_structured_cell(cell.value, allowed_entity_types=allowed):
+            text, spans = self._column_text(column_name, column_cells)
+            value_starts = [start for start, _end in spans]
+            for result in self._analyze_structured_cell(text, allowed_entity_types=allowed):
                 if not self._is_entity_enabled(result.entity_type):
                     continue
-                if not self._is_entity_allowed_for_column(result.entity_type, cell.column_name):
+                if not self._is_entity_allowed_for_column(result.entity_type, column_name):
                     continue
-
-                matched_content = cell.value[result.start : result.end]
-                if not self._should_keep_tabular_result(
+                # The cell whose value starts at or before the match; a match
+                # starting in the label before a value belongs to that value.
+                index = bisect.bisect_right(value_starts, result.start) - 1
+                if index < 0 or result.start >= spans[index][1]:
+                    index += 1
+                if index >= len(spans):
+                    continue
+                value_start, value_end = spans[index]
+                start, end = max(result.start, value_start), min(result.end, value_end)
+                if end <= start:
+                    continue
+                cell = column_cells[index]
+                matched_content = text[start:end]
+                if not matched_content.strip() or not self._should_keep_tabular_result(
                     cell=cell,
                     entity_type=result.entity_type,
                     matched_content=matched_content,
@@ -886,8 +903,8 @@ class PIIDetector(BaseDetector):
                     confidence=result.score,
                     recognition_metadata=result.recognition_metadata,
                     line_number=cell.row_index,
-                    start=result.start,
-                    end=result.end,
+                    start=start - value_start,
+                    end=end - value_start,
                     metadata={
                         "tabular_row_index": cell.row_index,
                         "tabular_column_name": cell.column_name,
@@ -897,6 +914,24 @@ class PIIDetector(BaseDetector):
                     results.append(detection)
 
         return self._dedupe_tabular_findings(results)
+
+    @staticmethod
+    def _column_text(
+        column_name: str, cells: list[_TabularCell]
+    ) -> tuple[str, list[tuple[int, int]]]:
+        """One column's cells as ``<column>: <value>`` blocks, a blank line
+        apart, and where each value starts and ends in that text."""
+        parts: list[str] = []
+        spans: list[tuple[int, int]] = []
+        position = 0
+        label = f"{column_name}: "
+        for cell in cells:
+            start = position + len(label)
+            spans.append((start, start + len(cell.value)))
+            block = f"{label}{cell.value}\n\n"
+            parts.append(block)
+            position += len(block)
+        return "".join(parts), spans
 
     # ------------------------------------------------------------------
     # Result construction

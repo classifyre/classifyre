@@ -300,33 +300,14 @@ async def test_enabled_patterns_passed_as_entity_list():
 
 @pytest.mark.asyncio
 async def test_tabular_detection_scans_per_cell_and_filters_entities_by_column() -> None:
-    class _StubAnalyzer:
-        def analyze(self, text: str, language: str = "en", entities: list | None = None):
-            del language
-            if text == "Patrick Clark":
-                return [_make_result("PERSON", 0, len("Patrick Clark"))]
-            if text == "carlacherry@example.org":
-                return [_make_result("EMAIL_ADDRESS", 0, len("carlacherry@example.org"))]
-            if text == "https://example.org/patrick":
-                return [_make_result("PERSON", 0, len("https://example.org/patrick"))]
-            if text == "Moore, Powell and Carter":
-                idx = text.index("Powell")
-                return [_make_result("PERSON", idx, idx + len("Powell"))]
-            if text == "Patrick Clark can be reached at carlacherry@example.org":
-                email_start = text.index("carlacherry@example.org")
-                return [
-                    _make_result("PERSON", 0, len("Patrick Clark"), 0.96),
-                    _make_result(
-                        "EMAIL_ADDRESS",
-                        email_start,
-                        email_start + len("carlacherry@example.org"),
-                        0.99,
-                    ),
-                ]
-            return []
-
-        def get_supported_entities(self) -> list[str]:
-            return ["PERSON", "EMAIL_ADDRESS"]
+    stub = _SubstringAnalyzer(
+        {
+            "Patrick Clark": "PERSON",
+            "carlacherry@example.org": "EMAIL_ADDRESS",
+            "https://example.org/patrick": "PERSON",
+            "Powell": "PERSON",
+        }
+    )
 
     _raw_content, text_content = format_tabular_sample_content(
         scope_label="table",
@@ -349,7 +330,7 @@ async def test_tabular_detection_scans_per_cell_and_filters_entities_by_column()
     detector = PIIDetector(
         PIIDetectorConfig(enabled_patterns=["PERSON", "EMAIL_ADDRESS"], confidence_threshold=0.0)
     )
-    detector.analyzer = _StubAnalyzer()
+    detector.analyzer = stub
 
     results = await detector.detect(text_content)
 
@@ -371,21 +352,9 @@ async def test_tabular_detection_scans_per_cell_and_filters_entities_by_column()
 
 @pytest.mark.asyncio
 async def test_tabular_detection_drops_single_token_person_noise_from_text_columns() -> None:
-    class _StubAnalyzer:
-        def analyze(self, text: str, language: str = "en", entities: list | None = None):
-            del language, entities
-            if text == "Patrick Clark":
-                return [_make_result("PERSON", 0, len("Patrick Clark"), 0.98)]
-            if text == "Moore, Powell and Carter":
-                powell_idx = text.index("Powell")
-                return [
-                    _make_result("PERSON", powell_idx, powell_idx + len("Powell"), 0.92),
-                    _make_result("PERSON", 0, len("Moore, Powell"), 0.94),
-                ]
-            return []
-
-        def get_supported_entities(self) -> list[str]:
-            return ["PERSON"]
+    stub = _SubstringAnalyzer(
+        {"Patrick Clark": "PERSON", "Powell": "PERSON", "Moore, Powell": "PERSON"}
+    )
 
     _raw_content, text_content = format_tabular_sample_content(
         scope_label="table",
@@ -398,7 +367,7 @@ async def test_tabular_detection_drops_single_token_person_noise_from_text_colum
     )
 
     detector = PIIDetector(PIIDetectorConfig(enabled_patterns=["PERSON"], confidence_threshold=0.0))
-    detector.analyzer = _StubAnalyzer()
+    detector.analyzer = stub
 
     results = await detector.detect(text_content)
 
@@ -522,3 +491,158 @@ async def test_contact_column_keeps_emails() -> None:
     found = {(r.finding_type, r.matched_content) for r in results}
     assert ("EMAIL_ADDRESS", "pip.marlow@example.com") in found
     assert ("PERSON", "Zephyr Quill") in found
+
+
+# ---------------------------------------------------------------------------
+# Tabular pages of realistic size: every finding keeps its row and column
+# ---------------------------------------------------------------------------
+
+
+class _SubstringAnalyzer:
+    """Finds each known value wherever it occurs in the text it is given."""
+
+    def __init__(self, values: dict[str, str]) -> None:
+        self.values = values
+        self.calls = 0
+
+    def analyze(self, text: str, language: str = "en", entities: list | None = None):
+        del language
+        self.calls += 1
+        out = []
+        for value, entity in self.values.items():
+            if entities is not None and entity not in entities:
+                continue
+            start = text.find(value)
+            while start != -1:
+                out.append(_make_result(entity, start, start + len(value)))
+                start = text.find(value, start + 1)
+        return out
+
+    def get_supported_entities(self) -> list[str]:
+        return sorted(set(self.values.values()))
+
+
+def _page(rows: list[tuple[str, ...]], columns: list[str], row_offset: int = 0) -> str:
+    return format_tabular_sample_content(
+        scope_label="table",
+        scope_value="crm.contacts",
+        strategy="ALL",
+        rows=rows,
+        column_names=columns,
+        serialize_cell=str,
+        include_column_names=True,
+        row_offset=row_offset,
+    )[1]
+
+
+@pytest.mark.asyncio
+async def test_tabular_page_over_the_cell_limit_keeps_columns() -> None:
+    """A 100-row page of a 13-column table used to fall back to full-text
+    analysis, losing every finding's column, so no column was classified and
+    nothing was masked by default (DQ §5.8)."""
+    columns = ["contact_id", "first_name", "email", "phone", *[f"extra_{i}" for i in range(9)]]
+    rows = [
+        (str(1000 + i), f"Person{i}", f"p{i}@example.com", f"+43 664 {1000000 + i}", *["x"] * 9)
+        for i in range(100)
+    ]
+    assert len(rows) * len(columns) > 200  # the old per-cell limit
+    analyzer = _SubstringAnalyzer(
+        {"p7@example.com": "EMAIL_ADDRESS", "+43 664 1000042": "PHONE_NUMBER"}
+    )
+    detector = PIIDetector(PIIDetectorConfig(confidence_threshold=0.0))
+    detector.analyzer = analyzer
+
+    results = await detector.detect(_page(rows, columns))
+
+    assert {
+        (
+            r.finding_type,
+            r.matched_content,
+            r.metadata["tabular_row_index"],
+            r.metadata["tabular_column_name"],
+        )
+        for r in results
+    } == {
+        ("EMAIL_ADDRESS", "p7@example.com", 8, "email"),
+        ("PHONE_NUMBER", "+43 664 1000042", 43, "phone"),
+    }
+    # One analysis per column that may hold PII, not one per cell.
+    assert analyzer.calls <= len(columns)
+
+
+@pytest.mark.asyncio
+async def test_tabular_sweep_page_that_does_not_start_at_row_1_keeps_columns() -> None:
+    """The second page of a sweep starts at row_101; it is still a table."""
+    analyzer = _SubstringAnalyzer({"late@example.com": "EMAIL_ADDRESS"})
+    detector = PIIDetector(PIIDetectorConfig(confidence_threshold=0.0))
+    detector.analyzer = analyzer
+
+    page = _page([("1101", "late@example.com")], ["contact_id", "email"], row_offset=100)
+    results = await detector.detect(page)
+
+    assert [
+        (r.metadata["tabular_row_index"], r.metadata["tabular_column_name"]) for r in results
+    ] == [(101, "email")]
+
+
+@pytest.mark.asyncio
+async def test_tabular_match_reaching_into_the_column_label_is_cut_to_the_value() -> None:
+    """The label written before each value is context, never part of a finding."""
+
+    class _Greedy(_SubstringAnalyzer):
+        def analyze(self, text: str, language: str = "en", entities: list | None = None):
+            start = text.find("name: Ada Ferrow")
+            return (
+                [_make_result("PERSON", start, start + len("name: Ada Ferrow"))]
+                if start >= 0
+                else []
+            )
+
+    detector = PIIDetector(PIIDetectorConfig(confidence_threshold=0.0))
+    detector.analyzer = _Greedy({"Ada Ferrow": "PERSON"})
+
+    results = await detector.detect(_page([("Ada Ferrow",)], ["name"]))
+
+    assert [(r.matched_content, r.metadata["tabular_column_name"]) for r in results] == [
+        ("Ada Ferrow", "name")
+    ]
+
+
+@requires_presidio
+@pytest.mark.asyncio
+async def test_tabular_phone_and_iban_columns_are_found_with_their_column() -> None:
+    """Context-dependent recognisers (phone numbers score 0.4 alone) need the
+    column's name beside the value, as full-text analysis had; analysed cell by
+    cell, a phone column of a small table classified nothing."""
+    rows = [
+        ("1001", "Margarethe", "+43 664 2718281", "AT48 3200 0000 1234 5864"),
+        ("1002", "Florian", "+49 151 38504945", "DE89 3704 0044 0532 0130 00"),
+        ("1003", "Sigrid", "+46 70 123 45 67", "SE45 5000 0000 0583 9825 7466"),
+    ]
+    detector = PIIDetector()
+    results = await detector.detect(_page(rows, ["contact_id", "first_name", "phone", "iban"]))
+
+    by_column = {(r.finding_type, r.metadata.get("tabular_column_name")) for r in results}
+    assert ("PHONE_NUMBER", "phone") in by_column
+    assert ("IBAN_CODE", "iban") in by_column
+    assert all(r.metadata.get("tabular_column_name") for r in results)
+
+
+def test_camel_case_column_names_get_the_same_hints_as_snake_case() -> None:
+    """Salesforce and HubSpot exports name columns FirstName, MobilePhone,
+    Email__c. Read as one word, they got no hint: no PERSON in FirstName, and
+    every recogniser on MobilePhone (PESEL, VAT and card "findings" in phone
+    numbers made the column sensitive)."""
+    detector = PIIDetector()
+    for camel, snake in [
+        ("FirstName", "first_name"),
+        ("MobilePhone", "mobile_phone"),
+        ("Email__c", "email__c"),
+        ("MailingStreet", "mailing_street"),
+        ("HTTPReferrerURL", "http_referrer_url"),
+    ]:
+        assert detector._allowed_entities_for_column(
+            camel
+        ) == detector._allowed_entities_for_column(snake), camel
+    assert detector._allowed_entities_for_column("MobilePhone") == {"PHONE_NUMBER"}
+    assert "PERSON" in detector._allowed_entities_for_column("LastName")

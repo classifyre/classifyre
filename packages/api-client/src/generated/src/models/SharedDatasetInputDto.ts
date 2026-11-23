@@ -70,6 +70,12 @@ export interface SharedDatasetInputDto {
      */
     groupCanQuery?: boolean | null;
     /**
+     * Which of its rows the owning group reads: every row, the rows its row rules select, or none (filtering is on and no rule is for the group). Null: no group given.
+     * @type {string}
+     * @memberof SharedDatasetInputDto
+     */
+    groupRows?: SharedDatasetInputDtoGroupRowsEnum | null;
+    /**
      * You own or steward it, or its source.
      * @type {boolean}
      * @memberof SharedDatasetInputDto
@@ -82,6 +88,18 @@ export interface SharedDatasetInputDto {
      */
     blocked: boolean;
 }
+
+
+/**
+ * @export
+ */
+export const SharedDatasetInputDtoGroupRowsEnum = {
+    All: 'all',
+    Filtered: 'filtered',
+    None: 'none'
+} as const;
+export type SharedDatasetInputDtoGroupRowsEnum = typeof SharedDatasetInputDtoGroupRowsEnum[keyof typeof SharedDatasetInputDtoGroupRowsEnum];
+
 
 /**
  * Check if a given object implements the SharedDatasetInputDto interface.
@@ -115,6 +133,7 @@ export function SharedDatasetInputDtoFromJSONTyped(json: any, ignoreDiscriminato
         'sourceName': json['sourceName'],
         'answeredBy': ((json['answeredBy'] as Array<any>).map(SharedDatasetActorDtoFromJSON)),
         'groupCanQuery': json['groupCanQuery'] == null ? undefined : json['groupCanQuery'],
+        'groupRows': json['groupRows'] == null ? undefined : json['groupRows'],
         'youGovern': json['youGovern'],
         'blocked': json['blocked'],
     };
@@ -138,6 +157,7 @@ export function SharedDatasetInputDtoToJSONTyped(value?: SharedDatasetInputDto |
         'sourceName': value['sourceName'],
         'answeredBy': ((value['answeredBy'] as Array<any>).map(SharedDatasetActorDtoToJSON)),
         'groupCanQuery': value['groupCanQuery'],
+        'groupRows': value['groupRows'],
         'youGovern': value['youGovern'],
         'blocked': value['blocked'],
     };

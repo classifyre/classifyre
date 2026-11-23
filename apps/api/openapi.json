@@ -42362,6 +42362,16 @@
             "nullable": true,
             "description": "Whether the owning group may query it now (null: no group given)."
           },
+          "groupRows": {
+            "type": "string",
+            "enum": [
+              "all",
+              "filtered",
+              "none"
+            ],
+            "nullable": true,
+            "description": "Which of its rows the owning group reads: every row, the rows its row rules select, or none (filtering is on and no rule is for the group). Null: no group given."
+          },
           "youGovern": {
             "type": "boolean",
             "description": "You own or steward it, or its source."

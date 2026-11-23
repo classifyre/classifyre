@@ -21,6 +21,8 @@ import {
 } from "@workspace/ui/components/sidebar";
 import { useTranslation } from "@/hooks/use-translation";
 import { useNamespaceCategories } from "@/hooks/use-namespace-categories";
+import { useMe } from "@/hooks/use-me";
+import { visibleNav } from "@/lib/nav-access";
 import { useLocalePath } from "@/lib/app-path";
 import type { TranslationKey } from "@/i18n";
 import { VersionSidebarNotifier } from "./version-update-notifier";
@@ -41,7 +43,13 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-type NavItem = { titleKey: TranslationKey; href: string; icon: LucideIcon };
+type NavItem = {
+  titleKey: TranslationKey;
+  href: string;
+  icon: LucideIcon;
+  /** What the page needs; entries without one are always offered. */
+  capability?: string;
+};
 type NavGroup = { labelKey: TranslationKey; items: NavItem[] };
 
 // Grouped by what the operator is doing, not by data model:
@@ -52,8 +60,18 @@ const NAV_GROUPS: NavGroup[] = [
   {
     labelKey: "nav.group.intelligence",
     items: [
-      { titleKey: "nav.dashboard", href: "/dashboard", icon: LayoutDashboard },
-      { titleKey: "nav.assets", href: "/assets", icon: FileText },
+      {
+        titleKey: "nav.dashboard",
+        href: "/dashboard",
+        icon: LayoutDashboard,
+        capability: "asset.view",
+      },
+      {
+        titleKey: "nav.assets",
+        href: "/assets",
+        icon: FileText,
+        capability: "asset.view",
+      },
       { titleKey: "nav.query", href: "/query", icon: TerminalSquare },
     ],
   },
@@ -64,22 +82,49 @@ const NAV_GROUPS: NavGroup[] = [
         titleKey: "nav.investigations",
         href: "/investigations",
         icon: Search,
+        capability: "case.view",
       },
-      { titleKey: "nav.findings", href: "/findings", icon: SearchCheck },
+      {
+        titleKey: "nav.findings",
+        href: "/findings",
+        icon: SearchCheck,
+        capability: "finding.view",
+      },
       {
         titleKey: "nav.fingerprints",
         href: "/duplicates",
         icon: Fingerprint,
+        capability: "finding.view",
       },
     ],
   },
   {
     labelKey: "nav.group.pipeline",
     items: [
-      { titleKey: "nav.sources", href: "/sources", icon: Database },
-      { titleKey: "nav.detectors", href: "/detectors", icon: FlaskConical },
-      { titleKey: "nav.glossary", href: "/glossary", icon: BookOpen },
-      { titleKey: "nav.scans", href: "/scans", icon: ScanSearch },
+      {
+        titleKey: "nav.sources",
+        href: "/sources",
+        icon: Database,
+        capability: "source.view",
+      },
+      {
+        titleKey: "nav.detectors",
+        href: "/detectors",
+        icon: FlaskConical,
+        capability: "detector.view",
+      },
+      {
+        titleKey: "nav.glossary",
+        href: "/glossary",
+        icon: BookOpen,
+        capability: "glossary.view",
+      },
+      {
+        titleKey: "nav.scans",
+        href: "/scans",
+        icon: ScanSearch,
+        capability: "source.view",
+      },
     ],
   },
 ];
@@ -90,6 +135,11 @@ export function AppSidebar() {
   const { nsHref, displayName, namespace, slug } = useNamespace();
   const localePath = useLocalePath();
   const { categories } = useNamespaceCategories();
+  const me = useMe();
+  const navGroups = React.useMemo(
+    () => visibleNav(NAV_GROUPS, me ? (me.capabilities as string[]) : null),
+    [me],
+  );
   // The categories this workspace is filed under, in the registry's own
   // (alphabetical) order. Empty only while the two requests are in flight —
   // a workspace always belongs to at least one.
@@ -177,7 +227,7 @@ export function AppSidebar() {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        {NAV_GROUPS.map((group) => (
+        {navGroups.map((group) => (
           <SidebarGroup key={group.labelKey}>
             <SidebarGroupLabel className="text-[10px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/50">
               {t(group.labelKey)}

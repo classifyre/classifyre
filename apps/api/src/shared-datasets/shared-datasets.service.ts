@@ -1,3 +1,4 @@
+import { groupRowsOf, rowProblems, type GroupRows } from './dataset-input-rows';
 import {
   BadRequestException,
   ConflictException,
@@ -84,6 +85,8 @@ export interface DatasetInputView {
   answeredBy: { ref: string; name: string }[];
   /** Whether the owning group may query it now (null when no group given). */
   groupCanQuery: boolean | null;
+  /** Which of its rows the owning group reads (null when no group given). */
+  groupRows: GroupRows | null;
   /** Whether you own or steward it (or its source). */
   youGovern: boolean;
   /** Open blocks on the dataset from this input (or its source). */
@@ -1190,6 +1193,9 @@ export class SharedDatasetsService implements OnModuleInit {
           `The owning group cannot query ${missing.map((m) => m.sqlName).join(', ')}: give it access first.`,
         );
       }
+      problems.push(
+        ...rowProblems(inputs.filter((input) => input.groupCanQuery)),
+      );
     }
     return problems;
   }
@@ -1321,6 +1327,9 @@ export class SharedDatasetsService implements OnModuleInit {
       })),
       groupCanQuery: groupTables
         ? Boolean(groupTables.get(table.assetId)?.canQuery)
+        : null,
+      groupRows: groupTables
+        ? groupRowsOf(groupTables.get(table.assetId))
         : null,
       youGovern:
         governed.assetIds.includes(table.assetId) ||

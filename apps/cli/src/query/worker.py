@@ -392,6 +392,9 @@ def _harden(workdir: str) -> None:
     signal.signal(signal.SIGTERM, signal.SIG_DFL)
     signal.signal(signal.SIGINT, signal.SIG_DFL)
     set_not_dumpable()
+    # Shares its host with other workspaces' queries: a source that needs
+    # DuckDB's external access (ODBC) is refused here (``QuerySession``).
+    os.environ["CLASSIFYRE_QUERY_SHARED_HOST"] = "1"
     os.environ["TMPDIR"] = workdir
     tempfile.tempdir = workdir
     os.chdir(workdir)
