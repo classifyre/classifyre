@@ -11,6 +11,8 @@ interface MatchedContentBlockProps {
   redactedContent?: string | null;
   contextBefore?: string | null;
   contextAfter?: string | null;
+  /** The API hid the value from this person (DQ §5.8a). */
+  contentHidden?: boolean;
 }
 
 export function MatchedContentBlock({
@@ -19,6 +21,7 @@ export function MatchedContentBlock({
   redactedContent,
   contextBefore,
   contextAfter,
+  contentHidden,
 }: MatchedContentBlockProps) {
   const { t } = useTranslation();
   const color =
@@ -58,6 +61,11 @@ export function MatchedContentBlock({
         >
           {content}
         </pre>
+        {contentHidden && (
+          <p className="text-xs text-muted-foreground">
+            {t("findings.signals.contentHidden")}
+          </p>
+        )}
         {contextAfter && (
           <pre className="overflow-x-auto rounded-[4px] border border-border/20 bg-muted/40 p-4 text-xs text-muted-foreground">
             {contextAfter}

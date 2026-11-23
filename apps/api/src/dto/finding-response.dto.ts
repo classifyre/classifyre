@@ -233,6 +233,12 @@ export class FindingResponseDto {
   @ApiPropertyOptional()
   redactedContent?: string;
 
+  @ApiPropertyOptional({
+    description:
+      'True when the value is hidden from you (`matchedContent` reads ••••): it is what a masked column protects. People with finding.content, and people who read its table in clear (data.unmask, its owner, its stewards), see it.',
+  })
+  contentHidden?: boolean;
+
   @ApiPropertyOptional()
   contextBefore?: string;
 

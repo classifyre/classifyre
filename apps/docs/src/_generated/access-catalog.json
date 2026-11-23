@@ -76,6 +76,11 @@
       "description": "Read findings, extractions and their evidence."
     },
     {
+      "id": "finding.content",
+      "scope": "workspace",
+      "description": "Read what a finding found: the matched value and the text around it, on every table."
+    },
+    {
       "id": "finding.triage",
       "scope": "workspace",
       "description": "Change finding status and severity, alone or in bulk."
@@ -299,6 +304,7 @@
         "entity.view",
         "agent.view",
         "mcp.token.own",
+        "finding.content",
         "agent.use",
         "finding.triage",
         "asset.tag",
@@ -327,6 +333,7 @@
         "entity.view",
         "agent.view",
         "mcp.token.own",
+        "finding.content",
         "agent.use",
         "glossary.edit",
         "glossary.approve",
@@ -351,6 +358,7 @@
         "detector.manage",
         "detector.train",
         "finding.view",
+        "finding.content",
         "asset.view"
       ]
     },
@@ -374,6 +382,7 @@
         "source.run",
         "source.purge",
         "finding.view",
+        "finding.content",
         "finding.triage",
         "asset.view",
         "asset.tag",
@@ -474,6 +483,7 @@
         "source.run",
         "source.purge",
         "finding.view",
+        "finding.content",
         "finding.triage",
         "asset.view",
         "asset.tag",
@@ -537,6 +547,7 @@
         "source.run",
         "source.purge",
         "finding.view",
+        "finding.content",
         "finding.triage",
         "asset.view",
         "asset.tag",
@@ -596,7 +607,8 @@
         "inquiry.view",
         "glossary.view",
         "entity.view",
-        "agent.view"
+        "agent.view",
+        "finding.content"
       ]
     }
   ]

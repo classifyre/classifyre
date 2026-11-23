@@ -11,6 +11,7 @@ import {
 import {
   columnsAsSeen,
   effectiveColumnPolicy,
+  jobMasks,
   toColumnMask,
   type ColumnMask,
   type ColumnPolicy,
@@ -560,14 +561,20 @@ export class QueryCatalogService {
    */
   async catalog(principal?: DataPrincipal): Promise<QueryCatalog> {
     const p = principal ?? (await this.requestPrincipal());
-    const [settings, scope, cached, clear, masks, rows] = await Promise.all([
-      this.settings(),
-      this.scope(p),
-      this.tables(),
-      this.clearScope(p),
-      this.columnMasks(),
-      this.rowFilters(p),
-    ]);
+    const [settings, scope, cached, clear, masks, rows, governed] =
+      await Promise.all([
+        this.settings(),
+        this.scope(p),
+        this.tables(),
+        this.clearScope(p),
+        this.columnMasks(),
+        this.rowFilters(p),
+        // Owners and stewards also read restricted columns (DQ §5.8).
+        governedDataScope(this.prisma, p.person),
+      ]);
+    const governs = (table: { sourceId: string; assetId: string }) =>
+      governed.sourceIds.includes(table.sourceId) ||
+      governed.assetIds.includes(table.assetId);
     const sources = new Map<string, CatalogSource>();
     for (const source of cached.sources) {
       sources.set(source.id, { ...source, tables: [] });
@@ -596,14 +603,21 @@ export class QueryCatalogService {
       // job gets the same masks, so what the list shows is what runs.
       const tableMasks = masks.get(table.assetId) ?? [];
       const inClear = readsInClear(clear, table);
-      const seen = columnsAsSeen(table.columns, tableMasks, inClear);
+      const governsTable = inClear && governs(table);
+      const seen = columnsAsSeen(
+        table.columns,
+        tableMasks,
+        inClear,
+        governsTable,
+      );
+      const applied = jobMasks(tableMasks, inClear, governsTable);
       sources.get(table.sourceId)?.tables.push({
         ...table,
         columns: seen.columns,
         canQuery: table.queryable && granted,
         ...(reason ? { reason } : {}),
         ...(seen.hidden ? { hiddenColumns: seen.hidden } : {}),
-        ...(!inClear && tableMasks.length ? { masks: tableMasks } : {}),
+        ...(applied.length ? { masks: applied } : {}),
         ...(rows.has(table.assetId)
           ? { rowFilter: rows.get(table.assetId) }
           : {}),

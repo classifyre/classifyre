@@ -1,3 +1,5 @@
+import { FindingContentService } from '../finding-content/finding-content.service';
+import type { ExportQuery } from '../export/export-query.service';
 import { GovernanceService } from '../governance/governance.service';
 import { GovernanceInsightsService } from '../governance/governance-insights.service';
 import { AssetsOverviewDto } from '../governance/governance.dto';
@@ -146,7 +148,20 @@ export class SearchAssetsController {
     private readonly governance: GovernanceService,
     private readonly insights: GovernanceInsightsService,
     private readonly accessRequests: AccessRequestsService,
+    @Optional() private readonly findingContent?: FindingContentService,
   ) {}
+
+  /** Without every value readable, the CSV leaves the value columns out (DQ §5.8a). */
+  private async withoutHiddenContent(query: ExportQuery): Promise<ExportQuery> {
+    if ((await this.findingContent?.readsAll()) ?? true) return query;
+    return {
+      ...query,
+      columns: query.columns.filter(
+        (column) =>
+          column.key !== 'matched_content' && column.key !== 'redacted_content',
+      ),
+    };
+  }
 
   @Get('assets/overview')
   @ApiOperation({
@@ -203,7 +218,9 @@ export class SearchAssetsController {
   ): Promise<void> {
     await this.pgStreamService.streamCsv(
       reply,
-      this.exportQueryService.buildFindingsQuery(query),
+      await this.withoutHiddenContent(
+        this.exportQueryService.buildFindingsQuery(query),
+      ),
     );
   }
 
@@ -226,7 +243,9 @@ export class SearchAssetsController {
   ): Promise<void> {
     await this.pgStreamService.streamCsv(
       reply,
-      this.exportQueryService.buildAssetsQuery(query),
+      await this.withoutHiddenContent(
+        this.exportQueryService.buildAssetsQuery(query),
+      ),
     );
   }
 

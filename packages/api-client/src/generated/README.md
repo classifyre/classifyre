@@ -996,6 +996,7 @@ All URIs are relative to *http://localhost*
 - [QuickSearchResponseDto](docs/QuickSearchResponseDto.md)
 - [QuickSearchSeverityCountsDto](docs/QuickSearchSeverityCountsDto.md)
 - [QuickSearchTermDto](docs/QuickSearchTermDto.md)
+- [ReaderWithoutRowsDto](docs/ReaderWithoutRowsDto.md)
 - [RebuildEdgesResponseDto](docs/RebuildEdgesResponseDto.md)
 - [RebuildIndexResponseDto](docs/RebuildIndexResponseDto.md)
 - [RecomputeCorrelationResponseDto](docs/RecomputeCorrelationResponseDto.md)

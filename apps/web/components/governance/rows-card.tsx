@@ -186,6 +186,18 @@ export function RowsCard({
                     {t("rowFilters.noRules")}
                   </p>
                 )}
+                {(rows.readersWithoutRows?.length ?? 0) > 0 && (
+                  <p
+                    className="rounded-[4px] border border-dashed border-amber-500/60 p-3 text-xs text-muted-foreground"
+                    data-testid="rows-readers-without-rows"
+                  >
+                    {t("rowFilters.readersWithoutRows", {
+                      list: (rows.readersWithoutRows ?? [])
+                        .map((reader) => reader.path)
+                        .join(", "),
+                    })}
+                  </p>
+                )}
                 {rules.map((rule, index) => (
                   <div
                     key={rule.id ?? `new-${index}`}

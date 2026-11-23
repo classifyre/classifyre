@@ -1,0 +1,1 @@
+A new mask, "identifiers removed", keeps free-text columns such as ticket bodies and notes readable while replacing e-mail addresses, IBANs, card and phone numbers, ID numbers, passwords and access keys in every row, instead of hiding the whole column.

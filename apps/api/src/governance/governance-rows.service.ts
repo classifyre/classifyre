@@ -1,3 +1,4 @@
+import { readersWithoutRows, type ReaderWithoutRows } from './row-coverage';
 import {
   BadRequestException,
   ForbiddenException,
@@ -50,6 +51,11 @@ export interface AssetRows {
   canGovern: boolean;
   /** The caller sees every row (owner or steward): only they may show more. */
   readsEveryRow: boolean;
+  /**
+   * Groups that may query the table and would read no row: no rule covers
+   * them (filters fail closed). For whoever governs it, when filtering is on.
+   */
+  readersWithoutRows?: ReaderWithoutRows[];
   updatedAt: Date | null;
   updatedBy: string | null;
 }
@@ -103,7 +109,61 @@ export class GovernanceRowsService {
     );
   }
 
-  async assetRows(assetId: string): Promise<AssetRows> {
+  /** The current workspace's id, when the request is in one. */
+  workspaceId(): string | undefined {
+    return this.actors.workspaceId();
+  }
+
+  private async withoutRows(
+    target: { assetId: string; sourceId: string },
+    ruleRefs: string[],
+    grants: () => Promise<
+      {
+        subjectId: string;
+        subjectLabel: string;
+        roleKey: string;
+        scopeType: string;
+        scopeId: string;
+      }[]
+    >,
+  ): Promise<ReaderWithoutRows[]> {
+    const namespaceId = this.workspaceId();
+    if (!namespaceId) return [];
+    const [listed, stewards, named] = await Promise.all([
+      grants(),
+      this.prisma.governanceRole.findMany({
+        where: {
+          role: 'STEWARD',
+          dateOut: null,
+          principalRef: { startsWith: 'group:' },
+          OR: [
+            { scopeType: 'ASSET', scopeId: target.assetId },
+            { scopeType: 'SOURCE', scopeId: target.sourceId },
+          ],
+        },
+        select: { principalRef: true },
+      }),
+      this.resolve(ruleRefs.filter((ref) => ref.startsWith('group:'))),
+    ]);
+    return readersWithoutRows({
+      table: { ...target, namespaceId },
+      grants: listed,
+      ruleRefs,
+      groupPaths: new Map(
+        named
+          .filter((actor) => actor.path)
+          .map((actor) => [actor.ref.slice('group:'.length), actor.path!]),
+      ),
+      stewardGroupIds: stewards.map((r) =>
+        r.principalRef.slice('group:'.length),
+      ),
+    });
+  }
+
+  async assetRows(
+    assetId: string,
+    grants?: Parameters<GovernanceRowsService['withoutRows']>[2],
+  ): Promise<AssetRows> {
     const rights = await this.governance.mayGovernScope({
       scopeType: 'ASSET',
       scopeId: assetId,
@@ -147,6 +207,15 @@ export class GovernanceRowsService {
       }),
       canGovern: rights.allowed,
       readsEveryRow: await this.readsEveryRow(target),
+      ...(policy && rights.allowed && grants
+        ? {
+            readersWithoutRows: await this.withoutRows(
+              target,
+              rules.map((rule) => rule.principalRef),
+              grants,
+            ),
+          }
+        : {}),
       updatedAt: policy?.updatedAt ?? null,
       updatedBy: policy?.updatedBy ?? null,
     };

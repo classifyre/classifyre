@@ -429,6 +429,7 @@ export * from './QuickSearchRequestDto';
 export * from './QuickSearchResponseDto';
 export * from './QuickSearchSeverityCountsDto';
 export * from './QuickSearchTermDto';
+export * from './ReaderWithoutRowsDto';
 export * from './RebuildEdgesResponseDto';
 export * from './RebuildIndexResponseDto';
 export * from './RecomputeCorrelationResponseDto';

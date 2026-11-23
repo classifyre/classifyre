@@ -9,9 +9,11 @@ import {
   Post,
   Put,
   Query,
+  Req,
   Res,
 } from '@nestjs/common';
-import type { FastifyReply } from 'fastify';
+import type { FastifyReply, FastifyRequest } from 'fastify';
+import { AccessManagementService } from '../identity/access-management.service';
 import { stringify as toYaml } from 'yaml';
 import {
   ApiOkResponse,
@@ -63,6 +65,7 @@ export class GovernanceController {
     private readonly governance: GovernanceService,
     private readonly insights: GovernanceInsightsService,
     private readonly rows: GovernanceRowsService,
+    private readonly access: AccessManagementService,
   ) {}
 
   @Get('assets/:id/governance/meaning')
@@ -265,8 +268,19 @@ export class GovernanceController {
       "A table's row filtering: on or off, and its rules for whoever governs it",
   })
   @ApiOkResponse({ type: AssetRowsDto })
-  assetRows(@Param('id', ParseUUIDPipe) id: string): Promise<AssetRowsDto> {
-    return this.rows.assetRows(id);
+  async assetRows(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() request: FastifyRequest,
+  ): Promise<AssetRowsDto> {
+    // Who would read no row: from the workspace's grants, seen as the caller.
+    const grants = async () => {
+      const principal = await this.access.identity.authenticate(request.raw);
+      const workspace = this.rows.workspaceId();
+      return principal && workspace
+        ? this.access.workspaceGrants(principal, workspace)
+        : [];
+    };
+    return this.rows.assetRows(id, grants);
   }
 
   @Put('assets/:id/rows')

@@ -21589,6 +21589,10 @@
           "redactedContent": {
             "type": "string"
           },
+          "contentHidden": {
+            "type": "boolean",
+            "description": "True when the value is hidden from you (`matchedContent` reads ••••): it is what a masked column protects. People with finding.content, and people who read its table in clear (data.unmask, its owner, its stewards), see it."
+          },
           "contextBefore": {
             "type": "string"
           },
@@ -22392,6 +22396,10 @@
           },
           "redactedContent": {
             "type": "string"
+          },
+          "contentHidden": {
+            "type": "boolean",
+            "description": "True when the value is hidden from you (`matchedContent` reads ••••): it is what a masked column protects. People with finding.content, and people who read its table in clear (data.unmask, its owner, its stewards), see it."
           },
           "contextBefore": {
             "type": "string"
@@ -32505,6 +32513,7 @@
                 "source.run",
                 "source.purge",
                 "finding.view",
+                "finding.content",
                 "finding.triage",
                 "asset.view",
                 "asset.tag",
@@ -32771,6 +32780,7 @@
                 "source.run",
                 "source.purge",
                 "finding.view",
+                "finding.content",
                 "finding.triage",
                 "asset.view",
                 "asset.tag",
@@ -33000,6 +33010,7 @@
                 "source.run",
                 "source.purge",
                 "finding.view",
+                "finding.content",
                 "finding.triage",
                 "asset.view",
                 "asset.tag",
@@ -37267,7 +37278,8 @@
             "type": "string",
             "enum": [
               "mask",
-              "hide"
+              "hide",
+              "restrict"
             ],
             "description": "Governance masks or hides this column (DQ §5.8). Hidden columns are left out unless you read them in clear."
           },
@@ -37277,7 +37289,8 @@
               "redact",
               "partial",
               "hash",
-              "null"
+              "null",
+              "scrub"
             ]
           },
           "inClear": {
@@ -37514,7 +37527,8 @@
             "type": "string",
             "enum": [
               "mask",
-              "hide"
+              "hide",
+              "restrict"
             ]
           },
           "column": {
@@ -37527,7 +37541,8 @@
               "redact",
               "partial",
               "hash",
-              "null"
+              "null",
+              "scrub"
             ]
           }
         },
@@ -38601,6 +38616,27 @@
           "updatedAt"
         ]
       },
+      "ReaderWithoutRowsDto": {
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string",
+            "example": "/admins"
+          },
+          "roleKey": {
+            "type": "string",
+            "example": "tenant-admin"
+          }
+        },
+        "required": [
+          "groupId",
+          "path",
+          "roleKey"
+        ]
+      },
       "AssetRowsDto": {
         "type": "object",
         "properties": {
@@ -38624,6 +38660,13 @@
           "readsEveryRow": {
             "type": "boolean",
             "description": "You see every row (owner or steward of the table or its source): only you may show readers more."
+          },
+          "readersWithoutRows": {
+            "description": "Groups that may query the table and would read no row (no rule covers them; filters fail closed). For whoever governs it, when filtering is on.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReaderWithoutRowsDto"
+            }
           },
           "updatedAt": {
             "format": "date-time",
@@ -38747,7 +38790,8 @@
             "enum": [
               "clear",
               "mask",
-              "hide"
+              "hide",
+              "restrict"
             ]
           },
           "mask": {
@@ -38756,7 +38800,8 @@
               "redact",
               "partial",
               "hash",
-              "null"
+              "null",
+              "scrub"
             ]
           },
           "fromClassification": {
@@ -38893,7 +38938,8 @@
             "enum": [
               "clear",
               "mask",
-              "hide"
+              "hide",
+              "restrict"
             ],
             "nullable": true,
             "description": "A steward's access; null when it follows the classification."
@@ -38904,7 +38950,8 @@
               "redact",
               "partial",
               "hash",
-              "null"
+              "null",
+              "scrub"
             ],
             "nullable": true
           },
@@ -39029,7 +39076,8 @@
             "enum": [
               "clear",
               "mask",
-              "hide"
+              "hide",
+              "restrict"
             ],
             "nullable": true,
             "description": "What people who may query the table but not unmask see (DQ §5.8). Null follows the classification."
@@ -39040,7 +39088,8 @@
               "redact",
               "partial",
               "hash",
-              "null"
+              "null",
+              "scrub"
             ],
             "nullable": true,
             "description": "How a masked column shows. Null is the default (`redact`)."

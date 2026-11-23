@@ -1616,7 +1616,8 @@
       "signal": "Signal",
       "matchedContent": "Matched Content",
       "matchedContentDesc": "Context around the detected signal.",
-      "noMatchedContent": "No matched content provided."
+      "noMatchedContent": "No matched content provided.",
+      "contentHidden": "Hidden for you: this value is what a masked column protects. Investigators, and people who read this table in clear (its owner and stewards, Data reader, unmasked), see it."
     },
     "metadata": {
       "entityType": "Entity type",
@@ -8318,11 +8319,13 @@
     "clear": "Clear",
     "mask": "Masked",
     "hide": "Hidden",
+    "restrict": "Restricted: owners and stewards only",
     "kind": {
       "redact": "redacted (****)",
       "partial": "last four shown",
       "hash": "hashed, joinable",
-      "null": "empty (NULL)"
+      "null": "empty (NULL)",
+      "scrub": "identifiers removed (scrubbed text)"
     },
     "fromClassification": "follows its classification",
     "bySteward": "set by a steward",
@@ -8338,6 +8341,7 @@
     "off": "Every reader sees every row.",
     "onReadOnly": "Rows are filtered: each reader sees only the rows shared with them. The owner and stewards keep the rules.",
     "noRules": "No rules yet: nobody but the owner and stewards sees a row.",
+    "readersWithoutRows": "These groups may query this table but no rule gives them a row, so they see none: {{list}}. Admins are bound by row filters too. Add a rule if they should see rows.",
     "addRule": "Add rule",
     "for": "For",
     "aGroup": "A group",
@@ -8361,7 +8365,7 @@
     "runFiltered": "Rows filtered for you: {{list}}.",
     "andJoin": " and ",
     "orJoin": "; or ",
-    "noneShared": "no rows are shared with you",
+    "noneShared": "no rule gives you rows, so you see none; ask the table's owner or a steward",
     "tableFiltered": "Rows filtered for you: {{rows}}"
   },
   "accessRequests": {

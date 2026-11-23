@@ -1314,3 +1314,98 @@ def test_odbc_source_is_refused_in_a_shared_query_process(
             session._lock_down(conn)
     finally:
         session.close()
+
+
+# ── hash ignores case, scrub removes identifiers from free text (2026-11-23) ──
+
+
+# Made-up keys, written in parts so no credential pattern sits in the source.
+_FAKE_AWS_KEY = "AKIA" + "Z7KESTRELFINCH42"
+_FAKE_STRIPE_KEY = "sk_" + "live_" + "4eC39HqLyjWDarjtT1zdp7dc"
+
+
+def _mask_value(value: str | None, mask: str, type_name: str = "VARCHAR") -> Any:
+    conn = duckdb.connect()
+    conn.execute(f"CREATE TABLE t AS SELECT CAST(? AS {type_name}) AS v", [value])
+    expr = mask_expression("v", type_name, mask, "salt")
+    return conn.execute(f"SELECT {expr} FROM t").fetchone()[0]
+
+
+def test_hash_ignores_case_and_surrounding_spaces() -> None:
+    """The same e-mail spelt differently in two CRMs hashed differently, so a
+    hashed join found 18 of 22 travellers (Kestrel & Finch battle test)."""
+    a = _mask_value("margarethe.albrecht@alpenmail.example.com", "hash")
+    assert a == _mask_value("Margarethe.Albrecht@alpenmail.example.com ", "hash")
+    assert a == _mask_value("MARGARETHE.ALBRECHT@ALPENMAIL.EXAMPLE.COM", "hash")
+    assert a != _mask_value("margarethe.albrecht@inbox.example.com", "hash")
+    assert _mask_value(None, "hash") is None
+
+
+@pytest.mark.parametrize(
+    ("text", "gone", "kept"),
+    [
+        (
+            "Hi, this is Margarethe. Please call me on +43 664 2718281, I'm travelling.",
+            ["2718281"],
+            ["Please call me on", "travelling"],
+        ),
+        ("My card 4111 1111 1111 1111 was charged twice.", ["4111"], ["was charged twice"]),
+        (
+            "Please refund to my account AT48 3200 0000 1234 5864, not the card.",
+            ["5864", "AT48"],
+            ["refund"],
+        ),
+        ("Write to margarethe.albrecht@alpenmail.example.com please", ["albrecht@"], ["Write to"]),
+        (
+            f"used the integration key directly: {_FAKE_AWS_KEY} / wJalrXUtnFEMI/K7MDENG/bPxRfiCYKESTREL42",
+            [_FAKE_AWS_KEY, "wJalrXUtnFEMI"],
+            ["used the integration key directly"],
+        ),
+        (
+            f"Stripe refund done by hand with {_FAKE_STRIPE_KEY} — rotate after?",
+            ["sk_live_"],
+            ["rotate after"],
+        ),
+        (
+            "Reset the portal, temp password is Wayfarer!2025 (tell nobody)",
+            ["Wayfarer!2025"],
+            ["Reset the portal"],
+        ),
+        (
+            "The name on my passport is wrong, number P4817263.",
+            ["P4817263"],
+            ["The name on my passport"],
+        ),
+        (
+            "Thanks for sorting out the room, all good now!",
+            [],
+            ["Thanks for sorting out the room, all good now!"],
+        ),
+    ],
+)
+def test_scrub_removes_identifiers_and_keeps_the_text(
+    text: str, gone: list[str], kept: list[str]
+) -> None:
+    """A support ticket's body with two keys pasted into it was hidden whole
+    from customer care; scrub keeps the text and removes what it recognises."""
+    scrubbed = _mask_value(text, "scrub")
+    for part in gone:
+        assert part not in scrubbed, scrubbed
+    for part in kept:
+        assert part in scrubbed, scrubbed
+
+
+def test_scrub_on_other_types_is_null() -> None:
+    assert _mask_value("2026-01-01", "scrub", "DATE") is None
+
+
+def test_scrub_filters_on_the_scrubbed_text(folder: Path) -> None:
+    masks = [{"column": "country", "action": "mask", "mask": "scrub"}]
+    payload, result = run_query(
+        _masked(
+            folder,
+            "SELECT count(*) AS n FROM files.local.customers WHERE country LIKE '%@%'",
+            masks,
+        )
+    )
+    assert _rows(payload, result) == [{"n": 0}]

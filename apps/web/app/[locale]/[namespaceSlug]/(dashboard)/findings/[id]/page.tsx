@@ -541,17 +541,20 @@ export default function FindingDetailPage() {
         redactedContent={finding.redactedContent}
         contextBefore={finding.contextBefore}
         contextAfter={finding.contextAfter}
+        contentHidden={finding.contentHidden}
       />
 
       {/* ── Where else this value appears (correlation reverse index) ── */}
-      {finding.findingType && finding.matchedContent && (
-        <WhereElseFound
-          label={finding.findingType}
-          value={finding.matchedContent}
-          currentAssetId={finding.asset?.id || finding.assetId}
-          findingId={finding.id}
-        />
-      )}
+      {finding.findingType &&
+        finding.matchedContent &&
+        !finding.contentHidden && (
+          <WhereElseFound
+            label={finding.findingType}
+            value={finding.matchedContent}
+            currentAssetId={finding.asset?.id || finding.assetId}
+            findingId={finding.id}
+          />
+        )}
 
       {/* ── Meaning (glossary semantic links) ── */}
       <FindingMeaningCard findingId={finding.id} />

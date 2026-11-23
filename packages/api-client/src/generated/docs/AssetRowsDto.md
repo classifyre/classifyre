@@ -11,6 +11,7 @@ Name | Type
 `rules` | [Array&lt;AssetRowRuleDto&gt;](AssetRowRuleDto.md)
 `canGovern` | boolean
 `readsEveryRow` | boolean
+`readersWithoutRows` | [Array&lt;ReaderWithoutRowsDto&gt;](ReaderWithoutRowsDto.md)
 `updatedAt` | Date
 `updatedBy` | string
 
@@ -26,6 +27,7 @@ const example = {
   "rules": null,
   "canGovern": null,
   "readsEveryRow": null,
+  "readersWithoutRows": null,
   "updatedAt": null,
   "updatedBy": null,
 } satisfies AssetRowsDto

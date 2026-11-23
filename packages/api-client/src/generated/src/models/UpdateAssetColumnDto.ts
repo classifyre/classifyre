@@ -89,7 +89,8 @@ export type UpdateAssetColumnDtoClassificationEnum = typeof UpdateAssetColumnDto
 export const UpdateAssetColumnDtoAccessEnum = {
     Clear: 'clear',
     Mask: 'mask',
-    Hide: 'hide'
+    Hide: 'hide',
+    Restrict: 'restrict'
 } as const;
 export type UpdateAssetColumnDtoAccessEnum = typeof UpdateAssetColumnDtoAccessEnum[keyof typeof UpdateAssetColumnDtoAccessEnum];
 
@@ -100,7 +101,8 @@ export const UpdateAssetColumnDtoMaskKindEnum = {
     Redact: 'redact',
     Partial: 'partial',
     Hash: 'hash',
-    Null: 'null'
+    Null: 'null',
+    Scrub: 'scrub'
 } as const;
 export type UpdateAssetColumnDtoMaskKindEnum = typeof UpdateAssetColumnDtoMaskKindEnum[keyof typeof UpdateAssetColumnDtoMaskKindEnum];
 

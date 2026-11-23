@@ -77,6 +77,7 @@ export const RoleDtoCapabilitiesEnum = {
     SourceRun: 'source.run',
     SourcePurge: 'source.purge',
     FindingView: 'finding.view',
+    FindingContent: 'finding.content',
     FindingTriage: 'finding.triage',
     AssetView: 'asset.view',
     AssetTag: 'asset.tag',

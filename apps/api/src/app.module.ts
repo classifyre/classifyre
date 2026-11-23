@@ -25,6 +25,7 @@ import { CliRunnerModule } from './cli-runner/cli-runner.module';
 import { NotebookModule } from './notebook/notebook.module';
 import { DeploymentSettingsModule } from './deployment-settings/deployment-settings.module';
 import { DataQueryModule } from './data-query/data-query.module';
+import { FindingContentModule } from './finding-content/finding-content.module';
 import { GovernanceModule } from './governance/governance.module';
 import { SqlConnectionsModule } from './sql-connections/sql-connections.module';
 import { AccessRequestsModule } from './access-requests/access-requests.module';
@@ -132,6 +133,7 @@ import {
     CliRunnerModule,
     NotebookModule,
     DataQueryModule,
+    FindingContentModule,
     GovernanceModule,
     SqlConnectionsModule,
     AccessRequestsModule,

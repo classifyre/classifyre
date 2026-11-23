@@ -51,7 +51,8 @@ export interface QueryRunMaskDto {
  */
 export const QueryRunMaskDtoActionEnum = {
     Mask: 'mask',
-    Hide: 'hide'
+    Hide: 'hide',
+    Restrict: 'restrict'
 } as const;
 export type QueryRunMaskDtoActionEnum = typeof QueryRunMaskDtoActionEnum[keyof typeof QueryRunMaskDtoActionEnum];
 
@@ -62,7 +63,8 @@ export const QueryRunMaskDtoMaskEnum = {
     Redact: 'redact',
     Partial: 'partial',
     Hash: 'hash',
-    Null: 'null'
+    Null: 'null',
+    Scrub: 'scrub'
 } as const;
 export type QueryRunMaskDtoMaskEnum = typeof QueryRunMaskDtoMaskEnum[keyof typeof QueryRunMaskDtoMaskEnum];
 

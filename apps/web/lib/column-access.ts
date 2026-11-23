@@ -5,10 +5,16 @@
  * dialog can say what "follow the classification" will mean before it is
  * saved. `column-access.spec.ts` pins the two to the same cases.
  */
-export const COLUMN_ACTIONS = ["clear", "mask", "hide"] as const;
+export const COLUMN_ACTIONS = ["clear", "mask", "hide", "restrict"] as const;
 export type ColumnAction = (typeof COLUMN_ACTIONS)[number];
 
-export const MASK_KINDS = ["redact", "partial", "hash", "null"] as const;
+export const MASK_KINDS = [
+  "redact",
+  "partial",
+  "hash",
+  "null",
+  "scrub",
+] as const;
 export type MaskKind = (typeof MASK_KINDS)[number];
 
 export const DEFAULT_MASK: MaskKind = "redact";
@@ -64,10 +70,11 @@ export function columnAccessFor(input: {
 
 /** How much of a column's values each mask leaves to see, least first. */
 const MASK_EXPOSURE: Readonly<Record<MaskKind, number>> = {
-  null: 1,
-  redact: 1,
-  hash: 2,
-  partial: 3,
+  null: 2,
+  redact: 2,
+  hash: 3,
+  partial: 4,
+  scrub: 5,
 };
 
 /**
@@ -75,8 +82,9 @@ const MASK_EXPOSURE: Readonly<Record<MaskKind, number>> = {
  * someone who reads the table in clear may raise it.
  */
 export function exposureOf(access: ColumnAccess): number {
-  if (access.action === "hide") return 0;
-  if (access.action === "clear") return 4;
+  if (access.action === "restrict") return 0;
+  if (access.action === "hide") return 1;
+  if (access.action === "clear") return 6;
   return MASK_EXPOSURE[access.mask ?? DEFAULT_MASK];
 }
 

@@ -153,6 +153,12 @@ export interface FindingResponseDto {
      */
     redactedContent?: string;
     /**
+     * True when the value is hidden from you (`matchedContent` reads ••••): it is what a masked column protects. People with finding.content, and people who read its table in clear (data.unmask, its owner, its stewards), see it.
+     * @type {boolean}
+     * @memberof FindingResponseDto
+     */
+    contentHidden?: boolean;
+    /**
      * 
      * @type {string}
      * @memberof FindingResponseDto
@@ -347,6 +353,7 @@ export function FindingResponseDtoFromJSONTyped(json: any, ignoreDiscriminator: 
         'confidence': json['confidence'],
         'matchedContent': json['matchedContent'],
         'redactedContent': json['redactedContent'] == null ? undefined : json['redactedContent'],
+        'contentHidden': json['contentHidden'] == null ? undefined : json['contentHidden'],
         'contextBefore': json['contextBefore'] == null ? undefined : json['contextBefore'],
         'contextAfter': json['contextAfter'] == null ? undefined : json['contextAfter'],
         'location': json['location'] == null ? undefined : FindingLocationDtoFromJSON(json['location']),
@@ -394,6 +401,7 @@ export function FindingResponseDtoToJSONTyped(value?: FindingResponseDto | null,
         'confidence': value['confidence'],
         'matchedContent': value['matchedContent'],
         'redactedContent': value['redactedContent'],
+        'contentHidden': value['contentHidden'],
         'contextBefore': value['contextBefore'],
         'contextAfter': value['contextAfter'],
         'location': FindingLocationDtoToJSON(value['location']),

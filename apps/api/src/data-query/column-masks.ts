@@ -16,11 +16,16 @@ import { createHmac } from 'node:crypto';
  * published data product) filters, joins and groups on the masked values,
  * never on the real ones.
  */
-export const COLUMN_ACTIONS = ['clear', 'mask', 'hide'] as const;
+/**
+ * `restrict`: hidden from everyone but the table's (or its source's) owners
+ * and stewards — Data reader, unmasked does not show it (national ids a
+ * sales team reads its customers' table in clear without).
+ */
+export const COLUMN_ACTIONS = ['clear', 'mask', 'hide', 'restrict'] as const;
 export type ColumnAction = (typeof COLUMN_ACTIONS)[number];
 
 /** What a column can be for someone who does not read it in clear. */
-export const COLUMN_MASK_ACTIONS = ['mask', 'hide'] as const;
+export const COLUMN_MASK_ACTIONS = ['mask', 'hide', 'restrict'] as const;
 export type ColumnMaskAction = (typeof COLUMN_MASK_ACTIONS)[number];
 
 /**
@@ -31,7 +36,17 @@ export type ColumnMaskAction = (typeof COLUMN_MASK_ACTIONS)[number];
  *   one workspace, so masked columns still join and count distinct;
  * - `null`: NULL.
  */
-export const MASK_KINDS = ['redact', 'partial', 'hash', 'null'] as const;
+/**
+ * `scrub`: free text with the identifiers and credentials in it replaced
+ * (`[email]`, `[iban]`, `[key]` …, masks.py), the rest kept.
+ */
+export const MASK_KINDS = [
+  'redact',
+  'partial',
+  'hash',
+  'null',
+  'scrub',
+] as const;
 export type MaskKind = (typeof MASK_KINDS)[number];
 
 export const DEFAULT_MASK: MaskKind = 'redact';
@@ -102,10 +117,12 @@ export function effectiveColumnPolicy(input: {
 
 /** How much of a column's values each mask leaves to see, least first. */
 const MASK_EXPOSURE: Readonly<Record<MaskKind, number>> = {
-  null: 1,
-  redact: 1,
-  hash: 2,
-  partial: 3,
+  null: 2,
+  redact: 2,
+  hash: 3,
+  partial: 4,
+  // The text around what it removes shows: more than any other mask.
+  scrub: 5,
 };
 
 /**
@@ -114,8 +131,9 @@ const MASK_EXPOSURE: Readonly<Record<MaskKind, number>> = {
  * that raises it gives people who may not unmask more than they had.
  */
 export function exposureOf(policy: ColumnPolicy): number {
-  if (policy.action === 'hide') return 0;
-  if (policy.action === 'clear') return 4;
+  if (policy.action === 'restrict') return 0;
+  if (policy.action === 'hide') return 1;
+  if (policy.action === 'clear') return 6;
   return MASK_EXPOSURE[policy.mask ?? DEFAULT_MASK];
 }
 
@@ -131,9 +149,31 @@ export function toColumnMask(
   policy: ColumnPolicy,
 ): ColumnMask | null {
   if (policy.action === 'clear') return null;
-  return policy.action === 'mask'
-    ? { column, action: 'mask', mask: policy.mask ?? DEFAULT_MASK }
-    : { column, action: 'hide' };
+  if (policy.action === 'mask') {
+    return { column, action: 'mask', mask: policy.mask ?? DEFAULT_MASK };
+  }
+  return { column, action: policy.action };
+}
+
+/**
+ * The masks a query job applies for one person on one table: every mask for
+ * someone who does not read it in clear (`restrict` as `hide`); only the
+ * restricted columns, hidden, for someone who reads it in clear without
+ * owning or stewarding it (`data.unmask`); none for its owners and stewards.
+ */
+export function jobMasks(
+  masks: readonly ColumnMask[],
+  inClear: boolean,
+  governs: boolean,
+): ColumnMask[] {
+  if (governs) return [];
+  return masks
+    .filter((mask) => !inClear || mask.action === 'restrict')
+    .map((mask) =>
+      mask.action === 'restrict'
+        ? { column: mask.column, action: 'hide' }
+        : mask,
+    );
 }
 
 /**
@@ -152,7 +192,7 @@ export function runMasksOf(
   return tables.flatMap((table) =>
     (table.masks ?? []).map(
       (mask): RunMask =>
-        mask.action === 'hide'
+        mask.action === 'hide' || mask.action === 'restrict'
           ? { table: table.sqlName, action: 'hide' }
           : {
               table: table.sqlName,
@@ -251,6 +291,8 @@ export function columnsAsSeen(
   columns: readonly { name: string; type: string }[],
   masks: readonly ColumnMask[],
   inClear: boolean,
+  /** Owns or stewards it: reads restricted columns too. */
+  governs = inClear,
 ): { columns: MaskedColumn[]; hidden: number } {
   if (!masks.length) return { columns: [...columns], hidden: 0 };
   const exact = new Map(masks.map((m) => [m.column, m]));
@@ -262,6 +304,8 @@ export function columnsAsSeen(
       exact.get(column.name) ?? folded.get(column.name.toLowerCase());
     if (!mask) {
       out.push({ ...column });
+    } else if (mask.action === 'restrict' && !governs) {
+      hidden += 1;
     } else if (inClear) {
       out.push({
         ...column,

@@ -1,3 +1,4 @@
+import { FindingContentService } from './finding-content/finding-content.service';
 import {
   BadRequestException,
   ConflictException,
@@ -123,6 +124,7 @@ export class FindingsService {
     @Optional() private readonly statsJobs?: FindingStatsScheduler,
     @Optional() private readonly bulkOperations?: FindingBulkOperationService,
     @Optional() private readonly caseCleanup?: CaseCleanupService,
+    @Optional() private readonly findingContent?: FindingContentService,
   ) {}
 
   /**
@@ -479,20 +481,25 @@ export class FindingsService {
     }
 
     // Full-text search on matched_content using standard PostgreSQL GIN index.
-    // Matches whole words only (no substring/partial matches).
-    try {
-      const ftsRows = await this.prisma.$queryRaw<{ id: string }[]>`
+    // Matches whole words only (no substring/partial matches). Only for
+    // someone who reads every value: for anyone else which findings match is
+    // an oracle on hidden values (DQ §5.8a).
+    const searchContent =
+      (await this.findingContent?.maySearchContent()) ?? true;
+    if (searchContent)
+      try {
+        const ftsRows = await this.prisma.$queryRaw<{ id: string }[]>`
         SELECT id FROM findings
         WHERE to_tsvector('simple', matched_content) @@ plainto_tsquery('simple', ${search})
         ORDER BY id
         LIMIT 1000
       `;
-      if (ftsRows.length > 0) {
-        textOr.push({ id: { in: ftsRows.map((r) => r.id) } });
+        if (ftsRows.length > 0) {
+          textOr.push({ id: { in: ftsRows.map((r) => r.id) } });
+        }
+      } catch {
+        // plainto_tsquery may reject certain inputs; skip FTS and rely on other OR conditions.
       }
-    } catch {
-      // plainto_tsquery may reject certain inputs; skip FTS and rely on other OR conditions.
-    }
 
     const existing = where.AND
       ? Array.isArray(where.AND)

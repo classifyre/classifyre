@@ -14,7 +14,33 @@ from typing import Any
 
 from ..utils.duckdb_engine import quote_identifier
 
-MASK_KINDS = ("redact", "partial", "hash", "null")
+MASK_KINDS = ("redact", "partial", "hash", "null", "scrub")
+
+#: What ``scrub`` removes from free text, in order (RE2, as DuckDB reads it):
+#: the identifiers and credentials a pattern can tell apart. Names and other
+#: words stay — scrub keeps a text readable, it does not anonymise it. Every
+#: row is scrubbed, not only the rows a scan sampled.
+SCRUB_PATTERNS: tuple[tuple[str, str], ...] = (
+    (r"(?s)-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----", "[private key]"),
+    (r"eyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}", "[token]"),
+    (r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b", "[key]"),
+    (r"\b[sr]k_(?:live|test)_[0-9A-Za-z]{10,}\b", "[key]"),
+    (r"\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b", "[key]"),
+    (r"\bxox[abprs]-[A-Za-z0-9-]{10,}\b", "[key]"),
+    (
+        r"(?i)\b(password|passwort|passwd|pwd|passcode|pin)(\s*(?:is|ist|:|=)\s*)\S+",
+        "\\1\\2[secret]",
+    ),
+    # A long run of key characters: an AWS secret access key (40) and its
+    # like. Words and URLs break such runs (spaces, dots, colons).
+    (r"[A-Za-z0-9/+]{30,}={0,2}", "[secret]"),
+    (r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", "[email]"),
+    (r"\b[A-Z]{2}[0-9]{2}(?: ?[A-Z0-9]{4}){2,7}(?: ?[A-Z0-9]{1,4})?\b", "[iban]"),
+    (r"\b(?:[0-9][ -]?){12,18}[0-9]\b", "[card number]"),
+    (r"\+[0-9][0-9 ()/-]{6,}[0-9]", "[phone]"),
+    (r"\b[0-9]{4} ?[0-9]{6}\b", "[number]"),
+    (r"\b[A-Z]{1,2}[0-9]{6,8}[A-Z]?\b", "[document number]"),
+)
 
 #: Shorter values are redacted whole by a ``partial`` mask: their last four
 #: characters would be most of them.
@@ -141,10 +167,24 @@ def _struct_fields(type_name: str) -> list[tuple[str, str]] | None:
 
 def _masked_leaf(expr: str, type_name: str, mask: str, salt: str) -> str:
     if mask == "hash":
+        # Text is hashed lower-cased and trimmed: the same address spelt
+        # differently in two systems must join (a hash is for joining).
+        value = (
+            f"lower(trim(CAST({expr} AS VARCHAR)))"
+            if _is_text(type_name)
+            else f"CAST({expr} AS VARCHAR)"
+        )
         return (
             f"CASE WHEN {expr} IS NULL THEN NULL "
-            f"ELSE left(sha256({_literal(salt)} || CAST({expr} AS VARCHAR)), 16) END"
+            f"ELSE left(sha256({_literal(salt)} || {value}), 16) END"
         )
+    if mask == "scrub" and _is_text(type_name):
+        scrubbed = expr
+        for pattern, replacement in SCRUB_PATTERNS:
+            scrubbed = (
+                f"regexp_replace({scrubbed}, {_literal(pattern)}, {_literal(replacement)}, 'g')"
+            )
+        return scrubbed
     if mask == "null" or not _is_text(type_name):
         # A number, a date or a map has no "partly hidden" form.
         return f"CAST(NULL AS {type_name})" if type_name else "NULL"

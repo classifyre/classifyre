@@ -21,6 +21,7 @@ Name | Type
 `confidence` | number
 `matchedContent` | string
 `redactedContent` | string
+`contentHidden` | boolean
 `contextBefore` | string
 `contextAfter` | string
 `location` | [FindingLocationDto](FindingLocationDto.md)
@@ -62,6 +63,7 @@ const example = {
   "confidence": null,
   "matchedContent": null,
   "redactedContent": null,
+  "contentHidden": null,
   "contextBefore": null,
   "contextAfter": null,
   "location": null,

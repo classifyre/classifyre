@@ -33,7 +33,7 @@ export function ColumnAccessChip({
   compact?: boolean;
 }) {
   const { t } = useTranslation();
-  if (action !== "mask" && action !== "hide") {
+  if (action !== "mask" && action !== "hide" && action !== "restrict") {
     if (compact) return null;
     return (
       <span className="text-xs text-muted-foreground">
@@ -41,11 +41,14 @@ export function ColumnAccessChip({
       </span>
     );
   }
-  const Icon = action === "hide" ? EyeOff : VenetianMask;
+  const hiddenLike = action === "hide" || action === "restrict";
+  const Icon = hiddenLike ? EyeOff : VenetianMask;
   const label =
-    action === "hide"
-      ? t("columnAccess.hide")
-      : `${t("columnAccess.mask")} · ${t(`columnAccess.kind.${mask ?? DEFAULT_MASK}` as TranslationKey)}`;
+    action === "restrict"
+      ? t("columnAccess.restrict")
+      : action === "hide"
+        ? t("columnAccess.hide")
+        : `${t("columnAccess.mask")} · ${t(`columnAccess.kind.${mask ?? DEFAULT_MASK}` as TranslationKey)}`;
   const why = inClear
     ? t("columnAccess.inClear")
     : fromClassification === undefined
@@ -65,7 +68,7 @@ export function ColumnAccessChip({
     />
   ) : (
     <ToneBadge
-      tone={inClear ? "neutral" : action === "hide" ? "error" : "progress"}
+      tone={inClear ? "neutral" : hiddenLike ? "error" : "progress"}
       data-testid={`column-access-${action}`}
     >
       <Icon className="h-3 w-3" aria-hidden />

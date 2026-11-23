@@ -57,7 +57,8 @@ export interface QueryColumnDto {
  */
 export const QueryColumnDtoAccessEnum = {
     Mask: 'mask',
-    Hide: 'hide'
+    Hide: 'hide',
+    Restrict: 'restrict'
 } as const;
 export type QueryColumnDtoAccessEnum = typeof QueryColumnDtoAccessEnum[keyof typeof QueryColumnDtoAccessEnum];
 
@@ -68,7 +69,8 @@ export const QueryColumnDtoMaskEnum = {
     Redact: 'redact',
     Partial: 'partial',
     Hash: 'hash',
-    Null: 'null'
+    Null: 'null',
+    Scrub: 'scrub'
 } as const;
 export type QueryColumnDtoMaskEnum = typeof QueryColumnDtoMaskEnum[keyof typeof QueryColumnDtoMaskEnum];
 

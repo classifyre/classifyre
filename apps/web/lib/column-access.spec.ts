@@ -66,8 +66,11 @@ describe("columnAccessFor", () => {
 });
 
 describe("exposureOf", () => {
-  it("orders hidden, emptied or redacted, hashed, last four, clear", () => {
-    const of = (action: "clear" | "mask" | "hide", mask?: string) =>
+  it("orders restricted, hidden, emptied or redacted, hashed, last four, scrubbed, clear", () => {
+    const of = (
+      action: "clear" | "mask" | "hide" | "restrict",
+      mask?: string,
+    ) =>
       exposureOf(
         columnAccessFor({
           access: action,
@@ -75,11 +78,38 @@ describe("exposureOf", () => {
           classification: null,
         }),
       );
-    expect(of("hide")).toBe(0);
-    expect(of("mask", "null")).toBe(1);
-    expect(of("mask", "redact")).toBe(1);
-    expect(of("mask", "hash")).toBe(2);
-    expect(of("mask", "partial")).toBe(3);
-    expect(of("clear")).toBe(4);
+    const order = [
+      of("restrict"),
+      of("hide"),
+      of("mask", "redact"),
+      of("mask", "hash"),
+      of("mask", "partial"),
+      of("mask", "scrub"),
+      of("clear"),
+    ];
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(new Set(order).size).toBe(order.length);
+    expect(of("mask", "null")).toBe(of("mask", "redact"));
+  });
+
+  it("matches the API's numbers, so the preview and the server agree", () => {
+    // apps/api/src/data-query/column-masks.ts
+    expect(of2("restrict")).toBe(0);
+    expect(of2("hide")).toBe(1);
+    expect(of2("mask", "redact")).toBe(2);
+    expect(of2("mask", "hash")).toBe(3);
+    expect(of2("mask", "partial")).toBe(4);
+    expect(of2("mask", "scrub")).toBe(5);
+    expect(of2("clear")).toBe(6);
   });
 });
+
+function of2(action: "clear" | "mask" | "hide" | "restrict", mask?: string) {
+  return exposureOf(
+    columnAccessFor({
+      access: action,
+      maskKind: mask ?? null,
+      classification: null,
+    }),
+  );
+}

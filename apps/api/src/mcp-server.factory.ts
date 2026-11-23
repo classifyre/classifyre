@@ -1,3 +1,5 @@
+import { hideValuesInText } from './finding-content/finding-content';
+import { FindingContentService } from './finding-content/finding-content.service';
 import { GovernanceService } from './governance/governance.service';
 import { QueryCatalogService } from './data-query/query-catalog.service';
 import { QueryRunService } from './data-query/query-run.service';
@@ -465,6 +467,7 @@ export class McpServerFactoryService {
     @Optional() private readonly governance?: GovernanceService,
     @Optional() private readonly queryCatalog?: QueryCatalogService,
     @Optional() private readonly queryRuns?: QueryRunService,
+    @Optional() private readonly findingContent?: FindingContentService,
   ) {}
 
   /**
@@ -523,6 +526,9 @@ export class McpServerFactoryService {
           ['custom_detectors'],
           withoutDetectorDefinition,
         );
+      }
+      if (!options.capabilities.has('finding.content') && this.findingContent) {
+        this.hideFindingContent(server, this.findingContent);
       }
     }
     if (this.auditTrail) {
@@ -605,6 +611,73 @@ export class McpServerFactoryService {
       const handler = tool.handler;
       tool.handler = async (...params: unknown[]) =>
         redactToolResult(await handler(...params), redact);
+    }
+  }
+
+  /**
+   * Every tool's findings with the values the caller may not read hidden,
+   * like the REST interceptor (finding-content.service.ts, DQ §5.8a): the
+   * value of a finding is the data a column mask protects.
+   */
+  private hideFindingContent(
+    server: McpServer,
+    content: FindingContentService,
+  ): void {
+    const registered = (
+      server as unknown as {
+        _registeredTools: Record<
+          string,
+          { handler: (...params: unknown[]) => unknown }
+        >;
+      }
+    )._registeredTools;
+    for (const tool of Object.values(registered)) {
+      const handler = tool.handler;
+      tool.handler = async (...params: unknown[]) => {
+        const result = await handler(...params);
+        const parts = (result as { content?: unknown } | undefined)?.content;
+        if (!Array.isArray(parts)) return result;
+        const redacted = await Promise.all(
+          parts.map(async (part: unknown) => {
+            const text = (part as { type?: string; text?: unknown }).text;
+            if (
+              (part as { type?: string }).type !== 'text' ||
+              typeof text !== 'string' ||
+              !text.includes('atched')
+            ) {
+              return part;
+            }
+            const notice = text.startsWith('NOTE: ')
+              ? text.slice(0, text.indexOf('\n') + 1)
+              : '';
+            try {
+              const parsed: unknown = JSON.parse(text.slice(notice.length));
+              const hidden = await content.redact(parsed);
+              return hidden === parsed
+                ? part
+                : {
+                    ...(part as object),
+                    text: notice + JSON.stringify(hidden, null, 2),
+                  };
+            } catch {
+              // Cut short (not JSON any more): hide every value, fail closed.
+              return {
+                ...(part as object),
+                text: hideValuesInText(text),
+              };
+            }
+          }),
+        );
+        const structured = (result as { structuredContent?: unknown })
+          .structuredContent;
+        return {
+          ...(result as object),
+          content: redacted,
+          ...(structured === undefined
+            ? {}
+            : { structuredContent: await content.redact(structured) }),
+        };
+      };
     }
   }
 

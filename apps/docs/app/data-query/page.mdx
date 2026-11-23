@@ -236,25 +236,28 @@ Give the Data reader role as narrowly as the work needs: one table or one source
 
 ## Masked and hidden columns
 
-A column of a table shows one of three ways to people who may query the table:
+A column of a table shows one of four ways to people who may query the table:
 
 | Access | What they get |
 | --- | --- |
 | **Clear** | the values as they are |
-| **Masked** | the column is there, its values replaced: *redacted* (`****`), *last four shown* (`••••1234`; values shorter than nine characters are redacted whole), *hashed* (16 hex characters, the same for equal values in the workspace, so masked columns still join and count distinct) or *empty* (`NULL`). Numbers and dates masked any way but *hashed* become `NULL`. Structs and lists keep their shape: each field and each element is masked as a column of its type would be (a hashed field joins with a hashed column of the same value); a map is masked whole. |
-| **Hidden** | the column is not there: `SELECT *` leaves it out, naming it is an unknown column. A result says how many columns were hidden, never which. |
+| **Masked** | the column is there, its values replaced: *redacted* (`****`), *last four shown* (`••••1234`; values shorter than nine characters are redacted whole), *hashed* (16 hex characters, the same for equal values in the workspace, so masked columns still join and count distinct; text is hashed lower-cased and without surrounding spaces, so `Ana@Example.com` and `ana@example.com` join), *empty* (`NULL`) or *identifiers removed* (see below). Numbers and dates masked any way but *hashed* become `NULL`. Structs and lists keep their shape: each field and each element is masked as a column of its type would be (a hashed field joins with a hashed column of the same value); a map is masked whole. |
+| **Hidden** | the column is not there: `SELECT *` leaves it out, naming it is an unknown column. A result says how many columns were hidden, never which. People who read the table in clear (below) still see it. |
+| **Restricted** | hidden like *Hidden*, also from people with *Data reader, unmasked*: only the table's (or its source's) owners and stewards see it. For a national ID or a passport number in a table a team reads in clear for its work. |
 
-**By default it follows the column's classification** on the table's **Governance** tab (Columns): *personal* and *sensitive* data are masked, *secret* is hidden, the rest is clear. Classifications come from open findings (an email address found in the column makes it personal data, a key or token found there makes it a secret) or from a steward. The table's owner or a steward can set a column's access and how it is masked in the same dialog — *Follow the classification*, *Clear*, *Masked* or *Hidden* — and it applies to the next query.
+**Identifiers removed** is for free text — a ticket's body, a note, a comment — where a few rows hold something nobody should read: someone pastes an access key, a card number or an IBAN. Hiding the column would take every other row's text away; this mask keeps the text and replaces, on every row (not only the rows a scan sampled), what it recognises: e-mail addresses (`[email]`), IBANs (`[iban]`), card numbers (`[card number]`), phone numbers in international form (`[phone]`), ID-like numbers and document numbers (`[number]`, `[document number]`), cloud and API keys and tokens (`[key]`, `[token]`, `[secret]`), private keys, and the word after *password is* / *Passwort:* and similar (`[secret]`). Names and other words stay: it removes identifiers, it does not anonymise. Because it shows the most of all masks, setting it needs someone who reads the table in clear (an owner or a steward).
+
+**By default it follows the column's classification** on the table's **Governance** tab (Columns): *personal* and *sensitive* data are masked, *secret* is hidden, the rest is clear. Classifications come from open findings (an email address found in the column makes it personal data, a key or token found there makes it a secret) or from a steward. The table's owner or a steward can set a column's access and how it is masked in the same dialog — *Follow the classification*, *Clear*, *Masked*, *Hidden* or *Restricted* — and it applies to the next query.
 
 **Who reads it in clear:**
 
 - people with **Data reader, unmasked** on the table, its source or the workspace;
-- the table's (or its source's) **owner and stewards**;
+- the table's (or its source's) **owner and stewards** — the only ones who also see *Restricted* columns;
 - tenant admins. Workspace admins do not, unless given Data reader, unmasked: like writing code, reading masked data is a decision of its own.
 
 **Only someone who reads a table in clear can make it show more.** A workspace admin or curator who does not can make a column stricter (masked instead of clear, hidden instead of masked, a higher classification) and can name other people as owner or steward, but cannot make a column show more than it does, and cannot name themselves or a group of theirs owner or steward: those read the table in clear.
 
-A table's **data contract** (Governance tab, ODCS v3.2) carries each column's access as custom properties of the column: `access` (`clear`, `mask`, `hide`), `maskKind` for a masked one and `accessFrom` (`steward`, or `classification` when it follows the classification). Applying a contract sets them, with the same rule as the dialog: a column it would make show more is skipped, with the reason, unless you read the table in clear.
+A table's **data contract** (Governance tab, ODCS v3.2) carries each column's access as custom properties of the column: `access` (`clear`, `mask`, `hide`, `restrict`), `maskKind` (`redact`, `partial`, `hash`, `null`, `scrub`) for a masked one and `accessFrom` (`steward`, or `classification` when it follows the classification). Applying a contract sets them, with the same rule as the dialog: a column it would make show more is skipped, with the reason, unless you read the table in clear.
 
 If a table has columns its last scan did not record (renamed at the source since), those are hidden for anyone it masks columns for, until a new scan names them. Masks apply wherever the table is read — the Query data page, a Data tab, exports, [SQL connections](/sql-connections) — and to the whole query: a `WHERE`, `JOIN` or `GROUP BY` sees the masked values too, so a filter cannot reveal what the result hides. The Query data page marks masked columns in the table list, counts hidden ones, and says above a result which columns were masked for you.
 
@@ -270,6 +273,10 @@ A table can also show each reader only some of its rows — a region's office it
 - **On**: a reader sees the rows that a rule for them selects, and **no row** without such a rule. A rule is for a group, or for everyone who may query the table, and names conditions a row must all meet: *column is one of …* or *is none of …*. A rule with no condition gives its group every row. Rules add up: someone in two groups sees the rows of both rules.
 
 The table's **owner and stewards** (its own, or its source's) always see every row: they keep the rules. Nobody else is exempt — not admins, and not people with Data reader, unmasked: unmasking is about columns, not rows.
+
+<Callout type="warning">
+Filters fail closed, for admins too: a tenant admin with no rule for one of their groups sees an empty table. So does a [shared dataset](#shared-datasets) whose owning group has no rule — sharing one refuses that input until you add a rule. While filtering is on, the *Rows* step lists the groups that may query the table but would see no row, so you can add a rule for them (a rule with no condition gives a group every row). A reader without a rule is told on the Query data page that no rule gives them rows and to ask the table's owner or a steward.
+</Callout>
 
 | Change | Who may make it |
 | --- | --- |

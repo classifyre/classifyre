@@ -41,9 +41,26 @@ Because each finding is attached to an asset, it also inherits that asset's name
 link, and [metadata](/sources/assets-and-metadata/) — so you always know which
 item, in which source, produced it.
 
-> **Sensitive matches stay protected.** Findings keep a **redacted** version of
-> the match so you can review and triage without re-exposing the secret or
-> personal data that was found.
+## Who sees what a finding found
+
+A finding's **matched content**, its **context** and a code detector's
+**extracted fields** are the data itself: the IBAN, the card number, the access
+key. They follow the same rule as a [masked column](/data-query/#masked-and-hidden-columns),
+so the findings list never shows what a query would mask.
+
+| Who | Sees the value |
+|---|---|
+| Investigators, curators, source managers, workspace and tenant admins (`finding.content`) | on every finding — they triage and tune detectors |
+| Anyone who reads the finding's table **in clear** — Data reader, unmasked on it or its source, its owner, its stewards | on that table's findings |
+| Viewers, auditors, Data readers, Data consumers | type, place, priority and status; the value shows as `••••` with a note why |
+| Visitors of a published workspace | every value: publishing a workspace is the decision to show what it found |
+
+The same applies everywhere findings appear — the findings list and page,
+search, cases and inquiries, the graph, CSV exports (the value columns are left
+out) and [AI agents](/settings/mcp-server). Searching findings by their value
+(the search box, quick search, *where else does this value appear*) needs
+`finding.content` too: otherwise the results would tell you whether a value you
+guessed is there.
 
 ---
 

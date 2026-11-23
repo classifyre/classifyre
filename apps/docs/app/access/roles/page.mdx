@@ -29,11 +29,11 @@ In plain words:
 
 | Role                  | For                                                                                                               |
 | --------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| **Viewer**            | Reading everything in a workspace, and personal MCP tokens, which can only read too. That includes each finding with the value it found, also in columns that [SQL masks](/data-query/#masked-and-hidden-columns): give people outside the team Data consumer instead. |
+| **Viewer**            | Reading everything in a workspace, and personal MCP tokens, which can only read too. Findings show their type, place and priority; the value a finding matched only on tables they read in clear — see [Who sees what a finding found](/detectors/findings/#who-sees-what-a-finding-found). |
 | **Data consumer**     | Opening a workspace for the tables and shared datasets a Data reader grant gives, and nothing else: no findings, assets, sources or activity. For people outside the team (an agency, an auditor, a partner department). Give it with Data reader on the table or shared dataset they receive. |
-| **Investigator**      | A Viewer who also triages findings, tags assets, works on cases and inquiries, reviews leads and asks the assistant. |
-| **Curator**           | A Viewer who also writes and approves glossary terms, manages entities and decides duplicates.                    |
-| **Source manager**    | Connecting sources, running scans and managing detectors. Sees findings and assets, **not** cases or inquiries.    |
+| **Investigator**      | A Viewer who also reads every finding's value (`finding.content`), triages findings, tags assets, works on cases and inquiries, reviews leads and asks the assistant. |
+| **Curator**           | A Viewer who also reads every finding's value, writes and approves glossary terms, manages entities and decides duplicates. |
+| **Source manager**    | Connecting sources, running scans and managing detectors. Sees findings with their values and assets, **not** cases or inquiries. |
 | **Workspace admin**   | Everything in a workspace, settings and access included, except writing code and reading masked columns in clear. |
 | **Code author**       | An add-on, next to another role: custom source notebooks and code detectors run code on your infrastructure.      |
 | **Data reader**       | An add-on, next to Viewer or Data consumer: reading the rows of tables with [SQL](/data-query/). Can also be given on a single source or a single table. |

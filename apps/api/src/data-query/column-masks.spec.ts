@@ -6,7 +6,9 @@ import {
   maskedType,
   parseRunMasks,
   runMasksOf,
+  jobMasks,
   toColumnMask,
+  type ColumnMask,
 } from './column-masks';
 
 describe('effectiveColumnPolicy', () => {
@@ -170,8 +172,11 @@ describe('maskedType and maskSalt', () => {
 });
 
 describe('exposureOf', () => {
-  it('orders hidden, emptied or redacted, hashed, last four, clear', () => {
-    const of = (action: 'clear' | 'mask' | 'hide', mask?: string) =>
+  it('orders restricted, hidden, emptied or redacted, hashed, last four, scrubbed, clear', () => {
+    const of = (
+      action: 'clear' | 'mask' | 'hide' | 'restrict',
+      mask?: string,
+    ) =>
       exposureOf(
         effectiveColumnPolicy({
           access: action,
@@ -179,12 +184,18 @@ describe('exposureOf', () => {
           classification: null,
         }),
       );
-    expect(of('hide')).toBe(0);
-    expect(of('mask', 'null')).toBe(1);
-    expect(of('mask', 'redact')).toBe(1);
-    expect(of('mask', 'hash')).toBe(2);
-    expect(of('mask', 'partial')).toBe(3);
-    expect(of('clear')).toBe(4);
+    const order = [
+      of('restrict'),
+      of('hide'),
+      of('mask', 'redact'),
+      of('mask', 'hash'),
+      of('mask', 'partial'),
+      of('mask', 'scrub'),
+      of('clear'),
+    ];
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(new Set(order).size).toBe(order.length);
+    expect(of('mask', 'null')).toBe(of('mask', 'redact'));
   });
 });
 
@@ -225,5 +236,76 @@ describe('run masks', () => {
       { table: 't', action: 'hide' },
     ]);
     expect(parseRunMasks(null)).toEqual([]);
+  });
+});
+
+describe('restricted columns and scrubbed text (2026-11-23)', () => {
+  // Kestrel & Finch: sales reps given "Data reader, unmasked" also read the
+  // social insurance numbers the steward had hidden; a ticket body with two
+  // keys in it was hidden whole from customer care.
+  it('restrict is a policy of its own, stricter than hide', () => {
+    const restrict = effectiveColumnPolicy({
+      access: 'restrict',
+      maskKind: null,
+      classification: 'sensitive',
+    });
+    expect(restrict).toEqual({ action: 'restrict', fromClassification: false });
+    const hide = effectiveColumnPolicy({
+      access: 'hide',
+      maskKind: null,
+      classification: null,
+    });
+    expect(exposureOf(restrict)).toBeLessThan(exposureOf(hide));
+  });
+
+  it('scrub shows more than any other mask, less than clear', () => {
+    const scrub = effectiveColumnPolicy({
+      access: 'mask',
+      maskKind: 'scrub',
+      classification: 'secret',
+    });
+    const partial = { ...scrub, mask: 'partial' as const };
+    expect(scrub.mask).toBe('scrub');
+    expect(exposureOf(scrub)).toBeGreaterThan(exposureOf(partial));
+    expect(exposureOf(scrub)).toBeLessThan(
+      exposureOf({ action: 'clear', fromClassification: false }),
+    );
+  });
+
+  const columns = [
+    { name: 'email', type: 'VARCHAR' },
+    { name: 'svnr', type: 'VARCHAR' },
+    { name: 'region', type: 'VARCHAR' },
+  ];
+  const masks: ColumnMask[] = [
+    { column: 'email', action: 'mask', mask: 'hash' },
+    { column: 'svnr', action: 'restrict' },
+  ];
+
+  it('hides a restricted column from someone who reads the table in clear', () => {
+    const seen = columnsAsSeen(columns, masks, true, false);
+    expect(seen.hidden).toBe(1);
+    expect(seen.columns.map((c) => c.name)).toEqual(['email', 'region']);
+    expect(jobMasks(masks, true, false)).toEqual([
+      { column: 'svnr', action: 'hide' },
+    ]);
+  });
+
+  it('shows it to its owners and stewards', () => {
+    const seen = columnsAsSeen(columns, masks, true, true);
+    expect(seen.hidden).toBe(0);
+    expect(seen.columns.find((c) => c.name === 'svnr')).toMatchObject({
+      access: 'restrict',
+      inClear: true,
+    });
+    expect(jobMasks(masks, true, true)).toEqual([]);
+  });
+
+  it('hides it, and masks the rest, for everyone else', () => {
+    expect(columnsAsSeen(columns, masks, false, false).hidden).toBe(1);
+    expect(jobMasks(masks, false, false)).toEqual([
+      { column: 'email', action: 'mask', mask: 'hash' },
+      { column: 'svnr', action: 'hide' },
+    ]);
   });
 });

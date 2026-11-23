@@ -204,7 +204,8 @@ export type AssetColumnDtoEffectiveClassificationEnum = typeof AssetColumnDtoEff
 export const AssetColumnDtoAccessEnum = {
     Clear: 'clear',
     Mask: 'mask',
-    Hide: 'hide'
+    Hide: 'hide',
+    Restrict: 'restrict'
 } as const;
 export type AssetColumnDtoAccessEnum = typeof AssetColumnDtoAccessEnum[keyof typeof AssetColumnDtoAccessEnum];
 
@@ -215,7 +216,8 @@ export const AssetColumnDtoMaskKindEnum = {
     Redact: 'redact',
     Partial: 'partial',
     Hash: 'hash',
-    Null: 'null'
+    Null: 'null',
+    Scrub: 'scrub'
 } as const;
 export type AssetColumnDtoMaskKindEnum = typeof AssetColumnDtoMaskKindEnum[keyof typeof AssetColumnDtoMaskKindEnum];
 

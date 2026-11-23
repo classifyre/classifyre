@@ -64,6 +64,8 @@ export const BUILT_IN_ROLES = [
     capabilities: [
       ...VIEWS,
       'mcp.token.own',
+      // Triage needs the value.
+      'finding.content',
       'agent.use',
       'finding.triage',
       'asset.tag',
@@ -79,6 +81,8 @@ export const BUILT_IN_ROLES = [
     capabilities: [
       ...VIEWS,
       'mcp.token.own',
+      // Entities and duplicates are decided on values.
+      'finding.content',
       'agent.use',
       'glossary.edit',
       'glossary.approve',
@@ -104,6 +108,8 @@ export const BUILT_IN_ROLES = [
       'detector.manage',
       'detector.train',
       'finding.view',
+      // Tuning a detector means seeing what it matched.
+      'finding.content',
       'asset.view',
     ],
   },
@@ -202,7 +208,13 @@ export const BUILT_IN_ROLES = [
     key: 'visitor',
     title: 'Visitor',
     scope: 'public',
-    capabilities: VIEWS.filter((id) => !NOT_FOR_VISITORS.has(id)),
+    // Finding values too: publishing a workspace is the decision to show
+    // what it found (a public showcase), made by someone holding
+    // workspace.publish.
+    capabilities: [
+      ...VIEWS.filter((id) => !NOT_FOR_VISITORS.has(id)),
+      'finding.content',
+    ],
   },
 ] as const satisfies readonly RoleDefinition[];
 

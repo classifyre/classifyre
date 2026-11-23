@@ -46,7 +46,8 @@ export interface ColumnAccessDto {
 export const ColumnAccessDtoActionEnum = {
     Clear: 'clear',
     Mask: 'mask',
-    Hide: 'hide'
+    Hide: 'hide',
+    Restrict: 'restrict'
 } as const;
 export type ColumnAccessDtoActionEnum = typeof ColumnAccessDtoActionEnum[keyof typeof ColumnAccessDtoActionEnum];
 
@@ -57,7 +58,8 @@ export const ColumnAccessDtoMaskEnum = {
     Redact: 'redact',
     Partial: 'partial',
     Hash: 'hash',
-    Null: 'null'
+    Null: 'null',
+    Scrub: 'scrub'
 } as const;
 export type ColumnAccessDtoMaskEnum = typeof ColumnAccessDtoMaskEnum[keyof typeof ColumnAccessDtoMaskEnum];
 

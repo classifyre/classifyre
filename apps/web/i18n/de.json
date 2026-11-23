@@ -1616,7 +1616,8 @@
       "signal": "Signal",
       "matchedContent": "Übereinstimmender Inhalt",
       "matchedContentDesc": "Kontext um das erkannte Signal.",
-      "noMatchedContent": "Kein übereinstimmender Inhalt vorhanden."
+      "noMatchedContent": "Kein übereinstimmender Inhalt vorhanden.",
+      "contentHidden": "Für Sie verborgen: Dieser Wert ist genau das, was eine maskierte Spalte schützt. Ermittler:innen und Personen, die diese Tabelle im Klartext lesen (Owner, Stewards, Data reader, unmasked), sehen ihn."
     },
     "metadata": {
       "entityType": "Entitätstyp",
@@ -8318,11 +8319,13 @@
     "clear": "Klartext",
     "mask": "Maskiert",
     "hide": "Verborgen",
+    "restrict": "Eingeschränkt: nur Owner und Stewards",
     "kind": {
       "redact": "geschwärzt (****)",
       "partial": "letzte vier sichtbar",
       "hash": "gehasht, verknüpfbar",
-      "null": "leer (NULL)"
+      "null": "leer (NULL)",
+      "scrub": "Kennungen entfernt (bereinigter Text)"
     },
     "fromClassification": "folgt der Klassifizierung",
     "bySteward": "von einem Steward gesetzt",
@@ -8338,6 +8341,7 @@
     "off": "Alle Lesenden sehen alle Zeilen.",
     "onReadOnly": "Zeilen sind gefiltert: Jede lesende Person sieht nur die für sie freigegebenen Zeilen. Eigentümer und Stewards pflegen die Regeln.",
     "noRules": "Noch keine Regeln: Außer Eigentümer und Stewards sieht niemand eine Zeile.",
+    "readersWithoutRows": "Diese Gruppen dürfen die Tabelle abfragen, aber keine Regel gibt ihnen eine Zeile, also sehen sie keine: {{list}}. Auch Admins sind an Zeilenfilter gebunden. Fügen Sie eine Regel hinzu, wenn sie Zeilen sehen sollen.",
     "addRule": "Regel hinzufügen",
     "for": "Für",
     "aGroup": "Eine Gruppe",
@@ -8361,7 +8365,7 @@
     "runFiltered": "Für Sie gefilterte Zeilen: {{list}}.",
     "andJoin": " und ",
     "orJoin": "; oder ",
-    "noneShared": "keine Zeilen für Sie freigegeben",
+    "noneShared": "keine Regel gibt Ihnen Zeilen, Sie sehen also keine; fragen Sie den Owner oder einen Steward der Tabelle",
     "tableFiltered": "Für Sie gefilterte Zeilen: {{rows}}"
   },
   "accessRequests": {

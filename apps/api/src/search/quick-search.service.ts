@@ -1,4 +1,5 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { FindingContentService } from '../finding-content/finding-content.service';
+import { BadRequestException, Injectable, Optional } from '@nestjs/common';
 import { DetectorType, FindingStatus, Prisma, Severity } from '@prisma/client';
 import { z } from 'zod';
 import { PrismaService } from '../prisma.service';
@@ -96,7 +97,10 @@ const emptyCounts = (): QuickSearchSeverityCountsDto => ({
 
 @Injectable()
 export class QuickSearchService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly findingContent?: FindingContentService,
+  ) {}
 
   async search(body: unknown): Promise<QuickSearchResponseDto> {
     const parsed = QuickSearchSchema.safeParse(body);
@@ -389,6 +393,9 @@ export class QuickSearchService {
   ): Promise<QuickSearchFindingDto[]> {
     const tsquery = prefixTsQuery(input.q);
     if (!tsquery) return [];
+    // A prefix search over values rebuilds a hidden one character by
+    // character: only for someone who reads every value (DQ §5.8a).
+    if (!((await this.findingContent?.maySearchContent()) ?? true)) return [];
     // The full-text GIN index finds candidates; the typed query filters
     // and shapes at most a couple of hundred of them.
     const candidates = await tx.$queryRaw<{ id: string }[]>`

@@ -20,6 +20,13 @@ import {
     AssetRowRuleDtoToJSON,
     AssetRowRuleDtoToJSONTyped,
 } from './AssetRowRuleDto';
+import type { ReaderWithoutRowsDto } from './ReaderWithoutRowsDto';
+import {
+    ReaderWithoutRowsDtoFromJSON,
+    ReaderWithoutRowsDtoFromJSONTyped,
+    ReaderWithoutRowsDtoToJSON,
+    ReaderWithoutRowsDtoToJSONTyped,
+} from './ReaderWithoutRowsDto';
 
 /**
  * 
@@ -57,6 +64,12 @@ export interface AssetRowsDto {
      * @memberof AssetRowsDto
      */
     readsEveryRow: boolean;
+    /**
+     * Groups that may query the table and would read no row (no rule covers them; filters fail closed). For whoever governs it, when filtering is on.
+     * @type {Array<ReaderWithoutRowsDto>}
+     * @memberof AssetRowsDto
+     */
+    readersWithoutRows?: Array<ReaderWithoutRowsDto>;
     /**
      * 
      * @type {Date}
@@ -98,6 +111,7 @@ export function AssetRowsDtoFromJSONTyped(json: any, ignoreDiscriminator: boolea
         'rules': ((json['rules'] as Array<any>).map(AssetRowRuleDtoFromJSON)),
         'canGovern': json['canGovern'],
         'readsEveryRow': json['readsEveryRow'],
+        'readersWithoutRows': json['readersWithoutRows'] == null ? undefined : ((json['readersWithoutRows'] as Array<any>).map(ReaderWithoutRowsDtoFromJSON)),
         'updatedAt': json['updatedAt'] == null ? undefined : (new Date(json['updatedAt'])),
         'updatedBy': json['updatedBy'] == null ? undefined : json['updatedBy'],
     };
@@ -119,6 +133,7 @@ export function AssetRowsDtoToJSONTyped(value?: AssetRowsDto | null, ignoreDiscr
         'rules': ((value['rules'] as Array<any>).map(AssetRowRuleDtoToJSON)),
         'canGovern': value['canGovern'],
         'readsEveryRow': value['readsEveryRow'],
+        'readersWithoutRows': value['readersWithoutRows'] == null ? undefined : ((value['readersWithoutRows'] as Array<any>).map(ReaderWithoutRowsDtoToJSON)),
         'updatedAt': value['updatedAt'] == null ? value['updatedAt'] : value['updatedAt'].toISOString(),
         'updatedBy': value['updatedBy'],
     };

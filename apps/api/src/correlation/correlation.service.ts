@@ -1,5 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  Logger,
+  Optional,
+} from '@nestjs/common';
+import { FindingContentService } from '../finding-content/finding-content.service';
 import { NamespacePauseService } from '../namespace/namespace-pause.service';
 import {
   DetectorType,
@@ -353,6 +359,7 @@ export class CorrelationService {
     // an absent switch reads as "on", which is every workspace's default.
     @Optional() private readonly featureSwitch?: CorrelationSwitchService,
     @Optional() private readonly entitySwitch?: EntitySwitchService,
+    @Optional() private readonly findingContent?: FindingContentService,
   ) {
     this.batches = computeCorrelationBatchSizes();
     this.logger.log(
@@ -2597,6 +2604,19 @@ export class CorrelationService {
     value?: string;
     valueHash?: string;
   }): Promise<ValueOccurrenceDto> {
+    // Looking a value (or its hash) up answers "does this IBAN occur here?"
+    // for a value the caller may not read: only for someone who reads every
+    // value (DQ §5.8a).
+    if (!((await this.findingContent?.maySearchContent()) ?? true)) {
+      throw new ForbiddenException({
+        statusCode: 403,
+        error: 'Forbidden',
+        code: 'CAPABILITY_REQUIRED',
+        capability: 'finding.content',
+        message:
+          'Looking up where a value appears needs the finding.content capability.',
+      });
+    }
     let hash = args.valueHash;
     let label = args.label ?? '';
     let normalized = args.value ?? '';

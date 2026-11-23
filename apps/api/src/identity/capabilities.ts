@@ -104,6 +104,15 @@ export const CAPABILITIES = [
     description: 'Read findings, extractions and their evidence.',
   },
   {
+    // Without it a finding shows its type, place and severity, and its value
+    // only on tables the person reads in clear (DQ §5.8a): the value is the
+    // data a column mask protects.
+    id: 'finding.content',
+    scope: 'workspace',
+    description:
+      'Read what a finding found: the matched value and the text around it, on every table.',
+  },
+  {
     id: 'finding.triage',
     scope: 'workspace',
     description: 'Change finding status and severity, alone or in bulk.',

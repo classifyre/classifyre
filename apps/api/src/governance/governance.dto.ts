@@ -1333,6 +1333,17 @@ export class AssetRowRuleDto {
 }
 
 /** Row filtering of a table (DQ §5.10). */
+export class ReaderWithoutRowsDto {
+  @ApiProperty()
+  groupId: string;
+
+  @ApiProperty({ example: '/admins' })
+  path: string;
+
+  @ApiProperty({ example: 'tenant-admin' })
+  roleKey: string;
+}
+
 export class AssetRowsDto {
   @ApiProperty()
   assetId: string;
@@ -1357,6 +1368,13 @@ export class AssetRowsDto {
       'You see every row (owner or steward of the table or its source): only you may show readers more.',
   })
   readsEveryRow: boolean;
+
+  @ApiPropertyOptional({
+    type: [ReaderWithoutRowsDto],
+    description:
+      'Groups that may query the table and would read no row (no rule covers them; filters fail closed). For whoever governs it, when filtering is on.',
+  })
+  readersWithoutRows?: ReaderWithoutRowsDto[];
 
   @ApiPropertyOptional({ nullable: true })
   updatedAt: Date | null;
