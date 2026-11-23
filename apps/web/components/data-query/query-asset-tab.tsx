@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import dynamic from "next/dynamic";
 import {
   AlertCircle,
@@ -9,7 +8,6 @@ import {
   Code2,
   Columns3,
   Copy,
-  ExternalLink,
   FileCode2,
   GitFork,
   Info,
@@ -45,23 +43,17 @@ import {
   TableHeader,
   TableRow,
 } from "@workspace/ui/components/table";
-import { ConnectToolButton } from "@/components/sql-connections/connect-tool-button";
 import { RequestAccess } from "@/components/access-requests/request-access";
-import { AssetKindBadge } from "@/components/asset-kind-badge";
 import { AssetMetadataCard } from "@/components/asset-metadata-card";
 import { ColumnLineagePanel } from "@/components/column-lineage-panel";
 import { FindingsTable } from "@/components/findings-table";
 import { ReferencingFindingsPanel } from "@/components/referencing-findings-panel";
-import { ActorChip } from "@/components/actor-chip";
 import { AssetGovernanceView } from "@/components/governance/asset-governance-view";
 import { AssetGovernanceSummary } from "@/components/governance/governance-summary";
 import { ColumnAccessChip } from "@/components/governance/column-access-chip";
 import { ClassificationChip } from "@/components/governance/columns-card";
-import { GovernanceBadge } from "@/components/governance/governance-badge";
-import { QualityChip } from "@/components/governance/quality-chip";
 import { UsageCard } from "@/components/governance/usage-card";
 import {
-  DatasetBadges,
   DatasetDefinitionCard,
   DatasetInputsCard,
   DatasetOverviewCard,
@@ -159,7 +151,7 @@ export function QueryAssetTab({
   const canManageAccess = useCan("access.manage");
 
   const [subtab, setSubtab] = React.useState("data");
-  const [showSql, setShowSql] = React.useState(true);
+  const [showSql, setShowSql] = React.useState(false);
 
   const querySql = React.useMemo(
     () => previewSql(table.sqlName, TABLE_PREVIEW_LIMIT),
@@ -310,9 +302,6 @@ export function QueryAssetTab({
   );
   const access = useDataAccessGrants(scope);
 
-  const owner = governance.data?.roles.find(
-    (role: { role: string }) => role.role === "OWNER",
-  );
   const masked =
     (table.hiddenColumns ?? 0) > 0 ||
     table.columns.some((column) => column.access && !column.inClear);
@@ -347,7 +336,7 @@ export function QueryAssetTab({
       data-testid={`asset-tab-data-${table.assetId}`}
     >
       {/* DBeaver-style toolbar: Show SQL, Refresh, Copy SQL, Edit in SQL */}
-      <div className="flex flex-wrap items-center gap-1.5 rounded-md border bg-muted/40 px-2 py-1.5">
+      <div className="flex shrink-0 flex-wrap items-center gap-1.5 rounded-md border bg-muted/40 px-2 py-1.5">
         <Button
           size="sm"
           variant={showSql ? "secondary" : "ghost"}
@@ -429,41 +418,21 @@ export function QueryAssetTab({
         </div>
       </div>
 
-      {/* Read-only SQL preview box: copyable, clicking Edit opens main SQL Query tab */}
+      {/* Read-only SQL preview; Copy SQL and Edit in SQL live in the toolbar. */}
       {showSql && (
         <div
-          className="flex items-start justify-between gap-2 rounded-md border bg-muted/25 px-3 py-2"
+          className="flex shrink-0 items-start rounded-md border bg-muted/25 px-3 py-2"
           data-testid="asset-sql-preview"
         >
           <pre className="min-w-0 flex-1 overflow-x-auto whitespace-pre-wrap font-mono text-xs leading-relaxed text-foreground">
             {querySql}
           </pre>
-          <div className="flex shrink-0 items-center gap-1">
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-6 w-6"
-              onClick={handleCopySql}
-              title={t("dataQuery.objectView.copySql")}
-            >
-              <Copy className="h-3 w-3" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-6 w-6"
-              onClick={() => onEditInQuery(querySql)}
-              title={t("dataQuery.objectView.editInQueryHint")}
-            >
-              <Pencil className="h-3 w-3" />
-            </Button>
-          </div>
         </div>
       )}
 
       {queryError && (
         <div
-          className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm"
+          className="flex max-h-48 shrink-0 items-start gap-2 overflow-auto rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm"
           data-testid="asset-preview-error"
         >
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
@@ -491,11 +460,11 @@ export function QueryAssetTab({
       )}
 
       {rows && (
-        <div className="space-y-2">
+        <div className="flex min-h-0 flex-1 flex-col gap-2">
           <RunMasksNote masks={run?.masks} />
           <RunRowsNote filters={run?.rowFilters} />
           {run?.truncated && (
-            <p className="text-xs text-amber-600 dark:text-amber-400">
+            <p className="shrink-0 text-xs text-amber-600 dark:text-amber-400">
               {run.truncatedReason === "bytes"
                 ? t("dataQuery.truncatedBytes", { count: rows.rows.length })
                 : t("dataQuery.truncatedRows", { count: rows.rows.length })}
@@ -504,13 +473,13 @@ export function QueryAssetTab({
           {rows.rows.length ? (
             <ResultsGrid
               result={rows}
-              height={460}
+              fill
               defaultPageSize={TABLE_PREVIEW_LIMIT}
               canExport
               onExport={(fileFormat) => void exportAs(fileFormat)}
             />
           ) : (
-            <div className="rounded-md border p-6 text-center text-sm text-muted-foreground">
+            <div className="shrink-0 rounded-md border p-6 text-center text-sm text-muted-foreground">
               {t("dataQuery.emptyResult")}
             </div>
           )}
@@ -855,71 +824,31 @@ export function QueryAssetTab({
       testId={`query-asset-tab-${table.assetId}`}
       icon={headerIcon}
       title={table.table}
+      titleHref={nsHref(`/assets/${table.assetId}`)}
+      titleHint={t("dataQuery.objectView.openFullAsset")}
       sqlName={table.sqlName}
       badges={
-        <>
-          <button
-            type="button"
-            onClick={() => onOpenSource(source)}
-            className="inline-flex items-center gap-1 rounded border bg-background px-1.5 py-0.5 text-[11px] font-medium transition-colors hover:bg-muted"
-            title={t("dataQuery.explorer.openSourceTabHint", {
-              name: source.name,
-            })}
-          >
-            <SourceIcon source={source.type} size="sm" />
-            <span className="max-w-[10rem] truncate">{source.name}</span>
-          </button>
-          <Badge variant="outline" className="font-mono text-[10px]">
-            {table.schema}
-          </Badge>
-          {isDataset && dataset.data ? (
-            <DatasetBadges dataset={dataset.data} />
-          ) : (
-            assetDetails && <AssetKindBadge kind={assetDetails.assetType} />
-          )}
-          {governance.data && (
-            <GovernanceBadge status={governance.data.status} />
-          )}
-          {quality.data && quality.data.rules.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setSubtab("governance")}
-              className="rounded-[4px]"
-            >
-              <QualityChip
-                quality={{
-                  rules: quality.data.rules.filter((rule) => rule.enabled)
-                    .length,
-                  failing: quality.data.failing,
-                  score: quality.data.score ?? null,
-                }}
-              />
-            </button>
-          )}
-          {owner && (
-            <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-              <ActorChip actorRef={owner.principal.ref} />
-            </span>
-          )}
-        </>
+        <button
+          type="button"
+          onClick={() => onOpenSource(source)}
+          className="inline-flex cursor-pointer items-center gap-1 rounded border bg-background px-1.5 py-0.5 text-[11px] font-medium transition-colors hover:bg-muted"
+          title={t("dataQuery.explorer.openSourceTabHint", {
+            name: source.name,
+          })}
+          data-testid="asset-source-badge"
+        >
+          <SourceIcon source={source.type} size="sm" />
+          <span className="max-w-[10rem] truncate">{source.name}</span>
+        </button>
       }
       actions={
-        <>
-          {table.canQuery && masked && (
-            <RequestAccess
-              target={{ scopeType: "asset", scopeId: table.assetId }}
-              unmasked
-              compact
-            />
-          )}
-          <ConnectToolButton scope={scope} />
-          <Button asChild size="sm" variant="ghost" className="h-7 px-2 text-xs">
-            <Link href={nsHref(`/assets/${table.assetId}`)}>
-              <ExternalLink className="mr-1 h-3.5 w-3.5" />
-              {t("dataQuery.objectView.openFullAsset")}
-            </Link>
-          </Button>
-        </>
+        table.canQuery && masked ? (
+          <RequestAccess
+            target={{ scopeType: "asset", scopeId: table.assetId }}
+            unmasked
+            compact
+          />
+        ) : undefined
       }
       tabs={tabs}
       activeTab={subtab}

@@ -23,9 +23,9 @@ import { contactEmail, docs, repoUrl, routes, showcaseUrl } from "@/lib/site";
 import "../../landing.css";
 
 export const metadata: Metadata = {
-  title: "Support, Maintenance & Tailored Deployments",
+  title: "Support & Contact",
   description:
-    "Self-service resources, annual maintenance and security-patch subscriptions, optional dedicated single-tenant hosting (never multi-tenant SaaS), and scoped engineering projects for IAM mapping, custom sources, EDI requests, and detectors.",
+    "Documentation, GitHub issues, the live demo and release notes for self-hosting Classifyre — and a direct line to the engineers if you have questions about your setup.",
   alternates: {
     canonical: "/support/",
     languages: {
@@ -35,9 +35,9 @@ export const metadata: Metadata = {
     },
   },
   openGraph: {
-    title: "Classifyre Support, Maintenance & Tailored Rollouts",
+    title: "Classifyre Support & Contact",
     description:
-      "Documentation, annual maintenance and dedicated hosting subscriptions, and direct engineering collaboration scoped individually to your organisation.",
+      "Self-service resources for running Classifyre yourself, and a direct line to the engineers for questions.",
     type: "website",
   },
 };
@@ -83,118 +83,84 @@ const selfService: readonly {
   },
 ];
 
-const tailoringAreas: readonly { marker: string; title: string; body: string }[] = [
+const questionTopics: readonly { marker: string; title: string; body: string }[] = [
   {
-    marker: "Support & dedicated hosting",
-    title: "Maintenance, security patches & dedicated hosting",
-    body: "Annual licensing-style maintenance subscriptions with SLA, hardened builds, timely security patches, and upgrades — self-hosted on your cluster or operated by us on a dedicated single-tenant sovereign host (never multi-tenant SaaS).",
+    marker: "Evaluating",
+    title: "Does it fit your environment?",
+    body: "Not sure Classifyre covers your sources, identity provider or masking rules? Ask before you install — we'd rather give you an honest answer than have you guess.",
   },
   {
-    marker: "IAM & org design",
-    title: "Identity, security & organisational mapping",
-    body: "Map Classifyre cleanly onto complex Active Directory, Entra ID, Okta, or custom IAM hierarchies, organisational structures, and internal security and data protection policies.",
+    marker: "Sources",
+    title: "Systems we haven't seen yet",
+    body: "Proprietary or legacy systems, internal APIs, EDI feeds or file formats that aren't in the source catalog — tell us what you have. It shapes what we build next.",
   },
   {
-    marker: "Custom sources & EDI",
-    title: "Custom source ingestion & billable EDI requests",
-    body: "Build, harden, and maintain connectors for proprietary or legacy systems, internal APIs, and regulated EDI / data-exchange ingestion workflows not yet covered in the public catalog.",
+    marker: "Identity",
+    title: "Unusual directory or group structures",
+    body: "Nested Active Directory groups, several Entra ID tenants, Okta or Keycloak setups that don't map neatly onto workspaces and roles — describe yours and we'll tell you how it maps.",
   },
   {
-    marker: "Data products",
-    title: "Delta-backed data products & sharing workflows",
-    body: "Design governed live and Delta-backed shared datasets (external Delta Sharing server protocol planned for 2027) and plain-language business dataset request workflows with owner approval and inherited masks.",
+    marker: "Infrastructure",
+    title: "Air-gapped, OpenShift & locked-down clusters",
+    body: "Questions about running Classifyre where outbound traffic is blocked, images come from an internal registry, or BI and AI tools must route only through the gateway.",
   },
   {
     marker: "Detectors & AI",
-    title: "Business-specific detectors & custom models",
-    body: "Author domain rules in regex or Python, tune lightweight on-CPU zero-shot AI extraction and classification models, or configure private LLM classifiers inside your environment.",
+    title: "Business-specific detection",
+    body: "Custom regex or Python detectors, on-CPU classification models or a private LLM inside your network — ask how to set them up if the docs leave you stuck.",
   },
   {
-    marker: "Architecture & enforcement",
-    title: "Non-bypass network design, K8s & compliance",
-    body: "Production deployment on Kubernetes, OpenShift, or air-gapped clusters — including network isolation so BI, SQL, and MCP AI tools route exclusively through Classifyre's TLS gateway.",
-  },
-];
-
-const commercialPlans: readonly {
-  marker: string;
-  title: string;
-  price: string;
-  body: string;
-  highlight?: boolean;
-}[] = [
-  {
-    marker: "Open source",
-    title: "Community Edition",
-    price: "€0 / forever",
-    body: "100% Apache-2.0 self-hosted core: 41 built-in connectors + custom SDK, 41 PII types, SSO, row filters, 5-mode masking, governed SQL workbench (DE/EN), BI & MCP gateway, Docker & Helm.",
-  },
-  {
-    marker: "Recurring subscription",
-    title: "Maintenance & Security Patches",
-    price: "€20k / €32k / €45k / yr",
-    body: "Three concrete tiers (Standard ≤5 sources, 24h SLA; Enterprise ≤15 sources, 8h SLA & GDPR/AI Act/NIS2 audit packs; Regulated Plus unlimited sources, OpenShift HA & certified ERP/EDI connectors).",
-    highlight: true,
-  },
-  {
-    marker: "Dedicated hosting · Not SaaS",
-    title: "Dedicated Single-Tenant Hosting",
-    price: "+€12,000–€20,000 / yr",
-    body: "Optional sovereign EU single-tenant hosting add-on where our team operates, monitors, backs up, and security-patches an isolated instance exclusively for your organisation.",
-  },
-  {
-    marker: "Scoped project work",
-    title: "Pilots & Custom Source Connectors",
-    price: "€18,000–€25,000 pilot",
-    body: "Fixed-scope 6–12 week Governance Pilots (3–5 sources), IAM & organisational-structure mapping, custom legacy/ERP/EDI source connectors, and bespoke business detectors.",
+    marker: "Feedback",
+    title: "What's missing or confusing",
+    body: "Something that didn't work the way you expected, a doc that skipped a step, or a feature you'd need before using Classifyre — all of it is useful to hear.",
   },
 ];
 
 const collaborationSteps: readonly { step: string; title: string; body: string }[] = [
   {
     step: "01",
-    title: "Share your environment & goals",
-    body: "Tell us which sources, IAM directory, cluster runtime, and governance goals matter most. You speak directly with the engineers who build Classifyre.",
+    title: "Write to us",
+    body: "Tell us what you're trying to do and where you're stuck. A short note is enough — there's no form and nothing to sign.",
   },
   {
     step: "02",
-    title: "Agree an individual scope",
-    body: "No canned tiers or rigid packages. Together we define exact deliverables — whether a short architecture review, a custom connector, or a full tailored rollout.",
+    title: "An engineer reads it",
+    body: "Messages go to the people who build Classifyre. We reply as soon as we can, and point you to the docs or an issue when the answer already exists.",
   },
   {
     step: "03",
-    title: "Deliver & hand over cleanly",
-    body: "Everything runs on your own infrastructure under Apache-2.0 or your agreed private modules, documented so your internal team or integrator owns operations long-term.",
+    title: "Everyone benefits",
+    body: "When your question shows a gap, the fix lands in the open-source repository or the documentation, so the next person doesn't hit it.",
   },
 ];
 
 const inquiryChecklist: readonly string[] = [
-  "Data sources, formats & EDI feeds involved (e.g., PostgreSQL, Oracle/ODBC, Databricks, Iceberg, Delta, Parquet, S3/Azure/GCS, or proprietary/EDI streams)",
-  "Identity provider & group structure (e.g., Entra ID, Active Directory, Okta, Keycloak, OIDC/SAML)",
-  "Target infrastructure (self-hosted Docker, Kubernetes, OpenShift, air-gapped, or dedicated single-tenant managed hosting)",
-  "Primary goals (annual maintenance & security patches, non-bypass BI/AI gateway, IAM mapping, custom sources/EDI, or custom detectors)",
+  "Data sources and formats involved (e.g., PostgreSQL, Oracle/ODBC, Databricks, Iceberg, Delta, Parquet, S3/Azure/GCS, or a proprietary system)",
+  "Identity provider and group structure (e.g., Entra ID, Active Directory, Okta, Keycloak, OIDC/SAML)",
+  "Where it runs (Docker, Kubernetes, OpenShift, air-gapped)",
+  "What you're trying to achieve, and where you got stuck",
 ];
 
 const supportFaq: readonly { q: string; a: string }[] = [
   {
-    q: "Is any feature locked behind a paid support contract or enterprise edition?",
-    a: "No. Every capability — SSO, roles, row filters, dynamic column masking, SQL/BI gateway, dataset requests, shared datasets, audit logging, and the Helm chart — is 100% Apache-2.0 open source. Paid engagements cover annual maintenance, SLA, timely security patches, optional dedicated single-tenant hosting, and scoped engineering projects.",
+    q: "Is any feature locked behind a paid edition?",
+    a: "No. Every capability — SSO, roles, row filters, dynamic column masking, the SQL/BI gateway, dataset requests, shared datasets, audit logging, and the Helm chart — is 100% Apache-2.0 open source. There is no enterprise edition.",
   },
   {
-    q: "Do you offer multi-tenant SaaS, or can you host Classifyre for us?",
-    a: "Classifyre is never multi-tenant SaaS. You can self-host completely on your own infrastructure, or subscribe to dedicated single-tenant managed hosting where we operate, upgrade, and apply security patches to an isolated Classifyre instance exclusively for your organisation.",
+    q: "Is Classifyre available as SaaS?",
+    a: "No. Classifyre is never multi-tenant SaaS. It runs on your own infrastructure — Docker for evaluation, Kubernetes or OpenShift via Helm for production — operated by your own team or the integrator you already work with.",
   },
   {
-    q: "How is tailored project work (IAM, custom sources, EDI) scoped and agreed?",
-    a: "Every implementation project is scoped individually around your technical requirements, timeline, and internal team capacity — whether mapping Classifyre onto your organisational structure and IAM, building custom source connectors, fulfilling billable EDI ingestion requests, or designing non-bypass network architecture.",
+    q: "Can I ask a question without committing to anything?",
+    a: "Yes. Questions about whether Classifyre fits your sources, identity provider or infrastructure are welcome, and so are descriptions of setups the docs don't cover. Writing to us doesn't start a sales process.",
   },
   {
     q: "Can custom connectors or detectors stay private to our organisation?",
-    a: "Yes. Connectors and detectors are modular plugins. You can choose to contribute general improvements upstream to the open-source repository or keep organisation-specific integrations and business rules strictly private in your own environment.",
+    a: "Yes. Connectors and detectors are modular plugins. You can contribute general improvements upstream to the open-source repository or keep organisation-specific integrations and business rules private in your own environment.",
   },
   {
-    q: "Can you work under NDA and standard European or North American procurement?",
-    a: "Yes. We work with organisations across Austria, the European Union, North America, and globally under standard NDAs and direct engineering or maintenance agreements.",
+    q: "Where do I report bugs or request features?",
+    a: "Open an issue in the public GitHub repository so others can follow and add to it. If the details are sensitive, email contact@classifyre.com instead.",
   },
   {
     q: "How do I report a security vulnerability?",
@@ -219,24 +185,23 @@ export default function SupportPage() {
       />
       <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 sm:px-6 lg:px-8">
         <PageHero
-          eyebrow="Support & Tailoring"
+          eyebrow="Support & Contact"
           title={
             <>
               Open source by default.
               <br />
               <span className="inline-block bg-accent px-[0.12em] text-black">
-                Tailored to your needs.
+                Questions welcome.
               </span>
             </>
           }
           lede={
             <>
               Every capability in Classifyre is open source under Apache-2.0
-              with no gated tiers. Self-host freely, subscribe to annual
-              maintenance, security patches, and optional dedicated
-              single-tenant hosting (never multi-tenant SaaS), or partner with
-              our engineers on scoped IAM mapping, custom sources, and EDI
-              requests.
+              with no gated tiers, and runs on your own infrastructure. If
+              you’re evaluating it, hit something the docs don’t cover, or
+              have a setup we haven’t seen, write to us — we read every
+              message.
             </>
           }
           actions={
@@ -247,7 +212,7 @@ export default function SupportPage() {
                 className="border-2 border-accent bg-accent font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-black hover:bg-accent/90"
               >
                 <a
-                  href={`mailto:${contactEmail}?subject=${encodeURIComponent("Classifyre inquiry")}`}
+                  href={`mailto:${contactEmail}?subject=${encodeURIComponent("Classifyre question")}`}
                 >
                   {contactEmail}
                 </a>
@@ -298,64 +263,18 @@ export default function SupportPage() {
           </SectionShell>
         </section>
 
-        {/* ── Transparent commercial plans ─────────────────────────────── */}
-        <section aria-labelledby="commercial-plans-title">
-          <SectionShell tone="plain">
-            <div className="space-y-8">
-              <SectionHead
-                id="commercial-plans-title"
-                marker="Plans & indicative pricing"
-                title="100% Apache-2.0 core. Transparent commercial options."
-                lede="Self-host freely forever, or add a Red Hat-style annual maintenance and security-patch subscription, dedicated single-tenant hosting (never multi-tenant SaaS), or scoped pilot and EDI work."
-              />
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                {commercialPlans.map((plan, index) => (
-                  <Reveal key={plan.title} delayMs={index * 60} className="h-full">
-                    <div
-                      className={`flex h-full flex-col items-start gap-3 border-2 p-5 ${
-                        plan.highlight
-                          ? "border-accent bg-foreground text-background shadow-[6px_6px_0_var(--color-accent)]"
-                          : "border-border bg-background text-foreground shadow-[6px_6px_0_var(--color-border)]"
-                      }`}
-                    >
-                      <Marker label={plan.marker} />
-                      <h3 className="font-sans text-base font-bold leading-snug">
-                        {plan.title}
-                      </h3>
-                      <p
-                        className={`font-mono text-lg font-bold tracking-tight ${
-                          plan.highlight ? "text-accent" : "text-accent-ink dark:text-accent"
-                        }`}
-                      >
-                        {plan.price}
-                      </p>
-                      <p
-                        className={`text-sm leading-6 ${
-                          plan.highlight ? "text-background/80" : "text-muted-foreground"
-                        }`}
-                      >
-                        {plan.body}
-                      </p>
-                    </div>
-                  </Reveal>
-                ))}
-              </div>
-            </div>
-          </SectionShell>
-        </section>
-
-        {/* ── Tailored engineering areas ────────────────────────────────── */}
+        {/* ── Questions we welcome ─────────────────────────────────────── */}
         <section aria-labelledby="support-topics-title">
           <SectionShell tone="plain">
             <div className="space-y-8">
               <SectionHead
                 id="support-topics-title"
-                marker="Direct engineering"
-                title="Where we collaborate with organisations"
-                lede="Scope, deliverables, and timelines are agreed individually with your team — no rigid packages and no vendor lock-in."
+                marker="Questions welcome"
+                title="Things we're happy to hear about"
+                lede="No question is too early or too specific. These are the ones we get most often."
               />
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {tailoringAreas.map((item, index) => (
+                {questionTopics.map((item, index) => (
                   <Reveal key={item.marker} delayMs={index * 60} className="h-full">
                     <div className="flex h-full flex-col items-start gap-3 border-2 border-border bg-background p-6 shadow-[6px_6px_0_var(--color-border)]">
                       <Marker label={item.marker} />
@@ -371,7 +290,7 @@ export default function SupportPage() {
           </SectionShell>
         </section>
 
-        {/* ── How collaboration works + What to include ─────────────────── */}
+        {/* ── How asking works + What to include ────────────────────────── */}
         <section aria-labelledby="how-we-work-title">
           <SectionShell tone="signal" fullWidth className="bg-black">
             <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-12">
@@ -382,7 +301,7 @@ export default function SupportPage() {
                     id="how-we-work-title"
                     className="font-hero text-[clamp(2.2rem,5vw,3.8rem)] uppercase leading-[0.9] tracking-[0.01em] text-white"
                   >
-                    Direct to the engineers. Individually agreed.
+                    Straight to the engineers. No sales process.
                   </h2>
                 </div>
                 <ol className="space-y-6">
@@ -407,13 +326,13 @@ export default function SupportPage() {
 
               <div className="flex flex-col justify-between gap-6 border-2 border-white/25 bg-white/[0.04] p-6 sm:p-8 lg:col-span-5">
                 <div className="space-y-4">
-                  <Marker label="Fastest way to start" />
+                  <Marker label="Writing to us" />
                   <h3 className="font-sans text-xl font-bold text-white">
                     What helps when you write to us
                   </h3>
                   <p className="text-sm leading-6 text-white/75">
-                    A brief note covering any of the points below helps us reply
-                    with concrete technical answers right away:
+                    None of this is required, but a line on any of these points
+                    helps us give you a concrete answer:
                   </p>
                   <ul className="space-y-3 pt-1">
                     {inquiryChecklist.map((line) => (
@@ -438,7 +357,7 @@ export default function SupportPage() {
                     className="border-2 border-accent bg-accent font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-black hover:bg-accent/90"
                   >
                     <a
-                      href={`mailto:${contactEmail}?subject=${encodeURIComponent("Classifyre technical inquiry")}`}
+                      href={`mailto:${contactEmail}?subject=${encodeURIComponent("Classifyre question")}`}
                     >
                       Email {contactEmail}
                     </a>
@@ -456,7 +375,7 @@ export default function SupportPage() {
         <FaqList
           id="support-faq-title"
           mark="Support FAQ"
-          title="Questions about working with us."
+          title="Questions about getting help."
           items={supportFaq}
           locale="en"
         />

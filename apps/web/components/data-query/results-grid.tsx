@@ -74,9 +74,15 @@ export function ResultsGrid({
   canExport = false,
   onExport,
   defaultPageSize = PAGE_SIZE_OPTIONS[1],
+  fill = false,
 }: {
   result: QueryRows;
   height?: number;
+  /**
+   * Fill the parent (a flex column) instead of a fixed `height`: the rows
+   * scroll inside the grid and the search bar and pager stay put.
+   */
+  fill?: boolean;
   /** Export beside the search — only when there are rows to download. */
   canExport?: boolean;
   onExport?: (format: ExportFormat) => void;
@@ -154,8 +160,12 @@ export function ResultsGrid({
 
   return (
     <TooltipProvider delayDuration={300}>
-      <div className="space-y-2">
-        <div className="flex flex-wrap items-center gap-2">
+      <div
+        className={cn(
+          fill ? "flex min-h-0 flex-1 flex-col gap-2" : "space-y-2",
+        )}
+      >
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
           <div className="relative min-w-[240px] flex-[1.6]">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -189,8 +199,11 @@ export function ResultsGrid({
         </div>
 
         <div
-          className="overflow-auto rounded-[4px] bg-white dark:bg-card"
-          style={{ maxHeight: height }}
+          className={cn(
+            "overflow-auto rounded-[4px] bg-white dark:bg-card",
+            fill && "min-h-40 flex-1",
+          )}
+          style={fill ? undefined : { maxHeight: height }}
           data-testid="query-results"
         >
           <Table className="font-mono text-xs">
@@ -283,7 +296,7 @@ export function ResultsGrid({
           </Table>
         </div>
 
-        <div className="flex flex-col gap-2 border-t pt-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex shrink-0 flex-col gap-2 border-t pt-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">
               {t("common.rowsPerPage")}

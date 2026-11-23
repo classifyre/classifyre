@@ -1,5 +1,8 @@
 import { expect, test } from "@playwright/experimental-ct-react";
-import { QueryGuiHarness } from "./fixtures/query-gui-harness";
+import {
+  QueryExplorerLoadingHarness,
+  QueryGuiHarness,
+} from "./fixtures/query-gui-harness";
 
 test("renders hierarchical folders, opens source & asset tabs, preloads 200-row SQL, and edits in main query tab", async ({
   mount,
@@ -132,26 +135,59 @@ test("renders hierarchical folders, opens source & asset tabs, preloads 200-row 
     component.getByRole("button", { name: "Close SQL Query" }),
   ).toHaveCount(0);
 
-  // 3. Double-clicking a source opens a closable Source tab listing its tables.
-  await component.getByTestId("catalog-source-src-pg").dblclick();
+  // 3. One click on a source opens a closable Source tab listing its tables.
+  await component.getByTestId("catalog-source-src-pg").click();
   await expect(
     component.getByRole("tab", { name: "Shop Postgres" }),
   ).toHaveAttribute("data-state", "active");
   await expect(
     component.getByTestId("source-table-row-shop_pg.public.orders"),
   ).toBeVisible();
+  // The source header is just its name (a link to the source page in a new
+  // browser tab) and a copy button; no Play in the tables list.
+  const sourceTab = component.getByTestId("query-source-tab-src-pg");
+  await expect(sourceTab.getByTestId("object-title-link")).toHaveAttribute(
+    "target",
+    "_blank",
+  );
+  await expect(sourceTab.getByTestId("object-copy-name")).toBeVisible();
+  await expect(
+    component
+      .getByTestId("source-table-row-shop_pg.public.orders")
+      .getByRole("button"),
+  ).toHaveCount(2); // Open + Copy
+
+  // The explorer rows carry only Copy: no Insert, no Run.
+  await expect(component.getByTestId(/^catalog-(insert|run)-/)).toHaveCount(0);
 
   // 4. Clicking a table opens a closable Asset tab and preloads SELECT * ... LIMIT 200.
   await component.getByTestId("catalog-table-shop_pg.public.orders").click();
   await expect(
     component.getByRole("tab", { name: "orders" }),
   ).toHaveAttribute("data-state", "active");
+  const assetTab = component.getByTestId("query-asset-tab-asset-orders");
+  await expect(assetTab.getByTestId("object-title-link")).toHaveAttribute(
+    "href",
+    /\/assets\/asset-orders$/,
+  );
+  await expect(assetTab.getByTestId("asset-source-badge")).toContainText(
+    "Shop Postgres",
+  );
+
+  // The SQL preview is hidden until asked for.
+  await expect(component.getByTestId("asset-sql-preview")).toHaveCount(0);
+  await component.getByTestId("asset-toggle-sql").click();
 
   await expect(component.getByTestId("asset-sql-preview")).toContainText(
     "SELECT *\nFROM shop_pg.public.orders\nLIMIT 200",
   );
   await expect.poll(() => startedSqls.length).toBeGreaterThan(0);
   expect(startedSqls[0]).toBe("SELECT *\nFROM shop_pg.public.orders\nLIMIT 200");
+
+  // The asset is now first under "Recently opened", one click reopens it.
+  await expect(
+    component.getByTestId("query-recent-asset-orders"),
+  ).toContainText("orders");
 
   // 5. Clicking "Edit in SQL" navigates back to the pinned main Query tab with the SQL loaded.
   await component.getByTestId("asset-edit-in-query").click();
@@ -174,4 +210,14 @@ test("renders hierarchical folders, opens source & asset tabs, preloads 200-row 
   ).toBeVisible();
 
   expect(pageErrors).toEqual([]);
+});
+
+test("shows skeletons in the explorer while the catalog loads", async ({
+  mount,
+}) => {
+  const component = await mount(<QueryExplorerLoadingHarness />);
+  // The harness has no CSS, so the empty skeleton boxes have no size: check
+  // they are there rather than visible.
+  await expect(component.getByTestId("query-catalog-skeleton")).toBeAttached();
+  await expect(component.getByTestId("query-recent-assets")).toHaveCount(0);
 });

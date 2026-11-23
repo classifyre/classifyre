@@ -79,7 +79,7 @@ const principles: readonly {
   {
     marker: "Datensouveränität",
     title: "Alles bleibt auf Ihrer Infrastruktur",
-    body: "Classifyre ist selbst betriebene Software – niemals ein Multi-Tenant-SaaS-Upload. Betreiben Sie es lokal mit Docker, produktiv auf Kubernetes und OpenShift On-Premises oder in Ihrer Cloud, oder lassen Sie eine dedizierte Einzelmandanten-Instanz von uns souverän betreiben und patchen.",
+    body: "Classifyre ist selbst betriebene Software – niemals ein Multi-Tenant-SaaS-Upload. Betreiben Sie es lokal mit Docker, produktiv auf Kubernetes und OpenShift On-Premises oder in Ihrer Cloud – betrieben von Ihrem eigenen Team oder Integrator.",
     href: docs.deployment,
     hrefLabel: "Deployment-Architektur",
   },
@@ -93,9 +93,9 @@ const principles: readonly {
   {
     marker: "Offen konzipiert",
     title: "100 % Apache-2.0, ohne gesperrte Stufen",
-    body: "Prüfen Sie jede Zeile Code, verifizieren Sie Maskierung und Zugriffssteuerung und betreiben Sie die gesamte Plattform ohne Nutzerlizenzen selbst. Organisationen beauftragen uns für jährliche Wartungs- und Sicherheits-Patch-Abos, dediziertes Hosting oder Projektarbeit für eigene Quellen, Organisations-Mapping und EDI.",
+    body: "Prüfen Sie jede Zeile Code, verifizieren Sie Maskierung und Zugriffssteuerung und betreiben Sie die gesamte Plattform ohne Nutzerlizenzen selbst. Fragen zu Ihrer Umgebung sind jederzeit willkommen.",
     href: "/de/support/",
-    hrefLabel: "Support & Anpassung",
+    hrefLabel: "Support & Kontakt",
   },
 ];
 
@@ -175,7 +175,7 @@ export default function MadeInEuropePageDe() {
               size="lg"
               className="border-2 border-accent bg-accent text-black hover:bg-accent/90"
             >
-              <a href={supportHref}>Mit unserem Team sprechen</a>
+              <a href={supportHref}>Kontakt aufnehmen</a>
             </Button>
             <Button
               asChild

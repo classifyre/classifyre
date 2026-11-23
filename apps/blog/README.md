@@ -12,7 +12,7 @@ Classifyre is positioned as an **end-to-end open-source data governance platform
 4. **Multi-level masking**: column masking (redacted, last-four, hashed pseudonymisation, empty, hidden) and row filtering across source tables and shared datasets, tailored per group.
 5. **Governed SQL, Power BI, Excel & ODBC**: personal, expiring TLS connections over PostgreSQL wire protocol, plus AI agents over MCP.
 6. **Dataset requests & Delta data products**: business users request combined datasets in plain language; owners review and publish governed live or Delta shared datasets that inherit source masks as a floor.
-7. **100% open source + maintenance & tailored projects (no SaaS)**: no enterprise tier or feature walls; organisations can self-host freely, subscribe to annual maintenance, security patches, and optional dedicated single-tenant hosting (never multi-tenant SaaS), or commission scoped projects (IAM/org mapping, custom sources, billable EDI requests, Delta data products, bespoke detectors).
+7. **100% open source, run by you (no SaaS)**: no enterprise tier or feature walls; organisations self-host with their own team or integrator. The site offers no plans, prices or services — the support page invites questions only.
 8. **Built in Austria, deployed worldwide**: engineered in Austria to European privacy and security standards, serving Europe, North America, and global teams.
 
 ## Blog authoring

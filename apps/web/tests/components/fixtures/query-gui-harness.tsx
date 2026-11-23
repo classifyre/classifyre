@@ -95,6 +95,9 @@ function QueryGuiInner() {
   const [openTabs, setOpenTabs] = React.useState<OpenTab[]>([]);
   const [activeTabId, setActiveTabId] = React.useState("query");
   const [mainSql, setMainSql] = React.useState("SELECT 1");
+  const [recent, setRecent] = React.useState<
+    { table: QueryCatalogTable; source: QueryCatalogSource }[]
+  >([]);
 
   const openSource = (source: QueryCatalogSource) => {
     const id = `source:${source.id}`;
@@ -112,6 +115,12 @@ function QueryGuiInner() {
         : [...cur, { kind: "asset", id, table, source }],
     );
     setActiveTabId(id);
+    setRecent((cur) =>
+      [
+        { table, source },
+        ...cur.filter((r) => r.table.assetId !== table.assetId),
+      ].slice(0, 5),
+    );
   };
 
   const closeTab = (id: string) => {
@@ -185,7 +194,6 @@ function QueryGuiInner() {
                 <QuerySourceTab
                   source={tab.source}
                   onOpenTable={openAsset}
-                  onEditInQuery={editInQuery}
                 />
               ) : (
                 <QueryAssetTab
@@ -202,8 +210,8 @@ function QueryGuiInner() {
       <div className="flex h-full min-h-0 flex-col overflow-hidden border-l p-2">
         <QueryExplorer
           catalog={SAMPLE_CATALOG}
+          recent={recent}
           onInsert={(text) => setMainSql((prev) => `${prev} ${text}`)}
-          onRunTable={(name) => editInQuery(`SELECT *\nFROM ${name}\nLIMIT 200`)}
           onOpenSource={openSource}
           onOpenTable={openAsset}
           activeSourceId={
@@ -226,6 +234,24 @@ export function QueryGuiHarness() {
   return (
     <NamespaceProvider slug="shop">
       <QueryGuiInner />
+    </NamespaceProvider>
+  );
+}
+
+/** The explorer before the catalog has answered. */
+export function QueryExplorerLoadingHarness() {
+  return (
+    <NamespaceProvider slug="shop">
+      <div className="h-[600px] w-80">
+        <QueryExplorer
+          catalog={null}
+          onInsert={() => undefined}
+          onOpenSource={() => undefined}
+          onOpenTable={() => undefined}
+          historyLoading
+          savedLoading
+        />
+      </div>
     </NamespaceProvider>
   );
 }

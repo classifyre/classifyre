@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { Copy } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -37,6 +38,9 @@ export interface WorkbenchSubtabItem {
 export function WorkbenchObjectShell({
   icon,
   title,
+  titleHref,
+  titleHint,
+  copyHint,
   subtitle,
   sqlName,
   badges,
@@ -49,6 +53,12 @@ export function WorkbenchObjectShell({
 }: {
   icon: React.ReactNode;
   title: string;
+  /** The object's own page; the title opens it in a new browser tab. */
+  titleHref?: string;
+  /** Tooltip on the title link. */
+  titleHint?: string;
+  /** Tooltip on the copy button beside the title (copies `sqlName`). */
+  copyHint?: string;
   subtitle?: React.ReactNode;
   sqlName?: string;
   badges?: React.ReactNode;
@@ -78,38 +88,61 @@ export function WorkbenchObjectShell({
         data-testid={testId}
       >
         <div className="flex shrink-0 flex-wrap items-center gap-x-2.5 gap-y-1.5 border-b bg-muted/20 px-3 py-2">
-          <div className="flex min-w-0 items-center gap-2">
+          <div className="flex min-w-0 items-center gap-1.5">
             <span className="flex shrink-0 items-center" aria-hidden="true">
               {icon}
             </span>
-            <h2
-              className="truncate text-sm font-semibold tracking-tight"
-              title={title}
-            >
-              {title}
-            </h2>
+            {titleHref ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Link
+                    href={titleHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="truncate text-sm font-semibold tracking-tight underline-offset-4 hover:underline"
+                    data-testid="object-title-link"
+                  >
+                    <h2 className="inline">{title}</h2>
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">
+                  {titleHint ?? title}
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              <h2
+                className="truncate text-sm font-semibold tracking-tight"
+                title={title}
+              >
+                {title}
+              </h2>
+            )}
+            {sqlName && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={handleCopySqlName}
+                    aria-label={
+                      copyHint ??
+                      t("dataQuery.explorer.copyNameHint", { name: sqlName })
+                    }
+                    className="shrink-0 cursor-pointer rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    data-testid="object-copy-name"
+                  >
+                    <Copy className="size-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="font-mono text-xs">
+                  {copyHint ??
+                    t("dataQuery.explorer.copyNameHint", { name: sqlName })}
+                </TooltipContent>
+              </Tooltip>
+            )}
           </div>
 
           {badges && (
             <div className="flex flex-wrap items-center gap-1.5">{badges}</div>
-          )}
-
-          {sqlName && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  onClick={handleCopySqlName}
-                  className="inline-flex max-w-xs items-center gap-1 rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground transition-colors hover:bg-muted/80 hover:text-foreground"
-                >
-                  <span className="truncate">{sqlName}</span>
-                  <Copy className="size-3 shrink-0 opacity-70" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="font-mono text-xs">
-                {t("dataQuery.explorer.copyNameHint", { name: sqlName })}
-              </TooltipContent>
-            </Tooltip>
           )}
 
           {subtitle && (

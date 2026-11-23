@@ -22,10 +22,10 @@ export const deChrome: TopicChrome = {
   runBody:
     "Lokal mit einem Docker-Container evaluieren oder mit Helm produktiv auf Kubernetes und OpenShift betreiben. 100 % Open Source (Apache-2.0) – Ihre Daten bleiben in Ihrem Netz.",
   runDocs: "Installationsleitfaden",
-  tailoringTitle: "Wartungs-Abo, dediziertes Hosting oder maßgeschneiderte Integration?",
+  tailoringTitle: "Fragen zu Ihrer Umgebung?",
   tailoringBody:
-    "Arbeiten Sie mit unseren Entwicklern über ein jährliches Wartungs- und Sicherheits-Patch-Abo (inkl. optionalem dediziertem Einzelmandanten-Hosting, kein Multi-Tenant-SaaS) oder klar abgegrenzte Projekte für IAM-Mapping, eigene Quellen, EDI-Anbindungen, Delta-Datenprodukte und Detektoren.",
-  tailoringCta: "Mit unserem Team sprechen",
+    "Wenn Sie Classifyre evaluieren und Ihre Quellen, Ihr Identity Provider oder Ihre Infrastruktur nicht ganz zur Dokumentation passen, schreiben Sie uns. Wir beantworten gern Fragen und hören von Umgebungen, die wir noch nicht kennen.",
+  tailoringCta: "Kontakt aufnehmen",
   relatedTitle: "Weitere Vergleiche & Leitfäden",
   faqTitle: "Häufige Fragen",
   sourcesLabel: "Quellen",
@@ -331,9 +331,9 @@ const immuta: TopicCopy = {
         us: "Datenanfragen in Alltagssprache, Owner-Freigabe und Live- oder Delta-Datenprodukte mit vererbter Masken-Untergrenze",
       },
       {
-        aspect: "Kosten & Unterstützung",
+        aspect: "Lizenz & Kosten",
         them: "Kommerzielle Enterprise-Subskription",
-        us: "100 % Apache-2.0-Kernplattform; optionale Jahresabos (ab €20k/Jahr) umfassen signierte gehärtete Builds, 24h-/8h-CVE-SLAs, Compliance-Nachweispakete, zertifizierte ERP-/EDI-Quellkonnektoren und dediziertes EU-Einzelmandanten-Hosting (kein SaaS)",
+        us: "100 % Apache-2.0, keine Nutzerlizenzen und keine gesperrten Stufen; selbst betrieben durch Ihr Team oder Ihren Integrator, Community-Support auf GitHub",
       },
     ],
     note: "Herstellerfunktionen ändern sich laufend; prüfen Sie den aktuellen Stand in der offiziellen Immuta-Dokumentation. Fachliche Korrekturen gerne an contact@classifyre.com.",
@@ -375,7 +375,7 @@ const immuta: TopicCopy = {
     },
     {
       q: "Wie vergleichen sich die Kosten bei 500+ Nutzern?",
-      a: "Die Classifyre-Kernplattform steht zu 100 % unter Apache-2.0 ohne Nutzer- oder Sitzplatzlizenzen. Regulierte Organisationen können optional ein jährliches Wartungs- und Compliance-Abo (ab €20.000/Jahr für signierte gehärtete Builds, 24h-/8h-CVE-Patch-SLAs, Audit-Nachweispakete und optionales dediziertes EU-Einzelmandanten-Hosting) sowie abgegrenzte Pilot- und Konnektor-Projekte vereinbaren. Immuta wird kommerziell lizenziert.",
+      a: "Die Classifyre-Kernplattform steht zu 100 % unter Apache-2.0 ohne Nutzer- oder Sitzplatzlizenzen. Ihre Kosten sind die Infrastruktur, auf der es läuft, und die Zeit, die Ihr Team oder Ihr Integrator für den Betrieb aufwendet. Immuta wird kommerziell lizenziert.",
     },
   ],
   related: ["data-access-governance", "unity-catalog-alternative"],

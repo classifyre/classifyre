@@ -8,7 +8,7 @@ import { ConnectToolButton } from "@/components/sql-connections/connect-tool-but
 import { useNamespace } from "@/components/namespace-provider";
 import { useCan } from "@/hooks/use-me";
 import { useTranslation } from "@/hooks/use-translation";
-import { previewSql, type QueryCatalog } from "@/lib/data-query";
+import { type QueryCatalog } from "@/lib/data-query";
 import {
   DataAccessSection,
   GiveDataAccessButton,
@@ -103,11 +103,6 @@ export function DataTab({
               catalog={catalog}
               tablesOnly
               onInsert={(text) => workbench.current?.insert(text)}
-              onRunTable={(name) => {
-                const next = previewSql(name);
-                setSql(next);
-                workbench.current?.setSql(next);
-              }}
             />
           </aside>
         </div>

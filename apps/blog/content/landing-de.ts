@@ -458,31 +458,31 @@ const de: LandingCopy = {
   },
 
   convert: {
-    marker: "Open Source, Wartung & Projektarbeit",
-    title: "100 % Open Source. Gewartet & angepasst bei Bedarf.",
-    lede: "Jede Funktion von Classifyre steht offen unter Apache-2.0 – selbst betrieben auf Ihren Servern, niemals Multi-Tenant-SaaS. Betreiben Sie alles selbst, schließen Sie ein jährliches Wartungs- und Sicherheits-Patch-Abo (inkl. optionalem dediziertem Einzelmandanten-Hosting) ab oder beauftragen Sie gezielte Projektarbeit.",
+    marker: "Open Source, von Ihnen betrieben",
+    title: "100 % Open Source. In Ihrer Hand.",
+    lede: "Jede Funktion von Classifyre steht offen unter Apache-2.0 und läuft auf Ihren eigenen Servern – niemals Multi-Tenant-SaaS. Installieren Sie es selbst, mit Ihrem eigenen Team oder dem Integrator, mit dem Sie bereits arbeiten.",
     paths: [
       {
-        label: "Wartung, Sicherheits-Patches & Dedicated Hosting",
-        text: "Jährliche Wartungs- und Support-Abos mit SLA, gehärteten Builds, zeitnahen Sicherheits-Patches, Upgrades und optionalem dediziertem Einzelmandanten-Hosting.",
+        label: "Classifyre evaluieren",
+        text: "Unsicher, ob es zu Ihren Quellen, Ihrem Identity Provider oder Ihren Maskierungsregeln passt? Fragen Sie vor der Installation – wir antworten lieber ehrlich, als dass Sie raten müssen.",
       },
       {
-        label: "IAM & Organisationsstruktur-Mapping",
-        text: "Saubere Abbildung komplexer Entra-ID-, Active-Directory-, Okta- und Mandantenstrukturen sowie interner Compliance-Richtlinien.",
+        label: "Quellen und Umgebungen, die wir noch nicht kennen",
+        text: "Ein Altsystem, eine interne API, eine ungewöhnliche Verzeichnisstruktur oder ein abgeschotteter Cluster – erzählen Sie uns davon. Das fließt in die Weiterentwicklung ein.",
       },
       {
-        label: "Eigene Datenquellen & EDI-Anforderungen",
-        text: "Entwicklung und Absicherung von Konnektoren für proprietäre Bestandssysteme, interne APIs sowie abrechenbare EDI- und Datenaustausch-Strecken.",
+        label: "Fehler und Funktionswünsche",
+        text: "Eröffnen Sie ein Issue auf GitHub, damit andere mitlesen können – oder schreiben Sie uns, wenn Sie es lieber nicht öffentlich posten möchten.",
       },
       {
-        label: "Delta-Datenprodukte & eigene Detektoren",
-        text: "Aufbau verwalteter Delta-Datenprodukte, fachlicher Datenanfragen sowie eigener Geschäftsregeln und lokaler/privater KI-Modelle.",
+        label: "Sicherheitsmeldungen",
+        text: "Schwachstellen bitte per E-Mail mit „Security“ im Betreff melden, nicht als öffentliches Issue.",
       },
     ],
-    tailoringTitle: "Wartungs-Abo, dediziertes Hosting oder maßgeschneiderte Integration?",
+    tailoringTitle: "Fragen oder eine ungewöhnliche Umgebung?",
     tailoringLede:
-      "Es gibt keine gesperrte Enterprise-Edition und keinen Multi-Tenant-SaaS-Upload. Betreiben Sie alles selbst – oder arbeiten Sie mit unseren Entwicklern über ein Wartungs-/Hosting-Abo oder ein klar abgegrenztes Integrationsprojekt.",
-    ctaPrimary: "Mit uns sprechen",
+      "Es gibt keine Enterprise-Edition und keine gesperrten Funktionen. Wenn Sie Classifyre ausprobieren und etwas unklar ist oder Ihre Umgebung anders aussieht, als die Dokumentation annimmt, freuen wir uns von Ihnen zu hören.",
+    ctaPrimary: "Kontakt aufnehmen",
     ctaSecondary: "Installationsleitfaden",
     ctaShowcase: "Live-Demo ansehen",
     ctaBlog: "Fachartikel lesen",
@@ -519,7 +519,7 @@ const de: LandingCopy = {
       },
       {
         q: "Gibt es eine kostenpflichtige Enterprise-Edition oder ist wirklich alles Open Source?",
-        a: "Alle Funktionen stehen unter Apache-2.0 im offenen Quellcode: SSO, Rollen, Zeilenfilter, dynamische Maskierung, SQL/BI-Gateway, Datenprodukte, Audit-Log und Helm-Chart. Wir sperren keine Sicherheitsfunktionen hinter einer Enterprise-Lizenz und betreiben kein Multi-Tenant-SaaS. Organisationen buchen jährliche Wartungs- und Sicherheits-Patch-Abos (inkl. optionalem dediziertem Hosting) oder Projektarbeit für IAM-Mapping, eigene Konnektoren, EDI-Anforderungen und Detektoren.",
+        a: "Alle Funktionen stehen unter Apache-2.0 im offenen Quellcode: SSO, Rollen, Zeilenfilter, dynamische Maskierung, SQL/BI-Gateway, Datenprodukte, Audit-Log und Helm-Chart. Wir sperren keine Sicherheitsfunktionen hinter einer Enterprise-Lizenz und betreiben kein Multi-Tenant-SaaS. Sie betreiben es selbst – mit Ihrem eigenen Team oder dem Integrator, mit dem Sie bereits arbeiten.",
       },
       {
         q: "Wo läuft Classifyre – verlassen Daten jemals unsere Infrastruktur?",

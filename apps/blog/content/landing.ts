@@ -481,34 +481,34 @@ const enSectors = {
   ],
 } as const;
 
-/* ── Conversion: Open Source + Tailored Rollout (NO Enterprise Tier) ────── */
+/* ── Conversion: Open source, run by you (no offer, questions welcome) ─── */
 
 const enConvert = {
-  marker: "Open source, maintenance & tailored projects",
-  title: "100% open source. Maintained & tailored when you need it.",
-  lede: "Every capability in Classifyre is open source under Apache-2.0 — self-hosted on your servers, never multi-tenant SaaS. Run it yourself, subscribe for commercial maintenance, security patches, and optional dedicated single-tenant hosting, or commission scoped project work on top of Classifyre.",
+  marker: "Open source, run by you",
+  title: "100% open source. Yours to run.",
+  lede: "Every capability in Classifyre is open source under Apache-2.0 and runs on your own servers — never multi-tenant SaaS. Install it yourself, with your own team or the integrator you already work with.",
   paths: [
     {
-      label: "Maintenance, security patches & dedicated hosting",
-      text: "Annual support and maintenance subscriptions covering SLA, hardened builds, timely security patches, upgrades, and optional dedicated single-tenant hosting.",
+      label: "Evaluating Classifyre",
+      text: "Not sure it fits your sources, identity provider or masking rules? Ask before you install — we'd rather give you an honest answer than have you guess.",
     },
     {
-      label: "IAM & organisational-structure mapping",
-      text: "Integrating Classifyre cleanly into complex Entra ID, Active Directory, Okta, multi-tenant structures, and internal compliance policies.",
+      label: "Sources and setups we haven't seen",
+      text: "A legacy system, an internal API, an unusual directory structure or an air-gapped cluster — tell us about it. It shapes what we build next.",
     },
     {
-      label: "Custom source ingestion & EDI requests",
-      text: "Building and hardening connectors for proprietary legacy systems, internal APIs, and billable EDI / regulated data-exchange workflows.",
+      label: "Bugs and feature requests",
+      text: "Open an issue on GitHub so others can follow along, or write to us if you'd rather not post publicly.",
     },
     {
-      label: "Delta data products & bespoke detectors",
-      text: "Designing governed Delta shared data assets, dataset request workflows, and domain-specific compliance detectors or local/private AI models.",
+      label: "Security reports",
+      text: "Send vulnerabilities by email with “Security” in the subject instead of opening a public issue.",
     },
   ],
-  tailoringTitle: "Need commercial maintenance, dedicated hosting, or tailored integration?",
+  tailoringTitle: "Questions, or an unusual setup?",
   tailoringLede:
-    "There is no separate enterprise edition with locked features and no multi-tenant SaaS upload. Self-host everything yourself, or work with our engineers on an annual maintenance/hosting subscription or scoped implementation project.",
-  ctaPrimary: "Talk to our team",
+    "There is no enterprise edition and no locked features. If you're trying Classifyre and something isn't clear, or your environment looks different from what the docs assume, we're happy to hear from you.",
+  ctaPrimary: "Get in touch",
   ctaSecondary: "Deployment guide",
   ctaShowcase: "Explore live demo",
   ctaBlog: "Read engineering articles",
@@ -547,7 +547,7 @@ const enFaq = {
     },
     {
       q: "Is there a separate Enterprise edition, or is everything truly open source?",
-      a: "Everything is open source under Apache-2.0 — SSO, roles, row filters, dynamic masking, SQL/BI gateway, shared datasets, audit logging, and the Helm chart. We do not gate security features behind an enterprise tier or offer multi-tenant SaaS. Organisations subscribe for annual maintenance, security patches, and optional dedicated single-tenant hosting, or commission scoped project work for IAM mapping, custom sources, EDI requests, or bespoke detectors.",
+      a: "Everything is open source under Apache-2.0 — SSO, roles, row filters, dynamic masking, SQL/BI gateway, shared datasets, audit logging, and the Helm chart. We do not gate security features behind an enterprise tier or offer multi-tenant SaaS. You run it yourself, with your own team or the integrator you already work with.",
     },
     {
       q: "Where does Classifyre run? Does data ever leave our environment?",

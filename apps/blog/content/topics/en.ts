@@ -22,10 +22,10 @@ export const enChrome: TopicChrome = {
   runBody:
     "Evaluate locally with one Docker container or deploy to Kubernetes and OpenShift with Helm. 100% Apache-2.0 open source — your data stays inside your network.",
   runDocs: "Deployment guide",
-  tailoringTitle: "Need commercial maintenance, dedicated hosting, or tailored integration?",
+  tailoringTitle: "Questions about your setup?",
   tailoringBody:
-    "Work with our engineers on an annual maintenance and security-patch subscription (with optional dedicated single-tenant hosting, never multi-tenant SaaS) or scoped project work for IAM mapping, custom sources, EDI integration, Delta data products, or custom detectors.",
-  tailoringCta: "Talk to our team",
+    "If you're evaluating Classifyre and your sources, identity provider or infrastructure don't quite match what the docs cover, write to us. We're happy to answer questions and to hear about setups we haven't seen yet.",
+  tailoringCta: "Get in touch",
   relatedTitle: "Related comparisons & guides",
   faqTitle: "Common questions",
   sourcesLabel: "Sources",
@@ -332,9 +332,9 @@ const immuta: TopicCopy = {
         us: "Plain-language dataset requests, owner approval workflow, and live or Delta shared data products with inherited mask floors",
       },
       {
-        aspect: "Pricing & support",
+        aspect: "Licensing & cost",
         them: "Commercial enterprise subscription",
-        us: "100% Apache-2.0 core platform; optional annual subscriptions (from €20k/yr) cover signed hardened builds, 24h/8h CVE SLAs, compliance evidence packs, certified ERP/EDI source connectors, and dedicated single-tenant EU hosting (never SaaS)",
+        us: "100% Apache-2.0, no per-seat licences and no locked tiers; self-hosted by your own team or integrator, with community support on GitHub",
       },
     ],
     note: "Vendor capabilities evolve frequently; verify current Immuta specifications in their official documentation. Factual corrections are always welcome at contact@classifyre.com.",
@@ -376,7 +376,7 @@ const immuta: TopicCopy = {
     },
     {
       q: "How does total cost compare at 500+ users?",
-      a: "The Classifyre core platform is 100% Apache-2.0 open source with zero per-seat licensing fees. Regulated organisations needing vendor accountability can add an optional annual maintenance & compliance subscription (from €20,000/yr for signed hardened builds, 24h/8h CVE patch SLAs, compliance audit packs, and optional dedicated single-tenant EU hosting) plus scoped pilot or custom-connector projects. Immuta is licensed commercially per platform/scale.",
+      a: "The Classifyre core platform is 100% Apache-2.0 open source with zero per-seat licensing fees. Your cost is the infrastructure it runs on and the time your team or integrator spends operating it. Immuta is licensed commercially per platform/scale.",
     },
   ],
   related: ["data-access-governance", "unity-catalog-alternative"],

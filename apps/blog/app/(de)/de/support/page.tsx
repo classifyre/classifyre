@@ -23,9 +23,9 @@ import { contactEmail, docs, repoUrl, showcaseUrlFor } from "@/lib/site";
 import "../../../landing.css";
 
 export const metadata: Metadata = {
-  title: "Support, Wartung & individuelle Einführung",
+  title: "Support & Kontakt",
   description:
-    "Self-Service-Ressourcen, jährliche Wartungs- und Sicherheits-Patch-Abos, optionales dediziertes Einzelmandanten-Hosting (kein Multi-Tenant-SaaS) sowie projektbezogenes Engineering für IAM-Mapping, eigene Quellen, EDI-Anfragen und Detektoren.",
+    "Dokumentation, GitHub-Issues, Live-Demo und Release Notes für den Eigenbetrieb von Classifyre – und ein direkter Draht zu den Entwicklern bei Fragen zu Ihrer Umgebung.",
   alternates: {
     canonical: "/de/support/",
     languages: {
@@ -35,9 +35,9 @@ export const metadata: Metadata = {
     },
   },
   openGraph: {
-    title: "Classifyre Support, Wartung & individuelle Einführung",
+    title: "Classifyre Support & Kontakt",
     description:
-      "Dokumentation, jährliche Wartungs- und Hosting-Abos sowie direkte Engineering-Unterstützung mit individuell vereinbartem Umfang.",
+      "Self-Service-Ressourcen für den Eigenbetrieb und ein direkter Draht zu den Entwicklern bei Fragen.",
     type: "website",
   },
 };
@@ -83,118 +83,84 @@ const selfService: readonly {
   },
 ];
 
-const tailoringAreas: readonly { marker: string; title: string; body: string }[] = [
+const questionTopics: readonly { marker: string; title: string; body: string }[] = [
   {
-    marker: "Support & Dedicated Hosting",
-    title: "Wartung, Sicherheits-Patches & dediziertes Hosting",
-    body: "Jährliche Wartungs- und Support-Abos mit SLA, gehärteten Builds, zeitnahen Sicherheits-Patches und Upgrades – auf Ihrem eigenen Cluster oder von uns auf einer dedizierten Einzelmandanten-Instanz betrieben (kein Multi-Tenant-SaaS).",
+    marker: "Evaluierung",
+    title: "Passt es zu Ihrer Umgebung?",
+    body: "Unsicher, ob Classifyre Ihre Quellen, Ihren Identity Provider oder Ihre Maskierungsregeln abdeckt? Fragen Sie vor der Installation – wir antworten lieber ehrlich, als dass Sie raten müssen.",
   },
   {
-    marker: "IAM & Organisation",
-    title: "Verzeichnisdienst, Sicherheit & Organisationsstruktur",
-    body: "Saubere Abbildung komplexer Active-Directory-, Entra-ID-, Okta- oder eigener IAM-Hierarchien, Organisationsstrukturen sowie interner Sicherheits- und Datenschutzrichtlinien.",
+    marker: "Quellen",
+    title: "Systeme, die wir noch nicht kennen",
+    body: "Proprietäre oder ältere Systeme, interne APIs, EDI-Strecken oder Dateiformate, die nicht im Quellenkatalog stehen – erzählen Sie uns davon. Das fließt in die Weiterentwicklung ein.",
   },
   {
-    marker: "Eigene Quellen & EDI",
-    title: "Konnektoren für Bestandssysteme & EDI-Anforderungen",
-    body: "Entwicklung, Absicherung und Pflege von Konnektoren für proprietäre Fachsysteme, interne APIs sowie abrechenbare EDI- und Datenaustausch-Anbindungen.",
+    marker: "Identität",
+    title: "Ungewöhnliche Verzeichnis- und Gruppenstrukturen",
+    body: "Verschachtelte Active-Directory-Gruppen, mehrere Entra-ID-Mandanten, Okta- oder Keycloak-Setups, die nicht direkt auf Workspaces und Rollen passen – beschreiben Sie Ihres, wir sagen Ihnen, wie es sich abbilden lässt.",
   },
   {
-    marker: "Datenprodukte",
-    title: "Delta-basierte Datenprodukte & Freigabeprozesse",
-    body: "Aufbau verwalteter Live- und Delta-basierter geteilter Datasets (externes Delta-Sharing-Protokoll geplant für 2027) sowie fachlicher Datenanfragen mit Owner-Freigabe und vererbter Maskierung.",
+    marker: "Infrastruktur",
+    title: "Air-Gapped, OpenShift & abgeschottete Cluster",
+    body: "Fragen zum Betrieb ohne ausgehenden Datenverkehr, mit Images aus einer internen Registry oder wenn BI- und KI-Werkzeuge ausschließlich über das Gateway laufen sollen.",
   },
   {
     marker: "Detektoren & KI",
-    title: "Geschäftsspezifische Detektoren & Modelle",
-    body: "Umsetzung eigener Regex- oder Python-Regeln, schlanker lokaler CPU-KI-Modelle sowie privater LLM-Klassifikatoren direkt in Ihrer Umgebung.",
+    title: "Fachspezifische Erkennung",
+    body: "Eigene Regex- oder Python-Detektoren, Klassifizierungsmodelle auf der CPU oder ein privates LLM in Ihrem Netz – fragen Sie, wenn die Dokumentation nicht weiterhilft.",
   },
   {
-    marker: "Architektur & Betrieb",
-    title: "Netzwerk-Durchsetzung, K8s & Air-Gapped-Betrieb",
-    body: "Produktivbetrieb auf Kubernetes, OpenShift oder abgeschotteten Clustern – inklusive Netzwerkisolierung, damit BI, SQL und MCP-KI-Agenten ausschließlich über das Classifyre-TLS-Gateway laufen.",
-  },
-];
-
-const commercialPlans: readonly {
-  marker: string;
-  title: string;
-  price: string;
-  body: string;
-  highlight?: boolean;
-}[] = [
-  {
-    marker: "Open Source",
-    title: "Community Edition",
-    price: "€0 / dauerhaft",
-    body: "100 % Apache-2.0 im Eigenbetrieb: 41 eingebaute Konnektoren + Custom-SDK, 41 PII-Typen, SSO, Zeilenfilter, 5-Stufen-Maskierung, verwaltete SQL-Workbench (DE/EN), BI- & MCP-Gateway, Docker & Helm.",
-  },
-  {
-    marker: "Jährliches Abo",
-    title: "Wartung & Sicherheits-Patches",
-    price: "€20k / €32k / €45k / Jahr",
-    body: "Drei klare Stufen (Standard ≤5 Quellen, 24h-SLA; Enterprise ≤15 Quellen, 8h-SLA & DSGVO-/KI-VO-/NIS2-Nachweispakete; Regulated Plus unbegrenzte Quellen, OpenShift HA & zertifizierte ERP-/EDI-Konnektoren).",
-    highlight: true,
-  },
-  {
-    marker: "Dediziertes Hosting · Kein SaaS",
-    title: "Einzelmandanten-Hosting",
-    price: "+€12.000–€20.000 / Jahr",
-    body: "Optionales souveränes EU-Einzelmandanten-Hosting: Wir betreiben, überwachen, sichern und patchen eine vollständig isolierte Instanz exklusiv für Ihre Organisation.",
-  },
-  {
-    marker: "Projektbezogen",
-    title: "Piloten & eigene Quell-Konnektoren",
-    price: "€18.000–€25.000 Pilot",
-    body: "Festpreis-Governance-Piloten (6–12 Wochen, 3–5 Quellen), IAM- & Organisations-Mapping, eigene Bestands-, ERP- und EDI-Quellkonnektoren sowie fachspezifische Detektoren.",
+    marker: "Feedback",
+    title: "Was fehlt oder unklar ist",
+    body: "Etwas hat nicht wie erwartet funktioniert, in der Doku fehlt ein Schritt oder Ihnen fehlt eine Funktion – all das hilft uns weiter.",
   },
 ];
 
 const collaborationSteps: readonly { step: string; title: string; body: string }[] = [
   {
     step: "01",
-    title: "Ausgangslage & Ziele teilen",
-    body: "Schildern Sie uns Ihre Datenquellen, Ihr IAM, Ihre Ziel-Infrastruktur und Ihre Governance-Ziele. Sie sprechen direkt mit den Entwicklern von Classifyre.",
+    title: "Schreiben Sie uns",
+    body: "Erzählen Sie, was Sie vorhaben und wo Sie hängen. Eine kurze Nachricht genügt – kein Formular, nichts zu unterschreiben.",
   },
   {
     step: "02",
-    title: "Umfang individuell vereinbaren",
-    body: "Keine starren Pakete und keine künstlichen Stufen. Wir vereinbaren Umfang, Ergebnisse und Zeitplan individuell nach Ihrem Bedarf – vom gezielten Review bis zur maßgeschneiderten Einführung.",
+    title: "Ein Entwickler liest mit",
+    body: "Nachrichten landen bei den Menschen, die Classifyre entwickeln. Wir antworten so bald wie möglich und verweisen auf Doku oder Issue, wenn es die Antwort schon gibt.",
   },
   {
     step: "03",
-    title: "Saubere Umsetzung & Übergabe",
-    body: "Alles läuft auf Ihrer eigenen Infrastruktur unter Apache-2.0 oder als vereinbartes privates Modul – sauber dokumentiert, damit Ihr Team oder Integrator langfristig unabhängig bleibt.",
+    title: "Alle profitieren",
+    body: "Zeigt Ihre Frage eine Lücke, landet die Korrektur im Open-Source-Repository oder in der Dokumentation – damit die nächste Person nicht darüber stolpert.",
   },
 ];
 
 const inquiryChecklist: readonly string[] = [
-  "Beteiligte Datenquellen, Formate & EDI-Strecken (z. B. PostgreSQL, Oracle/ODBC, Databricks, Iceberg, Delta, Parquet, S3/Azure/GCS oder proprietäre/EDI-Datenströme)",
-  "Identity Provider & Gruppenstruktur (z. B. Entra ID, Active Directory, Okta, Keycloak, OIDC/SAML)",
-  "Ziel-Infrastruktur (Self-Hosted Docker, Kubernetes, OpenShift, Air-Gapped oder dediziertes Einzelmandanten-Hosting)",
-  "Wichtigste Ziele (jährliche Wartung & Sicherheits-Patches, Non-Bypass-BI-/KI-Gateway, IAM-Mapping, eigene Quellen/EDI oder Detektoren)",
+  "Beteiligte Datenquellen und Formate (z. B. PostgreSQL, Oracle/ODBC, Databricks, Iceberg, Delta, Parquet, S3/Azure/GCS oder ein proprietäres System)",
+  "Identity Provider und Gruppenstruktur (z. B. Entra ID, Active Directory, Okta, Keycloak, OIDC/SAML)",
+  "Wo es läuft (Docker, Kubernetes, OpenShift, Air-Gapped)",
+  "Was Sie erreichen möchten und wo Sie nicht weiterkommen",
 ];
 
 const supportFaq: readonly { q: string; a: string }[] = [
   {
-    q: "Ist irgendeine Funktion hinter einem Supportvertrag oder einer Enterprise-Edition gesperrt?",
-    a: "Nein. Jede Funktion – SSO, Rollen, Zeilenfilter, dynamische Spaltenmaskierung, SQL-/BI-Gateway, Datenanfragen, geteilte Datenprodukte, Audit-Log und Helm-Chart – steht zu 100 % unter Apache-2.0. Bezahlte Leistungen umfassen jährliche Wartung, SLA, zeitnahe Sicherheits-Patches, optionales dediziertes Einzelmandanten-Hosting sowie abgegrenzte Umsetzungsprojekte.",
+    q: "Ist irgendeine Funktion hinter einer kostenpflichtigen Edition gesperrt?",
+    a: "Nein. Jede Funktion – SSO, Rollen, Zeilenfilter, dynamische Spaltenmaskierung, SQL-/BI-Gateway, Datenanfragen, geteilte Datenprodukte, Audit-Log und Helm-Chart – steht zu 100 % unter Apache-2.0. Es gibt keine Enterprise-Edition.",
   },
   {
-    q: "Bieten Sie Multi-Tenant-SaaS an – oder können Sie Classifyre für uns betreiben?",
-    a: "Classifyre ist niemals Multi-Tenant-SaaS. Sie können die Software vollständig selbst auf eigener Infrastruktur betreiben oder ein jährliches dediziertes Einzelmandanten-Hosting vereinbaren, bei dem wir eine isolierte Classifyre-Instanz exklusiv für Ihre Organisation betreiben, aktualisieren und mit Sicherheits-Patches pflegen.",
+    q: "Gibt es Classifyre als SaaS?",
+    a: "Nein. Classifyre ist niemals Multi-Tenant-SaaS. Es läuft auf Ihrer eigenen Infrastruktur – Docker zur Evaluierung, Kubernetes oder OpenShift per Helm im Betrieb – betrieben von Ihrem eigenen Team oder dem Integrator, mit dem Sie bereits arbeiten.",
   },
   {
-    q: "Wie werden individuelle Projekte (IAM, eigene Quellen, EDI) vereinbart?",
-    a: "Jedes Projekt wird individuell nach Ihren technischen Anforderungen, Ihrem Zeitrahmen und Ihren internen Ressourcen abgestimmt – von der Abbildung Ihrer Organisations- und IAM-Struktur über eigene Quell-Konnektoren und abrechenbare EDI-Anforderungen bis zur Non-Bypass-Netzwerkarchitektur.",
+    q: "Kann ich eine Frage stellen, ohne mich zu irgendetwas zu verpflichten?",
+    a: "Ja. Fragen, ob Classifyre zu Ihren Quellen, Ihrem Identity Provider oder Ihrer Infrastruktur passt, sind willkommen – ebenso Beschreibungen von Umgebungen, die die Dokumentation nicht abdeckt. Eine Nachricht an uns startet keinen Verkaufsprozess.",
   },
   {
     q: "Können eigene Konnektoren oder Detektoren intern und privat bleiben?",
     a: "Ja. Konnektoren und Detektoren sind modulare Plugins. Allgemeine Verbesserungen können gern ins Open-Source-Repository einfließen, während unternehmensspezifische Integrationen und Geschäftsregeln vollständig privat in Ihrer Umgebung bleiben.",
   },
   {
-    q: "Arbeiten Sie unter NDA und mit üblichen Beschaffungsprozessen?",
-    a: "Ja. Wir arbeiten mit Organisationen in Österreich, der EU, Nordamerika und weltweit unter üblichen Vertraulichkeitsvereinbarungen (NDA) sowie direkten Wartungs- und Projektverträgen.",
+    q: "Wo melde ich Fehler oder Funktionswünsche?",
+    a: "Eröffnen Sie ein Issue im öffentlichen GitHub-Repository, damit andere mitlesen und ergänzen können. Sind die Details vertraulich, schreiben Sie stattdessen an contact@classifyre.com.",
   },
   {
     q: "Wie melde ich eine Sicherheitslücke?",
@@ -219,24 +185,23 @@ export default function SupportPageDe() {
       />
       <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 sm:px-6 lg:px-8">
         <PageHero
-          eyebrow="Support & Anpassung"
+          eyebrow="Support & Kontakt"
           title={
             <>
               Offen im Kern.
               <br />
               <span className="inline-block bg-accent px-[0.12em] text-black">
-                Individuell abgestimmt.
+                Fragen willkommen.
               </span>
             </>
           }
           lede={
             <>
               Jede Funktion von Classifyre steht offen unter Apache-2.0 – ohne
-              gesperrte Stufen. Betreiben Sie selbst, abonnieren Sie jährliche
-              Wartung, Sicherheits-Patches und optionales dediziertes
-              Einzelmandanten-Hosting (kein Multi-Tenant-SaaS) oder arbeiten Sie
-              direkt mit unseren Entwicklern an IAM-Mapping, eigenen Quellen und
-              EDI-Anforderungen.
+              gesperrte Stufen – und läuft auf Ihrer eigenen Infrastruktur.
+              Wenn Sie es evaluieren, auf etwas stoßen, das die Dokumentation
+              nicht abdeckt, oder eine Umgebung haben, die wir noch nicht
+              kennen: Schreiben Sie uns – wir lesen jede Nachricht.
             </>
           }
           actions={
@@ -247,7 +212,7 @@ export default function SupportPageDe() {
                 className="border-2 border-accent bg-accent font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-black hover:bg-accent/90"
               >
                 <a
-                  href={`mailto:${contactEmail}?subject=${encodeURIComponent("Classifyre Anfrage")}`}
+                  href={`mailto:${contactEmail}?subject=${encodeURIComponent("Frage zu Classifyre")}`}
                 >
                   {contactEmail}
                 </a>
@@ -298,64 +263,18 @@ export default function SupportPageDe() {
           </SectionShell>
         </section>
 
-        {/* ── Transparente Optionen & Richtpreise ──────────────────────── */}
-        <section aria-labelledby="commercial-plans-title">
-          <SectionShell tone="plain">
-            <div className="space-y-8">
-              <SectionHead
-                id="commercial-plans-title"
-                marker="Modelle & Richtpreise"
-                title="100 % Apache-2.0 im Kern. Transparente Optionen."
-                lede="Dauerhaft kostenlos selbst betreiben – oder gezielt um jährliche Wartungs- und Sicherheits-Patch-Abos, dediziertes Einzelmandanten-Hosting (kein Multi-Tenant-SaaS) sowie abgegrenzte Pilot- und EDI-Projekte erweitern."
-              />
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                {commercialPlans.map((plan, index) => (
-                  <Reveal key={plan.title} delayMs={index * 60} className="h-full">
-                    <div
-                      className={`flex h-full flex-col items-start gap-3 border-2 p-5 ${
-                        plan.highlight
-                          ? "border-accent bg-foreground text-background shadow-[6px_6px_0_var(--color-accent)]"
-                          : "border-border bg-background text-foreground shadow-[6px_6px_0_var(--color-border)]"
-                      }`}
-                    >
-                      <Marker label={plan.marker} />
-                      <h3 className="font-sans text-base font-bold leading-snug">
-                        {plan.title}
-                      </h3>
-                      <p
-                        className={`font-mono text-lg font-bold tracking-tight ${
-                          plan.highlight ? "text-accent" : "text-accent-ink dark:text-accent"
-                        }`}
-                      >
-                        {plan.price}
-                      </p>
-                      <p
-                        className={`text-sm leading-6 ${
-                          plan.highlight ? "text-background/80" : "text-muted-foreground"
-                        }`}
-                      >
-                        {plan.body}
-                      </p>
-                    </div>
-                  </Reveal>
-                ))}
-              </div>
-            </div>
-          </SectionShell>
-        </section>
-
-        {/* ── Individuelle Engineering-Unterstützung ───────────────────── */}
+        {/* ── Fragen, die wir gern hören ───────────────────────────────── */}
         <section aria-labelledby="support-topics-title">
           <SectionShell tone="plain">
             <div className="space-y-8">
               <SectionHead
                 id="support-topics-title"
-                marker="Direktes Engineering"
-                title="Wobei wir Organisationen unterstützen"
-                lede="Umfang, Ergebnisse und Zeitplan werden individuell mit Ihrem Team vereinbart – ohne starre Pakete und ohne Herstellerbindung."
+                marker="Fragen willkommen"
+                title="Worüber wir gern von Ihnen hören"
+                lede="Keine Frage ist zu früh oder zu speziell. Diese hier bekommen wir am häufigsten."
               />
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {tailoringAreas.map((item, index) => (
+                {questionTopics.map((item, index) => (
                   <Reveal key={item.marker} delayMs={index * 60} className="h-full">
                     <div className="flex h-full flex-col items-start gap-3 border-2 border-border bg-background p-6 shadow-[6px_6px_0_var(--color-border)]">
                       <Marker label={item.marker} />
@@ -371,7 +290,7 @@ export default function SupportPageDe() {
           </SectionShell>
         </section>
 
-        {/* ── Ablauf & Checkliste für Anfragen ─────────────────────────── */}
+        {/* ── Ablauf & Checkliste für Nachrichten ──────────────────────── */}
         <section aria-labelledby="how-we-work-title">
           <SectionShell tone="signal" fullWidth className="bg-black">
             <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-12">
@@ -382,7 +301,7 @@ export default function SupportPageDe() {
                     id="how-we-work-title"
                     className="font-hero text-[clamp(2.2rem,5vw,3.8rem)] uppercase leading-[0.9] tracking-[0.01em] text-white"
                   >
-                    Direkt mit den Entwicklern. Individuell vereinbart.
+                    Direkt zu den Entwicklern. Kein Verkaufsprozess.
                   </h2>
                 </div>
                 <ol className="space-y-6">
@@ -407,13 +326,13 @@ export default function SupportPageDe() {
 
               <div className="flex flex-col justify-between gap-6 border-2 border-white/25 bg-white/[0.04] p-6 sm:p-8 lg:col-span-5">
                 <div className="space-y-4">
-                  <Marker label="Schnellster Einstieg" />
+                  <Marker label="Ihre Nachricht" />
                   <h3 className="font-sans text-xl font-bold text-white">
                     Was bei Ihrer Nachricht hilft
                   </h3>
                   <p className="text-sm leading-6 text-white/75">
-                    Ein paar kurze Stichpunkte zu folgenden Angaben helfen uns,
-                    sofort konkret und technisch fundiert zu antworten:
+                    Nichts davon ist Pflicht, aber ein Satz zu diesen Punkten
+                    hilft uns, konkret zu antworten:
                   </p>
                   <ul className="space-y-3 pt-1">
                     {inquiryChecklist.map((line) => (
@@ -438,7 +357,7 @@ export default function SupportPageDe() {
                     className="border-2 border-accent bg-accent font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-black hover:bg-accent/90"
                   >
                     <a
-                      href={`mailto:${contactEmail}?subject=${encodeURIComponent("Classifyre technische Anfrage")}`}
+                      href={`mailto:${contactEmail}?subject=${encodeURIComponent("Frage zu Classifyre")}`}
                     >
                       E-Mail an {contactEmail}
                     </a>
@@ -456,7 +375,7 @@ export default function SupportPageDe() {
         <FaqList
           id="support-faq-title"
           mark="Support-FAQ"
-          title="Fragen zur Zusammenarbeit."
+          title="Fragen rund um Unterstützung."
           items={supportFaq}
           locale="de"
         />

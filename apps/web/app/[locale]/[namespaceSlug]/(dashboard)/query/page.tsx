@@ -22,6 +22,14 @@ import {
   type QueryWorkbenchHandle,
 } from "@/components/data-query/query-workbench";
 import { useNsPath } from "@/lib/ns-path";
+import { useMe } from "@/hooks/use-me";
+import { useNamespace } from "@/components/namespace-provider";
+import {
+  pushRecent,
+  queryTabsCookieName,
+  readQueryTabs,
+  writeQueryTabs,
+} from "@/lib/query-tabs-cookie";
 import { ShareDatasetSheet } from "@/components/shared-datasets/share-dataset-sheet";
 import {
   useSharedDataset,
@@ -31,9 +39,7 @@ import {
   fetchCatalog,
   fetchRecentRuns,
   fetchSavedQueries,
-  previewSql,
   starterSql,
-  TABLE_PREVIEW_LIMIT,
   type QueryCatalog,
   type QueryCatalogSource,
   type QueryCatalogTable,
@@ -113,6 +119,15 @@ function QueryPageContent() {
   const editing = useSharedDataset(params.get("dataset"));
   const shareOptions = useSharedDatasetOptions();
   const [shareSql, setShareSql] = React.useState<string | null>(null);
+  const [recent, setRecent] = React.useState<string[]>([]);
+  const me = useMe();
+  const { slug } = useNamespace();
+  const cookieName = me
+    ? queryTabsCookieName(me.actor.id ?? me.actor.displayName ?? "me", slug)
+    : null;
+  // Saving waits for the restore, so an empty first render never wipes what
+  // this person had open in this workspace.
+  const restoredFor = React.useRef<string | null>(null);
 
   React.useEffect(() => {
     fetchCatalog()
@@ -150,6 +165,60 @@ function QueryPageContent() {
     );
   }, [catalog, params, editing.data]);
 
+  // Reopen the tabs this person had in this workspace, as far as the catalog
+  // still holds them (a removed table or source simply stays closed).
+  React.useEffect(() => {
+    if (!catalog || !cookieName || restoredFor.current === cookieName) return;
+    restoredFor.current = cookieName;
+    const saved = readQueryTabs(cookieName);
+    const tabs = saved.tabs
+      .map((tab): DynamicTab | null => {
+        if (tab.kind === "source") {
+          const source = catalog.sources.find((s) => s.id === tab.id);
+          return source ? { kind: "source", id: `source:${source.id}`, source } : null;
+        }
+        for (const source of catalog.sources) {
+          const table = source.tables.find((t) => t.assetId === tab.id);
+          if (table) {
+            return { kind: "asset", id: `asset:${table.assetId}`, table, source };
+          }
+        }
+        return null;
+      })
+      .filter((tab): tab is DynamicTab => tab !== null);
+    setOpenTabs(tabs);
+    setRecent(saved.recent);
+    // A link that carries SQL (or a dataset to edit) lands on the editor.
+    const linkedSql = Boolean(params.get("sql") || params.get("dataset"));
+    if (!linkedSql && tabs.some((tab) => tab.id === saved.active)) {
+      setActiveTabId(saved.active);
+    }
+  }, [catalog, cookieName, params]);
+
+  React.useEffect(() => {
+    if (!cookieName || restoredFor.current !== cookieName) return;
+    writeQueryTabs(cookieName, {
+      tabs: openTabs.map((tab) =>
+        tab.kind === "source"
+          ? { kind: "source", id: tab.source.id }
+          : { kind: "asset", id: tab.table.assetId },
+      ),
+      active: activeTabId,
+      recent,
+    });
+  }, [cookieName, openTabs, activeTabId, recent]);
+
+  const recentTables = React.useMemo(() => {
+    if (!catalog) return [];
+    return recent.flatMap((assetId) => {
+      for (const source of catalog.sources) {
+        const table = source.tables.find((t) => t.assetId === assetId);
+        if (table) return [{ table, source }];
+      }
+      return [];
+    });
+  }, [catalog, recent]);
+
   const recordRun = React.useCallback((run: QueryRun) => {
     setHistory((current) => {
       const rest = current.filter((r) => r.id !== run.id);
@@ -176,6 +245,7 @@ function QueryPageContent() {
           : [...current, { kind: "asset", id, table, source }],
       );
       setActiveTabId(id);
+      setRecent((current) => pushRecent(current, table.assetId));
     },
     [],
   );
@@ -302,19 +372,14 @@ function QueryPageContent() {
           ? ({ "--query-ide-height": `${viewportHeight}px` } as React.CSSProperties)
           : undefined
       }
-      className="-mx-4 -mb-4 flex min-h-[calc(100dvh-6rem)] min-w-0 flex-col lg:h-[var(--query-ide-height,calc(100dvh-5.5rem))] lg:overflow-hidden"
+      className="-mx-4 -mb-4 flex min-h-[calc(100dvh-6rem)] min-w-0 flex-col lg:h-[var(--query-ide-height,calc(100dvh-5.5rem))] lg:min-h-0 lg:overflow-hidden"
     >
       <div className="flex shrink-0 flex-wrap items-center gap-3 border-b px-4 py-2">
         <TerminalSquare className="size-6 shrink-0" aria-hidden />
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-            <h1 className="font-serif text-xl font-black uppercase tracking-[0.08em] sm:text-2xl">
-              {t("dataQuery.title")}
-            </h1>
-            <p className="hidden truncate text-xs text-muted-foreground xl:block">
-              {t("dataQuery.subtitle")}
-            </p>
-          </div>
+          <h1 className="font-serif text-xl font-black uppercase tracking-[0.08em] sm:text-2xl">
+            {t("dataQuery.title")}
+          </h1>
         </div>
         <ConnectToolButton />
       </div>
@@ -356,7 +421,7 @@ function QueryPageContent() {
                 preserves editor state, undo history, and query results. */}
             <div
               className={cn(
-                "min-h-0 flex-1 overflow-y-auto px-3 py-2",
+                "flex min-h-0 flex-1 flex-col overflow-y-auto px-3 py-2 lg:overflow-hidden",
                 activeTabId !== MAIN_QUERY_TAB_ID && "hidden",
               )}
               aria-hidden={activeTabId !== MAIN_QUERY_TAB_ID}
@@ -368,6 +433,7 @@ function QueryPageContent() {
                 editorPath="query://workspace/main.sql"
                 editorHeight={300}
                 resultHeight={480}
+                fill
                 disabled={!catalog}
                 onRunFinished={(run) => {
                   setActiveRunId(run.id);
@@ -415,7 +481,6 @@ function QueryPageContent() {
                         tab.source
                       }
                       onOpenTable={openAssetTab}
-                      onEditInQuery={editInQuery}
                     />
                   ) : (
                     <QueryAssetTab
@@ -450,6 +515,7 @@ function QueryPageContent() {
             activeAssetId={activeAssetId}
             onOpenSource={openSourceTab}
             onOpenTable={openAssetTab}
+            recent={recentTables}
             onInsert={(text) => {
               setActiveTabId(MAIN_QUERY_TAB_ID);
               workbench.current?.insert(text);
@@ -463,9 +529,6 @@ function QueryPageContent() {
               setActiveTabId(MAIN_QUERY_TAB_ID);
               setActiveRunId(null);
               workbench.current?.setSql(item.sql);
-            }}
-            onRunTable={(sqlName) => {
-              editInQuery(previewSql(sqlName, TABLE_PREVIEW_LIMIT));
             }}
           />
         </aside>

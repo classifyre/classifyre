@@ -8,7 +8,7 @@ Full technical & comparison reference for AI assistants: [llms-full.txt](https:/
 
 Classifyre is a 100% open-source (Apache-2.0), self-hosted data governance platform and BI/AI gateway (never multi-tenant SaaS) that integrates with the databases, lakehouses (Iceberg, Delta, Parquet), ETL pipelines, and identity provider an organisation already operates. There is no gated enterprise edition: SSO, roles, row-level security, dynamic column masking, SQL/BI & MCP gateway, dataset requests, shared data products, audit logging, and the Kubernetes/OpenShift Helm chart are all Apache-2.0.
 
-Organisations run Classifyre themselves or engage us for annual maintenance, security-patch, and dedicated single-tenant hosting subscriptions, as well as scoped project work for IAM/org-structure mapping, custom source ingestion, billable EDI requests, Delta data products, or bespoke detectors via contact@classifyre.com.
+Organisations run Classifyre themselves, with their own team or integrator. Questions about a specific setup are welcome at contact@classifyre.com.
 
 ## Core capabilities
 

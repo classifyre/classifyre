@@ -35,7 +35,7 @@ Classifyre integrates cleanly between your existing data estate and the tools yo
 | **Dataset requests & Delta-backed data products** | Business users request combined datasets in plain language or via structured workflows; owners approve and publish live or Delta-backed shared data products (external Delta Sharing protocol planned for 2027) whose inherited source masks act as a strict floor. | [Shared datasets](https://docs.classifyre.com/data-query/#shared-datasets) |
 | **Data quality, usage & audit trail** | Scheduled quality checks (missing/null/invalid values, duplicates, freshness, detector findings, custom SQL) with Draft → Certified lifecycle and auto-opened findings on failure, live usage & export analytics by tool, before/after policy change diffs, and open data contract (ODCS) import/export. | [Deployment](https://docs.classifyre.com/deployment/) |
 
-Need commercial support? We offer **annual maintenance & security-patch subscriptions** (from €20,000/yr with SLA, hardened builds, compliance packs, and optional **dedicated single-tenant hosting** — never multi-tenant SaaS) alongside scoped implementation projects (fixed-scope Governance Pilots €18k–€25k, IAM & organisational-structure mapping, custom source ingestion, billable EDI requests, or custom detectors). Contact [contact@classifyre.com](mailto:contact@classifyre.com) or view indicative plans at [classifyre.com/support](https://www.classifyre.com/support/).
+Questions about your setup, or a source or environment we haven't covered yet? Open an [issue](https://github.com/classifyre/classifyre/issues) or write to [contact@classifyre.com](mailto:contact@classifyre.com) — we're happy to hear from you.
 
 ### Incident response (optional)
 

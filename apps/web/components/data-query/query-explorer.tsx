@@ -6,9 +6,9 @@ import {
   ChevronDown,
   ChevronRight,
   CircleSlash,
+  Clock,
   Columns3,
   Copy,
-  CornerDownLeft,
   Database,
   ExternalLink,
   FileText,
@@ -17,10 +17,7 @@ import {
   FolderOpen,
   History,
   Lock,
-  PanelTopOpen,
-  Play,
   Search,
-  Star,
   Table2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -35,6 +32,7 @@ import {
   TabsTrigger,
 } from "@workspace/ui/components/tabs";
 import { Badge } from "@workspace/ui/components/badge";
+import { Skeleton } from "@workspace/ui/components/skeleton";
 import {
   Tooltip,
   TooltipContent,
@@ -90,6 +88,63 @@ function RunSqlPreview({ sql }: { sql: string }) {
   );
 }
 
+/** The explorer tree while the catalog loads: sources with a few tables. */
+function TreeSkeleton({ label }: { label: string }) {
+  const widths = [
+    ["w-28", "w-24", "w-32", "w-20"],
+    ["w-32", "w-28", "w-20"],
+    ["w-24", "w-32", "w-28", "w-24"],
+  ];
+  return (
+    <div
+      className="space-y-3 px-1 pt-1"
+      role="status"
+      aria-busy="true"
+      aria-label={label}
+      data-testid="query-catalog-skeleton"
+    >
+      {widths.map((tables, index) => (
+        <div key={index} className="space-y-1.5">
+          <div className="flex items-center gap-1.5">
+            <Skeleton className="size-3.5" />
+            <Skeleton className="size-4 rounded-full" />
+            <Skeleton className="h-3.5 w-32" />
+            <Skeleton className="ml-auto h-3.5 w-7" />
+          </div>
+          <div className="ml-3 space-y-1.5 border-l border-border/60 pl-3">
+            {tables.map((width, row) => (
+              <div key={row} className="flex items-center gap-1.5">
+                <Skeleton className="size-3" />
+                <Skeleton className={cn("h-3", width)} />
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** History and Saved while they load: a few query cards. */
+function CardsSkeleton({ label }: { label: string }) {
+  return (
+    <div className="space-y-1" role="status" aria-busy="true" aria-label={label}>
+      {[0, 1, 2, 3].map((index) => (
+        <div key={index} className="space-y-2 rounded border p-2">
+          <div className="flex items-center gap-1.5">
+            <Skeleton className="size-2 rounded-full" />
+            <Skeleton className={cn("h-3", index % 2 ? "w-40" : "w-52")} />
+          </div>
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-2.5 w-14" />
+            <Skeleton className="h-2.5 w-10" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 interface SchemaGroup {
   key: string;
   schema: string;
@@ -119,15 +174,15 @@ function groupTablesBySchema(source: QueryCatalogSource): SchemaGroup[] {
  * queries. Scrolls strictly inside itself so the workbench stays fixed in the
  * viewport.
  *
- * When `onOpenSource` / `onOpenTable` are supplied (the main `/query` IDE),
- * double-clicking a source (or clicking its tab icon) opens a Source tab and
- * clicking a table opens a DBeaver-style Asset tab preloaded with 200 rows.
- * Without them (`SourceDataTab`), clicking a table inserts its SQL name.
+ * Everything is one click. When `onOpenSource` / `onOpenTable` are supplied
+ * (the main `/query` IDE), clicking a source opens a Source tab and clicking a
+ * table opens a DBeaver-style Asset tab preloaded with 200 rows. Without them
+ * (`SourceDataTab`), clicking a source folds it and clicking a table inserts
+ * its SQL name. Chevrons fold; the only row action is Copy.
  */
 export function QueryExplorer({
   catalog,
   onInsert,
-  onRunTable,
   onOpenSource,
   onOpenTable,
   activeSourceId,
@@ -140,11 +195,11 @@ export function QueryExplorer({
   onOpenRun,
   onOpenSaved,
   activeRunId,
+  recent = [],
 }: {
   catalog: QueryCatalog | null;
   /** Writes a table or column name where the editor's cursor stands. */
   onInsert: (text: string) => void;
-  onRunTable: (sqlName: string) => void;
   /** Opens a database/source overview + tables tab inside the workbench. */
   onOpenSource?: (source: QueryCatalogSource) => void;
   /** Opens a table/asset data + info tab inside the workbench. */
@@ -161,6 +216,8 @@ export function QueryExplorer({
   onOpenRun?: (run: QueryRun) => void;
   onOpenSaved?: (saved: SavedQueryDto) => void;
   activeRunId?: string | null;
+  /** The last assets opened, newest first, listed above the tree. */
+  recent?: { table: QueryCatalogTable; source: QueryCatalogSource }[];
 }) {
   const { t } = useTranslation();
   const rowWords = useRowWords();
@@ -169,7 +226,6 @@ export function QueryExplorer({
   const [tab, setTab] = React.useState("tables");
   const [filter, setFilter] = React.useState("");
   const [onlyQueryable, setOnlyQueryable] = React.useState(false);
-  const [starred, setStarred] = React.useState<Record<string, boolean>>({});
   const [openSources, setOpenSources] = React.useState<Record<string, boolean>>(
     {},
   );
@@ -200,12 +256,8 @@ export function QueryExplorer({
           ),
         }))
         .filter((source) => source.tables.length)
-        .sort((a, b) => {
-          const aStar = starred[a.id] ? 0 : 1;
-          const bStar = starred[b.id] ? 0 : 1;
-          return aStar - bStar || a.name.localeCompare(b.name);
-        }),
-    [catalog, needle, onlyQueryable, starred],
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [catalog, needle, onlyQueryable],
   );
 
   const queryableCount = React.useMemo(
@@ -216,6 +268,10 @@ export function QueryExplorer({
       ),
     [catalog],
   );
+
+  const toggleSource = React.useCallback((id: string, open: boolean) => {
+    setOpenSources((state) => ({ ...state, [id]: !open }));
+  }, []);
 
   const doCopy = React.useCallback(
     (text: string) => {
@@ -242,6 +298,40 @@ export function QueryExplorer({
         onValueChange={setTab}
         className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden"
       >
+        {!tablesOnly && onOpenTable && recent.length > 0 && (
+          <div
+            className="mb-2 shrink-0 border-b pb-2"
+            data-testid="query-recent-assets"
+          >
+            <p className="flex items-center gap-1.5 px-1 pb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              <Clock className="h-3 w-3" aria-hidden />
+              {t("dataQuery.explorer.recent")}
+            </p>
+            {recent.map(({ table, source }) => (
+              <button
+                key={table.assetId}
+                type="button"
+                onClick={() => onOpenTable(table, source)}
+                className={cn(
+                  "flex w-full min-w-0 cursor-pointer items-center gap-1.5 rounded px-1 py-0.5 text-left transition-colors hover:bg-muted",
+                  activeAssetId === table.assetId &&
+                    "bg-accent/60 font-medium text-foreground",
+                )}
+                title={table.sqlName}
+                data-testid={`query-recent-${table.assetId}`}
+              >
+                {tableIcon(table)}
+                <span className="min-w-0 truncate font-mono text-xs">
+                  {table.table}
+                </span>
+                <span className="ml-auto min-w-0 max-w-[45%] shrink truncate text-[11px] text-muted-foreground">
+                  {source.name}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+
         {!tablesOnly && (
           <TabsList className="grid h-8 w-full shrink-0 grid-cols-3 p-0.5">
             <TabsTrigger value="tables" className="h-7 gap-1.5 px-1 text-xs">
@@ -292,6 +382,7 @@ export function QueryExplorer({
               </span>
             </div>
             <div className="min-h-0 flex-1 space-y-1 overflow-y-auto overflow-x-hidden overscroll-contain pr-0.5 text-sm">
+              {!catalog && <TreeSkeleton label={t("dataQuery.explorer.tables")} />}
               {catalog && !sources.length && (
                 <p className="px-0.5 text-xs text-muted-foreground">
                   {t("dataQuery.noTables")}
@@ -314,28 +405,40 @@ export function QueryExplorer({
                 return (
                   <div key={source.id} className="select-none">
                     {/*
-                     * One hover zone per row: action icons reserve layout via
-                     * `invisible group-hover:visible` so nothing jumps on hover.
+                     * One click on the row opens the source (in a tab on the
+                     * /query IDE, else it folds the tree); the chevron always
+                     * folds. Copy reserves its slot so nothing jumps on hover.
                      */}
                     <div
+                      role="button"
+                      tabIndex={0}
                       className={cn(
-                        "group flex min-h-7 items-center gap-1 rounded px-1 py-0.5 transition-colors hover:bg-muted",
+                        "group flex min-h-7 cursor-pointer items-center gap-1 rounded px-1 py-0.5 transition-colors hover:bg-muted",
                         isSourceActive &&
                           "bg-accent/50 font-semibold text-foreground",
                       )}
-                      onDoubleClick={() => onOpenSource?.(fullSource)}
+                      onClick={() =>
+                        onOpenSource
+                          ? onOpenSource(fullSource)
+                          : toggleSource(source.id, sourceOpen)
+                      }
+                      onKeyDown={(event) => {
+                        if (event.key !== "Enter" && event.key !== " ") return;
+                        event.preventDefault();
+                        if (onOpenSource) onOpenSource(fullSource);
+                        else toggleSource(source.id, sourceOpen);
+                      }}
                       data-testid={`catalog-source-${source.id}`}
                     >
                       <button
                         type="button"
-                        className="shrink-0 rounded p-0.5 hover:bg-background/60"
-                        onClick={() =>
-                          setOpenSources((state) => ({
-                            ...state,
-                            [source.id]: !sourceOpen,
-                          }))
-                        }
+                        className="shrink-0 cursor-pointer rounded p-0.5 hover:bg-background/60"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          toggleSource(source.id, sourceOpen);
+                        }}
                         aria-label={source.sqlName}
+                        tabIndex={-1}
                       >
                         {sourceOpen ? (
                           <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
@@ -344,75 +447,30 @@ export function QueryExplorer({
                         )}
                       </button>
                       <SourceIcon source={source.type} size="sm" />
-                      <span
-                        className={cn(
-                          "min-w-0 flex-1 truncate text-[13px] font-medium",
-                          onOpenSource && "cursor-pointer",
-                        )}
-                        title={
-                          onOpenSource
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
+                            {source.name}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="left" className="text-xs">
+                          {onOpenSource
                             ? t("dataQuery.explorer.openSourceTabHint", {
                                 name: source.name,
                               })
-                            : source.name
-                        }
-                      >
-                        {source.name}
-                      </span>
+                            : source.name}
+                        </TooltipContent>
+                      </Tooltip>
                       <span className="shrink-0 rounded bg-muted/80 px-1 py-0.5 text-[10px] tabular-nums text-muted-foreground">
                         {canCount}/{tablesCount}
                       </span>
-                      <button
-                        type="button"
-                        className={cn(
-                          "invisible shrink-0 rounded p-1 text-muted-foreground group-hover:visible hover:text-foreground",
-                          starred[source.id]
-                            ? "visible text-amber-500 hover:text-amber-600"
-                            : "",
-                        )}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setStarred((state) => ({
-                            ...state,
-                            [source.id]: !state[source.id],
-                          }));
-                        }}
-                        title={t("dataQuery.explorer.star")}
-                        tabIndex={-1}
-                      >
-                        <Star
-                          className="h-3 w-3"
-                          fill={starred[source.id] ? "currentColor" : "none"}
-                        />
-                      </button>
-                      {onOpenSource ? (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              type="button"
-                              className="invisible shrink-0 rounded p-1 text-muted-foreground group-hover:visible hover:bg-background/80 hover:text-foreground"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                onOpenSource(fullSource);
-                              }}
-                              data-testid={`catalog-open-source-${source.id}`}
-                              tabIndex={-1}
-                            >
-                              <PanelTopOpen className="h-3 w-3" />
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent side="left" className="text-xs">
-                            {t("dataQuery.explorer.openSourceTabHint", {
-                              name: source.name,
-                            })}
-                          </TooltipContent>
-                        </Tooltip>
-                      ) : (
+                      {!onOpenSource && (
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Link
                               href={nsHref(`/sources/${source.id}`)}
                               className="invisible shrink-0 rounded p-1 text-muted-foreground group-hover:visible hover:text-foreground"
+                              onClick={(event) => event.stopPropagation()}
                               tabIndex={-1}
                             >
                               <ExternalLink className="h-3 w-3" />
@@ -429,11 +487,12 @@ export function QueryExplorer({
                         <TooltipTrigger asChild>
                           <button
                             type="button"
-                            className="invisible shrink-0 rounded p-1 text-muted-foreground group-hover:visible hover:text-foreground"
+                            className="invisible shrink-0 cursor-pointer rounded p-1 text-muted-foreground group-hover:visible hover:text-foreground"
                             onClick={(event) => {
                               event.stopPropagation();
                               doCopy(source.sqlName);
                             }}
+                            data-testid={`catalog-copy-source-${source.id}`}
                             tabIndex={-1}
                           >
                             <Copy className="h-3 w-3" />
@@ -463,7 +522,7 @@ export function QueryExplorer({
                             <div key={group.key}>
                               <button
                                 type="button"
-                                className="flex w-full items-center gap-1.5 rounded px-1 py-0.5 text-left text-xs text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
+                                className="flex w-full cursor-pointer items-center gap-1.5 rounded px-1 py-0.5 text-left text-xs text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
                                 onClick={() =>
                                   setOpenFolders((state) => ({
                                     ...state,
@@ -502,33 +561,55 @@ export function QueryExplorer({
                                       openTables[table.assetId] ?? false;
                                     const isTableActive =
                                       activeAssetId === table.assetId;
+                                    const clickable =
+                                      Boolean(onOpenTable) || table.canQuery;
+                                    const openTable = () => {
+                                      if (onOpenTable) {
+                                        onOpenTable(table, fullSource);
+                                      } else if (table.canQuery) {
+                                        insert(table.sqlName);
+                                      }
+                                    };
                                     return (
                                       <div key={table.assetId}>
                                         <div
+                                          role="button"
+                                          tabIndex={clickable ? 0 : -1}
+                                          aria-disabled={!clickable}
                                           className={cn(
                                             "group flex min-h-6 items-center gap-1 rounded px-1 py-0.5 transition-colors hover:bg-muted",
+                                            clickable
+                                              ? "cursor-pointer"
+                                              : "cursor-not-allowed",
                                             !table.canQuery &&
                                               "text-muted-foreground",
                                             isTableActive &&
                                               "bg-accent/60 font-medium text-foreground",
                                           )}
-                                          title={
-                                            table.canQuery
-                                              ? table.sqlName
-                                              : (table.reason ??
-                                                t("dataQuery.locked"))
-                                          }
+                                          onClick={openTable}
+                                          onKeyDown={(event) => {
+                                            if (
+                                              event.key !== "Enter" &&
+                                              event.key !== " "
+                                            )
+                                              return;
+                                            event.preventDefault();
+                                            openTable();
+                                          }}
+                                          data-testid={`catalog-table-${table.sqlName}`}
                                         >
                                           <button
                                             type="button"
-                                            className="shrink-0 rounded p-0.5 hover:bg-background/60"
-                                            onClick={() =>
+                                            className="shrink-0 cursor-pointer rounded p-0.5 hover:bg-background/60"
+                                            onClick={(event) => {
+                                              event.stopPropagation();
                                               setOpenTables((state) => ({
                                                 ...state,
                                                 [table.assetId]: !expanded,
-                                              }))
-                                            }
+                                              }));
+                                            }}
                                             aria-label={table.sqlName}
+                                            tabIndex={-1}
                                           >
                                             {expanded ? (
                                               <ChevronDown className="h-3 w-3 text-muted-foreground" />
@@ -539,124 +620,55 @@ export function QueryExplorer({
                                           {tableIcon(table)}
                                           <Tooltip>
                                             <TooltipTrigger asChild>
-                                              <button
-                                                type="button"
-                                                className="min-w-0 flex-1 truncate text-left font-mono text-xs"
-                                                onClick={() => {
-                                                  if (onOpenTable) {
-                                                    onOpenTable(
-                                                      table,
-                                                      fullSource,
-                                                    );
-                                                  } else if (table.canQuery) {
-                                                    insert(table.sqlName);
-                                                  }
-                                                }}
-                                                disabled={
-                                                  !onOpenTable &&
-                                                  !table.canQuery
-                                                }
-                                                data-testid={`catalog-table-${table.sqlName}`}
-                                              >
+                                              <span className="min-w-0 flex-1 truncate text-left font-mono text-xs">
                                                 {table.table}
-                                              </button>
+                                              </span>
                                             </TooltipTrigger>
                                             <TooltipContent
                                               side="left"
-                                              className="max-w-xs font-mono text-xs"
+                                              className="font-mono text-xs"
                                             >
-                                              {onOpenTable
-                                                ? t(
-                                                    "dataQuery.explorer.openTableTabHint",
-                                                    { name: table.sqlName },
-                                                  )
-                                                : table.canQuery
+                                              {!table.canQuery
+                                                ? (table.reason ??
+                                                  t("dataQuery.locked"))
+                                                : onOpenTable
                                                   ? t(
-                                                      "dataQuery.explorer.insertHint",
+                                                      "dataQuery.explorer.openTableTabHint",
                                                       { name: table.sqlName },
                                                     )
-                                                  : (table.reason ??
-                                                    t("dataQuery.locked"))}
+                                                  : t(
+                                                      "dataQuery.explorer.insertHint",
+                                                      { name: table.sqlName },
+                                                    )}
                                             </TooltipContent>
                                           </Tooltip>
 
                                           {table.canQuery && (
-                                            <>
-                                              {onOpenTable && (
-                                                <Tooltip>
-                                                  <TooltipTrigger asChild>
-                                                    <button
-                                                      type="button"
-                                                      className="invisible shrink-0 rounded p-1 text-muted-foreground group-hover:visible hover:text-foreground"
-                                                      onClick={() =>
-                                                        insert(table.sqlName)
-                                                      }
-                                                      data-testid={`catalog-insert-${table.sqlName}`}
-                                                      tabIndex={-1}
-                                                    >
-                                                      <CornerDownLeft className="h-3 w-3" />
-                                                    </button>
-                                                  </TooltipTrigger>
-                                                  <TooltipContent
-                                                    side="left"
-                                                    className="font-mono text-xs"
-                                                  >
-                                                    {t(
-                                                      "dataQuery.explorer.insertTableHint",
-                                                      { name: table.sqlName },
-                                                    )}
-                                                  </TooltipContent>
-                                                </Tooltip>
-                                              )}
-                                              <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                  <button
-                                                    type="button"
-                                                    className="invisible shrink-0 rounded p-1 text-emerald-600 group-hover:visible hover:bg-emerald-500/10 hover:text-emerald-700 dark:text-emerald-500"
-                                                    onClick={() =>
-                                                      onRunTable(table.sqlName)
-                                                    }
-                                                    data-testid={`catalog-run-${table.sqlName}`}
-                                                    tabIndex={-1}
-                                                  >
-                                                    <Play className="h-3 w-3" />
-                                                  </button>
-                                                </TooltipTrigger>
-                                                <TooltipContent
-                                                  side="left"
-                                                  className="text-xs"
+                                            <Tooltip>
+                                              <TooltipTrigger asChild>
+                                                <button
+                                                  type="button"
+                                                  className="invisible shrink-0 cursor-pointer rounded p-1 text-muted-foreground group-hover:visible hover:text-foreground"
+                                                  onClick={(event) => {
+                                                    event.stopPropagation();
+                                                    doCopy(table.sqlName);
+                                                  }}
+                                                  data-testid={`catalog-copy-${table.sqlName}`}
+                                                  tabIndex={-1}
                                                 >
-                                                  {t(
-                                                    "dataQuery.explorer.runTableHint",
-                                                    { name: table.sqlName },
-                                                  )}
-                                                </TooltipContent>
-                                              </Tooltip>
-                                              <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                  <button
-                                                    type="button"
-                                                    className="invisible shrink-0 rounded p-1 text-muted-foreground group-hover:visible hover:text-foreground"
-                                                    onClick={() =>
-                                                      doCopy(table.sqlName)
-                                                    }
-                                                    data-testid={`catalog-copy-${table.sqlName}`}
-                                                    tabIndex={-1}
-                                                  >
-                                                    <Copy className="h-3 w-3" />
-                                                  </button>
-                                                </TooltipTrigger>
-                                                <TooltipContent
-                                                  side="left"
-                                                  className="font-mono text-xs"
-                                                >
-                                                  {t(
-                                                    "dataQuery.explorer.copyNameHint",
-                                                    { name: table.sqlName },
-                                                  )}
-                                                </TooltipContent>
-                                              </Tooltip>
-                                            </>
+                                                  <Copy className="h-3 w-3" />
+                                                </button>
+                                              </TooltipTrigger>
+                                              <TooltipContent
+                                                side="left"
+                                                className="font-mono text-xs"
+                                              >
+                                                {t(
+                                                  "dataQuery.explorer.copyNameHint",
+                                                  { name: table.sqlName },
+                                                )}
+                                              </TooltipContent>
+                                            </Tooltip>
                                           )}
 
                                           {!onOpenTable && (
@@ -665,6 +677,9 @@ export function QueryExplorer({
                                                 `/assets/${table.assetId}`,
                                               )}
                                               className="invisible shrink-0 rounded p-1 text-muted-foreground group-hover:visible hover:text-foreground"
+                                              onClick={(event) =>
+                                                event.stopPropagation()
+                                              }
                                               title={table.name}
                                               tabIndex={-1}
                                             >
@@ -688,7 +703,7 @@ export function QueryExplorer({
                                                 <TooltipTrigger asChild>
                                                   <button
                                                     type="button"
-                                                    className="flex w-full items-center gap-1.5 rounded px-1 py-0.5 text-left font-mono text-[11px] hover:bg-muted"
+                                                    className="flex w-full cursor-pointer items-center gap-1.5 rounded px-1 py-0.5 text-left font-mono text-[11px] hover:bg-muted"
                                                     onClick={() =>
                                                       insert(column.name)
                                                     }
@@ -788,10 +803,8 @@ export function QueryExplorer({
             className="flex h-full min-h-0 w-full min-w-0 flex-col gap-1 overflow-y-auto overflow-x-hidden overscroll-contain pr-0.5"
             data-testid="query-history"
           >
-            {historyLoading && (
-              <p className="px-0.5 text-xs text-muted-foreground">
-                {t("dataQuery.explorer.loadingHistory")}
-              </p>
+            {historyLoading && !history.length && (
+              <CardsSkeleton label={t("dataQuery.explorer.loadingHistory")} />
             )}
             {!historyLoading && !history.length && (
               <p className="px-0.5 text-xs text-muted-foreground">
@@ -803,7 +816,7 @@ export function QueryExplorer({
                 key={run.id}
                 type="button"
                 className={cn(
-                  "group w-full min-w-0 shrink-0 rounded border p-2 text-left hover:bg-muted",
+                  "group w-full min-w-0 shrink-0 cursor-pointer rounded border p-2 text-left hover:bg-muted",
                   activeRunId === run.id && "border-primary bg-muted",
                 )}
                 onClick={() => onOpenRun?.(run)}
@@ -838,10 +851,8 @@ export function QueryExplorer({
             className="flex h-full min-h-0 w-full min-w-0 flex-col gap-1 overflow-y-auto overflow-x-hidden overscroll-contain pr-0.5"
             data-testid="query-saved"
           >
-            {savedLoading && (
-              <p className="px-0.5 text-xs text-muted-foreground">
-                {t("dataQuery.explorer.loadingSaved")}
-              </p>
+            {savedLoading && !saved.length && (
+              <CardsSkeleton label={t("dataQuery.explorer.loadingSaved")} />
             )}
             {!savedLoading && !saved.length && (
               <p className="px-0.5 text-xs text-muted-foreground">
@@ -852,7 +863,7 @@ export function QueryExplorer({
               <button
                 key={item.id}
                 type="button"
-                className="group w-full min-w-0 shrink-0 rounded border p-2 text-left hover:bg-muted"
+                className="group w-full min-w-0 shrink-0 cursor-pointer rounded border p-2 text-left hover:bg-muted"
                 onClick={() => onOpenSaved?.(item)}
                 title={t("dataQuery.explorer.reopenHint")}
                 data-testid={`query-saved-${item.id}`}

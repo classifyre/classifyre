@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import {
@@ -10,12 +9,10 @@ import {
   CalendarOff,
   CircleSlash,
   Copy,
-  ExternalLink,
   Filter,
   GitFork,
   Info,
   Lock,
-  Play,
   Search,
   ShieldAlert,
   ShieldCheck,
@@ -56,7 +53,6 @@ import {
   TableRow,
 } from "@workspace/ui/components/table";
 import { getSourceLabel } from "@workspace/schemas/source-labels";
-import { ConnectToolButton } from "@/components/sql-connections/connect-tool-button";
 import {
   GiveDataAccessButton,
   useDataAccessGrants,
@@ -76,8 +72,6 @@ import { getSourceSchema } from "@/lib/schema-loader";
 import { formatDate, formatRelative } from "@/lib/date";
 import {
   copyText,
-  previewSql,
-  TABLE_PREVIEW_LIMIT,
   type QueryCatalogSource,
   type QueryCatalogTable,
 } from "@/lib/data-query";
@@ -117,11 +111,9 @@ function formatFieldValue(value: unknown): string {
 export function QuerySourceTab({
   source,
   onOpenTable,
-  onEditInQuery,
 }: {
   source: QueryCatalogSource;
   onOpenTable: (table: QueryCatalogTable, source: QueryCatalogSource) => void;
-  onEditInQuery: (sql: string) => void;
 }) {
   const { t } = useTranslation();
   const { nsHref } = useNamespace();
@@ -257,8 +249,11 @@ export function QuerySourceTab({
   );
 
   const tablesContent = (
-    <div className="space-y-3" data-testid={`source-tab-tables-${source.id}`}>
-      <div className="flex flex-wrap items-center gap-2">
+    <div
+      className="flex min-h-0 flex-1 flex-col gap-3"
+      data-testid={`source-tab-tables-${source.id}`}
+    >
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
         <div className="relative min-w-[200px] max-w-sm flex-1">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -289,7 +284,7 @@ export function QuerySourceTab({
         </span>
       </div>
 
-      <div className="overflow-auto rounded-md border bg-card">
+      <div className="min-h-0 flex-1 overflow-auto rounded-md border bg-card">
         <Table className="text-xs">
           <TableHeader>
             <TableRow>
@@ -303,7 +298,7 @@ export function QuerySourceTab({
               <TableHead className="w-32">
                 {t("dataQuery.objectView.accessColumn")}
               </TableHead>
-              <TableHead className="w-36 text-right">
+              <TableHead className="w-28 text-right">
                 {t("dataQuery.objectView.actionsColumn")}
               </TableHead>
             </TableRow>
@@ -392,26 +387,10 @@ export function QuerySourceTab({
                         variant="ghost"
                         className="h-7 px-2 text-xs"
                         onClick={() => onOpenTable(table, source)}
+                        data-testid={`source-table-open-${table.sqlName}`}
                       >
                         {t("dataQuery.objectView.openTable")}
                       </Button>
-                      {table.canQuery && (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700 dark:text-emerald-500"
-                          title={t("dataQuery.explorer.runTableHint", {
-                            name: table.sqlName,
-                          })}
-                          onClick={() =>
-                            onEditInQuery(
-                              previewSql(table.sqlName, TABLE_PREVIEW_LIMIT),
-                            )
-                          }
-                        >
-                          <Play className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
                       <Button
                         size="icon"
                         variant="ghost"
@@ -765,30 +744,16 @@ export function QuerySourceTab({
       testId={`query-source-tab-${source.id}`}
       icon={<SourceIcon source={source.type} size="sm" />}
       title={source.name}
+      titleHref={nsHref(`/sources/${source.id}`)}
+      titleHint={t("dataQuery.objectView.openFullSource")}
       sqlName={source.sqlName}
-      badges={
-        <>
-          <Badge variant="outline" className="text-[10px]">
-            {isIngestionSourceType(source.type)
-              ? getSourceLabel(source.type)
-              : source.type}
-          </Badge>
-          {lastRunner && <RunnerStatusBadge status={lastRunner.status} />}
-        </>
-      }
+      copyHint={t("dataQuery.explorer.copySourceHint", {
+        name: source.sqlName,
+      })}
       actions={
-        <>
-          {canManageAccess && (
-            <GiveDataAccessButton scope={scope} access={access} />
-          )}
-          <ConnectToolButton scope={scope} />
-          <Button asChild size="sm" variant="ghost" className="h-7 px-2 text-xs">
-            <Link href={nsHref(`/sources/${source.id}`)}>
-              <ExternalLink className="mr-1 h-3.5 w-3.5" />
-              {t("dataQuery.objectView.openFullSource")}
-            </Link>
-          </Button>
-        </>
+        canManageAccess ? (
+          <GiveDataAccessButton scope={scope} access={access} />
+        ) : undefined
       }
       tabs={tabs}
       activeTab={subtab}
