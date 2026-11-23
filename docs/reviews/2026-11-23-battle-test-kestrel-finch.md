@@ -8,8 +8,8 @@ an access request, a shared dataset, SQL connections, ODBC and psql clients
 and a Metabase dashboard. Every bug that blocked the scenario was fixed in
 place and the scenario re-run.
 
-The scenario kit is `showcases/kestrel-finch/` (README there), the raw
-evidence `showcases/kestrel-finch/.runs/` (battle JSON, screenshots, notes).
+The scenario kit is `development/kestrel-finch/` (README there), the raw
+evidence `development/kestrel-finch/.runs/` (battle JSON, screenshots, notes).
 
 ## Verdict
 
@@ -26,7 +26,7 @@ evidence `showcases/kestrel-finch/.runs/` (battle JSON, screenshots, notes).
 | ODBC sources | **Now yes** (was **broken**) | Bug 3: every query over an ODBC source failed |
 | ODBC/psql/JDBC clients | **Yes** | psqlODBC (Excel/Power BI's driver), psql 18, Metabase (pgJDBC): 11 + 9 checks |
 | Audit | **Yes** | Every read with person, channel, connection and the dataset it came through, also on the input table's activity |
-| Findings vs masks | **No — production blocker** | Blocker 5: anyone with Viewer reads every detected value (IBANs, card numbers, keys) in the findings list, whatever the column masks say |
+| Findings vs masks | **Now yes** (was **no — blocker**) | Finding values follow the column rule (`finding.content` or reading the table in clear), on every surface; value searches closed (follow-up below) |
 | Sharing with outsiders | **Now possible** (was **no**) | New role Data consumer; before, the only way in was Viewer, i.e. blocker 5 |
 
 **Overall:** the query engine, gate, masks, row filters, grants, access
@@ -63,7 +63,7 @@ agency.
 
 | Suite | Result |
 | --- | --- |
-| Persona checks (`setup/battle.py`): owners, stewards, admin, sales, marketing, care, finance, BI, agency, 12 bypasses | **38/38** after fixes (30/35 on the first run) |
+| Persona checks (`setup/battle.py`): owners, stewards, admin, sales, marketing, care, finance, BI, agency, 12 bypasses | **39/39** after fixes (30/35 on the first run) |
 | ODBC client checks (`clients/odbc_checks.py`, psqlODBC 18 + pyodbc) | **11/11**; on a rerun with Metabase's pool open, D11 was refused "busy" (gateway memory full, gap 11) |
 | Metabase checks (`clients/metabase_setup.py`, v0.65.6.2) | **9/9**; dashboard in a browser **0/5 cards failing** (was 4/5) |
 | psql 18 `\dn`, `\d+` | masks shown as column descriptions (`Masked (hash)`) |
@@ -106,27 +106,56 @@ A browser loads a dashboard's cards in parallel; Metabase opens its pool's four 
 
 GOV §5 says national ids → sensitive; the list had only US/UK ones. Added AT_SVNR, CH_AHV, DE_TAX_ID, PL_PESEL, FI, ES, IT ids, EU_NATIONAL_ID and the other person identifiers the detector knows. Spec added.
 
-## Production blocker (not fixed)
+## Follow-up (same day): finding values and the four gaps
 
-**Finding contents bypass column masks.** Inside the team, every Viewer still
-reads every detected value in the findings list, search, cases, graph and MCP
-(57 API files read `matched_content`). A workspace whose `crm.contacts.svnr` is
-hidden from marketing still shows marketing all 42 numbers under Findings.
-Investigators need the value to triage, so this is a decision, not a patch.
-Proposed: a finding's content follows the clear scope of its column —
-`data.unmask` on the asset or its source, owner or steward — and everyone else
-gets `redactedContent`; `investigator` gets a new `finding.content` capability
-for triage without SQL. Until then: give outsiders **Data consumer**, and say
-in the docs that Viewer sees detected values.
+**Finding values now follow column masks.** New capability `finding.content`
+(Investigator, Curator, Source manager, Workspace admin/manager, Tenant admin,
+and visitors of a *published* workspace — publishing is the decision to show
+what it found). Everyone else sees a finding's value only on tables they read
+in clear (`data.unmask` there, owner, steward); elsewhere `••••`, the context
+dropped, `contentHidden: true`. Enforced in one place for every REST response
+(`finding-content/`: a global interceptor that redacts any finding-shaped
+object — findings, search, quick search, cases, inquiries, graph, extractions),
+in MCP tool results (also when a result is cut short and no longer JSON: every
+value field blanked), and in CSV exports (value columns left out). Value
+searches would be oracles, so the findings search box (whole-word), quick
+search (prefix — a character-by-character oracle) and "where else does this
+value appear" need `finding.content`. Verified live: Amélie and Kwame (Viewer)
+0 of 200 values; Lukas sees values on the two tables he reads unmasked and
+`••••` elsewhere; Henrike (steward, Viewer only) and Tomasz see all; quick
+search for `AT48` and value lookup refused for Amélie; MCP returns hidden
+values. 13/13 checks (`setup/finding_content_check.py`, `setup/mcp_check.py`).
+Remaining: entity values (G5) are a separate surface, not covered.
+
+**The four gaps, fixed and verified live:**
+
+- **`scrub` mask ("identifiers removed")** for free text: e-mails, IBANs, card
+  and phone numbers, ID and document numbers, keys, tokens, private keys and
+  `password is …` replaced in every row. All 181 ticket bodies readable, no key
+  or number left (C1).
+- **`restrict` column access**: hidden even from *Data reader, unmasked*, only
+  owners and stewards see it. Lukas reads contacts in clear without `svnr`;
+  Tomasz sees it (S2).
+- **`hash` ignores case and surrounding spaces**: marketing's cross-CRM join
+  finds 22 of 22 (was 18), Finch ⋈ Wayfarer 66 of 66 (was 57) (M3, M4b). Hashes
+  shown before change once (release note).
+- **Readers without rows**: `GET assets/:id/rows` → `readersWithoutRows`, shown
+  in the Rows step ("These groups may query this table but no rule gives them
+  a row: /admins"); the run note tells a reader without a rule to ask the
+  owner or a steward (R1).
+
+Persona checks now 39/39. Note for the dev stack: the query worker pre-imports
+the CLI's query code, so CLI mask changes need `rollout restart
+deploy/classifyre-query-worker`.
 
 ## Gaps and frustrations (by impact)
 
-1. **Secrets in free text hide the whole column.** Two keys pasted into 2 of 181 tickets make `tickets.body` *secret* → hidden from customer care entirely. There is no mask that redacts only the detected spans; a steward can only choose hidden, masked or clear for the whole column.
-2. **Unmasked is per table, not per column.** Sales reps given *Data reader, unmasked* on contacts also read the column the steward *hid* (`svnr`). There is no "hidden even from unmasked readers".
+1. ~~**Secrets in free text hide the whole column.**~~ Fixed: `scrub` mask (follow-up above).
+2. ~~**Unmasked is per table, not per column.**~~ Fixed: `restrict` column access (follow-up above).
 3. **One mask per column for everyone.** Marketing needs `email` hashed (to deduplicate), support would want it partial: impossible on the same column.
-4. **Hashing is exact.** The same address in another case hashes differently: marketing matched 18 travellers across the CRMs where 22 exist; Finch ⋈ Wayfarer 57 of 66. A normalised hash for e-mail-classified columns would fix the common case.
+4. ~~**Hashing is exact.**~~ Fixed: hashes ignore case and surrounding spaces (follow-up above).
 5. **Masked columns cannot be searched.** Customer care cannot look a caller up by e-mail (filters see masked values); they need the member number.
-6. **Tenant admin sees zero rows** of every row-filtered table (fail closed, by design) — surprising in every demo; the run notes say so, the UI does not until a query returns nothing.
+6. **Tenant admin sees zero rows** of every row-filtered table (fail closed, by design) — now named in the Rows step (`readersWithoutRows`) and explained to the reader (follow-up above).
 7. **Stewards cannot query.** The DPO could set masks but not look at the data until her group got Data reader.
 8. **Owners who cannot open the workspace.** Over the API, a workspace's owning group gets no role (the web dialog pre-fills Viewer); Ines named Tomasz owner of five sources he could not open, without a warning.
 9. **Detection misses** that need a steward every time: dates of birth (dates in structured columns are never personal), non-US passport numbers, upper-case card-holder names, health data (dietary needs, GDPR Art. 9). And one `LOCATION` hit ("AT") classified a whole `country` column; there is no minimum share of rows.
@@ -166,9 +195,7 @@ were discarded and repeated.
 
 ## Next
 
-1. Decide and build finding-content visibility (blocker above).
-2. A "redact detected spans" mask for free-text columns.
-3. Column-level unmask (or "hidden from everyone but owners and stewards").
-4. Read-time check that a dataset's owning group still reads rows of each input.
+1. ~~Finding-content visibility~~, ~~a scrub mask~~, ~~restricted columns~~ — done (follow-up above). Entity values (G5) still follow `entity.view` only.
+2. Read-time check that a dataset's owning group still reads rows of each input.
 5. Real-table fixtures for the lakehouse lab (more than two columns, more than one sampling page) so bug 1 cannot come back unnoticed; a live ODBC query in CI.
 6. Run the full CLI suite in CI rather than beside the dev stack (not completed here, see above; the changed areas' suites pass).

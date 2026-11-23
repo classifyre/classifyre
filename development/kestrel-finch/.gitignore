@@ -1,0 +1,6 @@
+# Connection passwords, the gateway CA, screenshots and check evidence: local only.
+.runs/
+__pycache__/
+*.pyc
+# Written by seed/load.py on every run.
+seed/erased.txt

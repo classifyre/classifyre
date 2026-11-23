@@ -78,7 +78,7 @@ Kestrel. Marketing never sees her there.
 - **Lukas, sales DACH** — Margarethe in clear, because she is his customer. *(screenshot: 02-sales-sql-clear)*
 - **Amélie, marketing** — 114 opted-in contacts, hashed e-mails, last four of the phone, no birthday, no social insurance number; the page says which columns are masked and why. *(screenshot: 01-marketing-sql-masked)*
 - **Sigrid, sales Nordics** — "the table does not exist or you cannot query it." It is not her CRM.
-- **Kwame, customer care** — asks for the loyalty table ("callers want to know their tier"); Tomasz, its owner, approves for 30 days; two seconds later Kwame sees Falcon, 43,986 points, and still no name or e-mail.
+- **Kwame, customer care** — reads every ticket with keys, card and phone numbers scrubbed out (`…Mobile [phone].`); asks for the loyalty table ("callers want to know their tier"); Tomasz, its owner, approves for 30 days; two seconds later Kwame sees Falcon, 43,986 points, and still no name or e-mail.
 
 What none of them can do: `WHERE email LIKE '%@%'` (it counts zero — filters
 run on the masked value), `read_parquet('s3://…')`, `postgres_scan(…)`,
@@ -138,5 +138,5 @@ contact@classifyre.com. Writing to us doesn't start a sales process.
 
 - Don't claim timings in the post.
 - Be careful with "masking": say what each mask shows; never "anonymised".
-- The *findings* page still shows detected values to Viewers (see the battle-test report, blocker). Don't write "nobody without permission sees the number" until that is decided; the agency is safe because of *Data consumer*.
+- Finding values follow the column masks since the follow-up (Viewers see `••••`), so the findings page is safe to show. The scenario write-up with a video outline is `development/kestrel-finch/SCENARIO.md`.
 - A German version needs `DSGVO`, `Datenmaskierung`, `Pseudonymisierung`, `Zeilenfilter` in the copy (topic slugs in `apps/blog/lib/topic-slugs.json`).

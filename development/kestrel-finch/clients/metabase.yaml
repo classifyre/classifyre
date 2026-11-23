@@ -1,0 +1,51 @@
+# The showcase's own Metabase (open-source BI), next to the dev stack. Same
+# image and settings as the BI smoke's (development/bi-smoke), its own data.
+#   kubectl -n classifyre-dev apply -f development/kestrel-finch/clients/metabase.yaml
+#   kubectl -n classifyre-dev port-forward svc/kf-metabase 3031:3000
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kf-metabase
+  labels: { app: kf-metabase }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: kf-metabase } }
+  template:
+    metadata:
+      labels: { app: kf-metabase }
+    spec:
+      containers:
+        - name: metabase
+          image: metabase/metabase:v0.65.6.2
+          imagePullPolicy: IfNotPresent
+          ports: [{ containerPort: 3000 }]
+          env:
+            - { name: MB_ANON_TRACKING_ENABLED, value: "false" }
+            - { name: MB_CHECK_FOR_UPDATES, value: "false" }
+            - { name: MB_DB_TYPE, value: h2 }
+            - { name: MB_DB_FILE, value: /metabase-data/metabase.db }
+            - { name: JAVA_OPTS, value: "-Xmx1g" }
+            # A SQL connection allows 4 sessions; Metabase's default pool is 15.
+            - { name: MB_JDBC_DATA_WAREHOUSE_MAX_CONNECTION_POOL_SIZE, value: "4" }
+          readinessProbe:
+            httpGet: { path: /api/health, port: 3000 }
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 200m, memory: 1Gi }
+            limits: { memory: 2Gi }
+          volumeMounts:
+            - { name: data, mountPath: /metabase-data }
+            - { name: ca, mountPath: /ca, readOnly: true }
+      volumes:
+        - name: data
+          emptyDir: {}
+        - name: ca
+          configMap: { name: kf-gateway-ca }  # the gateway CA (GET data-connections/endpoint)
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kf-metabase
+spec:
+  selector: { app: kf-metabase }
+  ports: [{ port: 3000, targetPort: 3000 }]
