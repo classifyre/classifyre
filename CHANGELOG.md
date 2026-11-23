@@ -5,6 +5,17 @@ compiled at release time from per-PR fragments in `changelog.d/` (see
 `changelog.d/README.md`). Commit messages and PR titles are never used as
 release notes.
 
+## [0.9.2] - 2026-11-23
+
+### Changed
+
+- Every all-in-one Docker command now also publishes the SQL connections port, `-p 5433:5433` (not 5432, which the container's own PostgreSQL holds), and the app shows that port to Power BI, Excel and `psql`. If you already published it as `-p 5432:5433`, add `-e SQL_GATEWAY_PUBLIC_PORT=5432` so the app keeps showing 5432. Turn SQL connections off with `-e SQL_GATEWAY_ENABLED=false`.
+- SQL connections are now switched on by default in the Helm chart and stay on in the all-in-one Docker image. On Kubernetes the gateway runs as soon as you install, but tools cannot reach it until you set `sqlGateway.publicHost` and expose its port; set `sqlGateway.enabled: false` to run without it. The gateway pod asks for 250m CPU and 1 GiB by default, so lower `sqlGateway.resources.requests` on a small node.
+
+### Fixed
+
+- The "Connect a tool" button no longer flashes on and disappears on the SQL page and the Data tabs. Where SQL connections are on but have no public address yet, it stays, and the dialog, Settings → SQL connections and a table's Governance tab now say what is missing and link the setup guide for every kind of ingress.
+
 ## [0.9.1] - 2026-11-22
 
 ### Added
