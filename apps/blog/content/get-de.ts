@@ -73,7 +73,7 @@ const deFirstRun = {
     {
       step: "03",
       title: "Detektoren aktivieren & klassifizieren",
-      body: "Aktivieren Sie fertige PII- und Secret-Pakete oder eigene Regex-, Python-, lokale CPU-KI- (GLiNER2) oder LLM-Detektoren. Die Klassifizierung steuert die Spaltenmaskierung automatisch.",
+      body: "Aktivieren Sie fertige PII- und Secret-Pakete oder eigene Regex-, Python-, lokale CPU-KI- oder LLM-Detektoren. Die Klassifizierung steuert die Spaltenmaskierung automatisch.",
       href: docs.preBuiltDetectors,
       hrefLabel: "Detektor-Referenz",
     },

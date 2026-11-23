@@ -55,7 +55,7 @@ const L = {
     result: "0.1 % invalid · passed",
     rules: [
       { rule: "email · Missing values = 0", ok: true },
-      { rule: "Row count ≥ 4,000", ok: true },
+      { rule: "Row count ≥ 4,000 (4,215 rows)", ok: true },
     ],
     certify: "Certify",
     usage: "Usage · last 30 days",
@@ -110,7 +110,7 @@ const L = {
     result: "0,1 % ungültig · bestanden",
     rules: [
       { rule: "email · Fehlende Werte = 0", ok: true },
-      { rule: "Zeilenzahl ≥ 4.000", ok: true },
+      { rule: "Zeilenzahl ≥ 4.000 (4.215 Zeilen)", ok: true },
     ],
     certify: "Zertifizieren",
     usage: "Nutzung · letzte 30 Tage",

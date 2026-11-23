@@ -78,7 +78,7 @@ const principles: readonly {
   {
     marker: "Data sovereignty",
     title: "Everything stays on your infrastructure",
-    body: "Classifyre is self-hosted software, not a multi-tenant SaaS upload. Run it locally with Docker or in production on Kubernetes and OpenShift — on-premises, in a private cloud, or in your AWS, Azure, or GCP account.",
+    body: "Classifyre is self-hosted software — never a multi-tenant SaaS upload. Run it locally with Docker, on Kubernetes and OpenShift on-premises or in your own cloud, or have us operate and patch a dedicated single-tenant instance on sovereign infrastructure.",
     href: docs.deployment,
     hrefLabel: "Deployment architecture",
   },
@@ -92,7 +92,7 @@ const principles: readonly {
   {
     marker: "Open by design",
     title: "100% Apache-2.0, zero locked tiers",
-    body: "You can inspect every line of code, audit how masking and access control work, and deploy the full platform yourself with no per-seat licensing. When you want custom tailoring or rollout support, you work directly with our engineers.",
+    body: "Inspect every line of code, audit how masking and access control work, and deploy the full platform yourself with no per-seat licensing. Organisations engage us for annual maintenance and security-patch subscriptions, dedicated single-tenant hosting, or scoped implementation, custom sources, and EDI integration projects.",
     href: routes.support,
     hrefLabel: "Support & tailoring",
   },

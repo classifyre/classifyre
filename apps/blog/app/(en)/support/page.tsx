@@ -23,9 +23,9 @@ import { contactEmail, docs, repoUrl, routes, showcaseUrl } from "@/lib/site";
 import "../../landing.css";
 
 export const metadata: Metadata = {
-  title: "Support & Tailored Deployments",
+  title: "Support, Maintenance & Tailored Deployments",
   description:
-    "Self-service resources, community channels, and direct engineering collaboration for Classifyre. 100% Apache-2.0 open source with individually agreed tailoring for IAM, custom sources, Delta data products, and bespoke detectors.",
+    "Self-service resources, annual maintenance and security-patch subscriptions, optional dedicated single-tenant hosting (never multi-tenant SaaS), and scoped engineering projects for IAM mapping, custom sources, EDI requests, and detectors.",
   alternates: {
     canonical: "/support/",
     languages: {
@@ -35,9 +35,9 @@ export const metadata: Metadata = {
     },
   },
   openGraph: {
-    title: "Classifyre Support & Tailored Rollouts",
+    title: "Classifyre Support, Maintenance & Tailored Rollouts",
     description:
-      "Documentation, GitHub community support, and direct engineering collaboration scoped individually to your organisation.",
+      "Documentation, annual maintenance and dedicated hosting subscriptions, and direct engineering collaboration scoped individually to your organisation.",
     type: "website",
   },
 };
@@ -85,34 +85,68 @@ const selfService: readonly {
 
 const tailoringAreas: readonly { marker: string; title: string; body: string }[] = [
   {
-    marker: "IAM & org design",
-    title: "Identity, security & organisational fit",
-    body: "Integrate complex Active Directory, Entra ID, Okta, or custom IAM hierarchies, multi-tenant structures, and internal security and data protection policies.",
+    marker: "Support & dedicated hosting",
+    title: "Maintenance, security patches & dedicated hosting",
+    body: "Annual licensing-style maintenance subscriptions with SLA, hardened builds, timely security patches, and upgrades — self-hosted on your cluster or operated by us on a dedicated single-tenant sovereign host (never multi-tenant SaaS).",
   },
   {
-    marker: "Custom sources",
-    title: "Connectors for proprietary or legacy systems",
-    body: "Build, harden, and maintain connectors for industry-specific databases, internal APIs, or legacy systems not yet covered in the public catalog.",
+    marker: "IAM & org design",
+    title: "Identity, security & organisational mapping",
+    body: "Map Classifyre cleanly onto complex Active Directory, Entra ID, Okta, or custom IAM hierarchies, organisational structures, and internal security and data protection policies.",
+  },
+  {
+    marker: "Custom sources & EDI",
+    title: "Custom source ingestion & billable EDI requests",
+    body: "Build, harden, and maintain connectors for proprietary or legacy systems, internal APIs, and regulated EDI / data-exchange ingestion workflows not yet covered in the public catalog.",
   },
   {
     marker: "Data products",
-    title: "Delta data products & sharing workflows",
-    body: "Design governed shared datasets, Delta Sharing pipelines, and plain-language business dataset request workflows with owner approval and inherited masks.",
+    title: "Delta-backed data products & sharing workflows",
+    body: "Design governed live and Delta-backed shared datasets (external Delta Sharing server protocol planned for 2027) and plain-language business dataset request workflows with owner approval and inherited masks.",
   },
   {
     marker: "Detectors & AI",
     title: "Business-specific detectors & custom models",
-    body: "Author domain rules in regex or Python, tune lightweight on-CPU AI models (such as GLiNER2), or configure private LLM classifiers inside your environment.",
+    body: "Author domain rules in regex or Python, tune lightweight on-CPU zero-shot AI extraction and classification models, or configure private LLM classifiers inside your environment.",
   },
   {
-    marker: "Infrastructure",
-    title: "Kubernetes, OpenShift & air-gapped operations",
-    body: "Production architecture review and deployment on Kubernetes, OpenShift, on-premises clusters, or private/public clouds — including TLS, sizing, and tuning.",
+    marker: "Architecture & enforcement",
+    title: "Non-bypass network design, K8s & compliance",
+    body: "Production deployment on Kubernetes, OpenShift, or air-gapped clusters — including network isolation so BI, SQL, and MCP AI tools route exclusively through Classifyre's TLS gateway.",
+  },
+];
+
+const commercialPlans: readonly {
+  marker: string;
+  title: string;
+  price: string;
+  body: string;
+  highlight?: boolean;
+}[] = [
+  {
+    marker: "Open source",
+    title: "Community Edition",
+    price: "€0 / forever",
+    body: "100% Apache-2.0 self-hosted core: 41 built-in connectors + custom SDK, 41 PII types, SSO, row filters, 5-mode masking, governed SQL workbench (DE/EN), BI & MCP gateway, Docker & Helm.",
   },
   {
-    marker: "Architecture review",
-    title: "Security, masking & compliance verification",
-    body: "Review row-level security, column masking policies, Power BI / Excel / ODBC connectivity, and audit logging with your security and data protection teams.",
+    marker: "Recurring subscription",
+    title: "Maintenance & Security Patches",
+    price: "€20k / €32k / €45k / yr",
+    body: "Three concrete tiers (Standard ≤5 sources, 24h SLA; Enterprise ≤15 sources, 8h SLA & GDPR/AI Act/NIS2 audit packs; Regulated Plus unlimited sources, OpenShift HA & certified ERP/EDI connectors).",
+    highlight: true,
+  },
+  {
+    marker: "Dedicated hosting · Not SaaS",
+    title: "Dedicated Single-Tenant Hosting",
+    price: "+€12,000–€20,000 / yr",
+    body: "Optional sovereign EU single-tenant hosting add-on where our team operates, monitors, backs up, and security-patches an isolated instance exclusively for your organisation.",
+  },
+  {
+    marker: "Scoped project work",
+    title: "Pilots & Custom Source Connectors",
+    price: "€18,000–€25,000 pilot",
+    body: "Fixed-scope 6–12 week Governance Pilots (3–5 sources), IAM & organisational-structure mapping, custom legacy/ERP/EDI source connectors, and bespoke business detectors.",
   },
 ];
 
@@ -135,20 +169,24 @@ const collaborationSteps: readonly { step: string; title: string; body: string }
 ];
 
 const inquiryChecklist: readonly string[] = [
-  "Data sources & formats involved (e.g., PostgreSQL, Oracle/ODBC, Databricks, Iceberg, Delta, Parquet, S3/Azure/GCS)",
+  "Data sources, formats & EDI feeds involved (e.g., PostgreSQL, Oracle/ODBC, Databricks, Iceberg, Delta, Parquet, S3/Azure/GCS, or proprietary/EDI streams)",
   "Identity provider & group structure (e.g., Entra ID, Active Directory, Okta, Keycloak, OIDC/SAML)",
-  "Target infrastructure (Docker, Kubernetes, OpenShift, on-premises, air-gapped, or cloud)",
-  "Primary goals (group masking, Power BI/Excel access, Delta data products, custom sources, or custom detectors)",
+  "Target infrastructure (self-hosted Docker, Kubernetes, OpenShift, air-gapped, or dedicated single-tenant managed hosting)",
+  "Primary goals (annual maintenance & security patches, non-bypass BI/AI gateway, IAM mapping, custom sources/EDI, or custom detectors)",
 ];
 
 const supportFaq: readonly { q: string; a: string }[] = [
   {
     q: "Is any feature locked behind a paid support contract or enterprise edition?",
-    a: "No. Every capability — SSO, roles, row filters, dynamic column masking, SQL/BI gateway, dataset requests, shared datasets, audit logging, and the Helm chart — is 100% Apache-2.0 open source. You only engage us if you want direct engineering help, custom extensions, or tailored rollout support.",
+    a: "No. Every capability — SSO, roles, row filters, dynamic column masking, SQL/BI gateway, dataset requests, shared datasets, audit logging, and the Helm chart — is 100% Apache-2.0 open source. Paid engagements cover annual maintenance, SLA, timely security patches, optional dedicated single-tenant hosting, and scoped engineering projects.",
   },
   {
-    q: "How is tailored work scoped and agreed?",
-    a: "Every engagement is individual and agreed directly around your technical requirements, timeline, and internal team capacity — ranging from focused architecture reviews or custom connector development to end-to-end rollout assistance.",
+    q: "Do you offer multi-tenant SaaS, or can you host Classifyre for us?",
+    a: "Classifyre is never multi-tenant SaaS. You can self-host completely on your own infrastructure, or subscribe to dedicated single-tenant managed hosting where we operate, upgrade, and apply security patches to an isolated Classifyre instance exclusively for your organisation.",
+  },
+  {
+    q: "How is tailored project work (IAM, custom sources, EDI) scoped and agreed?",
+    a: "Every implementation project is scoped individually around your technical requirements, timeline, and internal team capacity — whether mapping Classifyre onto your organisational structure and IAM, building custom source connectors, fulfilling billable EDI ingestion requests, or designing non-bypass network architecture.",
   },
   {
     q: "Can custom connectors or detectors stay private to our organisation?",
@@ -156,7 +194,7 @@ const supportFaq: readonly { q: string; a: string }[] = [
   },
   {
     q: "Can you work under NDA and standard European or North American procurement?",
-    a: "Yes. We work with organisations across Austria, the European Union, North America, and globally under standard NDAs and direct engineering agreements.",
+    a: "Yes. We work with organisations across Austria, the European Union, North America, and globally under standard NDAs and direct engineering or maintenance agreements.",
   },
   {
     q: "How do I report a security vulnerability?",
@@ -194,10 +232,11 @@ export default function SupportPage() {
           lede={
             <>
               Every capability in Classifyre is open source under Apache-2.0
-              with no gated tiers. Use our documentation and public repository
-              for self-hosted operations, or work directly with the engineers
-              who build Classifyre on an individual, agreed scope for custom
-              IAM, sources, Delta data products, or detectors.
+              with no gated tiers. Self-host freely, subscribe to annual
+              maintenance, security patches, and optional dedicated
+              single-tenant hosting (never multi-tenant SaaS), or partner with
+              our engineers on scoped IAM mapping, custom sources, and EDI
+              requests.
             </>
           }
           actions={
@@ -252,6 +291,52 @@ export default function SupportPage() {
                         {item.label} →
                       </span>
                     </a>
+                  </Reveal>
+                ))}
+              </div>
+            </div>
+          </SectionShell>
+        </section>
+
+        {/* ── Transparent commercial plans ─────────────────────────────── */}
+        <section aria-labelledby="commercial-plans-title">
+          <SectionShell tone="plain">
+            <div className="space-y-8">
+              <SectionHead
+                id="commercial-plans-title"
+                marker="Plans & indicative pricing"
+                title="100% Apache-2.0 core. Transparent commercial options."
+                lede="Self-host freely forever, or add a Red Hat-style annual maintenance and security-patch subscription, dedicated single-tenant hosting (never multi-tenant SaaS), or scoped pilot and EDI work."
+              />
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                {commercialPlans.map((plan, index) => (
+                  <Reveal key={plan.title} delayMs={index * 60} className="h-full">
+                    <div
+                      className={`flex h-full flex-col items-start gap-3 border-2 p-5 ${
+                        plan.highlight
+                          ? "border-accent bg-foreground text-background shadow-[6px_6px_0_var(--color-accent)]"
+                          : "border-border bg-background text-foreground shadow-[6px_6px_0_var(--color-border)]"
+                      }`}
+                    >
+                      <Marker label={plan.marker} />
+                      <h3 className="font-sans text-base font-bold leading-snug">
+                        {plan.title}
+                      </h3>
+                      <p
+                        className={`font-mono text-lg font-bold tracking-tight ${
+                          plan.highlight ? "text-accent" : "text-accent-ink dark:text-accent"
+                        }`}
+                      >
+                        {plan.price}
+                      </p>
+                      <p
+                        className={`text-sm leading-6 ${
+                          plan.highlight ? "text-background/80" : "text-muted-foreground"
+                        }`}
+                      >
+                        {plan.body}
+                      </p>
+                    </div>
                   </Reveal>
                 ))}
               </div>

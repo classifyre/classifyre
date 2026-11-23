@@ -28,7 +28,7 @@ export default {
         href: "/de/get",
       },
       incident: {
-        title: "Vorfallbearbeitung",
+        title: "Vorfallbearbeitung (Add-on)",
         href: "/de/use-cases/incident-response",
       },
     },

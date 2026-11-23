@@ -30,7 +30,7 @@ const L = {
     create: "Create connection",
     created: "Created",
     string: "Server=sql.example.com:5432;Database=finance;User=lena_power_bi;SSL=verify-full",
-    report: "Customers report · via SQL connection Power BI",
+    report: "Customers report · Lena (EU BI · masked) · via SQL connection Power BI",
     log: "09:14 · Lena read crm.customers via SQL connection Power BI",
   },
   de: {
@@ -43,7 +43,7 @@ const L = {
     create: "Verbindung anlegen",
     created: "Angelegt",
     string: "Server=sql.example.at:5432;Database=finance;User=lena_power_bi;SSL=verify-full",
-    report: "Kundenbericht · über SQL-Verbindung Power BI",
+    report: "Kundenbericht · Lena (EU-BI · maskiert) · über SQL-Verbindung Power BI",
     log: "09:14 · Lena las crm.customers über SQL-Verbindung Power BI",
   },
 } as const;

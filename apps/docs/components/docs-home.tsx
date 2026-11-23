@@ -79,7 +79,7 @@ const START_HERE: Array<{
       { text: "SQL, masking & shared datasets", href: "/data-query/" },
       { text: "Power BI, Excel & ODBC connections", href: "/sql-connections/" },
       { text: "Organizing groups & roles", href: "/access/organizing/" },
-      { text: "Incident response", href: "/investigations/" },
+      { text: "Incident response (Add-on)", href: "/investigations/" },
     ],
   },
 ];
@@ -113,14 +113,24 @@ const DIRECTORY: Array<{ name: string; blurb: string; href: string }> = [
     href: "/flow/",
   },
   {
-    name: "Investigations",
-    blurb: "When something leaks: inquiries, cases, hypotheses — and the AI autopilot.",
-    href: "/investigations/",
+    name: "Access & Sign-in",
+    blurb: "Directory SSO, groups, roles, expiring grants, and per-workspace permissions.",
+    href: "/access/",
   },
   {
-    name: "Duplicate review",
-    blurb: "Assets that look like the same thing, queued so the list can be finished.",
-    href: "/duplicates/",
+    name: "SQL & Masking",
+    blurb: "Cross-source SQL, multi-level column masks, row filters, and governed shared datasets.",
+    href: "/data-query/",
+  },
+  {
+    name: "SQL Connections",
+    blurb: "Personal, expiring TLS connections for Power BI, Excel, Tableau, DBeaver, and ODBC.",
+    href: "/sql-connections/",
+  },
+  {
+    name: "Data Export",
+    blurb: "CSV downloads of findings, assets and scan assets.",
+    href: "/data-export/",
   },
   {
     name: "Notifications",
@@ -128,9 +138,14 @@ const DIRECTORY: Array<{ name: string; blurb: string; href: string }> = [
     href: "/notifications/",
   },
   {
-    name: "Data Export",
-    blurb: "CSV downloads of findings, assets and scan assets.",
-    href: "/data-export/",
+    name: "Investigations (Add-on)",
+    blurb: "Optional incident response module: inquiries, cases, hypotheses, and supervised autopilot.",
+    href: "/investigations/",
+  },
+  {
+    name: "Duplicate review",
+    blurb: "Assets that look like the same thing, queued so the list can be finished.",
+    href: "/duplicates/",
   },
   {
     name: "Settings",
