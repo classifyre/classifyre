@@ -20,11 +20,11 @@ import { docs, routes } from "@/lib/site";
 /* ── Hero ───────────────────────────────────────────────────────────────── */
 
 const enHero = {
-  chips: ["Open-Source Data Governance · Apache-2.0"],
-  titleA: "Control who sees what.",
-  titleBLead: "Enforced on",
-  titleBHighlight: "every query.",
-  lede: "Classifyre integrates with your existing databases, lakehouses, and identity provider to govern data from source to consumption. Classify sensitive and business-specific data, apply row and column masking by group, publish governed data products, and give teams live SQL, Power BI, and Excel access with every read logged.",
+  chips: ["Open-Source Data Governance Platform · Apache-2.0"],
+  titleA: "Find it. Govern it.",
+  titleBLead: "Use it",
+  titleBHighlight: "safely.",
+  lede: "Classifyre connects directly to your existing databases, lakehouses, file stores, and identity directory — governing data from source to consumption without migration. Discover and classify sensitive data in place, enforce live masking and access controls across SQL, Power BI, Excel, and AI agents, publish trusted data products with built-in quality checks and usage tracking, and resolve data leaks as auditable cases — on your own infrastructure.",
   ctaPrimary: "Deploy open source",
   ctaSecondary: "Plan a tailored rollout",
   ctaShowcase: "Explore live demo",
@@ -283,22 +283,22 @@ const enJourney = {
     },
     {
       id: "govern",
-      step: "Audit & quality",
-      title: "Verifiable ownership, data quality, and a complete read log",
+      step: "Quality, usage & audit",
+      title: "Verifiable ownership, data quality, and live usage tracking",
       body: [
-        "Every governed table and shared dataset carries named owners, stewards, and custodians, column-level classifications, certification status, and scheduled data quality checks for missing values, invalid identifiers, duplicates, or custom SQL rules.",
-        "Every read, export, permission change, and dataset approval is recorded with the person, timestamp, and tool used. Compliance reviews for GDPR, NIS2, DORA, or internal audit become a filtered view instead of a manual investigation.",
+        "Every governed table and shared dataset carries named owners, stewards, and custodians, certification status (Draft to Certified), and scheduled data quality checks for missing values, invalid identifiers, duplicates, freshness, or custom SQL — where failures automatically open findings for the asset owner and export cleanly as open data contracts (ODCS).",
+        "Every read, export, permission change, and dataset approval is recorded with the person, timestamp, and tool used (Workbench, Power BI, Excel, SQL, or MCP), giving CDOs live usage and export analytics while turning GDPR, EU AI Act, NIS2, and DORA reviews into a filtered view.",
       ],
       facts: [
         "Owners, stewards & certification lifecycle",
-        "Scheduled data quality checks",
-        "Open data contracts (ODCS)",
-        "Complete audit trail of every read",
+        "Scheduled quality checks & auto-findings",
+        "Live usage, exports & policy change diffs",
+        "Open data contracts (ODCS) & full read log",
       ],
       href: docs.governance,
       linkLabel: "Governance & audit docs",
       media: "govern",
-      caption: "Ownership assigned, column masks reviewed, quality checks passing, and open data contract exported.",
+      caption: "Ownership assigned, column masks reviewed, quality checks passing, live usage tracked, and open data contract exported.",
     },
   ],
 } as const;

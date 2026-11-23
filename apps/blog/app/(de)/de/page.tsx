@@ -19,11 +19,11 @@ import "../../landing.css";
  */
 
 const description =
-  "Open-Source Data Governance für Ihre bestehenden Systeme: sensible Daten erkennen, Zeilen- und Spaltenmaskierung nach Gruppen durchsetzen, Datenprodukte teilen und SQL, Power BI sowie Excel lückenlos protokollieren.";
+  "Selbst gehostete Open-Source Data Governance für Ihre bestehenden Datenbanken, Lakehouses und Dateien: sensible Daten erkennen, Live-Maskierung für SQL, Power BI, Excel und KI-Agenten durchsetzen, Datenqualität und Nutzung überwachen und Datenabflüsse klären.";
 
-const ogTitle = "Classifyre: Klare Datenregeln. Durchgesetzt bei jeder Abfrage.";
+const ogTitle = "Classifyre: Erkennen. Steuern. Sicher nutzen.";
 const ogDescription =
-  "Durchgängige Open-Source Data Governance über 40+ Systeme: Zeilen- und Spaltenmaskierung nach Gruppen, verwaltete Datenprodukte, SQL-, Power-BI- und Excel-Zugriff auf eigener Infrastruktur.";
+  "Open-Source Data Governance für Ihre bestehenden Datenbanken, Lakehouses und Verzeichnisdienste: Erkennung, Live-Maskierung für SQL, Power BI, Excel & KI-Agenten, Datenqualität, Nutzungsanalyse, Datenprodukte und Fallbearbeitung.";
 
 export const metadata: Metadata = {
   title: {

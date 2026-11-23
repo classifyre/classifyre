@@ -22,11 +22,11 @@ import "../landing.css";
  */
 
 const description =
-  "Open-source data governance for the systems you already run: classify sensitive data, enforce row and column masking by group, publish governed data products, and query via SQL, Power BI, and Excel with every read logged.";
+  "Self-hosted open-source data governance across your existing databases, lakehouses, and files: classify sensitive data in place, enforce live masking across SQL, Power BI, Excel, and AI agents, monitor quality and usage, publish data products, and resolve leaks.";
 
-const ogTitle = "Classifyre: Control who sees what. Enforced on every query.";
+const ogTitle = "Classifyre: Find it. Govern it. Use it safely.";
 const ogDescription =
-  "End-to-end open-source data governance across 40+ systems. Row and column masking by group, governed data products, live SQL/Power BI/Excel access, and full audit logging on your own infrastructure.";
+  "Open-source data governance across your existing databases, lakehouses, and identity directory: in-place discovery, live masking for SQL, Power BI, Excel & AI agents, data quality, usage tracking, governed data products, and leak cases.";
 
 export const metadata: Metadata = {
   title: {
