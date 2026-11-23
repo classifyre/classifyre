@@ -211,3 +211,12 @@ It makes a certificate authority and a certificate under `/var/lib/classifyre/sq
 </Tabs>
 
 Connections use TLS 1.3 only. Other settings: `maxSessions` per gateway pod (each session holds a catalog of about 150 MB), `maxSessionsPerConnection`, `idleMinutes`. Ten failed sign-ins within 15 minutes lock a user name, and an address, out for 15 minutes.
+
+## Preventing direct database bypass in production
+
+Classifyre enforces row filters, column masking, and audit logging on every query that passes through its SQL workbench, SQL gateway, and MCP server. Because Classifyre does not replace your underlying databases, production deployments enforce non-bypass operationally in two steps:
+
+1. **Revoke direct analyst and shared BI credentials on the source systems.** Analysts, BI dashboards, and AI agents authenticate only with personal, expiring Classifyre SQL connections or MCP tokens — never with raw database accounts.
+2. **Restrict source network reachability to Classifyre's service principal.** Use firewall rules, VPC security groups, or Kubernetes `NetworkPolicy` so source database ports (e.g., PostgreSQL `5432`, SQL Server `1433`, Oracle `1521`) accept analytical traffic exclusively from Classifyre's dedicated query workers and application backends — never from analyst laptops, BI desktops, or AI agent hosts.
+
+With those two controls in place, Power BI, Excel, Tableau, DBeaver, ODBC clients, and MCP AI agents have no alternative path to raw tables: every analytical read is governed, masked, and logged by Classifyre.

@@ -41,8 +41,8 @@ your estate into another vendor warehouse. See [Sources](/sources/).
 **2. Detect sensitive and business-specific data.** Built-in packs classify
 personal data (PII across EU, US, and global identifiers) and secrets out of
 the box. Custom detectors extend this to any business rule — from regex and
-Python checks to lightweight on-CPU AI models (GLiNER2, text/image
-classification), decision models, and LLMs. Every finding carries a score and
+Python checks to lightweight on-CPU zero-shot extraction and classification
+models, decision models, and private LLMs. Every finding carries a score and
 written explanation. See [Detectors](/detectors/).
 
 **3. Govern access by organisation.** Connect Entra ID, Active Directory, Okta,
@@ -62,8 +62,11 @@ personal data by default. See [SQL & Masking](/data-query/).
 **5. Query in SQL, Power BI, Excel, ODBC, and MCP.** Teams continue working in
 the tools they already know. Classifyre exposes a PostgreSQL-compatible TLS
 endpoint with personal, expiring, revocable connections — eliminating shared
-database passwords. AI agents connected over MCP inherit the exact permissions
-and masks of the signed-in user. See [SQL Connections](/sql-connections/).
+database passwords. In production, revoking direct analyst logins on underlying
+databases and restricting source network ports to Classifyre ensures BI, SQL,
+and MCP AI tools cannot bypass governance. AI agents connected over MCP inherit
+the exact permissions and masks of the signed-in user. See
+[SQL Connections](/sql-connections/).
 
 **6. Publish governed data products.** Teams combine data across sources into
 governed **shared datasets** (live cross-source queries or shared data

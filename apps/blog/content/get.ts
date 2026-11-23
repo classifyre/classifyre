@@ -173,7 +173,7 @@ const enFirstRun = {
     {
       step: "03",
       title: "Run detectors & classify",
-      body: "Enable built-in PII and secret packs or add custom regex, Python, local CPU AI (GLiNER2), or LLM detectors. Classifications drive column masking automatically.",
+      body: "Enable built-in PII and secret packs or add custom regex, Python, local CPU AI extraction, or LLM detectors. Classifications drive column masking automatically.",
       href: docs.preBuiltDetectors,
       hrefLabel: "Detectors reference",
     },

@@ -27,7 +27,7 @@ export default {
         href: "/get",
       },
       incident: {
-        title: "Incident Response",
+        title: "Incident Response (Add-on)",
         href: "/use-cases/incident-response",
       },
     },

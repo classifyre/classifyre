@@ -31,6 +31,11 @@ type Variant = {
 
 /** Support tickets per customer, by row position. */
 const TICKETS = [3, 1, 2];
+/** Per-city distinct customers in crm.customers (sums to 4,215, matching Discover/Access/Govern demos). */
+const CITY_COUNTS: Record<Locale, readonly string[]> = {
+  en: ["1,140", "980", "1,215", "880"],
+  de: ["1.140", "980", "1.215", "880"],
+};
 
 function buildVariants(locale: Locale): Record<string, Variant> {
   const all = sampleRows(locale);
@@ -84,11 +89,11 @@ function buildVariants(locale: Locale): Record<string, Variant> {
       sql: "SELECT city, count(DISTINCT email) AS customers\nFROM crm.customers\nGROUP BY city;",
       masked: {
         columns: ["city", "customers"],
-        rows: all.map((r) => [plain(r.city), plain("1")]),
+        rows: all.map((r, i) => [plain(r.city), plain(CITY_COUNTS[locale][i] ?? "1")]),
       },
       clear: {
         columns: ["city", "customers"],
-        rows: all.map((r) => [plain(r.city), plain("1")]),
+        rows: all.map((r, i) => [plain(r.city), plain(CITY_COUNTS[locale][i] ?? "1")]),
       },
     },
   };

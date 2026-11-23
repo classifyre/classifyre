@@ -79,7 +79,7 @@ const principles: readonly {
   {
     marker: "Datensouveränität",
     title: "Alles bleibt auf Ihrer Infrastruktur",
-    body: "Classifyre ist selbst betriebene Software, kein mandantenübergreifender SaaS-Upload. Betreiben Sie es lokal mit Docker oder produktiv auf Kubernetes und OpenShift – On-Premises, in Ihrer Private Cloud oder auf AWS, Azure und GCP.",
+    body: "Classifyre ist selbst betriebene Software – niemals ein Multi-Tenant-SaaS-Upload. Betreiben Sie es lokal mit Docker, produktiv auf Kubernetes und OpenShift On-Premises oder in Ihrer Cloud, oder lassen Sie eine dedizierte Einzelmandanten-Instanz von uns souverän betreiben und patchen.",
     href: docs.deployment,
     hrefLabel: "Deployment-Architektur",
   },
@@ -93,7 +93,7 @@ const principles: readonly {
   {
     marker: "Offen konzipiert",
     title: "100 % Apache-2.0, ohne gesperrte Stufen",
-    body: "Prüfen Sie jede Zeile Code, verifizieren Sie Maskierung und Zugriffssteuerung und betreiben Sie die gesamte Plattform ohne Nutzerlizenzen selbst. Wenn Sie individuelle Anpassungen benötigen, arbeiten Sie direkt mit unserem Engineering-Team.",
+    body: "Prüfen Sie jede Zeile Code, verifizieren Sie Maskierung und Zugriffssteuerung und betreiben Sie die gesamte Plattform ohne Nutzerlizenzen selbst. Organisationen beauftragen uns für jährliche Wartungs- und Sicherheits-Patch-Abos, dediziertes Hosting oder Projektarbeit für eigene Quellen, Organisations-Mapping und EDI.",
     href: "/de/support/",
     hrefLabel: "Support & Anpassung",
   },

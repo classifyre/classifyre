@@ -23,7 +23,7 @@ const COPY: Record<
       {
         marker: "01 · Connect & detect",
         title: "40+ sources and flexible detectors",
-        body: "Connect databases, Iceberg, Delta, Parquet, object storage, and collaboration platforms — or plug in custom sources. Detect personal data, secrets, and business-specific signals with regex, Python rules, local CPU AI models (GLiNER2), or LLMs.",
+        body: "Connect databases, Iceberg, Delta, Parquet, object storage, and collaboration platforms — or plug in custom sources. Detect personal data, secrets, and business-specific signals with regex, Python rules, local CPU AI extraction models, or private LLMs.",
         href: docs.detectors,
         hrefLabel: "Explore detectors",
       },
@@ -72,7 +72,7 @@ const COPY: Record<
       {
         marker: "01 · Verbinden & erkennen",
         title: "40+ Quellen und flexible Detektoren",
-        body: "Verbinden Sie Datenbanken, Iceberg, Delta, Parquet, Object Storage und Fachsysteme – oder eigene Konnektoren. Erkennen Sie PII, Secrets und Geschäftsregeln per Regex, Python, lokalen CPU-KI-Modellen (GLiNER2) oder LLMs.",
+        body: "Verbinden Sie Datenbanken, Iceberg, Delta, Parquet, Object Storage und Fachsysteme – oder eigene Konnektoren. Erkennen Sie PII, Secrets und Geschäftsregeln per Regex, Python, lokalen CPU-KI-Modellen oder privaten LLMs.",
         href: docs.detectors,
         hrefLabel: "Detektoren ansehen",
       },

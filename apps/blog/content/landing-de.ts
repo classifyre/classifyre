@@ -210,8 +210,8 @@ const de: LandingCopy = {
 
   tension: {
     marker: "Warum Classifyre",
-    title: "Data Governance, ohne Ihre bestehende Landschaft zu ersetzen.",
-    lede: "Sie betreiben bereits Datenbanken, Lakehouses, ETL-Pipelines und ein zentrales Benutzerverzeichnis. Proprietäre Governance-Suiten kosten hohe Nutzerlizenzen oder binden Sie an einen einzelnen Cloud-Anbieter – während manuelle Exporte und geteilte Datenbank-Passwörter jede Prüfung erschweren.",
+    title: "Datenblockade beenden – ohne CSV-Leaks oder US-Cloud-Zwang.",
+    lede: "Wenn sensible Daten über sechs oder mehr Datenbanken und Dateiablagen verteilt liegen, steht die IT vor einer schlechten Wahl: BI und KI-Agenten monatelang blockieren oder unkontrollierte CSV-Exporte und geteilte Passwörter ausgeben. Classifyre kommt zu Ihren Daten – damit Teams live in Power BI, Excel, SQL und per MCP unter einer offenen Maskierungs- und Audit-Schicht arbeiten.",
     diagram: {
       leftLabel: "Ihre bestehenden Systeme",
       leftSources: ["PostgreSQL · MySQL · Oracle", "Iceberg · Delta · Parquet", "S3 · Azure · GCS · Dateien", "Eigene & SaaS-Quellen"],
@@ -269,7 +269,7 @@ const de: LandingCopy = {
         title: "Bekannte oder eigene Quellen verbinden und gezielt klassifizieren",
         body: [
           "Verbinden Sie über 40 Quellsysteme – relationale Datenbanken, Iceberg, Delta, Parquet, Object Storage, Wikis und Kollaborationstools – oder binden Sie eigene Konnektoren für Fachsysteme an. Alle Daten werden direkt an der Quelle gelesen.",
-          "Starten Sie mit fertigen Paketen für personenbezogene Daten (AT/DE/CH, EU und weltweit) sowie Secrets und ergänzen Sie fachspezifische Detektoren: von einfachen Regex- und Python-Regeln über schlanke lokale KI-Modelle auf Ihrer CPU (z. B. GLiNER2, Text- und Bildklassifikation) bis zu Entscheidungsmodellen und eigenen LLMs.",
+          "Starten Sie mit fertigen Paketen für personenbezogene Daten (AT/DE/CH, EU und weltweit) sowie Secrets und ergänzen Sie fachspezifische Detektoren: von einfachen Regex- und Python-Regeln über schlanke lokale CPU-KI-Modelle (Zero-Shot-Extraktion, Text- und Bildklassifikation) bis zu Entscheidungsmodellen und privaten LLMs.",
         ],
         facts: [
           "40+ Standard- & eigene Quellen",
@@ -382,7 +382,7 @@ const de: LandingCopy = {
 
   readers: {
     readers: {
-      masked: { name: "Lena · Regionale Analystin", role: "Maskierter Zugriff" },
+      masked: { name: "Lena · BI-Analystin (EU)", role: "Maskiert · alle Regionen" },
       clear: { name: "Tom · Finance Steward", role: "Klartext-Freigabe" },
     },
     rowsLabel: (n: number) => (n === 1 ? "1 Zeile" : `${n} Zeilen`),
@@ -426,34 +426,24 @@ const de: LandingCopy = {
     },
     rows: [
       {
-        sector: "Banken & Finanzdienstleister",
-        data: "Kundenstamm, Transaktionen, KYC-Daten, Delta- & Iceberg-Lakes",
-        finds: "Analysten arbeiten in Power BI mit letzten vier IBAN-Stellen und gehashten IDs; Compliance erhält befristeten Klartext mit revisionssicherem Protokoll.",
+        sector: "Öffentliche Hand & kritische Infrastruktur",
+        data: "Stadtwerke, Register, Fachverfahren (Oracle/PostgreSQL), SAP & Open-Data-Exporte",
+        finds: "Jeder Bezirk bzw. jede Dienststelle sieht per Zeilenfilter nur eigene Fälle; Personendaten und IBANs bleiben maskiert; DSB und CISO prüfen jeden Zugriff nach NIS2 und DSGVO.",
       },
       {
-        sector: "Öffentliche Hand & Verwaltung",
-        data: "Register, Fachverfahren, Statistik-Warehouses, Beschaffung",
-        finds: "Jeder Bezirk oder jede Dienststelle sieht per Zeilenfilter nur die eigenen Fälle; Personendaten bleiben maskiert; die DSB prüft das Zugriffsprotokoll.",
+        sector: "Gesundheitswesen, Spitäler & Universitäten",
+        data: "Aufnahmen, Laborwerte, klinische & Forschungs-Kohorten, Abrechnung, Archive",
+        finds: "Auswertungsteams zählen Kohorten und verknüpfen Datensätze über gehashte IDs, ohne jemals Patientennamen oder österreichische SVNR im Klartext zu lesen.",
       },
       {
-        sector: "Gesundheitswesen & Spitäler",
-        data: "Aufnahmen, Laborwerte, klinische Kohorten, Abrechnung",
-        finds: "Auswertungsteams zählen Kohorten und verknüpfen Datensätze über gehashte IDs, ohne jemals Patientennamen oder Sozialversicherungsnummern zu lesen.",
+        sector: "Regulierter Mittelstand & hybride BI / KI",
+        data: "On-Premises PostgreSQL/Oracle/ODBC, Iceberg/Delta/Parquet, EDI, Power BI & MCP-Agenten",
+        finds: "Ersetzt unkontrollierte CSV-Exporte und geteilte DB-Passwörter durch persönliche, befristete BI-, Excel- und KI-Verbindungen entlang Ihrer Verzeichnisgruppen.",
       },
       {
-        sector: "Versicherungen & Aktuariat",
-        data: "Schadensdaten, Polizzen, Risikoprüfung",
-        finds: "Aktuare arbeiten in SQL und Excel live auf Schadensdaten, während Versichertennamen und Gesundheitsangaben geschwärzt oder ausgeblendet bleiben.",
-      },
-      {
-        sector: "BI-Teams & Datenprodukte",
-        data: "PostgreSQL, Databricks, Iceberg, Parquet in S3/Azure/GCS",
-        finds: "Fachbereiche fordern kombinierte Datensätze in Alltagssprache an; Owner prüfen und veröffentlichen verwaltete Live- oder Delta-Datenprodukte mit vererbten Masken.",
-      },
-      {
-        sector: "Security & Interne Revision",
-        data: "Zugriffsprotokolle, Gehaltsdaten, Git, Wikis, Dateiserver",
-        finds: "Eine Ansicht beantwortet, wer welche Tabelle oder welches Datenprodukt wann und womit gelesen hat – während Secret-Detektoren exponierte Schlüssel früh erkennen.",
+        sector: "Banken, Versicherungen & Aktuariat",
+        data: "Kundenstamm, Schadensdaten, KYC-Register, Delta- & Iceberg-Lakes",
+        finds: "Aktuare und Analysten arbeiten live mit geschwärzten Namen und letzten vier IBAN-Stellen; Compliance erhält befristeten Klartext mit DORA-tauglichem Protokoll.",
       },
     ],
     footnote:
@@ -468,30 +458,30 @@ const de: LandingCopy = {
   },
 
   convert: {
-    marker: "Open Source & individuelle Anpassung",
-    title: "100 % Open Source. Maßgeschneidert bei Bedarf.",
-    lede: "Jede Funktion von Classifyre steht offen unter Apache-2.0 – so können Ihre IT- und Sicherheitsteams die Softwarequalität direkt im Code prüfen und alles selbst betreiben. Wenn Ihre Organisation eine maßgeschneiderte Einführung braucht, arbeiten wir direkt mit Ihrem Team zusammen.",
+    marker: "Open Source, Wartung & Projektarbeit",
+    title: "100 % Open Source. Gewartet & angepasst bei Bedarf.",
+    lede: "Jede Funktion von Classifyre steht offen unter Apache-2.0 – selbst betrieben auf Ihren Servern, niemals Multi-Tenant-SaaS. Betreiben Sie alles selbst, schließen Sie ein jährliches Wartungs- und Sicherheits-Patch-Abo (inkl. optionalem dediziertem Einzelmandanten-Hosting) ab oder beauftragen Sie gezielte Projektarbeit.",
     paths: [
       {
-        label: "IAM, Sicherheit & Organisationsdesign",
-        text: "Anbindung an komplexe Verzeichnisstrukturen, Mandantenmodelle sowie unternehmensspezifische Sicherheits- und Datenschutzrichtlinien.",
+        label: "Wartung, Sicherheits-Patches & Dedicated Hosting",
+        text: "Jährliche Wartungs- und Support-Abos mit SLA, gehärteten Builds, zeitnahen Sicherheits-Patches, Upgrades und optionalem dediziertem Einzelmandanten-Hosting.",
       },
       {
-        label: "Eigene Datenquellen & Konnektoren",
-        text: "Entwicklung und Absicherung von Konnektoren für branchenspezifische, gewachsene oder proprietäre Fachsysteme.",
+        label: "IAM & Organisationsstruktur-Mapping",
+        text: "Saubere Abbildung komplexer Entra-ID-, Active-Directory-, Okta- und Mandantenstrukturen sowie interner Compliance-Richtlinien.",
       },
       {
-        label: "Delta-Datenprodukte & Freigabeprozesse",
-        text: "Aufbau verwalteter Delta-Datenprodukte, bereichsübergreifender Freigabe-Workflows und fachlicher Datenanfragen.",
+        label: "Eigene Datenquellen & EDI-Anforderungen",
+        text: "Entwicklung und Absicherung von Konnektoren für proprietäre Bestandssysteme, interne APIs sowie abrechenbare EDI- und Datenaustausch-Strecken.",
       },
       {
-        label: "Fachspezifische Detektoren & KI-Modelle",
-        text: "Umsetzung eigener Geschäftsregeln, Compliance-Klassifikatoren sowie lokaler oder maßgeschneiderter KI- und LLM-Modelle.",
+        label: "Delta-Datenprodukte & eigene Detektoren",
+        text: "Aufbau verwalteter Delta-Datenprodukte, fachlicher Datenanfragen sowie eigener Geschäftsregeln und lokaler/privater KI-Modelle.",
       },
     ],
-    tailoringTitle: "Classifyre passgenau auf Ihre Organisation abstimmen?",
+    tailoringTitle: "Wartungs-Abo, dediziertes Hosting oder maßgeschneiderte Integration?",
     tailoringLede:
-      "Es gibt keine separate Enterprise-Edition mit gesperrten Funktionen. Betreiben Sie alles selbst – oder arbeiten Sie direkt mit unserem Engineering-Team zu individuell vereinbartem Umfang passend zu Ihrer Infrastruktur, Sicherheitsarchitektur und Ihren Zielen.",
+      "Es gibt keine gesperrte Enterprise-Edition und keinen Multi-Tenant-SaaS-Upload. Betreiben Sie alles selbst – oder arbeiten Sie mit unseren Entwicklern über ein Wartungs-/Hosting-Abo oder ein klar abgegrenztes Integrationsprojekt.",
     ctaPrimary: "Mit uns sprechen",
     ctaSecondary: "Installationsleitfaden",
     ctaShowcase: "Live-Demo ansehen",
@@ -521,7 +511,7 @@ const de: LandingCopy = {
       },
       {
         q: "Welche Detektoren sind enthalten – und können wir eigene Geschäftsregeln erkennen?",
-        a: "Classifyre bringt fertige Pakete für personenbezogene Daten (inkl. AT/DE/CH-, EU- und internationaler Kennungen) sowie Secrets mit. Darüber hinaus erstellen Sie eigene fachspezifische Detektoren – von schnellen Regex- und Python-Regeln über lokale CPU-KI-Modelle (wie GLiNER2, Text- und Bildklassifikation) bis zu Entscheidungsmodellen und selbst gehosteten oder angebundenen LLMs.",
+        a: "Classifyre bringt fertige Pakete für personenbezogene Daten (inkl. AT/DE/CH-, EU- und internationaler Kennungen) sowie Secrets mit. Darüber hinaus erstellen Sie eigene fachspezifische Detektoren – von schnellen Regex- und Python-Regeln über schlanke lokale CPU-KI-Modelle (Zero-Shot-Extraktion, Text- und Bildklassifikation) bis zu Entscheidungsmodellen und privaten LLMs.",
       },
       {
         q: "Wie verbinden sich Power BI, Excel, SQL und ODBC-Werkzeuge?",
@@ -529,7 +519,7 @@ const de: LandingCopy = {
       },
       {
         q: "Gibt es eine kostenpflichtige Enterprise-Edition oder ist wirklich alles Open Source?",
-        a: "Alle Funktionen stehen unter Apache-2.0 im offenen Quellcode: SSO, Rollen, Zeilenfilter, dynamische Maskierung, SQL/BI-Gateway, Datenprodukte, Audit-Log und Helm-Chart. Wir sperren keine Sicherheitsfunktionen hinter einer Enterprise-Lizenz. Organisationen beauftragen uns, wenn sie Unterstützung bei IAM-Integration, Organisationsdesign, eigenen Konnektoren, Delta-Datenprodukten oder maßgeschneiderten Detektoren wünschen.",
+        a: "Alle Funktionen stehen unter Apache-2.0 im offenen Quellcode: SSO, Rollen, Zeilenfilter, dynamische Maskierung, SQL/BI-Gateway, Datenprodukte, Audit-Log und Helm-Chart. Wir sperren keine Sicherheitsfunktionen hinter einer Enterprise-Lizenz und betreiben kein Multi-Tenant-SaaS. Organisationen buchen jährliche Wartungs- und Sicherheits-Patch-Abos (inkl. optionalem dediziertem Hosting) oder Projektarbeit für IAM-Mapping, eigene Konnektoren, EDI-Anforderungen und Detektoren.",
       },
       {
         q: "Wo läuft Classifyre – verlassen Daten jemals unsere Infrastruktur?",

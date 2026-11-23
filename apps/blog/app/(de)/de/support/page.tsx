@@ -23,9 +23,9 @@ import { contactEmail, docs, repoUrl, showcaseUrlFor } from "@/lib/site";
 import "../../../landing.css";
 
 export const metadata: Metadata = {
-  title: "Support & individuelle Anpassung",
+  title: "Support, Wartung & individuelle Einführung",
   description:
-    "Self-Service-Ressourcen, Community-Kanäle und direkte Engineering-Zusammenarbeit für Classifyre. 100 % Open Source (Apache-2.0) mit individuell vereinbarter Anpassung für IAM, eigene Quellen, Delta-Datenprodukte und Detektoren.",
+    "Self-Service-Ressourcen, jährliche Wartungs- und Sicherheits-Patch-Abos, optionales dediziertes Einzelmandanten-Hosting (kein Multi-Tenant-SaaS) sowie projektbezogenes Engineering für IAM-Mapping, eigene Quellen, EDI-Anfragen und Detektoren.",
   alternates: {
     canonical: "/de/support/",
     languages: {
@@ -35,9 +35,9 @@ export const metadata: Metadata = {
     },
   },
   openGraph: {
-    title: "Classifyre Support & individuelle Einführung",
+    title: "Classifyre Support, Wartung & individuelle Einführung",
     description:
-      "Dokumentation, GitHub-Community und direkte Engineering-Unterstützung mit individuell vereinbartem Umfang.",
+      "Dokumentation, jährliche Wartungs- und Hosting-Abos sowie direkte Engineering-Unterstützung mit individuell vereinbartem Umfang.",
     type: "website",
   },
 };
@@ -85,34 +85,68 @@ const selfService: readonly {
 
 const tailoringAreas: readonly { marker: string; title: string; body: string }[] = [
   {
-    marker: "IAM & Organisation",
-    title: "Verzeichnisdienst, Sicherheit & Organisationsdesign",
-    body: "Anbindung an komplexe Active-Directory-, Entra-ID-, Okta- oder eigene IAM-Hierarchien, Mandantenstrukturen sowie interne Sicherheits- und Datenschutzrichtlinien.",
+    marker: "Support & Dedicated Hosting",
+    title: "Wartung, Sicherheits-Patches & dediziertes Hosting",
+    body: "Jährliche Wartungs- und Support-Abos mit SLA, gehärteten Builds, zeitnahen Sicherheits-Patches und Upgrades – auf Ihrem eigenen Cluster oder von uns auf einer dedizierten Einzelmandanten-Instanz betrieben (kein Multi-Tenant-SaaS).",
   },
   {
-    marker: "Eigene Quellen",
-    title: "Konnektoren für Fach- und Bestandssysteme",
-    body: "Entwicklung, Absicherung und Pflege von Konnektoren für branchenspezifische Datenbanken, interne APIs oder gewachsene Systeme außerhalb des Standardkatalogs.",
+    marker: "IAM & Organisation",
+    title: "Verzeichnisdienst, Sicherheit & Organisationsstruktur",
+    body: "Saubere Abbildung komplexer Active-Directory-, Entra-ID-, Okta- oder eigener IAM-Hierarchien, Organisationsstrukturen sowie interner Sicherheits- und Datenschutzrichtlinien.",
+  },
+  {
+    marker: "Eigene Quellen & EDI",
+    title: "Konnektoren für Bestandssysteme & EDI-Anforderungen",
+    body: "Entwicklung, Absicherung und Pflege von Konnektoren für proprietäre Fachsysteme, interne APIs sowie abrechenbare EDI- und Datenaustausch-Anbindungen.",
   },
   {
     marker: "Datenprodukte",
-    title: "Delta-Datenprodukte & Freigabeprozesse",
-    body: "Aufbau verwalteter geteilter Datasets, Delta-Sharing-Strecken sowie fachlicher Datenanfragen in Alltagssprache mit Owner-Freigabe und vererbter Maskierung.",
+    title: "Delta-basierte Datenprodukte & Freigabeprozesse",
+    body: "Aufbau verwalteter Live- und Delta-basierter geteilter Datasets (externes Delta-Sharing-Protokoll geplant für 2027) sowie fachlicher Datenanfragen mit Owner-Freigabe und vererbter Maskierung.",
   },
   {
     marker: "Detektoren & KI",
     title: "Geschäftsspezifische Detektoren & Modelle",
-    body: "Umsetzung eigener Regex- oder Python-Regeln, lokaler CPU-KI-Modelle (wie GLiNER2) sowie privater LLM-Klassifikatoren direkt in Ihrer Umgebung.",
+    body: "Umsetzung eigener Regex- oder Python-Regeln, schlanker lokaler CPU-KI-Modelle sowie privater LLM-Klassifikatoren direkt in Ihrer Umgebung.",
   },
   {
-    marker: "Infrastruktur",
-    title: "Kubernetes, OpenShift & Air-Gapped-Betrieb",
-    body: "Architektur-Review und Produktivbetrieb auf Kubernetes, OpenShift, On-Premises-Clustern oder Ihrer Cloud – inklusive TLS, Dimensionierung und Tuning.",
+    marker: "Architektur & Betrieb",
+    title: "Netzwerk-Durchsetzung, K8s & Air-Gapped-Betrieb",
+    body: "Produktivbetrieb auf Kubernetes, OpenShift oder abgeschotteten Clustern – inklusive Netzwerkisolierung, damit BI, SQL und MCP-KI-Agenten ausschließlich über das Classifyre-TLS-Gateway laufen.",
+  },
+];
+
+const commercialPlans: readonly {
+  marker: string;
+  title: string;
+  price: string;
+  body: string;
+  highlight?: boolean;
+}[] = [
+  {
+    marker: "Open Source",
+    title: "Community Edition",
+    price: "€0 / dauerhaft",
+    body: "100 % Apache-2.0 im Eigenbetrieb: 41 eingebaute Konnektoren + Custom-SDK, 41 PII-Typen, SSO, Zeilenfilter, 5-Stufen-Maskierung, verwaltete SQL-Workbench (DE/EN), BI- & MCP-Gateway, Docker & Helm.",
   },
   {
-    marker: "Architektur-Review",
-    title: "Prüfung von Sicherheit, Maskierung & Audit",
-    body: "Gemeinsame Verifikation von Zeilenfiltern, Spaltenmasken, Power-BI-/Excel-/ODBC-Anbindung und Audit-Protokollierung mit Ihren Security- und Datenschutzteams.",
+    marker: "Jährliches Abo",
+    title: "Wartung & Sicherheits-Patches",
+    price: "€20k / €32k / €45k / Jahr",
+    body: "Drei klare Stufen (Standard ≤5 Quellen, 24h-SLA; Enterprise ≤15 Quellen, 8h-SLA & DSGVO-/KI-VO-/NIS2-Nachweispakete; Regulated Plus unbegrenzte Quellen, OpenShift HA & zertifizierte ERP-/EDI-Konnektoren).",
+    highlight: true,
+  },
+  {
+    marker: "Dediziertes Hosting · Kein SaaS",
+    title: "Einzelmandanten-Hosting",
+    price: "+€12.000–€20.000 / Jahr",
+    body: "Optionales souveränes EU-Einzelmandanten-Hosting: Wir betreiben, überwachen, sichern und patchen eine vollständig isolierte Instanz exklusiv für Ihre Organisation.",
+  },
+  {
+    marker: "Projektbezogen",
+    title: "Piloten & eigene Quell-Konnektoren",
+    price: "€18.000–€25.000 Pilot",
+    body: "Festpreis-Governance-Piloten (6–12 Wochen, 3–5 Quellen), IAM- & Organisations-Mapping, eigene Bestands-, ERP- und EDI-Quellkonnektoren sowie fachspezifische Detektoren.",
   },
 ];
 
@@ -135,20 +169,24 @@ const collaborationSteps: readonly { step: string; title: string; body: string }
 ];
 
 const inquiryChecklist: readonly string[] = [
-  "Beteiligte Datenquellen & Formate (z. B. PostgreSQL, Oracle/ODBC, Databricks, Iceberg, Delta, Parquet, S3/Azure/GCS)",
+  "Beteiligte Datenquellen, Formate & EDI-Strecken (z. B. PostgreSQL, Oracle/ODBC, Databricks, Iceberg, Delta, Parquet, S3/Azure/GCS oder proprietäre/EDI-Datenströme)",
   "Identity Provider & Gruppenstruktur (z. B. Entra ID, Active Directory, Okta, Keycloak, OIDC/SAML)",
-  "Ziel-Infrastruktur (Docker, Kubernetes, OpenShift, On-Premises, Air-Gapped oder Cloud)",
-  "Wichtigste Ziele (Gruppenmaskierung, Power-BI-/Excel-Zugriff, Delta-Datenprodukte, eigene Quellen oder Detektoren)",
+  "Ziel-Infrastruktur (Self-Hosted Docker, Kubernetes, OpenShift, Air-Gapped oder dediziertes Einzelmandanten-Hosting)",
+  "Wichtigste Ziele (jährliche Wartung & Sicherheits-Patches, Non-Bypass-BI-/KI-Gateway, IAM-Mapping, eigene Quellen/EDI oder Detektoren)",
 ];
 
 const supportFaq: readonly { q: string; a: string }[] = [
   {
     q: "Ist irgendeine Funktion hinter einem Supportvertrag oder einer Enterprise-Edition gesperrt?",
-    a: "Nein. Jede Funktion – SSO, Rollen, Zeilenfilter, dynamische Spaltenmaskierung, SQL-/BI-Gateway, Datenanfragen, geteilte Datenprodukte, Audit-Log und Helm-Chart – steht zu 100 % unter Apache-2.0. Sie beauftragen uns nur dann, wenn Sie direkte Engineering-Unterstützung oder maßgeschneiderte Erweiterungen wünschen.",
+    a: "Nein. Jede Funktion – SSO, Rollen, Zeilenfilter, dynamische Spaltenmaskierung, SQL-/BI-Gateway, Datenanfragen, geteilte Datenprodukte, Audit-Log und Helm-Chart – steht zu 100 % unter Apache-2.0. Bezahlte Leistungen umfassen jährliche Wartung, SLA, zeitnahe Sicherheits-Patches, optionales dediziertes Einzelmandanten-Hosting sowie abgegrenzte Umsetzungsprojekte.",
   },
   {
-    q: "Wie werden individuelle Anpassungen und Zusammenarbeit vereinbart?",
-    a: "Jede Zusammenarbeit wird individuell nach Ihren technischen Anforderungen, Ihrem Zeitrahmen und Ihren internen Ressourcen abgestimmt – vom kompakten Architektur-Review oder eigenen Konnektor bis zur begleiteten Einführung.",
+    q: "Bieten Sie Multi-Tenant-SaaS an – oder können Sie Classifyre für uns betreiben?",
+    a: "Classifyre ist niemals Multi-Tenant-SaaS. Sie können die Software vollständig selbst auf eigener Infrastruktur betreiben oder ein jährliches dediziertes Einzelmandanten-Hosting vereinbaren, bei dem wir eine isolierte Classifyre-Instanz exklusiv für Ihre Organisation betreiben, aktualisieren und mit Sicherheits-Patches pflegen.",
+  },
+  {
+    q: "Wie werden individuelle Projekte (IAM, eigene Quellen, EDI) vereinbart?",
+    a: "Jedes Projekt wird individuell nach Ihren technischen Anforderungen, Ihrem Zeitrahmen und Ihren internen Ressourcen abgestimmt – von der Abbildung Ihrer Organisations- und IAM-Struktur über eigene Quell-Konnektoren und abrechenbare EDI-Anforderungen bis zur Non-Bypass-Netzwerkarchitektur.",
   },
   {
     q: "Können eigene Konnektoren oder Detektoren intern und privat bleiben?",
@@ -156,7 +194,7 @@ const supportFaq: readonly { q: string; a: string }[] = [
   },
   {
     q: "Arbeiten Sie unter NDA und mit üblichen Beschaffungsprozessen?",
-    a: "Ja. Wir arbeiten mit Organisationen in Österreich, der EU, Nordamerika und weltweit unter üblichen Vertraulichkeitsvereinbarungen (NDA) und direkten Projektverträgen.",
+    a: "Ja. Wir arbeiten mit Organisationen in Österreich, der EU, Nordamerika und weltweit unter üblichen Vertraulichkeitsvereinbarungen (NDA) sowie direkten Wartungs- und Projektverträgen.",
   },
   {
     q: "Wie melde ich eine Sicherheitslücke?",
@@ -194,10 +232,11 @@ export default function SupportPageDe() {
           lede={
             <>
               Jede Funktion von Classifyre steht offen unter Apache-2.0 – ohne
-              gesperrte Stufen. Nutzen Sie unsere Dokumentation und das
-              öffentliche Repository für den Eigenbetrieb oder arbeiten Sie
-              direkt mit unseren Entwicklern zu individuell vereinbartem Umfang
-              für IAM, eigene Quellen, Delta-Datenprodukte oder Detektoren.
+              gesperrte Stufen. Betreiben Sie selbst, abonnieren Sie jährliche
+              Wartung, Sicherheits-Patches und optionales dediziertes
+              Einzelmandanten-Hosting (kein Multi-Tenant-SaaS) oder arbeiten Sie
+              direkt mit unseren Entwicklern an IAM-Mapping, eigenen Quellen und
+              EDI-Anforderungen.
             </>
           }
           actions={
@@ -252,6 +291,52 @@ export default function SupportPageDe() {
                         {item.label} →
                       </span>
                     </a>
+                  </Reveal>
+                ))}
+              </div>
+            </div>
+          </SectionShell>
+        </section>
+
+        {/* ── Transparente Optionen & Richtpreise ──────────────────────── */}
+        <section aria-labelledby="commercial-plans-title">
+          <SectionShell tone="plain">
+            <div className="space-y-8">
+              <SectionHead
+                id="commercial-plans-title"
+                marker="Modelle & Richtpreise"
+                title="100 % Apache-2.0 im Kern. Transparente Optionen."
+                lede="Dauerhaft kostenlos selbst betreiben – oder gezielt um jährliche Wartungs- und Sicherheits-Patch-Abos, dediziertes Einzelmandanten-Hosting (kein Multi-Tenant-SaaS) sowie abgegrenzte Pilot- und EDI-Projekte erweitern."
+              />
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                {commercialPlans.map((plan, index) => (
+                  <Reveal key={plan.title} delayMs={index * 60} className="h-full">
+                    <div
+                      className={`flex h-full flex-col items-start gap-3 border-2 p-5 ${
+                        plan.highlight
+                          ? "border-accent bg-foreground text-background shadow-[6px_6px_0_var(--color-accent)]"
+                          : "border-border bg-background text-foreground shadow-[6px_6px_0_var(--color-border)]"
+                      }`}
+                    >
+                      <Marker label={plan.marker} />
+                      <h3 className="font-sans text-base font-bold leading-snug">
+                        {plan.title}
+                      </h3>
+                      <p
+                        className={`font-mono text-lg font-bold tracking-tight ${
+                          plan.highlight ? "text-accent" : "text-accent-ink dark:text-accent"
+                        }`}
+                      >
+                        {plan.price}
+                      </p>
+                      <p
+                        className={`text-sm leading-6 ${
+                          plan.highlight ? "text-background/80" : "text-muted-foreground"
+                        }`}
+                      >
+                        {plan.body}
+                      </p>
+                    </div>
                   </Reveal>
                 ))}
               </div>
