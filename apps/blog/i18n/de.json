@@ -66,7 +66,8 @@
     "copied": "Kopiert",
     "copyCommand": "Befehl kopieren",
     "notes": [
-      "der einzige Port, den es bedient",
+      "die App, die API und diese Doku",
+      "SQL-Verbindungen für Power BI, Excel, psql (nicht 5432: den belegt das PostgreSQL im Container)",
       "Postgres braucht es; der Default ist zu klein",
       "Ihre Daten",
       "Scan-Logs + Credential-Key",

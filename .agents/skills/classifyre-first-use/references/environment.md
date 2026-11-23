@@ -14,7 +14,7 @@
 
 Where the API lives depends on how the instance was started:
 
-1. **All-in-one Docker image** (the usual case for a first-use run). Everything is behind one published port, and the API is under `/api`: with the default `-p 3000:3000`, the base URL is `http://127.0.0.1:3000/api`. Confirm with `curl -fsS http://127.0.0.1:3000/api/ping` (expects `pong`), and `docker ps` for a remapped host port.
+1. **All-in-one Docker image** (the usual case for a first-use run). Everything is behind one published port, and the API is under `/api`: with the default `-p 3000:3000`, the base URL is `http://127.0.0.1:3000/api`. Confirm with `curl -fsS http://127.0.0.1:3000/api/ping` (expects `pong`), and `docker ps` for a remapped host port. The same image also publishes SQL connections (PostgreSQL protocol, TLS) on `-p 5433:5433`; the container's own PostgreSQL holds 5432, so that is not the port to use.
 2. **Local development.** `http://localhost:8000` directly, or `http://localhost:8811` when port-forwarded from k3d by Skaffold.
 3. **Kubernetes.** Whatever the API ingress resolves to.
 

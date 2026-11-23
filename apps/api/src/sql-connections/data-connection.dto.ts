@@ -244,8 +244,17 @@ export class DataConnectionSecretDto {
 }
 
 export class DataConnectionEndpointDto {
-  @ApiProperty({ description: 'The SQL gateway runs in this deployment.' })
+  @ApiProperty({
+    description:
+      'This deployment runs the SQL gateway (Helm `sqlGateway.enabled`; on in the all-in-one image).',
+  })
   enabled: boolean;
+
+  @ApiProperty({
+    description:
+      'The gateway has a public address (`sqlGateway.publicHost` / `SQL_GATEWAY_PUBLIC_HOST`). Without one it runs but nobody can be told where to connect.',
+  })
+  configured: boolean;
 
   @ApiProperty({ type: String, nullable: true })
   host: string | null;

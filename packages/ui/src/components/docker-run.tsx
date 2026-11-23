@@ -33,6 +33,12 @@ import {
  * upgrade does. `--shm-size` is the same kind of trap: Postgres puts
  * parallel-query buffers in /dev/shm, and Docker's 64 MB default is small
  * enough that a large query fails mid-scan.
+ *
+ * `-p 5433:5433` publishes the SQL gateway, on in the image by default: Power
+ * BI, Excel, DBeaver and psql connect to it with a SQL connection made in the
+ * app. 5433, not 5432, because the container's own PostgreSQL holds 5432 and a
+ * laptop often runs one of its own. Leave the line out and the app says the
+ * endpoint cannot be reached.
  */
 export interface DockerRunCopy {
   copy: string;

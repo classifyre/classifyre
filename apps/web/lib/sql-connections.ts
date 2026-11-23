@@ -10,6 +10,9 @@ import {
   type DataConnectionSecretDto,
 } from "@workspace/api-client";
 
+export { endpointState, SQL_SETUP_DOCS_HREF } from "./sql-endpoint-state";
+export type { EndpointState } from "./sql-endpoint-state";
+
 export type {
   DataConnectionExposureDto,
   DataConnectionExposureItemDto,

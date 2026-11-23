@@ -277,9 +277,13 @@ ENV PORT_HTTP=3000 \
     CLASSIFYRE_PLAYWRIGHT_INSTALL_WITH_DEPS=0 \
     CLASSIFYRE_BOOTSTRAP_NAMESPACE=default \
     CLASSIFYRE_ALLINONE=1 \
-    IAM_PORT=8180
+    IAM_PORT=8180 \
+    PORT_SQL=5433
 
-# 5433: SQL connections (PostgreSQL protocol), published as e.g. -p 5432:5433.
+# 5433: SQL connections (PostgreSQL protocol), published as -p 5433:5433. Not
+# 5432: the bundled PostgreSQL holds that one inside the container, and a
+# laptop often has its own on the host. Change it with PORT_SQL (inside) and
+# SQL_GATEWAY_PUBLIC_PORT (what the app shows).
 EXPOSE 3000 5433
 
 # start-period is generous on purpose: a first boot initialises the database

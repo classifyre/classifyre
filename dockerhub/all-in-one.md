@@ -22,6 +22,7 @@ For a team, or for anything that has to survive a machine dying, use the [Helm c
 ```bash
 docker run -d --name classifyre \
   -p 3000:3000 \
+  -p 5433:5433 \
   --shm-size=1g \
   -v classifyre-pgdata:/var/lib/postgresql/data \
   -v classifyre-data:/var/lib/classifyre \
@@ -29,7 +30,7 @@ docker run -d --name classifyre \
   classifyre/all-in-one:latest
 ```
 
-Then open **http://localhost:3000**.
+Then open **http://localhost:3000**. `-p 5433:5433` publishes **SQL connections** (Power BI, Excel, DBeaver, `psql` over the PostgreSQL protocol, TLS): make one in *Settings → SQL connections*, then connect a tool to `localhost:5433`. It is 5433, not 5432, because the PostgreSQL inside the container holds 5432. Another host port: `-p 15433:5433 -e SQL_GATEWAY_PUBLIC_PORT=15433`; none: `-e SQL_GATEWAY_ENABLED=false`. See the [SQL connections guide](https://docs.classifyre.com/deployment/docker/#sql-connections).
 
 The first boot initialises the database, applies the migrations and creates a workspace called `default`. On a laptop that takes a few minutes; watch it with `docker logs -f classifyre`.
 
@@ -50,7 +51,8 @@ Nothing leaves your machine. There is no account, no signup, and no telemetry yo
 
 | Process | Port | Purpose |
 |---|---|---|
-| Caddy | **3000** (the only published port) | Routes to the UI and API |
+| Caddy | **3000** | Routes to the UI and API |
+| SQL gateway | **5433** | SQL connections (PostgreSQL protocol, TLS) |
 | Web UI | 3100 (internal) | Next.js app + bundled docs at `/docs` |
 | API + worker | 8000 (internal) | REST, WebSockets, job queues, embeddings, scan orchestration |
 | PostgreSQL 18 + pgvector | 5432 (internal, not exposed) | All application data |
@@ -59,7 +61,7 @@ Nothing leaves your machine. There is no account, no signup, and no telemetry yo
 
 ```bash
 docker run -d --name classifyre \
-  -p 3000:3000 --shm-size=1g \
+  -p 3000:3000 -p 5433:5433 --shm-size=1g \
   -v classifyre-pgdata:/var/lib/postgresql/data \
   -v classifyre-data:/var/lib/classifyre \
   -v classifyre-uv-cache:/cache/uv \
@@ -83,6 +85,10 @@ Everything is an environment variable (`-e NAME=value` or `--env-file`), and eve
 | `DEMO_MODE` | `false` | Read-only mode; blocks every write. For shared demo instances. |
 | `TELEMETRY_DISABLED` / `DO_NOT_TRACK` | unset | Set either to `1` to disable anonymous usage telemetry. |
 | `CORS_ORIGIN` | same-origin | Only needed if you serve the UI from another host. |
+| `SQL_GATEWAY_ENABLED` | `true` | `false` runs without SQL connections. |
+| `PORT_SQL` | `5433` | SQL gateway port inside the container. Publish it: `-p 5433:5433`. |
+| `SQL_GATEWAY_PUBLIC_PORT` | `PORT_SQL` | Port the app shows to tools; set it with another published host port. |
+| `SQL_GATEWAY_PUBLIC_HOST` | host of `CLASSIFYRE_URL` | Name tools connect to and the certificate carries. |
 
 ### Database
 

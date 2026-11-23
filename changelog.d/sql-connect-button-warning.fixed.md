@@ -1,0 +1,1 @@
+The "Connect a tool" button no longer flashes on and disappears on the SQL page and the Data tabs. Where SQL connections are on but have no public address yet, it stays, and the dialog, Settings → SQL connections and a table's Governance tab now say what is missing and link the setup guide for every kind of ingress.

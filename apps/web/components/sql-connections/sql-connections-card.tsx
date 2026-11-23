@@ -12,15 +12,17 @@ import {
   TabsTrigger,
 } from "@workspace/ui/components";
 import { useTranslation } from "@/hooks/use-translation";
-import { useDataConnections } from "@/lib/sql-connections";
+import { useDataConnections, useSqlEndpoint } from "@/lib/sql-connections";
 import { ConnectIcon } from "./connect-details";
 import { ConnectionsPanel } from "./connections-panel";
+import { SqlEndpointNotice } from "./endpoint-notice";
 import { OpenToConnectionsList } from "./open-list";
 
 /** Settings → SQL connections: your own, and everyone's for managers. */
 export function SqlConnectionsCard() {
   const { t } = useTranslation();
   const mine = useDataConnections({ kind: "mine" });
+  const endpoint = useSqlEndpoint();
   const [view, setView] = useState<"mine" | "all">("mine");
   return (
     <Card>
@@ -32,6 +34,7 @@ export function SqlConnectionsCard() {
         <CardDescription>{t("sqlConnections.description")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <SqlEndpointNotice endpoint={endpoint} />
         {mine.data?.canManage && (
           <Tabs value={view} onValueChange={(v) => setView(v as "mine" | "all")}>
             <TabsList>

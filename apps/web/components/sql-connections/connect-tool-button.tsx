@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Plus, TriangleAlert } from "lucide-react";
 import {
   Button,
   Dialog,
@@ -20,6 +20,7 @@ import { useTranslation } from "@/hooks/use-translation";
 import { useNamespace } from "@/components/namespace-provider";
 import type { DataScope } from "@/components/data-query/data-access";
 import {
+  endpointState,
   useDataConnections,
   useReachable,
   useSqlEndpoint,
@@ -27,6 +28,7 @@ import {
   type DataConnectionSecretDto,
 } from "@/lib/sql-connections";
 import { ConnectDetails, ConnectIcon } from "./connect-details";
+import { SqlEndpointNotice } from "./endpoint-notice";
 import {
   ConnectionSecretDialog,
   CreateConnectionDialog,
@@ -62,7 +64,12 @@ export function ConnectToolButton({ scope }: { scope?: DataScope }) {
   const usable = (mine.data?.items ?? []).filter((c) => covers(c, scope));
   const [chosen, setChosen] = useState<string | null>(null);
   const current = usable.find((c) => c.id === chosen) ?? usable[0];
-  if (endpoint && !endpoint.enabled) return null;
+  // Nothing until the endpoint is known (a button that is drawn and then taken
+  // back flashes), and nothing where the deployment runs no gateway. With the
+  // gateway on but no public address the button stays, and says what is missing.
+  const state = endpointState(endpoint);
+  if (state === "loading" || state === "off") return null;
+  const unconfigured = state === "unconfigured";
 
   const reachableHere =
     !scope || !reachable
@@ -89,6 +96,13 @@ export function ConnectToolButton({ scope }: { scope?: DataScope }) {
       >
         <ConnectIcon className="mr-1.5 h-4 w-4" />
         {t("sqlConnections.connectTool")}
+        {unconfigured && (
+          <TriangleAlert
+            className="ml-1.5 h-3.5 w-3.5 text-amber-600 dark:text-amber-400"
+            aria-label={t("sqlConnections.setupNeededTitle")}
+            data-testid="connect-tool-unconfigured"
+          />
+        )}
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-2xl" data-testid="connect-tool-dialog">
@@ -100,6 +114,7 @@ export function ConnectToolButton({ scope }: { scope?: DataScope }) {
             </DialogTitle>
             <DialogDescription>{t("sqlConnections.connectIntro")}</DialogDescription>
           </DialogHeader>
+          <SqlEndpointNotice endpoint={endpoint} />
           {!reachableHere ? (
             <p className="rounded-[4px] border border-dashed px-3 py-3 text-sm text-muted-foreground">
               {t("sqlConnections.notOpenHere")}{" "}
@@ -125,7 +140,11 @@ export function ConnectToolButton({ scope }: { scope?: DataScope }) {
                   </SelectContent>
                 </Select>
               )}
-              <ConnectDetails endpoint={endpoint} username={current.username} />
+              <ConnectDetails
+                endpoint={endpoint}
+                username={current.username}
+                showNotice={false}
+              />
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">

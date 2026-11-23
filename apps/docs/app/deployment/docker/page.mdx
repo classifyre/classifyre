@@ -27,7 +27,8 @@ server for sign-in — with nothing to provision and nothing to connect.
 
 | Process | Port | What it is |
 | --- | --- | --- |
-| Caddy | **3000** | the only published port; routes to the two servers below |
+| Caddy | **3000** | the app and its API; routes to the two servers below |
+| SQL gateway | **5433** | SQL connections: Power BI, Excel, DBeaver and `psql` connect here over the PostgreSQL protocol (see [SQL connections](#sql-connections)) |
 | Web UI | 3100 (internal) | Next.js, and this documentation at `/docs` |
 | API + worker | 8000 (internal) | REST, WebSockets, job queues, embeddings, and the parent of every scan |
 | Identity server (Keycloak) | 8180 (internal) | sign-in, people, groups and tenants; reached through the web UI at `/iam` |
@@ -35,8 +36,10 @@ server for sign-in — with nothing to provision and nothing to connect.
 
 They are supervised by [s6-overlay](https://github.com/just-containers/s6-overlay),
 which restarts anything that dies and makes `docker stop` and `docker restart`
-behave as expected. Only port 3000 is reachable — PostgreSQL binds to loopback
-inside the container's own network namespace and is never exposed.
+behave as expected. Two ports are published, 3000 for the app and 5433 for SQL
+connections. The container's own PostgreSQL binds to loopback inside the
+container's network namespace and is never exposed; that is also why SQL
+connections use 5433, not 5432.
 
 The scan workers are not a service: the API starts one process per scan and it
 exits with the scan, the same lifecycle Kubernetes gives them as Jobs.
@@ -86,6 +89,12 @@ Point it at something you already run — a database, an S3 bucket, a Confluence
 space, a Git repository, or a folder you mounted. Credentials are encrypted at
 rest. See [configuring sources](/sources/configuration/).
 
+### Connect Power BI, Excel or psql
+
+Optional: **Settings → SQL connections** makes a personal, audited connection
+for your BI tool; the dialog shows the host, port and a ready-made connection
+string. See [SQL connections](#sql-connections) below.
+
 ### Switch on detectors
 
 Enable the [pre-built packs](/detectors/pre-built/) you care about. They work on
@@ -99,13 +108,39 @@ and let the autopilot work them between scans.
 
 </Steps>
 
+## SQL connections
+
+The gateway is on by default, so every command on this page publishes its port,
+`-p 5433:5433`. It is **not 5432** on purpose: the PostgreSQL inside the
+container holds 5432 internally, and a laptop often runs its own PostgreSQL on
+the host. Tools connect to `localhost:5433` with a SQL connection made in the
+app (**Settings → SQL connections**), over TLS 1.3 with a certificate the
+container made for the host in `CLASSIFYRE_URL`; the app offers the certificate
+authority for download. Everything about connections, masks and tools is in
+[SQL connections](/sql-connections/).
+
+Change what is published, or what the app shows:
+
+| You want | Do this |
+| --- | --- |
+| Keep an older `-p 5432:5433` | `-e SQL_GATEWAY_PUBLIC_PORT=5432`: the app used to show 5432, and now shows 5433 unless told otherwise. |
+| Another host port, `15433` | `-p 15433:5433 -e SQL_GATEWAY_PUBLIC_PORT=15433`. The app shows the port tools use, so it has to know it. |
+| Another port inside the container | `-e PORT_SQL=6543 -p 6543:6543` (the shown port follows it). |
+| People reach it under another name than `CLASSIFYRE_URL`'s host | `-e SQL_GATEWAY_PUBLIC_HOST=sql.example.com`. Delete `/var/lib/classifyre/sql-tls` if the container already made its certificate for the old name. |
+| Your own certificate | Put `tls.crt` and `tls.key` in `/var/lib/classifyre/sql-tls` before the first start. |
+| Only this machine can reach it | `-p 127.0.0.1:5433:5433` (and `-p 127.0.0.1:3000:3000` for the app). |
+| No SQL connections | `-e SQL_GATEWAY_ENABLED=false`. The app then says they are switched off, and `-p 5433:5433` is not needed. |
+
+Left out of `docker run`, the app still shows **Connect a tool**: it opens with
+the connection details, but tools cannot reach the port until it is published.
+
 ## Scanning a folder on your machine
 
 Bind-mount it, then point a source at the path *inside* the container:
 
 ```bash
 docker run -d --name classifyre \
-  -p 3000:3000 --shm-size=1g \
+  -p 3000:3000 -p 5433:5433 --shm-size=1g \
   -v classifyre-pgdata:/var/lib/postgresql/data \
   -v classifyre-data:/var/lib/classifyre \
   -v classifyre-uv-cache:/cache/uv \
@@ -144,6 +179,15 @@ Pass them with `-e NAME=value`, or with `--env-file`.
 | `CLASSIFYRE_MASKED_CONFIG_KEY` | *generated* | Encrypts stored source credentials and MCP tokens. |
 | `TELEMETRY_DISABLED` / `DO_NOT_TRACK` | unset | Set either to `1` to disable [telemetry](/deployment/telemetry/). |
 | `CORS_ORIGIN` | same-origin | Only needed if the UI is served from another host. |
+
+### SQL connections
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `SQL_GATEWAY_ENABLED` | `true` | `false` runs without the SQL gateway. |
+| `PORT_SQL` | `5433` | Port the gateway listens on inside the container. Publish it: `-p 5433:5433`. |
+| `SQL_GATEWAY_PUBLIC_PORT` | `PORT_SQL` | The port the app tells tools to use. Set it when you publish another host port (`-p 15433:5433`). |
+| `SQL_GATEWAY_PUBLIC_HOST` | host of `CLASSIFYRE_URL` | The name tools connect to; also the name on the certificate. |
 
 ### Sign-in
 
@@ -307,7 +351,7 @@ the identity server's.
 
 ## Troubleshooting
 
-<Tabs items={["Won't start", "/dev/shm", "Slow first scan"]}>
+<Tabs items={["Won't start", "/dev/shm", "Slow first scan", "SQL tools can't connect"]}>
   <Tabs.Tab>
     The container exits saying there is not enough memory: Docker is capping it
     below 4 GB. Raise **Settings → Resources → Memory** in Docker Desktop and
@@ -324,6 +368,16 @@ the identity server's.
     Optional Python dependencies (OCR, ML detectors) install on first use, and
     detector models download the first time they run. Both are cached in the
     `/cache/uv` volume — keep it and this happens once.
+  </Tabs.Tab>
+  <Tabs.Tab>
+    Connection refused: the port is not published. Add `-p 5433:5433` (the
+    container's PostgreSQL holds 5432, so 5432 is the wrong port unless you
+    published `-p 5432:5433` and set `-e SQL_GATEWAY_PUBLIC_PORT=5432`). A
+    certificate error: the tool reaches the container under a name the
+    certificate does not carry. Open it by the host in `CLASSIFYRE_URL`
+    (`localhost` by default) or set `SQL_GATEWAY_PUBLIC_HOST`, and give the tool
+    the downloaded certificate authority. The app's **Connect a tool** dialog
+    shows the host and port the container believes it has.
   </Tabs.Tab>
 </Tabs>
 

@@ -146,6 +146,7 @@ Home-Ordner, **nur lesend** in den Container eingebunden.
 ```bash
 docker run -d --name classifyre \
   -p 3000:3000 \
+  -p 5433:5433 \
   --shm-size=1g \
   -v classifyre-pgdata:/var/lib/postgresql/data \
   -v classifyre-data:/var/lib/classifyre \
@@ -164,8 +165,10 @@ Fehler könnte keine Ihrer Dateien ändern, verschieben oder löschen. Der
 Container hat dort schlicht keine Möglichkeit zu schreiben.
 
 **Nichts verlässt den Laptop.** Das Image enthält die Anwendung, ihre Datenbank
-und ihren Scanner. Es bedient genau einen Port, `3000`, auf Ihrem eigenen
-Gerät. Es gibt kein Konto und keine Registrierung, und was die Scans finden,
+und ihren Scanner. Es bedient zwei Ports auf Ihrem eigenen Gerät: `3000` für
+die App und `5433` für SQL-Verbindungen, die ein BI-Tool wie Power BI oder Excel
+nutzen kann und die nur auf eine Verbindung antworten, die Sie selbst in der App
+anlegen. Es gibt kein Konto und keine Registrierung, und was die Scans finden,
 liegt in einem Docker-Volume neben Ihren anderen Containern.
 
 Sie brauchen Docker und etwa 4 GB Arbeitsspeicher. Unter macOS fragt das System
@@ -394,7 +397,7 @@ Ein Befehl, auf Ihrem eigenen Gerät:
 
 ```bash
 docker run -d --name classifyre \
-  -p 3000:3000 --shm-size=1g \
+  -p 3000:3000 -p 5433:5433 --shm-size=1g \
   -v classifyre-pgdata:/var/lib/postgresql/data \
   -v classifyre-data:/var/lib/classifyre \
   -v classifyre-uv-cache:/cache/uv \

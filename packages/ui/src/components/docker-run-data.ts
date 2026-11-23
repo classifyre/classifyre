@@ -23,10 +23,11 @@ export const dockerImageTag = /-(SNAPSHOT|rc|alpha|beta)/i.test(softwareVersion)
 
 export function dockerRunLines(
   tag: string = dockerImageTag,
-  notes?: readonly [string, string, string, string, string],
+  notes?: readonly [string, string, string, string, string, string],
 ): RunLine[] {
-  const [port, shm, pgdata, data, cache] = notes ?? [
-    "the only port it serves",
+  const [port, sqlPort, shm, pgdata, data, cache] = notes ?? [
+    "the app, the API and these docs",
+    "SQL connections for Power BI, Excel, psql (not 5432: the container's own PostgreSQL holds it)",
     "Postgres needs it; the default is too small",
     "your data",
     "scan logs + credential key",
@@ -35,6 +36,7 @@ export function dockerRunLines(
   return [
     { code: "docker run -d --name classifyre \\" },
     { code: "  -p 3000:3000 \\", note: port },
+    { code: "  -p 5433:5433 \\", note: sqlPort },
     { code: "  --shm-size=1g \\", note: shm },
     { code: "  -v classifyre-pgdata:/var/lib/postgresql/data \\", note: pgdata },
     { code: "  -v classifyre-data:/var/lib/classifyre \\", note: data },

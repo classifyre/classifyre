@@ -346,15 +346,18 @@ default JAVA_OPTS_KC_HEAP        "-Xms64m -Xmx${CLASSIFYRE_IAM_HEAP_MB:-512}m"
 # The API (SERVICE_ROLE=all) also runs the SQL gateway: PostgreSQL clients —
 # BI tools, psql, JDBC, ODBC — connect with a SQL connection made in the app
 # (docs: SQL Connections). The bundled PostgreSQL holds 5432 inside the
-# container, so the gateway listens on 5433; publish it as you like
-# (`-p 5432:5433`). TLS always: without a mounted certificate a CA and a
-# certificate for the public host are made once and kept beside the data; the
-# app offers the CA for download.
+# container, so the gateway listens on 5433 (PORT_SQL) and every `docker run`
+# publishes it: `-p 5433:5433`. Published under another port
+# (`-p 15433:5433`), say so with SQL_GATEWAY_PUBLIC_PORT=15433 — the app shows
+# that port to tools. The host they connect to is the one in CLASSIFYRE_URL
+# (localhost by default); SQL_GATEWAY_PUBLIC_HOST overrides it. TLS always:
+# without a mounted certificate a CA and a certificate for the public host are
+# made once and kept beside the data; the app offers the CA for download.
 default SQL_GATEWAY_ENABLED "true"
 default SQL_GATEWAY_PORT "${PORT_SQL:-5433}"
 sql_url_host="${CLASSIFYRE_URL#*://}"; sql_url_host="${sql_url_host%%[:/]*}"
 default SQL_GATEWAY_PUBLIC_HOST "${sql_url_host:-localhost}"
-default SQL_GATEWAY_PUBLIC_PORT "5432"
+default SQL_GATEWAY_PUBLIC_PORT "${SQL_GATEWAY_PORT}"
 sql_tls="${CLASSIFYRE_SQL_TLS_DIR:-/var/lib/classifyre/sql-tls}"
 if [ "${SQL_GATEWAY_ENABLED}" = "true" ] && [ ! -s "${sql_tls}/tls.crt" ]; then
   mkdir -p "${sql_tls}"
@@ -408,5 +411,6 @@ log "postgres shared_buffers=${PG_SHARED_BUFFERS} work_mem=${PG_WORK_MEM} effect
 log "scans: ${MAX_CONCURRENT_RUNNERS} concurrent, ${CLASSIFYRE_MAX_POOL_WORKERS} worker(s) each"
 [ "${QUERY_WORKER_ENABLED}" = "true" ] && log "sql queries: ${QUERY_WORKER_SLOTS} at once on the query worker, planned in ${QUERY_WORKER_MEMORY_MB} MB"
 log "listening on :${PORT_HTTP}, for ${CLASSIFYRE_URL}"
+[ "${SQL_GATEWAY_ENABLED}" = "true" ] && log "SQL connections on :${SQL_GATEWAY_PORT}, advertised as ${SQL_GATEWAY_PUBLIC_HOST}:${SQL_GATEWAY_PUBLIC_PORT} (publish it: -p ${SQL_GATEWAY_PUBLIC_PORT}:${SQL_GATEWAY_PORT})"
 
 exec /init "$@"

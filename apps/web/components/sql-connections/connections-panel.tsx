@@ -54,6 +54,7 @@ import {
 } from "@/lib/sql-connections";
 import { ConnectDetails } from "./connect-details";
 import { ExposureSwitch } from "./exposure-switch";
+import { SqlEndpointNotice } from "./endpoint-notice";
 import { ScopePicker } from "./scope-picker";
 
 const EXPIRY_DAYS = [30, 90, 180, 365] as const;
@@ -90,6 +91,7 @@ export function ConnectionsPanel({
   const [creating, setCreating] = useState(false);
   const [issuing, setIssuing] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const endpoint = useSqlEndpoint();
   const isMine = scope.kind === "mine";
 
   const act = async (id: string, run: () => Promise<unknown>, done: string) => {
@@ -131,6 +133,7 @@ export function ConnectionsPanel({
   const exposure = data?.exposure;
   return (
     <div className="space-y-3" data-testid="sql-connections-panel">
+      {target && <SqlEndpointNotice endpoint={endpoint} compact />}
       {target && exposure && (
         <ExposureSwitch
           target={target}

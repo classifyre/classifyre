@@ -100,12 +100,16 @@ stack — API, web UI, scan workers and PostgreSQL — in one container:
 
 ```bash
 docker run -d --name classifyre \
-  -p 3000:3000 --shm-size=1g \
+  -p 3000:3000 -p 5433:5433 --shm-size=1g \
   -v classifyre-pgdata:/var/lib/postgresql/data \
   -v classifyre-data:/var/lib/classifyre \
   -v classifyre-uv-cache:/cache/uv \
   classifyre/all-in-one:latest
 ```
+
+`-p 5433:5433` publishes SQL connections (Power BI, Excel, DBeaver and `psql`
+over the PostgreSQL protocol), on 5433 because the container's own PostgreSQL
+holds 5432; it is on by default and `-e SQL_GATEWAY_ENABLED=false` turns it off.
 
 See [`docker/README.md`](docker/README.md) for configuration, external
 databases, object storage and resource tuning.
