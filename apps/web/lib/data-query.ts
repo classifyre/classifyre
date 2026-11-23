@@ -3,6 +3,7 @@
 import { api } from "@workspace/api-client";
 import type {
   QueryCatalogDto,
+  QueryCatalogSourceDto,
   QueryCatalogTableDto,
   QueryRunDto,
 } from "@workspace/api-client";
@@ -13,6 +14,7 @@ import type {
  */
 
 export type QueryCatalog = QueryCatalogDto;
+export type QueryCatalogSource = QueryCatalogSourceDto;
 export type QueryCatalogTable = QueryCatalogTableDto;
 export type QueryRun = QueryRunDto;
 export type { SavedQueryDto, SaveSavedQueryDto } from "@workspace/api-client";
@@ -118,9 +120,34 @@ export function starterSql(catalog: QueryCatalog | null): {
   return { sql: previewSql(first.sqlName), title: first.sqlName };
 }
 
+/** Default number of rows preloaded when opening a table tab (DBeaver-style). */
+export const TABLE_PREVIEW_LIMIT = 200;
+
 /** The preview query over one table: what a Data tab and a play button open. */
-export function previewSql(sqlName: string): string {
-  return `SELECT *\nFROM ${sqlName}\nLIMIT 100`;
+export function previewSql(sqlName: string, limit = 100): string {
+  return `SELECT *\nFROM ${sqlName}\nLIMIT ${limit}`;
+}
+
+/** Copy text to the clipboard, falling back to an off-screen textarea. */
+export async function copyText(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    try {
+      const area = document.createElement("textarea");
+      area.value = text;
+      area.style.position = "fixed";
+      area.style.opacity = "0";
+      document.body.appendChild(area);
+      area.select();
+      const ok = document.execCommand("copy");
+      area.remove();
+      return ok;
+    } catch {
+      return false;
+    }
+  }
 }
 
 /** How long polling rides out a gateway that does not answer (an API restart). */

@@ -313,7 +313,7 @@ export function QueryWorkbench({
  * `****` never reads as the data itself.
  */
 /** "Rows filtered for you": the row filters of the tables the run names (DQ §5.10). */
-function RunRowsNote({ filters }: { filters?: QueryRunRowFilterDto[] }) {
+export function RunRowsNote({ filters }: { filters?: QueryRunRowFilterDto[] }) {
   const { t } = useTranslation();
   const words = useRowWords();
   if (!filters?.length) return null;
@@ -337,7 +337,7 @@ function RunRowsNote({ filters }: { filters?: QueryRunRowFilterDto[] }) {
   );
 }
 
-function RunMasksNote({ masks }: { masks?: QueryRunMaskDto[] }) {
+export function RunMasksNote({ masks }: { masks?: QueryRunMaskDto[] }) {
   const { t } = useTranslation();
   if (!masks?.length) return null;
   const name = (mask: QueryRunMaskDto) =>

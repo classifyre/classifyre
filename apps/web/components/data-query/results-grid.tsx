@@ -73,19 +73,22 @@ export function ResultsGrid({
   height = 420,
   canExport = false,
   onExport,
+  defaultPageSize = PAGE_SIZE_OPTIONS[1],
 }: {
   result: QueryRows;
   height?: number;
   /** Export beside the search — only when there are rows to download. */
   canExport?: boolean;
   onExport?: (format: ExportFormat) => void;
+  /** Initial rows-per-page value (must be in PAGE_SIZE_OPTIONS). */
+  defaultPageSize?: number;
 }) {
   const { t } = useTranslation();
   const showExport = useCan("data.export");
   const [query, setQuery] = React.useState("");
   const [column, setColumn] = React.useState<number | null>(null);
   const [descending, setDescending] = React.useState(false);
-  const [pageSize, setPageSize] = React.useState(String(PAGE_SIZE_OPTIONS[1]));
+  const [pageSize, setPageSize] = React.useState(String(defaultPageSize));
   const [page, setPage] = React.useState(1);
 
   const needle = query.trim().toLowerCase();
