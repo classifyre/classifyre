@@ -1,6 +1,6 @@
 """Write the lakehouse cases only an engine can write, through the lab's Trino.
 
-    python trino_tables.py http://172.19.10.30:8080
+    python trino_tables.py http://172.18.10.30:8080
 
 * ``delta.crm.customers`` (s3://lake/tables/trino_delta/customers) — deletion
   vectors on and column mapping by name: 5 people, row 2 deleted (a deletion

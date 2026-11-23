@@ -35,7 +35,7 @@ services:
     ports: ["19000:9000"]
     networks:
       k3d:
-        ipv4_address: 172.19.10.10
+        ipv4_address: 172.18.10.10
 
   azurite:
     image: mcr.microsoft.com/azure-storage/azurite:latest
@@ -46,7 +46,7 @@ services:
     ports: ["10000:10000"]
     networks:
       k3d:
-        ipv4_address: 172.19.10.11
+        ipv4_address: 172.18.10.11
 
   fake-gcs:
     image: fsouza/fake-gcs-server:latest
@@ -57,7 +57,7 @@ services:
     ports: ["14443:4443"]
     networks:
       k3d:
-        ipv4_address: 172.19.10.12
+        ipv4_address: 172.18.10.12
 
   # Seeding and probing: `docker compose run --rm tools python <script>`.
   tools:
@@ -68,7 +68,7 @@ services:
     volumes: ["./seed:/seed", "../../dump_files/lakehouse-lab:/out"]
     environment:
       <<: *storage-env
-      LAB_S3_ENDPOINT: http://172.19.10.10:9000
+      LAB_S3_ENDPOINT: http://172.18.10.10:9000
     networks: [k3d]
 
   # ── catalogs ─────────────────────────────────────────────────────────
@@ -81,7 +81,7 @@ services:
     environment:
       GRAVITINO_WAREHOUSE: s3://lake/gravitino/
       GRAVITINO_IO_IMPL: org.apache.iceberg.aws.s3.S3FileIO
-      GRAVITINO_S3_ENDPOINT: http://172.19.10.10:9000
+      GRAVITINO_S3_ENDPOINT: http://172.18.10.10:9000
       GRAVITINO_S3_REGION: us-east-1
       GRAVITINO_S3_ACCESS_KEY: lab-access-key
       GRAVITINO_S3_SECRET_KEY: lab-secret-key-0123456789
@@ -90,7 +90,7 @@ services:
     ports: ["19101:9001"]
     networks:
       k3d:
-        ipv4_address: 172.19.10.20
+        ipv4_address: 172.18.10.20
 
   # Apache Polaris (also Snowflake Open Catalog's engine), in-memory, root
   # principal root/s3cr3t. The catalog is created by seed/polaris_bootstrap.py.
@@ -108,7 +108,7 @@ services:
     ports: ["18181:8181"]
     networks:
       k3d:
-        ipv4_address: 172.19.10.21
+        ipv4_address: 172.18.10.21
 
   # ── engines ──────────────────────────────────────────────────────────
   # Trino with Iceberg (over Gravitino's REST catalog), Delta Lake and Hive (a
@@ -121,7 +121,7 @@ services:
     ports: ["18080:8080"]
     networks:
       k3d:
-        ipv4_address: 172.19.10.30
+        ipv4_address: 172.18.10.30
 
   # ── ducklake ─────────────────────────────────────────────────────────
   # DuckLake's catalog in Postgres; its data in the lab bucket (s3://lake/ducklake/).
@@ -135,4 +135,4 @@ services:
     ports: ["15432:5432"]
     networks:
       k3d:
-        ipv4_address: 172.19.10.40
+        ipv4_address: 172.18.10.40

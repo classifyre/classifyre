@@ -36,7 +36,7 @@ OUT = Path("/out")
 AZURITE = (
     "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;"
     "AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;"
-    "BlobEndpoint=http://172.19.10.11:10000/devstoreaccount1;"
+    "BlobEndpoint=http://172.18.10.11:10000/devstoreaccount1;"
 )
 
 shutil.rmtree(WORK, ignore_errors=True)

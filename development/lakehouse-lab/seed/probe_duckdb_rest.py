@@ -17,14 +17,14 @@ def run(label, statements, db):
         print(label, "FAIL", str(e)[:400])
 
 S3 = ("CREATE SECRET lab_s3 (TYPE S3, KEY_ID 'lab-access-key', SECRET 'lab-secret-key-0123456789', "
-      "REGION 'us-east-1', ENDPOINT '172.19.10.10:9000', URL_STYLE 'path', USE_SSL false)")
+      "REGION 'us-east-1', ENDPOINT '172.18.10.10:9000', URL_STYLE 'path', USE_SSL false)")
 run("gravitino", [
-    "ATTACH '' AS g (TYPE iceberg, ENDPOINT 'http://172.19.10.20:9001/iceberg', AUTHORIZATION_TYPE 'none')",
+    "ATTACH '' AS g (TYPE iceberg, ENDPOINT 'http://172.18.10.20:9001/iceberg', AUTHORIZATION_TYPE 'none')",
 ], "g")
 run("gravitino+s3", [S3,
-    "ATTACH '' AS g (TYPE iceberg, ENDPOINT 'http://172.19.10.20:9001/iceberg', AUTHORIZATION_TYPE 'none', ACCESS_DELEGATION_MODE 'none')",
+    "ATTACH '' AS g (TYPE iceberg, ENDPOINT 'http://172.18.10.20:9001/iceberg', AUTHORIZATION_TYPE 'none', ACCESS_DELEGATION_MODE 'none')",
 ], "g")
 run("polaris", [S3,
-    "CREATE SECRET pol (TYPE ICEBERG, CLIENT_ID 'root', CLIENT_SECRET 's3cr3t', OAUTH2_SERVER_URI 'http://172.19.10.21:8181/api/catalog/v1/oauth/tokens', OAUTH2_SCOPE 'PRINCIPAL_ROLE:ALL')",
-    "ATTACH 'lab_polaris' AS p (TYPE iceberg, ENDPOINT 'http://172.19.10.21:8181/api/catalog', SECRET pol, ACCESS_DELEGATION_MODE 'none')",
+    "CREATE SECRET pol (TYPE ICEBERG, CLIENT_ID 'root', CLIENT_SECRET 's3cr3t', OAUTH2_SERVER_URI 'http://172.18.10.21:8181/api/catalog/v1/oauth/tokens', OAUTH2_SCOPE 'PRINCIPAL_ROLE:ALL')",
+    "ATTACH 'lab_polaris' AS p (TYPE iceberg, ENDPOINT 'http://172.18.10.21:8181/api/catalog', SECRET pol, ACCESS_DELEGATION_MODE 'none')",
 ], "p")
