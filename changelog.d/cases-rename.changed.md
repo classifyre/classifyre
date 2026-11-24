@@ -1,0 +1,1 @@
+Investigations now live under Cases alongside Data Requests, with a unified picker when starting new work. Existing bookmarks and notification links under /investigations/ redirect automatically to /cases/.

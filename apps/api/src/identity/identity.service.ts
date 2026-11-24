@@ -500,6 +500,50 @@ export class IdentityService {
   }
 
   /**
+   * Groups of the workspace's tenant that hold `capability` in `namespaceId`
+   * (directly, via an ancestor group, or via tenant-wide grants). Used by
+   * data requests to list eligible data-team routing targets (`dataset.publish`).
+   */
+  async groupsWithCapabilityIn(
+    namespaceId: string,
+    capability: Capability,
+  ): Promise<OrgGroup[]> {
+    const tenancy = await this.tenancy.workspaceTenancy(namespaceId);
+    const tenant = tenancy
+      ? await this.tenancy.tenantById(tenancy.tenantId)
+      : null;
+    if (!tenancy || !tenant?.orgId || tenant.status !== 'active') return [];
+    const [groups, allGrants, ownerLineage] = await Promise.all([
+      this.membership.groups(tenant.orgId),
+      this.tenancy.listGrants(tenant.id),
+      tenancy.ownerGroupId
+        ? this.membership.ancestry(tenant.orgId, tenancy.ownerGroupId)
+        : Promise.resolve([]),
+    ]);
+    const matched: OrgGroup[] = [];
+    for (const group of groups) {
+      const lineage = new Set(
+        await this.membership.ancestry(tenant.orgId, group.id),
+      );
+      const groupGrants = allGrants.filter(
+        (grant) =>
+          grant.subjectType === 'group' && lineage.has(grant.subjectId),
+      );
+      const capabilities = capabilitiesInWorkspace(groupGrants, {
+        namespaceId,
+        ownerLineage,
+        visibility: tenancy.visibility,
+      });
+      if (capabilities.has(capability)) {
+        matched.push(group);
+      }
+    }
+    return matched.sort((a, b) =>
+      (a.path || a.name).localeCompare(b.path || b.name),
+    );
+  }
+
+  /**
    * Capabilities in one workspace, or null when the workspace is in another
    * tenant (which must look exactly like a workspace that does not exist).
    * A public workspace adds read-only access for everyone of its tenant.

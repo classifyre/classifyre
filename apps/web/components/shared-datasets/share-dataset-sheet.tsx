@@ -66,10 +66,19 @@ import { InheritedTag } from "./inherited-tag";
  * what it is, what it inherits (checked against the owning group as you
  * pick it), and who reads it.
  */
+export interface ShareDatasetPreset {
+  owningGroupId?: string;
+  audienceGroupIds?: string[];
+  lockOwner?: boolean;
+  name?: string;
+  description?: string;
+}
+
 export function ShareDatasetSheet({
   open,
   sql,
   dataset,
+  preset,
   onClose,
   onShared,
 }: {
@@ -77,6 +86,8 @@ export function ShareDatasetSheet({
   sql: string;
   /** Set when saving a new version of this dataset. */
   dataset?: SharedDatasetDto | null;
+  /** Prefills when publishing from a data request (PRD DR §4.5). */
+  preset?: ShareDatasetPreset;
   onClose: () => void;
   onShared: (dataset: SharedDatasetDto) => void;
 }) {
@@ -99,22 +110,34 @@ export function ShareDatasetSheet({
 
   React.useEffect(() => {
     if (!open) return;
-    setName(dataset?.name ?? "");
+    setName(dataset?.name ?? (preset?.name ? sqlWord(preset.name, "") : ""));
     setDomain(dataset?.domain ?? "");
-    setDescription(dataset?.description ?? "");
-    setGroupId(dataset?.owningGroup.id ?? "");
-    setAudience([]);
+    setDescription(dataset?.description ?? preset?.description ?? "");
+    setGroupId(dataset?.owningGroup.id ?? preset?.owningGroupId ?? "");
+    setAudience(preset?.audienceGroupIds ?? []);
     setCheck(null);
     setCheckError(null);
     api.access
       .workspaceAccessControllerGroups()
       .then(setGroups)
       .catch(() => setGroups([]));
-  }, [open, dataset]);
+  }, [open, dataset, preset]);
 
   // The first group of yours is the natural owner, and its name a domain.
   React.useEffect(() => {
-    if (!open || dataset || groupId) return;
+    if (!open || dataset) return;
+    if (groupId) {
+      const chosen =
+        options.data?.groups.find((g) => g.id === groupId) ??
+        groups.find((g) => g.id === groupId);
+      if (chosen) {
+        setDomain(
+          (current) =>
+            current || sqlWord(chosen.name.split("/").pop() ?? "", "data"),
+        );
+      }
+      return;
+    }
     const first = options.data?.groups[0];
     if (first) {
       setGroupId(first.id);
@@ -123,7 +146,7 @@ export function ShareDatasetSheet({
           current || sqlWord(first.name.split("/").pop() ?? "", "data"),
       );
     }
-  }, [open, dataset, groupId, options.data]);
+  }, [open, dataset, groupId, options.data, groups]);
 
   // Checked again whenever the SQL or the owning group changes.
   React.useEffect(() => {
@@ -192,7 +215,23 @@ export function ShareDatasetSheet({
     }
   };
 
-  const myGroups = options.data?.groups ?? [];
+  const myGroups = React.useMemo(() => {
+    const base = options.data?.groups ?? [];
+    if (
+      preset?.owningGroupId &&
+      !base.some((g) => g.id === preset.owningGroupId)
+    ) {
+      const found = groups.find((g) => g.id === preset.owningGroupId);
+      return [
+        {
+          id: preset.owningGroupId,
+          name: found?.path || found?.name || preset.owningGroupId,
+        },
+        ...base,
+      ];
+    }
+    return base;
+  }, [options.data?.groups, preset?.owningGroupId, groups]);
 
   return (
     <Sheet open={open} onOpenChange={(next) => !next && onClose()}>
@@ -276,7 +315,11 @@ export function ShareDatasetSheet({
             </h3>
             <div className="space-y-1">
               <Label>{t("sharedDatasets.share.owningGroup")}</Label>
-              <Select value={groupId} onValueChange={setGroupId}>
+              <Select
+                value={groupId}
+                onValueChange={setGroupId}
+                disabled={Boolean(preset?.lockOwner)}
+              >
                 <SelectTrigger data-testid="share-owning-group">
                   <SelectValue
                     placeholder={t("sharedDatasets.share.pickGroup")}

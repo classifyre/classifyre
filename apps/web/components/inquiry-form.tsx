@@ -109,7 +109,7 @@ export const InquiryForm = React.forwardRef<
   const searchParams = useSearchParams();
   // Leave the way the person came (a case board passes ?returnTo=), else back.
   const { goBack, returnTo } = useGoBack(
-    isEdit && inquiryId ? `/investigations/inquiries/${inquiryId}` : "/investigations?tab=inquiries",
+    isEdit && inquiryId ? `/cases/inquiries/${inquiryId}` : "/cases?tab=inquiries",
   );
   // A new watch started from a case (?caseId=) is linked to it once created.
   const [draftCases, setDraftCases] = React.useState<CaseRef[]>([]);
@@ -533,11 +533,11 @@ export const InquiryForm = React.forwardRef<
         toast.success(t("investigations.inquiryForm.created"));
         // Started from a case: back to it, with the new watch open.
         if (presetCaseId && draftCases.some((c) => c.id === presetCaseId) && !failed.length) {
-          router.push(nsPath(`/investigations/${presetCaseId}?panel=watches&watch=${created.id}`));
+          router.push(nsPath(`/cases/${presetCaseId}?panel=watches&watch=${created.id}`));
         } else if (returnTo) {
           router.push(returnTo);
         } else {
-          router.push(nsPath(`/investigations/inquiries/${created.id}`));
+          router.push(nsPath(`/cases/inquiries/${created.id}`));
         }
       }
     } catch (err) {

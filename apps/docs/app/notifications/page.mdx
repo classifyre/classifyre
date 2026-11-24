@@ -50,7 +50,7 @@ The notification bell lives in the top-right corner of the app. A red badge show
 
 ## What Triggers a Notification
 
-Only five events send a notification. Everything else is intentionally silent — a successful scan with no anomalies produces no noise.
+For scans and findings, only five operational events send a notification. Everything else is intentionally silent — a successful scan with no anomalies produces no noise.
 
 <div className="my-8 flex flex-col gap-4">
   {NOTIFICATION_EVENTS.map((ev) => (
@@ -69,6 +69,13 @@ Only five events send a notification. Everything else is intentionally silent �
     </Card>
   ))}
 </div>
+
+### Governance & Data Request Notifications
+
+Alongside scan and finding alerts, Classifyre sends **Governance** notifications straight to the people or groups who need to act:
+
+- **[Data Requests](/data-requests/)** — notifies the routed data-team group when a request is submitted, rerouted, withdrawn, or has changes requested, and notifies the requester when a request is claimed, delivered as a shared dataset, declined, or when a delivered dataset later becomes unavailable.
+- **Access requests & shared datasets** — notifies table owners, stewards, and requesters when access is requested, approved, declined, or when a shared dataset reads or is blocked from an underlying table.
 
 ## Severity Levels
 

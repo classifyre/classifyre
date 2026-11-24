@@ -188,7 +188,7 @@ function BoardShell({ caseId }: { caseId: string }) {
       canOpen: true,
       getContext: () => ({
         key: "case.manage" as const,
-        route: `/investigations/${caseId}`,
+        route: `/cases/${caseId}`,
         title: "Case Assistant",
         entityId: caseId,
         values: caseData ? { title: caseData.title, status: caseData.status } : {},

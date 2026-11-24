@@ -2,14 +2,14 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowRight, Radar, UserRound } from "lucide-react";
+import { ArrowRight, Database, Radar, UserRound } from "lucide-react";
 import type { CaseResponseDto } from "@workspace/api-client";
 import { Card, CardContent } from "@workspace/ui/components/card";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { SeverityBadge, Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components";
 import { cn } from "@workspace/ui/lib/utils";
 import { AiActorBadge, isAiActor } from "@/components/ai-actor-badge";
-import { CaseStatusBadge } from "@/components/case-status-badge";
+import { CaseStatusBadge, DataRequestStateBadge } from "@/components/case-status-badge";
 import { OpenedBadge } from "@/components/opened-badge";
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
@@ -17,6 +17,7 @@ import { formatDate, formatRelative } from "@/lib/date";
 import { useNsPath } from "@/lib/ns-path";
 import { STATUS_TONE, statusBadgeClass } from "@/lib/status-tone";
 import { BoardSketchCanvas } from "./board-sketch-canvas";
+import { CaseKindBadge } from "./case-kind-badge";
 import { EscalatedPill } from "./escalated-pill";
 import { pickSketch } from "./sketch-cache";
 
@@ -48,6 +49,8 @@ export function CaseCard({
   const nsPath = useNsPath();
   const id = React.useId();
   const sketch = React.useMemo(() => pickSketch(item.id, item.thumbnail), [item.id, item.thumbnail]);
+  const isDataRequest = item.kind === "DATA_REQUEST";
+  const request = item.request ?? null;
   const closed = item.status === "CLOSED" || item.status === "ARCHIVED";
   const summary = (closed && item.conclusion?.trim()) || item.description?.trim();
   const newMatches = item.newMatchCount ?? 0;
@@ -61,13 +64,19 @@ export function CaseCard({
 
   return (
     <Link
-      href={nsPath(`/investigations/${item.id}`)}
+      href={nsPath(`/cases/${item.id}`)}
       aria-labelledby={`${id}-title`}
       aria-describedby={`${id}-summary`}
       className="group block h-full rounded-[6px] outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       data-testid="case-card"
+      data-case-kind={item.kind}
     >
-      <Card className="h-full gap-0 overflow-hidden py-0 shadow-none">
+      <Card
+        className={cn(
+          "h-full gap-0 overflow-hidden py-0 shadow-none",
+          isDataRequest && "border-l-2 border-l-sky-500",
+        )}
+      >
         <div
           className="relative aspect-[16/9] overflow-hidden border-b-2 border-border bg-background"
           style={DOT_GRID}
@@ -83,18 +92,37 @@ export function CaseCard({
               drawn={!!sketch}
               evidenceCount={item.evidenceCount}
               hypothesisCount={item.hypothesisCount}
+              isDataRequest={isDataRequest}
             />
           )}
           {openedAt !== undefined && <OpenedBadge at={openedAt} className="absolute top-2.5 left-2.5" />}
         </div>
 
         <CardContent className="@container flex flex-1 flex-col gap-3 p-4">
-          <div className="flex items-center gap-1.5">
-            <SeverityBadge severity={item.severity.toLowerCase() as SeverityLevel}>
-              {t(`cases.severityLabels.${item.severity}` as TranslationKey)}
-            </SeverityBadge>
-            {isAiActor(item.createdBy) && <AiActorBadge />}
-            <CaseStatusBadge status={item.status} className="ml-auto" />
+          <div className="flex flex-wrap items-center gap-1.5">
+            {isDataRequest ? (
+              <>
+                <CaseKindBadge kind={item.kind} />
+                {item.severity !== "INFO" && (
+                  <SeverityBadge severity={item.severity.toLowerCase() as SeverityLevel}>
+                    {t(`cases.severityLabels.${item.severity}` as TranslationKey)}
+                  </SeverityBadge>
+                )}
+                <DataRequestStateBadge
+                  state={request?.state}
+                  className="ml-auto"
+                />
+              </>
+            ) : (
+              <>
+                <SeverityBadge severity={item.severity.toLowerCase() as SeverityLevel}>
+                  {t(`cases.severityLabels.${item.severity}` as TranslationKey)}
+                </SeverityBadge>
+                <CaseKindBadge kind={item.kind} />
+                {isAiActor(item.createdBy) && <AiActorBadge />}
+                <CaseStatusBadge status={item.status} className="ml-auto" />
+              </>
+            )}
           </div>
 
           <div className="min-w-0">
@@ -115,39 +143,70 @@ export function CaseCard({
             </p>
           </div>
 
-          {/* The rules between cells are the gaps showing the border colour
-              through, so they hold whether the strip is one row or two. */}
-          <dl className="grid grid-cols-2 gap-0.5 overflow-hidden rounded-[4px] border-2 border-border bg-border @xs:grid-cols-4">
-            {stats.map(({ key, label, value }) => (
-              <div key={key} className="flex min-w-0 flex-col-reverse bg-card px-2 py-1.5">
-                <dt className="truncate font-mono text-[9px] tracking-[0.06em] text-muted-foreground uppercase">
-                  {label}
-                </dt>
-                <dd
-                  className={cn(
-                    "font-mono text-base leading-tight font-semibold tabular-nums",
-                    !value && "text-muted-foreground/60",
-                  )}
+          {isDataRequest ? (
+            <div className="space-y-1.5 rounded-[4px] border border-sky-500/30 bg-sky-50/40 px-2.5 py-2 text-xs dark:bg-sky-950/20">
+              {request?.routeGroup?.name && (
+                <div
+                  className="flex items-center gap-1.5 truncate font-mono text-[11px] text-foreground"
+                  title={t("cases.card.routedTo", { group: request.routeGroup.name })}
                 >
-                  {value === undefined ? "—" : value.toLocaleString()}
-                </dd>
-              </div>
-            ))}
-          </dl>
-
-          {(newMatches > 0 || item.escalatedCount > 0) && (
-            <div className="flex flex-wrap items-center gap-1.5">
-              {newMatches > 0 && (
-                <span
-                  className={cn(statusBadgeClass, STATUS_TONE.fresh, "inline-flex items-center gap-1 px-1.5 py-0.5")}
-                  title={t("cases.card.newMatchesHint")}
-                >
-                  <Radar className="size-3" aria-hidden />
-                  {t("cases.card.newMatches", { count: newMatches.toLocaleString() })}
-                </span>
+                  <span className="text-sky-600 dark:text-sky-400" aria-hidden>
+                    →
+                  </span>
+                  <span className="truncate font-medium">{request.routeGroup.name}</span>
+                </div>
               )}
-              {item.escalatedCount > 0 && <EscalatedPill count={item.escalatedCount} at={item.lastEscalatedAt} />}
+              {request?.datasetName && (
+                <div className="flex items-center gap-1.5 truncate font-mono text-[11px] text-muted-foreground">
+                  <Database className="size-3 shrink-0 text-sky-600 dark:text-sky-400" aria-hidden />
+                  <span className="truncate text-foreground">
+                    {request.deliveredVersion != null
+                      ? t("cases.card.deliveredVersion", {
+                          dataset: request.datasetName,
+                          version: String(request.deliveredVersion),
+                        })
+                      : request.datasetName}
+                  </span>
+                </div>
+              )}
             </div>
+          ) : (
+            <>
+              {/* The rules between cells are the gaps showing the border colour
+                  through, so they hold whether the strip is one row or two. */}
+              <dl className="grid grid-cols-2 gap-0.5 overflow-hidden rounded-[4px] border-2 border-border bg-border @xs:grid-cols-4">
+                {stats.map(({ key, label, value }) => (
+                  <div key={key} className="flex min-w-0 flex-col-reverse bg-card px-2 py-1.5">
+                    <dt className="truncate font-mono text-[9px] tracking-[0.06em] text-muted-foreground uppercase">
+                      {label}
+                    </dt>
+                    <dd
+                      className={cn(
+                        "font-mono text-base leading-tight font-semibold tabular-nums",
+                        !value && "text-muted-foreground/60",
+                      )}
+                    >
+                      {value === undefined ? "—" : value.toLocaleString()}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+
+              {(newMatches > 0 || item.escalatedCount > 0) && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {newMatches > 0 && (
+                    <span
+                      className={cn(statusBadgeClass, STATUS_TONE.fresh, "inline-flex items-center gap-1 px-1.5 py-0.5")}
+                      title={t("cases.card.newMatchesHint")}
+                    >
+                      <Radar className="size-3" aria-hidden />
+                      {t("cases.card.newMatches", { count: newMatches.toLocaleString() })}
+                    </span>
+                  )}
+                  {item.escalatedCount > 0 && <EscalatedPill count={item.escalatedCount} at={item.lastEscalatedAt} />}
+                </div>
+              )}
+            </>
           )}
 
           <div className="mt-auto flex items-center gap-2 border-t-2 border-border pt-3 font-mono text-[10px] tracking-[0.1em] text-muted-foreground uppercase">
@@ -188,15 +247,17 @@ function SketchPlaceholder({
   drawn,
   evidenceCount,
   hypothesisCount,
+  isDataRequest,
 }: {
   /** A sketch exists and is empty. */
   drawn: boolean;
   evidenceCount: number;
   hypothesisCount: number;
+  isDataRequest?: boolean;
 }) {
   const { t } = useTranslation();
-  const empty = drawn || evidenceCount + hypothesisCount === 0;
-  const rings = Math.min(evidenceCount, 5);
+  const empty = isDataRequest || drawn || evidenceCount + hypothesisCount === 0;
+  const rings = isDataRequest ? 0 : Math.min(evidenceCount, 5);
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-6 text-center">
       {!empty && rings > 0 && (
@@ -210,7 +271,11 @@ function SketchPlaceholder({
         </div>
       )}
       <p className="rounded-[3px] bg-background/80 px-1.5 font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
-        {empty ? t("cases.card.emptyBoard") : t("cases.card.notDrawn")}
+        {isDataRequest
+          ? t("cases.card.emptyRequestCanvas")
+          : empty
+            ? t("cases.card.emptyBoard")
+            : t("cases.card.notDrawn")}
       </p>
     </div>
   );

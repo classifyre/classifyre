@@ -43,7 +43,12 @@ export function CaseSearchList({
     let cancelled = false;
     const timer = window.setTimeout(() => {
       api.cases
-        .casesControllerList({ search: search.trim() || undefined, status: [...OPEN_STATUSES], limit: 50 })
+        .casesControllerList({
+          search: search.trim() || undefined,
+          kind: ["INVESTIGATION"],
+          status: [...OPEN_STATUSES],
+          limit: 50,
+        })
         .then((res) => {
           if (cancelled) return;
           const items = res.items ?? [];

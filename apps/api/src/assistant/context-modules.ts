@@ -39,9 +39,9 @@ const NAVIGATION_MAP = [
   '  /detectors — custom detector list; /detectors/new — create a detector; /detectors/{id} — detector detail (test, train, tune)',
   '  /fingerprints — correlation / duplicates graph and tuning panel',
   '  /dashboard — governance dashboard: governed vs ungoverned, quality, usage, what waits on you',
-  '  /investigations — case list; /investigations/{id} — case detail (threads, hypotheses, graph)',
-  '  /investigations/cases/new — create a case',
-  '  /investigations/inquiries/new — create an inquiry; /investigations/inquiries/{id} — inquiry detail and matches',
+  '  /cases — case list (investigations and data requests); /cases/{id} — case detail (board or data request canvas)',
+  '  /cases/new — choose investigation or data request; /cases/new/investigation — create an investigation; /cases/new/data-request — create a data request',
+  '  /cases/inquiries/new — create an inquiry; /cases/inquiries/{id} — inquiry detail and matches',
 ].join('\n');
 
 const DETECTOR_KNOWLEDGE = [

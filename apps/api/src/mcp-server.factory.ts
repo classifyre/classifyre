@@ -3,6 +3,11 @@ import { FindingContentService } from './finding-content/finding-content.service
 import { GovernanceService } from './governance/governance.service';
 import { QueryCatalogService } from './data-query/query-catalog.service';
 import { QueryRunService } from './data-query/query-run.service';
+import { DataRequestsService } from './data-requests/data-requests.service';
+import {
+  registerDataRequestMcpTools,
+  type DataRequestsMcpServer,
+} from './data-requests/data-requests-mcp-tools';
 import { describeCondition, rowFilterAsSeen } from './data-query/row-filters';
 import { CLS_PERSON as CLS_PERSON_KEY } from './identity/iam-access-policy';
 import { ClsServiceManager } from 'nestjs-cls';
@@ -468,6 +473,7 @@ export class McpServerFactoryService {
     @Optional() private readonly queryCatalog?: QueryCatalogService,
     @Optional() private readonly queryRuns?: QueryRunService,
     @Optional() private readonly findingContent?: FindingContentService,
+    @Optional() private readonly dataRequests?: DataRequestsService,
   ) {}
 
   /**
@@ -879,6 +885,12 @@ export class McpServerFactoryService {
           ? jsonResult(payload)
           : { ...jsonResult(payload), isError: true };
       },
+    );
+
+    registerDataRequestMcpTools(
+      server as unknown as DataRequestsMcpServer,
+      this.dataRequests,
+      { requirePerson, jsonResult },
     );
   }
 

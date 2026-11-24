@@ -324,7 +324,7 @@ function ConceptDetail({
 
   const sourceMax = Math.max(1, ...(rail?.bySource.map((row) => row.assets) ?? [1]));
   const watchHref = nsPath(
-    `/investigations/inquiries/new?term=${encodeURIComponent(concept.key)}${caseId ? `&caseId=${encodeURIComponent(caseId)}` : ""}`,
+    `/cases/inquiries/new?term=${encodeURIComponent(concept.key)}${caseId ? `&caseId=${encodeURIComponent(caseId)}` : ""}`,
   );
 
   const copyLink = async () => {

@@ -138,7 +138,7 @@ export class CaseBoardGateway implements OnGatewayDisconnect, CaseBoardEvents {
       !(await this.socketAccess.canJoin(
         client,
         namespace.namespaceId,
-        'case.view',
+        'workspace.view',
       ))
     ) {
       return null;

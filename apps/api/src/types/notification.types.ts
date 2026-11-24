@@ -46,4 +46,13 @@ export enum NotificationEvent {
   GOVERNANCE_DATASET_BLOCKED = 'governance.dataset_blocked',
   GOVERNANCE_DATASET_UNBLOCKED = 'governance.dataset_unblocked',
   GOVERNANCE_DATASET_UNAVAILABLE = 'governance.dataset_unavailable',
+  // Data requests (docs/prd/DR-data-requests.md): to the routed data-team group
+  // or the requester as the request progresses.
+  GOVERNANCE_DATA_REQUEST_SUBMITTED = 'governance.data_request_submitted',
+  GOVERNANCE_DATA_REQUEST_ASSIGNED = 'governance.data_request_assigned',
+  GOVERNANCE_DATA_REQUEST_DELIVERED = 'governance.data_request_delivered',
+  GOVERNANCE_DATA_REQUEST_CHANGES_REQUESTED = 'governance.data_request_changes_requested',
+  GOVERNANCE_DATA_REQUEST_DECLINED = 'governance.data_request_declined',
+  GOVERNANCE_DATA_REQUEST_WITHDRAWN = 'governance.data_request_withdrawn',
+  GOVERNANCE_DATA_REQUEST_DATASET_UNAVAILABLE = 'governance.data_request_dataset_unavailable',
 }

@@ -5,7 +5,21 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
-import { CaseActivityType, CaseThreadKind, Prisma } from '@prisma/client';
+import {
+  CaseActivityType,
+  CaseKind,
+  CaseThreadKind,
+  DataRequestState,
+  Prisma,
+} from '@prisma/client';
+import { ClsService } from 'nestjs-cls';
+import {
+  DataRequestSpecSchema,
+  EMPTY_DATA_REQUEST_SPEC,
+  specToSketch,
+} from '@workspace/schemas/data-request';
+import { ActorDirectoryService } from './identity/actor-directory.service';
+import { CLS_PERSON, type ClsPerson } from './identity/iam-access-policy';
 import { PrismaService } from './prisma.service';
 import { GraphService } from './graph.service';
 import { InquiryMatchingService } from './matching/inquiry-matching.service';
@@ -72,6 +86,17 @@ type CaseRow = Prisma.CaseGetPayload<{
         threads: { where: { kind: 'HYPOTHESIS' } };
         inquiryLinks: true;
         findings: { where: { escalatedAt: { not: null } } };
+      };
+    };
+    dataRequest: {
+      select: {
+        state: true;
+        routeGroupId: true;
+        audienceGroupId: true;
+        deliveredVersion: true;
+        spec: true;
+        updatedAt: true;
+        dataset: { select: { domain: true; name: true } };
       };
     };
   };
@@ -152,6 +177,17 @@ const countSelect = {
       findings: { where: { escalatedAt: { not: null } } },
     },
   },
+  dataRequest: {
+    select: {
+      state: true,
+      routeGroupId: true,
+      audienceGroupId: true,
+      deliveredVersion: true,
+      spec: true,
+      updatedAt: true,
+      dataset: { select: { domain: true, name: true } },
+    },
+  },
 } satisfies Prisma.CaseInclude;
 
 /** The investigation workspace: owns evidence, findings, hypotheses (via services) and the graph. */
@@ -170,6 +206,8 @@ export class CasesService {
     @Optional() private readonly cleanup?: CaseCleanupService,
     @Optional() private readonly escalation?: CaseEscalationService,
     @Optional() private readonly hypothesisRules?: CaseHypothesisRulesService,
+    @Optional() private readonly directory?: ActorDirectoryService,
+    @Optional() private readonly cls?: ClsService,
   ) {}
 
   async create(dto: CreateCaseDto): Promise<CaseResponseDto> {
@@ -520,10 +558,30 @@ export class CasesService {
     const limit = Math.min(Math.max(1, Number(query.limit ?? 50) || 50), 200);
 
     const where: Prisma.CaseWhereInput = {};
+    const kindFilter = this.toArray(query.kind);
     const statusFilter = this.toArray(query.status);
     const severityFilter = this.toArray(query.severity);
+    if (kindFilter.length > 0) where.kind = { in: kindFilter };
     if (statusFilter.length > 0) where.status = { in: statusFilter };
     if (severityFilter.length > 0) where.severity = { in: severityFilter };
+    // Draft data requests are visible only to their requester.
+    const viewerRef = this.cls?.isActive()
+      ? this.cls.get<ClsPerson | undefined>(CLS_PERSON)?.actorRef
+      : undefined;
+    const draftVisibility: Prisma.CaseWhereInput = viewerRef
+      ? {
+          OR: [
+            { kind: CaseKind.INVESTIGATION },
+            { dataRequest: { state: { not: DataRequestState.DRAFT } } },
+            { dataRequest: { requesterRef: viewerRef } },
+          ],
+        }
+      : {
+          OR: [
+            { kind: CaseKind.INVESTIGATION },
+            { dataRequest: { state: { not: DataRequestState.DRAFT } } },
+          ],
+        };
     if (flag(query.escalated)) {
       where.findings = { some: { escalatedAt: { not: null } } };
     }
@@ -535,13 +593,17 @@ export class CasesService {
         ...(excludeIds.length > 0 ? { notIn: excludeIds } : {}),
       };
     }
+    const andClauses: Prisma.CaseWhereInput[] = [draftVisibility];
     if (query.search && query.search.trim().length > 0) {
       const term = query.search.trim();
-      where.OR = [
-        { title: { contains: term, mode: 'insensitive' } },
-        { description: { contains: term, mode: 'insensitive' } },
-      ];
+      andClauses.push({
+        OR: [
+          { title: { contains: term, mode: 'insensitive' } },
+          { description: { contains: term, mode: 'insensitive' } },
+        ],
+      });
     }
+    where.AND = andClauses;
 
     const [rows, total] = await Promise.all([
       this.prisma.case.findMany({
@@ -553,8 +615,9 @@ export class CasesService {
       }),
       this.prisma.case.count({ where }),
     ]);
-    const items = rows.map((r) => this.mapCase(r));
-    if (flag(query.withCardDetails)) await this.addCardDetails(items);
+    const groupNames = await this.resolveRequestGroupNames(rows);
+    const items = rows.map((r) => this.mapCase(r, groupNames));
+    if (flag(query.withCardDetails)) await this.addCardDetails(items, rows);
     return { items, total, skip, limit };
   }
 
@@ -563,7 +626,10 @@ export class CasesService {
    * matches waiting in its watches, and its board drawn small. One query each
    * for the whole page.
    */
-  private async addCardDetails(items: CaseResponseDto[]): Promise<void> {
+  private async addCardDetails(
+    items: CaseResponseDto[],
+    rows?: CaseRow[],
+  ): Promise<void> {
     if (items.length === 0) return;
     const caseIds = items.map((c) => c.id);
     const [findingCounts, watches, thumbnails] = await Promise.all([
@@ -604,10 +670,25 @@ export class CasesService {
         },
       ]),
     );
+    const rowsById = new Map((rows ?? []).map((r) => [r.id, r]));
     for (const item of items) {
       item.findingCount = findings.get(item.id) ?? 0;
       item.newMatchCount = newMatches.get(item.id) ?? 0;
-      item.thumbnail = sketches.get(item.id) ?? null;
+      if (item.kind === CaseKind.DATA_REQUEST) {
+        const dr = rowsById.get(item.id)?.dataRequest;
+        const parsed = DataRequestSpecSchema.safeParse(dr?.spec);
+        const sketch = specToSketch(
+          parsed.success ? parsed.data : EMPTY_DATA_REQUEST_SPEC,
+        );
+        item.thumbnail = sketch
+          ? {
+              sketch: sketch as unknown as Record<string, unknown>,
+              updatedAt: dr?.updatedAt ?? item.updatedAt,
+            }
+          : null;
+      } else {
+        item.thumbnail = sketches.get(item.id) ?? null;
+      }
     }
   }
 
@@ -642,6 +723,7 @@ export class CasesService {
       },
     });
     if (!row) return null;
+    const groupNames = await this.resolveRequestGroupNames([row]);
     const evidence = this.hydrateEvidence(row.evidence);
     const inquiries: CaseLinkedInquiryDto[] = row.inquiryLinks.map((l) => ({
       id: l.inquiry.id,
@@ -653,7 +735,7 @@ export class CasesService {
       autoPull: l.autoPull,
     }));
     return {
-      ...this.mapCase(row),
+      ...this.mapCase(row, groupNames),
       evidence,
       inquiries,
       findingFilters: row.findingFilters.map(toFilterDto),
@@ -669,6 +751,7 @@ export class CasesService {
     const before = await this.prisma.case.findUnique({
       where: { id },
       select: {
+        kind: true,
         title: true,
         description: true,
         status: true,
@@ -682,6 +765,15 @@ export class CasesService {
       },
     });
     if (!before) throw new NotFoundException(`Case with ID ${id} not found`);
+    if (
+      before.kind === CaseKind.DATA_REQUEST &&
+      dto.status !== undefined &&
+      dto.status !== before.status
+    ) {
+      throw new BadRequestException(
+        'Data request status is controlled by workflow transitions; use the data-requests API.',
+      );
+    }
     const rules: CleanupRules = {
       removeGoneFindings:
         dto.removeGoneFindings === undefined
@@ -1607,9 +1699,14 @@ export class CasesService {
   ): Promise<void> {
     const found = await db.case.findUnique({
       where: { id },
-      select: { id: true },
+      select: { id: true, kind: true },
     });
     if (!found) throw new NotFoundException(`Case with ID ${id} not found`);
+    if (found.kind === CaseKind.DATA_REQUEST) {
+      throw new BadRequestException(
+        'This action is only supported on investigation cases; use the data-requests API instead.',
+      );
+    }
   }
 
   /** Upsert asset evidence (snapshotting display metadata) and return its id. */
@@ -1649,9 +1746,35 @@ export class CasesService {
     return ev.id;
   }
 
-  private mapCase(row: CaseRow): CaseResponseDto {
+  private async resolveRequestGroupNames(
+    rows: readonly CaseRow[],
+  ): Promise<Map<string, string>> {
+    const refs = new Set<string>();
+    for (const row of rows) {
+      if (row.dataRequest) {
+        refs.add(`group:${row.dataRequest.routeGroupId}`);
+        refs.add(`group:${row.dataRequest.audienceGroupId}`);
+      }
+    }
+    if (!refs.size || !this.directory) return new Map();
+    try {
+      const resolved = await this.directory.resolve([...refs]);
+      return new Map(
+        resolved.map((actor) => [actor.ref, actor.path ?? actor.displayName]),
+      );
+    } catch {
+      return new Map();
+    }
+  }
+
+  private mapCase(
+    row: CaseRow,
+    groupNames: Map<string, string> = new Map(),
+  ): CaseResponseDto {
+    const dr = row.dataRequest;
     return {
       id: row.id,
+      kind: row.kind ?? CaseKind.INVESTIGATION,
       title: row.title,
       description: row.description,
       status: row.status,
@@ -1668,6 +1791,26 @@ export class CasesService {
       removeGoneAssets: row.removeGoneAssets,
       escalatedCount: row._count.findings,
       lastEscalatedAt: row.lastEscalatedAt,
+      request: dr
+        ? {
+            state: dr.state,
+            routeGroup: {
+              id: dr.routeGroupId,
+              name:
+                groupNames.get(`group:${dr.routeGroupId}`) ?? dr.routeGroupId,
+            },
+            audienceGroup: {
+              id: dr.audienceGroupId,
+              name:
+                groupNames.get(`group:${dr.audienceGroupId}`) ??
+                dr.audienceGroupId,
+            },
+            datasetName: dr.dataset
+              ? `shared.${dr.dataset.domain}.${dr.dataset.name}`
+              : null,
+            deliveredVersion: dr.deliveredVersion,
+          }
+        : null,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     };

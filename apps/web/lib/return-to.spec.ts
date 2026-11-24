@@ -2,10 +2,10 @@ import { RETURN_TO_PARAM, safeReturnTo, withReturnTo } from "./return-to";
 
 describe("returnTo", () => {
   it("accepts addresses inside the app", () => {
-    expect(safeReturnTo("/ns/investigations/c1?panel=watches&watch=w1")).toBe(
-      "/ns/investigations/c1?panel=watches&watch=w1",
+    expect(safeReturnTo("/ns/cases/c1?panel=watches&watch=w1")).toBe(
+      "/ns/cases/c1?panel=watches&watch=w1",
     );
-    expect(safeReturnTo("/ns/investigations/c1?panel=details&edge=lnk%3Aabc")).not.toBeNull();
+    expect(safeReturnTo("/ns/cases/c1?panel=details&edge=lnk%3Aabc")).not.toBeNull();
   });
 
   it("refuses anything that leaves the app", () => {

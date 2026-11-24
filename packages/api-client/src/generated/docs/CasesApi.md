@@ -2102,7 +2102,7 @@ No authorization required
 
 ## casesControllerList
 
-> CaseListResponseDto casesControllerList(search, status, severity, escalated, ids, excludeIds, withCardDetails, skip, limit)
+> CaseListResponseDto casesControllerList(search, kind, status, severity, escalated, ids, excludeIds, withCardDetails, skip, limit)
 
 List cases
 
@@ -2122,6 +2122,8 @@ async function example() {
   const body = {
     // string (optional)
     search: search_example,
+    // Array<'INVESTIGATION' | 'DATA_REQUEST'> (optional)
+    kind: ...,
     // Array<'OPEN' | 'IN_PROGRESS' | 'CLOSED' | 'ARCHIVED'> (optional)
     status: ...,
     // Array<'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO'> (optional)
@@ -2158,6 +2160,7 @@ example().catch(console.error);
 | Name | Type | Description  | Notes |
 |------------- | ------------- | ------------- | -------------|
 | **search** | `string` |  | [Optional] [Defaults to `undefined`] |
+| **kind** | `INVESTIGATION`, `DATA_REQUEST` |  | [Optional] [Enum: INVESTIGATION, DATA_REQUEST] |
 | **status** | `OPEN`, `IN_PROGRESS`, `CLOSED`, `ARCHIVED` |  | [Optional] [Enum: OPEN, IN_PROGRESS, CLOSED, ARCHIVED] |
 | **severity** | `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`, `INFO` |  | [Optional] [Enum: CRITICAL, HIGH, MEDIUM, LOW, INFO] |
 | **escalated** | `boolean` | Only cases holding escalated findings | [Optional] [Defaults to `undefined`] |

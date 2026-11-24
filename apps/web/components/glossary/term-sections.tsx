@@ -395,7 +395,7 @@ export function TermCasesAndWatches({
             {usage.cases.map((entry) => (
               <li key={entry.id} className="flex items-center justify-between gap-3 px-3 py-2">
                 <Link
-                  href={nsPath(`/investigations/${entry.id}`)}
+                  href={nsPath(`/cases/${entry.id}`)}
                   className="min-w-0 truncate text-sm font-medium hover:underline"
                 >
                   {entry.title}
@@ -421,7 +421,7 @@ export function TermCasesAndWatches({
             <Button asChild size="sm" variant="outline" className="h-7 rounded-[4px] text-xs">
               <Link
                 href={nsPath(
-                  `/investigations/inquiries/new?term=${encodeURIComponent(term.key)}`,
+                  `/cases/inquiries/new?term=${encodeURIComponent(term.key)}`,
                 )}
               >
                 <Eye className="h-3.5 w-3.5" />
@@ -441,7 +441,7 @@ export function TermCasesAndWatches({
             {usage.watches.map((watch) => (
               <li key={watch.id} className="flex items-center justify-between gap-3 px-3 py-2">
                 <Link
-                  href={nsPath(`/investigations/inquiries/${watch.id}`)}
+                  href={nsPath(`/cases/inquiries/${watch.id}`)}
                   className="min-w-0 truncate text-sm font-medium hover:underline"
                 >
                   {watch.title}

@@ -33,7 +33,7 @@ import {
   FileText,
   Database,
   FlaskConical,
-  Search,
+  Briefcase,
   Fingerprint,
   BookOpen,
   ScanSearch,
@@ -79,10 +79,10 @@ const NAV_GROUPS: NavGroup[] = [
     labelKey: "nav.group.casework",
     items: [
       {
-        titleKey: "nav.investigations",
-        href: "/investigations",
-        icon: Search,
-        capability: "case.view",
+        titleKey: "nav.cases",
+        href: "/cases",
+        icon: Briefcase,
+        capability: "workspace.view",
       },
       {
         titleKey: "nav.findings",

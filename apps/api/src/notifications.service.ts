@@ -83,11 +83,24 @@ export class NotificationsService {
       return (actionUrl as string | null) ?? null;
     }
     const slug = this.cls.get<string>(CLS_SLUG);
-    if (!slug) return actionUrl;
-    if (actionUrl === `/${slug}` || actionUrl.startsWith(`/${slug}/`)) {
-      return actionUrl;
+    let normalized = actionUrl;
+    if (slug && (normalized === `/${slug}` || normalized.startsWith(`/${slug}/`))) {
+      const rest = normalized.slice(slug.length + 1);
+      if (rest === '/investigations') {
+        return `/${slug}/cases`;
+      }
+      if (rest.startsWith('/investigations/')) {
+        return `/${slug}/cases/${rest.slice('/investigations/'.length)}`;
+      }
+      return normalized;
     }
-    return `/${slug}${actionUrl}`;
+    if (normalized === '/investigations') {
+      normalized = '/cases';
+    } else if (normalized.startsWith('/investigations/')) {
+      normalized = `/cases/${normalized.slice('/investigations/'.length)}`;
+    }
+    if (!slug) return normalized;
+    return `/${slug}${normalized}`;
   }
 
   private toResponse(

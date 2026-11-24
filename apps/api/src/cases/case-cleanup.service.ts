@@ -317,7 +317,8 @@ export class CaseCleanupService implements CaseCleanupPort {
         FROM cases c
         JOIN case_evidence e ON e.case_id = c.id AND e.entity_type = 'asset'
         LEFT JOIN assets a ON a.id = e.entity_id
-       WHERE c.status NOT IN ('CLOSED'::"CaseStatus", 'ARCHIVED'::"CaseStatus")
+       WHERE c.kind = 'INVESTIGATION'::"CaseKind"
+         AND c.status NOT IN ('CLOSED'::"CaseStatus", 'ARCHIVED'::"CaseStatus")
          AND (c.remove_gone_findings OR c.remove_resolved_findings OR c.remove_gone_assets)
          AND (a.id IS NULL OR a.source_id = ${sourceId})`;
     if (cases.length === 0) return;
@@ -349,6 +350,7 @@ export class CaseCleanupService implements CaseCleanupPort {
    */
   async afterStatusChange(findingIds: string[] | null): Promise<void> {
     const where: Prisma.CaseWhereInput = {
+      kind: 'INVESTIGATION',
       status: { notIn: [CaseStatus.CLOSED, CaseStatus.ARCHIVED] },
       OR: [{ removeResolvedFindings: true }, { removeGoneFindings: true }],
     };

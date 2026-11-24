@@ -7,6 +7,7 @@
 Name | Type
 ------------ | -------------
 `byStatus` | [CaseworkCaseStatusBreakdownDto](CaseworkCaseStatusBreakdownDto.md)
+`byKind` | [CaseworkCaseKindBreakdownDto](CaseworkCaseKindBreakdownDto.md)
 `total` | number
 `recent` | [Array&lt;CaseworkCaseDto&gt;](CaseworkCaseDto.md)
 
@@ -18,6 +19,7 @@ import type { CaseworkCasesDto } from '@workspace/api-client'
 // TODO: Update the object below with actual values
 const example = {
   "byStatus": null,
+  "byKind": null,
   "total": null,
   "recent": null,
 } satisfies CaseworkCasesDto

@@ -275,6 +275,8 @@ export interface SqlEditorProps {
   height?: number | string;
   /** Distinct per editor, so each keeps its own undo history. */
   path: string;
+  /** Disable edits (e.g. requester view on a data request). */
+  readOnly?: boolean;
   /** React 19: `ref` arrives as a prop. */
   ref?: React.Ref<SqlEditorHandle>;
 }
@@ -287,6 +289,7 @@ export function SqlEditor({
   catalog,
   height = 220,
   path,
+  readOnly = false,
   ref,
 }: SqlEditorProps) {
   const { t } = useTranslation();
@@ -424,6 +427,7 @@ export function SqlEditor({
       redo={redo}
       undoLabel={t("dataQuery.editor.undo")}
       redoLabel={t("dataQuery.editor.redo")}
+      readOnly={readOnly}
     />
   );
 }
@@ -471,6 +475,7 @@ function EditorShell({
   redo,
   undoLabel,
   redoLabel,
+  readOnly = false,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -485,51 +490,62 @@ function EditorShell({
   redo: () => void;
   undoLabel: string;
   redoLabel: string;
+  readOnly?: boolean;
 }) {
   return (
     <div
       className="relative overflow-hidden rounded-md border bg-background"
       data-testid="sql-editor"
+      data-readonly={readOnly ? "true" : "false"}
     >
-      <div className="absolute right-8 top-1 z-10 flex gap-0.5 rounded border bg-background/90 shadow-sm">
-        <button
-          type="button"
-          className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-          onClick={undo}
-          title={undoLabel}
-          aria-label={undoLabel}
-          data-testid="sql-undo"
-        >
-          <Undo2 className="h-3.5 w-3.5" />
-        </button>
-        <button
-          type="button"
-          className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-          onClick={redo}
-          title={redoLabel}
-          aria-label={redoLabel}
-          data-testid="sql-redo"
-        >
-          <Redo2 className="h-3.5 w-3.5" />
-        </button>
-      </div>
+      {!readOnly && (
+        <div className="absolute right-8 top-1 z-10 flex gap-0.5 rounded border bg-background/90 shadow-sm">
+          <button
+            type="button"
+            className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+            onClick={undo}
+            title={undoLabel}
+            aria-label={undoLabel}
+            data-testid="sql-undo"
+          >
+            <Undo2 className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+            onClick={redo}
+            title={redoLabel}
+            aria-label={redoLabel}
+            data-testid="sql-redo"
+          >
+            <Redo2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
       <Editor
         height={height}
         defaultLanguage="sql"
         path={path}
         value={value}
-        onChange={(next) => onChange(next ?? "")}
+        onChange={(next) => {
+          if (!readOnly) onChange(next ?? "");
+        }}
         onMount={handleMount}
         theme={resolvedTheme === "dark" ? "vs-dark" : "vs"}
         loading={
           <Textarea
             value={value}
-            onChange={(event) => onChange(event.target.value)}
+            readOnly={readOnly}
+            onChange={(event) => {
+              if (!readOnly) onChange(event.target.value);
+            }}
             className="min-h-full rounded-none border-0 font-mono text-sm"
           />
         }
         options={{
           automaticLayout: true,
+          readOnly,
+          domReadOnly: readOnly,
           minimap: { enabled: false },
           scrollBeyondLastLine: false,
           lineNumbers: "on",
@@ -540,8 +556,8 @@ function EditorShell({
           fontSize: 13,
           tabSize: 2,
           wordWrap: "on",
-          quickSuggestions: true,
-          suggestOnTriggerCharacters: true,
+          quickSuggestions: !readOnly,
+          suggestOnTriggerCharacters: !readOnly,
         }}
       />
     </div>

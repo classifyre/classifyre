@@ -89,9 +89,10 @@ export class DecisionApplierService {
   ): Promise<AiManagementMode> {
     const existing = await this.prisma.case.findUnique({
       where: { id: caseId },
-      select: { aiMode: true },
+      select: { aiMode: true, kind: true },
     });
     if (!existing) return AiManagementMode.MANAGED;
+    if (existing.kind === 'DATA_REQUEST') return AiManagementMode.OBSERVE_ONLY;
     return this.effectiveMode(existing.aiMode, instanceEnabled);
   }
 
@@ -104,11 +105,17 @@ export class DecisionApplierService {
       where: { id: threadId },
       select: {
         caseId: true,
-        investigation: { select: { aiMode: true } },
+        investigation: { select: { aiMode: true, kind: true } },
       },
     });
     // Unknown ids stay MANAGED so the handler runs and reports the missing row.
     if (!existing) return { mode: AiManagementMode.MANAGED, caseId: null };
+    if (existing.investigation.kind === 'DATA_REQUEST') {
+      return {
+        mode: AiManagementMode.OBSERVE_ONLY,
+        caseId: existing.caseId,
+      };
+    }
     return {
       mode: this.effectiveMode(existing.investigation.aiMode, instanceEnabled),
       caseId: existing.caseId,

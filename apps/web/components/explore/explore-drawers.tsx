@@ -436,7 +436,7 @@ export function MarksDrawer({
             {data.cases.map((c) => (
               <li key={c.id}>
                 <Link
-                  href={nsPath(`/investigations/${c.id}`)}
+                  href={nsPath(`/cases/${c.id}`)}
                   className="flex items-center gap-2 rounded-[4px] px-2 py-1 text-sm hover:bg-muted"
                 >
                   <Briefcase className="size-3.5 shrink-0" aria-hidden />
@@ -462,7 +462,7 @@ export function MarksDrawer({
             {data.inquiries.map((q) => (
               <li key={q.id}>
                 <Link
-                  href={nsPath(`/investigations/inquiries/${q.id}`)}
+                  href={nsPath(`/cases/inquiries/${q.id}`)}
                   className="flex items-center gap-2 rounded-[4px] px-2 py-1 text-sm hover:bg-muted"
                 >
                   <Eye className="size-3.5 shrink-0" aria-hidden />
@@ -624,7 +624,7 @@ export function DetailsDrawer({
             {node.caseIds.map((id) => {
               const c = data.cases.find((x) => x.id === id);
               return c ? (
-                <Link key={id} href={nsPath(`/investigations/${id}`)} className="flex items-center gap-2 rounded-[4px] px-2 py-1 text-sm hover:bg-muted">
+                <Link key={id} href={nsPath(`/cases/${id}`)} className="flex items-center gap-2 rounded-[4px] px-2 py-1 text-sm hover:bg-muted">
                   <Briefcase className="size-3.5 shrink-0" aria-hidden />
                   <span className="truncate">{c.title}</span>
                 </Link>
@@ -635,7 +635,7 @@ export function DetailsDrawer({
               return q ? (
                 <Link
                   key={id}
-                  href={nsPath(`/investigations/inquiries/${id}`)}
+                  href={nsPath(`/cases/inquiries/${id}`)}
                   className="flex items-center gap-2 rounded-[4px] px-2 py-1 text-sm hover:bg-muted"
                 >
                   <Eye className="size-3.5 shrink-0" aria-hidden />

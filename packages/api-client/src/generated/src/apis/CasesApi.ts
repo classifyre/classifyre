@@ -313,6 +313,7 @@ export interface CasesControllerLinkInquiriesRequest {
 
 export interface CasesControllerListRequest {
     search?: string;
+    kind?: Array<CasesControllerListKindEnum>;
     status?: Array<CasesControllerListStatusEnum>;
     severity?: Array<CasesControllerListSeverityEnum>;
     escalated?: boolean;
@@ -1764,6 +1765,10 @@ export class CasesApi extends runtime.BaseAPI {
             queryParameters['search'] = requestParameters['search'];
         }
 
+        if (requestParameters['kind'] != null) {
+            queryParameters['kind'] = requestParameters['kind'];
+        }
+
         if (requestParameters['status'] != null) {
             queryParameters['status'] = requestParameters['status'];
         }
@@ -2289,6 +2294,14 @@ export const CaseLeadsControllerListStatusEnum = {
     Dismissed: 'DISMISSED'
 } as const;
 export type CaseLeadsControllerListStatusEnum = typeof CaseLeadsControllerListStatusEnum[keyof typeof CaseLeadsControllerListStatusEnum];
+/**
+ * @export
+ */
+export const CasesControllerListKindEnum = {
+    Investigation: 'INVESTIGATION',
+    DataRequest: 'DATA_REQUEST'
+} as const;
+export type CasesControllerListKindEnum = typeof CasesControllerListKindEnum[keyof typeof CasesControllerListKindEnum];
 /**
  * @export
  */

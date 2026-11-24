@@ -331,7 +331,7 @@ export function InquiriesTable() {
                         className={`cursor-pointer hover:bg-muted/40 ${archived ? "opacity-60" : ""}`}
                         onClick={() =>
                           router.push(
-                            nsPath(`/investigations/inquiries/${q.id}`),
+                            nsPath(`/cases/inquiries/${q.id}`),
                           )
                         }
                       >
@@ -370,7 +370,7 @@ export function InquiriesTable() {
                             cases={q.cases}
                             onOpen={(caseId) =>
                               router.push(
-                                nsPath(`/investigations/${caseId}?panel=watches&watch=${q.id}`),
+                                nsPath(`/cases/${caseId}?panel=watches&watch=${q.id}`),
                               )
                             }
                           />
@@ -418,7 +418,7 @@ export function InquiriesTable() {
                                       e.stopPropagation();
                                       router.push(
                                         nsPath(
-                                          `/investigations/cases/new?inquiryId=${q.id}`,
+                                          `/cases/new/investigation?inquiryId=${q.id}`,
                                         ),
                                       );
                                     }}
@@ -443,7 +443,7 @@ export function InquiriesTable() {
                                       e.stopPropagation();
                                       router.push(
                                         nsPath(
-                                          `/investigations/inquiries/${q.id}/edit`,
+                                          `/cases/inquiries/${q.id}/edit`,
                                         ),
                                       );
                                     }}

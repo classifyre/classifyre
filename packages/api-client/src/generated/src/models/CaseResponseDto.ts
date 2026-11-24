@@ -55,6 +55,13 @@ import {
     CaseCleanupResultDtoToJSON,
     CaseCleanupResultDtoToJSONTyped,
 } from './CaseCleanupResultDto';
+import type { CaseDataRequestSummaryDto } from './CaseDataRequestSummaryDto';
+import {
+    CaseDataRequestSummaryDtoFromJSON,
+    CaseDataRequestSummaryDtoFromJSONTyped,
+    CaseDataRequestSummaryDtoToJSON,
+    CaseDataRequestSummaryDtoToJSONTyped,
+} from './CaseDataRequestSummaryDto';
 
 /**
  * 
@@ -68,6 +75,12 @@ export interface CaseResponseDto {
      * @memberof CaseResponseDto
      */
     id: string;
+    /**
+     * 
+     * @type {string}
+     * @memberof CaseResponseDto
+     */
+    kind: CaseResponseDtoKindEnum;
     /**
      * 
      * @type {string}
@@ -219,6 +232,12 @@ export interface CaseResponseDto {
      */
     hypothesisRules?: Array<CaseHypothesisRuleDto>;
     /**
+     * Present on DATA_REQUEST cases: state, routing, and delivered dataset summary
+     * @type {CaseDataRequestSummaryDto}
+     * @memberof CaseResponseDto
+     */
+    request?: CaseDataRequestSummaryDto | null;
+    /**
      * On an update that switched a clean-up rule on: what it took out right away
      * @type {CaseCleanupResultDto}
      * @memberof CaseResponseDto
@@ -226,6 +245,15 @@ export interface CaseResponseDto {
     cleanup?: CaseCleanupResultDto;
 }
 
+
+/**
+ * @export
+ */
+export const CaseResponseDtoKindEnum = {
+    Investigation: 'INVESTIGATION',
+    DataRequest: 'DATA_REQUEST'
+} as const;
+export type CaseResponseDtoKindEnum = typeof CaseResponseDtoKindEnum[keyof typeof CaseResponseDtoKindEnum];
 
 /**
  * @export
@@ -266,6 +294,7 @@ export type CaseResponseDtoAiModeEnum = typeof CaseResponseDtoAiModeEnum[keyof t
  */
 export function instanceOfCaseResponseDto(value: object): value is CaseResponseDto {
     if (!('id' in value) || value['id'] === undefined) return false;
+    if (!('kind' in value) || value['kind'] === undefined) return false;
     if (!('title' in value) || value['title'] === undefined) return false;
     if (!('status' in value) || value['status'] === undefined) return false;
     if (!('severity' in value) || value['severity'] === undefined) return false;
@@ -293,6 +322,7 @@ export function CaseResponseDtoFromJSONTyped(json: any, ignoreDiscriminator: boo
     return {
         
         'id': json['id'],
+        'kind': json['kind'],
         'title': json['title'],
         'description': json['description'] == null ? undefined : json['description'],
         'status': json['status'],
@@ -318,6 +348,7 @@ export function CaseResponseDtoFromJSONTyped(json: any, ignoreDiscriminator: boo
         'inquiries': json['inquiries'] == null ? undefined : ((json['inquiries'] as Array<any>).map(CaseLinkedInquiryDtoFromJSON)),
         'findingFilters': json['findingFilters'] == null ? undefined : ((json['findingFilters'] as Array<any>).map(CaseFindingFilterDtoFromJSON)),
         'hypothesisRules': json['hypothesisRules'] == null ? undefined : ((json['hypothesisRules'] as Array<any>).map(CaseHypothesisRuleDtoFromJSON)),
+        'request': json['request'] == null ? undefined : CaseDataRequestSummaryDtoFromJSON(json['request']),
         'cleanup': json['cleanup'] == null ? undefined : CaseCleanupResultDtoFromJSON(json['cleanup']),
     };
 }
@@ -334,6 +365,7 @@ export function CaseResponseDtoToJSONTyped(value?: CaseResponseDto | null, ignor
     return {
         
         'id': value['id'],
+        'kind': value['kind'],
         'title': value['title'],
         'description': value['description'],
         'status': value['status'],
@@ -359,6 +391,7 @@ export function CaseResponseDtoToJSONTyped(value?: CaseResponseDto | null, ignor
         'inquiries': value['inquiries'] == null ? undefined : ((value['inquiries'] as Array<any>).map(CaseLinkedInquiryDtoToJSON)),
         'findingFilters': value['findingFilters'] == null ? undefined : ((value['findingFilters'] as Array<any>).map(CaseFindingFilterDtoToJSON)),
         'hypothesisRules': value['hypothesisRules'] == null ? undefined : ((value['hypothesisRules'] as Array<any>).map(CaseHypothesisRuleDtoToJSON)),
+        'request': CaseDataRequestSummaryDtoToJSON(value['request']),
         'cleanup': CaseCleanupResultDtoToJSON(value['cleanup']),
     };
 }

@@ -5,6 +5,8 @@ import { useTranslation } from "@/hooks/use-translation";
 import {
   getCaseStatusBadgeLabel,
   getCaseStatusBadgeTone,
+  getDataRequestStateBadgeLabel,
+  getDataRequestStateBadgeTone,
 } from "@/lib/case-status-badge";
 import { statusBadgeClass } from "@/lib/status-tone";
 
@@ -22,6 +24,29 @@ export function CaseStatusBadge({ status, className, ...props }: CaseStatusBadge
       {...props}
     >
       {t(getCaseStatusBadgeLabel(status))}
+    </Badge>
+  );
+}
+
+interface DataRequestStateBadgeProps
+  extends React.HTMLAttributes<HTMLDivElement> {
+  state?: string | null;
+}
+
+export function DataRequestStateBadge({
+  state,
+  className,
+  ...props
+}: DataRequestStateBadgeProps) {
+  const { t } = useTranslation();
+
+  return (
+    <Badge
+      variant="outline"
+      className={`${statusBadgeClass} ${getDataRequestStateBadgeTone(state)} ${className ?? ""}`}
+      {...props}
+    >
+      {t(getDataRequestStateBadgeLabel(state))}
     </Badge>
   );
 }

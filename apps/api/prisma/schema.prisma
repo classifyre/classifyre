@@ -678,6 +678,7 @@ model SharedDataset {
   asset          Asset                  @relation(fields: [assetId], references: [id], onDelete: Cascade)
   versions       SharedDatasetVersion[]
   blocks         SharedDatasetBlock[]
+  dataRequests   DataRequest[]
 
   @@unique([domain, name])
   @@index([owningGroupId])
@@ -2003,6 +2004,28 @@ enum EdgeMethod {
   MANUAL
 }
 
+enum CaseKind {
+  INVESTIGATION
+  DATA_REQUEST
+}
+
+enum DataRequestState {
+  DRAFT
+  SUBMITTED
+  IN_PROGRESS
+  CHANGES_REQUESTED
+  DELIVERED
+  DECLINED
+  WITHDRAWN
+}
+
+enum DataRequestDeliveryMode {
+  PUBLISHED
+  LINKED
+  UPDATED
+  SELF_SERVE
+}
+
 enum CaseStatus {
   OPEN
   IN_PROGRESS
@@ -2105,6 +2128,16 @@ enum CaseActivityType {
   FINDINGS_AUTO_LINKED
   // A hypothesis deleted together with the evidence that hung on it.
   THREAD_EVIDENCE_REMOVED
+  // Data request lifecycle events (docs/prd/DR-data-requests.md).
+  REQUEST_SUBMITTED
+  REQUEST_CLAIMED
+  REQUEST_REROUTED
+  REQUEST_SQL_EDITED
+  REQUEST_DELIVERED
+  REQUEST_CHANGES_REQUESTED
+  REQUEST_DECLINED
+  REQUEST_WITHDRAWN
+  REQUEST_REOPENED
 }
 
 enum EvidenceStance {
@@ -2601,6 +2634,7 @@ enum InquiryStatus {
 // relevant; evidence is pulled from those queries' matches or added manually.
 model Case {
   id          String           @id @default(uuid())
+  kind        CaseKind         @default(INVESTIGATION)
   title       String
   description String?          @db.Text
   status      CaseStatus       @default(OPEN)
@@ -2637,7 +2671,9 @@ model Case {
   board           CaseBoard?
   findingFilters  CaseFindingFilter[]
   hypothesisRules CaseHypothesisRule[]
+  dataRequest     DataRequest?
 
+  @@index([kind])
   @@index([status])
   @@index([severity])
   @@index([createdAt])
@@ -2645,6 +2681,63 @@ model Case {
   // read of either sorts the whole table.
   @@index([updatedAt])
   @@map("cases")
+}
+
+/// 1:1 extension for cases of kind DATA_REQUEST (docs/prd/DR-data-requests.md).
+/// Holds the visual join canvas spec, generated or hand-edited SQL, routing
+/// and audience groups, and link to the delivered shared dataset.
+model DataRequest {
+  caseId           String                @id @map("case_id")
+  requesterRef     String                @map("requester_ref")
+  routeGroupId     String                @map("route_group_id")
+  audienceGroupId  String                @map("audience_group_id")
+  assigneeRef      String?               @map("assignee_ref")
+  state            DataRequestState      @default(DRAFT)
+  spec             Json                  @default("{\"tables\":[],\"joins\":[],\"pins\":[]}") @db.JsonB
+  specVersion      Int                   @default(1) @map("spec_version")
+  draftSql         String                @default("") @map("draft_sql") @db.Text
+  sqlEdited        Boolean               @default(false) @map("sql_edited")
+  lastCheck        Json?                 @map("last_check") @db.JsonB
+  lastCheckSqlHash String?               @map("last_check_sql_hash")
+  datasetAssetId   String?               @map("dataset_asset_id")
+  deliveredVersion Int?                  @map("delivered_version")
+  declineReason    String?               @map("decline_reason") @db.Text
+  submittedAt      DateTime?             @map("submitted_at")
+  deliveredAt      DateTime?             @map("delivered_at")
+  closedAt         DateTime?             @map("closed_at")
+  createdAt        DateTime              @default(now()) @map("created_at")
+  updatedAt        DateTime              @updatedAt @map("updated_at")
+
+  case       Case                  @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  dataset    SharedDataset?        @relation(fields: [datasetAssetId], references: [assetId], onDelete: SetNull)
+  deliveries DataRequestDelivery[]
+
+  @@index([routeGroupId, state])
+  @@index([requesterRef])
+  @@index([datasetAssetId])
+  @@map("data_requests")
+}
+
+/// Snapshot of each delivery round on a data request, preserved even if the
+/// request is later linked to another dataset or updated to a new version.
+model DataRequestDelivery {
+  id             String                  @id @default(uuid())
+  caseId         String                  @map("case_id")
+  round          Int
+  datasetAssetId String                  @map("dataset_asset_id")
+  datasetVersion Int                     @map("dataset_version")
+  sqlSnapshot    String                  @map("sql_snapshot") @db.Text
+  specSnapshot   Json                    @map("spec_snapshot") @db.JsonB
+  mode           DataRequestDeliveryMode
+  deliveredBy    String                  @map("delivered_by")
+  note           String?                 @db.Text
+  createdAt      DateTime                @default(now()) @map("created_at")
+
+  request DataRequest @relation(fields: [caseId], references: [caseId], onDelete: Cascade)
+
+  @@unique([caseId, round])
+  @@index([caseId])
+  @@map("data_request_deliveries")
 }
 
 // ── Case leads (exploration triage) ─────────────────────────────────────────

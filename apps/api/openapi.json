@@ -4869,6 +4869,21 @@
             }
           },
           {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "INVESTIGATION",
+                  "DATA_REQUEST"
+                ]
+              }
+            }
+          },
+          {
             "name": "status",
             "required": false,
             "in": "query",
@@ -16735,6 +16750,691 @@
         ]
       }
     },
+    "/data-requests/options": {
+      "get": {
+        "operationId": "DataRequestsController_options",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRequestOptionsDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List eligible route groups, caller audience groups, and self-serve hint",
+        "tags": [
+          "Data requests"
+        ]
+      }
+    },
+    "/data-requests": {
+      "get": {
+        "operationId": "DataRequestsController_list",
+        "parameters": [
+          {
+            "name": "scope",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "mine",
+                "team",
+                "all"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRequestListResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List data requests (mine, team, or all)",
+        "tags": [
+          "Data requests"
+        ]
+      },
+      "post": {
+        "operationId": "DataRequestsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDataRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRequestDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create a new draft data request case",
+        "tags": [
+          "Data requests"
+        ]
+      }
+    },
+    "/data-requests/{id}": {
+      "get": {
+        "operationId": "DataRequestsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRequestDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get a data request with spec, deliveries, and live dataset status",
+        "tags": [
+          "Data requests"
+        ]
+      }
+    },
+    "/data-requests/{id}/spec": {
+      "put": {
+        "operationId": "DataRequestsController_updateSpec",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDataRequestSpecDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRequestDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Update the visual join canvas spec (optimistic concurrency)",
+        "tags": [
+          "Data requests"
+        ]
+      }
+    },
+    "/data-requests/{id}/sql": {
+      "put": {
+        "operationId": "DataRequestsController_updateSql",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDataRequestSqlDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRequestDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Hand-edit or regenerate the request SQL (data team only)",
+        "tags": [
+          "Data requests"
+        ]
+      }
+    },
+    "/data-requests/{id}/check": {
+      "post": {
+        "operationId": "DataRequestsController_check",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRequestCheckResultDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Fast static check of the request SQL against the routed group catalog",
+        "tags": [
+          "Data requests"
+        ]
+      }
+    },
+    "/data-requests/{id}/describe": {
+      "post": {
+        "operationId": "DataRequestsController_describe",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRequestDescribeResultDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Describe SQL lineage and floors as the routed group (cached by SQL hash)",
+        "tags": [
+          "Data requests"
+        ]
+      }
+    },
+    "/data-requests/{id}/submit": {
+      "post": {
+        "operationId": "DataRequestsController_submit",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRequestDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Submit a draft data request to the routed group",
+        "tags": [
+          "Data requests"
+        ]
+      }
+    },
+    "/data-requests/{id}/withdraw": {
+      "post": {
+        "operationId": "DataRequestsController_withdraw",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRequestDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Withdraw an open data request",
+        "tags": [
+          "Data requests"
+        ]
+      }
+    },
+    "/data-requests/{id}/claim": {
+      "post": {
+        "operationId": "DataRequestsController_claim",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClaimDataRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRequestDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Claim a data request for a team member",
+        "tags": [
+          "Data requests"
+        ]
+      }
+    },
+    "/data-requests/{id}/reroute": {
+      "post": {
+        "operationId": "DataRequestsController_reroute",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RerouteDataRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRequestDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Reroute a data request to another data-team group",
+        "tags": [
+          "Data requests"
+        ]
+      }
+    },
+    "/data-requests/{id}/deliver": {
+      "post": {
+        "operationId": "DataRequestsController_deliver",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeliverDataRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRequestDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Deliver a shared dataset to fulfil the data request",
+        "tags": [
+          "Data requests"
+        ]
+      }
+    },
+    "/data-requests/{id}/request-changes": {
+      "post": {
+        "operationId": "DataRequestsController_requestChanges",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestChangesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRequestDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Request changes on a delivered data request",
+        "tags": [
+          "Data requests"
+        ]
+      }
+    },
+    "/data-requests/{id}/decline": {
+      "post": {
+        "operationId": "DataRequestsController_decline",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeclineDataRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRequestDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Decline a data request with a reason",
+        "tags": [
+          "Data requests"
+        ]
+      }
+    },
+    "/data-requests/{id}/comments": {
+      "post": {
+        "operationId": "DataRequestsController_addComment",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddDataRequestCommentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Pin a discussion comment onto the request canvas",
+        "tags": [
+          "Data requests"
+        ]
+      }
+    },
+    "/data-requests/{id}/comments/{threadId}/entries": {
+      "get": {
+        "operationId": "DataRequestsController_getCommentEntries",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "threadId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadEntriesResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List entries on a data request comment pin",
+        "tags": [
+          "Data requests"
+        ]
+      },
+      "post": {
+        "operationId": "DataRequestsController_replyComment",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "threadId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddDataRequestCommentReplyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Reply to a data request comment pin",
+        "tags": [
+          "Data requests"
+        ]
+      }
+    },
+    "/data-requests/{id}/comments/{threadId}/resolve": {
+      "patch": {
+        "operationId": "DataRequestsController_resolveComment",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "threadId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveDataRequestCommentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Resolve or reopen a data request comment pin",
+        "tags": [
+          "Data requests"
+        ]
+      }
+    },
     "/runner-limits": {
       "get": {
         "operationId": "DeploymentSettingsController_get",
@@ -26706,6 +27406,57 @@
           "updatedAt"
         ]
       },
+      "CaseRequestGroupDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "CaseDataRequestSummaryDto": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "SUBMITTED",
+              "IN_PROGRESS",
+              "CHANGES_REQUESTED",
+              "DELIVERED",
+              "DECLINED",
+              "WITHDRAWN"
+            ]
+          },
+          "routeGroup": {
+            "$ref": "#/components/schemas/CaseRequestGroupDto"
+          },
+          "audienceGroup": {
+            "$ref": "#/components/schemas/CaseRequestGroupDto"
+          },
+          "datasetName": {
+            "type": "string",
+            "nullable": true
+          },
+          "deliveredVersion": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "state",
+          "routeGroup",
+          "audienceGroup"
+        ]
+      },
       "CaseCleanupResultDto": {
         "type": "object",
         "properties": {
@@ -26731,6 +27482,13 @@
         "properties": {
           "id": {
             "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "INVESTIGATION",
+              "DATA_REQUEST"
+            ]
           },
           "title": {
             "type": "string"
@@ -26857,6 +27615,16 @@
               "$ref": "#/components/schemas/CaseHypothesisRuleDto"
             }
           },
+          "request": {
+            "nullable": true,
+            "description": "Present on DATA_REQUEST cases: state, routing, and delivered dataset summary",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CaseDataRequestSummaryDto"
+              }
+            ]
+          },
           "cleanup": {
             "description": "On an update that switched a clean-up rule on: what it took out right away",
             "allOf": [
@@ -26868,6 +27636,7 @@
         },
         "required": [
           "id",
+          "kind",
           "title",
           "status",
           "severity",
@@ -28801,11 +29570,33 @@
           "archived"
         ]
       },
+      "CaseworkCaseKindBreakdownDto": {
+        "type": "object",
+        "properties": {
+          "investigations": {
+            "type": "number"
+          },
+          "dataRequests": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "investigations",
+          "dataRequests"
+        ]
+      },
       "CaseworkCaseDto": {
         "type": "object",
         "properties": {
           "id": {
             "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "INVESTIGATION",
+              "DATA_REQUEST"
+            ]
           },
           "title": {
             "type": "string"
@@ -28847,6 +29638,7 @@
         },
         "required": [
           "id",
+          "kind",
           "title",
           "status",
           "severity",
@@ -28861,6 +29653,9 @@
           "byStatus": {
             "$ref": "#/components/schemas/CaseworkCaseStatusBreakdownDto"
           },
+          "byKind": {
+            "$ref": "#/components/schemas/CaseworkCaseKindBreakdownDto"
+          },
           "total": {
             "type": "number"
           },
@@ -28874,6 +29669,7 @@
         },
         "required": [
           "byStatus",
+          "byKind",
           "total",
           "recent"
         ]
@@ -29847,7 +30643,16 @@
               "HYPOTHESIS_RULE_UPDATED",
               "HYPOTHESIS_RULE_REMOVED",
               "FINDINGS_AUTO_LINKED",
-              "THREAD_EVIDENCE_REMOVED"
+              "THREAD_EVIDENCE_REMOVED",
+              "REQUEST_SUBMITTED",
+              "REQUEST_CLAIMED",
+              "REQUEST_REROUTED",
+              "REQUEST_SQL_EDITED",
+              "REQUEST_DELIVERED",
+              "REQUEST_CHANGES_REQUESTED",
+              "REQUEST_DECLINED",
+              "REQUEST_WITHDRAWN",
+              "REQUEST_REOPENED"
             ]
           },
           "actor": {
@@ -42772,6 +43577,863 @@
         "required": [
           "scopeType",
           "scopeId"
+        ]
+      },
+      "DataRequestGroupRefDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "DataRequestOptionsDto": {
+        "type": "object",
+        "properties": {
+          "routeGroups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DataRequestGroupRefDto"
+            }
+          },
+          "audienceGroups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DataRequestGroupRefDto"
+            }
+          },
+          "canSelfServe": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "routeGroups",
+          "audienceGroups",
+          "canSelfServe"
+        ]
+      },
+      "DataRequestActorRefDto": {
+        "type": "object",
+        "properties": {
+          "ref": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ref",
+          "name"
+        ]
+      },
+      "DataRequestListItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "INVESTIGATION",
+              "DATA_REQUEST"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "OPEN",
+              "IN_PROGRESS",
+              "CLOSED",
+              "ARCHIVED"
+            ]
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "CRITICAL",
+              "HIGH",
+              "MEDIUM",
+              "LOW",
+              "INFO"
+            ]
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "SUBMITTED",
+              "IN_PROGRESS",
+              "CHANGES_REQUESTED",
+              "DELIVERED",
+              "DECLINED",
+              "WITHDRAWN"
+            ]
+          },
+          "requester": {
+            "$ref": "#/components/schemas/DataRequestActorRefDto"
+          },
+          "routeGroup": {
+            "$ref": "#/components/schemas/DataRequestGroupRefDto"
+          },
+          "audienceGroup": {
+            "$ref": "#/components/schemas/DataRequestGroupRefDto"
+          },
+          "assignee": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DataRequestActorRefDto"
+              }
+            ]
+          },
+          "datasetAssetId": {
+            "type": "string",
+            "nullable": true
+          },
+          "datasetName": {
+            "type": "string",
+            "nullable": true
+          },
+          "deliveredVersion": {
+            "type": "number",
+            "nullable": true
+          },
+          "declineReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "submittedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "deliveredAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "closedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "status",
+          "priority",
+          "state",
+          "requester",
+          "routeGroup",
+          "audienceGroup",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "DataRequestListResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DataRequestListItemDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ]
+      },
+      "CreateDataRequestDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "CRITICAL",
+              "HIGH",
+              "MEDIUM",
+              "LOW",
+              "INFO"
+            ],
+            "default": "MEDIUM"
+          },
+          "routeGroupId": {
+            "type": "string"
+          },
+          "audienceGroupId": {
+            "type": "string"
+          },
+          "spec": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "title",
+          "routeGroupId",
+          "audienceGroupId"
+        ]
+      },
+      "DataRequestLiveDatasetDto": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "nullable": true
+          },
+          "sqlName": {
+            "type": "string",
+            "nullable": true
+          },
+          "domain": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "currentVersion": {
+            "type": "number",
+            "nullable": true
+          },
+          "deliveredVersion": {
+            "type": "number",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "retired",
+              "blocked",
+              "unavailable",
+              "removed"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "DataRequestDeliveryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "round": {
+            "type": "number"
+          },
+          "datasetAssetId": {
+            "type": "string"
+          },
+          "datasetName": {
+            "type": "string",
+            "nullable": true
+          },
+          "datasetVersion": {
+            "type": "number"
+          },
+          "sqlSnapshot": {
+            "type": "string"
+          },
+          "specSnapshot": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "PUBLISHED",
+              "LINKED",
+              "UPDATED",
+              "SELF_SERVE"
+            ]
+          },
+          "deliveredBy": {
+            "$ref": "#/components/schemas/DataRequestActorRefDto"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "round",
+          "datasetAssetId",
+          "datasetVersion",
+          "sqlSnapshot",
+          "specSnapshot",
+          "mode",
+          "deliveredBy",
+          "createdAt"
+        ]
+      },
+      "DataRequestCommentThreadDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "resolvedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "resolvedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "entryCount": {
+            "type": "number"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "entryCount",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "DataRequestPermissionsDto": {
+        "type": "object",
+        "properties": {
+          "isRequester": {
+            "type": "boolean"
+          },
+          "isTeam": {
+            "type": "boolean"
+          },
+          "isManager": {
+            "type": "boolean"
+          },
+          "canEditSpec": {
+            "type": "boolean"
+          },
+          "canEditSql": {
+            "type": "boolean"
+          },
+          "canPreview": {
+            "type": "boolean"
+          },
+          "canSelfServe": {
+            "type": "boolean"
+          },
+          "allowedActions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "isRequester",
+          "isTeam",
+          "isManager",
+          "canEditSpec",
+          "canEditSql",
+          "canPreview",
+          "canSelfServe",
+          "allowedActions"
+        ]
+      },
+      "DataRequestDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "INVESTIGATION",
+              "DATA_REQUEST"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "OPEN",
+              "IN_PROGRESS",
+              "CLOSED",
+              "ARCHIVED"
+            ]
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "CRITICAL",
+              "HIGH",
+              "MEDIUM",
+              "LOW",
+              "INFO"
+            ]
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "SUBMITTED",
+              "IN_PROGRESS",
+              "CHANGES_REQUESTED",
+              "DELIVERED",
+              "DECLINED",
+              "WITHDRAWN"
+            ]
+          },
+          "requester": {
+            "$ref": "#/components/schemas/DataRequestActorRefDto"
+          },
+          "routeGroup": {
+            "$ref": "#/components/schemas/DataRequestGroupRefDto"
+          },
+          "audienceGroup": {
+            "$ref": "#/components/schemas/DataRequestGroupRefDto"
+          },
+          "assignee": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DataRequestActorRefDto"
+              }
+            ]
+          },
+          "datasetAssetId": {
+            "type": "string",
+            "nullable": true
+          },
+          "datasetName": {
+            "type": "string",
+            "nullable": true
+          },
+          "deliveredVersion": {
+            "type": "number",
+            "nullable": true
+          },
+          "declineReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "submittedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "deliveredAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "closedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "spec": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "specVersion": {
+            "type": "number"
+          },
+          "draftSql": {
+            "type": "string"
+          },
+          "sqlEdited": {
+            "type": "boolean"
+          },
+          "lastCheck": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
+          },
+          "lastCheckSqlHash": {
+            "type": "string",
+            "nullable": true
+          },
+          "dataset": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DataRequestLiveDatasetDto"
+              }
+            ]
+          },
+          "deliveries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DataRequestDeliveryDto"
+            }
+          },
+          "threads": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DataRequestCommentThreadDto"
+            }
+          },
+          "permissions": {
+            "$ref": "#/components/schemas/DataRequestPermissionsDto"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "status",
+          "priority",
+          "state",
+          "requester",
+          "routeGroup",
+          "audienceGroup",
+          "createdAt",
+          "updatedAt",
+          "spec",
+          "specVersion",
+          "draftSql",
+          "sqlEdited",
+          "deliveries",
+          "threads",
+          "permissions"
+        ]
+      },
+      "UpdateDataRequestSpecDto": {
+        "type": "object",
+        "properties": {
+          "spec": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "baseVersion": {
+            "type": "number"
+          },
+          "clientId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "spec",
+          "baseVersion"
+        ]
+      },
+      "UpdateDataRequestSqlDto": {
+        "type": "object",
+        "properties": {
+          "sql": {
+            "type": "string"
+          },
+          "regenerate": {
+            "type": "boolean"
+          },
+          "baseVersion": {
+            "type": "number"
+          },
+          "clientId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "baseVersion"
+        ]
+      },
+      "DataRequestCheckTableDto": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "nullable": true
+          },
+          "sqlName": {
+            "type": "string"
+          },
+          "sourceId": {
+            "type": "string",
+            "nullable": true
+          },
+          "exists": {
+            "type": "boolean"
+          },
+          "groupCanQuery": {
+            "type": "boolean"
+          },
+          "maskedColumns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "hiddenColumnCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "sqlName",
+          "exists",
+          "groupCanQuery",
+          "maskedColumns",
+          "hiddenColumnCount"
+        ]
+      },
+      "DataRequestCheckResultDto": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "sql": {
+            "type": "string"
+          },
+          "routeGroup": {
+            "$ref": "#/components/schemas/DataRequestGroupRefDto"
+          },
+          "precheckError": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
+          },
+          "diagnostics": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "tables": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DataRequestCheckTableDto"
+            }
+          },
+          "problems": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "ok",
+          "sql",
+          "routeGroup",
+          "diagnostics",
+          "tables",
+          "problems"
+        ]
+      },
+      "DataRequestDescribeResultDto": {
+        "type": "object",
+        "properties": {
+          "cached": {
+            "type": "boolean"
+          },
+          "sqlHash": {
+            "type": "string"
+          },
+          "describe": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
+          },
+          "error": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
+          },
+          "check": {
+            "$ref": "#/components/schemas/DataRequestCheckResultDto"
+          }
+        },
+        "required": [
+          "cached",
+          "sqlHash",
+          "check"
+        ]
+      },
+      "ClaimDataRequestDto": {
+        "type": "object",
+        "properties": {
+          "assigneeRef": {
+            "type": "string"
+          }
+        }
+      },
+      "RerouteDataRequestDto": {
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "groupId"
+        ]
+      },
+      "DeliverDataRequestDto": {
+        "type": "object",
+        "properties": {
+          "datasetAssetId": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "PUBLISHED",
+              "LINKED",
+              "UPDATED",
+              "SELF_SERVE"
+            ]
+          }
+        },
+        "required": [
+          "datasetAssetId"
+        ]
+      },
+      "RequestChangesDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "DeclineDataRequestDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "AddDataRequestCommentDto": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "anchor": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
+          },
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "body"
+        ]
+      },
+      "AddDataRequestCommentReplyDto": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "body"
+        ]
+      },
+      "ResolveDataRequestCommentDto": {
+        "type": "object",
+        "properties": {
+          "resolved": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "resolved"
         ]
       },
       "RunnerLimitDto": {

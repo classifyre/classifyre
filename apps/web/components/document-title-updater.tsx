@@ -17,9 +17,11 @@ const ROUTE_TITLE_KEYS: Record<string, string> = {
   "/scans": "scans.title",
   "/notifications": "notifications.title",
   "/settings": "settings.title",
-  "/investigations": "nav.investigations",
-  "/investigations/cases/new": "investigations.page.newCase",
-  "/investigations/inquiries/new": "investigations.page.newInquiry",
+  "/cases": "nav.cases",
+  "/cases/new": "cases.page.newCase",
+  "/cases/new/investigation": "cases.newPicker.investigationTitle",
+  "/cases/new/data-request": "cases.newPicker.dataRequestTitle",
+  "/cases/inquiries/new": "investigations.page.newInquiry",
   "/duplicates": "nav.fingerprints",
   "/glossary": "glossary.title",
   "/harness": "nav.harness",
@@ -57,8 +59,8 @@ function getTitleKey(pathname: string): string | null {
   if (pathname.startsWith("/harness/")) {
     return "nav.harness";
   }
-  if (pathname.startsWith("/investigations/")) {
-    return "nav.investigations";
+  if (pathname.startsWith("/cases/")) {
+    return "nav.cases";
   }
 
   return null;

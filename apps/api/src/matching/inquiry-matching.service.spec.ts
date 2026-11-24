@@ -126,7 +126,7 @@ describe('InquiryMatchingService', () => {
       expect(mockNotifications.create).toHaveBeenCalledWith(
         expect.objectContaining({
           event: 'inquiry.new_matches',
-          actionUrl: '/investigations/inquiries/q1',
+          actionUrl: '/cases/inquiries/q1',
           metadata: expect.objectContaining({ added: 1 }),
         }),
       );

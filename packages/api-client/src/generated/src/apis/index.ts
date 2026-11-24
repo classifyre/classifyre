@@ -15,6 +15,7 @@ export { CustomDetectorExtractionsApi } from './CustomDetectorExtractionsApi';
 export { CustomDetectorTestsApi } from './CustomDetectorTestsApi';
 export { CustomDetectorsApi } from './CustomDetectorsApi';
 export { DataQueryApi } from './DataQueryApi';
+export { DataRequestsApi } from './DataRequestsApi';
 export { EmbeddingsApi } from './EmbeddingsApi';
 export { EntitiesApi } from './EntitiesApi';
 export { ExploreApi } from './ExploreApi';

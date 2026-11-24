@@ -300,6 +300,10 @@ A **shared dataset** is a query you share with other groups as a dataset of its 
 
 It is a saved query, not a copy: every read runs its SQL live. Readers query it like any table, by its name `shared.<domain>.<name>`, on the Query data page, its **Data** tab, in exports, over [SQL connections](/sql-connections) (Power BI, Excel, DBeaver…) and through AI agents.
 
+<Callout type="info">
+Need a shared dataset built from tables you cannot query directly? Open a **[Data Request](/data-requests/)** under **Cases**: place catalog tables on a visual join canvas, pick columns and filters while SQL generates live, and route the request to a data team to review and publish for your group.
+</Callout>
+
 ### Sharing one
 
 1. Write the query on the **Query data** page and choose **Share as dataset**.

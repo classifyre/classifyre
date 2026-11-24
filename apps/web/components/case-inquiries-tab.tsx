@@ -512,7 +512,7 @@ function LinkWatchCard({
 
   // A new tab: created, it lands back on this board at the new watch; Cancel comes back here too.
   const startNew = () =>
-    window.open(withReturnTo(nsPath(`/investigations/inquiries/new?caseId=${encodeURIComponent(caseId)}`)), "_blank", "noopener");
+    window.open(withReturnTo(nsPath(`/cases/inquiries/new?caseId=${encodeURIComponent(caseId)}`)), "_blank", "noopener");
 
   const link = async () => {
     if (!inquiryToLink) return;
@@ -692,7 +692,7 @@ function FocusedWatch({
               aria-label={t("investigations.caseDetail.editInquiryQuery")}
               title={t("investigations.caseDetail.editInquiryQuery")}
               // Save or Cancel on the edit page comes back here, to this watch.
-              onClick={() => router.push(withReturnTo(nsPath(`/investigations/inquiries/${watch.id}/edit`)))}
+              onClick={() => router.push(withReturnTo(nsPath(`/cases/inquiries/${watch.id}/edit`)))}
             >
               <Pencil className="h-3.5 w-3.5" />
             </Button>
@@ -872,7 +872,7 @@ function FocusedWatch({
               size="sm"
               variant="outline"
               className="flex-1"
-              onClick={() => router.push(nsPath(`/investigations/inquiries/${watch.id}?caseId=${caseId}`))}
+              onClick={() => router.push(nsPath(`/cases/inquiries/${watch.id}?caseId=${caseId}`))}
             >
               {t("investigations.caseDetail.selectMatchesToPull")} <ArrowRight className="h-3.5 w-3.5" />
             </Button>

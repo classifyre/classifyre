@@ -7,6 +7,7 @@ import {
   CasesControllerListSeverityEnum,
   CasesControllerListStatusEnum,
   type CaseResponseDto,
+  type DataRequestListItemDto,
 } from "@workspace/api-client";
 import { FINDING_SEVERITY_COLOR_BY_ENUM } from "@workspace/ui/lib/finding-severity";
 import {
@@ -33,6 +34,7 @@ import {
 } from "@workspace/ui/components";
 import { useOptionalNamespace } from "@/components/namespace-provider";
 import { SectionHeading } from "@/components/section-heading";
+import { useMe } from "@/hooks/use-me";
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
 import { forgetOpened, recentCasesList, useRecentlyOpened } from "@/lib/recently-opened";
@@ -47,6 +49,7 @@ const STATUS_OPTIONS = Object.values(CasesControllerListStatusEnum);
 const SEVERITY_OPTIONS = Object.values(CasesControllerListSeverityEnum);
 type StatusFilter = (typeof CasesControllerListStatusEnum)[keyof typeof CasesControllerListStatusEnum];
 type SeverityFilter = (typeof CasesControllerListSeverityEnum)[keyof typeof CasesControllerListSeverityEnum];
+export type CaseKindFilter = "INVESTIGATION" | "DATA_REQUEST";
 
 /**
  * One card per row on a phone, two on a narrow pane, three on a desktop.
@@ -63,15 +66,56 @@ function getPageItems(current: number, total: number) {
   return Array.from(pages).sort((a, b) => a - b);
 }
 
+function dataRequestToCaseCard(item: DataRequestListItemDto): CaseResponseDto {
+  return {
+    id: item.id,
+    kind: "DATA_REQUEST",
+    title: item.title,
+    description: item.description ?? undefined,
+    status: item.status,
+    severity: item.priority,
+    aiMode: "INHERIT",
+    assignee: item.assignee?.name ?? undefined,
+    createdBy: item.requester?.name ?? undefined,
+    evidenceCount: 0,
+    hypothesisCount: 0,
+    inquiryCount: 0,
+    removeGoneFindings: false,
+    removeResolvedFindings: false,
+    removeGoneAssets: false,
+    escalatedCount: 0,
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt,
+    request: {
+      state: item.state,
+      routeGroup: { id: item.routeGroup.id, name: item.routeGroup.name },
+      audienceGroup: {
+        id: item.audienceGroup.id,
+        name: item.audienceGroup.name,
+      },
+      datasetName: item.datasetName,
+      deliveredVersion: item.deliveredVersion,
+    },
+  };
+}
+
 /**
- * The investigations page's cases: the filter bar, the cases this browser
- * opened last in a row of their own, then every other case, a page at a time.
- * While a search or filter is on there is one list of matches, recent or not.
+ * The cases page's grid: the filter bar, the cases this browser opened last
+ * in a row of their own, then every other case, a page at a time. While a
+ * search or filter is on there is one list of matches, recent or not.
+ *
+ * Business users without `case.view` still reach their own and their team's
+ * data requests through `/data-requests`.
  */
-export function CasesGrid() {
+export function CasesGrid({ kind }: { kind?: CaseKindFilter[] } = {}) {
   const { t } = useTranslation();
+  const me = useMe();
   // Not fixed ids: the router keeps the previous page mounted while hidden.
   const headingId = React.useId();
+
+  const kindKey = kind && kind.length > 0 ? [...kind].sort().join(",") : "";
+  const isDataRequestsOnly = kindKey === "DATA_REQUEST";
+  const canViewCases = me ? (me.capabilities as string[]).includes("case.view") : null;
 
   const [searchInput, setSearchInput] = React.useState("");
   const [search, setSearch] = React.useState("");
@@ -96,7 +140,7 @@ export function CasesGrid() {
 
   React.useEffect(() => {
     setPage(1);
-  }, [search, statuses, severities, pageSize]);
+  }, [search, statuses, severities, pageSize, kindKey]);
 
   // ── Recently opened ──────────────────────────────────────────────────────
 
@@ -104,26 +148,36 @@ export function CasesGrid() {
   const recentList = slug ? recentCasesList(slug) : null;
   const recent = useRecentlyOpened(recentList);
   const recentIds = React.useMemo(
-    () => (filtering ? [] : recent.slice(0, RECENT_COUNT).map((r) => r.id)),
-    [filtering, recent],
+    () => (filtering || canViewCases === false ? [] : recent.slice(0, RECENT_COUNT).map((r) => r.id)),
+    [filtering, recent, canViewCases],
   );
   const recentKey = recentIds.join(",");
   const [recentCases, setRecentCases] = React.useState<CaseResponseDto[] | null>(null);
 
   React.useEffect(() => {
+    if (canViewCases === null) return;
     const ids = recentKey ? recentKey.split(",") : [];
-    if (ids.length === 0) {
+    if (ids.length === 0 || !canViewCases) {
       setRecentCases([]);
       return;
     }
     let active = true;
+    const kindParam = kindKey ? (kindKey.split(",") as CaseKindFilter[]) : undefined;
     api.cases
-      .casesControllerList({ ids, limit: ids.length, withCardDetails: true })
+      .casesControllerList({
+        ids,
+        kind: kindParam,
+        limit: ids.length,
+        withCardDetails: true,
+      })
       .then((res) => {
         if (!active) return;
         const byId = new Map(res.items.map((c) => [c.id, c]));
-        // Deleted since: out of the row, so the next one moves up.
-        if (recentList) forgetOpened(recentList, ids.filter((id) => !byId.has(id)));
+        // Only forget missing IDs when unfiltered by kind, so switching tabs
+        // does not drop recently opened cases of the other kind.
+        if (recentList && !kindParam) {
+          forgetOpened(recentList, ids.filter((id) => !byId.has(id)));
+        }
         setRecentCases(ids.flatMap((id) => byId.get(id) ?? []));
       })
       .catch((loadError: unknown) => {
@@ -134,17 +188,69 @@ export function CasesGrid() {
     return () => {
       active = false;
     };
-  }, [recentKey, recentList]);
+  }, [recentKey, recentList, kindKey, canViewCases]);
 
   // ── Everything else ──────────────────────────────────────────────────────
 
   React.useEffect(() => {
+    if (canViewCases === null) return;
     let active = true;
     setIsUpdating(true);
+
+    if (!canViewCases) {
+      Promise.all([
+        api.dataRequests.dataRequestsControllerList({ scope: "mine" }).catch(() => ({ items: [], total: 0 })),
+        api.dataRequests.dataRequestsControllerList({ scope: "team" }).catch(() => ({ items: [], total: 0 })),
+      ])
+        .then(([mine, team]) => {
+          if (!active) return;
+          const merged = new Map<string, CaseResponseDto>();
+          for (const row of [...mine.items, ...team.items]) {
+            if (!merged.has(row.id)) {
+              merged.set(row.id, dataRequestToCaseCard(row));
+            }
+          }
+          const lower = search.toLowerCase();
+          const filtered = Array.from(merged.values())
+            .filter((c) => {
+              if (lower) {
+                const hay = `${c.title} ${c.description ?? ""} ${c.request?.routeGroup?.name ?? ""} ${c.request?.datasetName ?? ""}`.toLowerCase();
+                if (!hay.includes(lower)) return false;
+              }
+              if (statuses.length > 0 && !statuses.includes(c.status)) return false;
+              if (severities.length > 0 && !severities.includes(c.severity)) return false;
+              return true;
+            })
+            .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+
+          const start = (page - 1) * resolvedPageSize;
+          setError(null);
+          setItems(filtered.slice(start, start + resolvedPageSize));
+          setTotal(filtered.length);
+        })
+        .catch((loadError: unknown) => {
+          if (!active) return;
+          console.error("Failed to load data requests:", loadError);
+          setError(loadError instanceof Error ? loadError.message : "Failed to load data requests");
+          setItems([]);
+          setTotal(0);
+        })
+        .finally(() => {
+          if (!active) return;
+          setLoaded(true);
+          setIsUpdating(false);
+        });
+      return () => {
+        active = false;
+      };
+    }
+
     const ids = recentKey ? recentKey.split(",") : [];
+    const kindParam = kindKey ? (kindKey.split(",") as CaseKindFilter[]) : undefined;
     api.cases
       .casesControllerList({
         search: search || undefined,
+        kind: kindParam,
         status: statuses.length > 0 ? (statuses as StatusFilter[]) : undefined,
         severity: severities.length > 0 ? (severities as SeverityFilter[]) : undefined,
         excludeIds: ids.length > 0 ? ids : undefined,
@@ -173,7 +279,7 @@ export function CasesGrid() {
     return () => {
       active = false;
     };
-  }, [search, statuses, severities, page, resolvedPageSize, recentKey]);
+  }, [search, statuses, severities, page, resolvedPageSize, recentKey, kindKey, canViewCases]);
 
   const totalPages = Math.max(1, Math.ceil(total / Math.max(1, resolvedPageSize)));
   const clampedPage = Math.min(page, totalPages);
@@ -183,10 +289,22 @@ export function CasesGrid() {
   }, [loaded, page, totalPages]);
   const pageItems = React.useMemo(() => getPageItems(clampedPage, totalPages), [clampedPage, totalPages]);
   const openedAt = React.useMemo(() => new Map(recent.map((r) => [r.id, r.at])), [recent]);
-  const showRecent = !filtering && (recentCases === null ? recentIds.length > 0 : recentCases.length > 0);
+  const showRecent =
+    !filtering &&
+    canViewCases !== false &&
+    (recentCases === null ? recentIds.length > 0 : recentCases.length > 0);
   const nothingAtAll = loaded && !filtering && total === 0 && !showRecent;
   // Every case is in the recent row: no second, empty list under it.
   const showRest = !loaded || filtering || total > 0 || !showRecent;
+
+  const emptyTitle =
+    isDataRequestsOnly || canViewCases === false
+      ? t("cases.noDataRequests")
+      : t("cases.noInvestigations");
+  const emptyDescription =
+    isDataRequestsOnly || canViewCases === false
+      ? t("cases.noDataRequestsHint")
+      : t("cases.grid.emptyHint");
 
   return (
     <div className="space-y-6">
@@ -253,7 +371,7 @@ export function CasesGrid() {
       )}
 
       {nothingAtAll ? (
-        <EmptyState icon={Filter} title={t("cases.noInvestigations")} description={t("cases.grid.emptyHint")} />
+        <EmptyState icon={Filter} title={emptyTitle} description={emptyDescription} />
       ) : (
         <>
           {showRecent && (
@@ -270,37 +388,37 @@ export function CasesGrid() {
           )}
 
           {showRest && (
-          <section aria-labelledby={`${headingId}-all`} className={showRecent ? "space-y-3 pt-4" : "space-y-3"}>
-            <SectionHeading
-              id={`${headingId}-all`}
-              title={filtering ? t("cases.grid.results") : showRecent ? t("cases.grid.rest") : t("cases.grid.all")}
-              count={loaded ? total : undefined}
-            />
-            <div className="@container relative min-h-[240px]">
-              {!loaded ? (
-                <div className={GRID}>
-                  {Array.from({ length: 6 }, (_, i) => (
-                    <CaseCardSkeleton key={i} />
-                  ))}
-                </div>
-              ) : items.length === 0 ? (
-                <EmptyState
-                  icon={Filter}
-                  title={t("cases.noInvestigations")}
-                  description={t("cases.noInvestigationsHint")}
-                />
-              ) : (
-                <div className={GRID} aria-busy={isUpdating}>
-                  {items.map((c) => (
-                    <CaseCard key={c.id} item={c} openedAt={openedAt.get(c.id)} />
-                  ))}
-                </div>
-              )}
-              {isUpdating && loaded && items.length > 0 && (
-                <div className="pointer-events-none absolute inset-0 z-10 rounded-[6px] bg-background/45 backdrop-blur-[1px]" />
-              )}
-            </div>
-          </section>
+            <section aria-labelledby={`${headingId}-all`} className={showRecent ? "space-y-3 pt-4" : "space-y-3"}>
+              <SectionHeading
+                id={`${headingId}-all`}
+                title={filtering ? t("cases.grid.results") : showRecent ? t("cases.grid.rest") : t("cases.grid.all")}
+                count={loaded ? total : undefined}
+              />
+              <div className="@container relative min-h-[240px]">
+                {!loaded ? (
+                  <div className={GRID}>
+                    {Array.from({ length: 6 }, (_, i) => (
+                      <CaseCardSkeleton key={i} />
+                    ))}
+                  </div>
+                ) : items.length === 0 ? (
+                  <EmptyState
+                    icon={Filter}
+                    title={emptyTitle}
+                    description={t("cases.noInvestigationsHint")}
+                  />
+                ) : (
+                  <div className={GRID} aria-busy={isUpdating}>
+                    {items.map((c) => (
+                      <CaseCard key={c.id} item={c} openedAt={openedAt.get(c.id)} />
+                    ))}
+                  </div>
+                )}
+                {isUpdating && loaded && items.length > 0 && (
+                  <div className="pointer-events-none absolute inset-0 z-10 rounded-[6px] bg-background/45 backdrop-blur-[1px]" />
+                )}
+              </div>
+            </section>
           )}
         </>
       )}

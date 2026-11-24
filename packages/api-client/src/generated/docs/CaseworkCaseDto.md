@@ -7,6 +7,7 @@
 Name | Type
 ------------ | -------------
 `id` | string
+`kind` | string
 `title` | string
 `status` | string
 `severity` | string
@@ -23,6 +24,7 @@ import type { CaseworkCaseDto } from '@workspace/api-client'
 // TODO: Update the object below with actual values
 const example = {
   "id": null,
+  "kind": null,
   "title": null,
   "status": null,
   "severity": null,

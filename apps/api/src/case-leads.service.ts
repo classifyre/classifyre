@@ -275,12 +275,13 @@ export class CaseLeadsService {
     };
     const kase = await this.prisma.case.findUnique({
       where: { id: caseId },
-      select: { id: true, status: true },
+      select: { id: true, status: true, kind: true },
     });
     if (!kase) {
       if (opts.automatic) return empty;
       throw new NotFoundException(`Case ${caseId} not found`);
     }
+    if (kase.kind === 'DATA_REQUEST') return empty;
     // A closed case is a record: nothing new is suggested for it.
     if (kase.status === 'CLOSED' || kase.status === 'ARCHIVED') return empty;
 

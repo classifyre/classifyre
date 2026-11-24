@@ -157,12 +157,45 @@ const nextConfig = {
     // URL. Redirect rather than serve both, or every page has two indexable
     // addresses.
     async redirects() {
+      // Exclude locale prefixes, docs, api and Next internals from `:ns` so
+      // static docs pages (`/docs/investigations/...`) never redirect.
+      const ns = `:ns((?!(?:${LOCALE_ALTERNATION}|docs|api|_next)(?:/|$))[^/]+)`;
       return [
         { source: `/${DEFAULT_LOCALE}`, destination: "/", permanent: true },
         {
           source: `/${DEFAULT_LOCALE}/:path*`,
           destination: "/:path*",
           permanent: true,
+        },
+        {
+          source: `/${ns}/investigations/cases/new`,
+          destination: "/:ns/cases/new/investigation",
+          permanent: false,
+        },
+        {
+          source: `/${ns}/investigations`,
+          destination: "/:ns/cases",
+          permanent: false,
+        },
+        {
+          source: `/${ns}/investigations/:path*`,
+          destination: "/:ns/cases/:path*",
+          permanent: false,
+        },
+        {
+          source: `/de/${ns}/investigations/cases/new`,
+          destination: "/de/:ns/cases/new/investigation",
+          permanent: false,
+        },
+        {
+          source: `/de/${ns}/investigations`,
+          destination: "/de/:ns/cases",
+          permanent: false,
+        },
+        {
+          source: `/de/${ns}/investigations/:path*`,
+          destination: "/de/:ns/cases/:path*",
+          permanent: false,
         },
       ];
   },

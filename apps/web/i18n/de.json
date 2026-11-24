@@ -179,6 +179,7 @@
     "query": "Daten abfragen",
     "sources": "Quellen",
     "detectors": "Custom-Detektoren",
+    "cases": "Fälle",
     "investigations": "Ermittlungen",
     "fingerprints": "Dublettenprüfung",
     "glossary": "Entitäten & Glossar",
@@ -2954,10 +2955,49 @@
     }
   },
   "cases": {
-    "search": "Ermittlungen suchen…",
-    "noInvestigations": "Keine Ermittlungen gefunden",
+    "search": "Fälle suchen…",
+    "noInvestigations": "Keine Fälle gefunden",
     "noInvestigationsHint": "Filter anpassen, um die Suche zu erweitern.",
-    "loading": "Ermittlungen werden geladen...",
+    "noDataRequests": "Keine Datenanfragen gefunden",
+    "noDataRequestsHint": "Starten Sie eine neue Datenanfrage, um ein Datenteam um einen geteilten Datensatz zu bitten.",
+    "loading": "Fälle werden geladen…",
+    "kind": {
+      "INVESTIGATION": "Ermittlung",
+      "DATA_REQUEST": "Datenanfrage"
+    },
+    "requestStates": {
+      "DRAFT": "Entwurf",
+      "SUBMITTED": "Eingereicht",
+      "IN_PROGRESS": "In Bearbeitung",
+      "CHANGES_REQUESTED": "Änderungen angefordert",
+      "DELIVERED": "Geliefert",
+      "DECLINED": "Abgelehnt",
+      "WITHDRAWN": "Zurückgezogen"
+    },
+    "page": {
+      "newCase": "Neuer Fall",
+      "newDataRequest": "Neue Datenanfrage",
+      "tabAll": "Alle",
+      "tabInvestigations": "Ermittlungen",
+      "tabDataRequests": "Datenanfragen",
+      "tabInquiries": "Anfragen"
+    },
+    "newPicker": {
+      "back": "Zurück zu Fällen",
+      "title": "Neuer Fall",
+      "description": "Wählen Sie, welche Art von Fall Sie eröffnen möchten.",
+      "investigationTitle": "Ermittlung",
+      "investigationDescription": "Sammeln Sie Belege, verknüpfen Sie Anfrage-Beobachtungen, ordnen Sie Hypothesen und dokumentieren Sie ein Ergebnis auf dem Fall-Board.",
+      "investigationAction": "Ermittlung eröffnen",
+      "investigationNoPermission": "Erfordert Berechtigung zum Bearbeiten von Fällen.",
+      "dataRequestTitle": "Datenanfrage",
+      "dataRequestDescription": "Skizzieren Sie die benötigten Tabellen, Joins und Spalten und leiten Sie die Anfrage für einen geteilten Datensatz an ein Datenteam weiter.",
+      "dataRequestAction": "Datenanfrage starten"
+    },
+    "detail": {
+      "notFound": "Fall nicht gefunden oder keine Berechtigung zur Ansicht.",
+      "backToCases": "Zurück zu Fällen"
+    },
     "columns": {
       "title": "Titel",
       "status": "Status",
@@ -3039,6 +3079,10 @@
       "updatedAt": "Aktualisiert {{when}}",
       "newMatches": "Neue Treffer: {{count}}",
       "newMatchesHint": "Neue Treffer in den verknüpften Beobachtungen, bereit für den Fall",
+      "routedTo": "Weitergeleitet an {{group}}",
+      "deliveredVersion": "{{dataset}} · v{{version}}",
+      "emptyRequestCanvas": "Noch keine Tabellen auf der Zeichenfläche",
+      "requester": "Angefragt von {{who}}",
       "stats": {
         "assets": "Assets",
         "findings": "Befunde",
@@ -3428,6 +3472,11 @@
       "allClear": "Gerade wartet nichts auf Sie.",
       "requests": "Zu entscheidende Zugriffsanfragen",
       "noRequests": "Niemand wartet auf Ihre Entscheidung.",
+      "dataRequests": "Datenanfragen",
+      "dataRequestsTeam": "Wartet auf meine Gruppen",
+      "dataRequestsMine": "Neuigkeiten zu meinen Anfragen",
+      "dataRequestsRequestedBy": "von {{who}}",
+      "noDataRequests": "Keine Datenanfragen erfordern Ihre Aufmerksamkeit.",
       "failing": "Qualitätsfehler",
       "rulesFailing": "{{count}} fehlgeschlagen",
       "unfinished": "Unvollständige Governance",
@@ -3765,6 +3814,9 @@
     "evidence": "Beweismittel",
     "add": "Hinzufügen",
     "new": "Neu",
+    "cases": "Fälle",
+    "investigation": "Ermittlung",
+    "dataRequest": "Datenanfrage",
     "showPath": "Ganzen Pfad zeigen"
   },
   "investigations": {
@@ -6649,6 +6701,18 @@
       "ogTitle": "Fall eröffnen — neue Ermittlung | Classifyre",
       "ogDescription": "Titel, Schweregrad, Anfrage-Beobachtungen und Belege — starten Sie einen neuen Ermittlungsfall."
     },
+    "cases": {
+      "title": "Fälle — Ermittlungen, Datenanfragen & Anfrage-Beobachtungen",
+      "description": "Verwalten Sie Ermittlungen und Datenanfragen an einem Ort: sammeln Sie Belege auf dem Fall-Board, gestalten Sie Datenanfragen visuell für Datenteams oder starten Sie Anfrage-Beobachtungen.",
+      "ogTitle": "Fälle — Ermittlungen & Datenanfragen | Classifyre",
+      "ogDescription": "Ermittlungen, visuelle Datenanfragen für verwaltete geteilte Datensätze und Anfrage-Beobachtungen."
+    },
+    "dataRequestNew": {
+      "title": "Neue Datenanfrage — geteilten Datensatz beim Datenteam anfordern",
+      "description": "Erstellen Sie einen neuen Datenanfrage-Fall. Wählen Sie das zuständige Datenteam und Ihre Zielgruppe und skizzieren Sie die benötigten Tabellen, Joins und Spalten.",
+      "ogTitle": "Neue Datenanfrage — Anfrage für geteilten Datensatz | Classifyre",
+      "ogDescription": "Leiten Sie eine verwaltete Datenanfrage an ein Datenteam weiter und entwerfen Sie das SQL visuell."
+    },
     "duplicates": {
       "title": "Duplikatprüfung — Kopien über alle Quellen hinweg finden",
       "description": "Finden Sie Assets, die dasselbe zu sein scheinen — gruppiert nach gemeinsamen Fingerabdruckwerten und Trefferbegründung. Prüfen Sie Cluster, vergleichen Sie Paare, justieren Sie die Korrelation und verfolgen Sie jede Entscheidung.",
@@ -8528,6 +8592,155 @@
       "lift": "Sperre aufheben",
       "reasonHint": "Warum (die Verantwortlichen lesen das)",
       "blockConfirm": "Sperren"
+    }
+  },
+  "dataRequest": {
+    "kindLabel": "Datenanfrage",
+    "form": {
+      "title": "Neue Datenanfrage",
+      "subtitle": "Beschreiben Sie das benötigte Dataset und leiten Sie die Anfrage an ein Datenteam weiter. Tabellen und Joins gestalten Sie im nächsten Schritt auf dem Canvas.",
+      "nameLabel": "Titel",
+      "namePlaceholder": "Q3-Umsatz nach Region",
+      "purposeLabel": "Zweck",
+      "purposePlaceholder": "Beschreiben Sie, welche Entscheidung oder Auswertung dieses Dataset unterstützt.",
+      "priorityLabel": "Priorität",
+      "routeGroupLabel": "An Datenteam weiterleiten",
+      "routeGroupPlaceholder": "Datenteam wählen",
+      "noRouteGroups": "Keine Gruppe besitzt dataset.publish in diesem Workspace.",
+      "audienceGroupLabel": "Teilen mit Gruppe",
+      "audienceGroupPlaceholder": "Eigene Gruppe wählen",
+      "noAudienceGroups": "Sie sind Mitglied keiner Gruppe in diesem Mandanten.",
+      "submit": "Entwurf erstellen",
+      "created": "Entwurf der Datenanfrage erstellt."
+    },
+    "rail": {
+      "title": "Katalog",
+      "searchPlaceholder": "Tabellen oder Spalten suchen…",
+      "empty": "Keine passenden Tabellen.",
+      "lockedHint": "Sie können diese Tabelle nicht direkt abfragen, sie aber trotzdem platzieren, damit das Datenteam das Dataset erstellt.",
+      "addToCanvas": "Zum Canvas hinzufügen",
+      "noColumns": "Keine Spalten verfügbar."
+    },
+    "canvas": {
+      "undo": "Rückgängig",
+      "redo": "Wiederholen",
+      "pinComment": "Kommentar anheften",
+      "saving": "Speichert…",
+      "unsaved": "Ungespeichert",
+      "saved": "Gespeichert",
+      "emptyTitle": "Dataset entwerfen",
+      "emptyHint": "Ziehen Sie Tabellen aus dem Katalog oder klicken Sie auf + und verbinden Sie Spalten für Joins.",
+      "columnsKept": "ausgewählt",
+      "selectAll": "Alle",
+      "selectNone": "Keine",
+      "tableMissing": "Tabelle existiert nicht mehr im Katalog.",
+      "commentTitle": "Kommentar",
+      "commentPlaceholder": "Notiz für das Datenteam oder die anfragende Person…",
+      "postComment": "Anheften",
+      "replyPlaceholder": "Antwort schreiben…",
+      "reply": "Antworten",
+      "resolveComment": "Erledigen",
+      "reopenComment": "Wieder öffnen"
+    },
+    "filters": {
+      "title": "Filter",
+      "empty": "Noch keine Filter für diese Tabelle.",
+      "valuePlaceholder": "Wert",
+      "listPlaceholder": "Kommagetrennte Werte",
+      "add": "Filter hinzufügen"
+    },
+    "topBar": {
+      "forAudience": "für {{group}}",
+      "declinedReason": "Abgelehnt"
+    },
+    "actions": {
+      "submit": "Einreichen",
+      "withdraw": "Zurückziehen",
+      "claim": "Übernehmen",
+      "reroute": "Weiterleiten",
+      "publishDataset": "Dataset veröffentlichen",
+      "publishNewVersion": "Neue Version veröffentlichen",
+      "publishNow": "Jetzt veröffentlichen",
+      "linkExisting": "Vorhandenes verknüpfen",
+      "deliver": "Ausliefern",
+      "decline": "Ablehnen",
+      "requestChanges": "Änderungen anfragen"
+    },
+    "panel": {
+      "tabSql": "SQL",
+      "tabChecks": "Prüfungen",
+      "tabPreview": "Vorschau",
+      "tabHistory": "Verlauf",
+      "sqlEditedBanner": "SQL manuell bearbeitet — Joins dienen nun als Notiz",
+      "regenerate": "Aus Canvas neu erzeugen",
+      "regenConfirmTitle": "SQL aus dem Canvas neu erzeugen?",
+      "regenConfirmBody": "Das manuell bearbeitete SQL wird durch SQL aus den aktuellen Tabellen, Joins und Filtern ersetzt.",
+      "regenerated": "SQL aus dem Canvas neu erzeugt.",
+      "saveSql": "SQL speichern",
+      "sqlUnsavedHint": "Ungespeicherte SQL-Änderungen",
+      "sqlTeamHint": "Strg/Cmd+Enter speichert manuell bearbeitetes SQL",
+      "groupCanRun": "{{group}} kann diese Abfrage ausführen",
+      "checkHasProblems": "Prüfung meldet Probleme"
+    },
+    "checks": {
+      "heading": "Geprüft als {{group}}",
+      "subheading": "Rechte, Masken und vererbte Untergrenzen werden aus Sicht des Datenteams geprüft.",
+      "runDescribe": "Vollständig prüfen",
+      "inputsTitle": "Quelltabellen",
+      "noTables": "Platzieren Sie Tabellen auf dem Canvas, um den Zugriff zu prüfen.",
+      "missing": "Fehlt",
+      "readable": "Lesbar",
+      "blocked": "Kein Zugriff",
+      "requestAccessForGroup": "Zugriff für {{group}} anfragen",
+      "maskedList": "Maskiert: {{cols}}",
+      "hiddenCount": "{{count}} verborgen",
+      "describeFailed": "Abfrage konnte nicht als Datenteam beschrieben werden.",
+      "outputColumnsTitle": "Ausgabespalten ({{count}})",
+      "untraced": "Nicht zurückverfolgt"
+    },
+    "preview": {
+      "hint": "Die Vorschau läuft mit Ihren Rechten (nur Datenteam). Anfragende sehen niemals Rohzeilen.",
+      "run": "Vorschau ausführen",
+      "empty": "Führen Sie eine Vorschau aus, um Ergebniszeilen zu prüfen."
+    },
+    "history": {
+      "deliveriesTitle": "Auslieferungen",
+      "noDeliveries": "Noch kein Dataset ausgeliefert.",
+      "versionsTitle": "Dataset-Versionen",
+      "openDataset": "Dataset öffnen",
+      "removedDataset": "Entferntes Dataset"
+    },
+    "datasetStatus": {
+      "ok": "Verfügbar",
+      "retired": "Eingestellt",
+      "blocked": "Gesperrt",
+      "unavailable": "Nicht verfügbar",
+      "removed": "Entfernt"
+    },
+    "dialogs": {
+      "rerouteTitle": "Datenanfrage weiterleiten",
+      "rerouteBody": "Leiten Sie diese Anfrage an ein anderes Datenteam mit dataset.publish weiter.",
+      "linkTitle": "Vorhandenes Dataset verknüpfen",
+      "linkBody": "Wählen Sie ein geteiltes Dataset, das {{group}} bereits lesen darf.",
+      "datasetLabel": "Geteiltes Dataset",
+      "datasetPlaceholder": "Dataset auswählen",
+      "noteLabel": "Lieferhinweis (optional)",
+      "declineTitle": "Datenanfrage ablehnen",
+      "declineBody": "Teilen Sie der anfragenden Person mit, warum dieses Dataset nicht bereitgestellt werden kann.",
+      "reasonPlaceholder": "Grund für die Ablehnung…",
+      "changesTitle": "Änderungen anfragen",
+      "changesBody": "Beschreiben Sie, was sich in der nächsten Version ändern soll. Der Text wird auch als Kommentar gespeichert.",
+      "changesPlaceholder": "Spalten, Filter oder Joins beschreiben, die angepasst werden sollen…"
+    },
+    "toast": {
+      "submitted": "Datenanfrage eingereicht.",
+      "withdrawn": "Datenanfrage zurückgezogen.",
+      "claimed": "Datenanfrage übernommen.",
+      "rerouted": "Datenanfrage weitergeleitet.",
+      "delivered": "Geteiltes Dataset ausgeliefert.",
+      "declined": "Datenanfrage abgelehnt.",
+      "changesRequested": "Änderungen angefragt.",
+      "conflictReloaded": "Anderweitig geändert — neueste Version geladen."
     }
   }
 }

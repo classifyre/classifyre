@@ -462,6 +462,71 @@ export class SharedDatasetsService implements OnModuleInit {
     };
   }
 
+  /**
+   * Describe a query as a specific data-team group (docs/prd/DR-data-requests.md §4.3).
+   * Runs against the group's principal so a requester who cannot read the
+   * underlying tables still gets accurate lineage, floors and group-access
+   * diagnostics. Skips caller checks in `shareProblems`.
+   */
+  async describeForGroup(
+    sqlInput: unknown,
+    groupId: string,
+  ): Promise<DescribeResult> {
+    const sql = this.sql(sqlInput);
+    const person = this.person();
+    const principal = await this.resolver.principalForGroup(groupId);
+    if (!principal) {
+      throw new BadRequestException(
+        'The routed group is not a group of this workspace’s tenant.',
+      );
+    }
+    const described = await this.runs.describe(sql, { principal });
+    if ('error' in described) {
+      throw new BadRequestException({
+        statusCode: 400,
+        error: 'Bad Request',
+        code: described.error.code,
+        message: described.error.message,
+      });
+    }
+    const tables = await this.catalog.tables();
+    const { inputIds, problems } = this.inputsOf(
+      described.description.tables,
+      tables.tables,
+    );
+    const groupCatalog = await this.catalog.catalog(principal);
+    const inputs = await this.inputViews(inputIds, {
+      tables: tables.tables,
+      sources: tables.sources,
+      groupCatalog,
+      blocks: [],
+      person,
+    });
+    const columns = this.describedColumns(
+      described.description.columns,
+      described.description.lineage,
+      tables.tables,
+    );
+    const floors = await this.floorsFor(columns, inputIds);
+    const sqlOf = new Map(tables.tables.map((t) => [t.assetId, t.sqlName]));
+    const missing = inputs.filter((input) => input.groupCanQuery === false);
+    if (missing.length) {
+      problems.push(
+        `The routed group cannot query ${missing.map((m) => m.sqlName).join(', ')}: give it access first.`,
+      );
+    }
+    problems.push(...rowProblems(inputs.filter((input) => input.groupCanQuery)));
+    return {
+      columns: columns.map((column) =>
+        this.columnView(column, floors.get(column.name), sqlOf),
+      ),
+      inputs,
+      untraced: columns.filter((c) => !c.traced).map((c) => c.name),
+      canShare: problems.length === 0,
+      problems,
+    };
+  }
+
   // ── Changes ─────────────────────────────────────────────────────────────
 
   async create(

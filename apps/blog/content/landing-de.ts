@@ -181,7 +181,7 @@ const de: LandingCopy = {
       },
       {
         verb: "Teilen & Prüfen",
-        examples: ["Datenanfragen", "Owner-Freigabe", "Delta-Datenprodukte", "Jeder Zugriff geloggt"],
+        examples: ["Visueller Join-Canvas", "An Datenteams geroutet", "Versionierte Datasets", "Jeder Zugriff geloggt"],
       },
     ],
   },
@@ -341,22 +341,22 @@ const de: LandingCopy = {
       },
       {
         id: "share",
-        step: "Anfragen & Datenprodukte",
-        title: "Datensätze in Alltagssprache anfragen. Datenprodukte sicher teilen.",
+        step: "Datenanfragen & geteilte Datasets",
+        title: "Gewünschten Datensatz visuell skizzieren. Verwaltetes Dataset erhalten.",
         body: [
-          "Fachanwender können neue, kombinierte Datensätze in natürlicher Sprache oder über einen strukturierten Anfrageprozess anfordern – etwa die Verknüpfung von CRM-Kunden mit Bestellungen aus dem Lakehouse nach Region, ohne Personennamen. Anfragen gehen zur Prüfung, Umsetzung und Freigabe an Data Owner oder Datenteams.",
-          "Veröffentlichte Datenprodukte – als Live-Abfrage über mehrere Quellen oder als Delta-basiertes geteiltes Datenprodukt – erben automatisch alle Masken und Klassifizierungen ihrer Quelltabellen als Untergrenze und lassen sich pro Zielgruppe weiter einschränken.",
+          "Fachabteilungen stellen Datenanfragen auf einem visuellen Join-Canvas zusammen – sie platzieren Katalogtabellen (auch gesperrte, mit Spalten ohne Zeilenansicht), verbinden Joins, wählen Felder und setzen Filter, während gültiges SQL live entsteht. Anfragen werden an eine Datenteam-Gruppe geroutet, dort geprüft, bei Bedarf im SQL verfeinert und veröffentlicht – oder per Alltagssprache über einen MCP-KI-Assistenten angelegt.",
+          "Jede Auslieferung veröffentlicht oder verknüpft ein verwaltetes geteiltes Dataset für die anfragende Gruppe und vererbt automatisch alle Masken, Klassifizierungen und Zeilenfilter der Quelltabellen als verbindliche Untergrenze. Ändern sich Anforderungen, fordern Fachanwender Änderungen im selben Fall an und jede neue Auslieferung erzeugt eine neue Dataset-Version – mit Veröffentlichungsrechten auch direkt als Self-Service.",
         ],
         facts: [
-          "Datenanfragen in natürlicher Sprache",
-          "Prüfung & Freigabe durch Data Owner",
-          "Live- & Delta-Datenprodukte",
+          "Visueller Join-Canvas mit Live-SQL",
+          "Routing an Datenteam-Gruppen",
+          "Versionierte Datasets & Änderungsanfragen",
           "Quellmasken automatisch als Untergrenze",
         ],
-        href: docs.sharedDatasets,
-        linkLabel: "Geteilte Datasets & Datenprodukte",
+        href: docs.dataRequests,
+        linkLabel: "So funktionieren Datenanfragen",
         media: "share",
-        caption: "Fachliche Datenanfrage geprüft und als verwaltetes Datenprodukt mit vererbten Masken freigegeben.",
+        caption: "Tabellen auf dem Anfrage-Canvas verknüpft, SQL live erzeugt, an das Finance-Datenteam geroutet und als v1 eines verwalteten Datasets ausgeliefert.",
       },
       {
         id: "govern",
@@ -506,8 +506,8 @@ const de: LandingCopy = {
         a: "Berechtigungen folgen immer Ihren Verzeichnisgruppen. Auf jeder Quelltabelle und jedem Datenprodukt können Sie Zeilen pro Gruppe filtern (z. B. nach Region oder Abteilung) und sensible Spalten geschwärzt, mit den letzten vier Stellen, als gehashte Pseudonymisierung, geleert oder verborgen ausliefern. Verschiedene Gruppen erhalten auf derselben Tabelle automatisch unterschiedliche Sichten – und Workspace-Admins lesen standardmäßig keinen Klartext.",
       },
       {
-        q: "Können Fachabteilungen neue Datenprodukte anfordern und teilen?",
-        a: "Ja. Fachanwender beschreiben ihren Datenbedarf in natürlicher Sprache oder über einen strukturierten Anfrageprozess – zum Beispiel eine Auswertung aus CRM und Lakehouse nach Region. Data Owner und Datenteams prüfen, erstellen und veröffentlichen daraus ein verwaltetes Datenprodukt (Live-Dataset oder Delta-Share). Alle Masken und Klassifizierungen der Quelltabellen werden dabei automatisch als Untergrenze vererbt.",
+        q: "Können Fachabteilungen verwaltete Datasets anfragen und teilen?",
+        a: "Ja. Fachanwender stellen ihre Anfrage auf einem visuellen Join-Canvas zusammen – sie platzieren Katalogtabellen (Spalten sichtbar, ohne Rohzeilen), verbinden Joins, wählen Felder und setzen Filter, während SQL live entsteht – oder starten einen Entwurf in Alltagssprache über einen MCP-KI-Assistenten. Die Anfrage geht an eine Datenteam-Gruppe, die Rechte und SQL prüft, bei Bedarf anpasst und ein versioniertes geteiltes Dataset für die anfragende Gruppe veröffentlicht. Masken, Klassifizierungen und Zeilenfilter der Quelltabellen werden automatisch als Untergrenze vererbt, und Änderungsanfragen erzeugen neue Versionen im selben Fall.",
       },
       {
         q: "Welche Detektoren sind enthalten – und können wir eigene Geschäftsregeln erkennen?",

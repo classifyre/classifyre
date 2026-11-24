@@ -7,6 +7,7 @@
 Name | Type
 ------------ | -------------
 `id` | string
+`kind` | string
 `title` | string
 `description` | string
 `status` | string
@@ -32,6 +33,7 @@ Name | Type
 `inquiries` | [Array&lt;CaseLinkedInquiryDto&gt;](CaseLinkedInquiryDto.md)
 `findingFilters` | [Array&lt;CaseFindingFilterDto&gt;](CaseFindingFilterDto.md)
 `hypothesisRules` | [Array&lt;CaseHypothesisRuleDto&gt;](CaseHypothesisRuleDto.md)
+`request` | [CaseDataRequestSummaryDto](CaseDataRequestSummaryDto.md)
 `cleanup` | [CaseCleanupResultDto](CaseCleanupResultDto.md)
 
 ## Example
@@ -42,6 +44,7 @@ import type { CaseResponseDto } from '@workspace/api-client'
 // TODO: Update the object below with actual values
 const example = {
   "id": null,
+  "kind": null,
   "title": null,
   "description": null,
   "status": null,
@@ -67,6 +70,7 @@ const example = {
   "inquiries": null,
   "findingFilters": null,
   "hypothesisRules": null,
+  "request": null,
   "cleanup": null,
 } satisfies CaseResponseDto
 

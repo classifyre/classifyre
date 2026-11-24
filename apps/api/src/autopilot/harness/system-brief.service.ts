@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { INVESTIGATIONS } from '../../cases/investigation-filter';
 import {
   AgentMemoryKind,
   AutoSchedulePhase,
@@ -324,7 +325,7 @@ export class SystemBriefService {
       this.prisma.customDetector.count({ where: { isActive: true } }),
       this.prisma.inquiry.count({ where: { status: 'ACTIVE' } }),
       this.prisma.case.count({
-        where: { status: { in: ['OPEN', 'IN_PROGRESS'] } },
+        where: { ...INVESTIGATIONS, status: { in: ['OPEN', 'IN_PROGRESS'] } },
       }),
       this.prisma.finding.count({ where: { status: 'OPEN' } }),
       this.prisma.assetCluster.count(),

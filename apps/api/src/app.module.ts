@@ -30,6 +30,7 @@ import { GovernanceModule } from './governance/governance.module';
 import { SqlConnectionsModule } from './sql-connections/sql-connections.module';
 import { AccessRequestsModule } from './access-requests/access-requests.module';
 import { SharedDatasetsModule } from './shared-datasets/shared-datasets.module';
+import { DataRequestsModule } from './data-requests/data-requests.module';
 import { SqlGatewayModule } from './sql-gateway/sql-gateway.module';
 import { WebSocketModule } from './websocket/websocket.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
@@ -138,6 +139,7 @@ import {
     SqlConnectionsModule,
     AccessRequestsModule,
     SharedDatasetsModule,
+    DataRequestsModule,
     SqlGatewayModule,
     DeploymentSettingsModule,
     WebSocketModule,

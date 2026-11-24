@@ -2,10 +2,12 @@ import { Injectable } from '@nestjs/common';
 import {
   AssetStatus,
   AutoSchedulePhase,
+  CaseKind,
   Prisma,
   RunnerStatus,
   SourceScheduleMode,
 } from '@prisma/client';
+import { INVESTIGATIONS } from '../../cases/investigation-filter';
 import { PrismaService } from '../../prisma.service';
 import {
   CORRELATION_RELATION_TYPES,
@@ -863,7 +865,7 @@ export class AgentSearchService {
     }>
   > {
     const rows = await this.prisma.case.findMany({
-      where: { status: { in: ['CLOSED', 'ARCHIVED'] } },
+      where: { ...INVESTIGATIONS, status: { in: ['CLOSED', 'ARCHIVED'] } },
       select: { id: true, title: true, status: true, conclusion: true },
       orderBy: { updatedAt: 'desc' },
       take: 10,
@@ -881,6 +883,7 @@ export class AgentSearchService {
     options: RankedPageOptions = {},
   ): Promise<RankedList<CaseSummary>> {
     const open: Prisma.CaseWhereInput = {
+      ...INVESTIGATIONS,
       status: { in: ['OPEN', 'IN_PROGRESS'] },
     };
     const unevidenced: Prisma.CaseWhereInput = {
@@ -1013,6 +1016,7 @@ export class AgentSearchService {
     // case_threads(case_id, kind) index then serves the nested hypothesis read.
     const cases = await this.prisma.case.findMany({
       where: {
+        ...INVESTIGATIONS,
         status: { in: ['OPEN', 'IN_PROGRESS'] },
         threads: { some: threadWhere },
       },
@@ -1152,7 +1156,7 @@ export class AgentSearchService {
         },
       },
     });
-    if (!row) return null;
+    if (!row || row.kind === CaseKind.DATA_REQUEST) return null;
 
     // Edges touching anything in the case (assets in evidence + findings).
     const assetIds = row.evidence
@@ -1280,7 +1284,10 @@ export class AgentSearchService {
         rows = await this.prisma.inquiry.findMany({ where, select });
         break;
       case 'case':
-        rows = await this.prisma.case.findMany({ where, select });
+        rows = await this.prisma.case.findMany({
+          where: { ...where, ...INVESTIGATIONS },
+          select,
+        });
         break;
       case 'finding':
         rows = await this.prisma.finding.findMany({ where, select });

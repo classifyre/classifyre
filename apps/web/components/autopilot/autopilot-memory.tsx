@@ -273,7 +273,7 @@ export function AutopilotMemory() {
                   ))}
                   {m.refType === "case" && m.refId && (
                     <Link
-                      href={nsHref(`/investigations/${m.refId}`)}
+                      href={nsHref(`/cases/${m.refId}`)}
                       className="font-mono text-[9px] uppercase tracking-wide text-[#d97706] hover:underline"
                     >
                       {t("investigations.autopilot.memory.openCase")}
@@ -281,7 +281,7 @@ export function AutopilotMemory() {
                   )}
                   {m.refType === "inquiry" && m.refId && (
                     <Link
-                      href={nsHref(`/investigations/inquiries/${m.refId}`)}
+                      href={nsHref(`/cases/inquiries/${m.refId}`)}
                       className="font-mono text-[9px] uppercase tracking-wide text-[#d97706] hover:underline"
                     >
                       {t("investigations.autopilot.memory.openInquiry")}

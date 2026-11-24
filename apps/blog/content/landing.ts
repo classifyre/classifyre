@@ -105,7 +105,7 @@ const enPath = {
     },
     {
       verb: "Request & Share",
-      examples: ["Plain-language requests", "Owner approval flow", "Delta data products", "Every read logged"],
+      examples: ["Visual join canvas", "Routed to data teams", "Versioned shared datasets", "Every read logged"],
     },
   ],
 } as const;
@@ -264,22 +264,22 @@ const enJourney = {
     },
     {
       id: "share",
-      step: "Requests & data products",
-      title: "Request datasets in plain language. Publish governed data products.",
+      step: "Data requests & shared datasets",
+      title: "Sketch the dataset you need. Receive a governed shared dataset.",
       body: [
-        "Business users can request a new combined dataset in natural language or through a structured request workflow — for example, asking to join CRM accounts with lakehouse orders by region without exposing personal names. Requests route to data owners and engineers to review, build, and approve.",
-        "Published data products — whether live cross-source shared datasets or Delta-backed shared data assets — automatically inherit every underlying source's masking and classification rules as a floor, while allowing additional group-level masks and row filters for downstream consumers.",
+        "Business users build dataset requests on a visual join canvas — placing catalog tables (including locked tables, seeing columns without exposing rows), connecting joins, ticking fields, and adding filters while valid SQL writes itself live. Requests route to a data-team group to check, refine in SQL if needed, and publish — or open via plain-language prompts through an MCP AI assistant.",
+        "Each delivery publishes or links a governed shared dataset for the requesting group, automatically inheriting every underlying table's masks, classifications, and row filters as a strict floor. When needs change, requesters ask for updates on the same case and each delivery creates a new dataset version — or teams with publish rights can self-serve immediately.",
       ],
       facts: [
-        "Plain-language dataset request workflow",
-        "Owner & steward review and approval",
-        "Live & Delta shared data products",
+        "Visual join canvas with live SQL",
+        "Routed to data-team groups",
+        "Versioned shared datasets & change requests",
         "Source masks inherited as a strict floor",
       ],
-      href: docs.sharedDatasets,
-      linkLabel: "Shared datasets & data products",
+      href: docs.dataRequests,
+      linkLabel: "How data requests work",
       media: "share",
-      caption: "A business request approved and published as a governed shared dataset with inherited column masks.",
+      caption: "Tables joined on the request canvas, SQL generated live, routed to the Finance data team, and delivered as v1 of a governed shared dataset.",
     },
     {
       id: "govern",
@@ -534,8 +534,8 @@ const enFaq = {
       a: "Permissions always follow your directory groups. On any source table or shared dataset, you can restrict which rows a group sees (such as a single region or department) and mask sensitive columns as redacted, last-four, hashed pseudonymisation, empty, or hidden. Different groups querying the exact same table receive different rows and masking levels automatically, and workspace admins do not see clear personal data by default.",
     },
     {
-      q: "Can business users request and share governed data products?",
-      a: "Yes. Business users can submit a plain-language dataset request describing what they need (for example, joining CRM accounts with lakehouse orders by region). Data owners and engineers review, approve, and publish it as a governed shared dataset or Delta data product. Source masking and classification rules travel automatically as a floor, so shared assets can never expose more than their underlying tables allow.",
+      q: "Can business users request and share governed datasets?",
+      a: "Yes. Business users build a request on a visual join canvas — placing catalog tables (seeing columns without raw rows), connecting joins, ticking fields, and adding filters while SQL generates live — or open a draft in plain language through an MCP AI assistant. The request routes to a data-team group, which checks permissions against its own access, refines the SQL if needed, and publishes a versioned shared dataset for the requesting group. Source masking, classifications, and row filters travel automatically as a floor, and change requests create new versions on the same case.",
     },
     {
       q: "What detectors are included, and can we detect business-specific data?",

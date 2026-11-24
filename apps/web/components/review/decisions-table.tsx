@@ -192,7 +192,7 @@ export function DecisionsTable({ onChanged }: { onChanged: () => void }) {
           count: r.matchCount,
         }),
       );
-      router.push(nsPath(`/investigations/inquiries/${r.inquiryId}`));
+      router.push(nsPath(`/cases/inquiries/${r.inquiryId}`));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t("review.loadFailed"));
     } finally {
@@ -441,7 +441,7 @@ export function DecisionsTable({ onChanged }: { onChanged: () => void }) {
                           size="sm"
                           className="h-auto p-0 text-[11px]"
                           onClick={() =>
-                            router.push(nsPath(`/investigations/${r.caseId}`))
+                            router.push(nsPath(`/cases/${r.caseId}`))
                           }
                         >
                           {t("review.decisions.inCase")}
@@ -454,7 +454,7 @@ export function DecisionsTable({ onChanged }: { onChanged: () => void }) {
                           onClick={() =>
                             router.push(
                               nsPath(
-                                `/investigations/inquiries/${r.inquiryId}`,
+                                `/cases/inquiries/${r.inquiryId}`,
                               ),
                             )
                           }

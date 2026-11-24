@@ -394,6 +394,77 @@ test.describe.serial("smoke with sign-in", () => {
     expect(exported.body.code).toBe("EXPORT_NOT_ALLOWED");
   });
 
+  test("a viewer requests a dataset, the data team publishes it, and the viewer queries shared.<domain>.<name>", async () => {
+    const table = await ordersTable(admin.api);
+    const options = await viewer.api.ok<{
+      routeGroups: Array<{ id: string; name: string }>;
+      audienceGroups: Array<{ id: string; name: string }>;
+    }>("GET", `/${SLUG}/data-requests/options`);
+    const routeGroup =
+      options.routeGroups.find((g) => g.name.includes("admins")) ?? options.routeGroups[0]!;
+    const audienceGroup =
+      options.audienceGroups.find((g) => g.name.includes("smoke-viewers")) ??
+      options.audienceGroups[0]!;
+
+    // 1. smoke-viewer creates a data request with orders table and submits it.
+    const created = await viewer.api.ok<{ id: string; state: string }>(
+      "POST",
+      `/${SLUG}/data-requests`,
+      {
+        title: "Smoke orders by region",
+        priority: "HIGH",
+        routeGroupId: routeGroup.id,
+        audienceGroupId: audienceGroup.id,
+        spec: {
+          tables: [
+            {
+              id: "t1",
+              assetId: table.assetId,
+              sqlName: table.sqlName,
+              alias: "o",
+              x: 60,
+              y: 60,
+              keep: ["order_id", "region", "amount"],
+              filters: [],
+            },
+          ],
+          joins: [],
+          pins: [],
+        },
+      },
+    );
+    expect(created.state).toBe("DRAFT");
+    await viewer.api.ok("POST", `/${SLUG}/data-requests/${created.id}/submit`);
+
+    // 2. smoke-admin sees it in Waiting on you, opens it, and publishes through the sheet.
+    const adminPage = admin.page;
+    await adminPage.goto(`/${SLUG}/dashboard/`);
+    await expect(adminPage.getByTestId("data-requests-waiting")).toBeVisible({ timeout: 60_000 });
+    await expect(adminPage.getByTestId(`data-request-row-${created.id}`)).toBeVisible();
+    await adminPage.getByTestId(`data-request-row-${created.id}`).click();
+
+    await expect(adminPage.getByTestId("data-request-workspace")).toBeVisible({ timeout: 60_000 });
+    await adminPage.getByTestId("request-publish-btn").click();
+    await expect(adminPage.getByTestId("share-dataset-sheet")).toBeVisible();
+    await adminPage.getByTestId("share-domain").fill("smoke");
+    await adminPage.getByTestId("share-name").fill("orders_by_region");
+    await adminPage.getByTestId("share-submit").click();
+
+    await expect(adminPage.getByTestId("request-stepper")).toHaveAttribute(
+      "data-state",
+      "DELIVERED",
+      { timeout: 60_000 },
+    );
+
+    // 3. smoke-viewer queries shared.smoke.orders_by_region.
+    const run = await viewer.api.ok<{ id: string }>("POST", `/${SLUG}/query-runs`, {
+      sql: "SELECT order_id, region, amount FROM shared.smoke.orders_by_region",
+    });
+    const done = await finished(viewer.api, run.id);
+    expect(done.status).toBe("SUCCESS");
+    expect(done.rowCount).toBe(6);
+  });
+
   test("a public workspace is read-only for visitors, and closes again when made private", async ({
     browser,
   }) => {

@@ -66,7 +66,7 @@ describe("board URL state", () => {
 
   it("replaces only its own parameters", () => {
     const href = withBoardUrl(
-      "http://x.test/ns/investigations/c1?utm=1&panel=leads&item=old",
+      "http://x.test/ns/cases/c1?utm=1&panel=leads&item=old",
       state({ panel: "details", details: { itemId: "i2" } }),
     );
     const url = new URL(href);

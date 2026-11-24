@@ -179,6 +179,7 @@
     "query": "Query data",
     "sources": "Sources",
     "detectors": "Custom Detectors",
+    "cases": "Cases",
     "investigations": "Investigations",
     "fingerprints": "Duplicate review",
     "glossary": "Entities & glossary",
@@ -2954,10 +2955,49 @@
     }
   },
   "cases": {
-    "search": "Search investigations…",
-    "noInvestigations": "No investigations found",
+    "search": "Search cases…",
+    "noInvestigations": "No cases found",
     "noInvestigationsHint": "Adjust filters to broaden your search.",
-    "loading": "Loading investigations...",
+    "noDataRequests": "No data requests found",
+    "noDataRequestsHint": "Start a new data request to ask a data team for a governed dataset.",
+    "loading": "Loading cases…",
+    "kind": {
+      "INVESTIGATION": "Investigation",
+      "DATA_REQUEST": "Data request"
+    },
+    "requestStates": {
+      "DRAFT": "Draft",
+      "SUBMITTED": "Submitted",
+      "IN_PROGRESS": "In progress",
+      "CHANGES_REQUESTED": "Changes requested",
+      "DELIVERED": "Delivered",
+      "DECLINED": "Declined",
+      "WITHDRAWN": "Withdrawn"
+    },
+    "page": {
+      "newCase": "New case",
+      "newDataRequest": "New data request",
+      "tabAll": "All",
+      "tabInvestigations": "Investigations",
+      "tabDataRequests": "Data requests",
+      "tabInquiries": "Inquiries"
+    },
+    "newPicker": {
+      "back": "Back to cases",
+      "title": "New case",
+      "description": "Choose what kind of case you want to open.",
+      "investigationTitle": "Investigation",
+      "investigationDescription": "Collect evidence, link inquiry watches, map hypotheses and reach a conclusion on the case board.",
+      "investigationAction": "Open investigation",
+      "investigationNoPermission": "Requires case editing permissions.",
+      "dataRequestTitle": "Data request",
+      "dataRequestDescription": "Sketch the tables, joins and columns you need and route the request to a data team for a governed shared dataset.",
+      "dataRequestAction": "Start data request"
+    },
+    "detail": {
+      "notFound": "Case not found or you do not have access to view it.",
+      "backToCases": "Back to cases"
+    },
     "columns": {
       "title": "Title",
       "status": "Status",
@@ -3039,6 +3079,10 @@
       "updatedAt": "Updated {{when}}",
       "newMatches": "New matches: {{count}}",
       "newMatchesHint": "New matches in the linked inquiry watches, waiting to be pulled into the case",
+      "routedTo": "Routed to {{group}}",
+      "deliveredVersion": "{{dataset}} · v{{version}}",
+      "emptyRequestCanvas": "No tables on the canvas yet",
+      "requester": "Requested by {{who}}",
       "stats": {
         "assets": "Assets",
         "findings": "Findings",
@@ -3428,6 +3472,11 @@
       "allClear": "Nothing waits on you right now.",
       "requests": "Access requests to decide",
       "noRequests": "Nobody is waiting for your decision.",
+      "dataRequests": "Data requests",
+      "dataRequestsTeam": "Waiting on my groups",
+      "dataRequestsMine": "My requests with news",
+      "dataRequestsRequestedBy": "by {{who}}",
+      "noDataRequests": "No data requests need your attention.",
       "failing": "Failing quality",
       "rulesFailing": "{{count}} failing",
       "unfinished": "Unfinished governance",
@@ -3765,6 +3814,9 @@
     "evidence": "Evidence",
     "add": "Add",
     "new": "New",
+    "cases": "Cases",
+    "investigation": "Investigation",
+    "dataRequest": "Data request",
     "showPath": "Show the full path"
   },
   "investigations": {
@@ -6649,6 +6701,18 @@
       "ogTitle": "Open a Case — New Investigation | Classifyre",
       "ogDescription": "Title, severity, inquiry watches and evidence — start a new investigation case."
     },
+    "cases": {
+      "title": "Cases — Investigations, Data Requests & Inquiry Watches",
+      "description": "Manage investigations and data requests in one place: collect evidence on the case board, build dataset requests visually and route them to data teams, or run inquiry watches.",
+      "ogTitle": "Cases — Investigations & Data Requests | Classifyre",
+      "ogDescription": "Investigations, visual data requests for governed shared datasets, and inquiry watches."
+    },
+    "dataRequestNew": {
+      "title": "New Data Request — Ask a Data Team for a Shared Dataset",
+      "description": "Create a new data request case. Choose the data team to route it to, pick your audience group, and sketch the tables, joins and columns you need.",
+      "ogTitle": "New Data Request — Shared Dataset Request | Classifyre",
+      "ogDescription": "Route a governed dataset request to a data team and design its SQL visually."
+    },
     "duplicates": {
       "title": "Duplicate Review — Find Copies Across All Sources",
       "description": "Find assets that look like the same thing — grouped by shared fingerprint values and match reason. Review clusters, compare pairs, tune correlation and track every decision.",
@@ -8528,6 +8592,155 @@
       "lift": "Lift block",
       "reasonHint": "Why (its owner reads this)",
       "blockConfirm": "Block it"
+    }
+  },
+  "dataRequest": {
+    "kindLabel": "Data request",
+    "form": {
+      "title": "New data request",
+      "subtitle": "Describe the dataset you need and route it to a data team. You can arrange tables and joins on the canvas next.",
+      "nameLabel": "Title",
+      "namePlaceholder": "Q3 revenue by region",
+      "purposeLabel": "Purpose",
+      "purposePlaceholder": "Explain what decision or report this dataset supports.",
+      "priorityLabel": "Priority",
+      "routeGroupLabel": "Route to data team",
+      "routeGroupPlaceholder": "Pick a data team",
+      "noRouteGroups": "No group holds dataset.publish in this workspace.",
+      "audienceGroupLabel": "Share with group",
+      "audienceGroupPlaceholder": "Pick your group",
+      "noAudienceGroups": "You are not a member of any group in this tenant.",
+      "submit": "Create draft",
+      "created": "Data request draft created."
+    },
+    "rail": {
+      "title": "Catalog",
+      "searchPlaceholder": "Search tables or columns…",
+      "empty": "No matching tables.",
+      "lockedHint": "You cannot query this table directly; you can still place it so the data team builds the dataset.",
+      "addToCanvas": "Add to canvas",
+      "noColumns": "No columns available."
+    },
+    "canvas": {
+      "undo": "Undo",
+      "redo": "Redo",
+      "pinComment": "Pin comment",
+      "saving": "Saving…",
+      "unsaved": "Unsaved",
+      "saved": "Saved",
+      "emptyTitle": "Start drafting your dataset",
+      "emptyHint": "Drag tables from the catalog rail or click + to place them, then connect columns to build joins.",
+      "columnsKept": "kept",
+      "selectAll": "All",
+      "selectNone": "None",
+      "tableMissing": "Table no longer exists in the catalog.",
+      "commentTitle": "Comment",
+      "commentPlaceholder": "Leave a note for the data team or requester…",
+      "postComment": "Pin",
+      "replyPlaceholder": "Write a reply…",
+      "reply": "Reply",
+      "resolveComment": "Resolve",
+      "reopenComment": "Reopen"
+    },
+    "filters": {
+      "title": "Filters",
+      "empty": "No filters on this table yet.",
+      "valuePlaceholder": "Value",
+      "listPlaceholder": "Comma-separated values",
+      "add": "Add filter"
+    },
+    "topBar": {
+      "forAudience": "for {{group}}",
+      "declinedReason": "Declined"
+    },
+    "actions": {
+      "submit": "Submit",
+      "withdraw": "Withdraw",
+      "claim": "Claim",
+      "reroute": "Reroute",
+      "publishDataset": "Publish dataset",
+      "publishNewVersion": "Publish new version",
+      "publishNow": "Publish now",
+      "linkExisting": "Link existing",
+      "deliver": "Deliver",
+      "decline": "Decline",
+      "requestChanges": "Request changes"
+    },
+    "panel": {
+      "tabSql": "SQL",
+      "tabChecks": "Checks",
+      "tabPreview": "Preview",
+      "tabHistory": "History",
+      "sqlEditedBanner": "SQL edited by hand — joins are now notes",
+      "regenerate": "Regenerate from canvas",
+      "regenConfirmTitle": "Regenerate SQL from canvas?",
+      "regenConfirmBody": "This replaces the hand-edited SQL with SQL generated from the current canvas tables, joins, and filters.",
+      "regenerated": "SQL regenerated from canvas.",
+      "saveSql": "Save SQL",
+      "sqlUnsavedHint": "Unsaved SQL edits",
+      "sqlTeamHint": "Press Ctrl/Cmd+Enter to save hand-edited SQL",
+      "groupCanRun": "{{group}} can run this query",
+      "checkHasProblems": "Check reported issues"
+    },
+    "checks": {
+      "heading": "Checked as {{group}}",
+      "subheading": "Permissions, masks, and inherited floors are evaluated as the routed data team.",
+      "runDescribe": "Run full check",
+      "inputsTitle": "Input tables",
+      "noTables": "Add tables on the canvas to check access.",
+      "missing": "Missing",
+      "readable": "Readable",
+      "blocked": "No access",
+      "requestAccessForGroup": "Request access for {{group}}",
+      "maskedList": "Masked: {{cols}}",
+      "hiddenCount": "{{count}} hidden",
+      "describeFailed": "Could not describe this query as the routed group.",
+      "outputColumnsTitle": "Output columns ({{count}})",
+      "untraced": "Untraced"
+    },
+    "preview": {
+      "hint": "Preview runs as you (data team only). Requesters never see raw rows.",
+      "run": "Run preview",
+      "empty": "Run a preview to inspect output rows."
+    },
+    "history": {
+      "deliveriesTitle": "Deliveries",
+      "noDeliveries": "No dataset delivered yet.",
+      "versionsTitle": "Dataset versions",
+      "openDataset": "Open dataset",
+      "removedDataset": "Removed dataset"
+    },
+    "datasetStatus": {
+      "ok": "Available",
+      "retired": "Retired",
+      "blocked": "Blocked",
+      "unavailable": "Unavailable",
+      "removed": "Removed"
+    },
+    "dialogs": {
+      "rerouteTitle": "Reroute data request",
+      "rerouteBody": "Send this request to another data team holding dataset.publish.",
+      "linkTitle": "Link existing shared dataset",
+      "linkBody": "Pick a shared dataset already readable by {{group}}.",
+      "datasetLabel": "Shared dataset",
+      "datasetPlaceholder": "Choose a dataset",
+      "noteLabel": "Delivery note (optional)",
+      "declineTitle": "Decline data request",
+      "declineBody": "Tell the requester why this dataset cannot be provided.",
+      "reasonPlaceholder": "Explain why this request is declined…",
+      "changesTitle": "Request changes",
+      "changesBody": "Explain what should change in the next version. This is also posted as a comment.",
+      "changesPlaceholder": "Describe the columns, filters, or joins to adjust…"
+    },
+    "toast": {
+      "submitted": "Data request submitted.",
+      "withdrawn": "Data request withdrawn.",
+      "claimed": "Data request claimed.",
+      "rerouted": "Data request rerouted.",
+      "delivered": "Shared dataset delivered.",
+      "declined": "Data request declined.",
+      "changesRequested": "Changes requested.",
+      "conflictReloaded": "Updated elsewhere — reloaded latest version."
     }
   }
 }

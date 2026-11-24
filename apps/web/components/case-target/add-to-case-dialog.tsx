@@ -110,7 +110,7 @@ export function AddToCaseDialog({
       toast.success(t("caseTarget.added", { count: added, title: targetTitle }), {
         action: {
           label: t("caseTarget.openCase"),
-          onClick: () => router.push(nsPath(`/investigations/${target}`)),
+          onClick: () => router.push(nsPath(`/cases/${target}`)),
         },
       });
       onOpenChange(false);

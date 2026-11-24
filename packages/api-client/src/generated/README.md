@@ -249,6 +249,25 @@ All URIs are relative to *http://localhost*
 *DataQueryApi* | [**dataQueryControllerResult**](docs/DataQueryApi.md#dataquerycontrollerresult) | **GET** /query-runs/{id}/result | The rows of a finished query (Arrow IPC stream), or its exported file
 *DataQueryApi* | [**dataQueryControllerUpdateSaved**](docs/DataQueryApi.md#dataquerycontrollerupdatesaved) | **PATCH** /saved-queries/{id} | Rename a saved query or save new SQL under it
 *DataQueryApi* | [**dataQueryControllerUpdateSettings**](docs/DataQueryApi.md#dataquerycontrollerupdatesettings) | **PUT** /data-query/settings | Set the limits of SQL queries in this workspace
+*DataRequestsApi* | [**dataRequestsControllerAddComment**](docs/DataRequestsApi.md#datarequestscontrolleraddcomment) | **POST** /data-requests/{id}/comments | Pin a discussion comment onto the request canvas
+*DataRequestsApi* | [**dataRequestsControllerCheck**](docs/DataRequestsApi.md#datarequestscontrollercheck) | **POST** /data-requests/{id}/check | Fast static check of the request SQL against the routed group catalog
+*DataRequestsApi* | [**dataRequestsControllerClaim**](docs/DataRequestsApi.md#datarequestscontrollerclaim) | **POST** /data-requests/{id}/claim | Claim a data request for a team member
+*DataRequestsApi* | [**dataRequestsControllerCreate**](docs/DataRequestsApi.md#datarequestscontrollercreate) | **POST** /data-requests | Create a new draft data request case
+*DataRequestsApi* | [**dataRequestsControllerDecline**](docs/DataRequestsApi.md#datarequestscontrollerdecline) | **POST** /data-requests/{id}/decline | Decline a data request with a reason
+*DataRequestsApi* | [**dataRequestsControllerDeliver**](docs/DataRequestsApi.md#datarequestscontrollerdeliver) | **POST** /data-requests/{id}/deliver | Deliver a shared dataset to fulfil the data request
+*DataRequestsApi* | [**dataRequestsControllerDescribe**](docs/DataRequestsApi.md#datarequestscontrollerdescribe) | **POST** /data-requests/{id}/describe | Describe SQL lineage and floors as the routed group (cached by SQL hash)
+*DataRequestsApi* | [**dataRequestsControllerGet**](docs/DataRequestsApi.md#datarequestscontrollerget) | **GET** /data-requests/{id} | Get a data request with spec, deliveries, and live dataset status
+*DataRequestsApi* | [**dataRequestsControllerGetCommentEntries**](docs/DataRequestsApi.md#datarequestscontrollergetcommententries) | **GET** /data-requests/{id}/comments/{threadId}/entries | List entries on a data request comment pin
+*DataRequestsApi* | [**dataRequestsControllerList**](docs/DataRequestsApi.md#datarequestscontrollerlist) | **GET** /data-requests | List data requests (mine, team, or all)
+*DataRequestsApi* | [**dataRequestsControllerOptions**](docs/DataRequestsApi.md#datarequestscontrolleroptions) | **GET** /data-requests/options | List eligible route groups, caller audience groups, and self-serve hint
+*DataRequestsApi* | [**dataRequestsControllerReplyComment**](docs/DataRequestsApi.md#datarequestscontrollerreplycomment) | **POST** /data-requests/{id}/comments/{threadId}/entries | Reply to a data request comment pin
+*DataRequestsApi* | [**dataRequestsControllerRequestChanges**](docs/DataRequestsApi.md#datarequestscontrollerrequestchanges) | **POST** /data-requests/{id}/request-changes | Request changes on a delivered data request
+*DataRequestsApi* | [**dataRequestsControllerReroute**](docs/DataRequestsApi.md#datarequestscontrollerreroute) | **POST** /data-requests/{id}/reroute | Reroute a data request to another data-team group
+*DataRequestsApi* | [**dataRequestsControllerResolveComment**](docs/DataRequestsApi.md#datarequestscontrollerresolvecomment) | **PATCH** /data-requests/{id}/comments/{threadId}/resolve | Resolve or reopen a data request comment pin
+*DataRequestsApi* | [**dataRequestsControllerSubmit**](docs/DataRequestsApi.md#datarequestscontrollersubmit) | **POST** /data-requests/{id}/submit | Submit a draft data request to the routed group
+*DataRequestsApi* | [**dataRequestsControllerUpdateSpec**](docs/DataRequestsApi.md#datarequestscontrollerupdatespec) | **PUT** /data-requests/{id}/spec | Update the visual join canvas spec (optimistic concurrency)
+*DataRequestsApi* | [**dataRequestsControllerUpdateSql**](docs/DataRequestsApi.md#datarequestscontrollerupdatesql) | **PUT** /data-requests/{id}/sql | Hand-edit or regenerate the request SQL (data team only)
+*DataRequestsApi* | [**dataRequestsControllerWithdraw**](docs/DataRequestsApi.md#datarequestscontrollerwithdraw) | **POST** /data-requests/{id}/withdraw | Withdraw an open data request
 *EmbeddingsApi* | [**embeddingControllerBoilerplate**](docs/EmbeddingsApi.md#embeddingcontrollerboilerplate) | **GET** /sources/{sourceId}/boilerplate-clusters | Near-duplicate finding clusters in a source (repeated boilerplate)
 *EmbeddingsApi* | [**embeddingControllerBoilerplateGlobal**](docs/EmbeddingsApi.md#embeddingcontrollerboilerplateglobal) | **GET** /embeddings/boilerplate-clusters | Near-duplicate finding clusters across the corpus, optionally filtered to specific sources
 *EmbeddingsApi* | [**embeddingControllerChunks**](docs/EmbeddingsApi.md#embeddingcontrollerchunks) | **POST** /sources/{sourceId}/embeddings/chunks | Store asset chunk-to-content mappings
@@ -578,6 +597,8 @@ All URIs are relative to *http://localhost*
 - [AccessRequestTargetDto](docs/AccessRequestTargetDto.md)
 - [AddCaseFindingFiltersDto](docs/AddCaseFindingFiltersDto.md)
 - [AddCaseHypothesisRuleDto](docs/AddCaseHypothesisRuleDto.md)
+- [AddDataRequestCommentDto](docs/AddDataRequestCommentDto.md)
+- [AddDataRequestCommentReplyDto](docs/AddDataRequestCommentReplyDto.md)
 - [AddEvidenceDto](docs/AddEvidenceDto.md)
 - [AddExclusionDto](docs/AddExclusionDto.md)
 - [AddFindingDto](docs/AddFindingDto.md)
@@ -704,6 +725,7 @@ All URIs are relative to *http://localhost*
 - [CaseCleanupPreviewDto](docs/CaseCleanupPreviewDto.md)
 - [CaseCleanupResultDto](docs/CaseCleanupResultDto.md)
 - [CaseCleanupRulesDto](docs/CaseCleanupRulesDto.md)
+- [CaseDataRequestSummaryDto](docs/CaseDataRequestSummaryDto.md)
 - [CaseEventDto](docs/CaseEventDto.md)
 - [CaseEvidenceDto](docs/CaseEvidenceDto.md)
 - [CaseFindingDto](docs/CaseFindingDto.md)
@@ -719,11 +741,13 @@ All URIs are relative to *http://localhost*
 - [CaseLeadDto](docs/CaseLeadDto.md)
 - [CaseLinkedInquiryDto](docs/CaseLinkedInquiryDto.md)
 - [CaseListResponseDto](docs/CaseListResponseDto.md)
+- [CaseRequestGroupDto](docs/CaseRequestGroupDto.md)
 - [CaseResponseDto](docs/CaseResponseDto.md)
 - [CaseThreadKind](docs/CaseThreadKind.md)
 - [CaseThumbnailDto](docs/CaseThumbnailDto.md)
 - [CaseTimelineResponseDto](docs/CaseTimelineResponseDto.md)
 - [CaseworkCaseDto](docs/CaseworkCaseDto.md)
+- [CaseworkCaseKindBreakdownDto](docs/CaseworkCaseKindBreakdownDto.md)
 - [CaseworkCaseStatusBreakdownDto](docs/CaseworkCaseStatusBreakdownDto.md)
 - [CaseworkCasesDto](docs/CaseworkCasesDto.md)
 - [CaseworkInquiriesDto](docs/CaseworkInquiriesDto.md)
@@ -731,6 +755,7 @@ All URIs are relative to *http://localhost*
 - [CaseworkInquiryStatusBreakdownDto](docs/CaseworkInquiryStatusBreakdownDto.md)
 - [CaseworkLeadsDto](docs/CaseworkLeadsDto.md)
 - [CaseworkSummaryDto](docs/CaseworkSummaryDto.md)
+- [ClaimDataRequestDto](docs/ClaimDataRequestDto.md)
 - [ClearCaseEscalationsDto](docs/ClearCaseEscalationsDto.md)
 - [ClearCaseEscalationsResponseDto](docs/ClearCaseEscalationsResponseDto.md)
 - [CliRunnerControllerUpdateRunnerStatusRequest](docs/CliRunnerControllerUpdateRunnerStatusRequest.md)
@@ -759,6 +784,7 @@ All URIs are relative to *http://localhost*
 - [CreateCaseEventDto](docs/CreateCaseEventDto.md)
 - [CreateCustomDetectorDto](docs/CreateCustomDetectorDto.md)
 - [CreateDataConnectionDto](docs/CreateDataConnectionDto.md)
+- [CreateDataRequestDto](docs/CreateDataRequestDto.md)
 - [CreateDetectorNotebookExecutionDto](docs/CreateDetectorNotebookExecutionDto.md)
 - [CreateExternalRunnerDto](docs/CreateExternalRunnerDto.md)
 - [CreateFindingDto](docs/CreateFindingDto.md)
@@ -795,12 +821,27 @@ All URIs are relative to *http://localhost*
 - [DataConnectionScopeItemDto](docs/DataConnectionScopeItemDto.md)
 - [DataConnectionSecretDto](docs/DataConnectionSecretDto.md)
 - [DataQuerySettingsDto](docs/DataQuerySettingsDto.md)
+- [DataRequestActorRefDto](docs/DataRequestActorRefDto.md)
+- [DataRequestCheckResultDto](docs/DataRequestCheckResultDto.md)
+- [DataRequestCheckTableDto](docs/DataRequestCheckTableDto.md)
+- [DataRequestCommentThreadDto](docs/DataRequestCommentThreadDto.md)
+- [DataRequestDeliveryDto](docs/DataRequestDeliveryDto.md)
+- [DataRequestDescribeResultDto](docs/DataRequestDescribeResultDto.md)
+- [DataRequestDetailDto](docs/DataRequestDetailDto.md)
+- [DataRequestGroupRefDto](docs/DataRequestGroupRefDto.md)
+- [DataRequestListItemDto](docs/DataRequestListItemDto.md)
+- [DataRequestListResponseDto](docs/DataRequestListResponseDto.md)
+- [DataRequestLiveDatasetDto](docs/DataRequestLiveDatasetDto.md)
+- [DataRequestOptionsDto](docs/DataRequestOptionsDto.md)
+- [DataRequestPermissionsDto](docs/DataRequestPermissionsDto.md)
 - [DecisionsToCaseDto](docs/DecisionsToCaseDto.md)
 - [DecisionsToCaseResponseDto](docs/DecisionsToCaseResponseDto.md)
 - [DecisionsToInquiryDto](docs/DecisionsToInquiryDto.md)
 - [DecisionsToInquiryResponseDto](docs/DecisionsToInquiryResponseDto.md)
+- [DeclineDataRequestDto](docs/DeclineDataRequestDto.md)
 - [DeleteGlossaryTermResponseDto](docs/DeleteGlossaryTermResponseDto.md)
 - [DeleteRunnerResponseDto](docs/DeleteRunnerResponseDto.md)
+- [DeliverDataRequestDto](docs/DeliverDataRequestDto.md)
 - [DenyAccessRequestDto](docs/DenyAccessRequestDto.md)
 - [DeprecateGlossaryTermDto](docs/DeprecateGlossaryTermDto.md)
 - [DescribeSharedDatasetDto](docs/DescribeSharedDatasetDto.md)
@@ -1014,6 +1055,9 @@ All URIs are relative to *http://localhost*
 - [RematchResponseDto](docs/RematchResponseDto.md)
 - [ReopenDecisionsDto](docs/ReopenDecisionsDto.md)
 - [ReopenDecisionsResponseDto](docs/ReopenDecisionsResponseDto.md)
+- [RequestChangesDto](docs/RequestChangesDto.md)
+- [RerouteDataRequestDto](docs/RerouteDataRequestDto.md)
+- [ResolveDataRequestCommentDto](docs/ResolveDataRequestCommentDto.md)
 - [ResolvedActorDto](docs/ResolvedActorDto.md)
 - [RetireOutOfScopeFindingsDto](docs/RetireOutOfScopeFindingsDto.md)
 - [RevertResultDto](docs/RevertResultDto.md)
@@ -1217,6 +1261,8 @@ All URIs are relative to *http://localhost*
 - [UpdateCorrelationConfigDto](docs/UpdateCorrelationConfigDto.md)
 - [UpdateCustomDetectorDto](docs/UpdateCustomDetectorDto.md)
 - [UpdateDataQuerySettingsDto](docs/UpdateDataQuerySettingsDto.md)
+- [UpdateDataRequestSpecDto](docs/UpdateDataRequestSpecDto.md)
+- [UpdateDataRequestSqlDto](docs/UpdateDataRequestSqlDto.md)
 - [UpdateEdgeDto](docs/UpdateEdgeDto.md)
 - [UpdateEmbeddingSettingsDto](docs/UpdateEmbeddingSettingsDto.md)
 - [UpdateEmbeddingSettingsResponseDto](docs/UpdateEmbeddingSettingsResponseDto.md)

@@ -13,6 +13,13 @@
  */
 
 import { mapValues } from '../runtime';
+import type { CaseworkCaseKindBreakdownDto } from './CaseworkCaseKindBreakdownDto';
+import {
+    CaseworkCaseKindBreakdownDtoFromJSON,
+    CaseworkCaseKindBreakdownDtoFromJSONTyped,
+    CaseworkCaseKindBreakdownDtoToJSON,
+    CaseworkCaseKindBreakdownDtoToJSONTyped,
+} from './CaseworkCaseKindBreakdownDto';
 import type { CaseworkCaseDto } from './CaseworkCaseDto';
 import {
     CaseworkCaseDtoFromJSON,
@@ -42,6 +49,12 @@ export interface CaseworkCasesDto {
     byStatus: CaseworkCaseStatusBreakdownDto;
     /**
      * 
+     * @type {CaseworkCaseKindBreakdownDto}
+     * @memberof CaseworkCasesDto
+     */
+    byKind: CaseworkCaseKindBreakdownDto;
+    /**
+     * 
      * @type {number}
      * @memberof CaseworkCasesDto
      */
@@ -59,6 +72,7 @@ export interface CaseworkCasesDto {
  */
 export function instanceOfCaseworkCasesDto(value: object): value is CaseworkCasesDto {
     if (!('byStatus' in value) || value['byStatus'] === undefined) return false;
+    if (!('byKind' in value) || value['byKind'] === undefined) return false;
     if (!('total' in value) || value['total'] === undefined) return false;
     if (!('recent' in value) || value['recent'] === undefined) return false;
     return true;
@@ -75,6 +89,7 @@ export function CaseworkCasesDtoFromJSONTyped(json: any, ignoreDiscriminator: bo
     return {
         
         'byStatus': CaseworkCaseStatusBreakdownDtoFromJSON(json['byStatus']),
+        'byKind': CaseworkCaseKindBreakdownDtoFromJSON(json['byKind']),
         'total': json['total'],
         'recent': ((json['recent'] as Array<any>).map(CaseworkCaseDtoFromJSON)),
     };
@@ -92,6 +107,7 @@ export function CaseworkCasesDtoToJSONTyped(value?: CaseworkCasesDto | null, ign
     return {
         
         'byStatus': CaseworkCaseStatusBreakdownDtoToJSON(value['byStatus']),
+        'byKind': CaseworkCaseKindBreakdownDtoToJSON(value['byKind']),
         'total': value['total'],
         'recent': ((value['recent'] as Array<any>).map(CaseworkCaseDtoToJSON)),
     };

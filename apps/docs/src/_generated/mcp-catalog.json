@@ -1585,10 +1585,11 @@
     {
       "id": "data",
       "title": "Data",
-      "description": "Query the tables you may read with SQL: the same grants, masked columns, row filters, limits and audit as the SQL page.",
+      "description": "Query the tables you may read with SQL and create or submit data requests for shared datasets.",
       "operations": [
         "List the tables you can query, with what is masked or filtered for you",
-        "Run one SELECT and read up to 500 rows"
+        "Run one SELECT and read up to 500 rows",
+        "List, inspect, create, and submit data requests for a data team"
       ],
       "tools": [
         {
@@ -1625,6 +1626,117 @@
               "type": "integer",
               "required": false,
               "description": "Rows to return (default 100, at most 500)"
+            }
+          ]
+        },
+        {
+          "name": "list_data_requests",
+          "title": "List data requests",
+          "description": "List dataset requests in the current workspace. Use scope \"mine\" for requests you created, \"team\" for requests routed to your data-team groups, or \"all\" (requires case.view).",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "scope",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "mine",
+                "team",
+                "all"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "get_data_request",
+          "title": "Get data request",
+          "description": "Read one data request by its case id, including its visual join spec, generated or hand-edited SQL, delivery history, and live dataset status.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true
+            }
+          ]
+        },
+        {
+          "name": "create_data_request",
+          "title": "Create data request",
+          "description": "Create a new draft data request asking a data-team group for a governed shared dataset. Provide a title, routeGroupId (group with dataset.publish), audienceGroupId (group that should read the dataset), and optionally a canvas spec (tables, joins, filters).",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "title",
+              "type": "string",
+              "required": true
+            },
+            {
+              "name": "description",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "priority",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "CRITICAL",
+                "HIGH",
+                "MEDIUM",
+                "LOW"
+              ]
+            },
+            {
+              "name": "routeGroupId",
+              "type": "string",
+              "required": true
+            },
+            {
+              "name": "audienceGroupId",
+              "type": "string",
+              "required": true
+            },
+            {
+              "name": "spec",
+              "type": "object",
+              "required": false
+            },
+            {
+              "name": "spec.tables",
+              "type": "object[]",
+              "required": false
+            },
+            {
+              "name": "spec.joins",
+              "type": "object[]",
+              "required": false
+            },
+            {
+              "name": "spec.pins",
+              "type": "object[]",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "submit_data_request",
+          "title": "Submit data request",
+          "description": "Submit a draft data request to its routed data-team group so the team is notified and can claim and deliver a shared dataset.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true
             }
           ]
         }
@@ -3448,7 +3560,16 @@
                 "HYPOTHESIS_RULE_UPDATED",
                 "HYPOTHESIS_RULE_REMOVED",
                 "FINDINGS_AUTO_LINKED",
-                "THREAD_EVIDENCE_REMOVED"
+                "THREAD_EVIDENCE_REMOVED",
+                "REQUEST_SUBMITTED",
+                "REQUEST_CLAIMED",
+                "REQUEST_REROUTED",
+                "REQUEST_SQL_EDITED",
+                "REQUEST_DELIVERED",
+                "REQUEST_CHANGES_REQUESTED",
+                "REQUEST_DECLINED",
+                "REQUEST_WITHDRAWN",
+                "REQUEST_REOPENED"
               ]
             },
             {

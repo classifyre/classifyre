@@ -389,9 +389,9 @@ export class CaseEscalationService {
       if (recent) return;
       const found = await this.prisma.case.findUnique({
         where: { id: caseId },
-        select: { title: true, severity: true },
+        select: { title: true, severity: true, kind: true },
       });
-      if (!found) return;
+      if (!found || found.kind === 'DATA_REQUEST') return;
       const rules = [
         ...new Set(hits.map((h) => describeRule(h.rule, false))),
       ].slice(0, 3);
@@ -403,7 +403,7 @@ export class CaseEscalationService {
         message:
           `${hits.length} finding(s) matched an escalation rule (${rules.join('; ')})` +
           (inquiry ? ` and came in through “${inquiry.title}”.` : '.'),
-        actionUrl: `/investigations/${caseId}`,
+        actionUrl: `/cases/${caseId}`,
         isImportant: true,
         metadata: {
           caseId,

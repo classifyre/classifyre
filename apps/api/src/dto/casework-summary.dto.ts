@@ -1,5 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { CaseStatus, Severity } from '@prisma/client';
+import { CaseKind, CaseStatus, Severity } from '@prisma/client';
+
+export class CaseworkCaseKindBreakdownDto {
+  @ApiProperty()
+  investigations: number;
+
+  @ApiProperty()
+  dataRequests: number;
+}
 
 export class CaseworkCaseStatusBreakdownDto {
   @ApiProperty()
@@ -18,6 +26,9 @@ export class CaseworkCaseStatusBreakdownDto {
 export class CaseworkCaseDto {
   @ApiProperty()
   id: string;
+
+  @ApiProperty({ enum: CaseKind })
+  kind: CaseKind;
 
   @ApiProperty()
   title: string;
@@ -48,6 +59,9 @@ export class CaseworkCaseDto {
 export class CaseworkCasesDto {
   @ApiProperty({ type: CaseworkCaseStatusBreakdownDto })
   byStatus: CaseworkCaseStatusBreakdownDto;
+
+  @ApiProperty({ type: CaseworkCaseKindBreakdownDto })
+  byKind: CaseworkCaseKindBreakdownDto;
 
   @ApiProperty()
   total: number;

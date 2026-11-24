@@ -314,11 +314,12 @@ When building Docker images:
 - **Add to workspace**: `cd . && bun add -w <package>`
 - **Python CLI**: Edit `pyproject.toml` dependencies, run `uv sync`
 
-### Database Migrations (When Implemented)
+### Database Migrations
 
-- Backend will use Alembic for schema versioning
-- Migrations stored in `apps/api/migrations/versions/`
-- Apply with: `alembic upgrade head`
+- Prisma schema lives in `apps/api/prisma/schema.prisma`
+- Migrations are hand-written idempotent SQL files in `apps/api/prisma/migrations/<timestamp>_<name>/migration.sql` (enum additions live in their own migration because PostgreSQL cannot use newly added enum values in the same transaction)
+- Applied automatically per tenant/namespace schema on startup by `apps/api/src/database-migrations.ts`
+- After editing `schema.prisma`, regenerate the Prisma client from `apps/api` (`bunx prisma generate`)
 
 ## Security Considerations
 

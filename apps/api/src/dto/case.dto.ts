@@ -16,7 +16,9 @@ import {
 } from 'class-validator';
 import {
   AiManagementMode,
+  CaseKind,
   CaseStatus,
+  DataRequestState,
   InquiryStatus,
   Severity,
 } from '@prisma/client';
@@ -173,6 +175,12 @@ export class QueryCasesDto {
   @IsString()
   @MaxLength(200)
   search?: string;
+
+  @ApiPropertyOptional({ enum: CaseKind, isArray: true })
+  @IsOptional()
+  @IsArray()
+  @IsEnum(CaseKind, { each: true })
+  kind?: CaseKind[];
 
   @ApiPropertyOptional({ enum: CaseStatus, isArray: true })
   @IsOptional()
@@ -508,9 +516,37 @@ export class CaseThumbnailDto {
   updatedAt!: Date;
 }
 
+export class CaseRequestGroupDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty()
+  name!: string;
+}
+
+export class CaseDataRequestSummaryDto {
+  @ApiProperty({ enum: DataRequestState })
+  state!: DataRequestState;
+
+  @ApiProperty({ type: CaseRequestGroupDto })
+  routeGroup!: CaseRequestGroupDto;
+
+  @ApiProperty({ type: CaseRequestGroupDto })
+  audienceGroup!: CaseRequestGroupDto;
+
+  @ApiPropertyOptional({ type: String, nullable: true })
+  datasetName?: string | null;
+
+  @ApiPropertyOptional({ type: Number, nullable: true })
+  deliveredVersion?: number | null;
+}
+
 export class CaseResponseDto {
   @ApiProperty()
   id!: string;
+
+  @ApiProperty({ enum: CaseKind })
+  kind!: CaseKind;
 
   @ApiProperty()
   title!: string;
@@ -616,6 +652,13 @@ export class CaseResponseDto {
       'Hypothesis rules: which hypothesis, with which stance, the answers of each watch are linked to',
   })
   hypothesisRules?: CaseHypothesisRuleDto[];
+
+  @ApiPropertyOptional({
+    type: CaseDataRequestSummaryDto,
+    nullable: true,
+    description: 'Present on DATA_REQUEST cases: state, routing, and delivered dataset summary',
+  })
+  request?: CaseDataRequestSummaryDto | null;
 
   @ApiPropertyOptional({
     type: CaseCleanupResultDto,

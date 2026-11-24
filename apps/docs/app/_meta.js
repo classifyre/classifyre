@@ -11,8 +11,9 @@ export default {
   "data-query": "SQL & Masking",
   "sql-connections": "SQL Connections",
   "data-export": "Data Export",
+  "data-requests": "Data Requests",
   notifications: "Notifications",
-  investigations: "Investigations (Add-on)",
+  investigations: "Cases & Investigations",
   duplicates: "Duplicate Review",
   settings: "Settings",
 };

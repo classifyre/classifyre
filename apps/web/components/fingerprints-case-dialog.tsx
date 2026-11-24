@@ -88,7 +88,7 @@ export function FingerprintsCaseDialog({
     setCaseId("");
     setSelectedIds(new Set(preselected ?? assetIds));
     api.cases
-      .casesControllerList({})
+      .casesControllerList({ kind: ["INVESTIGATION"] })
       .then((r) => setCases(r.items ?? []))
       .catch(() => setCases([]));
   }, [open, assetIds, preselected]);
@@ -137,7 +137,7 @@ export function FingerprintsCaseDialog({
         }),
       );
       onOpenChange(false);
-      router.push(nsPath(`/investigations/${res.caseId}`));
+      router.push(nsPath(`/cases/${res.caseId}`));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t("correlation.caseAction.failed"));
     } finally {

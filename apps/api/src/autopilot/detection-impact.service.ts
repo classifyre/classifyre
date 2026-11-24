@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { INVESTIGATIONS } from '../cases/investigation-filter';
 import { DetectorType, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { InquiryMatchingService } from '../matching/inquiry-matching.service';
@@ -273,7 +274,7 @@ export class DetectionImpactService {
     const [cases, inquiries] = await Promise.all([
       byCase.size > 0
         ? this.prisma.case.findMany({
-            where: { id: { in: [...byCase.keys()] } },
+            where: { id: { in: [...byCase.keys()] }, ...INVESTIGATIONS },
             select: { id: true, title: true },
           })
         : Promise.resolve([]),

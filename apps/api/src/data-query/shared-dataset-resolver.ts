@@ -62,7 +62,7 @@ export type UnavailableListener = (event: {
 @Injectable()
 export class SharedDatasetResolver {
   private readonly logger = new Logger(SharedDatasetResolver.name);
-  private listener: UnavailableListener | null = null;
+  private readonly listeners: UnavailableListener[] = [];
 
   constructor(
     private readonly prisma: PrismaService,
@@ -80,7 +80,7 @@ export class SharedDatasetResolver {
   }
 
   onUnavailable(listener: UnavailableListener): void {
-    this.listener = listener;
+    this.listeners.push(listener);
   }
 
   /** A group's rights in the current workspace, or null when it has none. */
@@ -219,12 +219,14 @@ export class SharedDatasetResolver {
         data: { unavailableAt: new Date(), unavailableWhy: reason },
       })
       .catch(() => undefined);
-    try {
-      await this.listener?.({ assetId, owningGroupId, reason });
-    } catch (error) {
-      this.logger.warn(
-        `Could not report shared dataset ${assetId} unavailable: ${error instanceof Error ? error.message : String(error)}`,
-      );
+    for (const listener of this.listeners) {
+      try {
+        await listener({ assetId, owningGroupId, reason });
+      } catch (error) {
+        this.logger.warn(
+          `Could not report shared dataset ${assetId} unavailable: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
     }
   }
 }

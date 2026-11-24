@@ -112,7 +112,7 @@ export function AddConceptToCaseDialog({
       if (watch) {
         router.push(
           nsPath(
-            `/investigations/inquiries/new?term=${encodeURIComponent(concept.key)}&caseId=${encodeURIComponent(target)}`,
+            `/cases/inquiries/new?term=${encodeURIComponent(concept.key)}&caseId=${encodeURIComponent(target)}`,
           ),
         );
         return;
@@ -120,7 +120,7 @@ export function AddConceptToCaseDialog({
       toast.success(t("semanticMap.addToCase.added", { concept: concept.name, title: targetTitle }), {
         action: {
           label: t("caseTarget.openCase"),
-          onClick: () => router.push(nsPath(`/investigations/${target}`)),
+          onClick: () => router.push(nsPath(`/cases/${target}`)),
         },
       });
     } catch (error) {

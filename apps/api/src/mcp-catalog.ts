@@ -4,6 +4,7 @@ import type {
 } from './dto/mcp-settings.dto';
 import { SEMANTIC_MCP_TOOL_NAMES } from './semantic/semantic-mcp-tools';
 import { ENTITY_MCP_TOOL_NAMES } from './entities/entities-mcp-tools';
+import { DATA_REQUEST_MCP_TOOL_NAMES } from './data-requests/data-requests-mcp-tools';
 
 export const MCP_TOKEN_PREFIX = 'inmcp';
 
@@ -106,11 +107,16 @@ export const MCP_CAPABILITY_GROUPS: McpCapabilityGroupDto[] = [
     id: 'data',
     title: 'Data',
     description:
-      'Query the tables you may read with SQL: the same grants, masked columns, row filters, limits and audit as the SQL page.',
-    toolNames: ['list_queryable_tables', 'query_data'],
+      'Query the tables you may read with SQL and create or submit data requests for shared datasets.',
+    toolNames: [
+      'list_queryable_tables',
+      'query_data',
+      ...DATA_REQUEST_MCP_TOOL_NAMES,
+    ],
     operations: [
       'List the tables you can query, with what is masked or filtered for you',
       'Run one SELECT and read up to 500 rows',
+      'List, inspect, create, and submit data requests for a data team',
     ],
   },
   {

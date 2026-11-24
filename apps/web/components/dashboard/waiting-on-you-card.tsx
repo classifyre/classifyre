@@ -9,6 +9,7 @@ import {
   ClipboardList,
   Flame,
   Inbox,
+  TableProperties,
 } from "lucide-react";
 import type { GovernanceDashboardDto } from "@workspace/api-client";
 import { SeverityBadge, Skeleton, ToneBadge } from "@workspace/ui/components";
@@ -19,6 +20,10 @@ import type { DashboardScope } from "@/lib/governance";
 import type { AssetsLink } from "@/lib/dashboard-links";
 import type { TranslationKey } from "@/i18n";
 import { AccessRequestsList } from "@/components/access-requests/access-requests-list";
+import {
+  DataRequestsList,
+  useWaitingDataRequests,
+} from "@/components/dashboard/data-requests-list";
 import {
   PanelCard,
   microLabelClass,
@@ -52,8 +57,12 @@ export function WaitingOnYouCard({
   const assetHref = (assetId: string) =>
     nsPath(`/assets/${assetId}?tab=governance`);
 
+  const waitingDataRequests = useWaitingDataRequests();
+  const dataRequestsCount = waitingDataRequests.count;
+
   // Only what needs someone: a section with nothing in it is not shown.
   const hasRequests = (requestsForMe ?? 0) > 0;
+  const hasDataRequests = (dataRequestsCount ?? 0) > 0;
   const hasFailing = (dashboard?.failing.length ?? 0) > 0;
   const hasUnfinished =
     scope === "mine" && (dashboard?.incomplete.length ?? 0) > 0;
@@ -61,7 +70,9 @@ export function WaitingOnYouCard({
   const allClear =
     dashboard !== null &&
     requestsForMe !== undefined &&
+    dataRequestsCount !== undefined &&
     !hasRequests &&
+    !hasDataRequests &&
     !hasFailing &&
     !hasUnfinished &&
     !hasGovernFirst;
@@ -103,6 +114,26 @@ export function WaitingOnYouCard({
               showTarget
               emptyText={t("dashboard.waiting.noRequests")}
               onDecided={onDecided}
+            />
+          </Section>
+        )}
+
+        {hasDataRequests && (
+          <Section
+            icon={
+              <TableProperties
+                className="size-4 text-sky-600 dark:text-sky-400"
+                aria-hidden
+              />
+            }
+            title={t("dashboard.waiting.dataRequests")}
+            count={dataRequestsCount}
+            seeAllHref={nsPath("/cases?tab=data-requests")}
+          >
+            <DataRequestsList
+              team={waitingDataRequests.team}
+              mine={waitingDataRequests.mine}
+              emptyText={t("dashboard.waiting.noDataRequests")}
             />
           </Section>
         )}

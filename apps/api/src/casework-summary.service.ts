@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
+  CaseKind,
   CaseLeadStatus,
   CaseStatus,
   CaseThreadKind,
@@ -39,6 +40,7 @@ export class CaseworkSummaryService {
     // a consistent snapshot across five independent counts.
     const [
       caseStatusGroups,
+      caseKindGroups,
       recentCases,
       inquiryStatusGroups,
       newMatchAggregate,
@@ -47,6 +49,10 @@ export class CaseworkSummaryService {
     ] = await Promise.all([
       this.prisma.case.groupBy({
         by: ['status'],
+        _count: { _all: true },
+      }),
+      this.prisma.case.groupBy({
+        by: ['kind'],
         _count: { _all: true },
       }),
       this.prisma.case.findMany({
@@ -102,6 +108,16 @@ export class CaseworkSummaryService {
       }
     }
 
+    const byCaseKind = { investigations: 0, dataRequests: 0 };
+    for (const group of caseKindGroups) {
+      const count = group._count._all;
+      if (group.kind === CaseKind.DATA_REQUEST) {
+        byCaseKind.dataRequests += count;
+      } else {
+        byCaseKind.investigations += count;
+      }
+    }
+
     const byInquiryStatus = { active: 0, archived: 0 };
     let inquiryTotal = 0;
     for (const group of inquiryStatusGroups) {
@@ -115,9 +131,11 @@ export class CaseworkSummaryService {
     return {
       cases: {
         byStatus: byCaseStatus,
+        byKind: byCaseKind,
         total: caseTotal,
         recent: recentCases.map((row) => ({
           id: row.id,
+          kind: row.kind,
           title: row.title,
           status: row.status,
           severity: row.severity,

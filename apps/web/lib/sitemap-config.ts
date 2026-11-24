@@ -68,12 +68,12 @@ const ENTITY_CONFIG: Record<SitemapEntityType, EntitySitemapConfig> = {
   },
   // Cases are the investigations detail route; inquiries sit one level deeper.
   case: {
-    path: (id) => `/investigations/${encodeURIComponent(id)}`,
+    path: (id) => `/cases/${encodeURIComponent(id)}`,
     changeFrequency: "weekly",
     priority: 0.7,
   },
   inquiry: {
-    path: (id) => `/investigations/inquiries/${encodeURIComponent(id)}`,
+    path: (id) => `/cases/inquiries/${encodeURIComponent(id)}`,
     changeFrequency: "weekly",
     priority: 0.6,
   },
@@ -118,7 +118,7 @@ export const NAMESPACE_STATIC_PATHS: ReadonlyArray<{
   { path: "/assets", changeFrequency: "daily", priority: 0.8 },
   { path: "/findings", changeFrequency: "daily", priority: 0.8 },
   { path: "/dashboard", changeFrequency: "daily", priority: 0.7 },
-  { path: "/investigations", changeFrequency: "daily", priority: 0.7 },
+  { path: "/cases", changeFrequency: "daily", priority: 0.7 },
   { path: "/scans", changeFrequency: "daily", priority: 0.6 },
   { path: "/detectors", changeFrequency: "weekly", priority: 0.6 },
   { path: "/duplicates", changeFrequency: "weekly", priority: 0.5 },

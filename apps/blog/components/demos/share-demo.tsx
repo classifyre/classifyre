@@ -2,12 +2,10 @@
 
 import { cn } from "@workspace/ui/lib/utils";
 
-import { sampleHash, sampleRows } from "@/content/sample-data";
 import type { Locale } from "@/lib/locale";
 import {
   Caret,
   DemoFrame,
-  PressButton,
   step,
   typed,
   typedEnd,
@@ -15,140 +13,385 @@ import {
 } from "@/components/demos/timeline";
 
 /**
- * Dataset request & governed data product flow:
- * 1. A business user submits a plain-language dataset request joining CRM,
- *    lakehouse orders, and finance invoices.
- * 2. The data owner reviews and publishes it as a governed shared dataset
- *    (live or Delta-backed) for the requesting group.
- * 3. Downstream consumers query the published data product with all source
- *    column masks automatically inherited as a strict floor.
+ * Visual data-request canvas flow:
+ * 1. Two catalog table cards (`crm.public.customers` and `lake.sales.orders`)
+ *    appear with column lists (no rows exposed) and ticked output fields.
+ * 2. A string connector links `customers.id` ↔ `orders.customer_id` (INNER JOIN).
+ * 3. Deterministic SQL writes itself live on the SQL tape below the canvas.
+ * 4. The request routes to the Finance data team and lands as a case-file
+ *    stamp ("Delivered v1") pointing to the governed shared dataset.
  */
 
-const NAME = "shared.sales.customer_revenue";
-const CPS = 58;
+const SQL_LINES = [
+  "SELECT c.email, c.region, o.order_total",
+  "FROM crm.public.customers c",
+  "INNER JOIN lake.sales.orders o",
+  "  ON c.id = o.customer_id",
+  "WHERE o.status = 'paid'",
+] as const;
+
+const DATASET_NAME = "shared.sales.customer_orders";
+const CPS = 54;
 
 const L = {
   en: {
-    title: "Data requests · Governed data product",
-    requestTag: "Business request · Regional Sales",
-    requestPrompt:
-      "Join active CRM customers with Delta lakehouse orders and finance invoices by city, without customer names.",
-    routed: "Routed to Finance owner · 3 sources verified",
-    publish: "Approve & publish",
-    published: "Published",
-    name: "Asset",
-    format: "Delta & Live SQL",
-    group: "Regional sales",
-    access: "Masked · 90 days",
-    masks: "Inherited mask floor: customer email hashed (crm.customers.email), names excluded",
-    sources: "3 sources",
-    preview: "Regional sales queries it",
+    title: "Cases · Data request · Customer revenue",
+    columnsOnly: "locked · columns only",
+    joinBadge: "INNER",
+    joinAria: "Inner join from crm.public.customers.id to lake.sales.orders.customer_id",
+    maskedTag: "hashed",
+    filterTag: "= 'paid'",
+    sqlTape: "Live SQL · generated from canvas",
+    routed: "Routed to Finance data team",
+    audience: "Audience · Regional sales",
+    floor: "Inherited floor: c.email hashed · full_name excluded",
+    delivered: "Delivered v1",
   },
   de: {
-    title: "Datenanfragen · Verwaltetes Datenprodukt",
-    requestTag: "Fachliche Anfrage · Vertrieb Regionen",
-    requestPrompt:
-      "Verknüpfe aktive CRM-Kunden mit Delta-Lakehouse-Bestellungen und Rechnungen nach Stadt, ohne Kundennamen.",
-    routed: "An Finance Owner weitergeleitet · 3 Quellen geprüft",
-    publish: "Prüfen & veröffentlichen",
-    published: "Veröffentlicht",
-    name: "Asset",
-    format: "Delta & Live-SQL",
-    group: "Vertrieb Regionen",
-    access: "Maskiert · 90 Tage",
-    masks: "Vererbte Masken-Untergrenze: E-Mail gehasht (crm.customers.email), Namen ausgeschlossen",
-    sources: "3 Quellen",
-    preview: "Vertrieb Regionen fragt es ab",
+    title: "Fälle · Datenanfrage · Kundenumsatz",
+    columnsOnly: "gesperrt · nur Spalten",
+    joinBadge: "INNER",
+    joinAria: "Inner Join von crm.public.customers.id auf lake.sales.orders.customer_id",
+    maskedTag: "gehasht",
+    filterTag: "= 'paid'",
+    sqlTape: "Live-SQL · vom Canvas erzeugt",
+    routed: "An Finance-Datenteam geroutet",
+    audience: "Zielgruppe · Vertrieb Regionen",
+    floor: "Vererbte Untergrenze: c.email gehasht · full_name ausgeschlossen",
+    delivered: "Ausgeliefert v1",
   },
 } as const;
 
+interface ColumnSpec {
+  name: string;
+  key?: boolean;
+  tickAt?: number;
+  tag?: "masked" | "filter";
+}
+
+const LEFT_COLUMNS: readonly ColumnSpec[] = [
+  { name: "id", key: true },
+  { name: "email", tickAt: 980, tag: "masked" },
+  { name: "region", tickAt: 1180 },
+  { name: "full_name" },
+];
+
+const RIGHT_COLUMNS: readonly ColumnSpec[] = [
+  { name: "customer_id", key: true },
+  { name: "order_total", tickAt: 1380 },
+  { name: "status", tickAt: 1520, tag: "filter" },
+  { name: "internal_note" },
+];
+
+/** Highlight SQL keywords cleanly on the live tape. */
+function SqlLine({ text }: { text: string }) {
+  const parts = text.split(/(\b(?:SELECT|FROM|INNER JOIN|ON|WHERE)\b)/);
+  return (
+    <>
+      {parts.map((part, i) =>
+        /^(SELECT|FROM|INNER JOIN|ON|WHERE)$/.test(part) ? (
+          <span key={i} className="font-bold text-[#0a0a0a]">
+            {part}
+          </span>
+        ) : (
+          <span key={i}>{part}</span>
+        ),
+      )}
+    </>
+  );
+}
+
 export function ShareDemo({ locale, caption }: { locale: Locale; caption?: string }) {
   const l = L[locale];
-  const reqStart = 250;
-  const reqEnd = typedEnd(l.requestPrompt, reqStart, CPS);
-  const routeAt = reqEnd + 250;
-  const publishAt = routeAt + 850;
-  const previewAt = publishAt + 750;
-  const timeline = useTimeline(previewAt + 1600);
+
+  const leftCardAt = 150;
+  const rightCardAt = 320;
+  const joinAt = 560;
+  const sqlStart = 1660;
+
+  let cursor = sqlStart;
+  const sqlLines = SQL_LINES.map((line) => {
+    const start = cursor;
+    cursor = typedEnd(line, start, CPS) + 70;
+    return { line, start, end: typedEnd(line, start, CPS) };
+  });
+
+  const routeAt = cursor + 220;
+  const deliveredAt = routeAt + 760;
+  const timeline = useTimeline(deliveredAt + 1500);
   const { t } = timeline;
+
+  const leftOpacity = step(t, leftCardAt, 280);
+  const rightOpacity = step(t, rightCardAt, 280);
+  const joinProgress = step(t, joinAt, 460);
+  const routedProgress = step(t, routeAt, 280);
+  const deliveredProgress = step(t, deliveredAt, 260);
+
+  // Path length of the curved connector `M 6 38 C 28 38, 36 38, 58 38` plus gentle arch.
+  const connectorLength = 74;
 
   return (
     <DemoFrame timeline={timeline} title={l.title} caption={caption} locale={locale}>
-      {/* Step 1: Plain-language request from a business user */}
-      <div className="border-2 border-[#0a0a0a] bg-[#f6f6f6] p-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-[#0a0a0a]/65">
-            {l.requestTag}
+      {/* Visual join canvas */}
+      <div
+        className="border-2 border-[#0a0a0a] bg-[#f7f7f5] p-3"
+        style={{
+          backgroundImage:
+            "radial-gradient(rgba(10, 10, 10, 0.14) 1px, transparent 1px)",
+          backgroundSize: "14px 14px",
+        }}
+      >
+        <div className="grid items-stretch gap-3 sm:grid-cols-[minmax(0,1fr)_64px_minmax(0,1fr)] sm:gap-0">
+          {/* Left table card: crm.public.customers */}
+          <div
+            className="min-w-0 border-2 border-[#0a0a0a] bg-white shadow-[3px_3px_0_#0a0a0a]"
+            style={{ opacity: leftOpacity }}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-1 border-b-2 border-[#0a0a0a] bg-[#0a0a0a] px-2.5 py-1.5 text-white">
+              <span className="truncate font-mono text-[11px] font-bold">
+                crm.public.customers
+              </span>
+              <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-accent">
+                c
+              </span>
+            </div>
+            <div className="border-b border-[#0a0a0a]/15 bg-[#f6f6f6] px-2.5 py-1 font-mono text-[9.5px] uppercase tracking-[0.12em] text-[#0a0a0a]/60">
+              {l.columnsOnly}
+            </div>
+            <ul className="divide-y divide-[#0a0a0a]/10">
+              {LEFT_COLUMNS.map((col) => {
+                const ticked = col.tickAt !== undefined && t >= col.tickAt;
+                const joined = Boolean(col.key) && joinProgress > 0.08;
+                return (
+                  <li
+                    key={col.name}
+                    className={cn(
+                      "flex items-center justify-between gap-2 px-2.5 py-1.5 font-mono text-[11px]",
+                      joined && "bg-accent/25",
+                    )}
+                  >
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <span
+                        aria-hidden="true"
+                        className={cn(
+                          "flex size-3.5 shrink-0 items-center justify-center border text-[9px] font-bold transition-colors duration-200",
+                          col.tickAt === undefined
+                            ? "border-[#0a0a0a]/20 bg-transparent text-transparent"
+                            : ticked
+                              ? "border-[#0a0a0a] bg-accent text-[#0a0a0a]"
+                              : "border-[#0a0a0a]/40 bg-white text-transparent",
+                        )}
+                      >
+                        ✓
+                      </span>
+                      <span
+                        className={cn(
+                          "truncate",
+                          col.tickAt === undefined && !col.key
+                            ? "text-[#0a0a0a]/40 line-through"
+                            : "font-medium text-[#0a0a0a]",
+                        )}
+                      >
+                        {col.name}
+                      </span>
+                    </span>
+                    <span className="flex shrink-0 items-center gap-1.5">
+                      {col.tag === "masked" ? (
+                        <span className="border border-[#0a0a0a]/35 bg-[#f6f6f6] px-1 py-px font-mono text-[9px] uppercase tracking-[0.08em] text-[#0a0a0a]/75">
+                          {l.maskedTag}
+                        </span>
+                      ) : null}
+                      {col.key ? (
+                        <span
+                          aria-hidden="true"
+                          className={cn(
+                            "size-2.5 rounded-full border-2 border-[#0a0a0a] transition-colors duration-200",
+                            joined ? "bg-accent" : "bg-white",
+                          )}
+                        />
+                      ) : null}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+
+          {/* Animated SVG string connector between customers.id <-> orders.customer_id */}
+          <div className="relative flex items-center justify-center sm:flex-col sm:justify-start sm:pt-[48px]">
+            <svg
+              viewBox="0 0 64 46"
+              className="hidden h-[46px] w-[64px] overflow-visible sm:block"
+              role="img"
+              aria-label={l.joinAria}
+            >
+              <path
+                d="M 2 22 C 20 8, 44 8, 62 22"
+                fill="none"
+                stroke="#0a0a0a"
+                strokeWidth="2.25"
+                strokeLinecap="round"
+                strokeDasharray={connectorLength}
+                strokeDashoffset={(1 - joinProgress) * connectorLength}
+              />
+              <circle
+                cx="2"
+                cy="22"
+                r="3.5"
+                fill={joinProgress > 0.05 ? "var(--accent, #c7ff2e)" : "#ffffff"}
+                stroke="#0a0a0a"
+                strokeWidth="2"
+              />
+              <circle
+                cx="62"
+                cy="22"
+                r="3.5"
+                fill={joinProgress > 0.9 ? "var(--accent, #c7ff2e)" : "#ffffff"}
+                stroke="#0a0a0a"
+                strokeWidth="2"
+              />
+            </svg>
+            <span
+              className="border border-[#0a0a0a] bg-accent px-1.5 py-px font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-[#0a0a0a] sm:-mt-3"
+              style={{ opacity: step(t, joinAt + 220, 220) }}
+            >
+              {l.joinBadge}
+            </span>
+          </div>
+
+          {/* Right table card: lake.sales.orders */}
+          <div
+            className="min-w-0 border-2 border-[#0a0a0a] bg-white shadow-[3px_3px_0_#0a0a0a]"
+            style={{ opacity: rightOpacity }}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-1 border-b-2 border-[#0a0a0a] bg-[#0a0a0a] px-2.5 py-1.5 text-white">
+              <span className="truncate font-mono text-[11px] font-bold">
+                lake.sales.orders
+              </span>
+              <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-accent">
+                o
+              </span>
+            </div>
+            <div className="border-b border-[#0a0a0a]/15 bg-[#f6f6f6] px-2.5 py-1 font-mono text-[9.5px] uppercase tracking-[0.12em] text-[#0a0a0a]/60">
+              {l.columnsOnly}
+            </div>
+            <ul className="divide-y divide-[#0a0a0a]/10">
+              {RIGHT_COLUMNS.map((col) => {
+                const ticked = col.tickAt !== undefined && t >= col.tickAt;
+                const joined = Boolean(col.key) && joinProgress > 0.85;
+                return (
+                  <li
+                    key={col.name}
+                    className={cn(
+                      "flex items-center justify-between gap-2 px-2.5 py-1.5 font-mono text-[11px]",
+                      joined && "bg-accent/25",
+                    )}
+                  >
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      {col.key ? (
+                        <span
+                          aria-hidden="true"
+                          className={cn(
+                            "size-2.5 shrink-0 rounded-full border-2 border-[#0a0a0a] transition-colors duration-200",
+                            joined ? "bg-accent" : "bg-white",
+                          )}
+                        />
+                      ) : (
+                        <span
+                          aria-hidden="true"
+                          className={cn(
+                            "flex size-3.5 shrink-0 items-center justify-center border text-[9px] font-bold transition-colors duration-200",
+                            col.tickAt === undefined
+                              ? "border-[#0a0a0a]/20 bg-transparent text-transparent"
+                              : ticked
+                                ? "border-[#0a0a0a] bg-accent text-[#0a0a0a]"
+                                : "border-[#0a0a0a]/40 bg-white text-transparent",
+                          )}
+                        >
+                          ✓
+                        </span>
+                      )}
+                      <span
+                        className={cn(
+                          "truncate",
+                          col.tickAt === undefined && !col.key
+                            ? "text-[#0a0a0a]/40 line-through"
+                            : "font-medium text-[#0a0a0a]",
+                        )}
+                      >
+                        {col.name}
+                      </span>
+                    </span>
+                    {col.tag === "filter" ? (
+                      <span
+                        className="shrink-0 border border-[#0a0a0a] bg-accent/55 px-1 py-px font-mono text-[9px] font-semibold text-[#0a0a0a]"
+                        style={{ opacity: ticked ? 1 : 0.25 }}
+                      >
+                        {l.filterTag}
+                      </span>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      {/* Live SQL tape */}
+      <div className="mt-3 border-2 border-[#0a0a0a] bg-[#f6f6f6]">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#0a0a0a]/20 px-3 py-1.5">
+          <span className="font-mono text-[9.5px] font-bold uppercase tracking-[0.16em] text-[#0a0a0a]/60">
+            {l.sqlTape}
           </span>
           <span
-            className="font-mono text-[10px] text-[#0a0a0a]/60"
-            style={{ opacity: step(t, routeAt, 250) }}
+            className="font-mono text-[10.5px] font-semibold text-[#0a0a0a]"
+            style={{ opacity: deliveredProgress }}
           >
-            {l.routed}
+            {DATASET_NAME}
           </span>
         </div>
-        <p className="mt-2 min-h-[42px] font-sans text-[13px] leading-5 text-[#0a0a0a]">
-          “{typed(l.requestPrompt, t, reqStart, CPS)}
-          <Caret on={t >= reqStart && t < reqEnd + 60} />”
-        </p>
+        <pre className="min-h-[108px] overflow-x-auto px-3 py-2 font-mono text-[11.5px] leading-[1.65] text-[#0a0a0a]/85">
+          {sqlLines.map(({ line, start, end }, i) => {
+            const text = typed(line, t, start, CPS);
+            const active = t >= start && t < end + 70;
+            const tail = i === sqlLines.length - 1 && t >= end && t < routeAt;
+            return (
+              <div key={line}>
+                {text ? <SqlLine text={text} /> : "\u00a0"}
+                <Caret on={active || tail} />
+              </div>
+            );
+          })}
+        </pre>
       </div>
 
-      {/* Step 2: Owner review & governed data product publication */}
-      <div
-        className="mt-3 grid gap-3 sm:grid-cols-2"
-        style={{ opacity: step(t, routeAt, 300) }}
-      >
-        <div className="space-y-2 border border-[#0a0a0a]/25 p-2.5">
-          <div className="flex items-center justify-between gap-2">
-            <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#0a0a0a]/55">
-              {l.name}
-            </span>
-            <span className="border border-[#0a0a0a]/30 px-1.5 py-px font-mono text-[9.5px] uppercase tracking-[0.1em]">
-              {l.format}
-            </span>
-          </div>
-          <p className="font-mono text-[11.5px] font-semibold">{NAME}</p>
-        </div>
-
-        <div className="flex flex-col justify-between gap-2 border-2 border-[#0a0a0a] p-2.5">
+      {/* Routing status chip + case-file Delivered stamp */}
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="space-y-1.5" style={{ opacity: routedProgress }}>
           <div className="flex flex-wrap items-center gap-2">
-            <span
-              className={cn(
-                "border px-2 py-0.5 text-[12px] font-semibold transition-colors",
-                t >= publishAt - 400 ? "border-[#0a0a0a] bg-accent/50" : "border-[#0a0a0a]/30",
-              )}
-            >
-              {l.group}
+            <span className="inline-flex items-center gap-1.5 border border-[#0a0a0a] bg-white px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-[#0a0a0a]">
+              <span aria-hidden="true" className="size-2 rounded-full bg-accent ring-1 ring-[#0a0a0a]" />
+              {l.routed}
             </span>
-            <span className="font-mono text-[11px] text-[#0a0a0a]/65">{l.access}</span>
+            <span className="font-mono text-[10.5px] text-[#0a0a0a]/65">
+              {l.audience}
+            </span>
           </div>
-          <div>
-            <PressButton t={t} at={publishAt} label={l.publish} done={`✓ ${l.published}`} />
-          </div>
+          <p className="border-l-4 border-accent pl-2.5 font-mono text-[10.5px] leading-4 text-[#0a0a0a]/75">
+            {l.floor}
+          </p>
         </div>
-      </div>
 
-      {/* Step 3: Consumer preview with inherited masks */}
-      <div className="mt-4" style={{ opacity: step(t, previewAt, 400) }}>
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <span className="font-mono text-[11px] font-semibold">{NAME}</span>
-          <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#0a0a0a]/55">
-            {l.preview} · {l.sources}
-          </span>
-        </div>
-        <table className="mt-1 w-full border-collapse font-mono text-[11.5px]">
-          <tbody>
-            {sampleRows(locale).slice(0, 2).map((row, i) => (
-              <tr key={row.email} className="border-t border-[#0a0a0a]/10">
-                <td className="py-1 pr-3 text-[#0a0a0a]/60">{sampleHash(row.email)}</td>
-                <td className="py-1 pr-3">{row.city}</td>
-                <td className="py-1 pr-3">{[12, 4][i]}</td>
-                <td className="py-1 text-right">{["4,812.40", "1,130.00"][i]}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <p className="mt-2 border-l-4 border-accent pl-3 font-mono text-[11px] leading-5">{l.masks}</p>
+        <span
+          className="inline-flex shrink-0 items-center border-2 border-[#0a0a0a] bg-accent px-3 py-1.5 font-mono text-[11px] font-black uppercase tracking-[0.2em] text-[#0a0a0a] shadow-[2px_2px_0_#0a0a0a]"
+          style={{
+            opacity: deliveredProgress,
+            transform: `rotate(-2deg) scale(${1.12 - 0.12 * deliveredProgress})`,
+          }}
+        >
+          {l.delivered}
+        </span>
       </div>
     </DemoFrame>
   );

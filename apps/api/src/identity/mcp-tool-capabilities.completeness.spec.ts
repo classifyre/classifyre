@@ -60,15 +60,19 @@ describe('MCP tool capabilities', () => {
     expect(Object.values(tools).every((tool) => tool.enabled)).toBe(true);
   });
 
-  it('leaves a viewer only read-only tools', () => {
+  it('leaves a viewer only read-only tools plus data-request submission', () => {
     const viewer = BUILT_IN_ROLES.find((role) => role.key === 'viewer');
     const restricted = buildServer(new Set(viewer?.capabilities));
     const enabledWrites = Object.entries(restricted)
       .filter(
         ([, tool]) => tool.enabled && tool.annotations?.readOnlyHint === false,
       )
-      .map(([name]) => name);
-    expect(enabledWrites).toEqual([]);
+      .map(([name]) => name)
+      .sort();
+    expect(enabledWrites).toEqual([
+      'create_data_request',
+      'submit_data_request',
+    ]);
     expect(restricted.search_findings?.enabled).toBe(true);
     expect(restricted.update_source?.enabled).toBe(false);
   });

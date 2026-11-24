@@ -69,6 +69,7 @@ export const docs = {
   aiProviders: "https://docs.classifyre.com/settings/ai-providers/",
   mcpServer: "https://docs.classifyre.com/settings/mcp-server/",
   dataExport: "https://docs.classifyre.com/data-export/",
+  dataRequests: "https://docs.classifyre.com/data-requests/",
   dataQuery: "https://docs.classifyre.com/data-query/",
   masking: "https://docs.classifyre.com/data-query/#masked-and-hidden-columns",
   rowFilters: "https://docs.classifyre.com/data-query/#filtered-rows",

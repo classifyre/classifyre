@@ -210,7 +210,7 @@ export function AddEvidencePanel({ onFlyTo }: { onFlyTo: (nodeId: string) => voi
       )}
       {!readOnly && (
         <a
-          href={nsPath(`/investigations/${caseId}/evidence/add`)}
+          href={nsPath(`/cases/${caseId}/evidence/add`)}
           className="flex items-center gap-2 rounded-[4px] border-2 border-dashed border-border px-3 py-2 text-xs text-muted-foreground hover:border-foreground/50 hover:text-foreground"
           data-testid="add-evidence-bulk"
         >

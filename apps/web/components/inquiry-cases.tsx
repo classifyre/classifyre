@@ -114,7 +114,7 @@ export function InquiryCasesPanel(props: LiveProps | DraftProps) {
   };
 
   const caseHref = (c: CaseRef) =>
-    nsPath(inquiryId ? `/investigations/${c.id}?panel=watches&watch=${inquiryId}` : `/investigations/${c.id}`);
+    nsPath(inquiryId ? `/cases/${c.id}?panel=watches&watch=${inquiryId}` : `/cases/${c.id}`);
 
   return (
     <div className="space-y-2" data-testid="inquiry-cases">

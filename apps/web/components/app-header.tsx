@@ -72,7 +72,9 @@ function pageLabel(segment: string, previous: string | undefined, t: T): string 
     edit: t("breadcrumb.edit"),
     investigations: t("nav.investigations"),
     inquiries: t("investigations.page.tabInquiries"),
-    cases: t("investigations.page.tabCases"),
+    cases: t("breadcrumb.cases"),
+    investigation: t("breadcrumb.investigation"),
+    "data-request": t("breadcrumb.dataRequest"),
     evidence: t("breadcrumb.evidence"),
     add: t("breadcrumb.add"),
     duplicates: t("nav.fingerprints"),
@@ -83,7 +85,7 @@ function pageLabel(segment: string, previous: string | undefined, t: T): string 
   if (segment === "new") {
     if (previous === "providers") return t("breadcrumb.newProvider");
     if (previous === "inquiries") return t("investigations.page.newInquiry");
-    if (previous === "cases") return t("investigations.page.newCase");
+    if (previous === "cases") return t("cases.page.newCase");
     return t("breadcrumb.new");
   }
   if (labels[segment]) return labels[segment];
@@ -110,10 +112,9 @@ function pageLabel(segment: string, previous: string | undefined, t: T): string 
  */
 function crumbPath(segments: string[], index: number): string {
   const path = `/${segments.slice(0, index + 1).join("/")}`;
-  if (segments[0] === "investigations") {
-    if (index === 1 && segments[1] === "inquiries") return "/investigations?tab=inquiries";
-    if (index === 1 && segments[1] === "cases") return "/investigations";
-    if (index === 2 && segments[2] === "evidence") return `/investigations/${segments[1]}`;
+  if (segments[0] === "cases") {
+    if (index === 1 && segments[1] === "inquiries") return "/cases?tab=inquiries";
+    if (index === 2 && segments[2] === "evidence") return `/cases/${segments[1]}`;
   }
   // Patterns and pairs are opened from the review queue; neither has a list page.
   if (segments[0] === "duplicates" && index === 1 && (segments[1] === "patterns" || segments[1] === "pairs")) {
@@ -155,8 +156,12 @@ function useRecordLabels(segments: string[], nsHref: (path: string) => string) {
           set((await api.sources.sourcesControllerGetSource({ id: segment })).name);
         } else if (previous === "providers") {
           set((await api.aiProviderConfigs.aiProviderConfigControllerGet({ id: segment })).name);
-        } else if (previous === "investigations") {
-          set((await api.cases.casesControllerFindOne({ id: segment })).title);
+        } else if (previous === "cases" || previous === "investigations") {
+          try {
+            set((await api.cases.casesControllerFindOne({ id: segment })).title);
+          } catch {
+            set((await api.dataRequests.dataRequestsControllerGet({ id: segment })).title);
+          }
         } else if (previous === "inquiries") {
           set((await api.inquiries.inquiriesControllerFindOne({ id: segment })).title);
         } else if (previous === "findings") {

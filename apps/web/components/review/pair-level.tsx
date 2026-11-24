@@ -251,7 +251,7 @@ export const PairLevel = React.forwardRef<
             }),
           },
         });
-      router.push(nsPath(`/investigations/inquiries/${created.inquiryId}`));
+      router.push(nsPath(`/cases/inquiries/${created.inquiryId}`));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t("review.loadFailed"));
     } finally {

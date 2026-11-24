@@ -104,7 +104,7 @@ export function CasesTable({ limit = 6 }: CasesTableProps = {}) {
                   <TableRow
                     key={c.id}
                     className="cursor-pointer hover:bg-muted/40"
-                    onClick={() => router.push(nsPath(`/investigations/${c.id}`))}
+                    onClick={() => router.push(nsPath(`/cases/${c.id}`))}
                     data-escalated={c.escalatedCount > 0 ? "true" : undefined}
                   >
                     <TableCell className="font-medium">

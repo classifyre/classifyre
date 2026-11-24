@@ -33,6 +33,7 @@ import {
   QueryCatalogService,
   type CatalogTable,
 } from './query-catalog.service';
+import type { DataPrincipal } from './data-principal';
 import { SHARED_DATASET_SOURCE_TYPE, mentionedSourceNames } from './sql-names';
 import {
   SharedDatasetResolver,
@@ -388,11 +389,17 @@ export class QueryRunService {
    */
   async describe(
     sql: string,
+    opts?: { principal?: DataPrincipal },
   ): Promise<
     | { description: QueryDescription }
     | { error: { code: string; message: string } }
   > {
-    const { view, done } = await this.begin(sql, undefined, true);
+    const { view, done } = await this.begin(
+      sql,
+      undefined,
+      true,
+      opts?.principal,
+    );
     await done;
     const run = await this.prisma.queryRun.findUnique({
       where: { id: view.id },
@@ -424,6 +431,7 @@ export class QueryRunService {
     sql: string,
     format?: string,
     describe = false,
+    principal?: DataPrincipal,
   ): Promise<{ view: QueryRunView; done: Promise<void> }> {
     const text = (sql ?? '').trim();
     const exportFormat = format
@@ -460,7 +468,7 @@ export class QueryRunService {
     const origin = runOrigin(actor);
     await this.assertBelowCap(origin);
 
-    const catalog = await this.catalog.catalog();
+    const catalog = await this.catalog.catalog(principal);
     const allowed = catalog.sources
       .map((source) => ({
         source,

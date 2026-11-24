@@ -129,9 +129,9 @@ describe("sitemap-config", () => {
         { hreflang: "x-default", href: `${base}/acme/findings/` },
       ]);
       expect(entityAlternates(base, "acme", "case", "c1")).toEqual([
-        { hreflang: "en", href: `${base}/acme/investigations/c1/` },
-        { hreflang: "de", href: `${base}/de/acme/investigations/c1/` },
-        { hreflang: "x-default", href: `${base}/acme/investigations/c1/` },
+        { hreflang: "en", href: `${base}/acme/cases/c1/` },
+        { hreflang: "de", href: `${base}/de/acme/cases/c1/` },
+        { hreflang: "x-default", href: `${base}/acme/cases/c1/` },
       ]);
     });
 
@@ -140,10 +140,10 @@ describe("sitemap-config", () => {
         `${base}/acme/findings/f1/`,
       );
       expect(entityUrl(base, "acme", "case", "c1")).toBe(
-        `${base}/acme/investigations/c1/`,
+        `${base}/acme/cases/c1/`,
       );
       expect(entityUrl(base, "acme", "inquiry", "i1")).toBe(
-        `${base}/acme/investigations/inquiries/i1/`,
+        `${base}/acme/cases/inquiries/i1/`,
       );
       expect(entityUrl(base, "acme", "term", "accommodation-and-food")).toBe(
         `${base}/acme/glossary/terms/accommodation-and-food/`,

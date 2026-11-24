@@ -11,6 +11,7 @@
     "./pipeline-schema-utils": "./src/pipeline-schema-utils.ts",
     "./assistant": "./src/assistant.ts",
     "./case-board": "./src/case-board.ts",
+    "./data-request": "./src/data-request.ts",
     "./package.json": "./package.json",
     "./all_input_sources": "./src/schemas/all_input_sources.json",
     "./all_detectors": "./src/schemas/all_detectors.ts",

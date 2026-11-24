@@ -17,6 +17,7 @@ These PRDs turn the findings of [palantir-use-case-gap-analysis.md](../../palant
 | [IAM · Identity and access management](IAM-access-management.md) | Anyone who reaches an instance can do everything, and tenants and groups cannot be kept apart | L | after M0 | builds on F6 |
 | [TEN · Tenant isolation, operators and the cloud playground](TEN-tenant-isolation-and-cloud.md) | Turning sign-in off shows every tenant's workspaces, and nobody manages the tenants themselves | L | after IAM | — |
 | [DQ · Data query: SQL over the tables of a workspace](DQ-data-query.md) | Classifyre knows every table and what was found in it, but nobody can read the rows, join them, or be given access to one table | L | after IAM | grants on one source or table |
+| [DR · Data requests: cases that ask a data team for a dataset](DR-data-requests.md) | Business users need a governed way to ask a data team for a joined dataset without getting raw-table access | L | after DQ | data-request cases, visual join canvas |
 | [QC · Query connectors](QC-query-connectors.md) | Only sources DuckDB reads itself can be queried; search, graph, SaaS and custom sources cannot, and the list of queryable types is kept in two places by hand | L | after DQ 0–4 | one read interface per source type (replaces DQ phase 5) |
 | [BIC · BI clients over SQL connections](BIC-bi-client-compatibility.md) | SQL connections were never tested with a real BI tool, and nothing stops the next driver version from breaking them | M | after DQ 4 | Metabase/driver smoke on the dev stack, client statement corpus in CI |
 | [GOV · Governed data assets](GOV-governed-data-assets.md) | Nobody owns an asset, its meaning is hidden in a drawer, and quality is only failures from a sample: no owner, steward, column metadata, thresholds or results | L | after DQ 0–2 | owners for access requests, column classification for masks |
@@ -44,6 +45,7 @@ These PRDs turn the findings of [palantir-use-case-gap-analysis.md](../../palant
 | [GOV · Governed data assets](GOV-governed-data-assets.md) | Proposed, 2026-11-12 |
 | [QC · Query connectors](QC-query-connectors.md) | QC0–QC3 built 2026-11-21 (interface, connector runtime, Meilisearch, Neo4j, lab joins on skaffold); QC4 built 2026-11-22 (custom sources: `tables()`/`scan()`, tried on the live Firmenbuch); QC5 proposed |
 | [BIC · BI clients over SQL connections](BIC-bi-client-compatibility.md) | BIC0–BIC2 built and run 2026-11-21 (30/30 checks); BIC3 open |
+| [DR · Data requests](DR-data-requests.md) | In progress, 2026-11-24 |
 | All others | Proposed, 2026-09-30 |
 
 Update this table as PRDs move to *Accepted*, *In progress* and *Shipped*.

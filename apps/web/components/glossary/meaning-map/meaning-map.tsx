@@ -248,7 +248,11 @@ function MeaningCanvas({
       )
       .catch(() => setSources([]));
     api.cases
-      .casesControllerList({ status: [...OPEN_CASE_STATUSES], limit: 50 })
+      .casesControllerList({
+        kind: ["INVESTIGATION"],
+        status: [...OPEN_CASE_STATUSES],
+        limit: 50,
+      })
       .then((res) => setCases(res.items ?? []))
       .catch(() => setCases([]));
   }, []);
@@ -1181,7 +1185,7 @@ function MeaningCanvas({
                           type="button"
                           onClick={() =>
                             router.push(
-                              nsPath(`/investigations/${lensCase.id}`),
+                              nsPath(`/cases/${lensCase.id}`),
                             )
                           }
                           className="font-mono text-[10px] uppercase tracking-[0.1em] underline"

@@ -30,6 +30,12 @@ export interface CaseworkCaseDto {
      * @type {string}
      * @memberof CaseworkCaseDto
      */
+    kind: CaseworkCaseDtoKindEnum;
+    /**
+     * 
+     * @type {string}
+     * @memberof CaseworkCaseDto
+     */
     title: string;
     /**
      * 
@@ -73,6 +79,15 @@ export interface CaseworkCaseDto {
 /**
  * @export
  */
+export const CaseworkCaseDtoKindEnum = {
+    Investigation: 'INVESTIGATION',
+    DataRequest: 'DATA_REQUEST'
+} as const;
+export type CaseworkCaseDtoKindEnum = typeof CaseworkCaseDtoKindEnum[keyof typeof CaseworkCaseDtoKindEnum];
+
+/**
+ * @export
+ */
 export const CaseworkCaseDtoStatusEnum = {
     Open: 'OPEN',
     InProgress: 'IN_PROGRESS',
@@ -99,6 +114,7 @@ export type CaseworkCaseDtoSeverityEnum = typeof CaseworkCaseDtoSeverityEnum[key
  */
 export function instanceOfCaseworkCaseDto(value: object): value is CaseworkCaseDto {
     if (!('id' in value) || value['id'] === undefined) return false;
+    if (!('kind' in value) || value['kind'] === undefined) return false;
     if (!('title' in value) || value['title'] === undefined) return false;
     if (!('status' in value) || value['status'] === undefined) return false;
     if (!('severity' in value) || value['severity'] === undefined) return false;
@@ -119,6 +135,7 @@ export function CaseworkCaseDtoFromJSONTyped(json: any, ignoreDiscriminator: boo
     return {
         
         'id': json['id'],
+        'kind': json['kind'],
         'title': json['title'],
         'status': json['status'],
         'severity': json['severity'],
@@ -141,6 +158,7 @@ export function CaseworkCaseDtoToJSONTyped(value?: CaseworkCaseDto | null, ignor
     return {
         
         'id': value['id'],
+        'kind': value['kind'],
         'title': value['title'],
         'status': value['status'],
         'severity': value['severity'],
