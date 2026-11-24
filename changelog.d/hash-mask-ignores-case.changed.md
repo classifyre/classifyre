@@ -1,1 +1,0 @@
-Hashed columns now ignore upper and lower case and surrounding spaces, so the same e-mail address spelt differently in two systems gets the same hash and joins; hash values shown before this release change once.

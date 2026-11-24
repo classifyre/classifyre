@@ -1,1 +1,0 @@
-Columns holding European national ID numbers (Austrian social insurance, German tax ID, PESEL and others) are now classified as sensitive, like US social security numbers, instead of as ordinary personal data.

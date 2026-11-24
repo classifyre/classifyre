@@ -1,1 +1,0 @@
-Columns named in camelCase, as in Salesforce and HubSpot exports (FirstName, MobilePhone), now get the same detection as their snake_case equivalents, so names are found in them and phone numbers are no longer classified as card or national ID numbers.

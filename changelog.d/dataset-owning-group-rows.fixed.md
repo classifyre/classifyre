@@ -1,1 +1,0 @@
-Sharing a dataset now stops with a clear message when its owning group would read no rows of one of its tables because of a row filter, instead of sharing a dataset that silently leaves that table's rows out.

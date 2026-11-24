@@ -1,1 +1,0 @@
-Columns can now be restricted: hidden even from people allowed to read the table unmasked, so only the table's owners and stewards see a national ID or passport number in a table a team otherwise reads in clear.

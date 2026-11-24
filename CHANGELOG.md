@@ -5,6 +5,32 @@ compiled at release time from per-PR fragments in `changelog.d/` (see
 `changelog.d/README.md`). Commit messages and PR titles are never used as
 release notes.
 
+## [0.9.3] - 2026-11-24
+
+### Added
+
+- A new Data consumer role lets you give someone outside the team (an agency, an auditor, a partner department) exactly the tables or shared datasets you grant them, without showing them findings, assets, sources or activity; the app opens on the SQL page for them and only offers what they can use.
+- When row filtering is on, a table's Rows step now lists the groups that may query it but would see no rows (admins included), and readers without a rule are told to ask the table's owner or a steward.
+- Columns can now be restricted: hidden even from people allowed to read the table unmasked, so only the table's owners and stewards see a national ID or passport number in a table a team otherwise reads in clear.
+- A new mask, "identifiers removed", keeps free-text columns such as ticket bodies and notes readable while replacing e-mail addresses, IBANs, card and phone numbers, ID numbers, passwords and access keys in every row, instead of hiding the whole column.
+
+### Changed
+
+- Hashed columns now ignore upper and lower case and surrounding spaces, so the same e-mail address spelt differently in two systems gets the same hash and joins; hash values shown before this release change once.
+
+### Fixed
+
+- BI dashboards that load several charts at once (Metabase, for example) no longer fail with "the SQL gateway is busy" while their sessions are starting.
+- Columns named in camelCase, as in Salesforce and HubSpot exports (FirstName, MobilePhone), now get the same detection as their snake_case equivalents, so names are found in them and phone numbers are no longer classified as card or national ID numbers.
+- Sharing a dataset now stops with a clear message when its owning group would read no rows of one of its tables because of a row filter, instead of sharing a dataset that silently leaves that table's rows out.
+- Columns holding European national ID numbers (Austrian social insurance, German tax ID, PESEL and others) are now classified as sensitive, like US social security numbers, instead of as ordinary personal data.
+- Tables of ODBC sources can be queried with SQL again, from the SQL page, exports and SQL connections; every such query had failed since the query engine was hardened.
+- Personal data found in database and lakehouse tables is now tied to its column on tables of any size, so those columns are classified and masked by default; before, tables with more than a couple of columns were often left unmasked, and phone numbers and national IDs in small tables went undetected. Re-scan a source to classify the tables it already has.
+
+### Security
+
+- What a finding matched (the e-mail address, IBAN, card number or key itself, and the text around it) is now shown only to people who may read it: investigators, curators, source managers and admins, and anyone who reads that table in clear. Viewers see a finding's type, place and priority with the value hidden, on every page, in exports and to AI agents, and searching findings by their value needs the same right.
+
 ## [0.9.2] - 2026-11-23
 
 ### Changed

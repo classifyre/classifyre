@@ -1,1 +1,0 @@
-Personal data found in database and lakehouse tables is now tied to its column on tables of any size, so those columns are classified and masked by default; before, tables with more than a couple of columns were often left unmasked, and phone numbers and national IDs in small tables went undetected. Re-scan a source to classify the tables it already has.

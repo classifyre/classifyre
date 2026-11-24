@@ -1,1 +1,0 @@
-When row filtering is on, a table's Rows step now lists the groups that may query it but would see no rows (admins included), and readers without a rule are told to ask the table's owner or a steward.

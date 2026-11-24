@@ -1,1 +1,0 @@
-A new Data consumer role lets you give someone outside the team (an agency, an auditor, a partner department) exactly the tables or shared datasets you grant them, without showing them findings, assets, sources or activity; the app opens on the SQL page for them and only offers what they can use.
