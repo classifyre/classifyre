@@ -10,11 +10,15 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Requires, SignedInOnly } from '../identity/access.decorators';
-import { ThreadEntriesResponseDto } from '../dto/case-thread.dto';
+import {
+  ThreadEntriesResponseDto,
+  ThreadResponseDto,
+} from '../dto/case-thread.dto';
 import { DataRequestsService } from './data-requests.service';
 import {
   AddDataRequestCommentDto,
   AddDataRequestCommentReplyDto,
+  AddDataRequestCommentResponseDto,
   ClaimDataRequestDto,
   CreateDataRequestDto,
   DataRequestCheckResultDto,
@@ -27,6 +31,7 @@ import {
   RequestChangesDto,
   RerouteDataRequestDto,
   ResolveDataRequestCommentDto,
+  ResolveDataRequestCommentResponseDto,
   UpdateDataRequestSpecDto,
   UpdateDataRequestSqlDto,
 } from './dto/data-request.dto';
@@ -190,10 +195,11 @@ export class DataRequestsController {
   @Post(':id/comments')
   @Requires('workspace.view')
   @ApiOperation({ summary: 'Pin a discussion comment onto the request canvas' })
+  @ApiResponse({ status: 201, type: AddDataRequestCommentResponseDto })
   addComment(
     @Param('id') id: string,
     @Body() dto: AddDataRequestCommentDto,
-  ) {
+  ): Promise<AddDataRequestCommentResponseDto> {
     return this.service.addComment(id, dto);
   }
 
@@ -204,29 +210,31 @@ export class DataRequestsController {
   getCommentEntries(
     @Param('id') id: string,
     @Param('threadId') threadId: string,
-  ) {
+  ): Promise<ThreadEntriesResponseDto> {
     return this.service.getCommentEntries(id, threadId);
   }
 
   @Post(':id/comments/:threadId/entries')
   @Requires('workspace.view')
   @ApiOperation({ summary: 'Reply to a data request comment pin' })
+  @ApiResponse({ status: 201, type: ThreadResponseDto })
   replyComment(
     @Param('id') id: string,
     @Param('threadId') threadId: string,
     @Body() dto: AddDataRequestCommentReplyDto,
-  ) {
+  ): Promise<ThreadResponseDto> {
     return this.service.replyComment(id, threadId, dto.body);
   }
 
   @Patch(':id/comments/:threadId/resolve')
   @Requires('workspace.view')
   @ApiOperation({ summary: 'Resolve or reopen a data request comment pin' })
+  @ApiResponse({ status: 200, type: ResolveDataRequestCommentResponseDto })
   resolveComment(
     @Param('id') id: string,
     @Param('threadId') threadId: string,
     @Body() dto: ResolveDataRequestCommentDto,
-  ) {
+  ): Promise<ResolveDataRequestCommentResponseDto> {
     return this.service.resolveComment(id, threadId, dto.resolved);
   }
 }

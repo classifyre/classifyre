@@ -87,7 +87,7 @@ describe('data-request-rules', () => {
         for (const state of ALL_STATES) {
           const res = transition(state, action, 'requester');
           expect(res.allowed).toBe(false);
-          expect(res.reason).toContain('requester');
+          expect(res.reason).toContain('permission');
         }
       }
     });
@@ -221,9 +221,9 @@ describe('data-request-rules', () => {
       );
     });
 
-    it('lets team and manager edit spec in any open state and never in closed states', () => {
+    it('lets team and manager edit spec only after submission (not DRAFT) and never in closed states', () => {
       for (const role of ['team', 'manager'] as const) {
-        expect(canEditSpec(DataRequestState.DRAFT, [role])).toBe(true);
+        expect(canEditSpec(DataRequestState.DRAFT, [role])).toBe(false);
         expect(canEditSpec(DataRequestState.SUBMITTED, [role])).toBe(true);
         expect(canEditSpec(DataRequestState.IN_PROGRESS, [role])).toBe(true);
         expect(canEditSpec(DataRequestState.CHANGES_REQUESTED, [role])).toBe(
@@ -236,22 +236,24 @@ describe('data-request-rules', () => {
       expect(canEditSpec(DataRequestState.DRAFT, [])).toBe(false);
     });
 
-    it('lets only team and manager edit SQL, and only in open states', () => {
+    it('lets only the routed data team edit SQL (never requester-only or manager-only, and DRAFT only if requester is also team)', () => {
       for (const state of ALL_STATES) {
         expect(canEditSql(state, ['requester'])).toBe(false);
+        expect(canEditSql(state, ['manager'])).toBe(false);
         expect(canEditSql(state, [])).toBe(false);
       }
-      for (const role of ['team', 'manager'] as const) {
-        expect(canEditSql(DataRequestState.DRAFT, [role])).toBe(true);
-        expect(canEditSql(DataRequestState.SUBMITTED, [role])).toBe(true);
-        expect(canEditSql(DataRequestState.IN_PROGRESS, [role])).toBe(true);
-        expect(canEditSql(DataRequestState.CHANGES_REQUESTED, [role])).toBe(
-          true,
-        );
-        expect(canEditSql(DataRequestState.DELIVERED, [role])).toBe(false);
-        expect(canEditSql(DataRequestState.DECLINED, [role])).toBe(false);
-        expect(canEditSql(DataRequestState.WITHDRAWN, [role])).toBe(false);
-      }
+      expect(canEditSql(DataRequestState.DRAFT, ['team'])).toBe(false);
+      expect(canEditSql(DataRequestState.DRAFT, ['requester', 'team'])).toBe(
+        true,
+      );
+      expect(canEditSql(DataRequestState.SUBMITTED, ['team'])).toBe(true);
+      expect(canEditSql(DataRequestState.IN_PROGRESS, ['team'])).toBe(true);
+      expect(canEditSql(DataRequestState.CHANGES_REQUESTED, ['team'])).toBe(
+        true,
+      );
+      expect(canEditSql(DataRequestState.DELIVERED, ['team'])).toBe(false);
+      expect(canEditSql(DataRequestState.DECLINED, ['team'])).toBe(false);
+      expect(canEditSql(DataRequestState.WITHDRAWN, ['team'])).toBe(false);
     });
   });
 

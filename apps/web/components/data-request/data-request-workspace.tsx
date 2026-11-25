@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import type { DataRequestDetailDto } from "@workspace/api-client";
+import { api, type DataRequestDetailDto } from "@workspace/api-client";
 import { Button } from "@workspace/ui/components/button";
 import {
   ResizableHandle,
@@ -15,17 +15,10 @@ import { apiErrorMessage, fetchCatalog, type QueryCatalog } from "@/lib/data-que
 import {
   describeDataset,
   useSharedDataset,
+  useSharedDatasetOptions,
   type SharedDatasetDto,
 } from "@/lib/shared-datasets";
-import {
-  checkDataRequest,
-  deliverDataRequest,
-  describeDataRequest,
-  getDataRequest,
-  updateDataRequestSpec,
-  updateDataRequestSql,
-  useDataRequestSocket,
-} from "@/lib/data-requests";
+import { useCaseRoomSocket } from "@/components/case-board/hooks/use-board-socket";
 import {
   ShareDatasetSheet,
   type ShareDatasetPreset,
@@ -44,36 +37,51 @@ export interface DataRequestWorkspaceProps {
   caseId: string;
 }
 
+/**
+ * Keying the inner loader by `caseId` gives each case a fresh store created
+ * once in `useState` and disposed in `useEffect` cleanup — no render-phase ref
+ * mutation or disposal.
+ */
 export function DataRequestWorkspace({ caseId }: DataRequestWorkspaceProps) {
+  return <DataRequestWorkspaceLoader key={caseId} caseId={caseId} />;
+}
+
+function DataRequestWorkspaceLoader({ caseId }: DataRequestWorkspaceProps) {
   const { t } = useTranslation();
+  const tRef = React.useRef(t);
+  tRef.current = t;
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [catalog, setCatalog] = React.useState<QueryCatalog | null>(null);
   const [catalogLoading, setCatalogLoading] = React.useState(true);
 
-  const storeRef = React.useRef<RequestStoreApi | null>(null);
-  if (!storeRef.current || storeRef.current.getState().caseId !== caseId) {
-    storeRef.current?.getState().dispose();
-    storeRef.current = createRequestStore(caseId, {
+  const [store] = React.useState<RequestStoreApi>(() =>
+    createRequestStore(caseId, {
       saveSpec: (id, payload) =>
-        updateDataRequestSpec(id, {
-          spec: payload.spec as unknown as Record<string, unknown>,
-          baseVersion: payload.baseVersion,
-          clientId: payload.clientId,
+        api.dataRequests.dataRequestsControllerUpdateSpec({
+          id,
+          updateDataRequestSpecDto: {
+            spec: payload.spec as unknown as Record<string, unknown>,
+            baseVersion: payload.baseVersion,
+            clientId: payload.clientId,
+          },
         }),
-      saveSql: (id, payload) => updateDataRequestSql(id, payload),
-      check: (id) => checkDataRequest(id),
-      describe: (id) => describeDataRequest(id),
-      reload: (id) => getDataRequest(id),
+      saveSql: (id, payload) =>
+        api.dataRequests.dataRequestsControllerUpdateSql({
+          id,
+          updateDataRequestSqlDto: payload,
+        }),
+      check: (id) => api.dataRequests.dataRequestsControllerCheck({ id }),
+      describe: (id) => api.dataRequests.dataRequestsControllerDescribe({ id }),
+      reload: (id) => api.dataRequests.dataRequestsControllerGet({ id }),
       onConflict: () => {
-        toast.warning(t("dataRequest.toast.conflictReloaded"));
+        toast.warning(tRef.current("dataRequest.toast.conflictReloaded"));
       },
       onError: async (err) => {
         toast.error(await apiErrorMessage(err));
       },
-    });
-  }
-  const store = storeRef.current;
+    }),
+  );
 
   React.useEffect(() => {
     return () => {
@@ -86,7 +94,7 @@ export function DataRequestWorkspace({ caseId }: DataRequestWorkspaceProps) {
     setError(null);
     try {
       const [detail, cat] = await Promise.all([
-        getDataRequest(caseId),
+        api.dataRequests.dataRequestsControllerGet({ id: caseId }),
         fetchCatalog().catch(() => null),
       ]);
       setCatalog(cat);
@@ -107,23 +115,21 @@ export function DataRequestWorkspace({ caseId }: DataRequestWorkspaceProps) {
     void loadAll();
   }, [loadAll]);
 
-  useDataRequestSocket(
-    caseId,
-    store.getState().clientId,
-    (event) => {
+  useCaseRoomSocket(caseId, store.getState().clientId, {
+    onChanged: (event) => {
       void store.getState().reloadFromServer();
       toast(
-        t("caseBoard.changedBy", {
-          name: event.actor || t("caseBoard.someone"),
+        tRef.current("caseBoard.changedBy", {
+          name: event.actor || tRef.current("caseBoard.someone"),
           summary: event.summary,
         }),
         { id: `dr-changed-${caseId}`, duration: 3000 },
       );
     },
-    (others) => {
+    onPresence: (others) => {
       store.getState().setPresence(others);
     },
-  );
+  });
 
   if (loading) {
     return (
@@ -189,7 +195,6 @@ function DataRequestWorkspaceInner({
   const request = useRequest((s) => s.request);
   const spec = useRequest((s) => s.spec);
   const draftSql = useRequest((s) => s.draftSql);
-  const storeRef = React.useRef<RequestStoreApi | null>(null);
   const [publishMode, setPublishMode] = React.useState<
     "team" | "self_serve" | null
   >(null);
@@ -200,6 +205,19 @@ function DataRequestWorkspaceInner({
     publishMode === "team" ? request?.dataset?.assetId : null,
   );
 
+  // Load requester's publish-capable groups so self-serve uses an owning group
+  // the requester can actually publish under (not blindly request.audienceGroup.id).
+  const publishOptions = useSharedDatasetOptions();
+  const selfServeOwnerId = React.useMemo(() => {
+    const groups = publishOptions.data?.groups ?? [];
+    if (!groups.length || !request) return null;
+    return (
+      groups.find((g) => g.id === request.audienceGroup.id)?.id ??
+      groups[0]?.id ??
+      null
+    );
+  }, [publishOptions.data?.groups, request]);
+
   // Check self-serve eligibility when requester has canSelfServe and valid SQL
   React.useEffect(() => {
     if (
@@ -207,6 +225,7 @@ function DataRequestWorkspaceInner({
       !request.permissions.isRequester ||
       request.permissions.isTeam ||
       !request.permissions.canSelfServe ||
+      !selfServeOwnerId ||
       !draftSql.trim()
     ) {
       setCanPublishNow(false);
@@ -214,7 +233,7 @@ function DataRequestWorkspaceInner({
     }
     let active = true;
     const timer = setTimeout(() => {
-      describeDataset(draftSql, request.audienceGroup.id)
+      describeDataset(draftSql, selfServeOwnerId)
         .then((res) => {
           if (active) setCanPublishNow(Boolean(res.canShare));
         })
@@ -226,7 +245,7 @@ function DataRequestWorkspaceInner({
       active = false;
       clearTimeout(timer);
     };
-  }, [request, draftSql]);
+  }, [request, selfServeOwnerId, draftSql]);
 
   const placedAssetIds = React.useMemo(
     () => new Set(spec.tables.map((tbl) => tbl.assetId)),
@@ -237,7 +256,7 @@ function DataRequestWorkspaceInner({
     if (!request || !publishMode) return undefined;
     if (publishMode === "self_serve") {
       return {
-        owningGroupId: request.audienceGroup.id,
+        owningGroupId: selfServeOwnerId ?? request.audienceGroup.id,
         audienceGroupIds: [request.audienceGroup.id],
         lockOwner: false,
         name: request.title,
@@ -251,7 +270,7 @@ function DataRequestWorkspaceInner({
       name: request.title,
       description: request.description ?? undefined,
     };
-  }, [request, publishMode]);
+  }, [request, publishMode, selfServeOwnerId]);
 
   const hydrate = useRequest((s) => s.hydrate);
   const addTable = useRequest((s) => s.addTable);
@@ -265,17 +284,13 @@ function DataRequestWorkspaceInner({
     request.permissions.isManager;
 
   const handleShared = async (saved: SharedDatasetDto) => {
-    const mode = publishMode;
     setPublishMode(null);
     try {
-      const updated = await deliverDataRequest(request.id, {
-        datasetAssetId: saved.assetId,
-        mode:
-          mode === "self_serve"
-            ? "SELF_SERVE"
-            : existingDataset.data
-              ? "UPDATED"
-              : "PUBLISHED",
+      const updated = await api.dataRequests.dataRequestsControllerDeliver({
+        id: request.id,
+        deliverDataRequestDto: {
+          datasetAssetId: saved.assetId,
+        },
       });
       hydrate(updated);
       triggerDeliverPulse();
@@ -284,8 +299,6 @@ function DataRequestWorkspaceInner({
       toast.error(await apiErrorMessage(err));
     }
   };
-
-  void storeRef;
 
   return (
     <div

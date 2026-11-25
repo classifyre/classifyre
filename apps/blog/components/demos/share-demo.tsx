@@ -83,6 +83,119 @@ const RIGHT_COLUMNS: readonly ColumnSpec[] = [
   { name: "internal_note" },
 ];
 
+/** Shared catalog table card used on both sides of the visual join canvas. */
+function DemoTableCard({
+  sqlName,
+  alias,
+  columnsOnlyLabel,
+  columns,
+  side,
+  t,
+  opacity,
+  joinActive,
+  maskedTag,
+  filterTag,
+}: {
+  sqlName: string;
+  alias: string;
+  columnsOnlyLabel: string;
+  columns: readonly ColumnSpec[];
+  side: "left" | "right";
+  t: number;
+  opacity: number;
+  joinActive: boolean;
+  maskedTag: string;
+  filterTag: string;
+}) {
+  return (
+    <div
+      className="min-w-0 border-2 border-[#0a0a0a] bg-white shadow-[3px_3px_0_#0a0a0a]"
+      style={{ opacity }}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-1 border-b-2 border-[#0a0a0a] bg-[#0a0a0a] px-2.5 py-1.5 text-white">
+        <span className="truncate font-mono text-[11px] font-bold">
+          {sqlName}
+        </span>
+        <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-accent">
+          {alias}
+        </span>
+      </div>
+      <div className="border-b border-[#0a0a0a]/15 bg-[#f6f6f6] px-2.5 py-1 font-mono text-[9.5px] uppercase tracking-[0.12em] text-[#0a0a0a]/60">
+        {columnsOnlyLabel}
+      </div>
+      <ul className="divide-y divide-[#0a0a0a]/10">
+        {columns.map((col) => {
+          const ticked = col.tickAt !== undefined && t >= col.tickAt;
+          const joined = Boolean(col.key) && joinActive;
+          const keyDot = (
+            <span
+              aria-hidden="true"
+              className={cn(
+                "size-2.5 shrink-0 rounded-full border-2 border-[#0a0a0a] transition-colors duration-200",
+                joined ? "bg-accent" : "bg-white",
+              )}
+            />
+          );
+          const checkbox = (
+            <span
+              aria-hidden="true"
+              className={cn(
+                "flex size-3.5 shrink-0 items-center justify-center border text-[9px] font-bold transition-colors duration-200",
+                col.tickAt === undefined
+                  ? "border-[#0a0a0a]/20 bg-transparent text-transparent"
+                  : ticked
+                    ? "border-[#0a0a0a] bg-accent text-[#0a0a0a]"
+                    : "border-[#0a0a0a]/40 bg-white text-transparent",
+              )}
+            >
+              ✓
+            </span>
+          );
+          return (
+            <li
+              key={col.name}
+              className={cn(
+                "flex items-center justify-between gap-2 px-2.5 py-1.5 font-mono text-[11px]",
+                joined && "bg-accent/25",
+              )}
+            >
+              <span className="flex min-w-0 items-center gap-1.5">
+                {side === "right" && col.key ? keyDot : checkbox}
+                <span
+                  className={cn(
+                    "truncate",
+                    col.tickAt === undefined && !col.key
+                      ? "text-[#0a0a0a]/40 line-through"
+                      : "font-medium text-[#0a0a0a]",
+                  )}
+                >
+                  {col.name}
+                </span>
+              </span>
+              <span className="flex shrink-0 items-center gap-1.5">
+                {col.tag === "masked" ? (
+                  <span className="border border-[#0a0a0a]/35 bg-[#f6f6f6] px-1 py-px font-mono text-[9px] uppercase tracking-[0.08em] text-[#0a0a0a]/75">
+                    {maskedTag}
+                  </span>
+                ) : null}
+                {col.tag === "filter" ? (
+                  <span
+                    className="shrink-0 border border-[#0a0a0a] bg-accent/55 px-1 py-px font-mono text-[9px] font-semibold text-[#0a0a0a]"
+                    style={{ opacity: ticked ? 1 : 0.25 }}
+                  >
+                    {filterTag}
+                  </span>
+                ) : null}
+                {side === "left" && col.key ? keyDot : null}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 /** Highlight SQL keywords cleanly on the live tape. */
 function SqlLine({ text }: { text: string }) {
   const parts = text.split(/(\b(?:SELECT|FROM|INNER JOIN|ON|WHERE)\b)/);
@@ -143,79 +256,18 @@ export function ShareDemo({ locale, caption }: { locale: Locale; caption?: strin
       >
         <div className="grid items-stretch gap-3 sm:grid-cols-[minmax(0,1fr)_64px_minmax(0,1fr)] sm:gap-0">
           {/* Left table card: crm.public.customers */}
-          <div
-            className="min-w-0 border-2 border-[#0a0a0a] bg-white shadow-[3px_3px_0_#0a0a0a]"
-            style={{ opacity: leftOpacity }}
-          >
-            <div className="flex flex-wrap items-center justify-between gap-1 border-b-2 border-[#0a0a0a] bg-[#0a0a0a] px-2.5 py-1.5 text-white">
-              <span className="truncate font-mono text-[11px] font-bold">
-                crm.public.customers
-              </span>
-              <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-accent">
-                c
-              </span>
-            </div>
-            <div className="border-b border-[#0a0a0a]/15 bg-[#f6f6f6] px-2.5 py-1 font-mono text-[9.5px] uppercase tracking-[0.12em] text-[#0a0a0a]/60">
-              {l.columnsOnly}
-            </div>
-            <ul className="divide-y divide-[#0a0a0a]/10">
-              {LEFT_COLUMNS.map((col) => {
-                const ticked = col.tickAt !== undefined && t >= col.tickAt;
-                const joined = Boolean(col.key) && joinProgress > 0.08;
-                return (
-                  <li
-                    key={col.name}
-                    className={cn(
-                      "flex items-center justify-between gap-2 px-2.5 py-1.5 font-mono text-[11px]",
-                      joined && "bg-accent/25",
-                    )}
-                  >
-                    <span className="flex min-w-0 items-center gap-1.5">
-                      <span
-                        aria-hidden="true"
-                        className={cn(
-                          "flex size-3.5 shrink-0 items-center justify-center border text-[9px] font-bold transition-colors duration-200",
-                          col.tickAt === undefined
-                            ? "border-[#0a0a0a]/20 bg-transparent text-transparent"
-                            : ticked
-                              ? "border-[#0a0a0a] bg-accent text-[#0a0a0a]"
-                              : "border-[#0a0a0a]/40 bg-white text-transparent",
-                        )}
-                      >
-                        ✓
-                      </span>
-                      <span
-                        className={cn(
-                          "truncate",
-                          col.tickAt === undefined && !col.key
-                            ? "text-[#0a0a0a]/40 line-through"
-                            : "font-medium text-[#0a0a0a]",
-                        )}
-                      >
-                        {col.name}
-                      </span>
-                    </span>
-                    <span className="flex shrink-0 items-center gap-1.5">
-                      {col.tag === "masked" ? (
-                        <span className="border border-[#0a0a0a]/35 bg-[#f6f6f6] px-1 py-px font-mono text-[9px] uppercase tracking-[0.08em] text-[#0a0a0a]/75">
-                          {l.maskedTag}
-                        </span>
-                      ) : null}
-                      {col.key ? (
-                        <span
-                          aria-hidden="true"
-                          className={cn(
-                            "size-2.5 rounded-full border-2 border-[#0a0a0a] transition-colors duration-200",
-                            joined ? "bg-accent" : "bg-white",
-                          )}
-                        />
-                      ) : null}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
+          <DemoTableCard
+            sqlName="crm.public.customers"
+            alias="c"
+            columnsOnlyLabel={l.columnsOnly}
+            columns={LEFT_COLUMNS}
+            side="left"
+            t={t}
+            opacity={leftOpacity}
+            joinActive={joinProgress > 0.08}
+            maskedTag={l.maskedTag}
+            filterTag={l.filterTag}
+          />
 
           {/* Animated SVG string connector between customers.id <-> orders.customer_id */}
           <div className="relative flex items-center justify-center sm:flex-col sm:justify-start sm:pt-[48px]">
@@ -260,81 +312,18 @@ export function ShareDemo({ locale, caption }: { locale: Locale; caption?: strin
           </div>
 
           {/* Right table card: lake.sales.orders */}
-          <div
-            className="min-w-0 border-2 border-[#0a0a0a] bg-white shadow-[3px_3px_0_#0a0a0a]"
-            style={{ opacity: rightOpacity }}
-          >
-            <div className="flex flex-wrap items-center justify-between gap-1 border-b-2 border-[#0a0a0a] bg-[#0a0a0a] px-2.5 py-1.5 text-white">
-              <span className="truncate font-mono text-[11px] font-bold">
-                lake.sales.orders
-              </span>
-              <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-accent">
-                o
-              </span>
-            </div>
-            <div className="border-b border-[#0a0a0a]/15 bg-[#f6f6f6] px-2.5 py-1 font-mono text-[9.5px] uppercase tracking-[0.12em] text-[#0a0a0a]/60">
-              {l.columnsOnly}
-            </div>
-            <ul className="divide-y divide-[#0a0a0a]/10">
-              {RIGHT_COLUMNS.map((col) => {
-                const ticked = col.tickAt !== undefined && t >= col.tickAt;
-                const joined = Boolean(col.key) && joinProgress > 0.85;
-                return (
-                  <li
-                    key={col.name}
-                    className={cn(
-                      "flex items-center justify-between gap-2 px-2.5 py-1.5 font-mono text-[11px]",
-                      joined && "bg-accent/25",
-                    )}
-                  >
-                    <span className="flex min-w-0 items-center gap-1.5">
-                      {col.key ? (
-                        <span
-                          aria-hidden="true"
-                          className={cn(
-                            "size-2.5 shrink-0 rounded-full border-2 border-[#0a0a0a] transition-colors duration-200",
-                            joined ? "bg-accent" : "bg-white",
-                          )}
-                        />
-                      ) : (
-                        <span
-                          aria-hidden="true"
-                          className={cn(
-                            "flex size-3.5 shrink-0 items-center justify-center border text-[9px] font-bold transition-colors duration-200",
-                            col.tickAt === undefined
-                              ? "border-[#0a0a0a]/20 bg-transparent text-transparent"
-                              : ticked
-                                ? "border-[#0a0a0a] bg-accent text-[#0a0a0a]"
-                                : "border-[#0a0a0a]/40 bg-white text-transparent",
-                          )}
-                        >
-                          ✓
-                        </span>
-                      )}
-                      <span
-                        className={cn(
-                          "truncate",
-                          col.tickAt === undefined && !col.key
-                            ? "text-[#0a0a0a]/40 line-through"
-                            : "font-medium text-[#0a0a0a]",
-                        )}
-                      >
-                        {col.name}
-                      </span>
-                    </span>
-                    {col.tag === "filter" ? (
-                      <span
-                        className="shrink-0 border border-[#0a0a0a] bg-accent/55 px-1 py-px font-mono text-[9px] font-semibold text-[#0a0a0a]"
-                        style={{ opacity: ticked ? 1 : 0.25 }}
-                      >
-                        {l.filterTag}
-                      </span>
-                    ) : null}
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
+          <DemoTableCard
+            sqlName="lake.sales.orders"
+            alias="o"
+            columnsOnlyLabel={l.columnsOnly}
+            columns={RIGHT_COLUMNS}
+            side="right"
+            t={t}
+            opacity={rightOpacity}
+            joinActive={joinProgress > 0.85}
+            maskedTag={l.maskedTag}
+            filterTag={l.filterTag}
+          />
         </div>
       </div>
 

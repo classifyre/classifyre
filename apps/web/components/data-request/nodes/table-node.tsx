@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
-import { AlertTriangle, Lock, X } from "lucide-react";
+import { AlertTriangle, Lock, MessageSquarePlus, X } from "lucide-react";
 import type { DataRequestTable } from "@workspace/schemas/data-request";
 import { Checkbox } from "@workspace/ui/components/checkbox";
 import { cn } from "@workspace/ui/lib/utils";
@@ -17,7 +17,12 @@ export interface TableNodeData extends Record<string, unknown> {
   table: DataRequestTable;
   catalogTable: QueryCatalogTable | null;
   canEdit: boolean;
+  canComment?: boolean;
   hasError?: boolean;
+  onPinComment?: (
+    anchor: { tableId: string; column?: string },
+    screen: { x: number; y: number },
+  ) => void;
 }
 
 export type RequestTableNode = Node<TableNodeData, "request-table">;
@@ -40,7 +45,8 @@ export const TableNode = React.memo(function TableNode({
 }: NodeProps<RequestTableNode>) {
   const { t } = useTranslation();
   const store = useRequestStore();
-  const { table, catalogTable, canEdit, hasError } = data;
+  const { table, catalogTable, canEdit, canComment, hasError, onPinComment } =
+    data;
   const isMissing = catalogTable === null;
   const isLocked = Boolean(catalogTable && !catalogTable.canQuery);
 
@@ -118,6 +124,24 @@ export const TableNode = React.memo(function TableNode({
         </div>
 
         <div className="flex shrink-0 items-center gap-0.5">
+          {canComment && onPinComment && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onPinComment(
+                  { tableId: table.id },
+                  { x: e.clientX, y: e.clientY },
+                );
+              }}
+              className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+              title={t("dataRequest.canvas.pinComment")}
+              aria-label={`Comment on ${table.sqlName}`}
+              data-testid={`comment-table-${table.alias}`}
+            >
+              <MessageSquarePlus className="h-3.5 w-3.5" />
+            </button>
+          )}
           <FilterPopover
             tableId={table.id}
             columns={columns}
@@ -186,7 +210,7 @@ export const TableNode = React.memo(function TableNode({
               <div
                 key={col.name}
                 className={cn(
-                  "relative flex items-center gap-1.5 px-2.5 py-1 text-xs transition-colors hover:bg-muted/40",
+                  "group relative flex items-center gap-1.5 px-2.5 py-1 text-xs transition-colors hover:bg-muted/40",
                   isJoined && "bg-sky-500/8",
                 )}
                 data-testid={`col-row-${table.alias}-${col.name}`}
@@ -233,6 +257,24 @@ export const TableNode = React.memo(function TableNode({
                   <span className="shrink-0 font-mono text-[9px] uppercase text-muted-foreground">
                     {col.type.split("(")[0]}
                   </span>
+                )}
+                {canComment && onPinComment && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onPinComment(
+                        { tableId: table.id, column: col.name },
+                        { x: e.clientX, y: e.clientY },
+                      );
+                    }}
+                    className="hidden shrink-0 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground group-hover:inline-flex"
+                    title={`${table.alias}.${col.name}`}
+                    aria-label={`Comment on ${table.alias}.${col.name}`}
+                    data-testid={`comment-col-${table.alias}-${col.name}`}
+                  >
+                    <MessageSquarePlus className="h-3 w-3" />
+                  </button>
                 )}
                 <Handle
                   type="source"

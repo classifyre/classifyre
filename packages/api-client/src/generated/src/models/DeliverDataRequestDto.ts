@@ -31,26 +31,7 @@ export interface DeliverDataRequestDto {
      * @memberof DeliverDataRequestDto
      */
     note?: string;
-    /**
-     * 
-     * @type {string}
-     * @memberof DeliverDataRequestDto
-     */
-    mode?: DeliverDataRequestDtoModeEnum;
 }
-
-
-/**
- * @export
- */
-export const DeliverDataRequestDtoModeEnum = {
-    Published: 'PUBLISHED',
-    Linked: 'LINKED',
-    Updated: 'UPDATED',
-    SelfServe: 'SELF_SERVE'
-} as const;
-export type DeliverDataRequestDtoModeEnum = typeof DeliverDataRequestDtoModeEnum[keyof typeof DeliverDataRequestDtoModeEnum];
-
 
 /**
  * Check if a given object implements the DeliverDataRequestDto interface.
@@ -72,7 +53,6 @@ export function DeliverDataRequestDtoFromJSONTyped(json: any, ignoreDiscriminato
         
         'datasetAssetId': json['datasetAssetId'],
         'note': json['note'] == null ? undefined : json['note'],
-        'mode': json['mode'] == null ? undefined : json['mode'],
     };
 }
 
@@ -89,7 +69,6 @@ export function DeliverDataRequestDtoToJSONTyped(value?: DeliverDataRequestDto |
         
         'datasetAssetId': value['datasetAssetId'],
         'note': value['note'],
-        'mode': value['mode'],
     };
 }
 

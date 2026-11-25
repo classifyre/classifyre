@@ -1,14 +1,17 @@
+import { Optional } from '@nestjs/common';
 import {
   OnGatewayDisconnect,
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
+import { CaseKind, DataRequestState } from '@prisma/client';
 import { Server, Socket } from 'socket.io';
 import { ClsService } from 'nestjs-cls';
 import { CLS_SCHEMA } from '../namespace/namespace.constants';
 import { NamespaceRegistryService } from '../registry/namespace-registry.service';
 import { SocketAccessService } from '../identity/socket-access.service';
+import { PrismaService } from '../prisma.service';
 import type {
   BoardChangedEvent,
   CaseBoardEvents,
@@ -53,6 +56,7 @@ export class CaseBoardGateway implements OnGatewayDisconnect, CaseBoardEvents {
     private readonly cls: ClsService,
     private readonly namespaces: NamespaceRegistryService,
     private readonly socketAccess: SocketAccessService,
+    @Optional() private readonly prisma?: PrismaService,
   ) {}
 
   @SubscribeMessage('subscribe')
@@ -64,6 +68,9 @@ export class CaseBoardGateway implements OnGatewayDisconnect, CaseBoardEvents {
     if (!schema) return { success: false, message: 'Unknown namespace' };
     const caseId = typeof body?.caseId === 'string' ? body.caseId : '';
     if (!UUID.test(caseId)) return { success: false, message: 'Invalid case' };
+    if (!(await this.canSubscribeCase(client, schema, caseId))) {
+      return { success: false, message: 'Forbidden' };
+    }
     const room = this.room(schema, caseId);
     // One board per socket: leaving the previous room keeps presence honest.
     for (const [other, members] of this.presence) {
@@ -134,7 +141,13 @@ export class CaseBoardGateway implements OnGatewayDisconnect, CaseBoardEvents {
     if (typeof slug !== 'string') return null;
     const namespace = await this.namespaces.resolve(slug);
     if (!namespace) return null;
+    const hasCaseView = await this.socketAccess.canJoin(
+      client,
+      namespace.namespaceId,
+      'case.view',
+    );
     if (
+      !hasCaseView &&
       !(await this.socketAccess.canJoin(
         client,
         namespace.namespaceId,
@@ -144,6 +157,56 @@ export class CaseBoardGateway implements OnGatewayDisconnect, CaseBoardEvents {
       return null;
     }
     client.data['classifyreSchema'] = namespace.schemaName;
+    client.data['classifyreHasCaseView'] = hasCaseView;
     return namespace.schemaName;
+  }
+
+  /**
+   * Per-case room authorization:
+   * - Investigation rooms require `case.view`.
+   * - Data-request DRAFT rooms are strictly restricted to their requester.
+   * - Non-draft data-request rooms allow `case.view` holders or participants
+   *   (requester, routed data-team group, or audience group).
+   */
+  private async canSubscribeCase(
+    client: Socket,
+    schema: string,
+    caseId: string,
+  ): Promise<boolean> {
+    const hasCaseView = client.data['classifyreHasCaseView'] === true;
+    if (!this.prisma) return hasCaseView;
+
+    const row = await this.cls.run(async () => {
+      this.cls.set(CLS_SCHEMA, schema);
+      return this.prisma!.case.findUnique({
+        where: { id: caseId },
+        select: {
+          kind: true,
+          dataRequest: {
+            select: {
+              state: true,
+              requesterRef: true,
+              routeGroupId: true,
+              audienceGroupId: true,
+            },
+          },
+        },
+      });
+    });
+
+    if (!row) return false;
+    if (row.kind !== CaseKind.DATA_REQUEST) return hasCaseView;
+    const dr = row.dataRequest;
+    if (!dr) return false;
+
+    const person = await this.socketAccess.person(client);
+    const isRequester = Boolean(
+      person?.actorRef && person.actorRef === dr.requesterRef,
+    );
+    if (dr.state === DataRequestState.DRAFT) return isRequester;
+    if (hasCaseView || isRequester) return true;
+    if (!person) return false;
+    const groups = new Set(person.groupIds);
+    return groups.has(dr.routeGroupId) || groups.has(dr.audienceGroupId);
   }
 }

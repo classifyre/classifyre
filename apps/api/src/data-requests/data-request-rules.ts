@@ -124,30 +124,14 @@ export interface TransitionResult {
 }
 
 /**
- * Pure state-transition check for a single role.
+ * Pure state-transition check for a single role (PRD DR §3).
  */
 export function transition(
   state: DataRequestState,
   action: DataRequestAction,
   role: DataRequestRole,
 ): TransitionResult {
-  const rule = TRANSITIONS[action];
-  if (!rule.roles.includes(role)) {
-    return {
-      allowed: false,
-      reason: `Role "${role}" cannot perform "${action}".`,
-    };
-  }
-  if (!rule.from.includes(state)) {
-    return {
-      allowed: false,
-      reason: `Cannot perform "${action}" while the request is ${state}.`,
-    };
-  }
-  return {
-    allowed: true,
-    nextState: rule.to === 'KEEP' ? state : rule.to,
-  };
+  return transitionForRoles(state, action, [role]);
 }
 
 /**
@@ -179,17 +163,20 @@ export function transitionForRoles(
 }
 
 /**
- * Requester may edit spec while DRAFT, SUBMITTED, or CHANGES_REQUESTED.
- * Team/manager may edit spec in any open state (drafts are invisible to non-requesters).
+ * Drafts are visible and editable only by the requester.
+ * Once submitted: requester may edit while SUBMITTED or CHANGES_REQUESTED;
+ * team/manager may edit in any open non-draft state.
  */
 export function canEditSpec(
   state: DataRequestState,
   roles: readonly DataRequestRole[],
 ): boolean {
+  if (state === DataRequestState.DRAFT) {
+    return roles.includes('requester');
+  }
   if (
     roles.includes('requester') &&
-    (state === DataRequestState.DRAFT ||
-      state === DataRequestState.SUBMITTED ||
+    (state === DataRequestState.SUBMITTED ||
       state === DataRequestState.CHANGES_REQUESTED)
   ) {
     return true;
@@ -204,16 +191,18 @@ export function canEditSpec(
 }
 
 /**
- * Team/manager may hand-edit or regenerate SQL in any open state.
+ * Team only (PRD DR §4.4): members of the routed data-team group may hand-edit
+ * or regenerate SQL in open states. On a DRAFT, only if they are also the requester.
  */
 export function canEditSql(
   state: DataRequestState,
   roles: readonly DataRequestRole[],
 ): boolean {
-  return (
-    (roles.includes('team') || roles.includes('manager')) &&
-    isOpenRequestState(state)
-  );
+  if (!roles.includes('team')) return false;
+  if (state === DataRequestState.DRAFT) {
+    return roles.includes('requester');
+  }
+  return isOpenRequestState(state);
 }
 
 /** Actions currently allowed for the given state and caller roles. */

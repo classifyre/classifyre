@@ -18,19 +18,18 @@ import "@xyflow/react/dist/style.css";
 import {
   MessageSquarePlus,
   Redo2,
-  Send,
   TableProperties,
   Undo2,
-  X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { api } from "@workspace/api-client";
+import type { DataRequestPinAnchor } from "@workspace/schemas/data-request";
 import { Button } from "@workspace/ui/components/button";
-import { Textarea } from "@workspace/ui/components/textarea";
 import { cn } from "@workspace/ui/lib/utils";
 import { useTranslation } from "@/hooks/use-translation";
 import type { QueryCatalog, QueryCatalogTable } from "@/lib/data-query";
 import { apiErrorMessage } from "@/lib/data-query";
-import { addDataRequestComment } from "@/lib/data-requests";
+import { CommentComposerPopover } from "@/components/case-board/ui/composer-popover";
 import { useRequest, useRequestStore } from "./store/request-context";
 import { GRID_SNAP, snapToGrid } from "./store/request-store";
 import { TABLE_DRAG_MIME } from "./request-catalog-rail";
@@ -93,10 +92,10 @@ function RequestCanvasInner({
   const [composer, setComposer] = React.useState<{
     x: number;
     y: number;
-    screenX: number;
-    screenY: number;
+    screen: { x: number; y: number };
+    anchor: DataRequestPinAnchor | null;
+    anchorLabel: string | null;
   } | null>(null);
-  const [commentBody, setCommentBody] = React.useState("");
   const [postingComment, setPostingComment] = React.useState(false);
 
   const catalogByAsset = React.useMemo(() => {
@@ -128,6 +127,35 @@ function RequestCanvasInner({
     return map;
   }, [request?.threads]);
 
+  const tablesById = React.useMemo(
+    () => new Map(spec.tables.map((tbl) => [tbl.id, tbl])),
+    [spec.tables],
+  );
+
+  const handleAnchorComment = React.useCallback(
+    (
+      anchor: { tableId: string; column?: string },
+      screen: { x: number; y: number },
+    ) => {
+      if (!canComment) return;
+      const tbl = tablesById.get(anchor.tableId);
+      const flowPos = screenToFlowPosition(screen);
+      const anchorLabel = tbl
+        ? anchor.column
+          ? `${tbl.alias}.${anchor.column}`
+          : tbl.sqlName.split(".").pop() ?? tbl.alias
+        : null;
+      setComposer({
+        x: snapToGrid(tbl ? tbl.x + 256 : flowPos.x),
+        y: snapToGrid(flowPos.y),
+        screen,
+        anchor,
+        anchorLabel,
+      });
+    },
+    [canComment, tablesById, screenToFlowPosition],
+  );
+
   // Keep live drag positions smooth while only snapping & committing on drag end.
   const [dragPositions, setDragPositions] = React.useState<
     Record<string, { x: number; y: number }>
@@ -146,21 +174,34 @@ function RequestCanvasInner({
           table,
           catalogTable,
           canEdit,
+          canComment,
           hasError: errorTableIds.has(table.id),
+          onPinComment: handleAnchorComment,
         },
       };
     });
-    const pinNodes: RequestCommentPinNode[] = spec.pins.map((pin) => ({
-      id: `pin:${pin.threadId}`,
-      type: "request-comment",
-      position: { x: pin.x, y: pin.y },
-      draggable: false,
-      data: {
-        pin,
-        thread: threadsById.get(pin.threadId) ?? null,
-        canComment,
-      },
-    }));
+    const pinNodes: RequestCommentPinNode[] = spec.pins.map((pin) => {
+      const anchoredTable = pin.anchor?.tableId
+        ? tablesById.get(pin.anchor.tableId)
+        : undefined;
+      const anchorLabel = anchoredTable
+        ? pin.anchor?.column
+          ? `${anchoredTable.alias}.${pin.anchor.column}`
+          : anchoredTable.sqlName.split(".").pop() ?? anchoredTable.alias
+        : null;
+      return {
+        id: `pin:${pin.threadId}`,
+        type: "request-comment",
+        position: { x: pin.x, y: pin.y },
+        draggable: false,
+        data: {
+          pin,
+          thread: threadsById.get(pin.threadId) ?? null,
+          anchorLabel,
+          canComment,
+        },
+      };
+    });
     return [...tableNodes, ...pinNodes];
   }, [
     spec.tables,
@@ -171,14 +212,15 @@ function RequestCanvasInner({
     canEdit,
     errorTableIds,
     threadsById,
+    tablesById,
     canComment,
+    handleAnchorComment,
   ]);
 
   const edges: RequestJoinEdge[] = React.useMemo(() => {
-    const tableMap = new Map(spec.tables.map((t) => [t.id, t]));
     return spec.joins.map((join) => {
-      const leftTbl = tableMap.get(join.left.tableId);
-      const rightTbl = tableMap.get(join.right.tableId);
+      const leftTbl = tablesById.get(join.left.tableId);
+      const rightTbl = tablesById.get(join.right.tableId);
       const leftIsLeft = (leftTbl?.x ?? 0) <= (rightTbl?.x ?? 0);
       return {
         id: join.id,
@@ -190,7 +232,7 @@ function RequestCanvasInner({
         data: { join, canEdit },
       };
     });
-  }, [spec.joins, spec.tables, canEdit]);
+  }, [spec.joins, tablesById, canEdit]);
 
   const onNodesChange = React.useCallback(
     (changes: NodeChange<Node>[]) => {
@@ -283,35 +325,53 @@ function RequestCanvasInner({
       setComposer({
         x: snapToGrid(flowPos.x),
         y: snapToGrid(flowPos.y),
-        screenX: event.clientX,
-        screenY: event.clientY,
+        screen: { x: event.clientX, y: event.clientY },
+        anchor: null,
+        anchorLabel: null,
       });
-      setCommentBody("");
     },
     [commentToolActive, canComment, screenToFlowPosition],
   );
 
-  const submitComment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!composer || !commentBody.trim() || postingComment) return;
+  const submitComment = async (body: string) => {
+    if (!composer || postingComment) return;
     setPostingComment(true);
     try {
       await store.getState().flushSave();
-      const created = (await addDataRequestComment(caseId, {
-        body: commentBody.trim(),
-        anchor: null,
-        x: composer.x,
-        y: composer.y,
-      })) as unknown as {
-        pin?: { threadId: string; anchor: null; x: number; y: number };
-        specVersion?: number;
-      };
-      if (created?.pin && typeof created.specVersion === "number") {
-        store.getState().appendPin(created.pin, created.specVersion);
-      }
+      const created = await api.dataRequests.dataRequestsControllerAddComment({
+        id: caseId,
+        addDataRequestCommentDto: {
+          body,
+          anchor: composer.anchor
+            ? {
+                tableId: composer.anchor.tableId,
+                ...(composer.anchor.column
+                  ? { column: composer.anchor.column }
+                  : {}),
+              }
+            : null,
+          x: composer.x,
+          y: composer.y,
+        },
+      });
+      store.getState().appendPin(
+        {
+          threadId: created.pin.threadId,
+          anchor: created.pin.anchor
+            ? {
+                tableId: created.pin.anchor.tableId,
+                ...(created.pin.anchor.column
+                  ? { column: created.pin.anchor.column }
+                  : {}),
+              }
+            : null,
+          x: created.pin.x,
+          y: created.pin.y,
+        },
+        created.specVersion,
+      );
       await store.getState().reloadFromServer();
       setComposer(null);
-      setCommentBody("");
       store.getState().setCommentToolActive(false);
     } catch (err) {
       toast.error(await apiErrorMessage(err));
@@ -431,60 +491,27 @@ function RequestCanvasInner({
         </div>
       )}
 
-      {/* Comment composer popover anchored at click */}
-      {composer && (
-        <div
-          className="fixed z-50 w-72 rounded-md border bg-popover p-3 shadow-md"
-          style={{
-            left: Math.min(composer.screenX, window.innerWidth - 300),
-            top: Math.min(composer.screenY, window.innerHeight - 180),
-          }}
-          data-testid="request-comment-composer"
-        >
-          <form onSubmit={submitComment} className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                {t("dataRequest.canvas.pinComment")}
+      {/* Reuses case-board CommentComposerPopover */}
+      <CommentComposerPopover
+        open={Boolean(composer)}
+        screen={composer?.screen ?? null}
+        placeholder={t("dataRequest.canvas.commentPlaceholder")}
+        submitLabel={t("dataRequest.canvas.postComment")}
+        cancelLabel={t("common.cancel")}
+        busy={postingComment}
+        testId="request-comment-composer"
+        header={
+          composer?.anchorLabel ? (
+            <div className="flex items-center gap-1.5 font-mono text-[10px] text-sky-700 dark:text-sky-300">
+              <span className="rounded bg-sky-500/15 px-1.5 py-0.5">
+                {composer.anchorLabel}
               </span>
-              <button
-                type="button"
-                onClick={() => setComposer(null)}
-                className="rounded p-0.5 text-muted-foreground hover:text-foreground"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
             </div>
-            <Textarea
-              value={commentBody}
-              onChange={(e) => setCommentBody(e.target.value)}
-              placeholder={t("dataRequest.canvas.commentPlaceholder")}
-              rows={3}
-              autoFocus
-              className="text-xs"
-            />
-            <div className="flex justify-end gap-1.5">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-7 text-xs"
-                onClick={() => setComposer(null)}
-              >
-                {t("common.cancel")}
-              </Button>
-              <Button
-                type="submit"
-                size="sm"
-                className="h-7 text-xs"
-                disabled={!commentBody.trim() || postingComment}
-              >
-                <Send className="mr-1 h-3 w-3" />
-                {t("dataRequest.canvas.postComment")}
-              </Button>
-            </div>
-          </form>
-        </div>
-      )}
+          ) : undefined
+        }
+        onClose={() => setComposer(null)}
+        onSubmit={submitComment}
+      />
     </div>
   );
 }

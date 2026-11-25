@@ -7,7 +7,10 @@ import {
   Severity,
 } from '@prisma/client';
 import { CasesService } from './cases.service';
+import { CaseworkSummaryService } from './casework-summary.service';
 import { CaseLeadsService } from './case-leads.service';
+import { CaseLeadsScheduler } from './cases/case-leads.scheduler';
+import { CaseBoardGateway } from './websocket/case-board.gateway';
 import { DecisionApplierService } from './autopilot/decision-applier.service';
 import { AgentSearchService } from './autopilot/search/agent-search.service';
 import { CLS_PERSON } from './identity/iam-access-policy';
@@ -130,6 +133,255 @@ describe('CaseKind.DATA_REQUEST guards and investigation scoping', () => {
           }),
         }),
       );
+    });
+
+    it('hides another user DRAFT data request in findOne() and allows its requester', async () => {
+      const draftRow = {
+        id: 'dr-draft',
+        kind: CaseKind.DATA_REQUEST,
+        title: 'Secret draft',
+        description: null,
+        status: CaseStatus.OPEN,
+        severity: Severity.MEDIUM,
+        assignee: null,
+        conclusion: null,
+        createdBy: 'user:alice',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        aiMode: AiManagementMode.INHERIT,
+        removeGoneFindings: false,
+        removeResolvedFindings: false,
+        removeGoneAssets: false,
+        _count: { evidence: 0, threads: 0, inquiryLinks: 0, findings: 0 },
+        dataRequest: {
+          state: DataRequestState.DRAFT,
+          requesterRef: 'user:alice',
+          routeGroupId: 'grp-data',
+          audienceGroupId: 'grp-finance',
+          deliveredVersion: null,
+          spec: { tables: [], joins: [], pins: [] },
+          updatedAt: new Date(),
+          dataset: null,
+        },
+        evidence: [],
+        inquiryLinks: [],
+        findingFilters: [],
+        hypothesisRules: [],
+      };
+
+      const bob = makeCasesService({ viewerRef: 'user:bob' });
+      bob.prisma.case.findUnique.mockResolvedValue(draftRow);
+      await expect(bob.service.findOne('dr-draft')).resolves.toBeNull();
+
+      const alice = makeCasesService({ viewerRef: 'user:alice' });
+      alice.prisma.case.findUnique.mockResolvedValue(draftRow);
+      await expect(alice.service.findOne('dr-draft')).resolves.toMatchObject({
+        id: 'dr-draft',
+        kind: CaseKind.DATA_REQUEST,
+      });
+    });
+  });
+
+  describe('CaseworkSummaryService draft visibility', () => {
+    it('excludes other users DRAFT data requests from counts and recent list', async () => {
+      const prisma = {
+        case: {
+          groupBy: jest.fn(() => Promise.resolve([])),
+          findMany: jest.fn(() => Promise.resolve([])),
+        },
+        inquiry: {
+          groupBy: jest.fn(() => Promise.resolve([])),
+          aggregate: jest.fn(() => Promise.resolve({ _sum: { newMatchCount: 0 } })),
+          findMany: jest.fn(() => Promise.resolve([])),
+        },
+        caseLead: { count: jest.fn(() => Promise.resolve(0)) },
+      };
+      const cls = {
+        isActive: () => true,
+        get: (key: string) =>
+          key === CLS_PERSON
+            ? { actorRef: 'user:bob', groupIds: ['grp-data'] }
+            : undefined,
+      };
+      const summary = new CaseworkSummaryService(prisma as never, cls as never);
+
+      await summary.getSummary();
+
+      const expectedWhere = {
+        OR: [
+          { kind: CaseKind.INVESTIGATION },
+          { dataRequest: { state: { not: DataRequestState.DRAFT } } },
+          { dataRequest: { requesterRef: 'user:bob' } },
+        ],
+      };
+      expect(prisma.case.groupBy).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ where: expectedWhere }),
+      );
+      expect(prisma.case.groupBy).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ where: expectedWhere }),
+      );
+      expect(prisma.case.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expectedWhere }),
+      );
+    });
+  });
+
+  describe('CaseLeadsScheduler investigation scoping', () => {
+    it('does not enqueue lead refresh jobs for DATA_REQUEST cases', async () => {
+      const send = jest.fn();
+      const pgBoss = { getBossAsync: jest.fn(() => Promise.resolve({ send })) };
+      const prisma = {
+        case: {
+          findFirst: jest.fn(() => Promise.resolve(null)),
+        },
+      };
+      const scheduler = new CaseLeadsScheduler(
+        pgBoss as never,
+        undefined,
+        prisma as never,
+      );
+
+      await scheduler.request('dr-1', 'updated');
+      await scheduler.requestOnRead('dr-1');
+
+      expect(prisma.case.findFirst).toHaveBeenCalledWith({
+        where: { id: 'dr-1', kind: CaseKind.INVESTIGATION },
+        select: { id: true },
+      });
+      expect(send).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('CaseBoardGateway per-case room authorization', () => {
+    const CASE_ID = '11111111-2222-3333-4444-555555555555';
+
+    function makeGateway(opts: {
+      hasCaseView: boolean;
+      person: { actorRef: string; groupIds: string[] } | null;
+      caseRow: {
+        kind: CaseKind;
+        dataRequest: {
+          state: DataRequestState;
+          requesterRef: string;
+          routeGroupId: string;
+          audienceGroupId: string;
+        } | null;
+      } | null;
+    }) {
+      const cls = {
+        run: (fn: () => Promise<unknown>) => fn(),
+        set: jest.fn(),
+        get: jest.fn(),
+      };
+      const namespaces = {
+        resolve: jest.fn(() =>
+          Promise.resolve({ namespaceId: 'ns-1', schemaName: 'ns_demo' }),
+        ),
+      };
+      const socketAccess = {
+        canJoin: jest.fn((_c: unknown, _ns: string, cap: string) =>
+          Promise.resolve(cap === 'case.view' ? opts.hasCaseView : true),
+        ),
+        person: jest.fn(() => Promise.resolve(opts.person)),
+      };
+      const prisma = {
+        case: {
+          findUnique: jest.fn(() => Promise.resolve(opts.caseRow)),
+        },
+      };
+      const gateway = new CaseBoardGateway(
+        cls as never,
+        namespaces as never,
+        socketAccess as never,
+        prisma as never,
+      );
+      gateway.server = { to: jest.fn(() => ({ emit: jest.fn() })) } as never;
+      const client = {
+        id: 'sock-1',
+        data: {
+          classifyrePrincipal: {
+            actor: { displayName: 'Test User', ref: opts.person?.actorRef },
+          },
+        } as Record<string, unknown>,
+        handshake: { auth: { namespaceSlug: 'demo' } },
+        join: jest.fn(() => Promise.resolve()),
+        leave: jest.fn(() => Promise.resolve()),
+      };
+      return { gateway, client };
+    }
+
+    it('forbids workspace-only users from subscribing to INVESTIGATION boards', async () => {
+      const { gateway, client } = makeGateway({
+        hasCaseView: false,
+        person: { actorRef: 'user:alice', groupIds: ['grp-finance'] },
+        caseRow: { kind: CaseKind.INVESTIGATION, dataRequest: null },
+      });
+
+      const res = await gateway.subscribe(client as never, { caseId: CASE_ID });
+      expect(res).toEqual({ success: false, message: 'Forbidden' });
+      expect(client.join).not.toHaveBeenCalled();
+    });
+
+    it('restricts DRAFT data-request rooms to the requester only', async () => {
+      const other = makeGateway({
+        hasCaseView: true,
+        person: { actorRef: 'user:bob', groupIds: ['grp-data'] },
+        caseRow: {
+          kind: CaseKind.DATA_REQUEST,
+          dataRequest: {
+            state: DataRequestState.DRAFT,
+            requesterRef: 'user:alice',
+            routeGroupId: 'grp-data',
+            audienceGroupId: 'grp-finance',
+          },
+        },
+      });
+      await expect(
+        other.gateway.subscribe(other.client as never, { caseId: CASE_ID }),
+      ).resolves.toEqual({ success: false, message: 'Forbidden' });
+
+      const requester = makeGateway({
+        hasCaseView: false,
+        person: { actorRef: 'user:alice', groupIds: ['grp-finance'] },
+        caseRow: {
+          kind: CaseKind.DATA_REQUEST,
+          dataRequest: {
+            state: DataRequestState.DRAFT,
+            requesterRef: 'user:alice',
+            routeGroupId: 'grp-data',
+            audienceGroupId: 'grp-finance',
+          },
+        },
+      });
+      await expect(
+        requester.gateway.subscribe(requester.client as never, {
+          caseId: CASE_ID,
+        }),
+      ).resolves.toEqual({ success: true });
+      expect(requester.client.join).toHaveBeenCalledWith(
+        `ns_demo:case-board:${CASE_ID}`,
+      );
+    });
+
+    it('allows routed data team members without case.view to subscribe to SUBMITTED data requests', async () => {
+      const team = makeGateway({
+        hasCaseView: false,
+        person: { actorRef: 'user:bob', groupIds: ['grp-data'] },
+        caseRow: {
+          kind: CaseKind.DATA_REQUEST,
+          dataRequest: {
+            state: DataRequestState.SUBMITTED,
+            requesterRef: 'user:alice',
+            routeGroupId: 'grp-data',
+            audienceGroupId: 'grp-finance',
+          },
+        },
+      });
+      await expect(
+        team.gateway.subscribe(team.client as never, { caseId: CASE_ID }),
+      ).resolves.toEqual({ success: true });
     });
   });
 

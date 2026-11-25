@@ -87,6 +87,7 @@ export { DataRequestsApi } from "./generated/src/apis/DataRequestsApi";
 export type {
   AddDataRequestCommentDto,
   AddDataRequestCommentReplyDto,
+  AddDataRequestCommentResponseDto,
   CaseDataRequestSummaryDto,
   CaseworkCaseKindBreakdownDto,
   ClaimDataRequestDto,
@@ -104,11 +105,14 @@ export type {
   DataRequestLiveDatasetDto,
   DataRequestOptionsDto,
   DataRequestPermissionsDto,
+  DataRequestPinAnchorDto,
+  DataRequestPinDto,
   DeclineDataRequestDto,
   DeliverDataRequestDto,
   RequestChangesDto,
   RerouteDataRequestDto,
   ResolveDataRequestCommentDto,
+  ResolveDataRequestCommentResponseDto,
   UpdateDataRequestSpecDto,
   UpdateDataRequestSqlDto,
 } from "./generated/src/models";

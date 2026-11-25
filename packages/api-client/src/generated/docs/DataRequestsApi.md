@@ -28,7 +28,7 @@ All URIs are relative to *http://localhost*
 
 ## dataRequestsControllerAddComment
 
-> dataRequestsControllerAddComment(id, addDataRequestCommentDto)
+> AddDataRequestCommentResponseDto dataRequestsControllerAddComment(id, addDataRequestCommentDto)
 
 Pin a discussion comment onto the request canvas
 
@@ -74,7 +74,7 @@ example().catch(console.error);
 
 ### Return type
 
-`void` (Empty response body)
+[**AddDataRequestCommentResponseDto**](AddDataRequestCommentResponseDto.md)
 
 ### Authorization
 
@@ -83,7 +83,7 @@ No authorization required
 ### HTTP request headers
 
 - **Content-Type**: `application/json`
-- **Accept**: Not defined
+- **Accept**: `application/json`
 
 
 ### HTTP response details
@@ -750,7 +750,7 @@ No authorization required
 
 ## dataRequestsControllerReplyComment
 
-> dataRequestsControllerReplyComment(id, threadId, addDataRequestCommentReplyDto)
+> ThreadResponseDto dataRequestsControllerReplyComment(id, threadId, addDataRequestCommentReplyDto)
 
 Reply to a data request comment pin
 
@@ -799,7 +799,7 @@ example().catch(console.error);
 
 ### Return type
 
-`void` (Empty response body)
+[**ThreadResponseDto**](ThreadResponseDto.md)
 
 ### Authorization
 
@@ -808,7 +808,7 @@ No authorization required
 ### HTTP request headers
 
 - **Content-Type**: `application/json`
-- **Accept**: Not defined
+- **Accept**: `application/json`
 
 
 ### HTTP response details
@@ -957,7 +957,7 @@ No authorization required
 
 ## dataRequestsControllerResolveComment
 
-> dataRequestsControllerResolveComment(id, threadId, resolveDataRequestCommentDto)
+> ResolveDataRequestCommentResponseDto dataRequestsControllerResolveComment(id, threadId, resolveDataRequestCommentDto)
 
 Resolve or reopen a data request comment pin
 
@@ -1006,7 +1006,7 @@ example().catch(console.error);
 
 ### Return type
 
-`void` (Empty response body)
+[**ResolveDataRequestCommentResponseDto**](ResolveDataRequestCommentResponseDto.md)
 
 ### Authorization
 
@@ -1015,7 +1015,7 @@ No authorization required
 ### HTTP request headers
 
 - **Content-Type**: `application/json`
-- **Accept**: Not defined
+- **Accept**: `application/json`
 
 
 ### HTTP response details

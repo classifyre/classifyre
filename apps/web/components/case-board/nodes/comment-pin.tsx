@@ -83,53 +83,46 @@ export const CommentPin = React.memo(function CommentPin({ id, selected }: NodeP
   );
 });
 
-function CommentThread({
-  threadId,
-  fallbackBody,
-  resolved,
-  readOnly,
-  onResolve,
-}: {
-  threadId: string | null;
-  fallbackBody: string | null;
+export interface CommentThreadPanelProps {
+  entries: ThreadEntryDto[] | null;
+  fallbackBody?: string | null;
+  headerLabel?: string;
+  anchorLabel?: string | null;
   resolved: boolean;
   readOnly: boolean;
-  onResolve: () => void;
-}) {
+  busy?: boolean;
+  allowReplyWhenResolved?: boolean;
+  onResolve: () => void | Promise<void>;
+  onReply: (body: string) => Promise<void>;
+}
+
+/**
+ * Reusable comment-pin thread panel shared by investigation case boards and
+ * data-request canvases.
+ */
+export function CommentThreadPanel({
+  entries,
+  fallbackBody = null,
+  headerLabel,
+  anchorLabel,
+  resolved,
+  readOnly,
+  busy = false,
+  allowReplyWhenResolved = true,
+  onResolve,
+  onReply,
+}: CommentThreadPanelProps) {
   const { t } = useTranslation();
-  const store = useBoardStore();
-  const [entries, setEntries] = React.useState<ThreadEntryDto[] | null>(null);
   const [reply, setReply] = React.useState("");
   const [sending, setSending] = React.useState(false);
 
-  const load = React.useCallback(async () => {
-    if (!threadId) return;
-    try {
-      const res = await api.threads.caseThreadsControllerGetEntries({ id: threadId, limit: "100" });
-      setEntries([...res.items].reverse());
-    } catch {
-      setEntries([]);
-    }
-  }, [threadId]);
-
-  React.useEffect(() => {
-    void load();
-  }, [load]);
-
   const send = async () => {
     const body = reply.trim();
-    if (!body || !threadId) return;
+    if (!body || sending || busy) return;
     setSending(true);
     try {
-      await api.threads.caseThreadsControllerAddEntry({
-        id: threadId,
-        addThreadEntryDto: { entryType: "NOTE", body },
-      });
+      await onReply(body);
       setReply("");
-      await load();
-      store.getState().refetch();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : String(error));
     } finally {
       setSending(false);
     }
@@ -137,20 +130,44 @@ function CommentThread({
 
   return (
     <div className="flex max-h-[420px] flex-col">
-      <div className="flex items-center justify-between border-b border-border px-3 py-2">
-        <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-          {resolved ? t("caseBoard.comment.resolved") : t("caseBoard.comment.post")}
-        </span>
-        {!readOnly && threadId && (
-          <Button variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs" onClick={onResolve}>
-            {resolved ? <RotateCcw className="size-3" /> : <Check className="size-3" />}
-            {resolved ? t("caseBoard.comment.reopen") : t("caseBoard.comment.resolve")}
+      <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
+        <div className="min-w-0 flex-1">
+          <span className="block truncate font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+            {headerLabel ??
+              (resolved
+                ? t("caseBoard.comment.resolved")
+                : t("caseBoard.comment.post"))}
+          </span>
+          {anchorLabel && (
+            <span className="mt-0.5 inline-block truncate rounded bg-sky-500/15 px-1.5 py-0.5 font-mono text-[10px] text-sky-700 dark:text-sky-300">
+              {anchorLabel}
+            </span>
+          )}
+        </div>
+        {!readOnly && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 shrink-0 gap-1 px-2 text-xs"
+            disabled={busy || sending}
+            onClick={() => void onResolve()}
+          >
+            {resolved ? (
+              <RotateCcw className="size-3" />
+            ) : (
+              <Check className="size-3" />
+            )}
+            {resolved
+              ? t("caseBoard.comment.reopen")
+              : t("caseBoard.comment.resolve")}
           </Button>
         )}
       </div>
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-2">
-        {!threadId || entries === null ? (
-          <p className="text-sm">{fallbackBody ?? <Loader2 className="size-4 animate-spin" />}</p>
+        {entries === null ? (
+          <p className="text-sm">
+            {fallbackBody ?? <Loader2 className="size-4 animate-spin" />}
+          </p>
         ) : (
           entries.map((entry) => (
             <div key={entry.id} className="space-y-0.5">
@@ -158,16 +175,24 @@ function CommentThread({
                 {entry.author ? (
                   <ActorChip actorRef={entry.author} />
                 ) : (
-                  <span className="font-semibold text-foreground">{t("caseBoard.someone")}</span>
+                  <span className="font-semibold text-foreground">
+                    {t("caseBoard.someone")}
+                  </span>
                 )}
-                <span>{formatDistanceToNowStrict(new Date(entry.createdAt), { addSuffix: true })}</span>
+                <span>
+                  {formatDistanceToNowStrict(new Date(entry.createdAt), {
+                    addSuffix: true,
+                  })}
+                </span>
               </div>
-              <p className="text-sm whitespace-pre-wrap">{entry.body}</p>
+              <p className="whitespace-pre-wrap break-words text-sm">
+                {entry.body}
+              </p>
             </div>
           ))
         )}
       </div>
-      {!readOnly && threadId && (
+      {!readOnly && (allowReplyWhenResolved || !resolved) && (
         <div className="flex items-end gap-2 border-t border-border p-2">
           <Textarea
             value={reply}
@@ -187,13 +212,76 @@ function CommentThread({
             size="icon"
             className="size-8 shrink-0"
             aria-label={t("caseBoard.comment.reply")}
-            disabled={sending || !reply.trim()}
+            disabled={sending || busy || !reply.trim()}
             onClick={() => void send()}
           >
-            {sending ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
+            {sending ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <Send className="size-3.5" />
+            )}
           </Button>
         </div>
       )}
     </div>
+  );
+}
+
+function CommentThread({
+  threadId,
+  fallbackBody,
+  resolved,
+  readOnly,
+  onResolve,
+}: {
+  threadId: string | null;
+  fallbackBody: string | null;
+  resolved: boolean;
+  readOnly: boolean;
+  onResolve: () => void;
+}) {
+  const store = useBoardStore();
+  const [entries, setEntries] = React.useState<ThreadEntryDto[] | null>(null);
+
+  const load = React.useCallback(async () => {
+    if (!threadId) return;
+    try {
+      const res = await api.threads.caseThreadsControllerGetEntries({
+        id: threadId,
+        limit: "100",
+      });
+      setEntries([...res.items].reverse());
+    } catch {
+      setEntries([]);
+    }
+  }, [threadId]);
+
+  React.useEffect(() => {
+    void load();
+  }, [load]);
+
+  const handleReply = async (body: string) => {
+    if (!threadId) return;
+    try {
+      await api.threads.caseThreadsControllerAddEntry({
+        id: threadId,
+        addThreadEntryDto: { entryType: "NOTE", body },
+      });
+      await load();
+      store.getState().refetch();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  return (
+    <CommentThreadPanel
+      entries={threadId ? entries : null}
+      fallbackBody={fallbackBody}
+      resolved={resolved}
+      readOnly={readOnly || !threadId}
+      onResolve={onResolve}
+      onReply={handleReply}
+    />
   );
 }

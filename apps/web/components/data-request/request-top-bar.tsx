@@ -21,9 +21,10 @@ import {
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
-import type {
-  DataRequestDetailDto,
-  DataRequestOptionsDto,
+import {
+  api,
+  type DataRequestDetailDto,
+  type DataRequestOptionsDto,
 } from "@workspace/api-client";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
@@ -45,26 +46,12 @@ import {
 } from "@workspace/ui/components/select";
 import { SeverityBadge } from "@workspace/ui/components/severity-badge";
 import { Textarea } from "@workspace/ui/components/textarea";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@workspace/ui/components/tooltip";
 import { cn } from "@workspace/ui/lib/utils";
 import { useTranslation } from "@/hooks/use-translation";
 import { useNsPath } from "@/lib/ns-path";
 import { apiErrorMessage } from "@/lib/data-query";
 import { useSharedDatasets } from "@/lib/shared-datasets";
-import {
-  claimDataRequest,
-  declineDataRequest,
-  deliverDataRequest,
-  fetchDataRequestOptions,
-  requestDataRequestChanges,
-  rerouteDataRequest,
-  submitDataRequest,
-  withdrawDataRequest,
-} from "@/lib/data-requests";
+import { PresenceChips } from "@/components/case-board/ui/presence";
 import { useRequest, useRequestStore } from "./store/request-context";
 
 const STEP_STATES = ["DRAFT", "SUBMITTED", "IN_PROGRESS", "DELIVERED"] as const;
@@ -83,6 +70,68 @@ function stepIndexOf(state: string): number {
     default:
       return -1;
   }
+}
+
+function ReasonDialog({
+  open,
+  onOpenChange,
+  title,
+  description,
+  placeholder,
+  confirmLabel,
+  confirmVariant,
+  value,
+  onChange,
+  busy,
+  onConfirm,
+  inputTestId,
+  confirmTestId,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  description: string;
+  placeholder: string;
+  confirmLabel: string;
+  confirmVariant?: "default" | "destructive";
+  value: string;
+  onChange: (value: string) => void;
+  busy: boolean;
+  onConfirm: () => void;
+  inputTestId: string;
+  confirmTestId: string;
+}) {
+  const { t } = useTranslation();
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
+        </DialogHeader>
+        <Textarea
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          rows={3}
+          data-testid={inputTestId}
+        />
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            {t("common.cancel")}
+          </Button>
+          <Button
+            variant={confirmVariant}
+            disabled={!value.trim() || busy}
+            onClick={onConfirm}
+            data-testid={confirmTestId}
+          >
+            {confirmLabel}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 export interface RequestTopBarProps {
@@ -122,7 +171,8 @@ export function RequestTopBar({
 
   React.useEffect(() => {
     if (!rerouteOpen) return;
-    fetchDataRequestOptions()
+    api.dataRequests
+      .dataRequestsControllerOptions()
       .then((res) => {
         setOptions(res);
         const alt = res.routeGroups.find(
@@ -139,19 +189,43 @@ export function RequestTopBar({
   const isClosedTerminal =
     request.state === "DECLINED" || request.state === "WITHDRAWN";
 
+  const describeIfReady = async () => {
+    const state = store.getState();
+    await state.flushSave();
+    if (store.getState().draftSql.trim()) {
+      await store.getState().runDescribe();
+    }
+  };
+
   const runAction = async (
     key: string,
     fn: () => Promise<DataRequestDetailDto>,
     successMsg: string,
-    pulseDeliver = false,
+    opts?: { pulseDeliver?: boolean; describeFirst?: boolean },
   ) => {
     setBusy(key);
     try {
-      await store.getState().flushSave();
+      if (opts?.describeFirst) {
+        await describeIfReady();
+      } else {
+        await store.getState().flushSave();
+      }
       const updated = await fn();
       onUpdated(updated);
-      if (pulseDeliver) store.getState().triggerDeliverPulse();
+      if (opts?.pulseDeliver) store.getState().triggerDeliverPulse();
       toast.success(successMsg);
+    } catch (err) {
+      toast.error(await apiErrorMessage(err));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const openPublishAfterDescribe = async (mode: "team" | "self_serve") => {
+    setBusy("publish");
+    try {
+      await describeIfReady();
+      onOpenPublish(mode);
     } catch (err) {
       toast.error(await apiErrorMessage(err));
     } finally {
@@ -272,21 +346,12 @@ export function RequestTopBar({
         )}
       </div>
 
-      {/* Presence avatars */}
-      {presence.length > 0 && (
-        <div className="flex items-center" data-testid="request-presence">
-          {presence.slice(0, 3).map((person, i) => (
-            <Tooltip key={`${person}-${i}`}>
-              <TooltipTrigger asChild>
-                <span className="-mr-1.5 flex size-6 items-center justify-center rounded-full border-2 border-background bg-muted font-mono text-[10px] font-bold">
-                  {person.slice(0, 2).toUpperCase()}
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>{person}</TooltipContent>
-            </Tooltip>
-          ))}
-        </div>
-      )}
+      {/* Presence avatars (reuses case-board PresenceChips) */}
+      <PresenceChips
+        others={presence}
+        testId="request-presence"
+        maxVisible={3}
+      />
 
       {/* Role-aware actions */}
       <div className="ml-auto flex flex-wrap items-center gap-1.5">
@@ -300,7 +365,7 @@ export function RequestTopBar({
               variant="secondary"
               className="h-7 gap-1 text-xs"
               disabled={Boolean(busy)}
-              onClick={() => onOpenPublish("self_serve")}
+              onClick={() => void openPublishAfterDescribe("self_serve")}
               data-testid="request-publish-now-btn"
             >
               <Sparkles className="h-3.5 w-3.5 text-sky-600" />
@@ -318,8 +383,12 @@ export function RequestTopBar({
             onClick={() =>
               void runAction(
                 "submit",
-                () => submitDataRequest(request.id),
+                () =>
+                  api.dataRequests.dataRequestsControllerSubmit({
+                    id: request.id,
+                  }),
                 t("dataRequest.toast.submitted"),
+                { describeFirst: true },
               )
             }
             data-testid="request-submit-btn"
@@ -344,7 +413,11 @@ export function RequestTopBar({
             onClick={() =>
               void runAction(
                 "claim",
-                () => claimDataRequest(request.id),
+                () =>
+                  api.dataRequests.dataRequestsControllerClaim({
+                    id: request.id,
+                    claimDataRequestDto: {},
+                  }),
                 t("dataRequest.toast.claimed"),
               )
             }
@@ -367,7 +440,7 @@ export function RequestTopBar({
               size="sm"
               className="h-7 gap-1 text-xs"
               disabled={Boolean(busy)}
-              onClick={() => onOpenPublish("team")}
+              onClick={() => void openPublishAfterDescribe("team")}
               data-testid="request-publish-btn"
             >
               <Share2 className="h-3.5 w-3.5" />
@@ -459,7 +532,10 @@ export function RequestTopBar({
             onClick={() =>
               void runAction(
                 "withdraw",
-                () => withdrawDataRequest(request.id),
+                () =>
+                  api.dataRequests.dataRequestsControllerWithdraw({
+                    id: request.id,
+                  }),
                 t("dataRequest.toast.withdrawn"),
               )
             }
@@ -522,7 +598,11 @@ export function RequestTopBar({
                 setRerouteOpen(false);
                 void runAction(
                   "reroute",
-                  () => rerouteDataRequest(request.id, rerouteGroupId),
+                  () =>
+                    api.dataRequests.dataRequestsControllerReroute({
+                      id: request.id,
+                      rerouteDataRequestDto: { groupId: rerouteGroupId },
+                    }),
                   t("dataRequest.toast.rerouted"),
                 );
               }}
@@ -582,13 +662,15 @@ export function RequestTopBar({
                 void runAction(
                   "deliver",
                   () =>
-                    deliverDataRequest(request.id, {
-                      datasetAssetId: linkDatasetId,
-                      note: linkNote.trim() || undefined,
-                      mode: "LINKED",
+                    api.dataRequests.dataRequestsControllerDeliver({
+                      id: request.id,
+                      deliverDataRequestDto: {
+                        datasetAssetId: linkDatasetId,
+                        note: linkNote.trim() || undefined,
+                      },
                     }),
                   t("dataRequest.toast.delivered"),
-                  true,
+                  { pulseDeliver: true, describeFirst: true },
                 );
               }}
             >
@@ -599,81 +681,59 @@ export function RequestTopBar({
       </Dialog>
 
       {/* Decline dialog */}
-      <Dialog open={declineOpen} onOpenChange={setDeclineOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t("dataRequest.dialogs.declineTitle")}</DialogTitle>
-            <DialogDescription>
-              {t("dataRequest.dialogs.declineBody")}
-            </DialogDescription>
-          </DialogHeader>
-          <Textarea
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            placeholder={t("dataRequest.dialogs.reasonPlaceholder")}
-            rows={3}
-            data-testid="decline-reason-input"
-          />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeclineOpen(false)}>
-              {t("common.cancel")}
-            </Button>
-            <Button
-              variant="destructive"
-              disabled={!reason.trim() || Boolean(busy)}
-              onClick={() => {
-                setDeclineOpen(false);
-                void runAction(
-                  "decline",
-                  () => declineDataRequest(request.id, reason.trim()),
-                  t("dataRequest.toast.declined"),
-                );
-              }}
-              data-testid="decline-confirm-btn"
-            >
-              {t("dataRequest.actions.decline")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ReasonDialog
+        open={declineOpen}
+        onOpenChange={setDeclineOpen}
+        title={t("dataRequest.dialogs.declineTitle")}
+        description={t("dataRequest.dialogs.declineBody")}
+        placeholder={t("dataRequest.dialogs.reasonPlaceholder")}
+        confirmLabel={t("dataRequest.actions.decline")}
+        confirmVariant="destructive"
+        value={reason}
+        onChange={setReason}
+        busy={Boolean(busy)}
+        inputTestId="decline-reason-input"
+        confirmTestId="decline-confirm-btn"
+        onConfirm={() => {
+          setDeclineOpen(false);
+          void runAction(
+            "decline",
+            () =>
+              api.dataRequests.dataRequestsControllerDecline({
+                id: request.id,
+                declineDataRequestDto: { reason: reason.trim() },
+              }),
+            t("dataRequest.toast.declined"),
+          );
+        }}
+      />
 
       {/* Request changes dialog */}
-      <Dialog open={changesOpen} onOpenChange={setChangesOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t("dataRequest.dialogs.changesTitle")}</DialogTitle>
-            <DialogDescription>
-              {t("dataRequest.dialogs.changesBody")}
-            </DialogDescription>
-          </DialogHeader>
-          <Textarea
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            placeholder={t("dataRequest.dialogs.changesPlaceholder")}
-            rows={3}
-            data-testid="changes-reason-input"
-          />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setChangesOpen(false)}>
-              {t("common.cancel")}
-            </Button>
-            <Button
-              disabled={!reason.trim() || Boolean(busy)}
-              onClick={() => {
-                setChangesOpen(false);
-                void runAction(
-                  "changes",
-                  () => requestDataRequestChanges(request.id, reason.trim()),
-                  t("dataRequest.toast.changesRequested"),
-                );
-              }}
-              data-testid="changes-confirm-btn"
-            >
-              {t("dataRequest.actions.requestChanges")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ReasonDialog
+        open={changesOpen}
+        onOpenChange={setChangesOpen}
+        title={t("dataRequest.dialogs.changesTitle")}
+        description={t("dataRequest.dialogs.changesBody")}
+        placeholder={t("dataRequest.dialogs.changesPlaceholder")}
+        confirmLabel={t("dataRequest.actions.requestChanges")}
+        value={reason}
+        onChange={setReason}
+        busy={Boolean(busy)}
+        inputTestId="changes-reason-input"
+        confirmTestId="changes-confirm-btn"
+        onConfirm={() => {
+          setChangesOpen(false);
+          void runAction(
+            "changes",
+            () =>
+              api.dataRequests.dataRequestsControllerRequestChanges({
+                id: request.id,
+                requestChangesDto: { reason: reason.trim() },
+              }),
+            t("dataRequest.toast.changesRequested"),
+          );
+        }}
+      />
     </header>
   );
 }

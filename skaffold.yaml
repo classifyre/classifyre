@@ -13,6 +13,8 @@ profiles:
       - kubeContext: k3d-classifyre
         env: CLASSIFYRE_VPS_DB_HOST=
     deploy:
+      statusCheckDeadlineSeconds: 1800
+      tolerateFailuresUntilDeadline: true
       helm:
         releases:
           - name: classifyre
@@ -70,6 +72,8 @@ profiles:
   # and exports the values the templates below read.
   - name: dev-vps-db
     deploy:
+      statusCheckDeadlineSeconds: 1800
+      tolerateFailuresUntilDeadline: true
       helm:
         releases:
           - name: classifyre

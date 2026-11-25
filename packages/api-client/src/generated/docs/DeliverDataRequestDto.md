@@ -8,7 +8,6 @@ Name | Type
 ------------ | -------------
 `datasetAssetId` | string
 `note` | string
-`mode` | string
 
 ## Example
 
@@ -19,7 +18,6 @@ import type { DeliverDataRequestDto } from '@workspace/api-client'
 const example = {
   "datasetAssetId": null,
   "note": null,
-  "mode": null,
 } satisfies DeliverDataRequestDto
 
 console.log(example)

@@ -14,6 +14,7 @@ docs/AddCaseFindingFiltersDto.md
 docs/AddCaseHypothesisRuleDto.md
 docs/AddDataRequestCommentDto.md
 docs/AddDataRequestCommentReplyDto.md
+docs/AddDataRequestCommentResponseDto.md
 docs/AddEvidenceDto.md
 docs/AddExclusionDto.md
 docs/AddFindingDto.md
@@ -260,6 +261,8 @@ docs/DataRequestListResponseDto.md
 docs/DataRequestLiveDatasetDto.md
 docs/DataRequestOptionsDto.md
 docs/DataRequestPermissionsDto.md
+docs/DataRequestPinAnchorDto.md
+docs/DataRequestPinDto.md
 docs/DataRequestsApi.md
 docs/DecisionsToCaseDto.md
 docs/DecisionsToCaseResponseDto.md
@@ -501,6 +504,7 @@ docs/ReopenDecisionsResponseDto.md
 docs/RequestChangesDto.md
 docs/RerouteDataRequestDto.md
 docs/ResolveDataRequestCommentDto.md
+docs/ResolveDataRequestCommentResponseDto.md
 docs/ResolvedActorDto.md
 docs/RetireOutOfScopeFindingsDto.md
 docs/RevertResultDto.md
@@ -804,6 +808,7 @@ src/models/AddCaseFindingFiltersDto.ts
 src/models/AddCaseHypothesisRuleDto.ts
 src/models/AddDataRequestCommentDto.ts
 src/models/AddDataRequestCommentReplyDto.ts
+src/models/AddDataRequestCommentResponseDto.ts
 src/models/AddEvidenceDto.ts
 src/models/AddExclusionDto.ts
 src/models/AddFindingDto.ts
@@ -1039,6 +1044,8 @@ src/models/DataRequestListResponseDto.ts
 src/models/DataRequestLiveDatasetDto.ts
 src/models/DataRequestOptionsDto.ts
 src/models/DataRequestPermissionsDto.ts
+src/models/DataRequestPinAnchorDto.ts
+src/models/DataRequestPinDto.ts
 src/models/DecisionsToCaseDto.ts
 src/models/DecisionsToCaseResponseDto.ts
 src/models/DecisionsToInquiryDto.ts
@@ -1263,6 +1270,7 @@ src/models/ReopenDecisionsResponseDto.ts
 src/models/RequestChangesDto.ts
 src/models/RerouteDataRequestDto.ts
 src/models/ResolveDataRequestCommentDto.ts
+src/models/ResolveDataRequestCommentResponseDto.ts
 src/models/ResolvedActorDto.ts
 src/models/RetireOutOfScopeFindingsDto.ts
 src/models/RevertResultDto.ts

@@ -13,11 +13,7 @@ export function RequestStoreProvider({
   store: RequestStoreApi;
   children: React.ReactNode;
 }) {
-  return (
-    <RequestStoreContext.Provider value={store}>
-      {children}
-    </RequestStoreContext.Provider>
-  );
+  return <RequestStoreContext value={store}>{children}</RequestStoreContext>;
 }
 
 export function useRequestStore(): RequestStoreApi {

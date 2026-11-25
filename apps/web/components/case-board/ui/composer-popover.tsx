@@ -9,6 +9,111 @@ import { useTranslation } from "@/hooks/use-translation";
 import { useBoardStore, useUi, useUiStore } from "../store/board-context";
 import { addComment, createHypothesis } from "../store/commands";
 
+export interface CommentComposerPopoverProps {
+  open: boolean;
+  screen: { x: number; y: number } | null;
+  placeholder: string;
+  submitLabel: string;
+  cancelLabel: string;
+  maxLength?: number;
+  multilineEnter?: boolean;
+  busy?: boolean;
+  header?: React.ReactNode;
+  testId?: string;
+  onClose: () => void;
+  onSubmit: (body: string) => void | Promise<void>;
+}
+
+/**
+ * Floating anchored popover composer shared by investigation boards and data
+ * request canvases.
+ */
+export function CommentComposerPopover({
+  open,
+  screen,
+  placeholder,
+  submitLabel,
+  cancelLabel,
+  maxLength = BOARD_NOTE_MAX_CHARS,
+  multilineEnter = true,
+  busy = false,
+  header,
+  testId = "composer-popover",
+  onClose,
+  onSubmit,
+}: CommentComposerPopoverProps) {
+  const [text, setText] = React.useState("");
+
+  React.useEffect(() => {
+    if (open) setText("");
+  }, [open, screen?.x, screen?.y]);
+
+  if (!open || !screen) return null;
+
+  const submit = () => {
+    const body = text.trim();
+    if (!body || busy) return;
+    void onSubmit(body);
+  };
+
+  return (
+    <Popover open onOpenChange={(next) => !next && onClose()}>
+      <PopoverAnchor asChild>
+        <span
+          aria-hidden
+          style={{
+            position: "fixed",
+            left: screen.x,
+            top: screen.y,
+            width: 1,
+            height: 1,
+          }}
+        />
+      </PopoverAnchor>
+      <PopoverContent
+        align="start"
+        side="bottom"
+        sideOffset={6}
+        className="w-72 space-y-2 p-2"
+        onKeyDown={(e) => e.stopPropagation()}
+        data-testid={testId}
+      >
+        {header}
+        <Textarea
+          autoFocus
+          rows={3}
+          value={text}
+          maxLength={maxLength}
+          placeholder={placeholder}
+          className="resize-none text-sm"
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              e.preventDefault();
+              onClose();
+            }
+            if (
+              e.key === "Enter" &&
+              (multilineEnter ? e.metaKey || e.ctrlKey : !e.shiftKey)
+            ) {
+              e.preventDefault();
+              submit();
+            }
+          }}
+        />
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            {cancelLabel}
+          </Button>
+          <Button size="sm" disabled={!text.trim() || busy} onClick={submit}>
+            {submitLabel}
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 /**
  * The small composer that opens where a comment pin or hypothesis card is
  * being placed. Posting creates the thread and its board item in one op;
@@ -19,75 +124,41 @@ export function ComposerPopover() {
   const composer = useUi((s) => s.composer);
   const ui = useUiStore();
   const store = useBoardStore();
-  const [text, setText] = React.useState("");
-
-  React.useEffect(() => {
-    if (composer) setText("");
-  }, [composer]);
 
   if (!composer) return null;
   const close = () => ui.getState().set({ composer: null });
-
-  const submit = () => {
-    const body = text.trim();
-    if (!body) return;
-    if (composer.kind === "comment") {
-      const cmd = addComment(body, composer.anchor, composer.at);
-      store.getState().run(cmd);
-    } else {
-      const cmd = createHypothesis(body, composer.at, composer.supports ?? []);
-      store.getState().run(cmd);
-    }
-    ui.getState().set({ composer: null, tool: "select" });
-  };
-
   const isComment = composer.kind === "comment";
+
   return (
-    <Popover open onOpenChange={(open) => !open && close()}>
-      <PopoverAnchor asChild>
-        <span
-          aria-hidden
-          style={{ position: "fixed", left: composer.screen.x, top: composer.screen.y, width: 1, height: 1 }}
-        />
-      </PopoverAnchor>
-      <PopoverContent
-        align="start"
-        side="bottom"
-        sideOffset={6}
-        className="w-72 space-y-2 p-2"
-        onKeyDown={(e) => e.stopPropagation()}
-        data-testid="composer-popover"
-      >
-        <Textarea
-          autoFocus
-          rows={3}
-          value={text}
-          maxLength={isComment ? BOARD_NOTE_MAX_CHARS : BOARD_HYPOTHESIS_TITLE_MAX_CHARS}
-          placeholder={isComment ? t("caseBoard.comment.placeholder") : t("caseBoard.hypothesis.placeholder")}
-          className="resize-none text-sm"
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") {
-              e.preventDefault();
-              close();
-            }
-            // Enter posts a hypothesis statement; comments take Cmd/Ctrl+Enter
-            // so they can span lines.
-            if (e.key === "Enter" && (!isComment ? !e.shiftKey : e.metaKey || e.ctrlKey)) {
-              e.preventDefault();
-              submit();
-            }
-          }}
-        />
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" size="sm" onClick={close}>
-            {t("caseBoard.link.cancel")}
-          </Button>
-          <Button size="sm" disabled={!text.trim()} onClick={submit}>
-            {isComment ? t("caseBoard.comment.post") : t("caseBoard.hypothesis.create")}
-          </Button>
-        </div>
-      </PopoverContent>
-    </Popover>
+    <CommentComposerPopover
+      open
+      screen={composer.screen}
+      maxLength={
+        isComment ? BOARD_NOTE_MAX_CHARS : BOARD_HYPOTHESIS_TITLE_MAX_CHARS
+      }
+      multilineEnter={isComment}
+      placeholder={
+        isComment
+          ? t("caseBoard.comment.placeholder")
+          : t("caseBoard.hypothesis.placeholder")
+      }
+      submitLabel={
+        isComment
+          ? t("caseBoard.comment.post")
+          : t("caseBoard.hypothesis.create")
+      }
+      cancelLabel={t("caseBoard.link.cancel")}
+      onClose={close}
+      onSubmit={(body) => {
+        if (composer.kind === "comment") {
+          store.getState().run(addComment(body, composer.anchor, composer.at));
+        } else {
+          store
+            .getState()
+            .run(createHypothesis(body, composer.at, composer.supports ?? []));
+        }
+        ui.getState().set({ composer: null, tool: "select" });
+      }}
+    />
   );
 }

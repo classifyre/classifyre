@@ -1,7 +1,7 @@
 "use client";
 
 import { Search, TableProperties } from "lucide-react";
-import { Badge } from "@workspace/ui/components";
+import { Badge } from "@workspace/ui/components/badge";
 import { cn } from "@workspace/ui/lib/utils";
 import { useTranslation } from "@/hooks/use-translation";
 import { STATUS_TONE, statusBadgeClass } from "@/lib/status-tone";

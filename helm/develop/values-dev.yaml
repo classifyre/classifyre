@@ -9,7 +9,7 @@ api:
   image:
     repository: oven/bun
     tag: latest
-    pullPolicy: Always
+    pullPolicy: IfNotPresent
 
   # Fixed rather than autoGenerate: the chart's default `randAlphaNum` value is
   # only stable across a `helm upgrade` (guarded by a Secret `lookup`) -- it is
@@ -325,9 +325,10 @@ api:
   startupProbe:
     enabled: true
     periodSeconds: 2
-    # 10 minutes: API, worker and SQL gateway boot together on one k3d node
-    # (tenant migrations, route mapping) and took over 3 minutes each.
-    failureThreshold: 300
+    # 30 minutes: API, worker and SQL gateway boot together on one k3d node
+    # (first-time bun install on slow connections, tenant migrations, route
+    # mapping).
+    failureThreshold: 900
 
   # With the init-container disabled, the API's existing Kubernetes startup
   # path applies pending migrations using the same source-mounted runtime.

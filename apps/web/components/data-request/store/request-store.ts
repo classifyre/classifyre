@@ -246,6 +246,34 @@ export function createRequestStore(caseId: string, deps: RequestStoreDeps) {
       scheduleCheck();
     };
 
+    const handleWriteFailure = async (
+      error: unknown,
+      fallbackMessage?: string,
+      clearDirty = false,
+    ) => {
+      if (isConflictError(error)) {
+        set((c) => ({
+          saving: false,
+          ...(clearDirty ? { dirty: false } : {}),
+          conflictCount: c.conflictCount + 1,
+        }));
+        if (clearDirty) pendingResave = false;
+        deps.onConflict?.();
+        await get().reloadFromServer();
+        return;
+      }
+      set({
+        saving: false,
+        ...(fallbackMessage
+          ? {
+              saveError:
+                error instanceof Error ? error.message : fallbackMessage,
+            }
+          : {}),
+      });
+      deps.onError?.(error);
+    };
+
     return {
       caseId,
       clientId,
@@ -571,23 +599,7 @@ export function createRequestStore(caseId: string, deps: RequestStoreDeps) {
             dirty: !unchanged,
           });
         } catch (error) {
-          if (isConflictError(error)) {
-            set((curr) => ({
-              saving: false,
-              dirty: false,
-              conflictCount: curr.conflictCount + 1,
-            }));
-            pendingResave = false;
-            deps.onConflict?.();
-            await get().reloadFromServer();
-          } else {
-            set({
-              saving: false,
-              saveError:
-                error instanceof Error ? error.message : "Failed to save spec",
-            });
-            deps.onError?.(error);
-          }
+          await handleWriteFailure(error, "Failed to save spec", true);
         } finally {
           saveInFlight = false;
           if (pendingResave) {
@@ -623,18 +635,7 @@ export function createRequestStore(caseId: string, deps: RequestStoreDeps) {
             void get().runDescribe();
           }, describeMs);
         } catch (error) {
-          if (isConflictError(error)) {
-            set((c) => ({ saving: false, conflictCount: c.conflictCount + 1 }));
-            deps.onConflict?.();
-            await get().reloadFromServer();
-          } else {
-            set({
-              saving: false,
-              saveError:
-                error instanceof Error ? error.message : "Failed to save SQL",
-            });
-            deps.onError?.(error);
-          }
+          await handleWriteFailure(error, "Failed to save SQL");
         }
       },
 
@@ -653,14 +654,7 @@ export function createRequestStore(caseId: string, deps: RequestStoreDeps) {
           set({ saving: false });
           void get().runCheck();
         } catch (error) {
-          if (isConflictError(error)) {
-            set((c) => ({ saving: false, conflictCount: c.conflictCount + 1 }));
-            deps.onConflict?.();
-            await get().reloadFromServer();
-          } else {
-            set({ saving: false });
-            deps.onError?.(error);
-          }
+          await handleWriteFailure(error);
         }
       },
 

@@ -9,7 +9,7 @@ for required_command in curl kubectl skaffold; do
 done
 
 skaffold_version="$(skaffold version)"
-skaffold_latest_url="$(curl -fsSL -o /dev/null -w '%{url_effective}' \
+skaffold_latest_url="$(curl -fsSL --connect-timeout 30 --max-time 120 --retry 3 --retry-delay 2 -o /dev/null -w '%{url_effective}' \
   https://github.com/GoogleContainerTools/skaffold/releases/latest)"
 skaffold_latest_version="${skaffold_latest_url##*/}"
 if [[ -z "${skaffold_version}" || -z "${skaffold_latest_version}" || "${skaffold_version}" != "${skaffold_latest_version}" ]]; then

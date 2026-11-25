@@ -23,14 +23,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@workspace/ui/components/select";
+import { api, type DataRequestOptionsDto } from "@workspace/api-client";
 import { useTranslation } from "@/hooks/use-translation";
 import { useNsPath } from "@/lib/ns-path";
 import { apiErrorMessage } from "@/lib/data-query";
-import {
-  createDataRequest,
-  fetchDataRequestOptions,
-  type DataRequestOptionsDto,
-} from "@/lib/data-requests";
 
 type Priority = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
 
@@ -54,7 +50,8 @@ export function NewDataRequestForm() {
 
   React.useEffect(() => {
     let active = true;
-    fetchDataRequestOptions()
+    api.dataRequests
+      .dataRequestsControllerOptions()
       .then((res) => {
         if (!active) return;
         setOptions(res);
@@ -83,12 +80,14 @@ export function NewDataRequestForm() {
     if (!canSubmit) return;
     setSubmitting(true);
     try {
-      const created = await createDataRequest({
-        title: title.trim(),
-        description: description.trim() || undefined,
-        priority,
-        routeGroupId,
-        audienceGroupId,
+      const created = await api.dataRequests.dataRequestsControllerCreate({
+        createDataRequestDto: {
+          title: title.trim(),
+          description: description.trim() || undefined,
+          priority,
+          routeGroupId,
+          audienceGroupId,
+        },
       });
       toast.success(t("dataRequest.form.created"));
       router.push(nsPath(`/cases/${created.id}`));

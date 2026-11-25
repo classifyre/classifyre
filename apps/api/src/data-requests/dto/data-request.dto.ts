@@ -95,9 +95,6 @@ export class DeliverDataRequestDto {
 
   @ApiPropertyOptional()
   note?: string;
-
-  @ApiPropertyOptional({ enum: DataRequestDeliveryMode })
-  mode?: DataRequestDeliveryMode;
 }
 
 export class RequestChangesDto {
@@ -136,6 +133,28 @@ export class AddDataRequestCommentReplyDto {
 export class ResolveDataRequestCommentDto {
   @ApiProperty()
   resolved!: boolean;
+}
+
+export class DataRequestPinAnchorDto {
+  @ApiProperty()
+  tableId!: string;
+
+  @ApiPropertyOptional()
+  column?: string;
+}
+
+export class DataRequestPinDto {
+  @ApiProperty()
+  threadId!: string;
+
+  @ApiPropertyOptional({ type: DataRequestPinAnchorDto, nullable: true })
+  anchor!: DataRequestPinAnchorDto | null;
+
+  @ApiProperty()
+  x!: number;
+
+  @ApiProperty()
+  y!: number;
 }
 
 export class DataRequestDeliveryDto {
@@ -295,6 +314,28 @@ export class DataRequestCommentThreadDto {
 
   @ApiProperty()
   updatedAt!: Date;
+}
+
+export class AddDataRequestCommentResponseDto {
+  @ApiProperty({ type: DataRequestCommentThreadDto })
+  thread!: DataRequestCommentThreadDto;
+
+  @ApiProperty({ type: DataRequestPinDto })
+  pin!: DataRequestPinDto;
+
+  @ApiProperty()
+  specVersion!: number;
+}
+
+export class ResolveDataRequestCommentResponseDto {
+  @ApiProperty()
+  changed!: boolean;
+
+  @ApiProperty()
+  caseId!: string;
+
+  @ApiProperty()
+  title!: string;
 }
 
 export class DataRequestListItemDto {

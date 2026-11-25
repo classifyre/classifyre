@@ -17,6 +17,7 @@ import * as runtime from '../runtime';
 import type {
   AddDataRequestCommentDto,
   AddDataRequestCommentReplyDto,
+  AddDataRequestCommentResponseDto,
   ClaimDataRequestDto,
   CreateDataRequestDto,
   DataRequestCheckResultDto,
@@ -29,7 +30,9 @@ import type {
   RequestChangesDto,
   RerouteDataRequestDto,
   ResolveDataRequestCommentDto,
+  ResolveDataRequestCommentResponseDto,
   ThreadEntriesResponseDto,
+  ThreadResponseDto,
   UpdateDataRequestSpecDto,
   UpdateDataRequestSqlDto,
 } from '../models/index';
@@ -38,6 +41,8 @@ import {
     AddDataRequestCommentDtoToJSON,
     AddDataRequestCommentReplyDtoFromJSON,
     AddDataRequestCommentReplyDtoToJSON,
+    AddDataRequestCommentResponseDtoFromJSON,
+    AddDataRequestCommentResponseDtoToJSON,
     ClaimDataRequestDtoFromJSON,
     ClaimDataRequestDtoToJSON,
     CreateDataRequestDtoFromJSON,
@@ -62,8 +67,12 @@ import {
     RerouteDataRequestDtoToJSON,
     ResolveDataRequestCommentDtoFromJSON,
     ResolveDataRequestCommentDtoToJSON,
+    ResolveDataRequestCommentResponseDtoFromJSON,
+    ResolveDataRequestCommentResponseDtoToJSON,
     ThreadEntriesResponseDtoFromJSON,
     ThreadEntriesResponseDtoToJSON,
+    ThreadResponseDtoFromJSON,
+    ThreadResponseDtoToJSON,
     UpdateDataRequestSpecDtoFromJSON,
     UpdateDataRequestSpecDtoToJSON,
     UpdateDataRequestSqlDtoFromJSON,
@@ -163,7 +172,7 @@ export class DataRequestsApi extends runtime.BaseAPI {
     /**
      * Pin a discussion comment onto the request canvas
      */
-    async dataRequestsControllerAddCommentRaw(requestParameters: DataRequestsControllerAddCommentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+    async dataRequestsControllerAddCommentRaw(requestParameters: DataRequestsControllerAddCommentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AddDataRequestCommentResponseDto>> {
         if (requestParameters['id'] == null) {
             throw new runtime.RequiredError(
                 'id',
@@ -196,14 +205,15 @@ export class DataRequestsApi extends runtime.BaseAPI {
             body: AddDataRequestCommentDtoToJSON(requestParameters['addDataRequestCommentDto']),
         }, initOverrides);
 
-        return new runtime.VoidApiResponse(response);
+        return new runtime.JSONApiResponse(response, (jsonValue) => AddDataRequestCommentResponseDtoFromJSON(jsonValue));
     }
 
     /**
      * Pin a discussion comment onto the request canvas
      */
-    async dataRequestsControllerAddComment(requestParameters: DataRequestsControllerAddCommentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
-        await this.dataRequestsControllerAddCommentRaw(requestParameters, initOverrides);
+    async dataRequestsControllerAddComment(requestParameters: DataRequestsControllerAddCommentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AddDataRequestCommentResponseDto> {
+        const response = await this.dataRequestsControllerAddCommentRaw(requestParameters, initOverrides);
+        return await response.value();
     }
 
     /**
@@ -607,7 +617,7 @@ export class DataRequestsApi extends runtime.BaseAPI {
     /**
      * Reply to a data request comment pin
      */
-    async dataRequestsControllerReplyCommentRaw(requestParameters: DataRequestsControllerReplyCommentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+    async dataRequestsControllerReplyCommentRaw(requestParameters: DataRequestsControllerReplyCommentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ThreadResponseDto>> {
         if (requestParameters['id'] == null) {
             throw new runtime.RequiredError(
                 'id',
@@ -648,14 +658,15 @@ export class DataRequestsApi extends runtime.BaseAPI {
             body: AddDataRequestCommentReplyDtoToJSON(requestParameters['addDataRequestCommentReplyDto']),
         }, initOverrides);
 
-        return new runtime.VoidApiResponse(response);
+        return new runtime.JSONApiResponse(response, (jsonValue) => ThreadResponseDtoFromJSON(jsonValue));
     }
 
     /**
      * Reply to a data request comment pin
      */
-    async dataRequestsControllerReplyComment(requestParameters: DataRequestsControllerReplyCommentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
-        await this.dataRequestsControllerReplyCommentRaw(requestParameters, initOverrides);
+    async dataRequestsControllerReplyComment(requestParameters: DataRequestsControllerReplyCommentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ThreadResponseDto> {
+        const response = await this.dataRequestsControllerReplyCommentRaw(requestParameters, initOverrides);
+        return await response.value();
     }
 
     /**
@@ -755,7 +766,7 @@ export class DataRequestsApi extends runtime.BaseAPI {
     /**
      * Resolve or reopen a data request comment pin
      */
-    async dataRequestsControllerResolveCommentRaw(requestParameters: DataRequestsControllerResolveCommentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+    async dataRequestsControllerResolveCommentRaw(requestParameters: DataRequestsControllerResolveCommentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ResolveDataRequestCommentResponseDto>> {
         if (requestParameters['id'] == null) {
             throw new runtime.RequiredError(
                 'id',
@@ -796,14 +807,15 @@ export class DataRequestsApi extends runtime.BaseAPI {
             body: ResolveDataRequestCommentDtoToJSON(requestParameters['resolveDataRequestCommentDto']),
         }, initOverrides);
 
-        return new runtime.VoidApiResponse(response);
+        return new runtime.JSONApiResponse(response, (jsonValue) => ResolveDataRequestCommentResponseDtoFromJSON(jsonValue));
     }
 
     /**
      * Resolve or reopen a data request comment pin
      */
-    async dataRequestsControllerResolveComment(requestParameters: DataRequestsControllerResolveCommentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
-        await this.dataRequestsControllerResolveCommentRaw(requestParameters, initOverrides);
+    async dataRequestsControllerResolveComment(requestParameters: DataRequestsControllerResolveCommentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ResolveDataRequestCommentResponseDto> {
+        const response = await this.dataRequestsControllerResolveCommentRaw(requestParameters, initOverrides);
+        return await response.value();
     }
 
     /**

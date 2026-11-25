@@ -17,7 +17,6 @@ import {
   Prisma,
   Severity,
 } from '@prisma/client';
-import { createHash } from 'node:crypto';
 import { ClsService } from 'nestjs-cls';
 import {
   DataRequestSpecSchema,
@@ -25,7 +24,6 @@ import {
   generateRequestSql,
   type DataRequestPin,
   type DataRequestSpec,
-  type RequestTableMeta,
 } from '@workspace/schemas/data-request';
 import { PrismaService } from '../prisma.service';
 import { ActorContextService } from '../identity/actor-context.service';
@@ -42,17 +40,7 @@ import {
   datasetResource,
 } from '../identity/audit-resources';
 import { governedDataScope } from '../governance/governance-filter';
-import {
-  QueryCatalogService,
-  type CatalogTable,
-} from '../data-query/query-catalog.service';
 import { SharedDatasetResolver } from '../data-query/shared-dataset-resolver';
-import {
-  extractThreePartNames,
-  precheckSql,
-  stripLiteralsAndComments,
-} from '../data-query/sql-precheck';
-import { SharedDatasetsService } from '../shared-datasets/shared-datasets.service';
 import { CaseActivityService } from '../case-activity.service';
 import { CaseThreadsService } from '../case-threads.service';
 import {
@@ -60,7 +48,6 @@ import {
   type CaseBoardEvents,
 } from '../case-board/case-board.events';
 import {
-  allowedActionsFor,
   canEditSpec,
   canEditSql,
   caseStatusFor,
@@ -69,23 +56,25 @@ import {
   type DataRequestRole,
 } from './data-request-rules';
 import { DataRequestNotifier } from './data-request.notifier';
+import { DataRequestChecksService } from './data-request-checks.service';
+import {
+  mapDataRequestDetail,
+  mapDataRequestListItem,
+  parseSpecSafe,
+  type DataRequestDetailRow,
+} from './data-request.mapper';
 import type {
   AddDataRequestCommentDto,
+  AddDataRequestCommentResponseDto,
   ClaimDataRequestDto,
   CreateDataRequestDto,
   DataRequestCheckResultDto,
-  DataRequestCheckTableDto,
-  DataRequestCommentThreadDto,
-  DataRequestDeliveryDto,
   DataRequestDescribeResultDto,
   DataRequestDetailDto,
-  DataRequestListItemDto,
   DataRequestListResponseDto,
-  DataRequestLiveDatasetDto,
   DataRequestOptionsDto,
   DeclineDataRequestDto,
   DeliverDataRequestDto,
-  LiveDatasetStatus,
   RequestChangesDto,
   RerouteDataRequestDto,
   UpdateDataRequestSpecDto,
@@ -105,18 +94,6 @@ const ALLOWED_PRIORITIES = new Set<Severity>([
   Severity.LOW,
 ]);
 
-function sqlHashOf(sql: string, routeGroupId: string): string {
-  return createHash('sha256')
-    .update(`${routeGroupId}\n${sql}`)
-    .digest('hex')
-    .slice(0, 32);
-}
-
-function parseSpecSafe(raw: unknown): DataRequestSpec {
-  const parsed = DataRequestSpecSchema.safeParse(raw);
-  return parsed.success ? parsed.data : EMPTY_DATA_REQUEST_SPEC;
-}
-
 @Injectable()
 export class DataRequestsService {
   constructor(
@@ -125,9 +102,8 @@ export class DataRequestsService {
     private readonly actors: ActorContextService,
     private readonly directory: ActorDirectoryService,
     private readonly audit: AuditTrailService,
-    private readonly catalog: QueryCatalogService,
     private readonly resolver: SharedDatasetResolver,
-    private readonly sharedDatasets: SharedDatasetsService,
+    private readonly checks: DataRequestChecksService,
     private readonly activity: CaseActivityService,
     private readonly threads: CaseThreadsService,
     private readonly notifier: DataRequestNotifier,
@@ -138,7 +114,7 @@ export class DataRequestsService {
     private readonly boardEvents?: CaseBoardEvents,
   ) {}
 
-  // ── Identity & roles ─────────────────────────────────────────────────────
+  // ── Identity, visibility & helpers ───────────────────────────────────────
 
   private person(): ClsPerson {
     const person = this.cls.isActive()
@@ -192,6 +168,21 @@ export class DataRequestsService {
     return { roles, isRequester, isTeam, isManager };
   }
 
+  /** Drafts are strictly requester-only across every read and mutation. */
+  private assertDraftVisible(
+    row: { state: DataRequestState; requesterRef: string },
+    person: ClsPerson,
+  ): void {
+    if (
+      row.state === DataRequestState.DRAFT &&
+      row.requesterRef !== person.actorRef
+    ) {
+      throw new ForbiddenException(
+        'Draft data requests are visible only to their requester.',
+      );
+    }
+  }
+
   private async canView(
     row: {
       requesterRef: string;
@@ -210,24 +201,46 @@ export class DataRequestsService {
     return this.can('case.view');
   }
 
+  private async assertParticipant(
+    row: {
+      state: DataRequestState;
+      requesterRef: string;
+      routeGroupId: string;
+    },
+    person: ClsPerson,
+    message: string,
+  ) {
+    this.assertDraftVisible(row, person);
+    const roleInfo = await this.rolesFor(row, person);
+    if (!roleInfo.isRequester && !roleInfo.isTeam && !roleInfo.isManager) {
+      throw new ForbiddenException(message);
+    }
+    return roleInfo;
+  }
+
+  private assertBaseVersion(
+    row: { specVersion: number },
+    rawBaseVersion: unknown,
+  ): number {
+    const baseVersion = Number(rawBaseVersion);
+    if (!Number.isInteger(baseVersion) || baseVersion < 1) {
+      throw new BadRequestException('baseVersion must be a positive integer.');
+    }
+    if (row.specVersion !== baseVersion) {
+      throw new ConflictException({
+        statusCode: 409,
+        code: 'VERSION_CONFLICT',
+        currentVersion: row.specVersion,
+        message: 'This data request was updated by someone else. Reloading.',
+      });
+    }
+    return baseVersion;
+  }
+
   private async canSelfServe(person: ClsPerson): Promise<boolean> {
     if (await this.can('dataset.publish')) return true;
     const governed = await governedDataScope(this.prisma, person);
     return governed.assetIds.length > 0 || governed.sourceIds.length > 0;
-  }
-
-  private async tableLookup(): Promise<Map<string, RequestTableMeta>> {
-    const { tables } = await this.catalog.tables();
-    return new Map(
-      tables.map((t) => [
-        t.assetId,
-        {
-          sqlName: t.sqlName,
-          exists: true,
-          columns: t.columns.map((c) => ({ name: c.name, type: c.type })),
-        },
-      ]),
-    );
   }
 
   private emitChanged(
@@ -265,6 +278,45 @@ export class DataRequestsService {
     });
   }
 
+  private async runTransition(
+    caseId: string,
+    nextState: DataRequestState,
+    dataRequestData: Prisma.DataRequestUncheckedUpdateInput,
+    caseData: Prisma.CaseUncheckedUpdateInput,
+    activityType: CaseActivityType,
+    activityPayload: Record<string, unknown>,
+    actorRef: string,
+    extra?: (tx: Prisma.TransactionClient) => Promise<void>,
+  ): Promise<void> {
+    const now = new Date();
+    await this.prisma.$transaction(async (tx) => {
+      if (extra) await extra(tx);
+      await tx.dataRequest.update({
+        where: { caseId },
+        data: {
+          state: nextState,
+          specVersion: { increment: 1 },
+          ...dataRequestData,
+        },
+      });
+      await tx.case.update({
+        where: { id: caseId },
+        data: {
+          status: caseStatusFor(nextState),
+          updatedAt: now,
+          ...caseData,
+        },
+      });
+      await this.activity.record(
+        caseId,
+        activityType,
+        activityPayload,
+        actorRef,
+        tx,
+      );
+    });
+  }
+
   // ── Options & List ───────────────────────────────────────────────────────
 
   async options(): Promise<DataRequestOptionsDto> {
@@ -276,20 +328,17 @@ export class DataRequestsService {
       this.resolveNames(person.groupIds.map((id) => `group:${id}`)),
     ]);
 
-    const routeGroups = eligible.map((g) => ({
-      id: g.id,
-      name: g.path || g.name,
-    }));
-    const audienceGroups = person.groupIds
-      .map((id) => ({
-        id,
-        name: groupNames.get(`group:${id}`) ?? id,
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-
     return {
-      routeGroups,
-      audienceGroups,
+      routeGroups: eligible.map((g) => ({
+        id: g.id,
+        name: g.path || g.name,
+      })),
+      audienceGroups: person.groupIds
+        .map((id) => ({
+          id,
+          name: groupNames.get(`group:${id}`) ?? id,
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
       canSelfServe: selfServe,
     };
   }
@@ -341,9 +390,7 @@ export class DataRequestsService {
       ]),
     );
 
-    const items: DataRequestListItemDto[] = rows.map((row) =>
-      this.toListItem(row, names),
-    );
+    const items = rows.map((row) => mapDataRequestListItem(row, names));
     return { items, total: items.length };
   }
 
@@ -375,7 +422,9 @@ export class DataRequestsService {
       throw new BadRequestException('Choose a data-team group to route to.');
     }
     if (!audienceGroupId) {
-      throw new BadRequestException('Choose a group to share the dataset with.');
+      throw new BadRequestException(
+        'Choose a group to share the dataset with.',
+      );
     }
 
     const eligible = await this.identity.groupsWithCapabilityIn(
@@ -403,7 +452,7 @@ export class DataRequestsService {
       );
     }
 
-    const lookup = await this.tableLookup();
+    const lookup = await this.checks.tableLookup();
     const generated = parsedSpec.data.tables.length
       ? generateRequestSql(parsedSpec.data, lookup)
       : { sql: '', diagnostics: [] };
@@ -456,9 +505,11 @@ export class DataRequestsService {
     const person = this.person();
     const row = await this.loadRequest(caseId);
     if (!(await this.canView(row, person))) {
-      throw new ForbiddenException('You do not have access to this data request.');
+      throw new ForbiddenException(
+        'You do not have access to this data request.',
+      );
     }
-    return this.toDetailDto(row, person);
+    return this.buildDetailDto(row, person);
   }
 
   // ── Spec & SQL edits ─────────────────────────────────────────────────────
@@ -469,24 +520,14 @@ export class DataRequestsService {
   ): Promise<DataRequestDetailDto> {
     const person = this.person();
     const row = await this.loadRequest(caseId);
+    this.assertDraftVisible(row, person);
     const { roles } = await this.rolesFor(row, person);
     if (!canEditSpec(row.state, roles)) {
       throw new ForbiddenException(
         'You cannot edit the request specification in its current state.',
       );
     }
-    const baseVersion = Number(dto.baseVersion);
-    if (!Number.isInteger(baseVersion) || baseVersion < 1) {
-      throw new BadRequestException('baseVersion must be a positive integer.');
-    }
-    if (row.specVersion !== baseVersion) {
-      throw new ConflictException({
-        statusCode: 409,
-        code: 'VERSION_CONFLICT',
-        currentVersion: row.specVersion,
-        message: 'This data request was updated by someone else. Reloading.',
-      });
-    }
+    const baseVersion = this.assertBaseVersion(row, dto.baseVersion);
 
     const parsedSpec = DataRequestSpecSchema.safeParse(dto.spec);
     if (!parsedSpec.success) {
@@ -497,7 +538,7 @@ export class DataRequestsService {
 
     let nextSql = row.draftSql;
     if (!row.sqlEdited) {
-      const lookup = await this.tableLookup();
+      const lookup = await this.checks.tableLookup();
       nextSql = generateRequestSql(parsedSpec.data, lookup).sql;
     }
 
@@ -533,30 +574,20 @@ export class DataRequestsService {
   ): Promise<DataRequestDetailDto> {
     const person = this.person();
     const row = await this.loadRequest(caseId);
+    this.assertDraftVisible(row, person);
     const { roles } = await this.rolesFor(row, person);
     if (!canEditSql(row.state, roles)) {
       throw new ForbiddenException(
         'Only members of the routed data team can edit SQL directly.',
       );
     }
-    const baseVersion = Number(dto.baseVersion);
-    if (!Number.isInteger(baseVersion) || baseVersion < 1) {
-      throw new BadRequestException('baseVersion must be a positive integer.');
-    }
-    if (row.specVersion !== baseVersion) {
-      throw new ConflictException({
-        statusCode: 409,
-        code: 'VERSION_CONFLICT',
-        currentVersion: row.specVersion,
-        message: 'This data request was updated by someone else. Reloading.',
-      });
-    }
+    const baseVersion = this.assertBaseVersion(row, dto.baseVersion);
 
     let nextSql: string;
     let nextSqlEdited: boolean;
     if (dto.regenerate) {
       const spec = parseSpecSafe(row.spec);
-      const lookup = await this.tableLookup();
+      const lookup = await this.checks.tableLookup();
       nextSql = generateRequestSql(spec, lookup).sql;
       nextSqlEdited = false;
     } else {
@@ -622,249 +653,23 @@ export class DataRequestsService {
   async check(caseId: string): Promise<DataRequestCheckResultDto> {
     const person = this.person();
     const row = await this.loadRequest(caseId);
-    const { isRequester, isTeam, isManager } = await this.rolesFor(row, person);
-    if (!isRequester && !isTeam && !isManager) {
-      throw new ForbiddenException(
-        'Only the requester, the routed data team, or a case manager can check this request.',
-      );
-    }
-    return this.runStaticCheck(row);
+    await this.assertParticipant(
+      row,
+      person,
+      'Only the requester, the routed data team, or a case manager can check this request.',
+    );
+    return this.checks.runStaticCheck(row);
   }
 
   async describe(caseId: string): Promise<DataRequestDescribeResultDto> {
     const person = this.person();
     const row = await this.loadRequest(caseId);
-    const { isRequester, isTeam, isManager } = await this.rolesFor(row, person);
-    if (!isRequester && !isTeam && !isManager) {
-      throw new ForbiddenException(
-        'Only the requester, the routed data team, or a case manager can describe this request.',
-      );
-    }
-
-    const check = await this.runStaticCheck(row);
-    const sql = check.sql.trim();
-    const hash = sqlHashOf(sql, row.routeGroupId);
-
-    if (!sql) {
-      return {
-        cached: false,
-        sqlHash: hash,
-        describe: null,
-        error: {
-          code: 'empty_sql',
-          message:
-            check.problems[0] ?? 'Complete the request before running describe.',
-        },
-        check,
-      };
-    }
-
-    if (row.lastCheck && row.lastCheckSqlHash === hash) {
-      return {
-        cached: true,
-        sqlHash: hash,
-        describe: row.lastCheck as Record<string, unknown>,
-        error: null,
-        check,
-      };
-    }
-
-    try {
-      const described = await this.sharedDatasets.describeForGroup(
-        sql,
-        row.routeGroupId,
-      );
-      await this.prisma.dataRequest.update({
-        where: { caseId },
-        data: {
-          lastCheck: described as unknown as Prisma.InputJsonValue,
-          lastCheckSqlHash: hash,
-        },
-      });
-      return {
-        cached: false,
-        sqlHash: hash,
-        describe: described as unknown as Record<string, unknown>,
-        error: null,
-        check,
-      };
-    } catch (error) {
-      const resp =
-        error &&
-        typeof error === 'object' &&
-        'getResponse' in error &&
-        typeof (error as { getResponse: () => unknown }).getResponse ===
-          'function'
-          ? (error as { getResponse: () => unknown }).getResponse()
-          : null;
-      const obj =
-        resp && typeof resp === 'object'
-          ? (resp as Record<string, unknown>)
-          : null;
-      const code =
-        typeof obj?.code === 'string' ? obj.code : 'describe_failed';
-      const message =
-        typeof obj?.message === 'string'
-          ? obj.message
-          : error instanceof Error
-            ? error.message
-            : 'Could not describe SQL as the routed group.';
-      return {
-        cached: false,
-        sqlHash: hash,
-        describe: null,
-        error: { code, message },
-        check,
-      };
-    }
-  }
-
-  private async runStaticCheck(row: {
-    routeGroupId: string;
-    spec: Prisma.JsonValue;
-    draftSql: string;
-    sqlEdited: boolean;
-  }): Promise<DataRequestCheckResultDto> {
-    const spec = parseSpecSafe(row.spec);
-    const [tablesInfo, groupCatalog, names] = await Promise.all([
-      this.catalog.tables(),
-      this.resolver.catalogForGroup(row.routeGroupId),
-      this.resolveNames([`group:${row.routeGroupId}`]),
-    ]);
-    const routeGroupName =
-      names.get(`group:${row.routeGroupId}`) ?? row.routeGroupId;
-
-    const lookup = new Map<string, RequestTableMeta>(
-      tablesInfo.tables.map((t) => [
-        t.assetId,
-        {
-          sqlName: t.sqlName,
-          exists: true,
-          columns: t.columns.map((c) => ({ name: c.name, type: c.type })),
-        },
-      ]),
+    await this.assertParticipant(
+      row,
+      person,
+      'Only the requester, the routed data team, or a case manager can describe this request.',
     );
-    const generated = generateRequestSql(spec, lookup);
-    const sql = row.sqlEdited ? row.draftSql.trim() : generated.sql;
-
-    const groupTablesBySql = new Map<string, CatalogTable>();
-    const groupTablesByAsset = new Map<string, CatalogTable>();
-    if (groupCatalog) {
-      for (const src of groupCatalog.sources) {
-        for (const t of src.tables) {
-          groupTablesBySql.set(t.sqlName.toLowerCase(), t);
-          groupTablesByAsset.set(t.assetId, t);
-        }
-      }
-    }
-    const allTablesBySql = new Map(
-      tablesInfo.tables.map((t) => [t.sqlName.toLowerCase(), t]),
-    );
-    const allTablesByAsset = new Map(
-      tablesInfo.tables.map((t) => [t.assetId, t]),
-    );
-
-    const allowedInGroup = new Set(
-      [...groupTablesBySql.values()]
-        .filter((t) => t.canQuery && t.location)
-        .map((t) => t.sqlName.toLowerCase()),
-    );
-    const allSources = new Set(
-      (groupCatalog?.sources ?? []).map((s) => s.sqlName.toLowerCase()),
-    );
-    for (const t of tablesInfo.tables) {
-      const src = t.sqlName.split('.')[0];
-      if (src) allSources.add(src.toLowerCase());
-    }
-
-    const precheckError = sql
-      ? precheckSql(sql, allowedInGroup, allSources)
-      : null;
-
-    // Collect every referenced table from spec + SQL 3-part names
-    const referencedSqlNames = new Set<string>();
-    const specTableBySql = new Map<string, { assetId: string; sqlName: string }>();
-    for (const t of spec.tables) {
-      const resolved = allTablesByAsset.get(t.assetId)?.sqlName ?? t.sqlName;
-      const key = resolved.toLowerCase();
-      referencedSqlNames.add(key);
-      specTableBySql.set(key, { assetId: t.assetId, sqlName: resolved });
-    }
-    if (sql) {
-      for (const name of extractThreePartNames(
-        stripLiteralsAndComments(sql).toLowerCase(),
-      )) {
-        referencedSqlNames.add(name);
-      }
-    }
-
-    const problems: string[] = [];
-    if (!groupCatalog) {
-      problems.push(
-        `Data team ${routeGroupName} is not active in this workspace.`,
-      );
-    }
-
-    const checkTables: DataRequestCheckTableDto[] = [];
-    for (const sqlName of referencedSqlNames) {
-      const fromSpec = specTableBySql.get(sqlName);
-      const catalogEntry =
-        (fromSpec ? allTablesByAsset.get(fromSpec.assetId) : undefined) ??
-        allTablesBySql.get(sqlName);
-      const groupEntry =
-        (catalogEntry
-          ? groupTablesByAsset.get(catalogEntry.assetId)
-          : undefined) ?? groupTablesBySql.get(sqlName);
-
-      const exists = Boolean(catalogEntry);
-      const groupCanQuery = Boolean(groupEntry?.canQuery);
-      const maskedColumns = (groupEntry?.masks ?? [])
-        .filter((m) => m.action === 'mask')
-        .map((m) => m.column);
-      const hiddenColumnCount = groupEntry?.hiddenColumns ?? 0;
-
-      checkTables.push({
-        assetId: catalogEntry?.assetId ?? fromSpec?.assetId ?? null,
-        sqlName: catalogEntry?.sqlName ?? fromSpec?.sqlName ?? sqlName,
-        sourceId: catalogEntry?.sourceId ?? null,
-        exists,
-        groupCanQuery,
-        maskedColumns,
-        hiddenColumnCount,
-      });
-
-      if (!exists) {
-        problems.push(`Table ${sqlName} no longer exists in the catalog.`);
-      } else if (!groupCanQuery) {
-        problems.push(
-          `Data team ${routeGroupName} cannot query ${catalogEntry?.sqlName ?? sqlName}.`,
-        );
-      }
-    }
-
-    if (!row.sqlEdited) {
-      for (const d of generated.diagnostics) {
-        if (d.level === 'error') problems.push(d.message);
-      }
-    }
-    if (precheckError) {
-      problems.push(precheckError.message);
-    }
-
-    const uniqueProblems = [...new Set(problems)];
-    return {
-      ok: uniqueProblems.length === 0 && Boolean(sql),
-      sql,
-      routeGroup: { id: row.routeGroupId, name: routeGroupName },
-      precheckError: precheckError
-        ? { code: precheckError.code, message: precheckError.message }
-        : null,
-      diagnostics: row.sqlEdited
-        ? []
-        : (generated.diagnostics as unknown as Array<Record<string, unknown>>),
-      tables: checkTables,
-      problems: uniqueProblems,
-    };
+    return this.checks.describe(caseId, row);
   }
 
   // ── Transitions ──────────────────────────────────────────────────────────
@@ -875,28 +680,15 @@ export class DataRequestsService {
     const { roles } = await this.rolesFor(row, person);
     const nextState = this.assertTransition(row.state, 'submit', roles);
 
-    const now = new Date();
-    await this.prisma.$transaction(async (tx) => {
-      await tx.dataRequest.update({
-        where: { caseId },
-        data: {
-          state: nextState,
-          submittedAt: now,
-          specVersion: { increment: 1 },
-        },
-      });
-      await tx.case.update({
-        where: { id: caseId },
-        data: { status: caseStatusFor(nextState), updatedAt: now },
-      });
-      await this.activity.record(
-        caseId,
-        CaseActivityType.REQUEST_SUBMITTED,
-        { routeGroupId: row.routeGroupId },
-        person.actorRef,
-        tx,
-      );
-    });
+    await this.runTransition(
+      caseId,
+      nextState,
+      { submittedAt: new Date() },
+      {},
+      CaseActivityType.REQUEST_SUBMITTED,
+      { routeGroupId: row.routeGroupId },
+      person.actorRef,
+    );
 
     const names = await this.resolveNames([person.actorRef]);
     await this.notifier.submitted({
@@ -919,28 +711,15 @@ export class DataRequestsService {
     const nextState = this.assertTransition(row.state, 'withdraw', roles);
     const wasSubmitted = row.state !== DataRequestState.DRAFT;
 
-    const now = new Date();
-    await this.prisma.$transaction(async (tx) => {
-      await tx.dataRequest.update({
-        where: { caseId },
-        data: {
-          state: nextState,
-          closedAt: now,
-          specVersion: { increment: 1 },
-        },
-      });
-      await tx.case.update({
-        where: { id: caseId },
-        data: { status: caseStatusFor(nextState), updatedAt: now },
-      });
-      await this.activity.record(
-        caseId,
-        CaseActivityType.REQUEST_WITHDRAWN,
-        { previousState: row.state },
-        person.actorRef,
-        tx,
-      );
-    });
+    await this.runTransition(
+      caseId,
+      nextState,
+      { closedAt: new Date() },
+      {},
+      CaseActivityType.REQUEST_WITHDRAWN,
+      { previousState: row.state },
+      person.actorRef,
+    );
 
     if (wasSubmitted) {
       const names = await this.resolveNames([person.actorRef]);
@@ -972,32 +751,15 @@ export class DataRequestsService {
         ? dto.assigneeRef.trim()
         : person.actorRef;
 
-    const now = new Date();
-    await this.prisma.$transaction(async (tx) => {
-      await tx.dataRequest.update({
-        where: { caseId },
-        data: {
-          state: nextState,
-          assigneeRef,
-          specVersion: { increment: 1 },
-        },
-      });
-      await tx.case.update({
-        where: { id: caseId },
-        data: {
-          status: caseStatusFor(nextState),
-          assignee: assigneeRef,
-          updatedAt: now,
-        },
-      });
-      await this.activity.record(
-        caseId,
-        CaseActivityType.REQUEST_CLAIMED,
-        { assigneeRef },
-        person.actorRef,
-        tx,
-      );
-    });
+    await this.runTransition(
+      caseId,
+      nextState,
+      { assigneeRef },
+      { assignee: assigneeRef },
+      CaseActivityType.REQUEST_CLAIMED,
+      { assigneeRef },
+      person.actorRef,
+    );
 
     const names = await this.resolveNames([assigneeRef, person.actorRef]);
     const assigneeName = names.get(assigneeRef) ?? assigneeRef;
@@ -1030,7 +792,7 @@ export class DataRequestsService {
     const workspaceId = this.workspaceId();
     const row = await this.loadRequest(caseId);
     const { roles } = await this.rolesFor(row, person);
-    this.assertTransition(row.state, 'reroute', roles);
+    const nextState = this.assertTransition(row.state, 'reroute', roles);
 
     const groupId = typeof dto.groupId === 'string' ? dto.groupId.trim() : '';
     if (!groupId) {
@@ -1048,30 +810,20 @@ export class DataRequestsService {
     }
 
     const previousGroupId = row.routeGroupId;
-    const now = new Date();
-    await this.prisma.$transaction(async (tx) => {
-      await tx.dataRequest.update({
-        where: { caseId },
-        data: {
-          routeGroupId: groupId,
-          assigneeRef: null,
-          lastCheck: Prisma.JsonNull,
-          lastCheckSqlHash: null,
-          specVersion: { increment: 1 },
-        },
-      });
-      await tx.case.update({
-        where: { id: caseId },
-        data: { assignee: null, updatedAt: now },
-      });
-      await this.activity.record(
-        caseId,
-        CaseActivityType.REQUEST_REROUTED,
-        { fromGroupId: previousGroupId, toGroupId: groupId },
-        person.actorRef,
-        tx,
-      );
-    });
+    await this.runTransition(
+      caseId,
+      nextState,
+      {
+        routeGroupId: groupId,
+        assigneeRef: null,
+        lastCheck: Prisma.JsonNull,
+        lastCheckSqlHash: null,
+      },
+      { assignee: null },
+      CaseActivityType.REQUEST_REROUTED,
+      { fromGroupId: previousGroupId, toGroupId: groupId },
+      person.actorRef,
+    );
 
     await this.notifier.assigned({
       caseId,
@@ -1093,6 +845,7 @@ export class DataRequestsService {
   ): Promise<DataRequestDetailDto> {
     const person = this.person();
     const row = await this.loadRequest(caseId);
+    this.assertDraftVisible(row, person);
     const { roles, isTeam, isManager, isRequester } = await this.rolesFor(
       row,
       person,
@@ -1115,9 +868,11 @@ export class DataRequestsService {
       throw new NotFoundException('Shared dataset not found.');
     }
 
-    // Determine whether this delivery is team/manager or requester self-serve.
     const isSelfServe =
-      !isTeam && !isManager && isRequester && dataset.createdBy === person.actorRef;
+      !isTeam &&
+      !isManager &&
+      isRequester &&
+      dataset.createdBy === person.actorRef;
 
     const action: DataRequestAction =
       isTeam || isManager
@@ -1132,7 +887,6 @@ export class DataRequestsService {
 
     const nextState = this.assertTransition(row.state, action, roles);
 
-    // Verify the audience group can query the delivered dataset.
     const [audienceCatalog, names] = await Promise.all([
       this.resolver.catalogForGroup(row.audienceGroupId),
       this.resolveNames([`group:${row.audienceGroupId}`]),
@@ -1143,9 +897,7 @@ export class DataRequestsService {
       .flatMap((s) => s.tables)
       .find((t) => t.assetId === dataset.assetId);
     if (!audienceTable?.canQuery) {
-      throw new BadRequestException(
-        `Share it with ${audienceName} first.`,
-      );
+      throw new BadRequestException(`Share it with ${audienceName} first.`);
     }
 
     const note =
@@ -1157,66 +909,55 @@ export class DataRequestsService {
       where: { caseId },
     });
     const round = prevDeliveries + 1;
+    // Delivery mode is always derived server-side (PRD DR §4.4).
     const mode: DataRequestDeliveryMode =
-      dto.mode ??
-      (action === 'deliver_self_serve'
+      action === 'deliver_self_serve'
         ? DataRequestDeliveryMode.SELF_SERVE
         : row.datasetAssetId === dataset.assetId
           ? DataRequestDeliveryMode.UPDATED
           : prevDeliveries === 0 && dataset.version === 1
             ? DataRequestDeliveryMode.PUBLISHED
-            : DataRequestDeliveryMode.LINKED);
+            : DataRequestDeliveryMode.LINKED;
 
     const datasetSqlName = `shared.${dataset.domain}.${dataset.name}`;
     const now = new Date();
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.dataRequestDelivery.create({
-        data: {
-          caseId,
-          round,
-          datasetAssetId: dataset.assetId,
-          datasetVersion: dataset.version,
-          sqlSnapshot: dataset.sql,
-          specSnapshot: row.spec as Prisma.InputJsonValue,
-          mode,
-          deliveredBy: person.actorRef,
-          note,
-        },
-      });
-      await tx.dataRequest.update({
-        where: { caseId },
-        data: {
-          state: nextState,
-          datasetAssetId: dataset.assetId,
-          deliveredVersion: dataset.version,
-          deliveredAt: now,
-          closedAt: now,
-          specVersion: { increment: 1 },
-        },
-      });
-      await tx.case.update({
-        where: { id: caseId },
-        data: {
-          status: caseStatusFor(nextState),
-          updatedAt: now,
-        },
-      });
-      await this.activity.record(
-        caseId,
-        CaseActivityType.REQUEST_DELIVERED,
-        {
-          round,
-          datasetAssetId: dataset.assetId,
-          datasetName: datasetSqlName,
-          datasetVersion: dataset.version,
-          mode,
-          note,
-        },
-        person.actorRef,
-        tx,
-      );
-    });
+    await this.runTransition(
+      caseId,
+      nextState,
+      {
+        datasetAssetId: dataset.assetId,
+        deliveredVersion: dataset.version,
+        deliveredAt: now,
+        closedAt: now,
+      },
+      {},
+      CaseActivityType.REQUEST_DELIVERED,
+      {
+        round,
+        datasetAssetId: dataset.assetId,
+        datasetName: datasetSqlName,
+        datasetVersion: dataset.version,
+        mode,
+        note,
+      },
+      person.actorRef,
+      async (tx) => {
+        await tx.dataRequestDelivery.create({
+          data: {
+            caseId,
+            round,
+            datasetAssetId: dataset.assetId,
+            datasetVersion: dataset.version,
+            sqlSnapshot: dataset.sql,
+            specSnapshot: row.spec as Prisma.InputJsonValue,
+            mode,
+            deliveredBy: person.actorRef,
+            note,
+          },
+        });
+      },
+    );
 
     if (row.requesterRef !== person.actorRef) {
       await this.notifier.delivered({
@@ -1234,7 +975,7 @@ export class DataRequestsService {
       'deliver',
       caseId,
       row.case.title,
-      ['datasetAssetId', 'mode'],
+      ['datasetAssetId'],
       [DATA_RESOURCE, GOVERNANCE_RESOURCE, datasetResource(dataset.assetId)],
     );
     return this.get(caseId);
@@ -1247,7 +988,11 @@ export class DataRequestsService {
     const person = this.person();
     const row = await this.loadRequest(caseId);
     const { roles } = await this.rolesFor(row, person);
-    const nextState = this.assertTransition(row.state, 'request_changes', roles);
+    const nextState = this.assertTransition(
+      row.state,
+      'request_changes',
+      roles,
+    );
 
     const reason = typeof dto.reason === 'string' ? dto.reason.trim() : '';
     if (!reason || reason.length > REASON_MAX) {
@@ -1256,41 +1001,27 @@ export class DataRequestsService {
       );
     }
 
-    const now = new Date();
-    await this.prisma.$transaction(async (tx) => {
-      await this.threads.create(
-        caseId,
-        {
-          kind: CaseThreadKind.DISCUSSION,
-          title: `Changes requested: ${reason}`.slice(0, 200),
-          statement: reason,
-          createdBy: person.actorRef,
-        },
-        tx,
-      );
-      await tx.dataRequest.update({
-        where: { caseId },
-        data: {
-          state: nextState,
-          closedAt: null,
-          specVersion: { increment: 1 },
-        },
-      });
-      await tx.case.update({
-        where: { id: caseId },
-        data: {
-          status: caseStatusFor(nextState),
-          updatedAt: now,
-        },
-      });
-      await this.activity.record(
-        caseId,
-        CaseActivityType.REQUEST_CHANGES_REQUESTED,
-        { reason },
-        person.actorRef,
-        tx,
-      );
-    });
+    await this.runTransition(
+      caseId,
+      nextState,
+      { closedAt: null },
+      {},
+      CaseActivityType.REQUEST_CHANGES_REQUESTED,
+      { reason },
+      person.actorRef,
+      async (tx) => {
+        await this.threads.create(
+          caseId,
+          {
+            kind: CaseThreadKind.DISCUSSION,
+            title: `Changes requested: ${reason}`.slice(0, 200),
+            statement: reason,
+            createdBy: person.actorRef,
+          },
+          tx,
+        );
+      },
+    );
 
     const names = await this.resolveNames([person.actorRef]);
     await this.notifier.changesRequested({
@@ -1323,32 +1054,15 @@ export class DataRequestsService {
       );
     }
 
-    const now = new Date();
-    await this.prisma.$transaction(async (tx) => {
-      await tx.dataRequest.update({
-        where: { caseId },
-        data: {
-          state: nextState,
-          declineReason: reason,
-          closedAt: now,
-          specVersion: { increment: 1 },
-        },
-      });
-      await tx.case.update({
-        where: { id: caseId },
-        data: {
-          status: caseStatusFor(nextState),
-          updatedAt: now,
-        },
-      });
-      await this.activity.record(
-        caseId,
-        CaseActivityType.REQUEST_DECLINED,
-        { reason },
-        person.actorRef,
-        tx,
-      );
-    });
+    await this.runTransition(
+      caseId,
+      nextState,
+      { declineReason: reason, closedAt: new Date() },
+      {},
+      CaseActivityType.REQUEST_DECLINED,
+      { reason },
+      person.actorRef,
+    );
 
     await this.notifier.declined({
       caseId,
@@ -1365,22 +1079,26 @@ export class DataRequestsService {
 
   // ── Comments / Pins ──────────────────────────────────────────────────────
 
+  private async loadCommentThread(caseId: string, threadId: string) {
+    const thread = await this.prisma.caseThread.findFirst({
+      where: { id: threadId, caseId, kind: CaseThreadKind.DISCUSSION },
+      select: { id: true },
+    });
+    if (!thread) throw new NotFoundException('Comment thread not found.');
+    return thread;
+  }
+
   async addComment(
     caseId: string,
     dto: AddDataRequestCommentDto,
-  ): Promise<{
-    thread: DataRequestCommentThreadDto;
-    pin: DataRequestPin;
-    specVersion: number;
-  }> {
+  ): Promise<AddDataRequestCommentResponseDto> {
     const person = this.person();
     const row = await this.loadRequest(caseId);
-    const { isRequester, isTeam, isManager } = await this.rolesFor(row, person);
-    if (!isRequester && !isTeam && !isManager) {
-      throw new ForbiddenException(
-        'Only participants of this data request can add comments.',
-      );
-    }
+    await this.assertParticipant(
+      row,
+      person,
+      'Only participants of this data request can add comments.',
+    );
 
     const body = typeof dto.body === 'string' ? dto.body.trim() : '';
     if (!body) {
@@ -1388,8 +1106,10 @@ export class DataRequestsService {
     }
 
     const spec = parseSpecSafe(row.spec);
-    const x = typeof dto.x === 'number' && Number.isFinite(dto.x) ? dto.x : 120;
-    const y = typeof dto.y === 'number' && Number.isFinite(dto.y) ? dto.y : 120;
+    const x =
+      typeof dto.x === 'number' && Number.isFinite(dto.x) ? dto.x : 120;
+    const y =
+      typeof dto.y === 'number' && Number.isFinite(dto.y) ? dto.y : 120;
     const anchor =
       dto.anchor && typeof dto.anchor.tableId === 'string'
         ? {
@@ -1457,30 +1177,23 @@ export class DataRequestsService {
     const person = this.person();
     const row = await this.loadRequest(caseId);
     if (!(await this.canView(row, person))) {
-      throw new ForbiddenException('You do not have access to this data request.');
+      throw new ForbiddenException(
+        'You do not have access to this data request.',
+      );
     }
-    const thread = await this.prisma.caseThread.findFirst({
-      where: { id: threadId, caseId, kind: CaseThreadKind.DISCUSSION },
-      select: { id: true },
-    });
-    if (!thread) throw new NotFoundException('Comment thread not found.');
+    await this.loadCommentThread(caseId, threadId);
     return this.threads.getEntries(threadId, undefined, 100);
   }
 
   async replyComment(caseId: string, threadId: string, body: string) {
     const person = this.person();
     const row = await this.loadRequest(caseId);
-    const { isRequester, isTeam, isManager } = await this.rolesFor(row, person);
-    if (!isRequester && !isTeam && !isManager) {
-      throw new ForbiddenException(
-        'Only participants of this data request can reply to comments.',
-      );
-    }
-    const thread = await this.prisma.caseThread.findFirst({
-      where: { id: threadId, caseId, kind: CaseThreadKind.DISCUSSION },
-      select: { id: true },
-    });
-    if (!thread) throw new NotFoundException('Comment thread not found.');
+    await this.assertParticipant(
+      row,
+      person,
+      'Only participants of this data request can reply to comments.',
+    );
+    await this.loadCommentThread(caseId, threadId);
     const trimmed = typeof body === 'string' ? body.trim() : '';
     if (!trimmed) throw new BadRequestException('Reply text is required.');
     const entry = await this.threads.addEntry(threadId, {
@@ -1495,17 +1208,12 @@ export class DataRequestsService {
   async resolveComment(caseId: string, threadId: string, resolved: boolean) {
     const person = this.person();
     const row = await this.loadRequest(caseId);
-    const { isRequester, isTeam, isManager } = await this.rolesFor(row, person);
-    if (!isRequester && !isTeam && !isManager) {
-      throw new ForbiddenException(
-        'Only participants of this data request can resolve comments.',
-      );
-    }
-    const thread = await this.prisma.caseThread.findFirst({
-      where: { id: threadId, caseId, kind: CaseThreadKind.DISCUSSION },
-      select: { id: true },
-    });
-    if (!thread) throw new NotFoundException('Comment thread not found.');
+    await this.assertParticipant(
+      row,
+      person,
+      'Only participants of this data request can resolve comments.',
+    );
+    await this.loadCommentThread(caseId, threadId);
     const updated = await this.threads.setResolved(
       threadId,
       Boolean(resolved),
@@ -1515,7 +1223,7 @@ export class DataRequestsService {
     return updated;
   }
 
-  // ── Internal loaders & mappers ───────────────────────────────────────────
+  // ── Internal loaders ─────────────────────────────────────────────────────
 
   private assertTransition(
     state: DataRequestState,
@@ -1537,7 +1245,7 @@ export class DataRequestsService {
     return res.nextState;
   }
 
-  private async loadRequest(caseId: string) {
+  private async loadRequest(caseId: string): Promise<DataRequestDetailRow> {
     const row = await this.prisma.dataRequest.findUnique({
       where: { caseId },
       include: {
@@ -1567,131 +1275,8 @@ export class DataRequestsService {
     return row;
   }
 
-  private toListItem(
-    row: {
-      caseId: string;
-      requesterRef: string;
-      routeGroupId: string;
-      audienceGroupId: string;
-      assigneeRef: string | null;
-      state: DataRequestState;
-      datasetAssetId: string | null;
-      deliveredVersion: number | null;
-      declineReason: string | null;
-      submittedAt: Date | null;
-      deliveredAt: Date | null;
-      closedAt: Date | null;
-      createdAt: Date;
-      updatedAt: Date;
-      case: {
-        kind: CaseKind;
-        title: string;
-        description: string | null;
-        status: import('@prisma/client').CaseStatus;
-        severity: Severity;
-      };
-      dataset: { domain: string; name: string } | null;
-    },
-    names: Map<string, string>,
-  ): DataRequestListItemDto {
-    return {
-      id: row.caseId,
-      kind: row.case.kind,
-      title: row.case.title,
-      description: row.case.description,
-      status: row.case.status,
-      priority: row.case.severity,
-      state: row.state,
-      requester: {
-        ref: row.requesterRef,
-        name: names.get(row.requesterRef) ?? row.requesterRef,
-      },
-      routeGroup: {
-        id: row.routeGroupId,
-        name: names.get(`group:${row.routeGroupId}`) ?? row.routeGroupId,
-      },
-      audienceGroup: {
-        id: row.audienceGroupId,
-        name: names.get(`group:${row.audienceGroupId}`) ?? row.audienceGroupId,
-      },
-      assignee: row.assigneeRef
-        ? {
-            ref: row.assigneeRef,
-            name: names.get(row.assigneeRef) ?? row.assigneeRef,
-          }
-        : null,
-      datasetAssetId: row.datasetAssetId,
-      datasetName: row.dataset
-        ? `shared.${row.dataset.domain}.${row.dataset.name}`
-        : null,
-      deliveredVersion: row.deliveredVersion,
-      declineReason: row.declineReason,
-      submittedAt: row.submittedAt,
-      deliveredAt: row.deliveredAt,
-      closedAt: row.closedAt,
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
-    };
-  }
-
-  private computeLiveDataset(row: {
-    datasetAssetId: string | null;
-    deliveredVersion: number | null;
-    dataset: {
-      assetId: string;
-      domain: string;
-      name: string;
-      version: number;
-      unavailableAt: Date | null;
-      unavailableWhy: string | null;
-      blocks: { id: string }[];
-      asset: { governance: { status: string } | null };
-    } | null;
-  }): DataRequestLiveDatasetDto | null {
-    if (!row.datasetAssetId && row.deliveredVersion === null) {
-      return null;
-    }
-    if (!row.dataset) {
-      return {
-        assetId: null,
-        sqlName: null,
-        domain: null,
-        name: null,
-        currentVersion: null,
-        deliveredVersion: row.deliveredVersion,
-        status: 'removed',
-        reason: 'The delivered shared dataset was removed.',
-      };
-    }
-    const lifecycle = row.dataset.asset.governance?.status ?? 'DRAFT';
-    let status: LiveDatasetStatus = 'ok';
-    let reason: string | null = null;
-    if (lifecycle === 'RETIRED') {
-      status = 'retired';
-      reason = 'This shared dataset has been retired.';
-    } else if (row.dataset.blocks.length > 0) {
-      status = 'blocked';
-      reason = 'An owner of an underlying table blocked this dataset.';
-    } else if (row.dataset.unavailableAt) {
-      status = 'unavailable';
-      reason =
-        row.dataset.unavailableWhy ??
-        'The owning group lost access to one of the underlying tables.';
-    }
-    return {
-      assetId: row.dataset.assetId,
-      sqlName: `shared.${row.dataset.domain}.${row.dataset.name}`,
-      domain: row.dataset.domain,
-      name: row.dataset.name,
-      currentVersion: row.dataset.version,
-      deliveredVersion: row.deliveredVersion,
-      status,
-      reason,
-    };
-  }
-
-  private async toDetailDto(
-    row: Awaited<ReturnType<DataRequestsService['loadRequest']>>,
+  private async buildDetailDto(
+    row: DataRequestDetailRow,
     person: ClsPerson,
   ): Promise<DataRequestDetailDto> {
     const [{ roles, isRequester, isTeam, isManager }, selfServe] =
@@ -1725,61 +1310,14 @@ export class DataRequestsService {
       ),
     );
 
-    const base = this.toListItem(row, names);
-    const deliveries: DataRequestDeliveryDto[] = row.deliveries.map((d) => ({
-      id: d.id,
-      round: d.round,
-      datasetAssetId: d.datasetAssetId,
-      datasetName: datasetNameById.get(d.datasetAssetId) ?? null,
-      datasetVersion: d.datasetVersion,
-      sqlSnapshot: d.sqlSnapshot,
-      specSnapshot: (d.specSnapshot ?? EMPTY_DATA_REQUEST_SPEC) as Record<
-        string,
-        unknown
-      >,
-      mode: d.mode,
-      deliveredBy: {
-        ref: d.deliveredBy,
-        name: names.get(d.deliveredBy) ?? d.deliveredBy,
-      },
-      note: d.note,
-      createdAt: d.createdAt,
-    }));
-
-    const threads: DataRequestCommentThreadDto[] = row.case.threads.map(
-      (t) => ({
-        id: t.id,
-        title: t.title,
-        createdBy: t.createdBy,
-        resolvedAt: t.resolvedAt,
-        resolvedBy: t.resolvedBy,
-        entryCount: t._count.entries,
-        createdAt: t.createdAt,
-        updatedAt: t.updatedAt,
-      }),
-    );
-
-    return {
-      ...base,
-      spec: parseSpecSafe(row.spec) as unknown as Record<string, unknown>,
-      specVersion: row.specVersion,
-      draftSql: row.draftSql,
-      sqlEdited: row.sqlEdited,
-      lastCheck: (row.lastCheck as Record<string, unknown> | null) ?? null,
-      lastCheckSqlHash: row.lastCheckSqlHash,
-      dataset: this.computeLiveDataset(row),
-      deliveries,
-      threads,
-      permissions: {
-        isRequester,
-        isTeam,
-        isManager,
-        canEditSpec: canEditSpec(row.state, roles),
-        canEditSql: canEditSql(row.state, roles),
-        canPreview: isTeam || isManager,
-        canSelfServe: selfServe,
-        allowedActions: allowedActionsFor(row.state, roles),
-      },
-    };
+    return mapDataRequestDetail(row, {
+      names,
+      datasetNameById,
+      roles,
+      isRequester,
+      isTeam,
+      isManager,
+      canSelfServe: selfServe,
+    });
   }
 }

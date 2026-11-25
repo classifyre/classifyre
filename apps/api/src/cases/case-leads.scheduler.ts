@@ -1,7 +1,9 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { PgBossService } from '../scheduler/pg-boss.service';
-// A value import: an @Optional() injection resolves from emitted metadata.
+// Value imports: @Optional() injections resolve from emitted metadata.
 import { ActorContextService } from '../identity/actor-context.service';
+import { PrismaService } from '../prisma.service';
+import { INVESTIGATIONS } from './investigation-filter';
 import {
   CASE_LEADS_COALESCE_SECONDS,
   CASE_LEADS_DELAY_SECONDS,
@@ -41,10 +43,12 @@ export class CaseLeadsScheduler {
   constructor(
     private readonly pgBoss: PgBossService,
     @Optional() private readonly actors?: ActorContextService,
+    @Optional() private readonly prisma?: PrismaService,
   ) {}
 
   /** The case's evidence or watches changed: refresh its leads shortly. */
   async request(caseId: string, reason: string): Promise<void> {
+    if (!(await this.isInvestigation(caseId))) return;
     if (this.askedRecently(`change:${caseId}`, ASKED_RECENTLY_MS)) return;
     await this.send(
       { caseId, reason },
@@ -65,6 +69,7 @@ export class CaseLeadsScheduler {
    */
   async requestOnRead(caseId: string): Promise<void> {
     if (this.actors?.current().kind === 'visitor') return;
+    if (!(await this.isInvestigation(caseId))) return;
     if (this.askedRecently(`read:${caseId}`, READ_ASKED_RECENTLY_MS)) return;
     await this.send(
       { caseId, reason: 'board opened' },
@@ -73,6 +78,19 @@ export class CaseLeadsScheduler {
         singletonSeconds: CASE_LEADS_READ_THROTTLE_SECONDS,
       },
     );
+  }
+
+  private async isInvestigation(caseId: string): Promise<boolean> {
+    if (!this.prisma) return true;
+    try {
+      const row = await this.prisma.case.findFirst({
+        where: { id: caseId, ...INVESTIGATIONS },
+        select: { id: true },
+      });
+      return row !== null;
+    } catch {
+      return false;
+    }
   }
 
   private askedRecently(key: string, windowMs: number): boolean {

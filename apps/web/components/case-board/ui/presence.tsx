@@ -12,33 +12,43 @@ import { initialsOf } from "../store/selectors";
  */
 export function Presence() {
   const others = useBoard((s) => s.presence);
-  if (others.length === 0) return null;
-  return (
-    <div className="flex shrink-0 items-center" data-testid="presence">
-      <OthersHere others={others} />
-    </div>
-  );
+  return <PresenceChips others={others} testId="presence" />;
 }
 
-function OthersHere({ others }: { others: string[] }) {
+/**
+ * Reusable presence avatar stack shared by investigation boards and data
+ * request workspaces.
+ */
+export function PresenceChips({
+  others,
+  testId = "presence",
+  maxVisible = 4,
+}: {
+  others: string[];
+  testId?: string;
+  maxVisible?: number;
+}) {
   const { t } = useTranslation();
+  if (others.length === 0) return null;
   return (
-    <>
-      {others.slice(0, 4).map((person, index) => (
+    <div className="flex shrink-0 items-center" data-testid={testId}>
+      {others.slice(0, maxVisible).map((person, index) => (
         <Tooltip key={`${person}-${index}`}>
           <TooltipTrigger asChild>
             <span className="-mr-1.5 flex size-7 items-center justify-center rounded-full border-2 border-background bg-muted font-mono text-[10px] font-bold">
               {initialsOf(person)}
             </span>
           </TooltipTrigger>
-          <TooltipContent>{t("caseBoard.topBar.alsoHere", { names: person })}</TooltipContent>
+          <TooltipContent>
+            {t("caseBoard.topBar.alsoHere", { names: person })}
+          </TooltipContent>
         </Tooltip>
       ))}
-      {others.length > 4 && (
+      {others.length > maxVisible && (
         <span className="-mr-1.5 flex size-7 items-center justify-center rounded-full border-2 border-background bg-muted font-mono text-[10px]">
-          +{others.length - 4}
+          +{others.length - maxVisible}
         </span>
       )}
-    </>
+    </div>
   );
 }

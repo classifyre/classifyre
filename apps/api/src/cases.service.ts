@@ -20,6 +20,7 @@ import {
 } from '@workspace/schemas/data-request';
 import { ActorDirectoryService } from './identity/actor-directory.service';
 import { CLS_PERSON, type ClsPerson } from './identity/iam-access-policy';
+import { visibleCaseWhere } from './cases/investigation-filter';
 import { PrismaService } from './prisma.service';
 import { GraphService } from './graph.service';
 import { InquiryMatchingService } from './matching/inquiry-matching.service';
@@ -91,6 +92,7 @@ type CaseRow = Prisma.CaseGetPayload<{
     dataRequest: {
       select: {
         state: true;
+        requesterRef: true;
         routeGroupId: true;
         audienceGroupId: true;
         deliveredVersion: true;
@@ -180,6 +182,7 @@ const countSelect = {
   dataRequest: {
     select: {
       state: true,
+      requesterRef: true,
       routeGroupId: true,
       audienceGroupId: true,
       deliveredVersion: true,
@@ -568,20 +571,7 @@ export class CasesService {
     const viewerRef = this.cls?.isActive()
       ? this.cls.get<ClsPerson | undefined>(CLS_PERSON)?.actorRef
       : undefined;
-    const draftVisibility: Prisma.CaseWhereInput = viewerRef
-      ? {
-          OR: [
-            { kind: CaseKind.INVESTIGATION },
-            { dataRequest: { state: { not: DataRequestState.DRAFT } } },
-            { dataRequest: { requesterRef: viewerRef } },
-          ],
-        }
-      : {
-          OR: [
-            { kind: CaseKind.INVESTIGATION },
-            { dataRequest: { state: { not: DataRequestState.DRAFT } } },
-          ],
-        };
+    const draftVisibility = visibleCaseWhere(viewerRef);
     if (flag(query.escalated)) {
       where.findings = { some: { escalatedAt: { not: null } } };
     }
@@ -723,6 +713,17 @@ export class CasesService {
       },
     });
     if (!row) return null;
+    if (
+      row.kind === CaseKind.DATA_REQUEST &&
+      row.dataRequest?.state === DataRequestState.DRAFT
+    ) {
+      const viewerRef = this.cls?.isActive()
+        ? this.cls.get<ClsPerson | undefined>(CLS_PERSON)?.actorRef
+        : undefined;
+      if (!viewerRef || viewerRef !== row.dataRequest.requesterRef) {
+        return null;
+      }
+    }
     const groupNames = await this.resolveRequestGroupNames([row]);
     const evidence = this.hydrateEvidence(row.evidence);
     const inquiries: CaseLinkedInquiryDto[] = row.inquiryLinks.map((l) => ({

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import {
   CaseKind,
   CaseLeadStatus,
@@ -7,6 +7,9 @@ import {
   InquiryStatus,
   Prisma,
 } from '@prisma/client';
+import { ClsService } from 'nestjs-cls';
+import { CLS_PERSON, type ClsPerson } from './identity/iam-access-policy';
+import { visibleCaseWhere } from './cases/investigation-filter';
 import { PrismaService } from './prisma.service';
 import type { CaseworkSummaryDto } from './dto/casework-summary.dto';
 
@@ -32,9 +35,16 @@ const RECENT_LIMIT = 5;
  */
 @Injectable()
 export class CaseworkSummaryService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly cls?: ClsService,
+  ) {}
 
   async getSummary(): Promise<CaseworkSummaryDto> {
+    const viewerRef = this.cls?.isActive()
+      ? this.cls.get<ClsPerson | undefined>(CLS_PERSON)?.actorRef
+      : undefined;
+    const caseWhere = visibleCaseWhere(viewerRef);
     // Promise.all, not $transaction: interactive transactions hold a connection
     // for their whole duration, and a read-only summary has nothing to gain from
     // a consistent snapshot across five independent counts.
@@ -49,13 +59,16 @@ export class CaseworkSummaryService {
     ] = await Promise.all([
       this.prisma.case.groupBy({
         by: ['status'],
+        where: caseWhere,
         _count: { _all: true },
       }),
       this.prisma.case.groupBy({
         by: ['kind'],
+        where: caseWhere,
         _count: { _all: true },
       }),
       this.prisma.case.findMany({
+        where: caseWhere,
         include: countSelect,
         orderBy: { updatedAt: 'desc' },
         take: RECENT_LIMIT,

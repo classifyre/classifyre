@@ -14,6 +14,7 @@ import {
 } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import { CLS_PERSON, type ClsPerson } from '../identity/iam-access-policy';
+import { DataRequestChecksService } from './data-request-checks.service';
 import { DataRequestsService } from './data-requests.service';
 
 const BASE_SPEC = {
@@ -452,15 +453,22 @@ function setup(opts: {
 
   const boardEvents = { emitChanged: jest.fn() };
 
+  const checks = new DataRequestChecksService(
+    prisma as never,
+    directory as never,
+    catalog as never,
+    resolver as never,
+    sharedDatasets as never,
+  );
+
   const service = new DataRequestsService(
     prisma as never,
     cls as never,
     actors as never,
     directory as never,
     audit as never,
-    catalog as never,
     resolver as never,
-    sharedDatasets as never,
+    checks,
     activity as never,
     threads as never,
     notifier as never,
@@ -557,6 +565,23 @@ describe('DataRequestsService', () => {
       });
 
       await expect(service.get('case-1')).rejects.toThrow(ForbiddenException);
+      await expect(
+        service.updateSpec('case-1', { spec: BASE_SPEC, baseVersion: 1 }),
+      ).rejects.toThrow(ForbiddenException);
+      await expect(
+        service.updateSql('case-1', { sql: 'SELECT 1', baseVersion: 1 }),
+      ).rejects.toThrow(ForbiddenException);
+      await expect(service.check('case-1')).rejects.toThrow(ForbiddenException);
+      await expect(service.describe('case-1')).rejects.toThrow(
+        ForbiddenException,
+      );
+      await expect(
+        service.addComment('case-1', {
+          body: 'peeking',
+          x: 0,
+          y: 0,
+        }),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('allows requester to read their DRAFT request and team to read once SUBMITTED', async () => {
@@ -638,6 +663,21 @@ describe('DataRequestsService', () => {
       const { service } = setup({
         person: { actorRef: 'user:alice', groupIds: ['grp-finance'] },
         row: makeRow({ state: DataRequestState.DRAFT }),
+      });
+
+      await expect(
+        service.updateSql('case-1', {
+          sql: 'SELECT 1',
+          baseVersion: 1,
+        }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('forbids case.manage managers who are not on the routed data team from editing SQL', async () => {
+      const { service } = setup({
+        person: { actorRef: 'user:carol', groupIds: ['grp-ops'] },
+        capabilities: ['workspace.view', 'case.view', 'case.manage'],
+        row: makeRow({ state: DataRequestState.SUBMITTED }),
       });
 
       await expect(
@@ -821,6 +861,40 @@ describe('DataRequestsService', () => {
       });
       // Self-serve does not self-notify the requester
       expect(allowed.notifier.delivered).not.toHaveBeenCalled();
+    });
+
+    it('derives UPDATED when re-delivering the same dataset and LINKED when linking an existing dataset', async () => {
+      const updatedCtx = setup({
+        person: { actorRef: 'user:bob', groupIds: ['grp-data'] },
+        row: makeRow({
+          state: DataRequestState.CHANGES_REQUESTED,
+          datasetAssetId: 'ds-1',
+          deliveredVersion: 1,
+        }),
+        sharedDataset: { ...sharedDataset, version: 2 },
+        audienceCanQuery: true,
+      });
+      await updatedCtx.service.deliver('case-1', { datasetAssetId: 'ds-1' });
+      expect(updatedCtx.createdDeliveries[0]).toMatchObject({
+        mode: DataRequestDeliveryMode.UPDATED,
+        datasetVersion: 2,
+      });
+
+      const linkedCtx = setup({
+        person: { actorRef: 'user:bob', groupIds: ['grp-data'] },
+        row: makeRow({ state: DataRequestState.IN_PROGRESS }),
+        sharedDataset: {
+          ...sharedDataset,
+          version: 3,
+          sql: 'SELECT * FROM lake.sales.orders_v3',
+        },
+        audienceCanQuery: true,
+      });
+      await linkedCtx.service.deliver('case-1', { datasetAssetId: 'ds-1' });
+      expect(linkedCtx.createdDeliveries[0]).toMatchObject({
+        mode: DataRequestDeliveryMode.LINKED,
+        datasetVersion: 3,
+      });
     });
   });
 

@@ -6,6 +6,7 @@ import { CaseActivityService } from '../case-activity.service';
 import { CaseThreadsService } from '../case-threads.service';
 import { DataRequestsController } from './data-requests.controller';
 import { DataRequestsService } from './data-requests.service';
+import { DataRequestChecksService } from './data-request-checks.service';
 import { DataRequestNotifier } from './data-request.notifier';
 
 @Module({
@@ -14,10 +15,11 @@ import { DataRequestNotifier } from './data-request.notifier';
   providers: [
     PrismaService,
     DataRequestsService,
+    DataRequestChecksService,
     DataRequestNotifier,
     CaseActivityService,
     CaseThreadsService,
   ],
-  exports: [DataRequestsService, DataRequestNotifier],
+  exports: [DataRequestsService, DataRequestChecksService, DataRequestNotifier],
 })
 export class DataRequestsModule {}

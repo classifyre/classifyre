@@ -13,7 +13,7 @@ done
 # Resolve the latest stable tag on every cluster creation instead of allowing a
 # hard-coded minimum version to become stale.
 k3d_version="$(k3d version | awk '/k3d version/ {print $3}')"
-k3d_latest_url="$(curl -fsSL -o /dev/null -w '%{url_effective}' \
+k3d_latest_url="$(curl -fsSL --connect-timeout 30 --max-time 120 --retry 3 --retry-delay 2 -o /dev/null -w '%{url_effective}' \
   https://github.com/k3d-io/k3d/releases/latest)"
 k3d_latest_version="${k3d_latest_url##*/}"
 if [[ -z "${k3d_version}" || -z "${k3d_latest_version}" || "${k3d_version}" != "${k3d_latest_version}" ]]; then
@@ -78,13 +78,13 @@ helm upgrade --install ingress-nginx ingress-nginx \
   --set controller.service.type=LoadBalancer \
   --set controller.ingressClassResource.default=true \
   --wait \
-  --timeout 5m
+  --timeout 30m
 
 kubectl wait \
   --namespace ingress-nginx \
   --for=condition=Available \
   deployment/ingress-nginx-controller \
-  --timeout=5m
+  --timeout=30m
 
 # CLI Jobs run classifyre/cli:dev-local (values-dev.yaml): the published image
 # plus unixODBC, which it predates. Loaded here so a fresh cluster can run an

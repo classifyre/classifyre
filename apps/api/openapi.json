@@ -17305,7 +17305,14 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddDataRequestCommentResponseDto"
+                }
+              }
+            }
           }
         },
         "summary": "Pin a discussion comment onto the request canvas",
@@ -17384,7 +17391,14 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadResponseDto"
+                }
+              }
+            }
           }
         },
         "summary": "Reply to a data request comment pin",
@@ -17426,7 +17440,14 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolveDataRequestCommentResponseDto"
+                }
+              }
+            }
           }
         },
         "summary": "Resolve or reopen a data request comment pin",
@@ -44355,15 +44376,6 @@
           },
           "note": {
             "type": "string"
-          },
-          "mode": {
-            "type": "string",
-            "enum": [
-              "PUBLISHED",
-              "LINKED",
-              "UPDATED",
-              "SELF_SERVE"
-            ]
           }
         },
         "required": [
@@ -44414,6 +44426,67 @@
           "body"
         ]
       },
+      "DataRequestPinAnchorDto": {
+        "type": "object",
+        "properties": {
+          "tableId": {
+            "type": "string"
+          },
+          "column": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "tableId"
+        ]
+      },
+      "DataRequestPinDto": {
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string"
+          },
+          "anchor": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DataRequestPinAnchorDto"
+              }
+            ]
+          },
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "threadId",
+          "x",
+          "y"
+        ]
+      },
+      "AddDataRequestCommentResponseDto": {
+        "type": "object",
+        "properties": {
+          "thread": {
+            "$ref": "#/components/schemas/DataRequestCommentThreadDto"
+          },
+          "pin": {
+            "$ref": "#/components/schemas/DataRequestPinDto"
+          },
+          "specVersion": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "thread",
+          "pin",
+          "specVersion"
+        ]
+      },
       "AddDataRequestCommentReplyDto": {
         "type": "object",
         "properties": {
@@ -44434,6 +44507,25 @@
         },
         "required": [
           "resolved"
+        ]
+      },
+      "ResolveDataRequestCommentResponseDto": {
+        "type": "object",
+        "properties": {
+          "changed": {
+            "type": "boolean"
+          },
+          "caseId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "changed",
+          "caseId",
+          "title"
         ]
       },
       "RunnerLimitDto": {

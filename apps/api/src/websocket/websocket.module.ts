@@ -1,4 +1,5 @@
 import { Module, Global } from '@nestjs/common';
+import { PrismaService } from '../prisma.service';
 import { RunnerEventsGateway } from './runner-events.gateway';
 import { NotificationEventsGateway } from './notification-events.gateway';
 import { CaseBoardGateway } from './case-board.gateway';
@@ -7,6 +8,7 @@ import { CASE_BOARD_EVENTS } from '../case-board/case-board.events';
 @Global()
 @Module({
   providers: [
+    PrismaService,
     RunnerEventsGateway,
     NotificationEventsGateway,
     CaseBoardGateway,

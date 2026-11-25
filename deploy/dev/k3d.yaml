@@ -15,9 +15,18 @@ ports:
       - loadbalancer
 
 options:
+  k3d:
+    wait: true
+    timeout: "15m"
   k3s:
     extraArgs:
       - arg: --disable=traefik
+        nodeFilters:
+          - server:*
+      - arg: --kubelet-arg=image-pull-progress-deadline=15m
+        nodeFilters:
+          - server:*
+      - arg: --kubelet-arg=runtime-request-timeout=15m
         nodeFilters:
           - server:*
   kubeconfig:
