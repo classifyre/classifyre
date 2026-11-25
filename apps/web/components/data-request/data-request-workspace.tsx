@@ -303,6 +303,7 @@ function DataRequestWorkspaceInner({
   return (
     <div
       className="flex h-[calc(100vh-3.5rem)] flex-col overflow-hidden bg-background"
+      style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 3.5rem)" }}
       data-testid="data-request-workspace"
     >
       <RequestTopBar
@@ -322,7 +323,7 @@ function DataRequestWorkspaceInner({
         </div>
       )}
 
-      <div className="min-h-0 flex-1">
+      <div className="min-h-0 flex-1" style={{ minHeight: 0, flex: "1 1 0%" }}>
         <ResizablePanelGroup orientation="horizontal" className="h-full w-full">
           <ResizablePanel id="rail" defaultSize="20%" minSize="15%" maxSize="32%">
             <RequestCatalogRail

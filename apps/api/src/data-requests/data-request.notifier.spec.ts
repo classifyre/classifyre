@@ -6,23 +6,26 @@ import {
 import { DataRequestNotifier } from './data-request.notifier';
 
 describe('DataRequestNotifier', () => {
-  function setup(opts: {
-    hasNotifications?: boolean;
-    createForReject?: Error;
-    dataset?: { domain: string; name: string } | null;
-    linkedRequests?: Array<{
-      caseId: string;
-      requesterRef: string;
-      case: { title: string };
-    }>;
-  } = {}) {
+  function setup(
+    opts: {
+      hasNotifications?: boolean;
+      createForReject?: Error;
+      dataset?: { domain: string; name: string } | null;
+      linkedRequests?: Array<{
+        caseId: string;
+        requesterRef: string;
+        case: { title: string };
+      }>;
+    } = {},
+  ) {
     let unavailableCb:
       | ((event: { assetId: string; reason: string }) => Promise<void> | void)
       | null = null;
 
+    const rejectErr = opts.createForReject;
     const notifications = {
-      createFor: opts.createForReject
-        ? jest.fn(() => Promise.reject(opts.createForReject))
+      createFor: rejectErr
+        ? jest.fn(() => Promise.reject(rejectErr))
         : jest.fn(() => Promise.resolve()),
     };
 
@@ -69,7 +72,10 @@ describe('DataRequestNotifier', () => {
       notifications,
       prisma,
       resolver,
-      triggerUnavailable: async (event: { assetId: string; reason: string }) => {
+      triggerUnavailable: async (event: {
+        assetId: string;
+        reason: string;
+      }) => {
         if (!unavailableCb) throw new Error('onModuleInit not called');
         await unavailableCb(event);
       },

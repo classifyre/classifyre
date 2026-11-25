@@ -204,7 +204,8 @@ export class ResolvedActorDto {
 
   @ApiPropertyOptional({
     enum: ['mcp', 'sql'],
-    description: 'What `viaDisplayName` names: an MCP token or a SQL connection.',
+    description:
+      'What `viaDisplayName` names: an MCP token or a SQL connection.',
   })
   viaKind?: 'mcp' | 'sql';
 

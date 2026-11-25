@@ -86,7 +86,9 @@ describe('data-requests MCP tools', () => {
     const list = jest.fn().mockResolvedValue({ items: [], total: 0 });
     const get = jest.fn().mockResolvedValue({ id: 'case-1' });
     const create = jest.fn().mockResolvedValue({ id: 'case-2' });
-    const submit = jest.fn().mockResolvedValue({ id: 'case-2', state: 'SUBMITTED' });
+    const submit = jest
+      .fn()
+      .mockResolvedValue({ id: 'case-2', state: 'SUBMITTED' });
 
     const { tools, requirePerson, jsonResult } = register({
       list,

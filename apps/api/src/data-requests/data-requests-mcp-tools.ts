@@ -68,7 +68,8 @@ export function registerDataRequestMcpTools(
     },
     async (args) => {
       helpers.requirePerson();
-      const scope = (args.scope as 'mine' | 'team' | 'all' | undefined) ?? 'mine';
+      const scope =
+        (args.scope as 'mine' | 'team' | 'all' | undefined) ?? 'mine';
       const result = await requireService().list(scope);
       return helpers.jsonResult(result);
     },

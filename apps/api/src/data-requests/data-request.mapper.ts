@@ -237,7 +237,7 @@ export function mapDataRequestDetail(
 
   return {
     ...base,
-    spec: parseSpecSafe(row.spec) as unknown as Record<string, unknown>,
+    spec: parseSpecSafe(row.spec),
     specVersion: row.specVersion,
     draftSql: row.draftSql,
     sqlEdited: row.sqlEdited,

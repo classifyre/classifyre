@@ -84,7 +84,10 @@ export class NotificationsService {
     }
     const slug = this.cls.get<string>(CLS_SLUG);
     let normalized = actionUrl;
-    if (slug && (normalized === `/${slug}` || normalized.startsWith(`/${slug}/`))) {
+    if (
+      slug &&
+      (normalized === `/${slug}` || normalized.startsWith(`/${slug}/`))
+    ) {
       const rest = normalized.slice(slug.length + 1);
       if (rest === '/investigations') {
         return `/${slug}/cases`;

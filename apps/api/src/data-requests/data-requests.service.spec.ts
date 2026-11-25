@@ -157,27 +157,30 @@ function makeRow(over: Partial<RowState> = {}): RowState {
   };
 }
 
-function setup(opts: {
-  person?: ClsPerson;
-  capabilities?: string[];
-  eligibleGroups?: Array<{ id: string; name: string; path?: string }>;
-  row?: RowState | null;
-  sharedDataset?: {
-    assetId: string;
-    domain: string;
-    name: string;
-    version: number;
-    sql: string;
-    createdBy: string;
-  } | null;
-  audienceCanQuery?: boolean;
-  groupNames?: Record<string, string>;
-} = {}) {
+function setup(
+  opts: {
+    person?: ClsPerson;
+    capabilities?: string[];
+    eligibleGroups?: Array<{ id: string; name: string; path?: string }>;
+    row?: RowState | null;
+    sharedDataset?: {
+      assetId: string;
+      domain: string;
+      name: string;
+      version: number;
+      sql: string;
+      createdBy: string;
+    } | null;
+    audienceCanQuery?: boolean;
+    groupNames?: Record<string, string>;
+  } = {},
+) {
   const person: ClsPerson = opts.person ?? {
     actorRef: 'user:alice',
     groupIds: ['grp-finance'],
   };
-  let storedRow: RowState | null = opts.row === undefined ? makeRow() : opts.row;
+  let storedRow: RowState | null =
+    opts.row === undefined ? makeRow() : opts.row;
   const createdDeliveries: Record<string, unknown>[] = [];
   const createdCases: Record<string, unknown>[] = [];
   const createdRequests: Record<string, unknown>[] = [];
@@ -216,10 +219,12 @@ function setup(opts: {
           case: {
             id: String(data.caseId),
             kind: CaseKind.DATA_REQUEST,
-            title: String(createdCases[0]?.title ?? 'Untitled'),
-            description: (createdCases[0]?.description as string | null) ?? null,
+            title: (createdCases[0]?.title as string | undefined) ?? 'Untitled',
+            description:
+              (createdCases[0]?.description as string | null) ?? null,
             status: (createdCases[0]?.status as CaseStatus) ?? CaseStatus.OPEN,
-            severity: (createdCases[0]?.severity as Severity) ?? Severity.MEDIUM,
+            severity:
+              (createdCases[0]?.severity as Severity) ?? Severity.MEDIUM,
             assignee: null,
             threads: [],
           },
@@ -229,19 +234,31 @@ function setup(opts: {
       update: jest.fn(({ data }: { data: Record<string, any> }) => {
         if (storedRow) {
           const next = { ...data };
-          if (next.specVersion && typeof next.specVersion === 'object' && 'increment' in next.specVersion) {
-            next.specVersion = storedRow.specVersion + next.specVersion.increment;
+          if (
+            next.specVersion &&
+            typeof next.specVersion === 'object' &&
+            'increment' in next.specVersion
+          ) {
+            next.specVersion =
+              storedRow.specVersion + next.specVersion.increment;
           }
           Object.assign(storedRow, next);
         }
         return Promise.resolve(storedRow);
       }),
       updateMany: jest.fn(
-        ({ where, data }: { where: { caseId: string; specVersion?: number }; data: Record<string, unknown> }) => {
+        ({
+          where,
+          data,
+        }: {
+          where: { caseId: string; specVersion?: number };
+          data: Record<string, unknown>;
+        }) => {
           if (
             !storedRow ||
             storedRow.caseId !== where.caseId ||
-            (where.specVersion !== undefined && storedRow.specVersion !== where.specVersion)
+            (where.specVersion !== undefined &&
+              storedRow.specVersion !== where.specVersion)
           ) {
             return Promise.resolve({ count: 0 });
           }
@@ -265,7 +282,9 @@ function setup(opts: {
   };
 
   const prisma = {
-    $transaction: jest.fn((fn: (client: unknown) => Promise<unknown>) => fn(tx)),
+    $transaction: jest.fn((fn: (client: unknown) => Promise<unknown>) =>
+      fn(tx),
+    ),
     case: tx.case,
     dataRequest: {
       ...tx.dataRequest,
@@ -282,7 +301,10 @@ function setup(opts: {
     },
     sharedDataset: {
       findUnique: jest.fn(({ where }: { where: { assetId: string } }) => {
-        if (!opts.sharedDataset || opts.sharedDataset.assetId !== where.assetId) {
+        if (
+          !opts.sharedDataset ||
+          opts.sharedDataset.assetId !== where.assetId
+        ) {
           return Promise.resolve(null);
         }
         return Promise.resolve({
@@ -474,7 +496,7 @@ function setup(opts: {
     notifier as never,
     policy as never,
     identity as never,
-    boardEvents as never,
+    boardEvents,
   );
 
   return {
@@ -561,7 +583,10 @@ describe('DataRequestsService', () => {
       const { service } = setup({
         person: { actorRef: 'user:bob', groupIds: ['grp-data', 'grp-finance'] },
         capabilities: ['workspace.view', 'case.view', 'case.manage'],
-        row: makeRow({ state: DataRequestState.DRAFT, requesterRef: 'user:alice' }),
+        row: makeRow({
+          state: DataRequestState.DRAFT,
+          requesterRef: 'user:alice',
+        }),
       });
 
       await expect(service.get('case-1')).rejects.toThrow(ForbiddenException);
@@ -636,7 +661,8 @@ describe('DataRequestsService', () => {
     });
 
     it('preserves hand-edited SQL when sqlEdited is true', async () => {
-      const customSql = 'SELECT id, total * 2 AS doubled FROM lake.sales.orders';
+      const customSql =
+        'SELECT id, total * 2 AS doubled FROM lake.sales.orders';
       const { service, getRow } = setup({
         person: { actorRef: 'user:bob', groupIds: ['grp-data'] },
         row: makeRow({
@@ -790,7 +816,9 @@ describe('DataRequestsService', () => {
 
       await expect(
         service.deliver('case-1', { datasetAssetId: 'ds-1' }),
-      ).rejects.toThrow(new BadRequestException('Share it with Finance first.'));
+      ).rejects.toThrow(
+        new BadRequestException('Share it with Finance first.'),
+      );
       expect(createdDeliveries).toHaveLength(0);
       expect(notifier.delivered).not.toHaveBeenCalled();
     });

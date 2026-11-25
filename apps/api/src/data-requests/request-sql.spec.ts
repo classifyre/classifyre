@@ -15,7 +15,8 @@ import { BoardSketchSchema } from '@workspace/schemas/case-board';
 import { precheckSql } from '../data-query/sql-precheck';
 
 function table(
-  overrides: Partial<DataRequestTable> & Pick<DataRequestTable, 'id' | 'sqlName' | 'alias'>,
+  overrides: Partial<DataRequestTable> &
+    Pick<DataRequestTable, 'id' | 'sqlName' | 'alias'>,
 ): DataRequestTable {
   return {
     assetId: `asset-${overrides.id}`,
@@ -92,10 +93,30 @@ describe('generateRequestSql', () => {
   it('orders joins by BFS from spec.tables[0] and puts visited side on left of ON', () => {
     const s = spec({
       tables: [
-        table({ id: 'a', sqlName: 'lake.crm.accounts', alias: 'a', keep: ['account_id'] }),
-        table({ id: 'b', sqlName: 'lake.crm.orders', alias: 'b', keep: ['order_id'] }),
-        table({ id: 'c', sqlName: 'lake.crm.invoices', alias: 'c', keep: ['invoice_id'] }),
-        table({ id: 'd', sqlName: 'lake.crm.line_items', alias: 'd', keep: ['item_id'] }),
+        table({
+          id: 'a',
+          sqlName: 'lake.crm.accounts',
+          alias: 'a',
+          keep: ['account_id'],
+        }),
+        table({
+          id: 'b',
+          sqlName: 'lake.crm.orders',
+          alias: 'b',
+          keep: ['order_id'],
+        }),
+        table({
+          id: 'c',
+          sqlName: 'lake.crm.invoices',
+          alias: 'c',
+          keep: ['invoice_id'],
+        }),
+        table({
+          id: 'd',
+          sqlName: 'lake.crm.line_items',
+          alias: 'd',
+          keep: ['item_id'],
+        }),
       ],
       joins: [
         // d connects to b (depth 2) — listed first to verify BFS still visits b & c before d
@@ -143,8 +164,18 @@ describe('generateRequestSql', () => {
   it('combines multiple joins between the same pair into a single ON ... AND ... and supports LEFT join', () => {
     const s = spec({
       tables: [
-        table({ id: 'o', sqlName: 'lake.sales.orders', alias: 'o', keep: ['tenant_id'] }),
-        table({ id: 'c', sqlName: 'lake.sales.customers', alias: 'c', keep: ['name'] }),
+        table({
+          id: 'o',
+          sqlName: 'lake.sales.orders',
+          alias: 'o',
+          keep: ['tenant_id'],
+        }),
+        table({
+          id: 'c',
+          sqlName: 'lake.sales.customers',
+          alias: 'c',
+          keep: ['name'],
+        }),
       ],
       joins: [
         {
@@ -180,8 +211,18 @@ describe('generateRequestSql', () => {
   it('refuses a disconnected table with an error and empty SQL', () => {
     const s = spec({
       tables: [
-        table({ id: 't1', sqlName: 'lake.crm.customers', alias: 'c', keep: ['id'] }),
-        table({ id: 't2', sqlName: 'lake.crm.orders', alias: 'o', keep: ['total'] }),
+        table({
+          id: 't1',
+          sqlName: 'lake.crm.customers',
+          alias: 'c',
+          keep: ['id'],
+        }),
+        table({
+          id: 't2',
+          sqlName: 'lake.crm.orders',
+          alias: 'o',
+          keep: ['total'],
+        }),
       ],
       joins: [],
     });
@@ -224,13 +265,15 @@ describe('generateRequestSql', () => {
   });
 
   it('errors when more than 8 distinct sources are referenced', () => {
-    const tables = Array.from({ length: DATA_REQUEST_MAX_SOURCES + 1 }, (_, i) =>
-      table({
-        id: `t${i}`,
-        sqlName: `src_${i}.public.tbl`,
-        alias: `s${i}`,
-        keep: ['id'],
-      }),
+    const tables = Array.from(
+      { length: DATA_REQUEST_MAX_SOURCES + 1 },
+      (_, i) =>
+        table({
+          id: `t${i}`,
+          sqlName: `src_${i}.public.tbl`,
+          alias: `s${i}`,
+          keep: ['id'],
+        }),
     );
     const joins = tables.slice(1).map((t, idx) => ({
       id: `j${idx}`,
@@ -376,8 +419,18 @@ describe('generateRequestSql', () => {
     ]);
     const s = spec({
       tables: [
-        table({ id: 't1', sqlName: 'lake.crm.customers', alias: 'c', keep: ['id'] }),
-        table({ id: 't2', sqlName: 'lake.crm.orders', alias: 'o', keep: ['id'] }),
+        table({
+          id: 't1',
+          sqlName: 'lake.crm.customers',
+          alias: 'c',
+          keep: ['id'],
+        }),
+        table({
+          id: 't2',
+          sqlName: 'lake.crm.orders',
+          alias: 'o',
+          keep: ['id'],
+        }),
       ],
       joins: [
         {
@@ -541,8 +594,22 @@ describe('specToSketch', () => {
   it('marks LEFT join edges with style "s" and still validates against BoardSketchSchema', () => {
     const s = spec({
       tables: [
-        table({ id: 'a', sqlName: 'lake.crm.a', alias: 'a', x: -100, y: -50, keep: ['id'] }),
-        table({ id: 'b', sqlName: 'lake.crm.b', alias: 'b', x: 200, y: 100, keep: ['id'] }),
+        table({
+          id: 'a',
+          sqlName: 'lake.crm.a',
+          alias: 'a',
+          x: -100,
+          y: -50,
+          keep: ['id'],
+        }),
+        table({
+          id: 'b',
+          sqlName: 'lake.crm.b',
+          alias: 'b',
+          x: 200,
+          y: 100,
+          keep: ['id'],
+        }),
       ],
       joins: [
         {

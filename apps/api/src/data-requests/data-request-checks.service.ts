@@ -242,7 +242,8 @@ export class DataRequestChecksService {
         error: {
           code: 'empty_sql',
           message:
-            check.problems[0] ?? 'Complete the request before running describe.',
+            check.problems[0] ??
+            'Complete the request before running describe.',
         },
         check,
       };
@@ -290,8 +291,7 @@ export class DataRequestChecksService {
         resp && typeof resp === 'object'
           ? (resp as Record<string, unknown>)
           : null;
-      const code =
-        typeof obj?.code === 'string' ? obj.code : 'describe_failed';
+      const code = typeof obj?.code === 'string' ? obj.code : 'describe_failed';
       const message =
         typeof obj?.message === 'string'
           ? obj.message

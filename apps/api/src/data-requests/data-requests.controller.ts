@@ -45,7 +45,8 @@ export class DataRequestsController {
   @Get('options')
   @Requires('workspace.view')
   @ApiOperation({
-    summary: 'List eligible route groups, caller audience groups, and self-serve hint',
+    summary:
+      'List eligible route groups, caller audience groups, and self-serve hint',
   })
   @ApiResponse({ status: 200, type: DataRequestOptionsDto })
   options(): Promise<DataRequestOptionsDto> {
@@ -77,7 +78,10 @@ export class DataRequestsController {
 
   @Get(':id')
   @Requires('workspace.view')
-  @ApiOperation({ summary: 'Get a data request with spec, deliveries, and live dataset status' })
+  @ApiOperation({
+    summary:
+      'Get a data request with spec, deliveries, and live dataset status',
+  })
   @ApiResponse({ status: 200, type: DataRequestDetailDto })
   get(@Param('id') id: string): Promise<DataRequestDetailDto> {
     return this.service.get(id);
@@ -85,7 +89,9 @@ export class DataRequestsController {
 
   @Put(':id/spec')
   @Requires('workspace.view')
-  @ApiOperation({ summary: 'Update the visual join canvas spec (optimistic concurrency)' })
+  @ApiOperation({
+    summary: 'Update the visual join canvas spec (optimistic concurrency)',
+  })
   @ApiResponse({ status: 200, type: DataRequestDetailDto })
   updateSpec(
     @Param('id') id: string,
@@ -96,7 +102,9 @@ export class DataRequestsController {
 
   @Put(':id/sql')
   @Requires('workspace.view')
-  @ApiOperation({ summary: 'Hand-edit or regenerate the request SQL (data team only)' })
+  @ApiOperation({
+    summary: 'Hand-edit or regenerate the request SQL (data team only)',
+  })
   @ApiResponse({ status: 200, type: DataRequestDetailDto })
   updateSql(
     @Param('id') id: string,
@@ -107,7 +115,10 @@ export class DataRequestsController {
 
   @Post(':id/check')
   @Requires('workspace.view')
-  @ApiOperation({ summary: 'Fast static check of the request SQL against the routed group catalog' })
+  @ApiOperation({
+    summary:
+      'Fast static check of the request SQL against the routed group catalog',
+  })
   @ApiResponse({ status: 201, type: DataRequestCheckResultDto })
   check(@Param('id') id: string): Promise<DataRequestCheckResultDto> {
     return this.service.check(id);
@@ -115,7 +126,10 @@ export class DataRequestsController {
 
   @Post(':id/describe')
   @Requires('workspace.view')
-  @ApiOperation({ summary: 'Describe SQL lineage and floors as the routed group (cached by SQL hash)' })
+  @ApiOperation({
+    summary:
+      'Describe SQL lineage and floors as the routed group (cached by SQL hash)',
+  })
   @ApiResponse({ status: 201, type: DataRequestDescribeResultDto })
   describe(@Param('id') id: string): Promise<DataRequestDescribeResultDto> {
     return this.service.describe(id);
@@ -150,7 +164,9 @@ export class DataRequestsController {
 
   @Post(':id/reroute')
   @Requires('workspace.view')
-  @ApiOperation({ summary: 'Reroute a data request to another data-team group' })
+  @ApiOperation({
+    summary: 'Reroute a data request to another data-team group',
+  })
   @ApiResponse({ status: 201, type: DataRequestDetailDto })
   reroute(
     @Param('id') id: string,
@@ -161,7 +177,9 @@ export class DataRequestsController {
 
   @Post(':id/deliver')
   @Requires('workspace.view')
-  @ApiOperation({ summary: 'Deliver a shared dataset to fulfil the data request' })
+  @ApiOperation({
+    summary: 'Deliver a shared dataset to fulfil the data request',
+  })
   @ApiResponse({ status: 201, type: DataRequestDetailDto })
   deliver(
     @Param('id') id: string,

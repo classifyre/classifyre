@@ -61,14 +61,20 @@ function makeDescribeService(describePayload: unknown) {
 
   const catalog = {
     settings: jest.fn(() =>
-      Promise.resolve({ maxRows: 100, timeoutSeconds: 30, exportMaxRows: 1000 }),
+      Promise.resolve({
+        maxRows: 100,
+        timeoutSeconds: 30,
+        exportMaxRows: 1000,
+      }),
     ),
     catalog: catalogSpy,
   };
 
   const cliRunner = {
     queryCallbackBaseUrl: () => 'http://api/ws-1',
-    runQueryExecution: jest.fn(() => Promise.resolve({ output: '', exitCode: 0 })),
+    runQueryExecution: jest.fn(() =>
+      Promise.resolve({ output: '', exitCode: 0 }),
+    ),
     cancelQueryExecution: jest.fn(() => Promise.resolve()),
   };
 
@@ -112,10 +118,9 @@ describe('QueryRunService.describe principal forwarding', () => {
       },
     });
 
-    const result = await service.describe(
-      'SELECT id FROM lake.sales.orders',
-      { principal },
-    );
+    const result = await service.describe('SELECT id FROM lake.sales.orders', {
+      principal,
+    });
 
     expect(catalogSpy).toHaveBeenCalledTimes(1);
     expect(catalogSpy).toHaveBeenCalledWith(principal);

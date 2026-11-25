@@ -515,7 +515,9 @@ export class SharedDatasetsService implements OnModuleInit {
         `The routed group cannot query ${missing.map((m) => m.sqlName).join(', ')}: give it access first.`,
       );
     }
-    problems.push(...rowProblems(inputs.filter((input) => input.groupCanQuery)));
+    problems.push(
+      ...rowProblems(inputs.filter((input) => input.groupCanQuery)),
+    );
     return {
       columns: columns.map((column) =>
         this.columnView(column, floors.get(column.name), sqlOf),

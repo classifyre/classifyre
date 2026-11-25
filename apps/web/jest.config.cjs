@@ -13,7 +13,10 @@ module.exports = {
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/$1",
     "^@workspace/case-board/(.*)$": "<rootDir>/../../packages/case-board/src/$1",
-    "^@workspace/schemas/(.*)$": "<rootDir>/../../packages/schemas/src/$1",
+    "^@workspace/schemas/(.*)$": [
+      "<rootDir>/../../packages/schemas/src/$1",
+      "<rootDir>/../../packages/schemas/src/schemas/$1",
+    ],
   },
   moduleFileExtensions: ["ts", "js", "json"],
 }

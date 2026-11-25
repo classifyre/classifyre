@@ -6,6 +6,7 @@ import {
   BackgroundVariant,
   ConnectionMode,
   Controls,
+  Panel,
   ReactFlow,
   ReactFlowProvider,
   useReactFlow,
@@ -386,69 +387,11 @@ function RequestCanvasInner({
         "relative h-full w-full bg-background",
         commentToolActive && "cursor-crosshair",
       )}
+      style={{ position: "relative", width: "100%", height: "100%" }}
       onDragOver={onDragOver}
       onDrop={onDrop}
       data-testid="request-canvas"
     >
-      {/* Floating drafting-sheet toolbar */}
-      <div className="absolute left-3 top-3 z-10 flex items-center gap-1 rounded-xs border bg-background/95 p-1 shadow-xs">
-        {canEdit && (
-          <>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-7 px-2"
-              disabled={undoCount === 0}
-              onClick={() => store.getState().undo()}
-              title={t("dataRequest.canvas.undo")}
-              data-testid="request-undo"
-            >
-              <Undo2 className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-7 px-2"
-              disabled={redoCount === 0}
-              onClick={() => store.getState().redo()}
-              title={t("dataRequest.canvas.redo")}
-              data-testid="request-redo"
-            >
-              <Redo2 className="h-3.5 w-3.5" />
-            </Button>
-          </>
-        )}
-        {canComment && (
-          <Button
-            type="button"
-            variant={commentToolActive ? "secondary" : "ghost"}
-            size="sm"
-            className="h-7 gap-1 px-2 text-xs"
-            onClick={() =>
-              store.getState().setCommentToolActive(!commentToolActive)
-            }
-            data-testid="request-comment-tool"
-          >
-            <MessageSquarePlus className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">
-              {t("dataRequest.canvas.pinComment")}
-            </span>
-          </Button>
-        )}
-        <span
-          className="px-2 font-mono text-[10px] text-muted-foreground"
-          data-testid="request-save-status"
-        >
-          {saving
-            ? t("dataRequest.canvas.saving")
-            : dirty
-              ? t("dataRequest.canvas.unsaved")
-              : t("dataRequest.canvas.saved")}
-        </span>
-      </div>
-
       <ReactFlow
         nodes={nodes as Node[]}
         edges={edges as Edge[]}
@@ -464,6 +407,66 @@ function RequestCanvasInner({
         fitViewOptions={{ padding: 0.25, maxZoom: 1 }}
         proOptions={{ hideAttribution: true }}
       >
+        <Panel
+          position="top-left"
+          className="m-3 flex items-center gap-1 rounded-xs border bg-background/95 p-1 shadow-xs"
+        >
+          {canEdit && (
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2"
+                disabled={undoCount === 0}
+                onClick={() => store.getState().undo()}
+                title={t("dataRequest.canvas.undo")}
+                data-testid="request-undo"
+              >
+                <Undo2 className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2"
+                disabled={redoCount === 0}
+                onClick={() => store.getState().redo()}
+                title={t("dataRequest.canvas.redo")}
+                data-testid="request-redo"
+              >
+                <Redo2 className="h-3.5 w-3.5" />
+              </Button>
+            </>
+          )}
+          {canComment && (
+            <Button
+              type="button"
+              variant={commentToolActive ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 gap-1 px-2 text-xs"
+              onClick={() =>
+                store.getState().setCommentToolActive(!commentToolActive)
+              }
+              data-testid="request-comment-tool"
+            >
+              <MessageSquarePlus className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">
+                {t("dataRequest.canvas.pinComment")}
+              </span>
+            </Button>
+          )}
+          <span
+            className="px-2 font-mono text-[10px] text-muted-foreground"
+            data-testid="request-save-status"
+          >
+            {saving
+              ? t("dataRequest.canvas.saving")
+              : dirty
+                ? t("dataRequest.canvas.unsaved")
+                : t("dataRequest.canvas.saved")}
+          </span>
+        </Panel>
         <Background
           variant={BackgroundVariant.Lines}
           gap={GRID_SNAP}

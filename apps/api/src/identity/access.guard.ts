@@ -156,7 +156,7 @@ export class AccessGuard implements CanActivate {
   private signedInOnly(context: ExecutionContext): boolean {
     return Boolean(
       this.reflector.get<boolean>(SIGNED_IN_KEY, context.getHandler()) ??
-        this.reflector.get<boolean>(SIGNED_IN_KEY, context.getClass()),
+      this.reflector.get<boolean>(SIGNED_IN_KEY, context.getClass()),
     );
   }
 

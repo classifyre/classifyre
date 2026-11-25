@@ -173,7 +173,10 @@ export function DataRequestCanvasHarness({
 
   return (
     <NamespaceProvider slug="demo">
-      <div className="h-[720px] w-[1280px]">
+      <div
+        className="h-[720px] w-[1280px]"
+        style={{ position: "relative", width: 1280, height: 720 }}
+      >
         <DataRequestWorkspaceView
           store={store}
           catalog={SAMPLE_REQUEST_CATALOG}
@@ -182,6 +185,13 @@ export function DataRequestCanvasHarness({
         <button
           type="button"
           className="sr-only"
+          style={{
+            position: "absolute",
+            width: 1,
+            height: 1,
+            overflow: "hidden",
+            clip: "rect(0, 0, 0, 0)",
+          }}
           data-testid="harness-join-orders-customers"
           onClick={() => {
             const tables = store.getState().spec.tables;

@@ -656,7 +656,8 @@ export class CaseResponseDto {
   @ApiPropertyOptional({
     type: CaseDataRequestSummaryDto,
     nullable: true,
-    description: 'Present on DATA_REQUEST cases: state, routing, and delivered dataset summary',
+    description:
+      'Present on DATA_REQUEST cases: state, routing, and delivered dataset summary',
   })
   request?: CaseDataRequestSummaryDto | null;
 

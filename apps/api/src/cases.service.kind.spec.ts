@@ -191,7 +191,9 @@ describe('CaseKind.DATA_REQUEST guards and investigation scoping', () => {
         },
         inquiry: {
           groupBy: jest.fn(() => Promise.resolve([])),
-          aggregate: jest.fn(() => Promise.resolve({ _sum: { newMatchCount: 0 } })),
+          aggregate: jest.fn(() =>
+            Promise.resolve({ _sum: { newMatchCount: 0 } }),
+          ),
           findMany: jest.fn(() => Promise.resolve([])),
         },
         caseLead: { count: jest.fn(() => Promise.resolve(0)) },

@@ -475,7 +475,7 @@ export class DataRequestsService {
           routeGroupId,
           audienceGroupId,
           state: DataRequestState.DRAFT,
-          spec: parsedSpec.data as unknown as Prisma.InputJsonValue,
+          spec: parsedSpec.data,
           specVersion: 1,
           draftSql: generated.sql,
           sqlEdited: false,
@@ -545,7 +545,7 @@ export class DataRequestsService {
     const updated = await this.prisma.dataRequest.updateMany({
       where: { caseId, specVersion: baseVersion },
       data: {
-        spec: parsedSpec.data as unknown as Prisma.InputJsonValue,
+        spec: parsedSpec.data,
         specVersion: baseVersion + 1,
         draftSql: nextSql,
       },
@@ -1106,10 +1106,8 @@ export class DataRequestsService {
     }
 
     const spec = parseSpecSafe(row.spec);
-    const x =
-      typeof dto.x === 'number' && Number.isFinite(dto.x) ? dto.x : 120;
-    const y =
-      typeof dto.y === 'number' && Number.isFinite(dto.y) ? dto.y : 120;
+    const x = typeof dto.x === 'number' && Number.isFinite(dto.x) ? dto.x : 120;
+    const y = typeof dto.y === 'number' && Number.isFinite(dto.y) ? dto.y : 120;
     const anchor =
       dto.anchor && typeof dto.anchor.tableId === 'string'
         ? {
@@ -1143,7 +1141,7 @@ export class DataRequestsService {
       await tx.dataRequest.update({
         where: { caseId },
         data: {
-          spec: nextSpec as unknown as Prisma.InputJsonValue,
+          spec: nextSpec,
           specVersion: nextVersion,
         },
       });
@@ -1305,9 +1303,10 @@ export class DataRequestsService {
     ]);
 
     const datasetNameById = new Map<string, string>(
-      deliveryDatasets.map(
-        (d): [string, string] => [d.assetId, `shared.${d.domain}.${d.name}`],
-      ),
+      deliveryDatasets.map((d): [string, string] => [
+        d.assetId,
+        `shared.${d.domain}.${d.name}`,
+      ]),
     );
 
     return mapDataRequestDetail(row, {

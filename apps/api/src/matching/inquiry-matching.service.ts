@@ -562,7 +562,10 @@ export class InquiryMatchingService {
     const links = await this.prisma.caseInquiry.findMany({
       where: {
         inquiryId: q.id,
-        case: { kind: 'INVESTIGATION', status: { notIn: ['CLOSED', 'ARCHIVED'] } },
+        case: {
+          kind: 'INVESTIGATION',
+          status: { notIn: ['CLOSED', 'ARCHIVED'] },
+        },
         OR: [
           { autoPull: true },
           { filters: { some: { action: 'ESCALATE' } } },
@@ -651,7 +654,10 @@ export class InquiryMatchingService {
       const links = await this.prisma.caseInquiry.findMany({
         where: {
           inquiryId,
-          case: { kind: 'INVESTIGATION', status: { notIn: ['CLOSED', 'ARCHIVED'] } },
+          case: {
+            kind: 'INVESTIGATION',
+            status: { notIn: ['CLOSED', 'ARCHIVED'] },
+          },
         },
         select: { caseId: true },
       });

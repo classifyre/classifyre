@@ -41,9 +41,9 @@ describe('data-request-rules', () => {
 
   describe('transition', () => {
     it('allows requester transitions in the right states', () => {
-      expect(
-        transition(DataRequestState.DRAFT, 'submit', 'requester'),
-      ).toEqual({ allowed: true, nextState: DataRequestState.SUBMITTED });
+      expect(transition(DataRequestState.DRAFT, 'submit', 'requester')).toEqual(
+        { allowed: true, nextState: DataRequestState.SUBMITTED },
+      );
       expect(
         transition(DataRequestState.SUBMITTED, 'submit', 'requester').allowed,
       ).toBe(false);
@@ -130,9 +130,9 @@ describe('data-request-rules', () => {
           expect(transition(blocked, 'decline', role).allowed).toBe(false);
         }
         // Cannot submit/withdraw/request_changes/deliver_self_serve
-        expect(
-          transition(DataRequestState.DRAFT, 'submit', role).allowed,
-        ).toBe(false);
+        expect(transition(DataRequestState.DRAFT, 'submit', role).allowed).toBe(
+          false,
+        );
         expect(
           transition(DataRequestState.SUBMITTED, 'withdraw', role).allowed,
         ).toBe(false);
@@ -184,11 +184,7 @@ describe('data-request-rules', () => {
     });
 
     it('denies when roles list is empty or lacks permission', () => {
-      const noRoles = transitionForRoles(
-        DataRequestState.DRAFT,
-        'submit',
-        [],
-      );
+      const noRoles = transitionForRoles(DataRequestState.DRAFT, 'submit', []);
       expect(noRoles.allowed).toBe(false);
       expect(noRoles.reason).toContain('permission');
 

@@ -260,7 +260,11 @@ export class DataRequestCheckResultDto {
   @ApiProperty({ type: DataRequestGroupRefDto })
   routeGroup!: DataRequestGroupRefDto;
 
-  @ApiPropertyOptional({ type: 'object', additionalProperties: true, nullable: true })
+  @ApiPropertyOptional({
+    type: 'object',
+    additionalProperties: true,
+    nullable: true,
+  })
   precheckError!: { code: string; message: string } | null;
 
   @ApiProperty({ type: [Object] })
@@ -280,10 +284,18 @@ export class DataRequestDescribeResultDto {
   @ApiProperty()
   sqlHash!: string;
 
-  @ApiPropertyOptional({ type: 'object', additionalProperties: true, nullable: true })
+  @ApiPropertyOptional({
+    type: 'object',
+    additionalProperties: true,
+    nullable: true,
+  })
   describe!: Record<string, unknown> | null;
 
-  @ApiPropertyOptional({ type: 'object', additionalProperties: true, nullable: true })
+  @ApiPropertyOptional({
+    type: 'object',
+    additionalProperties: true,
+    nullable: true,
+  })
   error!: { code: string; message: string } | null;
 
   @ApiProperty({ type: DataRequestCheckResultDto })
@@ -447,7 +459,11 @@ export class DataRequestDetailDto extends DataRequestListItemDto {
   @ApiProperty()
   sqlEdited!: boolean;
 
-  @ApiPropertyOptional({ type: 'object', additionalProperties: true, nullable: true })
+  @ApiPropertyOptional({
+    type: 'object',
+    additionalProperties: true,
+    nullable: true,
+  })
   lastCheck!: Record<string, unknown> | null;
 
   @ApiPropertyOptional({ type: String, nullable: true })
