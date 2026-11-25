@@ -112,6 +112,8 @@ describe('route access completeness', () => {
       'HealthController.ping',
       'SitemapController.getEntries',
       'SitemapController.getIndex',
+      'SqlGatewayHealthController.metrics',
+      'SqlGatewayHealthController.readiness',
     ]);
   });
 
