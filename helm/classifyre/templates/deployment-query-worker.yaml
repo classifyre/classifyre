@@ -97,6 +97,10 @@ spec:
               value: {{ $qw.memoryGuardPercent | quote }}
             - name: CLASSIFYRE_QUERY_WORKER_JOB_ONLY_SOURCES
               value: {{ join "," $qw.jobOnlySourceTypes | quote }}
+            - name: CLASSIFYRE_QUERY_WORKER_EXTENSIONS
+              value: {{ join "," ($qw.preloadExtensions | default list) | quote }}
+            - name: CLASSIFYRE_QUERY_WORKER_STICKY_TTL_SECONDS
+              value: {{ $qw.stickySessionTtlSeconds | default 0 | quote }}
             - name: CLASSIFYRE_QUERY_WORKER_DRAIN_SECONDS
               value: {{ $qw.drainSeconds | quote }}
             - name: CLASSIFYRE_QUERY_WORKER_WORKSPACE_SHARE_PERCENT

@@ -241,11 +241,11 @@ RUN set -eux; \
     groupadd -g 10001 classifyre; \
     useradd -u 10001 -g 10001 -r -m -d /home/classifyre classifyre; \
     mkdir -p \
-      "${PGDATA}" /var/run/postgresql \
+      "${PGDATA}" /var/run/postgresql /var/run/sql-catalog-pg \
       "${UV_CACHE_DIR}" "${EMBEDDING_CACHE_DIR}" "${RUNNER_LOG_DIR}" \
       "${PLAYWRIGHT_BROWSERS_PATH}" \
       /data /var/lib/classifyre/tmp; \
-    chown -R postgres:postgres /var/lib/postgresql /var/run/postgresql; \
+    chown -R postgres:postgres /var/lib/postgresql /var/run/postgresql /var/run/sql-catalog-pg; \
     chmod 700 "${PGDATA}"; \
     chown -R 10001:10001 \
       /app/apps/cli /app/packages "${UV_CACHE_DIR}" "${EMBEDDING_CACHE_DIR}" \

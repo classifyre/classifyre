@@ -1,35 +1,179 @@
+import { execFileSync } from 'node:child_process';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+} from 'node:fs';
 import {
   type AddressInfo,
   connect as connectRaw,
   createServer,
   type Server,
 } from 'node:net';
-import { readdirSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { tableFromArrays, tableToIPC } from 'apache-arrow';
 import { Client, type QueryConfig } from 'pg';
-import { catalogDdl } from './catalog-ddl';
+import { arrowRows, plainRows } from './arrow-rows';
+import { CatalogCapacityError, type CatalogSession } from './catalog-backend';
+import { catalogDdl, computeCatalogHash } from './catalog-ddl';
 import {
   MessageReader,
   MessageWriter,
   authenticationOk,
+  errorResponse,
   frontend,
   readyForQuery,
 } from './pg-protocol';
-import { PgliteHost, type PgliteSession } from './pglite-host';
+import { DataError, type DataRunner, PgSession } from './pg-session';
 import {
-  DataError,
-  type DataRunner,
-  PgSession,
-  SessionEscape,
-} from './pg-session';
+  type CatalogPgConfig,
+  PostgresCatalogHost,
+} from './postgres-catalog-host';
+import { SqlGatewayMetrics } from './sql-gateway-metrics';
+
+interface EphemeralPg {
+  config: Partial<CatalogPgConfig>;
+  isLocal: boolean;
+  restart?: () => void;
+  stop: () => void;
+}
+
+function findPgBinDir(): string | null {
+  const candidates = [
+    '/opt/homebrew/opt/postgresql@18/bin',
+    '/opt/homebrew/opt/postgresql@17/bin',
+    '/opt/homebrew/opt/postgresql@16/bin',
+    '/usr/local/opt/postgresql@18/bin',
+    '/usr/local/opt/postgresql@17/bin',
+    '/usr/lib/postgresql/18/bin',
+    '/usr/lib/postgresql/17/bin',
+    '/usr/lib/postgresql/16/bin',
+  ];
+  for (const dir of candidates) {
+    if (existsSync(join(dir, 'initdb')) && existsSync(join(dir, 'pg_ctl'))) {
+      return dir;
+    }
+  }
+  try {
+    const pgCtl = execFileSync('which', ['pg_ctl'], {
+      encoding: 'utf8',
+    }).trim();
+    const initdb = execFileSync('which', ['initdb'], {
+      encoding: 'utf8',
+    }).trim();
+    if (pgCtl && initdb) return join(pgCtl, '..');
+  } catch {
+    // not on PATH
+  }
+  return null;
+}
+
+function startCatalogPostgres(): EphemeralPg {
+  if (
+    process.env.SQL_GATEWAY_CATALOG_PG_SOCKET ||
+    process.env.SQL_GATEWAY_CATALOG_PG_HOST
+  ) {
+    return {
+      isLocal: false,
+      config: {
+        socketDir:
+          process.env.SQL_GATEWAY_CATALOG_PG_SOCKET?.trim() || undefined,
+        host: process.env.SQL_GATEWAY_CATALOG_PG_HOST?.trim() || undefined,
+        port: Number(process.env.SQL_GATEWAY_CATALOG_PG_PORT) || 5432,
+        adminUser:
+          process.env.SQL_GATEWAY_CATALOG_PG_USER?.trim() || 'postgres',
+        adminPassword: process.env.SQL_GATEWAY_CATALOG_PG_PASSWORD,
+        maintenanceDb:
+          process.env.SQL_GATEWAY_CATALOG_PG_DATABASE?.trim() || 'postgres',
+      },
+      stop: () => undefined,
+    };
+  }
+
+  const binDir = findPgBinDir();
+  if (!binDir) {
+    throw new Error(
+      'PostgreSQL binaries (initdb/pg_ctl) not found and SQL_GATEWAY_CATALOG_PG_HOST/SOCKET is unset.',
+    );
+  }
+  const root = mkdtempSync(join(tmpdir(), 'classifyre-catalog-pg-'));
+  const dataDir = join(root, 'data');
+  const sockDir = join(root, 'sock');
+  const logFile = join(root, 'pg.log');
+  mkdirSync(sockDir, { recursive: true });
+
+  execFileSync(
+    join(binDir, 'initdb'),
+    ['-D', dataDir, '-U', 'postgres', '--auth=trust', '--no-sync'],
+    { stdio: 'pipe' },
+  );
+
+  const pgOpts = [
+    "-c listen_addresses=''",
+    `-c unix_socket_directories=${sockDir}`,
+    '-c fsync=off',
+    '-c synchronous_commit=off',
+    '-c full_page_writes=off',
+    '-c wal_level=minimal',
+    '-c max_wal_senders=0',
+    '-c shared_buffers=32MB',
+    '-c max_connections=128',
+    '-c jit=off',
+  ].join(' ');
+
+  const startServer = () => {
+    execFileSync(
+      join(binDir, 'pg_ctl'),
+      ['-D', dataDir, '-l', logFile, '-w', '-o', pgOpts, 'start'],
+      { stdio: 'pipe' },
+    );
+  };
+  const stopServer = (mode: 'fast' | 'immediate' = 'fast') => {
+    try {
+      execFileSync(
+        join(binDir, 'pg_ctl'),
+        ['-D', dataDir, '-m', mode, '-w', 'stop'],
+        { stdio: 'pipe' },
+      );
+    } catch {
+      // already stopped
+    }
+  };
+
+  startServer();
+
+  return {
+    isLocal: true,
+    config: {
+      socketDir: sockDir,
+      port: 5432,
+      adminUser: 'postgres',
+      maintenanceDb: 'postgres',
+    },
+    restart: () => {
+      stopServer('immediate');
+      startServer();
+    },
+    stop: () => {
+      stopServer('fast');
+      rmSync(root, { recursive: true, force: true });
+    },
+  };
+}
 
 /**
- * A real PGlite session behind a test listener (trust sign-in), spoken to by
- * node-postgres: what BI tools do, without the query jobs — the data runner
- * answers from fixed rows and records what it was asked.
+ * A real native PostgreSQL catalog session behind a test listener (trust
+ * sign-in), spoken to by node-postgres: what BI tools do, without query jobs —
+ * the data runner answers from fixed rows (and real Arrow IPC) and records
+ * what it was asked.
  */
-describe('PgSession over PGlite', () => {
-  const host = new PgliteHost();
+describe('PgSession over native Postgres catalog sidecar', () => {
+  let pgCluster: EphemeralPg;
+  let host: PostgresCatalogHost;
   let server: Server;
   let port: number;
   const asked: { sql: string; tables: string[]; searchPath: string[] }[] = [];
@@ -41,26 +185,27 @@ describe('PgSession over PGlite', () => {
         throw new DataError('42501', 'You cannot query that.');
       if (/many/.test(input.sql)) {
         return Promise.resolve({
-          rows: [
+          rows: plainRows([
             [1n, 'a', '1.50', { micros: 1794564672000000n, kind: 'timestamp' }],
-          ].concat([
             [2n, 'b', '2', null],
             [3n, 'c', '3', null],
-          ] as never) as never,
+          ]),
           truncated: true,
         });
       }
       if (/^SELECT id, customer/.test(input.sql)) {
+        // Exercise direct Apache Arrow IPC → DataRow encoding path end-to-end.
+        const arrowTable = tableFromArrays({
+          id: new BigInt64Array([1n, 2n]),
+          customer: ['Ana', 'Bo'],
+        });
         return Promise.resolve({
-          rows: [
-            [1n, 'Ana'],
-            [2n, 'Bo'],
-          ],
+          rows: arrowRows(Buffer.from(tableToIPC(arrowTable, 'stream'))),
           truncated: false,
         });
       }
       return Promise.resolve({
-        rows: [
+        rows: plainRows([
           [
             1n,
             'Ana',
@@ -68,59 +213,68 @@ describe('PgSession over PGlite', () => {
             { micros: 1794564672123456n, kind: 'timestamp' },
           ],
           [2n, 'Bo', null, null],
-        ],
+        ]),
         truncated: false,
       });
     },
   };
-  const sessions: PgliteSession[] = [];
+  const sessions: CatalogSession[] = [];
 
-  beforeAll(async () => {
-    const ddl = catalogDdl(
-      [
+  const baseSources = [
+    {
+      id: 's1',
+      name: 'Shop',
+      type: 'POSTGRESQL',
+      sqlName: 'shop',
+      queryable: true,
+      tables: [
         {
-          id: 's1',
-          name: 'Shop',
-          type: 'POSTGRESQL',
-          sqlName: 'shop',
-          queryable: true,
-          tables: [
-            {
-              assetId: 'a1',
-              sourceId: 's1',
-              name: 'orders',
-              schema: 'public',
-              table: 'orders',
-              sqlName: 'shop.public.orders',
-              columns: [
-                { name: 'id', type: 'BIGINT' },
-                { name: 'customer', type: 'VARCHAR' },
-                { name: 'amount', type: 'DECIMAL(12,2)' },
-                { name: 'created', type: 'TIMESTAMP WITH TIME ZONE' },
-              ],
-              queryable: true,
-              canQuery: true,
-              location: null,
-            },
+          assetId: 'a1',
+          sourceId: 's1',
+          name: 'orders',
+          schema: 'public',
+          table: 'orders',
+          sqlName: 'shop.public.orders',
+          columns: [
+            { name: 'id', type: 'BIGINT' },
+            { name: 'customer', type: 'VARCHAR' },
+            { name: 'amount', type: 'DECIMAL(12,2)' },
+            { name: 'created', type: 'TIMESTAMP WITH TIME ZONE' },
           ],
+          queryable: true,
+          canQuery: true,
+          location: null,
         },
       ],
-      {
-        tables: new Map([['a1', 'Every order, one row each.']]),
-        columns: new Map([
+    },
+  ];
+  const baseNotes = {
+    tables: new Map([['a1', 'Every order, one row each.']]),
+    columns: new Map([
+      [
+        'a1',
+        new Map([
           [
-            'a1',
-            new Map([
-              [
-                'customer',
-                { businessName: 'Customer', description: 'Who ordered' },
-              ],
-            ]),
+            'customer',
+            { businessName: 'Customer', description: 'Who ordered' },
           ],
         ]),
-      },
-      'ana_bi',
-    );
+      ],
+    ]),
+  };
+
+  beforeAll(async () => {
+    pgCluster = startCatalogPostgres();
+    host = new PostgresCatalogHost(new SqlGatewayMetrics(), {
+      ...pgCluster.config,
+      statementTimeoutMs: 1_500,
+      sweepIntervalMs: 0,
+      supersededGraceMs: 0,
+      dbTtlMs: 60_000,
+      maxCatalogDbs: 16,
+      reconcileOrphansOnStartup: pgCluster.isLocal,
+    });
+    const ddl = catalogDdl(baseSources, baseNotes);
     server = createServer((socket) => {
       void (async () => {
         const chunks: Buffer[] = [];
@@ -140,23 +294,41 @@ describe('PgSession over PGlite', () => {
           };
           socket.on('data', onData);
         });
-        const pg = await host.open('lab', ddl.sql);
+        const pg = await host.open({
+          workspaceId: 'ws-lab',
+          connectionId: 'conn-ana',
+          ddl,
+        });
         sessions.push(pg);
-        const session = new PgSession(
-          pg,
-          ddl.dataSchemas,
-          runner,
-          (b) => socket.write(b),
-          undefined,
-          'ana_bi',
+        const session = new PgSession(pg, ddl.dataSchemas, runner, (b) =>
+          socket.write(b),
         );
+        pg.onDisconnect(() => {
+          if (!socket.destroyed) {
+            socket.end(
+              errorResponse({
+                severity: 'FATAL',
+                code: '57P01',
+                message: 'The SQL gateway lost this session.',
+              }),
+            );
+          }
+        });
         await session.start({ TimeZone: 'UTC' });
         socket.write(Buffer.concat([authenticationOk(), readyForQuery('I')]));
         const reader = new MessageReader();
         const onData = (chunk: Buffer) => {
           const messages = reader.push(chunk).filter((m) => m.type !== 'X');
-          void session.receive(messages).catch((error: unknown) => {
-            if (error instanceof SessionEscape) socket.destroy();
+          void session.receive(messages).catch(() => {
+            if (!socket.destroyed) {
+              socket.end(
+                errorResponse({
+                  severity: 'FATAL',
+                  code: '57P01',
+                  message: 'The SQL gateway lost this session.',
+                }),
+              );
+            }
           });
         };
         socket.on('data', onData);
@@ -171,8 +343,13 @@ describe('PgSession over PGlite', () => {
   }, 120_000);
 
   afterAll(async () => {
-    server.close();
-    await Promise.all(sessions.map((s) => s.close()));
+    server?.close();
+    await Promise.all(sessions.map((s) => s.close().catch(() => undefined)));
+    if (host) {
+      await host.sweepNow(Date.now() + 10 * 60_000).catch(() => undefined);
+      await host.close();
+    }
+    pgCluster?.stop();
   });
 
   const connect = async () => {
@@ -186,36 +363,50 @@ describe('PgSession over PGlite', () => {
     return client;
   };
 
-  it.each([
-    'SET SESSION AUTHORIZATION postgres',
-    "DO $$ BEGIN EXECUTE 'SET SESSION AUTHORIZATION ' || 'postgres'; END $$",
-    "SELECT set_config('session_authorization', 'postgres', false)",
-  ])(
-    'ends the session when it leaves its role: %s',
-    async (sql) => {
+  it('refuses privilege escalation and keeps RESET SESSION AUTHORIZATION locked to r_<hash>', async () => {
+    for (const sql of [
+      'SET SESSION AUTHORIZATION postgres',
+      'SET ROLE postgres',
+      "DO $$ BEGIN EXECUTE 'SET SESSION AUTHORIZATION ' || 'postgres'; END $$",
+      "SELECT set_config('session_authorization', 'postgres', false)",
+    ]) {
       const client = await connect();
       client.on('error', () => undefined);
       await expect(client.query(sql)).rejects.toThrow();
+      const who = await client
+        .query(`SELECT current_setting('is_superuser') AS su`)
+        .catch(() => null);
+      if (who) expect(who.rows[0]).toEqual({ su: 'off' });
       await client.end().catch(() => undefined);
-    },
-    60_000,
-  );
+    }
 
-  it('keeps the catalog read-only for the connection', async () => {
+    // RESET SESSION AUTHORIZATION on a non-superuser role cannot elevate.
     const client = await connect();
-    // Refused before PGlite (a SQL connection only reads), and PGlite's
-    // role could not write anyway.
+    await client.query('RESET SESSION AUTHORIZATION');
+    const afterReset = await client.query(
+      `SELECT current_user AS u, current_setting('is_superuser') AS su`,
+    );
+    expect(afterReset.rows[0].u).toMatch(/^r_[0-9a-f]{24}$/);
+    expect(afterReset.rows[0].su).toBe('off');
+    await client.end();
+  }, 60_000);
+
+  it('keeps the catalog read-only and uses an opaque non-superuser role and database', async () => {
+    const client = await connect();
     await expect(
       client.query(`CREATE TABLE public.x (id int)`),
     ).rejects.toMatchObject({ code: '25006' });
     const who = await client.query(
-      `SELECT current_user AS u, current_setting('is_superuser') AS su`,
+      `SELECT current_user AS u, current_setting('is_superuser') AS su, current_database() AS db`,
     );
-    expect(who.rows[0]).toEqual({ u: 'ana_bi', su: 'off' });
+    expect(who.rows[0].u).toMatch(/^r_[0-9a-f]{24}$/);
+    expect(who.rows[0].db).toMatch(/^c_[0-9a-f]{24}$/);
+    expect(who.rows[0].db).not.toContain('lab');
+    expect(who.rows[0].su).toBe('off');
     await client.end();
   }, 60_000);
 
-  it('answers the catalog from PGlite, with governance notes', async () => {
+  it('answers the catalog from native Postgres, with governance notes', async () => {
     const client = await connect();
     const tables = await client.query(
       `SELECT table_schema, table_name FROM information_schema.tables WHERE table_schema NOT IN ('pg_catalog','information_schema','classifyre')`,
@@ -226,15 +417,13 @@ describe('PgSession over PGlite', () => {
     const comment = await client.query(
       `SELECT col_description('"shop.public".orders'::regclass, 2) AS c, obj_description('"shop.public".orders'::regclass) AS t, current_database() AS db`,
     );
-    expect(comment.rows[0]).toEqual({
-      c: 'Customer — Who ordered',
-      t: 'orders — Every order, one row each.',
-      db: 'lab',
-    });
+    expect(comment.rows[0].c).toBe('Customer — Who ordered');
+    expect(comment.rows[0].t).toBe('orders — Every order, one row each.');
+    expect(comment.rows[0].db).toMatch(/^c_[0-9a-f]{24}$/);
     await client.end();
   }, 60_000);
 
-  it('runs data statements as jobs, text and binary, with parameters', async () => {
+  it('runs data statements as jobs, text and binary, with parameters and direct Arrow encoding', async () => {
     const client = await connect();
     const text = await client.query('SELECT * FROM "shop.public".orders');
     expect(text.rows).toEqual([
@@ -253,7 +442,6 @@ describe('PgSession over PGlite', () => {
       binary: true,
     } as QueryConfig);
     expect(bound.rows.length).toBe(2);
-    // Parsed from binary by node-postgres: right only if the bytes are.
     expect(bound.fields.map((f) => f.format)).toEqual(['binary', 'binary']);
     expect(bound.rows.map((r) => [String(r.id), r.customer])).toEqual([
       ['1', 'Ana'],
@@ -291,16 +479,13 @@ describe('PgSession over PGlite', () => {
       ),
     ).rejects.toMatchObject({ code: '0A000' });
     expect((await client.query('SELECT 1 AS one')).rows).toEqual([{ one: 1 }]);
-    // Idle after statements, data and catalog alike: no transaction left open
-    // by the gateway's own messages (psqlODBC acts on it with SAVEPOINTs).
     await client.query(`SELECT * FROM "shop.public".orders`);
     await client.query('SELECT 1');
     await expect(client.query('SAVEPOINT s')).rejects.toMatchObject({
       code: '25P01',
     });
-    expect((await client.query('SELECT current_user AS u')).rows).toEqual([
-      { u: 'ana_bi' },
-    ]);
+    const who = await client.query('SELECT current_user AS u');
+    expect(who.rows[0].u).toMatch(/^r_[0-9a-f]{24}$/);
     await expect(
       client.query(`DELETE FROM "shop.public".orders`),
     ).rejects.toMatchObject({ code: '25006' });
@@ -310,17 +495,10 @@ describe('PgSession over PGlite', () => {
     await client.end();
   }, 60_000);
 
-  /**
-   * What pgJDBC does with a fetch size inside a transaction (BIC J3, and
-   * Metabase's downloads, M13): one Execute per page, each followed by Sync,
-   * on a named portal. Every page must arrive; the last ends the result.
-   * Spoken over a raw socket, message by message, as the driver does.
-   */
   it('serves a portal page by page across Syncs in a transaction', async () => {
     const { socket, untilReady } = await rawSession(port);
     socket.write(frontend.query('BEGIN'));
     await untilReady();
-    // pgJDBC binds the page portal to the *unnamed* statement…
     socket.write(
       Buffer.concat([
         frontend.parse('', 'SELECT * FROM "shop.public".orders'),
@@ -333,9 +511,7 @@ describe('PgSession over PGlite', () => {
     const rowsOf = (types: string[]) => types.filter((t) => t === 'D').length;
     const first = await untilReady();
     expect(rowsOf(first)).toBe(1);
-    expect(first).toContain('s'); // PortalSuspended
-    // …and between pages asks for column metadata through the unnamed
-    // statement again: the portal keeps the statement it was bound from.
+    expect(first).toContain('s');
     socket.write(
       Buffer.concat([
         frontend.parse('', 'SELECT attname FROM pg_attribute LIMIT 1'),
@@ -348,8 +524,6 @@ describe('PgSession over PGlite', () => {
     socket.write(Buffer.concat([frontend.execute('C_1', 1), frontend.sync()]));
     let page = await untilReady();
     let rows = rowsOf(first) + rowsOf(page);
-    // The page holding the last row may end the result, as here, or be
-    // suspended with an empty last page, as PostgreSQL does: clients take both.
     while (page.includes('s')) {
       socket.write(
         Buffer.concat([frontend.execute('C_1', 1), frontend.sync()]),
@@ -357,16 +531,12 @@ describe('PgSession over PGlite', () => {
       page = await untilReady();
       rows += rowsOf(page);
     }
-    expect(page).toContain('C'); // CommandComplete
+    expect(page).toContain('C');
     expect(page).not.toContain('E');
     expect(rows).toBe(2);
     socket.end();
   }, 60_000);
 
-  /**
-   * What psqlODBC does with UseDeclareFetch=1 (BIC D5, and Excel through it):
-   * the SELECT runs in a cursor, read with FETCH, all in simple queries.
-   */
   it('reads a data cursor with FETCH, as psqlODBC does', async () => {
     const { socket, untilReady } = await rawSession(port);
     const rowsOf = (types: string[]) => types.filter((t) => t === 'D').length;
@@ -378,7 +548,7 @@ describe('PgSession over PGlite', () => {
     const first = await untilReady();
     expect(first).not.toContain('E');
     expect(rowsOf(first)).toBe(1);
-    expect(first).toContain('T'); // the FETCH describes its rows
+    expect(first).toContain('T');
     socket.write(frontend.query('fetch 100 in "SQL_CUR0x1"'));
     const rest = await untilReady();
     expect(rowsOf(rest)).toBe(1);
@@ -386,7 +556,6 @@ describe('PgSession over PGlite', () => {
     expect(rowsOf(await untilReady())).toBe(0);
     socket.write(frontend.query('close "SQL_CUR0x1";commit'));
     expect(await untilReady()).not.toContain('E');
-    // A cursor over the catalog is still PGlite's own.
     socket.write(
       frontend.query(
         'BEGIN;declare c cursor for SELECT relname FROM pg_class LIMIT 2;fetch all in c;close c;commit',
@@ -402,7 +571,6 @@ describe('PgSession over PGlite', () => {
     const { socket, untilReady, codes } = await rawSession(port);
     const rowsOf = (types: string[]) => types.filter((t) => t === 'D').length;
     const orders = 'SELECT * FROM "shop.public".orders';
-    // After a comment, options in another order: served (review c1).
     socket.write(
       frontend.query(
         `BEGIN;-- x\nDECLARE c1 BINARY NO SCROLL CURSOR FOR ${orders};fetch all in c1`,
@@ -410,7 +578,6 @@ describe('PgSession over PGlite', () => {
     );
     expect(rowsOf(await untilReady())).toBe(2);
     expect(codes()).toEqual([]);
-    // A second cursor of the same name (42P03), SCROLL and BACKWARD (0A000).
     socket.write(frontend.query(`declare c1 cursor for ${orders}`));
     await untilReady();
     expect(codes()).toEqual(['42P03']);
@@ -430,13 +597,11 @@ describe('PgSession over PGlite', () => {
     );
     await untilReady();
     expect(codes()).toEqual(['0A000']);
-    // A failed block refuses everything, cursors too (25P02).
     socket.write(frontend.query('fetch 1 in c3'));
     await untilReady();
     expect(codes()).toEqual(['25P02']);
     socket.write(frontend.query('rollback'));
     await untilReady();
-    // Through Parse/Bind/Execute: refused, not read from empty tables.
     socket.write(
       Buffer.concat([
         frontend.parse('', `declare c4 cursor with hold for ${orders}`),
@@ -454,7 +619,6 @@ describe('PgSession over PGlite', () => {
     const { socket, untilReady, codes } = await rawSession(port);
     const rowsOf = (types: string[]) => types.filter((t) => t === 'D').length;
     const orders = 'SELECT * FROM "shop.public".orders';
-    // WITH HOLD declared in a block that rolls back is gone, as in PostgreSQL.
     socket.write(
       frontend.query(
         `BEGIN;declare h1 cursor with hold for ${orders};rollback`,
@@ -464,7 +628,6 @@ describe('PgSession over PGlite', () => {
     socket.write(frontend.query('fetch 1 in h1'));
     await untilReady();
     expect(codes()).toEqual(['34000']);
-    // Committed, it outlives the block; a cursor without HOLD does not.
     socket.write(
       frontend.query(
         `BEGIN;declare h2 cursor with hold for ${orders};declare n1 cursor for ${orders};commit`,
@@ -476,7 +639,6 @@ describe('PgSession over PGlite', () => {
     socket.write(frontend.query('fetch 1 in n1'));
     await untilReady();
     expect(codes()).toEqual(['34000']);
-    // At most MAX_DATA_CURSORS open at once (53400).
     const declares = Array.from(
       { length: 8 },
       (_, i) => `declare m${i} cursor with hold for ${orders}`,
@@ -487,13 +649,11 @@ describe('PgSession over PGlite', () => {
     socket.end();
   }, 60_000);
 
-  it('refuses statements that would answer from empty tables, and FETCH 0', async () => {
-    // Re-reviews 2026-11-22: each of these reached PGlite and answered 0 rows.
+  it('refuses writes, DDL, unserved reads, and revoked functions (SG §8.2)', async () => {
     const { socket, untilReady, codes } = await rawSession(port);
     const T = '"shop.public".orders';
     const orders = `SELECT * FROM ${T}`;
     const cases: [string, string][] = [
-      // A SQL connection only reads: writes and DDL, whatever they read.
       [`CREATE TEMP TABLE x AS ${orders}`, '25006'],
       [
         `CREATE /*x*/ FUNCTION pg_temp.f() RETURNS bigint LANGUAGE sql AS 'SELECT count(*) FROM ${T}'`,
@@ -514,10 +674,8 @@ describe('PgSession over PGlite', () => {
         '25006',
       ],
       [`CREATE RULE r AS ON INSERT TO u DO ALSO SELECT 1`, '25006'],
-      // Planned first: refused when they read your tables.
       [`PREPARE p AS ${orders}`, '0A000'],
       [`EXPLAIN ANALYZE ${orders}`, '0A000'],
-      // Functions that run SQL text are revoked in PGlite.
       [`SELECT table_to_xml('${T}'::regclass, false, false, '')`, '42501'],
       [
         `SELECT * FROM ts_stat('SELECT to_tsvector(customer) FROM ${T}')`,
@@ -527,13 +685,16 @@ describe('PgSession over PGlite', () => {
         `SELECT query_to_xml('${orders.replace(/'/g, "''")}', false, false, '')`,
         '42501',
       ],
+      [`SELECT pg_sleep(1)`, '42501'],
+      [`SELECT pg_sleep_for('1 second'::interval)`, '42501'],
+      [`SELECT pg_read_file('PG_VERSION')`, '42501'],
+      [`SELECT lo_create(0)`, '42501'],
     ];
     for (const [sql, code] of cases) {
       socket.write(frontend.query(sql));
       await untilReady();
       expect([sql, codes()]).toEqual([sql, [code]]);
     }
-    // Over the catalog they are PGlite's, as before.
     socket.write(
       frontend.query(
         'PREPARE c AS SELECT relname FROM pg_class LIMIT 1; EXECUTE c',
@@ -574,11 +735,6 @@ describe('PgSession over PGlite', () => {
     socket.end();
   }, 60_000);
 
-  /**
-   * The client corpus (fixtures/client-corpus, BIC §6): what Metabase,
-   * psqlODBC and pgJDBC send, replayed statement by statement. A new driver
-   * version that breaks a statement shows here, not at a customer's.
-   */
   it.each(corpusFiles())(
     'replays the client corpus %s',
     async (_file, entries) => {
@@ -612,6 +768,278 @@ describe('PgSession over PGlite', () => {
     },
     60_000,
   );
+
+  // ── SG §8.2 Isolation, Lockdown, Abuse Guards, Cleanup & Recovery ────
+
+  describe('isolation, abuse guards, lifecycle, and crash recovery (SG §8.2)', () => {
+    it('isolates metadata across users and blocks cross-DB CONNECT and writes directly in Postgres', async () => {
+      const ddlA = catalogDdl(baseSources);
+      const ddlB = catalogDdl([
+        {
+          ...baseSources[0],
+          tables: [
+            ...baseSources[0].tables,
+            {
+              ...baseSources[0].tables[0],
+              assetId: 'a2',
+              name: 'invoices',
+              table: 'invoices',
+              sqlName: 'shop.public.invoices',
+            },
+          ],
+        },
+      ]);
+
+      const [sessA, sessB] = await Promise.all([
+        host.open({ workspaceId: 'ws-iso', connectionId: 'conn-a', ddl: ddlA }),
+        host.open({ workspaceId: 'ws-iso', connectionId: 'conn-b', ddl: ddlB }),
+      ]);
+      try {
+        expect(sessA.database).not.toBe(sessB.database);
+        expect(sessA.role).not.toBe(sessB.role);
+        expect(sessA.database).toMatch(/^c_[0-9a-f]{24}$/);
+
+        const tablesA = await sessA.query<{ table_name: string }>(
+          `SELECT table_name FROM information_schema.tables WHERE table_schema = 'shop.public' ORDER BY 1`,
+        );
+        const tablesB = await sessB.query<{ table_name: string }>(
+          `SELECT table_name FROM information_schema.tables WHERE table_schema = 'shop.public' ORDER BY 1`,
+        );
+        expect(tablesA.map((r) => r.table_name)).toEqual(['orders']);
+        expect(tablesB.map((r) => r.table_name)).toEqual([
+          'invoices',
+          'orders',
+        ]);
+
+        // User A also cannot see User B's tables in pg_catalog.pg_class.
+        const pgClassA = await sessA.query<{ relname: string }>(
+          `SELECT c.relname FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'shop.public' ORDER BY 1`,
+        );
+        expect(pgClassA.map((r) => r.relname)).toEqual(['orders']);
+
+        // Even bypassing the gateway's WRITE_VERBS filter, PostgreSQL itself
+        // enforces read-only transactions and blocks CREATE / TEMP / writes.
+        await expect(
+          sessA.exec('CREATE TABLE public.nope (id int)'),
+        ).rejects.toThrow();
+        await expect(
+          sessA.exec('CREATE TEMP TABLE tmp_nope (id int)'),
+        ).rejects.toThrow();
+        await expect(
+          sessA.exec(
+            'SET default_transaction_read_only = off; CREATE TEMP TABLE tmp_nope2 (id int)',
+          ),
+        ).rejects.toThrow();
+
+        // Actual CONNECT attempts as role A to User B's DB, postgres,
+        // template1, and classifyre_tpl must all be refused by PostgreSQL.
+        const hashA = computeCatalogHash('ws-iso', ddlA.sql);
+        const infoA = host.catalogInfo(hashA)!;
+        for (const forbiddenDb of [
+          sessB.database,
+          'postgres',
+          'template1',
+          'classifyre_tpl',
+        ]) {
+          const intruder = new Client({
+            host: pgCluster.config.socketDir ?? pgCluster.config.host,
+            port: pgCluster.config.port ?? 5432,
+            user: infoA.roleName,
+            password: infoA.password,
+            database: forbiddenDb,
+          });
+          await expect(intruder.connect()).rejects.toThrow();
+          await intruder.end().catch(() => undefined);
+        }
+      } finally {
+        await sessA.close();
+        await sessB.close();
+      }
+    }, 60_000);
+
+    it('enforces maxCatalogDbs immediately at creation (LRU evicts idle, refuses when all active)', async () => {
+      const cappedHost = new PostgresCatalogHost(new SqlGatewayMetrics(), {
+        ...pgCluster.config,
+        statementTimeoutMs: 1_500,
+        sweepIntervalMs: 0,
+        maxCatalogDbs: 2,
+        reconcileOrphansOnStartup: false,
+      });
+      const ddl = catalogDdl(baseSources);
+      try {
+        const s1 = await cappedHost.open({
+          workspaceId: 'ws-cap-1',
+          connectionId: 'c1',
+          ddl,
+        });
+        const s2 = await cappedHost.open({
+          workspaceId: 'ws-cap-2',
+          connectionId: 'c2',
+          ddl,
+        });
+        expect(cappedHost.catalogCount()).toBe(2);
+
+        // Both DBs are active -> opening a 3rd distinct DB is refused immediately.
+        await expect(
+          cappedHost.open({
+            workspaceId: 'ws-cap-3',
+            connectionId: 'c3',
+            ddl,
+          }),
+        ).rejects.toThrow(CatalogCapacityError);
+
+        // Once s1 closes, opening a 3rd DB synchronously LRU-evicts ws-cap-1.
+        await s1.close();
+        const s3 = await cappedHost.open({
+          workspaceId: 'ws-cap-3',
+          connectionId: 'c3',
+          ddl,
+        });
+        expect(cappedHost.catalogCount()).toBe(2);
+        expect(
+          cappedHost.catalogInfo(computeCatalogHash('ws-cap-1', ddl.sql)),
+        ).toBeNull();
+        await s2.close();
+        await s3.close();
+        await cappedHost.sweepNow(Date.now() + 60 * 60_000);
+      } finally {
+        await cappedHost.close();
+      }
+    }, 60_000);
+
+    it('cancels CPU abuse at statement_timeout without affecting other sessions, and blocks temp_file_limit spills', async () => {
+      const [c1, c2] = await Promise.all([connect(), connect()]);
+      try {
+        // Pure CPU cross-join (small operands stay within work_mem) hits
+        // per-role statement_timeout (57014) without spilling to disk.
+        const abuse = c1.query(
+          'SELECT count(*) FROM generate_series(1, 20000) a, generate_series(1, 20000) b',
+        );
+        // Concurrent session remains fast and unaffected.
+        const healthy = await c2.query('SELECT 42 AS answer');
+        expect(healthy.rows).toEqual([{ answer: 42 }]);
+
+        await expect(abuse).rejects.toMatchObject({ code: '57014' });
+
+        // Exceeding work_mem (4MB) with temp_file_limit = 0 fails cleanly (53400).
+        await expect(
+          c1.query(
+            'SELECT * FROM generate_series(1, 300000) g ORDER BY md5(g::text)',
+          ),
+        ).rejects.toMatchObject({ code: '53400' });
+      } finally {
+        await c1.end().catch(() => undefined);
+        await c2.end().catch(() => undefined);
+      }
+    }, 60_000);
+
+    it('coalesces concurrent sign-ins on one catalogHash, keeps active sessions immutable on change, and reaps superseded DBs', async () => {
+      const ddlV1 = catalogDdl(baseSources);
+      const ddlV2 = catalogDdl([
+        {
+          ...baseSources[0],
+          tables: [
+            ...baseSources[0].tables,
+            {
+              ...baseSources[0].tables[0],
+              assetId: 'a3',
+              name: 'shipments',
+              table: 'shipments',
+              sqlName: 'shop.public.shipments',
+            },
+          ],
+        },
+      ]);
+
+      const beforeCreates = host.metrics.snapshot().catalogDbCreateCount;
+      // 5 concurrent sign-ins for the exact same view coalesce into 1 DB creation.
+      const burst = await Promise.all(
+        Array.from({ length: 5 }, () =>
+          host.open({
+            workspaceId: 'ws-lifecycle',
+            connectionId: 'conn-1',
+            ddl: ddlV1,
+          }),
+        ),
+      );
+      const hashV1 = computeCatalogHash('ws-lifecycle', ddlV1.sql);
+      const hashV2 = computeCatalogHash('ws-lifecycle', ddlV2.sql);
+      expect(new Set(burst.map((s) => s.database)).size).toBe(1);
+      expect(host.metrics.snapshot().catalogDbCreateCount).toBe(
+        beforeCreates + 1,
+      );
+
+      // Granting a new table produces a new DB for new sessions while active
+      // sessions on v1 remain uninterrupted.
+      const v2Session = await host.open({
+        workspaceId: 'ws-lifecycle',
+        connectionId: 'conn-1',
+        ddl: ddlV2,
+      });
+      expect(v2Session.database).toBe(`c_${hashV2}`);
+      expect(host.catalogInfo(hashV1)?.supersededAt).not.toBeNull();
+
+      // Active v1 sessions still work and are NOT dropped by sweepNow().
+      const rV1 = await burst[0].query<{ n: string }>('SELECT 1 AS n');
+      expect(rV1).toEqual([{ n: '1' }]);
+      await host.sweepNow(Date.now() + 1_000);
+      expect(host.catalogInfo(hashV1)).not.toBeNull();
+
+      // Once all v1 sessions close, sweepNow() reaps c_<hashV1> and r_<hashV1>.
+      await Promise.all(burst.map((s) => s.close()));
+      const dropsBefore = host.metrics.snapshot().catalogDbDropsTotal;
+      const dropped = await host.sweepNow(Date.now() + 1_000);
+      expect(dropped).toBeGreaterThanOrEqual(1);
+      expect(host.catalogInfo(hashV1)).toBeNull();
+      expect(host.metrics.snapshot().catalogDbDropsTotal).toBeGreaterThan(
+        dropsBefore,
+      );
+
+      // Verify v1 DB & role are truly gone from PostgreSQL.
+      const check = await v2Session.query<{ dbs: string; roles: string }>(
+        `SELECT
+          (SELECT count(*) FROM pg_database WHERE datname = 'c_${hashV1}')::text AS dbs,
+          (SELECT count(*) FROM pg_roles WHERE rolname = 'r_${hashV1}')::text AS roles`,
+      );
+      expect(check).toEqual([{ dbs: '0', roles: '0' }]);
+      await v2Session.close();
+    }, 60_000);
+
+    it('cleanly closes live sessions with 57P01 and recovers classifyre_tpl when the sidecar restarts', async () => {
+      if (!pgCluster.isLocal || !pgCluster.restart) {
+        return; // Only runs against local ephemeral Postgres we control
+      }
+      const client = await connect();
+      let receivedError: { code?: string } | null = null;
+      const closed = new Promise<void>((resolve) => {
+        client.on('error', (err: Error & { code?: string }) => {
+          receivedError = err;
+          resolve();
+        });
+        client.on('end', () => resolve());
+      });
+
+      const restartsBefore = host.metrics.snapshot().sidecarRestartsTotal;
+      pgCluster.restart();
+      await closed;
+      await client.end().catch(() => undefined);
+
+      expect(receivedError).not.toBeNull();
+      expect(receivedError!.code).toBe('57P01');
+      expect(host.metrics.snapshot().sidecarRestartsTotal).toBeGreaterThan(
+        restartsBefore,
+      );
+
+      // New connections recover automatically without restarting the gateway.
+      expect(await host.ping()).toBe(true);
+      const recovered = await connect();
+      const res = await recovered.query(
+        `SELECT table_name FROM information_schema.tables WHERE table_schema = 'shop.public'`,
+      );
+      expect(res.rows).toEqual([{ table_name: 'orders' }]);
+      await recovered.end();
+    }, 60_000);
+  });
 });
 
 /** A protocol-3.0 StartupMessage, as every driver sends first. */
@@ -631,7 +1059,6 @@ async function rawSession(port: number) {
   const reader = new MessageReader();
   const inbox: { type: string; body: Buffer }[] = [];
   let wake: (() => void) | undefined;
-  /** The SQLSTATEs of the errors in the last reply untilReady returned. */
   let codes: string[] = [];
   socket.on('data', (chunk: Buffer) => {
     inbox.push(...reader.push(chunk));

@@ -30,6 +30,7 @@ class ObjectStorageBinding(QueryBinding):
     def __init__(self, source: SourceContext) -> None:
         super().__init__(source)
         self._storage: Any = None
+        self._iceberg_version_guessing = False
 
     def relation(self, conn: Any, location: TableLocation) -> str:
         (key,) = self.require(location, "object_key")
@@ -59,7 +60,13 @@ class ObjectStorageBinding(QueryBinding):
             # Without a version-hint file DuckDB finds the newest metadata by
             # listing the root, which it calls "unsafe" because a writer could
             # be mid-commit; for a read-only query that is the right trade.
-            conn.execute("SET unsafe_enable_version_guessing = true")
+            if not self._iceberg_version_guessing:
+                row = conn.execute(
+                    "SELECT current_setting('unsafe_enable_version_guessing')"
+                ).fetchone()
+                if not (row and bool(row[0])):
+                    conn.execute("SET unsafe_enable_version_guessing = true")
+                self._iceberg_version_guessing = True
             return f"iceberg_scan({uri}, allow_moved_paths = true)"
         if location.kind == "file":
             if fmt == "parquet":

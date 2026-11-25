@@ -725,6 +725,19 @@ queryWorker:
   jobOnlySourceTypes:
     - ODBC
     - CUSTOM
+  # -- DuckDB extensions preloaded into the fork server at startup
+  # (`CLASSIFYRE_QUERY_WORKER_EXTENSIONS`). Trimmed by default to lightweight
+  # core connectors (`httpfs`, `postgres`, `mysql`); add `azure`, `delta`,
+  # `iceberg`, or `ducklake` when those connectors are active, or set `[]` to
+  # skip preloading (docs/prd/SG-sql-gateway-native-catalog.md §6.2).
+  preloadExtensions:
+    - httpfs
+    - postgres
+    - mysql
+  # -- Idle TTL (seconds) for reusing a warm query process per
+  # `(workspaceId, connectionId, sourceCredsDigest)` on BI dashboard bursts
+  # (docs/prd/SG-sql-gateway-native-catalog.md §6.3). `0` disables reuse.
+  stickySessionTtlSeconds: 0
   # -- When every slot of the pod the query reached is taken: `job` runs the
   # query as a Job (the query-Job settings in `api.cliJobs.query`), `refuse`
   # fails it at once with "busy".
@@ -855,8 +868,8 @@ sqlGateway:
   # (https://docs.classifyre.com/sql-connections/#making-the-endpoint-reachable).
   enabled: true
 
-  # -- Gateway replicas. A client session stays on one pod; more replicas
-  # spread sessions (each holds an in-memory catalog of ~150 MB).
+  # -- Gateway replicas. A client session stays on one pod with its pod-local
+  # catalog Postgres sidecar; more replicas spread sessions and blast radius.
   replicaCount: 1
 
   # -- Port the gateway listens on inside the pod and on its Service.
@@ -874,21 +887,18 @@ sqlGateway:
   # entrypoint's).
   publicPort: 5432
 
-  # -- Sessions one gateway pod holds at once. Each is a PGlite of its own:
-  # about 150 MB idle, about 450 MB while a BI tool syncs and queries.
-  # Memory bounds it too: a new session is refused as busy (53300) unless
-  # the pod's memory, plus `sessionMemoryMb` for it and for each session
-  # still starting, stays under the RSS guard (87.5 % of
-  # `resources.limits.memory`). At the default 4Gi that is about 6 busy
-  # sessions: raise the limit along with this.
-  maxSessions: 16
+  # -- Sessions one gateway pod holds at once. Each session opens one dedicated
+  # connection to the pod-local native Postgres catalog sidecar (~10–30 MB on
+  # the sidecar depending on catalog size, ~32 MB headroom on the gateway).
+  maxSessions: 64
 
-  # -- What one more session is allowed for when deciding whether the pod has
-  # room for it (MB; measured 2026-11-21 with Metabase, BIC M5).
-  sessionMemoryMb: 450
+  # -- What one more session is allowed for on the Node gateway container when
+  # deciding whether the pod has room for it (MB).
+  sessionMemoryMb: 32
 
-  # -- Sessions one SQL connection may have open at once.
-  maxSessionsPerConnection: 4
+  # -- Sessions one SQL connection may have open at once (16 matches Metabase's
+  # default 15-connection pool out of the box).
+  maxSessionsPerConnection: 16
 
   # -- Minutes a session may sit idle before it is closed.
   idleMinutes: 30
@@ -911,16 +921,58 @@ sqlGateway:
   # start without it, and a malformed CIDR also stops it.
   trustedProxies: []
 
-  # -- V8 heap cap (MB) of the gateway process. The catalogs live outside the
-  # JS heap (WebAssembly), so this stays small.
-  maxOldSpaceSizeMb: 1024
+  # -- V8 heap cap (MB) of the gateway Node container. Catalogs live in the
+  # `catalog-postgres` sidecar and Arrow results stream directly to wire frames.
+  maxOldSpaceSizeMb: 512
 
   resources:
     requests:
-      cpu: 250m
-      memory: 1Gi
+      cpu: 100m
+      memory: 256Mi
     limits:
-      memory: 4Gi
+      memory: 1Gi
+
+  catalog:
+    # -- Pod-local stateless native PostgreSQL catalog-only sidecar
+    # (docs/prd/SG-sql-gateway-native-catalog.md §4). Stores empty catalog
+    # tables per `(workspace, catalogHash)` on ephemeral tmpfs; no PVC or Service.
+    image:
+      # -- Catalog sidecar Postgres image repository.
+      repository: postgres
+      # -- Catalog sidecar Postgres image tag (matches PG_MAJOR=18 in all-in-one Docker).
+      tag: "18-alpine"
+      # -- Catalog sidecar image pull policy.
+      pullPolicy: IfNotPresent
+    # -- PostgreSQL `shared_buffers` for the catalog sidecar.
+    sharedBuffers: 128MB
+    # -- Per-role `work_mem` limit for catalog queries.
+    workMem: 4MB
+    # -- Per-role `statement_timeout` (seconds) on the catalog sidecar.
+    statementTimeoutSeconds: 15
+    # -- Minutes an idle catalog database stays before the sweeper drops it.
+    dbTtlMinutes: 30
+    # -- Upper cap on live catalog databases per gateway pod (LRU evicted when idle).
+    maxCatalogDbs: 256
+    # -- Size limit of the tmpfs (`emptyDir` with `medium: Memory`) backing the catalog data directory.
+    tmpfsSizeLimit: 512Mi
+    # -- Resource requests and limits for the `catalog-postgres` sidecar container.
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: "1"
+        memory: 1Gi
+    # -- Container security context for `catalog-postgres` (uid 70 is alpine's `postgres` user).
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 70
+      runAsGroup: 70
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop:
+          - ALL
 
   service:
     # -- `ClusterIP` when a TCP proxy (Traefik) exposes it; `LoadBalancer` or

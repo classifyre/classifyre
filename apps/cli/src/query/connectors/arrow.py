@@ -171,6 +171,14 @@ class ArrowConnector(QueryBinding):
         live = self._live.get(relation.strip('"'))
         return live.error if live is not None else None
 
+    def reset_query(self, conn: Any) -> None:
+        for name in list(self._live):
+            try:
+                conn.unregister(name)
+            except Exception:  # pragma: no cover - best effort
+                pass
+        self._live.clear()
+
     def close(self) -> None:
         self._live.clear()
 

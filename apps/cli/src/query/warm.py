@@ -25,6 +25,7 @@ logged and the query that needs it pays for it as a Job would.
 
 from __future__ import annotations
 
+import gc
 import logging
 import os
 import threading
@@ -176,6 +177,14 @@ def warm_up() -> dict[str, float]:
                 ", ".join(others),
             )
         timings["other_threads"] = float(len(others))
+    with _step("gc_freeze"):
+        # Preserve Linux Copy-on-Write page sharing across forked query
+        # processes (docs/prd/SG-sql-gateway-native-catalog.md §6.1): moving
+        # preloaded objects into CPython's permanent generation stops cyclic GC
+        # from mutating their refcount/GC headers in every forked child.
+        gc.collect()
+        gc.freeze()
+        timings["gc_frozen_objects"] = float(gc.get_freeze_count())
     return timings
 
 

@@ -161,6 +161,9 @@ class QueryBinding(ABC):
         (``ConnectorError``); None for tables DuckDB reads itself."""
         return None
 
+    def reset_query(self, conn: Any) -> None:
+        """Release per-query state registered on ``conn`` between sticky queries."""
+
     def close(self) -> None:
         """Release what the binding made (temporary files); the session closes DuckDB."""
 

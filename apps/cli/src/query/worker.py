@@ -48,6 +48,8 @@ frameworks are not fork-safe, and DuckDB's httpfs reaches them through curl.
 
 from __future__ import annotations
 
+import gc
+import hashlib
 import hmac
 import http.server
 import json
@@ -61,13 +63,17 @@ import sys
 import tempfile
 import threading
 import time
+from collections import OrderedDict
 from collections.abc import MutableMapping
 from dataclasses import dataclass, field
 from multiprocessing.connection import Connection, wait
 from pathlib import Path
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from ..utils.resources import get_effective_cpu_count, get_effective_memory_mb
+
+if TYPE_CHECKING:
+    from .session import StickyDuckDbState
 
 logger = logging.getLogger(__name__)
 
@@ -101,6 +107,12 @@ DEFAULT_MEMORY_GUARD_PERCENT = 90
 GUARD_INTERVAL_SECONDS = 0.1
 DEFAULT_DRAIN_SECONDS = 960
 DEFAULT_WORKSPACE_SHARE_PERCENT = 75
+#: Short-TTL sticky reuse per (workspaceId, connectionId, sourceCredsDigest)
+#: (docs/prd/SG-sql-gateway-native-catalog.md §6.3). Disabled (0) by default
+#: until benchmarked on BI dashboard bursts.
+DEFAULT_STICKY_TTL_SECONDS = 0
+#: Upper cap on idle sticky processes kept per pod.
+DEFAULT_MAX_IDLE_STICKY = 4
 #: Source types whose queries always run as Jobs: they load native code the
 #: source names (an ODBC ``Driver=`` path) or run code its editors wrote (a
 #: CUSTOM notebook's ``scan()``), which must not share a process host with
@@ -291,6 +303,19 @@ class WorkerConfig:
     #: The share of the slots one workspace may hold at once (review of
     #: 383fd5c4, P6): the rest stay for other workspaces sharing the pool.
     workspace_share_percent: int = DEFAULT_WORKSPACE_SHARE_PERCENT
+    #: Idle TTL (seconds) for reusing a warm query process for the same
+    #: ``(workspaceId, connectionId, sourceCredsDigest)``. 0 disables reuse.
+    sticky_ttl_seconds: int = DEFAULT_STICKY_TTL_SECONDS
+    #: Cap on idle sticky processes kept per pod; 0 derives ``min(4, max(1, slots // 2))``.
+    max_idle_sticky: int = 0
+
+    @property
+    def effective_max_idle_sticky(self) -> int:
+        if self.sticky_ttl_seconds <= 0:
+            return 0
+        if self.max_idle_sticky > 0:
+            return self.max_idle_sticky
+        return min(DEFAULT_MAX_IDLE_STICKY, max(1, self.slots // 2))
 
     @classmethod
     def from_env(cls, environ: MutableMapping[str, str] | None = None) -> WorkerConfig:
@@ -335,6 +360,8 @@ class WorkerConfig:
             workspace_share_percent=_int(
                 env, "WORKSPACE_SHARE_PERCENT", DEFAULT_WORKSPACE_SHARE_PERCENT, 1
             ),
+            sticky_ttl_seconds=_int(env, "STICKY_TTL_SECONDS", DEFAULT_STICKY_TTL_SECONDS),
+            max_idle_sticky=_int(env, "MAX_IDLE_STICKY", 0),
         )
 
 
@@ -400,28 +427,101 @@ def _harden(workdir: str) -> None:
     os.chdir(workdir)
 
 
-def _query_process(request_data: dict[str, Any], out: Connection, workdir: str) -> None:
-    """Runs in the forked query process: one query, as a query Job runs it."""
-    _harden(workdir)
+@dataclass(frozen=True)
+class StickyKey:
+    """Strict isolation key for optional sticky process reuse (SG §6.3)."""
+
+    workspace_id: str
+    connection_id: str
+    sources_digest: str
+
+
+def sticky_key_of(request_data: dict[str, Any]) -> StickyKey | None:
+    """Strict isolation key for optional sticky process reuse (SG §6.3).
+
+    Scoped strictly to ``(workspaceId, connectionId, sourceCredsDigest)``:
+    queries without a workspace or SQL connection, exports, or requests whose
+    source recipes/credentials differ never share a process.
+    """
+    workspace_id = str(request_data.get("workspaceId") or "").strip()
+    connection_id = str(request_data.get("connectionId") or "").strip()
+    if not workspace_id or not connection_id:
+        return None
+    if request_data.get("exportFormat") or request_data.get("describe"):
+        return None
+    sources = request_data.get("sources") or []
+    canonical = json.dumps(sources, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    digest = hashlib.sha256(canonical).hexdigest()
+    return StickyKey(workspace_id, connection_id, digest)
+
+
+def _execute_and_report(
+    request_data: dict[str, Any], *, sticky: StickyDuckDbState | None = None
+) -> tuple[dict[str, Any], bool]:
+    """Run one query and deliver its result callback; returns (payload, fatal)."""
     from .runner import error_payload, report_result, run_query
     from .session import QueryRequest
 
-    payload: dict[str, Any] = error_payload("execution_error", "The query process stopped early.")
     try:
-        payload, result = run_query(request_data)
+        payload, result = run_query(request_data, sticky=sticky)
         report_result(
             QueryRequest.from_dict(request_data),
             payload,
             result.arrow if result is not None else None,
             echo=False,
         )
+        return payload, False
     except Exception as exc:  # run_query catches query errors; this is the rest
-        payload = error_payload("execution_error", type(exc).__name__)
+        return error_payload("execution_error", type(exc).__name__), True
+
+
+def _sticky_query_process(req_in: Connection, resp_out: Connection, workdir: str) -> None:
+    """Long-lived hardened child process serving sequential queries for one StickyKey.
+
+    Keeps a warm :class:`.session.StickyDuckDbState` (DuckDB database, verified
+    extensions, and attached remote source catalogs) alive across sequential
+    queries while resetting views and spill files between queries.
+    """
+    _harden(workdir)
+    from .session import StickyDuckDbState
+
+    sticky_state = StickyDuckDbState()
+    try:
+        while True:
+            try:
+                request_data = req_in.recv()
+            except (EOFError, OSError):
+                break
+            if request_data is None:
+                break
+            payload, fatal = _execute_and_report(request_data, sticky=sticky_state)
+            gc.collect()
+            try:
+                resp_out.send(payload)
+            except OSError:
+                break
+            if fatal or payload.get("status") != "success":
+                break
     finally:
+        sticky_state.close()
         try:
-            out.send(payload)
-        finally:
-            out.close()
+            req_in.close()
+        except OSError:
+            pass
+        try:
+            resp_out.close()
+        except OSError:
+            pass
+
+
+def _query_process(request_data: dict[str, Any], out: Connection, workdir: str) -> None:
+    """Runs in the forked query process: one query, as a query Job runs it."""
+    _harden(workdir)
+    payload, _ = _execute_and_report(request_data)
+    try:
+        out.send(payload)
+    finally:
+        out.close()
 
 
 def _ping(out: Connection) -> None:
@@ -449,6 +549,9 @@ class Stats:
         self.queries: dict[str, int] = {}
         self.refused: dict[str, int] = {}
         self.seconds_sum = 0.0
+        self.sticky_hits = 0
+        self.sticky_misses = 0
+        self.sticky_evictions = 0
 
     def started(self) -> None:
         with self._lock:
@@ -464,7 +567,19 @@ class Stats:
         with self._lock:
             self.refused[reason] = self.refused.get(reason, 0) + 1
 
-    def prometheus(self, slots: int, ready: bool) -> str:
+    def record_sticky_hit(self) -> None:
+        with self._lock:
+            self.sticky_hits += 1
+
+    def record_sticky_miss(self) -> None:
+        with self._lock:
+            self.sticky_misses += 1
+
+    def record_sticky_eviction(self, count: int = 1) -> None:
+        with self._lock:
+            self.sticky_evictions += count
+
+    def prometheus(self, slots: int, ready: bool, sticky_idle: int = 0) -> str:
         with self._lock:
             lines = [
                 "# HELP classifyre_query_worker_slots Queries one worker runs at once.",
@@ -476,6 +591,18 @@ class Stats:
                 "# HELP classifyre_query_worker_ready 1 when the worker takes queries.",
                 "# TYPE classifyre_query_worker_ready gauge",
                 f"classifyre_query_worker_ready {1 if ready else 0}",
+                "# HELP classifyre_query_worker_sticky_idle Idle sticky query processes held for reuse.",
+                "# TYPE classifyre_query_worker_sticky_idle gauge",
+                f"classifyre_query_worker_sticky_idle {sticky_idle}",
+                "# HELP classifyre_query_worker_sticky_hits_total Queries served by a warm sticky process.",
+                "# TYPE classifyre_query_worker_sticky_hits_total counter",
+                f"classifyre_query_worker_sticky_hits_total {self.sticky_hits}",
+                "# HELP classifyre_query_worker_sticky_misses_total Sticky-eligible queries that forked a fresh process.",
+                "# TYPE classifyre_query_worker_sticky_misses_total counter",
+                f"classifyre_query_worker_sticky_misses_total {self.sticky_misses}",
+                "# HELP classifyre_query_worker_sticky_evictions_total Idle sticky processes evicted by TTL, LRU cap, or memory pressure.",
+                "# TYPE classifyre_query_worker_sticky_evictions_total counter",
+                f"classifyre_query_worker_sticky_evictions_total {self.sticky_evictions}",
                 "# HELP classifyre_query_worker_queries_total Queries run, by outcome.",
                 "# TYPE classifyre_query_worker_queries_total counter",
             ]
@@ -570,6 +697,31 @@ class _Running:
     memory_mb: float | None = None
 
 
+@dataclass
+class _StickyProcess:
+    key: StickyKey
+    process: multiprocessing.process.BaseProcess
+    req_out: Connection
+    resp_in: Connection
+    workdir: str
+    last_used_at: float = field(default_factory=time.monotonic)
+
+    def terminate(self) -> None:
+        try:
+            self.req_out.close()
+        except OSError:
+            pass
+        try:
+            self.resp_in.close()
+        except OSError:
+            pass
+        if self.process.pid is not None:
+            if self.process.is_alive():
+                self.process.kill()
+            self.process.join(5)
+        shutil.rmtree(self.workdir, ignore_errors=True)
+
+
 class QueryWorker:
     def __init__(self, config: WorkerConfig) -> None:
         self.config = config
@@ -586,7 +738,15 @@ class QueryWorker:
         self.warm_timings: dict[str, float] = {}
         self._running: dict[int, _Running] = {}
         self._running_lock = threading.Lock()
+        #: Idle sticky workers keyed by PID, ordered LRU (oldest first).
+        self._sticky_idle: OrderedDict[int, _StickyProcess] = OrderedDict()
+        self._sticky_lock = threading.Lock()
         self._query_dirs = Path(tempfile.gettempdir()) / QUERY_DIRS
+
+    @property
+    def sticky_idle_count(self) -> int:
+        with self._sticky_lock:
+            return len(self._sticky_idle)
 
     @property
     def ready(self) -> bool:
@@ -688,6 +848,15 @@ class QueryWorker:
             else DEFAULT_TIMEOUT_SECONDS
         )
         deadline = started + seconds + BACKSTOP_SECONDS
+        if self.config.sticky_ttl_seconds > 0:
+            key = sticky_key_of(request_data)
+            if key is not None:
+                return self._run_sticky(key, request_data, client, deadline)
+        return self._run_oneshot(request_data, client, deadline)
+
+    def _run_oneshot(
+        self, request_data: dict[str, Any], client: socket.socket | None, deadline: float
+    ) -> Outcome:
         workdir = tempfile.mkdtemp(prefix="q-", dir=self._query_dirs)
         reader, writer = self._ctx.Pipe(duplex=False)
         process = self._ctx.Process(
@@ -702,7 +871,7 @@ class QueryWorker:
             running = _Running(process, workdir)
             with self._running_lock:
                 self._running[process.pid] = running
-            outcome = self._await(process, reader, client, deadline)
+            outcome = self._await(process, reader, client, deadline, wait_for_exit=True)
             if outcome.kind == "crashed" and running.memory_mb is not None:
                 return Outcome("memory", exit_code=process.exitcode)
             return outcome
@@ -718,12 +887,157 @@ class QueryWorker:
             # with it, also when it was killed before it could clean up.
             shutil.rmtree(workdir, ignore_errors=True)
 
+    def _pop_expired_sticky_locked(self, now: float) -> list[_StickyProcess]:
+        ttl = self.config.sticky_ttl_seconds
+        expired: list[_StickyProcess] = []
+        for pid, entry in list(self._sticky_idle.items()):
+            if not entry.process.is_alive() or now - entry.last_used_at >= ttl:
+                expired.append(self._sticky_idle.pop(pid))
+        return expired
+
+    def _terminate_evicted(self, entries: list[_StickyProcess]) -> None:
+        if not entries:
+            return
+        for entry in entries:
+            entry.terminate()
+        self.stats.record_sticky_eviction(len(entries))
+
+    def _checkout_sticky(self, key: StickyKey) -> _StickyProcess | None:
+        now = time.monotonic()
+        chosen: _StickyProcess | None = None
+        with self._sticky_lock:
+            expired = self._pop_expired_sticky_locked(now)
+            for pid in reversed(list(self._sticky_idle.keys())):
+                if self._sticky_idle[pid].key == key:
+                    chosen = self._sticky_idle.pop(pid)
+                    break
+        self._terminate_evicted(expired)
+        return chosen
+
+    def _checkin_sticky(self, entry: _StickyProcess) -> None:
+        cap = self.config.effective_max_idle_sticky
+        if (
+            cap <= 0
+            or self._draining.is_set()
+            or self._stopping.is_set()
+            or not entry.process.is_alive()
+            or entry.process.pid is None
+        ):
+            entry.terminate()
+            return
+        entry.last_used_at = time.monotonic()
+        evicted: list[_StickyProcess] = []
+        with self._sticky_lock:
+            self._sticky_idle[entry.process.pid] = entry
+            self._sticky_idle.move_to_end(entry.process.pid)
+            while len(self._sticky_idle) > cap:
+                _, oldest = self._sticky_idle.popitem(last=False)
+                evicted.append(oldest)
+        self._terminate_evicted(evicted)
+
+    def _spawn_sticky(self, key: StickyKey) -> _StickyProcess:
+        workdir = tempfile.mkdtemp(prefix="qs-", dir=self._query_dirs)
+        req_in, req_out = self._ctx.Pipe(duplex=False)
+        resp_in, resp_out = self._ctx.Pipe(duplex=False)
+        process = self._ctx.Process(
+            target=_sticky_query_process,
+            args=(req_in, resp_out, workdir),
+            daemon=False,
+        )
+        process.start()
+        req_in.close()
+        resp_out.close()
+        return _StickyProcess(
+            key=key,
+            process=process,
+            req_out=req_out,
+            resp_in=resp_in,
+            workdir=workdir,
+        )
+
+    def _run_sticky(
+        self,
+        key: StickyKey,
+        request_data: dict[str, Any],
+        client: socket.socket | None,
+        deadline: float,
+    ) -> Outcome:
+        sticky = self._checkout_sticky(key)
+        if sticky is not None:
+            self.stats.record_sticky_hit()
+        else:
+            self.stats.record_sticky_miss()
+            sticky = self._spawn_sticky(key)
+
+        running = _Running(sticky.process, sticky.workdir)
+        reusable = False
+        try:
+            with self._running_lock:
+                if sticky.process.pid is not None:
+                    self._running[sticky.process.pid] = running
+            try:
+                sticky.req_out.send(request_data)
+            except OSError:
+                return Outcome("crashed", exit_code=sticky.process.exitcode)
+            outcome = self._await(
+                sticky.process, sticky.resp_in, client, deadline, wait_for_exit=False
+            )
+            if outcome.kind == "crashed" and running.memory_mb is not None:
+                return Outcome("memory", exit_code=sticky.process.exitcode)
+            if (
+                outcome.kind == "done"
+                and outcome.payload is not None
+                and outcome.payload.get("status") == "success"
+                and running.memory_mb is None
+                and sticky.process.is_alive()
+            ):
+                reusable = True
+            return outcome
+        finally:
+            if sticky.process.pid is not None:
+                with self._running_lock:
+                    self._running.pop(sticky.process.pid, None)
+            if reusable:
+                self._checkin_sticky(sticky)
+            else:
+                sticky.terminate()
+
+    def _reap_expired_sticky(self) -> None:
+        if self.config.sticky_ttl_seconds <= 0:
+            return
+        with self._sticky_lock:
+            expired = self._pop_expired_sticky_locked(time.monotonic())
+        self._terminate_evicted(expired)
+
+    def _evict_idle_sticky_for_memory(self) -> bool:
+        """Evict all idle sticky workers before touching any active query (SG §6.3)."""
+        with self._sticky_lock:
+            if not self._sticky_idle:
+                return False
+            evicted = list(self._sticky_idle.values())
+            self._sticky_idle.clear()
+        self._terminate_evicted(evicted)
+        logger.warning(
+            "Memory pressure: evicted %d idle sticky query worker(s) before touching active queries",
+            len(evicted),
+        )
+        return True
+
+    def clear_sticky_idle(self) -> None:
+        with self._sticky_lock:
+            entries = list(self._sticky_idle.values())
+            self._sticky_idle.clear()
+        for entry in entries:
+            entry.terminate()
+
     def _await(
         self,
         process: multiprocessing.process.BaseProcess,
         reader: Connection,
         client: socket.socket | None,
         deadline: float,
+        *,
+        wait_for_exit: bool = True,
     ) -> Outcome:
         payload: dict[str, Any] | None = None
         watch: list[Any] = [reader, process.sentinel]
@@ -742,7 +1056,13 @@ class QueryWorker:
                     try:
                         payload = reader.recv()
                     except (EOFError, OSError):
-                        pass
+                        if not wait_for_exit:
+                            process.join(5)
+                            return Outcome("crashed", exit_code=process.exitcode)
+                    if not wait_for_exit:
+                        assert payload is not None
+                        code = 0 if payload.get("status") == "success" else 1
+                        return Outcome("done", payload, code)
                     watch.remove(reader)
                 elif item is client:
                     if _client_gone(client):
@@ -751,7 +1071,7 @@ class QueryWorker:
                     watch.remove(client)  # unexpected bytes: stop watching, keep running
                 else:
                     process.join(5)
-                    if payload is None:
+                    if payload is None and wait_for_exit:
                         try:
                             if reader.poll(0):
                                 payload = reader.recv()
@@ -792,8 +1112,14 @@ class QueryWorker:
         limit = container * self.config.memory_guard_percent / 100
         while not self._stopping.is_set():
             time.sleep(GUARD_INTERVAL_SECONDS)
+            self._reap_expired_sticky()
             with self._running_lock:
                 running = list(self._running.values())
+            used = container_memory_mb() if limit else None
+            if used is not None and used > limit:
+                # Evict idle sticky workers FIRST before touching active queries (SG §6.3).
+                if self._evict_idle_sticky_for_memory():
+                    continue
             if not running:
                 continue
             sizes = [
@@ -805,7 +1131,6 @@ class QueryWorker:
             for size, entry in sizes:
                 if cap and size > cap:
                     self._stop_for_memory(entry, size, f"more than its {cap} MB")
-            used = container_memory_mb() if limit else None
             if used is not None and used > limit and sizes:
                 size, entry = max(sizes, key=lambda pair: pair[0])
                 if entry.memory_mb is None:
@@ -823,6 +1148,7 @@ class QueryWorker:
     def drain(self) -> None:
         """Stop taking queries, let running ones finish, then stop the rest."""
         self._draining.set()
+        self.clear_sticky_idle()
         deadline = time.monotonic() + self.config.drain_seconds
         while self.stats.active > 0 and time.monotonic() < deadline:
             time.sleep(0.2)
@@ -832,6 +1158,7 @@ class QueryWorker:
             stop_by = time.monotonic() + 10
             while self.stats.active > 0 and time.monotonic() < stop_by:
                 time.sleep(0.1)
+        self.clear_sticky_idle()
 
 
 # ── HTTP ───────────────────────────────────────────────────────────────
@@ -874,7 +1201,9 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             ready = worker.ready
             self._send(200 if ready else 503, {"ready": ready, "active": worker.stats.active})
         elif self.path == "/metrics":
-            text = worker.stats.prometheus(worker.config.slots, worker.ready)
+            text = worker.stats.prometheus(
+                worker.config.slots, worker.ready, worker.sticky_idle_count
+            )
             self._send(200, text, "text/plain; version=0.0.4")
         else:
             self._send(404, {"code": "not_found"})

@@ -3,7 +3,6 @@ import {
   type FieldDescription,
   type Message,
   commandComplete,
-  dataRow,
   frontend,
   parseBind,
   parseClose,
@@ -18,8 +17,9 @@ import {
   splitMessages,
   BodyReader,
 } from './pg-protocol';
-import type { PgliteSession } from './pglite-host';
-import { EncodeError, OID, type PlainValue, encodeValue } from './pg-types';
+import { DataError, type DataRows } from './arrow-rows';
+import type { CatalogSession } from './catalog-backend';
+import { OID } from './pg-types';
 import {
   READING_KEYWORDS,
   firstKeyword,
@@ -31,10 +31,12 @@ import {
   type CursorStatement,
 } from './sql-text';
 
+export { DataError, type DataRows } from './arrow-rows';
+
 /**
- * A SQL connection only reads (DQ §5.7): these are refused before PGlite
- * sees them. In PGlite they would write to or define over empty copies of
- * your tables, and the SELECT that follows would answer 0 rows.
+ * A SQL connection only reads (DQ §5.7): these are refused before the catalog
+ * backend sees them. In the catalog database they would write to or define over
+ * empty copies of your tables, and the SELECT that follows would answer 0 rows.
  */
 const WRITE_VERBS = new Set([
   'INSERT',
@@ -65,29 +67,11 @@ const WRITE_VERBS = new Set([
   'LOCK',
 ]);
 
-/** A data statement failed: what the client is told, as PostgreSQL would. */
-export class DataError extends Error {
-  constructor(
-    readonly sqlState: string,
-    message: string,
-  ) {
-    super(message);
-  }
-}
-
 export interface DataResult {
-  rows: PlainValue[][];
+  rows: DataRows;
   /** The job stopped at the row cap: there were more. */
   truncated: boolean;
 }
-
-/**
- * The session left the connection's role inside its PGlite (`RESET SESSION
- * AUTHORIZATION`, `set_config('session_authorization', …)`): the catalog
- * runs as the connection, read-only (§5.7), and the bootstrap superuser it
- * was set up as must stay out of reach. The gateway ends the session.
- */
-export class SessionEscape extends Error {}
 
 /** What a session needs from outside: running a data statement as a query job. */
 export interface DataRunner {
@@ -118,7 +102,7 @@ interface Portal {
   paramTypes?: number[];
   bind: BindMessage;
   fields?: FieldDescription[];
-  rows?: PlainValue[][];
+  rows?: DataRows;
   truncated?: boolean;
   offset: number;
 }
@@ -127,7 +111,7 @@ interface Portal {
 interface DataCursor {
   description: Buffer | null;
   fields: FieldDescription[];
-  rows: PlainValue[][];
+  rows: DataRows;
   truncated: boolean;
   offset: number;
   /** WITH HOLD: kept past its transaction, until CLOSE. */
@@ -153,8 +137,6 @@ const READS = '__classifyre_reads';
 const FAIL = '__classifyre_fail';
 const PATH = '__classifyre_path';
 const PROBE = '__classifyre_probe';
-const WHO = '__classifyre_who';
-const WHO_PORTAL = '__classifyre_who_p';
 const DECODE = '__classifyre_decode';
 
 const NUMERIC_OIDS = new Set<number>([
@@ -208,15 +190,18 @@ export function readTables(
 }
 
 /**
- * One client connection after sign-in (docs/prd/DQ-data-query.md §5.7).
+ * One client connection after sign-in (docs/prd/DQ-data-query.md §5.7,
+ * docs/prd/SG-sql-gateway-native-catalog.md §4).
  *
- * Every message goes to the session's PGlite, which owns the catalog, the
- * prepared statements, portals, transactions and errors, so clients see a
- * real PostgreSQL. The one exception is a statement whose plan reads the
- * person's tables: its Execute (or simple Query) runs as a query job instead,
- * and the gateway sends the rows in the formats PGlite described. A data
- * statement that fails fails through PGlite (`classifyre.fail`), so its error
- * aborts the transaction and skips to Sync exactly as PostgreSQL does.
+ * Every message goes to the session's dedicated native Postgres catalog
+ * connection (`c_<hash>` as non-superuser `r_<hash>`), which owns the catalog,
+ * prepared statements, portals, transactions and errors, so clients see a real
+ * PostgreSQL. The one exception is a statement whose plan reads the person's
+ * tables: its Execute (or simple Query) runs as a query job instead, and the
+ * gateway encodes Arrow columns directly into `DataRow` frames in the formats
+ * PostgreSQL described. A data statement that fails fails through PostgreSQL
+ * (`classifyre.fail`), so its error aborts the transaction and skips to Sync
+ * exactly as PostgreSQL does.
  */
 export class PgSession {
   private readonly statements = new Map<string, Statement>();
@@ -234,60 +219,13 @@ export class PgSession {
   private inSimpleQuery = false;
 
   constructor(
-    private readonly pg: PgliteSession,
+    private readonly pg: CatalogSession,
     private readonly dataSchemas: ReadonlySet<string>,
     private readonly data: DataRunner,
     private readonly sendRaw: (bytes: Buffer) => void,
     /** Debugging only (`SQL_GATEWAY_TRACE`): message types, statements, errors — never values. */
     private readonly trace?: (line: string) => void,
-    /** The role the catalog runs as; any report of another ends the session. */
-    private readonly role?: string,
   ) {}
-
-  /**
-   * PGlite's reply to protocol messages. Whenever one finishes a request
-   * (ReadyForQuery), the session is asked who it runs as: PGlite signs in as
-   * its bootstrap superuser, so `SET SESSION AUTHORIZATION postgres` or
-   * `set_config('session_authorization', …)` would leave the connection's
-   * read-only role, and PGlite reports no ParameterStatus to notice it by.
-   * The client never sees that reply; the session ends.
-   */
-  private async raw(bytes: Buffer): Promise<Uint8Array> {
-    const reply = await this.pg.raw(bytes);
-    if (!this.role) return reply;
-    const ready = splitMessages(reply).find((m) => m.type === 'Z');
-    if (ready && ready.body[0] !== 'E'.charCodeAt(0)) await this.assertRole();
-    return reply;
-  }
-
-  private async assertRole(): Promise<void> {
-    const reply = splitMessages(
-      await this.pg.raw(
-        Buffer.concat([
-          frontend.bind(WHO_PORTAL, WHO, []),
-          frontend.execute(WHO_PORTAL),
-          frontend.close('P', WHO_PORTAL),
-          frontend.sync(),
-        ]),
-      ),
-    );
-    const row = reply.find((m) => m.type === 'D');
-    const values: string[] = [];
-    if (row) {
-      const reader = new BodyReader(row.body);
-      const count = reader.int16();
-      for (let i = 0; i < count; i += 1) {
-        const length = reader.int32();
-        values.push(length < 0 ? '' : reader.bytes(length).toString('utf8'));
-      }
-    }
-    const [user, superuser] = values;
-    if (user !== this.role || superuser !== 'off') {
-      throw new SessionEscape(
-        `session runs as ${user ?? '?'} (superuser ${superuser ?? '?'})`,
-      );
-    }
-  }
 
   private send(bytes: Buffer): void {
     if (this.trace) {
@@ -313,7 +251,7 @@ export class PgSession {
       .map(([key, value]) => `SET ${key} = ${quoteLiteral(value)};`)
       .join(' ');
     if (sets) await this.pg.exec(sets).catch(() => undefined);
-    await this.raw(
+    await this.pg.raw(
       Buffer.concat([
         frontend.parse(READS, 'SELECT classifyre.reads($1, $2)', [
           OID.text,
@@ -326,10 +264,6 @@ export class PgSession {
         frontend.parse(
           PATH,
           'SELECT array_to_json(current_schemas(false))::text',
-        ),
-        frontend.parse(
-          WHO,
-          "SELECT current_user::text, current_setting('is_superuser')",
         ),
         frontend.sync(),
       ]),
@@ -351,6 +285,8 @@ export class PgSession {
 
   async close(): Promise<void> {
     this.cancel();
+    this.portals.clear();
+    this.cursors.clear();
     await this.pg.close();
   }
 
@@ -386,16 +322,16 @@ export class PgSession {
       case 'H':
         return;
       default:
-        // COPY data, function calls: not on offer; let PGlite refuse them.
+        // COPY data, function calls: not on offer; let the catalog backend refuse them.
         await this.forward(message.raw);
         return;
     }
   }
 
-  /** To PGlite and back to the client; true when PGlite answered an error. */
+  /** To the catalog backend and back to the client; true when it answered an error. */
   private async forward(bytes: Buffer, keepReady = true): Promise<boolean> {
     if (this.skipping && bytes[0] !== 'S'.charCodeAt(0)) return true;
-    const reply = await this.raw(bytes);
+    const reply = await this.pg.raw(bytes);
     let failed = false;
     const out: Buffer[] = [];
     for (const m of splitMessages(reply)) {
@@ -420,7 +356,7 @@ export class PgSession {
   }
 
   /**
-   * The transaction status PGlite reported. When a transaction block ends,
+   * The transaction status PostgreSQL reported. When a transaction block ends,
    * its cursors end with it: those without HOLD always, those declared in it
    * when it rolled back (a COMMIT in a failed block is a rollback too).
    */
@@ -437,7 +373,7 @@ export class PgSession {
   }
 
   /**
-   * PGlite's reply to internal messages, never shown to the client. Inside a
+   * Backend reply to internal messages, never shown to the client. Inside a
    * simple query they end with their own Sync: unsynced extended messages
    * before a Query would leave a transaction open (status T) that clients
    * act on — psqlODBC then wraps every statement in a SAVEPOINT. In the
@@ -445,7 +381,7 @@ export class PgSession {
    */
   private async internal(...messages: Buffer[]): Promise<Message[]> {
     const reply = splitMessages(
-      await this.raw(
+      await this.pg.raw(
         Buffer.concat(
           this.inSimpleQuery ? [...messages, frontend.sync()] : messages,
         ),
@@ -465,13 +401,13 @@ export class PgSession {
   }
 
   /**
-   * A statement other than a SELECT that would read your tables in PGlite,
-   * where they are empty, and answer 0 rows as if that were the result
-   * (re-reviews 2026-11-22). A SQL connection only reads, so writes and DDL
-   * are refused outright, whatever they would read; PREPARE, EXECUTE and
-   * EXPLAIN ANALYZE are planned first, and refused when they read your
-   * tables or cannot be planned (fail closed). Functions that run SQL text
-   * (`query_to_xml`, `ts_stat`, …) are revoked in PGlite itself.
+   * A statement other than a SELECT that would read your tables in the catalog
+   * database, where they are empty, and answer 0 rows as if that were the
+   * result (re-reviews 2026-11-22). A SQL connection only reads, so writes and
+   * DDL are refused outright, whatever they would read; PREPARE, EXECUTE and
+   * EXPLAIN ANALYZE are planned first, and refused when they read your tables
+   * or cannot be planned (fail closed). Functions that run SQL text
+   * (`query_to_xml`, `ts_stat`, …) are revoked in `classifyre_tpl`.
    */
   private async unservedRead(sql: string): Promise<DataError | null> {
     if (this.status === 'E') return null;
@@ -511,7 +447,7 @@ export class PgSession {
     );
   }
 
-  /** Your tables a statement reads, from its plan in PGlite; null when it cannot be planned. */
+  /** Your tables a statement reads, from its plan in PostgreSQL; null when it cannot be planned. */
   private async readsOf(sql: string): Promise<string[] | null> {
     const nulls = substituteParams(
       sql,
@@ -576,8 +512,8 @@ export class PgSession {
     for (const statement of statements) {
       const cursor = parseCursorStatement(statement);
       if (cursor && this.status !== 'E') {
-        // In a failed transaction PGlite refuses everything (25P02), as
-        // PostgreSQL does: cursor statements included.
+        // In a failed transaction PostgreSQL refuses everything (25P02):
+        // cursor statements included.
         const handled = await this.cursorStatement(cursor);
         if (handled === 'failed') return;
         if (handled === 'served') continue;
@@ -597,7 +533,7 @@ export class PgSession {
         if (await this.forward(frontend.query(statement), false)) break;
         continue;
       }
-      // Its columns, as PGlite plans them over the empty tables.
+      // Its columns, as PostgreSQL plans them over the empty catalog tables.
       const described = await this.internal(
         frontend.parse(PROBE, statement),
         frontend.describe('S', PROBE),
@@ -614,9 +550,9 @@ export class PgSession {
       try {
         const result = await this.run(statement, tables);
         if (description) this.send(Buffer.from(description.raw));
-        this.sendRows(fields, result.rows, 0, result.rows.length);
+        this.sendRows(fields, result.rows, 0, result.rows.numRows);
         if (result.truncated) throw this.tooMany();
-        this.send(commandComplete(`SELECT ${result.rows.length}`));
+        this.send(commandComplete(`SELECT ${result.rows.numRows}`));
       } catch (failure) {
         await this.failSimple(failure);
         return;
@@ -637,17 +573,17 @@ export class PgSession {
   /**
    * DECLARE, FETCH and CLOSE of a cursor over data (BIC D5): the query runs
    * once as a job when declared, and FETCH reads its rows forward. A cursor
-   * over the catalog is PGlite's (`'pglite'`). A result over the row cap is
-   * refused when a FETCH reaches the cap, never cut short.
+   * over the catalog is PostgreSQL's (`'catalog'`). A result over the row cap
+   * is refused when a FETCH reaches the cap, never cut short.
    */
   private async cursorStatement(
     cursor: CursorStatement,
-  ): Promise<'served' | 'pglite' | 'failed'> {
+  ): Promise<'served' | 'catalog' | 'failed'> {
     if (cursor.kind === 'unsupported') {
-      // Never left to PGlite when it may concern data: there it would read
-      // empty tables and answer as if that were the result.
+      // Never left to the catalog DB when it may concern data: there it would
+      // read empty tables and answer as if that were the result.
       const refusal = this.unsupportedCursor(cursor);
-      if (!refusal) return 'pglite';
+      if (!refusal) return 'catalog';
       await this.failSimple(refusal);
       return 'failed';
     }
@@ -659,7 +595,7 @@ export class PgSession {
         await this.failSimple(error);
         return 'failed';
       }
-      if (!tables.length) return 'pglite';
+      if (!tables.length) return 'catalog';
       const refusal = this.declareRefusal(cursor.name, cursor.scroll);
       if (refusal) {
         await this.failSimple(refusal);
@@ -680,7 +616,7 @@ export class PgSession {
       try {
         const result = await this.run(cursor.query, tables);
         const budget = this.data.maxRows * CURSOR_ROWS_PER_ROW_CAP;
-        if (this.cursorRows() + result.rows.length > budget) {
+        if (this.cursorRows() + result.rows.numRows > budget) {
           throw new DataError(
             '53400',
             `Open cursors of this connection would hold more than ${budget} rows: close one (CLOSE) before declaring another.`,
@@ -705,14 +641,14 @@ export class PgSession {
     if (cursor.kind === 'close') {
       if (cursor.name === null) {
         this.cursors.clear();
-        return 'pglite';
+        return 'catalog';
       }
-      if (!this.cursors.delete(cursor.name)) return 'pglite';
+      if (!this.cursors.delete(cursor.name)) return 'catalog';
       this.send(commandComplete('CLOSE CURSOR'));
       return 'served';
     }
     const open = this.cursors.get(cursor.name);
-    if (!open) return 'pglite';
+    if (!open) return 'catalog';
     if (cursor.count === 0) {
       // PostgreSQL re-reads the current row; answering 0 rows would look
       // like the end of the result.
@@ -727,11 +663,11 @@ export class PgSession {
     const start = open.offset;
     const wanted =
       cursor.count === 'all' ? Number.POSITIVE_INFINITY : cursor.count;
-    const end = Math.min(start + wanted, open.rows.length);
+    const end = Math.min(start + wanted, open.rows.numRows);
     if (open.description) this.send(open.description);
     this.sendRows(open.fields, open.rows, start, end);
     open.offset = end;
-    if (open.truncated && start + wanted > open.rows.length) {
+    if (open.truncated && start + wanted > open.rows.numRows) {
       await this.failSimple(this.tooMany());
       return 'failed';
     }
@@ -779,11 +715,11 @@ export class PgSession {
 
   private cursorRows(): number {
     let rows = 0;
-    for (const cursor of this.cursors.values()) rows += cursor.rows.length;
+    for (const cursor of this.cursors.values()) rows += cursor.rows.numRows;
     return rows;
   }
 
-  /** An error in a simple query, through PGlite so the transaction knows. */
+  /** An error in a simple query, through PostgreSQL so the transaction knows. */
   private async failSimple(error: unknown): Promise<void> {
     const { sqlState, message } = this.errorOf(error);
     await this.forward(
@@ -845,7 +781,7 @@ export class PgSession {
   private async describe(message: Message): Promise<void> {
     if (this.skipping) return;
     const target = parseDescribe(message.body);
-    const reply = await this.raw(message.raw);
+    const reply = await this.pg.raw(message.raw);
     const messages = splitMessages(reply);
     if (target.kind === 'P') {
       const description = messages.find((m) => m.type === 'T');
@@ -884,18 +820,17 @@ export class PgSession {
         portal.rows = result.rows;
         portal.truncated = result.truncated;
       }
+      const total = portal.rows.numRows;
       const end =
-        maxRows > 0
-          ? Math.min(portal.offset + maxRows, portal.rows.length)
-          : portal.rows.length;
+        maxRows > 0 ? Math.min(portal.offset + maxRows, total) : total;
       this.sendRows(portal.fields, portal.rows, portal.offset, end);
       portal.offset = end;
-      if (end < portal.rows.length) {
+      if (end < total) {
         this.send(portalSuspended());
         return;
       }
       if (portal.truncated) throw this.tooMany();
-      this.send(commandComplete(`SELECT ${portal.rows.length}`));
+      this.send(commandComplete(`SELECT ${total}`));
     } catch (error) {
       await this.failExtended(error);
     }
@@ -917,12 +852,11 @@ export class PgSession {
     if (this.status === 'I') this.portals.clear();
   }
 
-  /** An error in the extended protocol: raised in PGlite, which then skips to Sync. */
   /**
    * Cursors over data are served in the simple query protocol only (where
    * psqlODBC's UseDeclareFetch sends them). Sent through Parse, the
-   * statement would reach PGlite's empty tables and FETCH would answer 0
-   * rows, so it is refused (review of 493fba5d, c1).
+   * statement would reach the catalog DB's empty tables and FETCH would answer
+   * 0 rows, so it is refused (review of 493fba5d, c1).
    */
   private async extendedCursorRefusal(sql: string): Promise<DataError | null> {
     const cursor = parseCursorStatement(sql);
@@ -952,6 +886,7 @@ export class PgSession {
       : null;
   }
 
+  /** An error in the extended protocol: raised in PostgreSQL, which then skips to Sync. */
   private async failExtended(error: unknown): Promise<void> {
     const { sqlState, message } = this.errorOf(error);
     const reply = await this.internal(
@@ -965,7 +900,7 @@ export class PgSession {
 
   // ── Data ──────────────────────────────────────────────────────────────
 
-  /** The parameter types of a statement as PGlite inferred them, for its bound values. */
+  /** The parameter types of a statement as PostgreSQL inferred them, for its bound values. */
   private async paramTypes(
     statement: Statement,
     bind: BindMessage,
@@ -986,7 +921,7 @@ export class PgSession {
     return types;
   }
 
-  /** The bound values as text, decoded by PGlite from whatever format the client used. */
+  /** The bound values as text, decoded by PostgreSQL from whatever format the client used. */
   private async paramLiterals(portal: Portal): Promise<string[]> {
     const { bind } = portal;
     if (!bind.params.length) return [];
@@ -1035,37 +970,14 @@ export class PgSession {
 
   private sendRows(
     fields: FieldDescription[],
-    rows: PlainValue[][],
+    rows: DataRows,
     from: number,
     to: number,
   ): void {
     const chunk: Buffer[] = [];
     let size = 0;
     for (let r = from; r < to; r++) {
-      const row = rows[r];
-      if (row.length !== fields.length) {
-        throw new DataError(
-          'XX000',
-          `The result has ${row.length} columns, the catalog says ${fields.length}: rescan the source.`,
-        );
-      }
-      const values = row.map((value, c) => {
-        try {
-          return encodeValue(value, fields[c].typeOid, fields[c].format);
-        } catch (error) {
-          if (error instanceof EncodeError) {
-            throw new DataError(
-              '22P03',
-              `Column ${fields[c].name}: ${error.message}`,
-            );
-          }
-          throw new DataError(
-            '22P03',
-            `Column ${fields[c].name}: the value does not fit its type.`,
-          );
-        }
-      });
-      const encoded = dataRow(values);
+      const encoded = rows.encodeRow(r, fields);
       chunk.push(encoded);
       size += encoded.length;
       if (size > 256 * 1024) {

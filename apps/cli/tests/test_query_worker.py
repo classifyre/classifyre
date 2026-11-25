@@ -612,3 +612,292 @@ def test_the_workspace_share_is_at_least_one_slot() -> None:
     assert workspace_slots(8, 75) == 6
     assert workspace_slots(1, 50) == 1
     assert workspace_slots(3, 100) == 3
+
+
+# ── CoW gc.freeze() and sticky worker reuse (SG §6.1, §6.3) ──────────────
+
+
+def test_warm_up_freezes_gc_objects_for_cow(monkeypatch: pytest.MonkeyPatch) -> None:
+    from src.query import warm
+
+    monkeypatch.setenv("CLASSIFYRE_QUERY_WORKER_EXTENSIONS", "")
+    timings = warm.warm_up()
+    assert "gc_freeze" in timings
+    assert timings.get("gc_frozen_objects", 0) > 0
+
+
+def test_sticky_config_defaults_off_and_parses_env() -> None:
+    cfg_default = WorkerConfig.from_env({"CLASSIFYRE_QUERY_WORKER_TOKEN": TOKEN})
+    assert cfg_default.sticky_ttl_seconds == 0
+    assert cfg_default.effective_max_idle_sticky == 0
+
+    cfg_on = WorkerConfig.from_env(
+        {
+            "CLASSIFYRE_QUERY_WORKER_TOKEN": TOKEN,
+            "CLASSIFYRE_QUERY_WORKER_SLOTS": "6",
+            "CLASSIFYRE_QUERY_WORKER_STICKY_TTL_SECONDS": "60",
+        }
+    )
+    assert cfg_on.sticky_ttl_seconds == 60
+    assert cfg_on.effective_max_idle_sticky == 3
+
+
+def test_sticky_key_scopes_strictly_by_workspace_connection_and_sources(folder: Path) -> None:
+    from src.query.worker import sticky_key_of
+
+    req_a = _request(folder, "SELECT 1", workspaceId="ws-1", connectionId="conn-1")
+    req_a2 = _request(folder, "SELECT 2", workspaceId="ws-1", connectionId="conn-1")
+    req_other_conn = _request(folder, "SELECT 1", workspaceId="ws-1", connectionId="conn-2")
+    req_other_ws = _request(folder, "SELECT 1", workspaceId="ws-2", connectionId="conn-1")
+    req_other_cred = _request(folder, "SELECT 1", workspaceId="ws-1", connectionId="conn-1")
+    req_other_cred["sources"][0]["recipe"]["masked"] = {"secret": "changed"}
+
+    assert sticky_key_of(req_a) is not None
+    assert sticky_key_of(req_a) == sticky_key_of(req_a2)
+    assert sticky_key_of(req_a) != sticky_key_of(req_other_conn)
+    assert sticky_key_of(req_a) != sticky_key_of(req_other_ws)
+    assert sticky_key_of(req_a) != sticky_key_of(req_other_cred)
+
+    # Without workspaceId or connectionId, or for exports/describe: never sticky.
+    assert sticky_key_of(_request(folder, "SELECT 1")) is None
+    assert sticky_key_of(_request(folder, "SELECT 1", workspaceId="ws-1")) is None
+    assert (
+        sticky_key_of(
+            _request(
+                folder, "SELECT 1", workspaceId="ws-1", connectionId="conn-1", exportFormat="csv"
+            )
+        )
+        is None
+    )
+    assert (
+        sticky_key_of(
+            _request(folder, "SELECT 1", workspaceId="ws-1", connectionId="conn-1", describe=True)
+        )
+        is None
+    )
+
+
+def test_sticky_worker_reuses_duckdb_isolates_others_and_kills_on_timeout_or_memory(
+    monkeypatch: pytest.MonkeyPatch, folder: Path, callbacks: _Callbacks
+) -> None:
+    monkeypatch.setenv("CLASSIFYRE_QUERY_WORKER_EXTENSIONS", "")
+    monkeypatch.setenv("CLASSIFYRE_QUERY_WORKER_FORKSERVER", "1")
+    sticky = _start(slots=4, sticky_ttl_seconds=60, max_idle_sticky=2)
+    try:
+        sql = "SELECT country FROM files.local.customers ORDER BY id LIMIT 1"
+        # First query for (ws-1, conn-a): miss, opens DuckDB (stickyReuse == 0), then cached idle.
+        s1, b1 = sticky.post(
+            _request(folder, sql, callbacks, workspaceId="ws-1", connectionId="conn-a")
+        )
+        assert s1 == 200 and b1["exitCode"] == 0
+        assert b1["payload"]["timings"]["stickyReuse"] == 0
+        assert sticky.worker.stats.sticky_misses == 1
+        assert sticky.worker.stats.sticky_hits == 0
+        assert sticky.worker.sticky_idle_count == 1
+        rows1 = pa.ipc.open_stream(callbacks.received[-1]["body"]).read_all().to_pylist()
+        assert rows1 == [{"country": "AT"}]
+
+        # Second query for the same (ws-1, conn-a): reuses warm DuckDB connection
+        # (stickyReuse == 1) while rebuilding views fresh so new column masks apply.
+        masked_req = _request(folder, sql, callbacks, workspaceId="ws-1", connectionId="conn-a")
+        masked_req["tables"][0]["columns"] = [
+            {"column": "country", "action": "mask", "mask": "redact"}
+        ]
+        s2, b2 = sticky.post(masked_req)
+        assert s2 == 200 and b2["exitCode"] == 0
+        assert b2["payload"]["timings"]["stickyReuse"] == 1
+        assert sticky.worker.stats.sticky_hits == 1
+        assert sticky.worker.sticky_idle_count == 1
+        rows2 = pa.ipc.open_stream(callbacks.received[-1]["body"]).read_all().to_pylist()
+        assert rows2 != rows1 and rows2[0]["country"] != "AT"
+
+        # Different connection in the same workspace NEVER reuses conn-a's process.
+        s3, b3 = sticky.post(_request(folder, sql, workspaceId="ws-1", connectionId="conn-b"))
+        assert s3 == 200 and b3["exitCode"] == 0
+        assert b3["payload"]["timings"]["stickyReuse"] == 0
+        assert sticky.worker.stats.sticky_misses == 2
+        assert sticky.worker.stats.sticky_hits == 1
+        assert sticky.worker.sticky_idle_count == 2
+
+        # A third distinct connection evicts LRU idle sticky worker to stay <= max_idle_sticky (2).
+        s4, b4 = sticky.post(_request(folder, sql, workspaceId="ws-2", connectionId="conn-c"))
+        assert s4 == 200 and b4["exitCode"] == 0
+        assert sticky.worker.sticky_idle_count == 2
+        assert sticky.worker.stats.sticky_evictions >= 1
+
+        # Memory pressure evicts idle sticky workers FIRST.
+        assert sticky.worker._evict_idle_sticky_for_memory() is True
+        assert sticky.worker.sticky_idle_count == 0
+
+        # A sticky query that times out is killed alone and NOT returned to the idle pool.
+        st, bt = sticky.post(
+            _request(folder, SLOW_SQL, timeoutSeconds=1, workspaceId="ws-1", connectionId="conn-a")
+        )
+        assert st == 200
+        assert bt["payload"]["error"]["code"] == "timeout"
+        assert sticky.worker.sticky_idle_count == 0
+
+        # A sticky process exceeding its per-query memory cap is killed alone (outcome == "memory").
+        monkeypatch.setattr("src.query.worker.process_memory_mb", lambda _pid: 99999.0)
+        sm, bm = sticky.post(
+            _request(
+                folder, SLOW_SQL, timeoutSeconds=60, workspaceId="ws-1", connectionId="conn-mem"
+            )
+        )
+        assert sm == 200
+        assert bm["outcome"] == "memory"
+        assert sticky.worker.sticky_idle_count == 0
+        monkeypatch.setattr("src.query.worker.process_memory_mb", lambda _pid: None)
+
+        # Subsequent queries still succeed cleanly after a memory kill.
+        sok, bok = sticky.post(_request(folder, sql, workspaceId="ws-1", connectionId="conn-ok"))
+        assert sok == 200 and bok["exitCode"] == 0
+
+        # Metrics expose sticky counters.
+        ms, mtext = sticky.get("/metrics")
+        assert ms == 200
+        assert "classifyre_query_worker_sticky_hits_total 1" in mtext
+    finally:
+        sticky.worker.drain()
+        sticky.server.shutdown()
+        sticky.server.server_close()
+
+
+def test_sticky_session_describe_retry_timeout_arrow_cleanup_and_iceberg(
+    monkeypatch: pytest.MonkeyPatch, folder: Path
+) -> None:
+    import duckdb
+
+    from src.query.connectors.arrow import ArrowConnector
+    from src.query.connectors.base import TableLocation
+    from src.query.connectors.object_storage import ObjectStorageBinding
+    from src.query.session import QueryRequest, QuerySession, QueryTimeoutError, StickyDuckDbState
+
+    # 1. describe() closes its own temporary connection and never pollutes StickyDuckDbState.
+    sticky = StickyDuckDbState()
+    try:
+        desc_req = QueryRequest.from_dict(
+            _request(folder, "SELECT country FROM files.local.customers", describe=True)
+        )
+        with QuerySession(desc_req, sticky=sticky) as session:
+            desc_result = session.run()
+        assert desc_result.description is not None
+        assert sticky.is_warm is False
+
+        # 2. Warm sticky connection, then trigger retry and verify timeout still interrupts the
+        # newly opened DuckDB connection promptly.
+        warm_req = QueryRequest.from_dict(
+            _request(folder, "SELECT country FROM files.local.customers LIMIT 1")
+        )
+        with QuerySession(warm_req, sticky=sticky) as session:
+            session.run()
+        assert sticky.is_warm is True
+
+        slow_req = QueryRequest.from_dict(_request(folder, SLOW_SQL, timeoutSeconds=1))
+        original_attach = QuerySession._attach_tables_as_views
+        failed_once = False
+
+        def fail_first_attach(
+            self: QuerySession, conn: Any, tables: Any, *, track_sticky: bool = True
+        ) -> None:
+            nonlocal failed_once
+            if not failed_once:
+                failed_once = True
+                raise RuntimeError("Configuration Error: Cannot change configuration when locked")
+            original_attach(self, conn, tables, track_sticky=track_sticky)
+
+        monkeypatch.setattr(QuerySession, "_attach_tables_as_views", fail_first_attach)
+        started = time.monotonic()
+        with pytest.raises(QueryTimeoutError):
+            with QuerySession(slow_req, sticky=sticky) as session:
+                session.run()
+        assert failed_once is True
+        assert time.monotonic() - started < 5.0
+    finally:
+        sticky.close()
+
+    # 3. ArrowConnector.reset_query() unregisters __live_* datasets and clears _live.
+    class _DummySource:
+        alias = "api"
+        index = 0
+        source_id = "s1"
+        source_type = "MEILISEARCH"
+        deadline = float("inf")
+        hidden = "__src_0"
+
+        def __init__(self) -> None:
+            self.recipe: dict[str, Any] = {}
+
+        def label(self) -> str:
+            return "api"
+
+        def section(self, name: str) -> dict[str, Any]:
+            return {}
+
+        def connection_option(self, name: str) -> Any:
+            return None
+
+        def instance(self) -> Any:
+            return None
+
+    class _DummyArrow(ArrowConnector):
+        def scan(self, location: TableLocation, request: Any) -> Any:
+            yield [{"id": 1}]
+
+    conn = duckdb.connect()
+    try:
+        connector = _DummyArrow(_DummySource())
+        loc = TableLocation(kind="connector", columns=(("id", "BIGINT"),))
+        rel = connector.relation(conn, loc)
+        assert len(connector._live) == 1
+        assert conn.execute(f"SELECT id FROM {rel}").fetchall() == [(1,)]
+        connector.reset_query(conn)
+        assert connector._live == {}
+        with pytest.raises(duckdb.CatalogException):
+            conn.execute(f"SELECT id FROM {rel}")
+    finally:
+        conn.close()
+
+    # 4. ObjectStorageBinding skips SET unsafe_enable_version_guessing when already enabled.
+    class _FakeStorage:
+        duckdb_extensions: tuple[str, ...] = ()
+        duckdb_secret = ""
+
+        def uri(self, key: str) -> str:
+            return f"s3://bucket/{key}"
+
+    class _FakeSourceInstance:
+        def _lakehouse_storage(self) -> _FakeStorage:
+            return _FakeStorage()
+
+    class _FakeObjSource(_DummySource):
+        def instance(self) -> Any:
+            return _FakeSourceInstance()
+
+    executed_sql: list[str] = []
+
+    class _FakeConn:
+        def __init__(self, already_enabled: bool) -> None:
+            self.already_enabled = already_enabled
+
+        def execute(self, sql: str) -> Any:
+            executed_sql.append(sql)
+
+            class _Res:
+                def __init__(self, val: bool) -> None:
+                    self._val = val
+
+                def fetchone(self) -> tuple[bool]:
+                    return (self._val,)
+
+            return _Res(self.already_enabled)
+
+    obj = ObjectStorageBinding(_FakeObjSource())
+    monkeypatch.setattr(obj, "load", lambda _conn, _ext: None)
+    fake_conn = _FakeConn(already_enabled=True)
+    ice_loc = TableLocation(kind="lakehouse", format="iceberg", object_key="wh/orders")
+    assert "iceberg_scan(" in obj.relation(fake_conn, ice_loc)
+    assert "iceberg_scan(" in obj.relation(fake_conn, ice_loc)
+    assert not any(sql.startswith("SET unsafe_enable_version_guessing") for sql in executed_sql)
+    # Only queried current_setting once (cached on the binding for subsequent calls).
+    assert len(executed_sql) == 1

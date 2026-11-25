@@ -136,6 +136,11 @@ class SourceBinding:
         """Why a connector's scan of that table failed, as it said it."""
         return self._reader.failure(relation) if self._reader else None
 
+    def reset_query(self, conn: Any) -> None:
+        """Release per-query state registered on ``conn`` between sticky queries."""
+        if self._reader is not None:
+            self._reader.reset_query(conn)
+
     def close(self) -> None:
         if self._reader is not None:
             self._reader.close()

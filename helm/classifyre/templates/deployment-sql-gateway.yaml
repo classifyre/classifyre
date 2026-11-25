@@ -124,6 +124,18 @@ spec:
               value: {{ .Values.sqlGateway.idleMinutes | quote }}
             - name: SQL_GATEWAY_SESSION_MEMORY_MB
               value: {{ .Values.sqlGateway.sessionMemoryMb | quote }}
+            - name: SQL_GATEWAY_CATALOG_PG_SOCKET
+              value: /var/run/sql-catalog-pg
+            - name: SQL_GATEWAY_CATALOG_PG_USER
+              value: classifyre_catalog
+            - name: SQL_GATEWAY_CATALOG_WORK_MEM
+              value: {{ .Values.sqlGateway.catalog.workMem | quote }}
+            - name: SQL_GATEWAY_CATALOG_STATEMENT_SECONDS
+              value: {{ .Values.sqlGateway.catalog.statementTimeoutSeconds | quote }}
+            - name: SQL_GATEWAY_CATALOG_DB_TTL_MINUTES
+              value: {{ .Values.sqlGateway.catalog.dbTtlMinutes | quote }}
+            - name: SQL_GATEWAY_MAX_CATALOG_DBS
+              value: {{ .Values.sqlGateway.catalog.maxCatalogDbs | quote }}
           {{- with .Values.api.extraEnvFrom }}
           envFrom:
             {{- toYaml . | nindent 12 }}
@@ -132,6 +144,8 @@ spec:
             - name: sql-tls
               mountPath: /etc/classifyre/sql-tls
               readOnly: true
+            - name: sql-catalog-socket
+              mountPath: /var/run/sql-catalog-pg
             {{- if .Values.api.cliJobs.enabled }}
             - name: cli-job-template
               mountPath: /etc/classifyre/cli-job-template
@@ -146,9 +160,11 @@ spec:
             {{- toYaml . | nindent 12 }}
           {{- end }}
           readinessProbe:
-            tcpSocket:
-              port: postgres
+            httpGet:
+              path: /health/sql-gateway
+              port: http
             periodSeconds: 10
+            timeoutSeconds: 5
             failureThreshold: 3
           {{- if .Values.api.livenessProbe.enabled }}
           livenessProbe:
@@ -173,11 +189,94 @@ spec:
           securityContext:
             {{- toYaml . | nindent 12 }}
           {{- end }}
+        - name: catalog-postgres
+          image: {{ .Values.sqlGateway.catalog.image.repository }}:{{ .Values.sqlGateway.catalog.image.tag }}
+          imagePullPolicy: {{ .Values.sqlGateway.catalog.image.pullPolicy }}
+          args:
+            - -c
+            - listen_addresses=
+            - -c
+            - unix_socket_directories=/var/run/sql-catalog-pg
+            - -c
+            - unix_socket_permissions=0777
+            - -c
+            - fsync=off
+            - -c
+            - synchronous_commit=off
+            - -c
+            - full_page_writes=off
+            - -c
+            - wal_level=minimal
+            - -c
+            - max_wal_senders=0
+            - -c
+            - {{ printf "shared_buffers=%s" .Values.sqlGateway.catalog.sharedBuffers | quote }}
+            - -c
+            - {{ printf "work_mem=%s" .Values.sqlGateway.catalog.workMem | quote }}
+            - -c
+            - temp_file_limit=0
+            - -c
+            - {{ printf "max_connections=%d" (add (int .Values.sqlGateway.maxSessions) 16) | quote }}
+            - -c
+            - autovacuum_max_workers=1
+            - -c
+            - autovacuum_naptime=5min
+            - -c
+            - jit=off
+          env:
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+            - name: POSTGRES_USER
+              value: classifyre_catalog
+            - name: POSTGRES_HOST_AUTH_METHOD
+              value: trust
+            - name: POSTGRES_INITDB_ARGS
+              value: "--no-sync"
+          volumeMounts:
+            - name: sql-catalog-data
+              mountPath: /var/lib/postgresql/data
+            - name: sql-catalog-socket
+              mountPath: /var/run/sql-catalog-pg
+            - name: sql-catalog-run
+              mountPath: /var/run/postgresql
+            - name: sql-catalog-tmp
+              mountPath: /tmp
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -h
+                - /var/run/sql-catalog-pg
+                - -U
+                - classifyre_catalog
+                - -d
+                - postgres
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          {{- with .Values.sqlGateway.catalog.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.sqlGateway.catalog.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
       volumes:
         - name: sql-tls
           secret:
             secretName: {{ include "classifyre.sqlGateway.tlsSecret" . }}
             optional: true
+        - name: sql-catalog-data
+          emptyDir:
+            medium: Memory
+            sizeLimit: {{ .Values.sqlGateway.catalog.tmpfsSizeLimit }}
+        - name: sql-catalog-socket
+          emptyDir: {}
+        - name: sql-catalog-run
+          emptyDir: {}
+        - name: sql-catalog-tmp
+          emptyDir: {}
         {{- if .Values.api.cliJobs.enabled }}
         - name: cli-job-template
           configMap:

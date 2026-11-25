@@ -20,6 +20,7 @@ These PRDs turn the findings of [palantir-use-case-gap-analysis.md](../../palant
 | [DR · Data requests: cases that ask a data team for a dataset](DR-data-requests.md) | Business users need a governed way to ask a data team for a joined dataset without getting raw-table access | L | after DQ | data-request cases, visual join canvas |
 | [QC · Query connectors](QC-query-connectors.md) | Only sources DuckDB reads itself can be queried; search, graph, SaaS and custom sources cannot, and the list of queryable types is kept in two places by hand | L | after DQ 0–4 | one read interface per source type (replaces DQ phase 5) |
 | [BIC · BI clients over SQL connections](BIC-bi-client-compatibility.md) | SQL connections were never tested with a real BI tool, and nothing stops the next driver version from breaking them | M | after DQ 4 | Metabase/driver smoke on the dev stack, client statement corpus in CI |
+| [SG · Native Postgres catalog sidecar and query-path efficiency](SG-sql-gateway-native-catalog.md) | Per-session PGlite WASM costs 150–450 MB per BI connection and the query path leaves gateway heap and worker CoW/CPU on the table | M–L | after BIC | PGlite removed; stateless native Postgres catalog sidecar (`c_<hash>` DBs), direct Arrow wire encoding, `gc.freeze()` & sticky worker reuse |
 | [GOV · Governed data assets](GOV-governed-data-assets.md) | Nobody owns an asset, its meaning is hidden in a drawer, and quality is only failures from a sample: no owner, steward, column metadata, thresholds or results | L | after DQ 0–2 | owners for access requests, column classification for masks |
 | [G1 · PYTHON detector](G1-python-detector.md) | Rules and quality checks live in connector notebooks as TAG workarounds (67 of 68 GENESIS detectors) | M | M1 | C1, C2 |
 | [G3 · Domain events, webhooks, push, case export](G3-outbound-webhooks-notifications-export.md) | Nothing leaves the app: no webhook, no push, no case export | S–M | M1 | F1 |
@@ -45,6 +46,7 @@ These PRDs turn the findings of [palantir-use-case-gap-analysis.md](../../palant
 | [GOV · Governed data assets](GOV-governed-data-assets.md) | Proposed, 2026-11-12 |
 | [QC · Query connectors](QC-query-connectors.md) | QC0–QC3 built 2026-11-21 (interface, connector runtime, Meilisearch, Neo4j, lab joins on skaffold); QC4 built 2026-11-22 (custom sources: `tables()`/`scan()`, tried on the live Firmenbuch); QC5 proposed |
 | [BIC · BI clients over SQL connections](BIC-bi-client-compatibility.md) | BIC0–BIC2 built and run 2026-11-21 (30/30 checks); BIC3 open |
+| [SG · Native Postgres catalog sidecar and query-path efficiency](SG-sql-gateway-native-catalog.md) | Implemented (SG0–SG4 code & local tests), 2026-11-25; live k3d `bi-smoke.sh` & §8.3 benchmarks pending |
 | [DR · Data requests](DR-data-requests.md) | In progress, 2026-11-24 |
 | All others | Proposed, 2026-09-30 |
 

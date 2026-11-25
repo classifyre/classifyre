@@ -565,10 +565,12 @@ helm upgrade --install classifyre ./helm/classifyre \
 | queryWorker.podLabels | object | `{}` | Extra pod labels. |
 | queryWorker.podSecurityContext | object | `{"fsGroup":10001,"runAsGroup":10001,"runAsNonRoot":true,"runAsUser":10001,"seccompProfile":{"type":"RuntimeDefault"}}` | Pod security context. Emptied, the template still sets these. |
 | queryWorker.port | int | `8090` | Port of the worker's HTTP endpoint (cluster-internal). |
+| queryWorker.preloadExtensions | list | `["httpfs","postgres","mysql"]` | DuckDB extensions preloaded into the fork server at startup (`CLASSIFYRE_QUERY_WORKER_EXTENSIONS`). Trimmed by default to lightweight core connectors (`httpfs`, `postgres`, `mysql`); add `azure`, `delta`, `iceberg`, or `ducklake` when those connectors are active, or set `[]` to skip preloading (docs/prd/SG-sql-gateway-native-catalog.md §6.2). |
 | queryWorker.priorityClassName | string | `"service-standard"` | Priority class of worker pods (a service, like the API). |
 | queryWorker.replicaCount | int | `1` | Worker pods when `queryWorker.autoscaling` is off. The Service spreads queries across them; each pod drains its running queries on a rollout or scale-down. |
 | queryWorker.resources | object | `{"limits":{"cpu":"2","memory":"4Gi"},"requests":{"cpu":"500m","memory":"2Gi"}}` | Requests and limits of one worker pod. Memory: about 400 MiB for the warmed fork server plus what `slots` queries use at once. |
 | queryWorker.slots | int | `0` | Queries one pod runs at once. 0: as many as its memory limit holds at `memoryPerQuery` each (up to 256), so a bigger pod runs more (vertical scaling): 32Gi at 256Mi is about 125 at once. DuckDB gets an equal share of the pod's memory (70 % after a fixed reserve) and its cores. |
+| queryWorker.stickySessionTtlSeconds | int | `0` | Idle TTL (seconds) for reusing a warm query process per `(workspaceId, connectionId, sourceCredsDigest)` on BI dashboard bursts (docs/prd/SG-sql-gateway-native-catalog.md §6.3). `0` disables reuse. |
 | queryWorker.tmpSizeLimit | string | `"12Gi"` | Size limit of the pod's /tmp, where queries spill large sorts and joins. |
 | queryWorker.token.existingKey | string | `"token"` | Key of the token in that Secret. |
 | queryWorker.token.existingSecret | string | `""` | Existing Secret with the token the API signs worker requests with. Empty: the chart creates one and keeps it across `helm upgrade`. With `helm template` or a GitOps tool that renders without cluster access, set this (or `value`), or each render makes a new token; the API and the worker read the mounted file again when it changes, so a new one is picked up within the kubelet's sync period, without restarts. |
@@ -581,25 +583,37 @@ helm upgrade --install classifyre ./helm/classifyre \
 | serviceAccount.create | bool | `true` | Create the API service account. |
 | serviceAccount.name | string | `""` | Existing service account name to use when `create=false`. |
 | sqlGateway.allowedCidrs | list | `[]` | Client networks allowed to connect (CIDRs, checked in the gateway on the real client address). Empty: any. Also set `service.loadBalancerSourceRanges` for a LoadBalancer. |
+| sqlGateway.catalog.dbTtlMinutes | int | `30` | Minutes an idle catalog database stays before the sweeper drops it. |
+| sqlGateway.catalog.image | object | `{"pullPolicy":"IfNotPresent","repository":"postgres","tag":"18-alpine"}` | Pod-local stateless native PostgreSQL catalog-only sidecar (docs/prd/SG-sql-gateway-native-catalog.md §4). Stores empty catalog tables per `(workspace, catalogHash)` on ephemeral tmpfs; no PVC or Service. |
+| sqlGateway.catalog.image.pullPolicy | string | `"IfNotPresent"` | Catalog sidecar image pull policy. |
+| sqlGateway.catalog.image.repository | string | `"postgres"` | Catalog sidecar Postgres image repository. |
+| sqlGateway.catalog.image.tag | string | `"18-alpine"` | Catalog sidecar Postgres image tag (matches PG_MAJOR=18 in all-in-one Docker). |
+| sqlGateway.catalog.maxCatalogDbs | int | `256` | Upper cap on live catalog databases per gateway pod (LRU evicted when idle). |
+| sqlGateway.catalog.resources | object | `{"limits":{"cpu":"1","memory":"1Gi"},"requests":{"cpu":"100m","memory":"256Mi"}}` | Resource requests and limits for the `catalog-postgres` sidecar container. |
+| sqlGateway.catalog.securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true,"runAsGroup":70,"runAsNonRoot":true,"runAsUser":70}` | Container security context for `catalog-postgres` (uid 70 is alpine's `postgres` user). |
+| sqlGateway.catalog.sharedBuffers | string | `"128MB"` | PostgreSQL `shared_buffers` for the catalog sidecar. |
+| sqlGateway.catalog.statementTimeoutSeconds | int | `15` | Per-role `statement_timeout` (seconds) on the catalog sidecar. |
+| sqlGateway.catalog.tmpfsSizeLimit | string | `"512Mi"` | Size limit of the tmpfs (`emptyDir` with `medium: Memory`) backing the catalog data directory. |
+| sqlGateway.catalog.workMem | string | `"4MB"` | Per-role `work_mem` limit for catalog queries. |
 | sqlGateway.enabled | bool | `true` | SQL connections (docs/prd/DQ-data-query.md §5.7): a PostgreSQL endpoint for BI tools and drivers (psql, DBeaver, Power BI, Excel, Tableau, JDBC, ODBC). Runs the API image with SERVICE_ROLE=sql. People sign in with a SQL connection made in the app; every query runs as a query job and is audited with the connection. On by default; set it to `false` to run without it (the app then says SQL connections are off). It only becomes reachable once `publicHost` is set and the port is exposed (`service`, `traefik`): until then the app shows a warning that links the setup guide (https://docs.classifyre.com/sql-connections/#making-the-endpoint-reachable). |
 | sqlGateway.idleMinutes | int | `30` | Minutes a session may sit idle before it is closed. |
-| sqlGateway.maxOldSpaceSizeMb | int | `1024` | V8 heap cap (MB) of the gateway process. The catalogs live outside the JS heap (WebAssembly), so this stays small. |
-| sqlGateway.maxSessions | int | `16` | Sessions one gateway pod holds at once. Each is a PGlite of its own: about 150 MB idle, about 450 MB while a BI tool syncs and queries. Memory bounds it too: a new session is refused as busy (53300) unless the pod's memory, plus `sessionMemoryMb` for it and for each session still starting, stays under the RSS guard (87.5 % of `resources.limits.memory`). At the default 4Gi that is about 6 busy sessions: raise the limit along with this. |
-| sqlGateway.maxSessionsPerConnection | int | `4` | Sessions one SQL connection may have open at once. |
+| sqlGateway.maxOldSpaceSizeMb | int | `512` | V8 heap cap (MB) of the gateway Node container. Catalogs live in the `catalog-postgres` sidecar and Arrow results stream directly to wire frames. |
+| sqlGateway.maxSessions | int | `64` | Sessions one gateway pod holds at once. Each session opens one dedicated connection to the pod-local native Postgres catalog sidecar (~10–30 MB on the sidecar depending on catalog size, ~32 MB headroom on the gateway). |
+| sqlGateway.maxSessionsPerConnection | int | `16` | Sessions one SQL connection may have open at once (16 matches Metabase's default 15-connection pool out of the box). |
 | sqlGateway.port | int | `5432` | Port the gateway listens on inside the pod and on its Service. |
 | sqlGateway.proxyProtocol | bool | `false` | Expect a PROXY protocol header (v1 or v2) on every connection, so the gateway sees the real client behind a TCP proxy (Traefik, HAProxy, a cloud load balancer) for lockouts and `allowedCidrs`. Turn on only when every connection comes through such a proxy. |
 | sqlGateway.publicHost | string | `""` | The host name people connect to, shown in the app next to each connection, and put in the generated certificate. Set it for SQL connections to work: while it is empty the app warns that the endpoint is not configured instead of showing connection details; e.g. `sql.example.com`. Changing it later: delete the generated TLS Secret so the certificate is made again with the new name. |
 | sqlGateway.publicPort | int | `5432` | The port people connect to (the Service's, a NodePort, or a Traefik entrypoint's). |
-| sqlGateway.replicaCount | int | `1` | Gateway replicas. A client session stays on one pod; more replicas spread sessions (each holds an in-memory catalog of ~150 MB). |
-| sqlGateway.resources.limits.memory | string | `"4Gi"` |  |
-| sqlGateway.resources.requests.cpu | string | `"250m"` |  |
-| sqlGateway.resources.requests.memory | string | `"1Gi"` |  |
+| sqlGateway.replicaCount | int | `1` | Gateway replicas. A client session stays on one pod with its pod-local catalog Postgres sidecar; more replicas spread sessions and blast radius. |
+| sqlGateway.resources.limits.memory | string | `"1Gi"` |  |
+| sqlGateway.resources.requests.cpu | string | `"100m"` |  |
+| sqlGateway.resources.requests.memory | string | `"256Mi"` |  |
 | sqlGateway.service.annotations | object | `{}` |  |
 | sqlGateway.service.externalTrafficPolicy | string | `""` | `Local` keeps the client address for `allowedCidrs` without PROXY protocol. |
 | sqlGateway.service.loadBalancerSourceRanges | list | `[]` | For a LoadBalancer: the client networks it accepts. |
 | sqlGateway.service.nodePort | string | `nil` | Fixed node port for `NodePort`/`LoadBalancer`. |
 | sqlGateway.service.type | string | `"ClusterIP"` | `ClusterIP` when a TCP proxy (Traefik) exposes it; `LoadBalancer` or `NodePort` to expose it directly — the gateway does its own TLS, so no reverse proxy is needed at all. |
-| sqlGateway.sessionMemoryMb | int | `450` | What one more session is allowed for when deciding whether the pod has room for it (MB; measured 2026-11-21 with Metabase, BIC M5). |
+| sqlGateway.sessionMemoryMb | int | `32` | What one more session is allowed for on the Node gateway container when deciding whether the pod has room for it (MB). |
 | sqlGateway.tls.allowPlaintext | bool | `false` | Development only: accept connections without TLS. |
 | sqlGateway.tls.certManager.enabled | bool | `false` | Let cert-manager issue the certificate for `publicHost`. |
 | sqlGateway.tls.certManager.issuerRef.kind | string | `"ClusterIssuer"` |  |

@@ -1,4 +1,4 @@
-import { catalogDdl } from './catalog-ddl';
+import { catalogDdl, computeCatalogHash } from './catalog-ddl';
 import type { CatalogSource } from '../data-query/query-catalog.service';
 
 const table = (over: Record<string, unknown> = {}) => ({
@@ -19,13 +19,17 @@ const table = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-const source = (tables: ReturnType<typeof table>[]): CatalogSource => ({
+const source = (
+  tables: ReturnType<typeof table>[],
+  over: Partial<CatalogSource> = {},
+): CatalogSource => ({
   id: 's1',
   name: 'Shop',
   type: 'POSTGRESQL',
   sqlName: 'shop',
   queryable: true,
   tables,
+  ...over,
 });
 
 describe('catalogDdl', () => {
@@ -71,14 +75,35 @@ describe('catalogDdl', () => {
     expect(ddl.skipped).toEqual(['shop.public.orders']);
   });
 
-  it('runs the session as a read-only role named after the connection', () => {
-    const ddl = catalogDdl([source([table()])], undefined, 'ana_bi');
-    expect(ddl.sql).toContain('CREATE ROLE "ana_bi" LOGIN;');
-    expect(ddl.sql).toContain(
-      'GRANT SELECT ON ALL TABLES IN SCHEMA "shop.public" TO "ana_bi";',
+  it('produces canonical DDL independent of input order and hashes opaquely per workspace', () => {
+    const a = source(
+      [
+        table({ assetId: 'a2', table: 'zeta', sqlName: 'alpha.public.zeta' }),
+        table({ assetId: 'a1', table: 'beta', sqlName: 'alpha.public.beta' }),
+      ],
+      { id: 's1', name: 'Alpha', sqlName: 'alpha' },
     );
-    expect(ddl.sql.trim().endsWith('SET SESSION AUTHORIZATION "ana_bi";')).toBe(
-      true,
+    const b = source(
+      [
+        table({
+          assetId: 'a3',
+          table: 'items',
+          sqlName: 'billing.public.items',
+        }),
+      ],
+      { id: 's2', name: 'Billing', sqlName: 'billing' },
     );
+
+    const ddl1 = catalogDdl([a, b]);
+    const ddl2 = catalogDdl([b, { ...a, tables: [...a.tables].reverse() }]);
+    expect(ddl1.sql).toBe(ddl2.sql);
+
+    const h1 = computeCatalogHash('ws-acme', ddl1.sql);
+    const h2 = computeCatalogHash('ws-acme', ddl2.sql);
+    const hOtherWs = computeCatalogHash('ws-other', ddl1.sql);
+    expect(h1).toBe(h2);
+    expect(h1).toMatch(/^[0-9a-f]{24}$/);
+    expect(h1).not.toBe(hOtherWs);
+    expect(h1).not.toContain('acme');
   });
 });

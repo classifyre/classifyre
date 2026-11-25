@@ -12,7 +12,6 @@ import { randomInt } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { type Server, type Socket, createServer } from 'node:net';
 import { type SecureContext, TLSSocket, createSecureContext } from 'node:tls';
-import { tableFromIPC } from 'apache-arrow';
 import { QueryRunStatus } from '@prisma/client';
 import { NamespaceRegistryService } from '../registry/namespace-registry.service';
 import { PrismaClientManager } from '../prisma/prisma-client-manager';
@@ -54,16 +53,21 @@ import {
   parseStartupParameters,
   readyForQuery,
 } from './pg-protocol';
+import { arrowRows } from './arrow-rows';
+import {
+  CatalogBackendDisconnectedError,
+  CatalogCapacityError,
+  type CatalogSession,
+} from './catalog-backend';
+import { PostgresCatalogHost } from './postgres-catalog-host';
 import { catalogDdl, type CatalogNotes } from './catalog-ddl';
-import { PgliteHost } from './pglite-host';
 import {
   DataError,
   type DataResult,
   type DataRunner,
   PgSession,
-  SessionEscape,
 } from './pg-session';
-import { plainValue } from './pg-types';
+import { SqlGatewayMetrics } from './sql-gateway-metrics';
 import { readProxyHeader } from './proxy-protocol';
 import {
   SignInLockout,
@@ -82,7 +86,6 @@ const STARTUP_SETTINGS = new Set([
   'extra_float_digits',
   'datestyle',
   'intervalstyle',
-  'statement_timeout',
 ]);
 
 const SWEEP_MS = 30_000;
@@ -167,9 +170,9 @@ function readConfig(): Config | null {
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean),
-    maxSessions: Number(process.env.SQL_GATEWAY_MAX_SESSIONS) || 16,
+    maxSessions: Number(process.env.SQL_GATEWAY_MAX_SESSIONS) || 64,
     maxPerConnection:
-      Number(process.env.SQL_GATEWAY_MAX_SESSIONS_PER_CONNECTION) || 4,
+      Number(process.env.SQL_GATEWAY_MAX_SESSIONS_PER_CONNECTION) || 16,
     idleMs: (Number(process.env.SQL_GATEWAY_IDLE_MINUTES) || 30) * 60_000,
   };
 }
@@ -314,28 +317,35 @@ class Refusal extends Error {
   }
 }
 
+export interface SqlGatewayReadiness {
+  ready: boolean;
+  listener: boolean;
+  catalogSidecar: boolean;
+  activeSessions: number;
+  catalogDbs: number;
+}
+
 /**
  * The SQL gateway (docs/prd/DQ-data-query.md §5.7): a PostgreSQL endpoint for
  * BI tools and drivers. TLS always (STARTTLS with SSLRequest, or direct TLS
  * as libpq 17's `sslnegotiation=direct`), SCRAM-SHA-256 against a SQL
  * connection's verifier, the workspace as the database. Each signed-in
- * session gets its own PGlite with the person's catalog; each data statement
- * runs as a query job for the connection's person, audited with the
- * connection. Runs in the `sql` (or `all`) process role when
- * `SQL_GATEWAY_ENABLED` is set.
+ * session gets its own dedicated connection to the pod-local native Postgres
+ * catalog sidecar; each data statement runs as a query job for the
+ * connection's person, audited with the connection. Runs in the `sql` (or
+ * `all`) process role when `SQL_GATEWAY_ENABLED` is set.
  */
 @Injectable()
 export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
   private readonly logger = new Logger(SqlGatewayService.name);
   private server: Server | null = null;
   private config: Config | null = null;
-  private readonly host = new PgliteHost();
   private readonly live = new Map<number, Live>();
   private readonly sessionMemory = sessionMemoryConfig();
   private readonly lockout = new SignInLockout();
   /** Sockets not signed in yet. */
   private readonly signInSlots = new SignInSlots();
-  /** Sessions signed in whose PGlite is starting: slot → connection id. */
+  /** Sessions signed in whose catalog connection is starting: slot → connection id. */
   private readonly opening = new Map<number, string>();
   private nextSlot = 1;
   private secretKey: Buffer | null = null;
@@ -350,6 +360,8 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
     private readonly queryRuns: QueryRunService,
     private readonly connections: ConnectionSignInService,
     @Inject(IDENTITY) private readonly identity: IdentityService,
+    private readonly metrics: SqlGatewayMetrics,
+    private readonly host: PostgresCatalogHost,
   ) {}
 
   onModuleInit(): void {
@@ -378,6 +390,7 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
       return;
     }
     this.config = config;
+    this.host.start();
     this.server = createServer((socket) => void this.accept(socket));
     this.server.on('error', (error) =>
       this.logger.error(`SQL gateway listener: ${error.message}`),
@@ -391,6 +404,23 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
     this.sweeper.unref();
   }
 
+  /** Pod readiness: checks both the TCP listener and the pod-local catalog sidecar. */
+  async readiness(): Promise<SqlGatewayReadiness> {
+    const listener = Boolean(this.server?.listening);
+    const catalogSidecar = listener ? await this.host.ping() : false;
+    return {
+      ready: listener && catalogSidecar,
+      listener,
+      catalogSidecar,
+      activeSessions: this.live.size,
+      catalogDbs: this.host.catalogCount(),
+    };
+  }
+
+  metricsPrometheus(): string {
+    return this.metrics.prometheus();
+  }
+
   async onApplicationShutdown(): Promise<void> {
     if (this.sweeper) clearInterval(this.sweeper);
     this.server?.close();
@@ -399,6 +429,7 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
         this.end(l, '57P01', 'The SQL gateway is shutting down.'),
       ),
     );
+    await this.host.close();
   }
 
   /** The application secret: the decoy verifiers are derived from it. */
@@ -801,7 +832,6 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
         socket,
         incoming,
         params,
-        username,
         client,
         row,
         signedIn,
@@ -816,7 +846,6 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
     socket: Socket,
     incoming: Incoming,
     params: Record<string, string>,
-    username: string,
     client: string | null,
     row: NonNullable<
       Awaited<ReturnType<ConnectionSignInService['forSignIn']>>
@@ -868,12 +897,24 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
         const notes = await this.notes(
           sources.flatMap((s) => s.tables.map((t) => t.assetId)),
         );
-        return { ddl: catalogDdl(sources, notes, row.username), notes };
+        return { ddl: catalogDdl(sources, notes), notes };
       },
       scope,
     );
     void notes;
-    const pg = await this.host.open(ns.slug, ddl.sql);
+    let pg: CatalogSession;
+    try {
+      pg = await this.host.open({
+        workspaceId: ns.namespaceId,
+        connectionId: row.id,
+        ddl,
+      });
+    } catch (error) {
+      if (error instanceof CatalogCapacityError) {
+        throw new Refusal('53300', error.message);
+      }
+      throw error;
+    }
     const pid = randomInt(1, 2_147_483_647);
     const secret = randomInt(1, 2_147_483_647);
     const entry = {} as Live;
@@ -885,7 +926,6 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
       /^(1|true|yes|on)$/i.test(process.env.SQL_GATEWAY_TRACE ?? '')
         ? (line) => this.logger.log(`sql ${pid}: ${line}`)
         : undefined,
-      row.username,
     );
     Object.assign(entry, {
       pid,
@@ -896,12 +936,16 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
       session,
       principal: principalState,
     } satisfies Live);
+    pg.onDisconnect(() => {
+      void this.end(entry, '57P01', 'The SQL gateway lost this session.');
+    });
     const settings: Record<string, string> = { TimeZone: 'UTC' };
     for (const [key, value] of Object.entries(params)) {
       if (STARTUP_SETTINGS.has(key.toLowerCase())) settings[key] = value;
     }
     await session.start(settings);
     this.live.set(pid, entry);
+    this.metrics.setSessionsActive(this.live.size);
     await this.inWorkspace(ns, () =>
       this.connections.markUsed(row.id, client, row.lastUsedAt),
     );
@@ -912,7 +956,7 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
     const out: Buffer[] = status.map((s) => parameterStatus(s.name, s.setting));
     out.push(
       parameterStatus('is_superuser', 'off'),
-      parameterStatus('session_authorization', username),
+      parameterStatus('session_authorization', pg.role),
       parameterStatus('default_transaction_read_only', 'on'),
       parameterStatus('in_hot_standby', 'off'),
       backendKeyData(pid, secret),
@@ -920,7 +964,7 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
     );
     socket.write(Buffer.concat(out));
     this.logger.log(
-      `SQL connection ${row.username} signed in to ${ns.slug} from ${client ?? 'unknown'} (${ddl.tables} tables${ddl.skipped.length ? `, ${ddl.skipped.length} with names too long` : ''})`,
+      `SQL connection ${row.username} signed in to ${ns.slug} from ${client ?? 'unknown'} (${ddl.tables} tables${ddl.skipped.length ? `, ${ddl.skipped.length} with names too long` : ''}, db=${pg.database})`,
     );
 
     const rest = incoming.detach();
@@ -937,13 +981,9 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
       const handled = terminate >= 0 ? messages.slice(0, terminate) : messages;
       void session.receive(handled).catch((error: unknown) => {
         this.logger.warn(`SQL session ${pid}: ${String(error)}`);
-        void (error instanceof SessionEscape
-          ? this.end(
-              entry,
-              '42501',
-              'This session runs as its SQL connection; changing the session user is not allowed.',
-            )
-          : this.end(entry, 'XX000', 'The SQL gateway lost this session.'));
+        const code =
+          error instanceof CatalogBackendDisconnectedError ? '57P01' : 'XX000';
+        void this.end(entry, code, 'The SQL gateway lost this session.');
       });
       if (terminate >= 0) void session.receive([]).then(() => this.drop(entry));
     };
@@ -1036,7 +1076,7 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
           );
         }
         return {
-          rows: decodeArrow(result.arrow),
+          rows: arrowRows(result.arrow),
           truncated: result.truncated,
         };
       },
@@ -1187,21 +1227,8 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
   private async drop(entry: Live): Promise<void> {
     if (!this.live.has(entry.pid)) return;
     this.live.delete(entry.pid);
+    this.metrics.setSessionsActive(this.live.size);
     if (!entry.socket.destroyed) entry.socket.end();
     await entry.session.close().catch(() => undefined);
   }
-}
-
-/** The job's Arrow result as plain rows. */
-export function decodeArrow(bytes: Buffer): DataResult['rows'] {
-  const table = tableFromIPC(bytes);
-  const columns = table.schema.fields.map((field, i) => ({
-    vector: table.getChildAt(i)!,
-    type: field.type,
-  }));
-  const rows: DataResult['rows'] = [];
-  for (let r = 0; r < table.numRows; r++) {
-    rows.push(columns.map((c) => plainValue(c.vector.get(r), c.type)));
-  }
-  return rows;
 }

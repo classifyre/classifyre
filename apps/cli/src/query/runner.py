@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING, Any
 from ..utils.redaction import ENCRYPTED_CONFIG_PATHS, Redactor, _leaves_at_path
 
 if TYPE_CHECKING:
-    from .session import QueryRequest, QueryResult
+    from .session import QueryRequest, QueryResult, StickyDuckDbState
 
 logger = logging.getLogger(__name__)
 
@@ -123,7 +123,9 @@ def ensure_dependencies() -> None:
     require_module("sqlglot", "SQL query", ["lineage"])
 
 
-def run_query(request_data: dict[str, Any]) -> tuple[dict[str, Any], QueryResult | None]:
+def run_query(
+    request_data: dict[str, Any], *, sticky: StickyDuckDbState | None = None
+) -> tuple[dict[str, Any], QueryResult | None]:
     """Run a request; return the status payload and, on success, the result."""
     redact = _redactor(request_data)
     try:
@@ -136,7 +138,7 @@ def run_query(request_data: dict[str, Any]) -> tuple[dict[str, Any], QueryResult
 
     request = QueryRequest.from_dict(request_data)
     try:
-        with QuerySession(request) as session:
+        with QuerySession(request, sticky=sticky) as session:
             result = session.run()
     except QueryRefusedError as exc:
         return error_payload(exc.code, redact(str(exc))), None

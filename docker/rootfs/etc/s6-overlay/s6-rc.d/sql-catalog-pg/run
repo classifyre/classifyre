@@ -1,0 +1,48 @@
+#!/command/with-contenv bash
+# Stateless native PostgreSQL catalog-only instance for the SQL gateway
+# (docs/prd/SG-sql-gateway-native-catalog.md §4.6).
+#
+# Strictly isolated from Classifyre's main PostgreSQL cluster (PGDATA): uses its
+# own ephemeral data directory under /tmp/sql-catalog-pg and listens only on its
+# dedicated Unix domain socket (/var/run/sql-catalog-pg), with zero TCP ports.
+set -euo pipefail
+
+if [ "${SQL_GATEWAY_ENABLED:-true}" != "true" ]; then
+  exec sleep infinity
+fi
+
+PGBIN="/usr/lib/postgresql/${PG_MAJOR}/bin"
+CATALOG_PGDATA="/tmp/sql-catalog-pg/data"
+CATALOG_SOCKET="${SQL_GATEWAY_CATALOG_PG_SOCKET:-/var/run/sql-catalog-pg}"
+
+rm -rf "${CATALOG_PGDATA}"
+mkdir -p "${CATALOG_PGDATA}" "${CATALOG_SOCKET}"
+chown -R postgres:postgres /tmp/sql-catalog-pg "${CATALOG_SOCKET}"
+chmod 700 "${CATALOG_PGDATA}"
+
+echo "sql-catalog-pg: initialising ephemeral catalog cluster in ${CATALOG_PGDATA}"
+s6-setuidgid postgres "${PGBIN}/initdb" \
+  -D "${CATALOG_PGDATA}" \
+  --username="${SQL_GATEWAY_CATALOG_PG_USER:-postgres}" \
+  --auth=trust \
+  --encoding=UTF8 \
+  --locale=C.UTF-8 \
+  --no-sync >/dev/null
+
+exec s6-setuidgid postgres "${PGBIN}/postgres" \
+  -D "${CATALOG_PGDATA}" \
+  -c "listen_addresses=" \
+  -c "unix_socket_directories=${CATALOG_SOCKET}" \
+  -c "unix_socket_permissions=0777" \
+  -c "fsync=off" \
+  -c "synchronous_commit=off" \
+  -c "full_page_writes=off" \
+  -c "wal_level=minimal" \
+  -c "max_wal_senders=0" \
+  -c "shared_buffers=64MB" \
+  -c "work_mem=4MB" \
+  -c "temp_file_limit=0" \
+  -c "max_connections=$(( ${SQL_GATEWAY_MAX_SESSIONS:-64} + 16 ))" \
+  -c "autovacuum_max_workers=1" \
+  -c "autovacuum_naptime=5min" \
+  -c "jit=off"

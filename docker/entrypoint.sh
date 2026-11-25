@@ -355,6 +355,10 @@ default JAVA_OPTS_KC_HEAP        "-Xms64m -Xmx${CLASSIFYRE_IAM_HEAP_MB:-512}m"
 # made once and kept beside the data; the app offers the CA for download.
 default SQL_GATEWAY_ENABLED "true"
 default SQL_GATEWAY_PORT "${PORT_SQL:-5433}"
+if [ "${SQL_GATEWAY_ENABLED}" = "true" ]; then
+  default SQL_GATEWAY_CATALOG_PG_SOCKET "/var/run/sql-catalog-pg"
+  default SQL_GATEWAY_CATALOG_PG_USER   "postgres"
+fi
 sql_url_host="${CLASSIFYRE_URL#*://}"; sql_url_host="${sql_url_host%%[:/]*}"
 default SQL_GATEWAY_PUBLIC_HOST "${sql_url_host:-localhost}"
 default SQL_GATEWAY_PUBLIC_PORT "${SQL_GATEWAY_PORT}"

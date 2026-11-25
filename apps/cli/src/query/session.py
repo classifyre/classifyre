@@ -21,7 +21,7 @@ import re
 import tempfile
 import threading
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from pathlib import Path
@@ -266,22 +266,145 @@ def _known_columns(value: Any) -> list[str] | None:
     return [str(name) for name in value if isinstance(name, str)]
 
 
+def _build_bindings(sources: list[dict[str, Any]]) -> dict[str, SourceBinding]:
+    bindings: dict[str, SourceBinding] = {}
+    for index, entry in enumerate(sources):
+        alias = str(entry.get("alias") or "").lower()
+        recipe = entry.get("recipe")
+        if alias and isinstance(recipe, dict):
+            bindings[alias] = SourceBinding(
+                alias, index, recipe, str(entry.get("sourceId") or "")
+            )
+    return bindings
+
+
+class StickyDuckDbState:
+    """Reusable warm DuckDB database + attached source bindings for one sticky worker.
+
+    Scoped strictly to a single ``(workspaceId, connectionId, sourceCredsDigest)``
+    child process (docs/prd/SG-sql-gateway-native-catalog.md §6.3). Reuses the
+    DuckDB instance, verified extensions, and already-attached ``__src_<n>``
+    remote catalogs across sequential BI dashboard cards, while resetting all
+    view catalogs, registered live Arrow datasets, and spill files between
+    queries so column masks and row filters are always rebuilt fresh.
+    """
+
+    def __init__(self) -> None:
+        self._conn: Any = None
+        self._bindings: dict[str, SourceBinding] = {}
+        self._spill: tempfile.TemporaryDirectory[str] | None = None
+        self._locked: bool = False
+        self._view_catalogs: set[str] = set()
+        self._reuse_count: int = 0
+
+    @property
+    def is_warm(self) -> bool:
+        return self._conn is not None
+
+    @property
+    def reuse_count(self) -> int:
+        return self._reuse_count
+
+    def ensure_spill_dir(self) -> str:
+        if self._spill is None:
+            self._spill = tempfile.TemporaryDirectory(prefix="classifyre-sticky-")
+        return self._spill.name
+
+    def get_or_init_bindings(self, sources: list[dict[str, Any]]) -> dict[str, SourceBinding]:
+        if not self._bindings:
+            self._bindings = _build_bindings(sources)
+        return self._bindings
+
+    def checkout_connection(self, opener: Callable[[str], Any]) -> tuple[Any, bool]:
+        if self._conn is not None:
+            return self._conn, True
+        self._conn = opener(self.ensure_spill_dir())
+        return self._conn, False
+
+    def recycle(
+        self, sources: list[dict[str, Any]], opener: Callable[[str], Any]
+    ) -> tuple[Any, str, dict[str, SourceBinding]]:
+        """Close the locked warm connection and open a fresh one for retry."""
+        self.close()
+        spill_path = self.ensure_spill_dir()
+        bindings = self.get_or_init_bindings(sources)
+        self._conn = opener(spill_path)
+        return self._conn, spill_path, bindings
+
+    def track_view_catalog(self, catalog: str) -> None:
+        self._view_catalogs.add(catalog)
+
+    def mark_locked(self) -> None:
+        self._locked = True
+
+    def record_reuse(self) -> None:
+        self._reuse_count += 1
+
+    def clean_spill_files(self) -> None:
+        if self._spill is None:
+            return
+        import shutil
+
+        for entry in Path(self._spill.name).iterdir():
+            if entry.is_dir() and not entry.is_symlink():
+                shutil.rmtree(entry, ignore_errors=True)
+            else:
+                try:
+                    entry.unlink()
+                except OSError:
+                    pass
+
+    def reset_after_query(self) -> None:
+        """Detach view catalogs, unregister live connector datasets, and clean spill files."""
+        if self._conn is None:
+            return
+        for catalog in list(self._view_catalogs):
+            try:
+                self._conn.execute(f"DETACH IF EXISTS {quote_identifier(catalog)}")
+            except Exception:
+                self.close()
+                return
+        self._view_catalogs.clear()
+        for binding in self._bindings.values():
+            binding.reset_query(self._conn)
+        self.clean_spill_files()
+
+    def close(self) -> None:
+        if self._conn is not None:
+            try:
+                self._conn.close()
+            except Exception:  # pragma: no cover - best effort
+                pass
+            self._conn = None
+        for binding in self._bindings.values():
+            binding.close()
+        self._bindings.clear()
+        self._view_catalogs.clear()
+        self._locked = False
+        if self._spill is not None:
+            self._spill.cleanup()
+            self._spill = None
+
+
 class QuerySession:
     """Runs one :class:`QueryRequest`; use as a context manager."""
 
-    def __init__(self, request: QueryRequest) -> None:
+    def __init__(
+        self, request: QueryRequest, *, sticky: StickyDuckDbState | None = None
+    ) -> None:
         self.request = request
         self._duckdb = require_duckdb()
-        self._spill = tempfile.TemporaryDirectory(prefix="classifyre-query-")
+        self._sticky = sticky
+        if sticky is not None:
+            self._spill: tempfile.TemporaryDirectory[str] | None = None
+            self._spill_path = sticky.ensure_spill_dir()
+        else:
+            spill = tempfile.TemporaryDirectory(prefix="classifyre-query-")
+            self._spill = spill
+            self._spill_path = spill.name
         self._conn: Any = None
         self._bindings: dict[str, SourceBinding] = {}
-        for index, entry in enumerate(request.sources):
-            alias = str(entry.get("alias") or "").lower()
-            recipe = entry.get("recipe")
-            if alias and isinstance(recipe, dict):
-                self._bindings[alias] = SourceBinding(
-                    alias, index, recipe, str(entry.get("sourceId") or "")
-                )
+        self._init_bindings()
         #: Each source table's view reads this binding's relation.
         self._relations: dict[str, _Relation] = {}
         self._tables: dict[TableName, _Table] = {}
@@ -293,6 +416,12 @@ class QuerySession:
                 table = self._source_table(entry)
             if table is not None:
                 self._tables[table.name] = table
+
+    def _init_bindings(self) -> None:
+        if self._sticky is not None:
+            self._bindings = self._sticky.get_or_init_bindings(self.request.sources)
+            return
+        self._bindings = _build_bindings(self.request.sources)
 
     def _source_table(self, entry: dict[str, Any]) -> _Table | None:
         name = TableName.of(
@@ -346,6 +475,10 @@ class QuerySession:
         self.close()
 
     def close(self) -> None:
+        if self._sticky is not None:
+            self._sticky.reset_after_query()
+            self._conn = None
+            return
         if self._conn is not None:
             try:
                 self._conn.close()
@@ -354,14 +487,15 @@ class QuerySession:
             self._conn = None
         for binding in self._bindings.values():
             binding.close()
-        self._spill.cleanup()
+        if self._spill is not None:
+            self._spill.cleanup()
 
     # ── setup ──────────────────────────────────────────────────────────
 
-    def _open(self) -> Any:
+    def _open(self, spill_path: str | None = None) -> Any:
         conn = connect(self._duckdb)
         conn.execute("SET enable_progress_bar = false")
-        conn.execute(f"SET temp_directory = '{self._spill.name}'")
+        conn.execute(f"SET temp_directory = '{spill_path or self._spill_path}'")
         memory = self.request.memory_limit or os.environ.get("CLASSIFYRE_QUERY_MEMORY_LIMIT")
         if memory:
             conn.execute(f"SET memory_limit = '{memory.replace(chr(39), '')}'")
@@ -389,7 +523,7 @@ class QuerySession:
         """
         conn.execute("SET autoinstall_known_extensions = false")
         conn.execute("SET autoload_known_extensions = false")
-        allowed = [*REMOTE_PREFIXES, _as_directory(self._spill.name)]
+        allowed = [*REMOTE_PREFIXES, _as_directory(self._spill_path)]
         for binding in self._bindings.values():
             allowed += recipe_endpoints(binding.recipe)
         # Not the allowlist itself: only the folders the query's sources read.
@@ -429,7 +563,9 @@ class QuerySession:
             logger.info("external access left on for %s (a Job of its own)", ", ".join(external))
         conn.execute("SET lock_configuration = true")
 
-    def _attach_tables_as_views(self, conn: Any, tables: set[TableName]) -> None:
+    def _attach_tables_as_views(
+        self, conn: Any, tables: set[TableName], *, track_sticky: bool = True
+    ) -> None:
         created_catalogs: set[str] = set()
         created_schemas: set[tuple[str, str]] = set()
 
@@ -437,6 +573,8 @@ class QuerySession:
             if catalog not in created_catalogs:
                 conn.execute(f"ATTACH ':memory:' AS {quote_identifier(catalog)}")
                 created_catalogs.add(catalog)
+                if track_sticky and self._sticky is not None:
+                    self._sticky.track_view_catalog(catalog)
             if (catalog, schema) not in created_schemas:
                 conn.execute(
                     f"CREATE SCHEMA IF NOT EXISTS "
@@ -565,15 +703,17 @@ class QuerySession:
             ) from exc
 
     @contextmanager
-    def _deadline(self, conn: Any, seconds: float) -> Iterator[threading.Event]:
+    def _deadline(self, seconds: float) -> Iterator[threading.Event]:
         fired = threading.Event()
 
         def interrupt() -> None:
             fired.set()
-            try:
-                conn.interrupt()
-            except Exception:  # pragma: no cover - connection already closed
-                pass
+            conn = self._conn
+            if conn is not None:
+                try:
+                    conn.interrupt()
+                except Exception:  # pragma: no cover - connection already closed
+                    pass
 
         timer = threading.Timer(max(seconds, 0.001), interrupt)
         timer.daemon = True
@@ -591,7 +731,7 @@ class QuerySession:
         cap = int(self.request.max_rows)
         if fmt == "xlsx":
             cap = min(cap, XLSX_MAX_ROWS)
-        path = Path(self._spill.name) / f"export.{fmt}"
+        path = Path(self._spill_path) / f"export.{fmt}"
         projection = _export_columns(conn, sql, fmt)
         options = {
             "xlsx": "FORMAT xlsx, HEADER true",
@@ -636,29 +776,36 @@ class QuerySession:
         validated = validate(self.request.sql, self._tables.keys())
         conn = self._open()
         self._conn = conn
-        with self._deadline(conn, self.request.timeout_seconds) as fired:
+        try:
+            with self._deadline(self.request.timeout_seconds) as fired:
+                try:
+                    self._attach_tables_as_views(conn, validated.tables, track_sticky=False)
+                    self._lock_down(conn)
+                    described = conn.execute(
+                        f"DESCRIBE SELECT * FROM ({validated.sql}) AS __result"
+                    ).fetchall()
+                    schemas: dict[TableName, list[str]] = {}
+                    for name in validated.tables:
+                        target = ".".join(
+                            quote_identifier(p) for p in (name.source, name.schema, name.table)
+                        )
+                        schemas[name] = [
+                            str(row[0])
+                            for row in conn.execute(f"DESCRIBE SELECT * FROM {target}").fetchall()
+                        ]
+                except Exception:
+                    if fired.is_set():
+                        raise QueryTimeoutError(
+                            f"Describing the query took longer than "
+                            f"{self.request.timeout_seconds} s and was stopped."
+                        ) from None
+                    raise
+        finally:
+            self._conn = None
             try:
-                self._attach_tables_as_views(conn, validated.tables)
-                self._lock_down(conn)
-                described = conn.execute(
-                    f"DESCRIBE SELECT * FROM ({validated.sql}) AS __result"
-                ).fetchall()
-                schemas: dict[TableName, list[str]] = {}
-                for name in validated.tables:
-                    target = ".".join(
-                        quote_identifier(p) for p in (name.source, name.schema, name.table)
-                    )
-                    schemas[name] = [
-                        str(row[0])
-                        for row in conn.execute(f"DESCRIBE SELECT * FROM {target}").fetchall()
-                    ]
-            except Exception:
-                if fired.is_set():
-                    raise QueryTimeoutError(
-                        f"Describing the query took longer than "
-                        f"{self.request.timeout_seconds} s and was stopped."
-                    ) from None
-                raise
+                conn.close()
+            except Exception:  # pragma: no cover - best effort
+                pass
         columns = [{"name": str(row[0]), "type": str(row[1])} for row in described]
         return QueryResult(
             arrow=b"",
@@ -685,17 +832,48 @@ class QuerySession:
             database=self.request.database,
             search_path=self.request.search_path,
         )
-        conn = self._open()
+        if self._sticky is not None:
+            conn, reused = self._sticky.checkout_connection(self._open)
+        else:
+            conn, reused = self._open(), False
         self._conn = conn
         for binding in self._bindings.values():
             binding.deadline = started + self.request.timeout_seconds
-        with self._deadline(conn, self.request.timeout_seconds) as fired:
+        with self._deadline(self.request.timeout_seconds) as fired:
             try:
-                self._attach_tables_as_views(conn, validated.tables)
+                try:
+                    self._attach_tables_as_views(conn, validated.tables)
+                except Exception:
+                    if fired.is_set() or not reused or self._sticky is None:
+                        raise
+                    # A newly referenced source/format needed an extension or
+                    # path not present before lock_configuration=true: recycle
+                    # the warm DuckDB connection cleanly and retry once under
+                    # the same active deadline (self._conn is updated so
+                    # interrupt() targets the retried connection).
+                    conn, self._spill_path, self._bindings = self._sticky.recycle(
+                        self.request.sources, self._open
+                    )
+                    self._conn = conn
+                    if fired.is_set():
+                        raise QueryTimeoutError(
+                            f"The query took longer than {self.request.timeout_seconds} s "
+                            "and was stopped."
+                        ) from None
+                    for binding in self._bindings.values():
+                        binding.deadline = started + self.request.timeout_seconds
+                    self._relations.clear()
+                    reused = False
+                    self._attach_tables_as_views(conn, validated.tables)
                 setup_done = time.monotonic()
                 if self.request.export_format == "xlsx":
                     load_extension(conn, "excel")
-                self._lock_down(conn)
+                if not reused:
+                    self._lock_down(conn)
+                    if self._sticky is not None:
+                        self._sticky.mark_locked()
+                elif self._sticky is not None:
+                    self._sticky.record_reuse()
                 if self.request.export_format:
                     exported = self._export(conn, validated.sql)
                 else:
@@ -721,6 +899,11 @@ class QuerySession:
             "setupMs": int((setup_done - started) * 1000),
             "executeMs": int((executed - setup_done) * 1000),
             "totalMs": int((time.monotonic() - started) * 1000),
+            **(
+                {"stickyReuse": self._sticky.reuse_count}
+                if self._sticky is not None
+                else {}
+            ),
         }
         result.tables = sorted(str(t) for t in validated.tables)
         result.scans = self._scan_stats()

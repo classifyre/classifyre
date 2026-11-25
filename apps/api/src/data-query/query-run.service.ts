@@ -959,8 +959,12 @@ export class QueryRunService {
       ...(input.exportFormat ? { exportFormat: input.exportFormat } : {}),
       ...(input.extra ?? {}),
       timeoutSeconds: input.timeoutSeconds,
-      // The query worker gives each workspace its share of its slots.
+      // The query worker gives each workspace its share of its slots, and
+      // scopes optional sticky worker reuse strictly to (workspaceId, connectionId, sourceCredsDigest).
       workspaceId: this.actors.workspaceId(),
+      ...(input.origin.connectionId
+        ? { connectionId: input.origin.connectionId }
+        : {}),
       callbackUrl: `${this.cliRunner.queryCallbackBaseUrl(this.actors.workspaceId())}/query-runs/${run.id}/result`,
       callbackToken: token,
       sources: attached.map((source) => ({

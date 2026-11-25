@@ -218,6 +218,11 @@ jobs:
 
       - name: Unit tests
         if: success() || failure()
+        env:
+          SQL_GATEWAY_CATALOG_PG_HOST: 127.0.0.1
+          SQL_GATEWAY_CATALOG_PG_PORT: "5432"
+          SQL_GATEWAY_CATALOG_PG_USER: postgres
+          SQL_GATEWAY_CATALOG_PG_PASSWORD: postgres
         run: bun run test
 
       - name: API integration tests

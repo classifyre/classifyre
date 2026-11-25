@@ -390,9 +390,30 @@ export function dataRow(values: (Buffer | null)[]): Buffer {
   return out;
 }
 
-// ── Frontend messages built by the gateway itself (for PGlite) ──────────
+// ── Frontend messages built by the gateway itself (for the catalog backend) ──
 
 export const frontend = {
+  startup: (params: Record<string, string>) => {
+    const w = new MessageWriter().int32(PROTOCOL_V3);
+    for (const [key, value] of Object.entries(params)) {
+      w.cstring(key).cstring(value);
+    }
+    return w.cstring('').build();
+  },
+  password: (value: string | Buffer) =>
+    typeof value === 'string'
+      ? new MessageWriter().cstring(value).build('p')
+      : new MessageWriter().bytes(value).build('p'),
+  saslInitial: (mechanism: string, data: string) => {
+    const bytes = Buffer.from(data, 'utf8');
+    return new MessageWriter()
+      .cstring(mechanism)
+      .int32(bytes.length)
+      .bytes(bytes)
+      .build('p');
+  },
+  cancel: (pid: number, secret: number) =>
+    new MessageWriter().int32(CANCEL_REQUEST).int32(pid).int32(secret).build(),
   query: (sql: string) => new MessageWriter().cstring(sql).build('Q'),
   parse: (name: string, sql: string, types: number[] = []) => {
     const w = new MessageWriter()
@@ -429,5 +450,7 @@ export const frontend = {
     new MessageWriter().cstring(portal).int32(maxRows).build('E'),
   close: (kind: 'S' | 'P', name: string) =>
     new MessageWriter().byte(kind).cstring(name).build('C'),
+  flush: () => new MessageWriter().build('H'),
   sync: () => new MessageWriter().build('S'),
+  terminate: () => new MessageWriter().build('X'),
 };

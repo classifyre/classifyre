@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { CatalogSource } from '../data-query/query-catalog.service';
 import { DEFAULT_MASK } from '../data-query/column-masks';
 import { ddlType } from './pg-types';
@@ -9,7 +10,7 @@ export const quoteIdent = (name: string) => `"${name.replace(/"/g, '""')}"`;
 const quoteLiteral = (text: string) => `'${text.replace(/'/g, "''")}'`;
 
 export interface CatalogDdl {
-  /** CREATE SCHEMA/TABLE/COMMENT statements for the session's PGlite. */
+  /** Canonical CREATE SCHEMA/TABLE/COMMENT statements for the catalog database. */
   sql: string;
   /** PostgreSQL schema names that hold tables (`<source>.<schema>`). */
   dataSchemas: Set<string>;
@@ -29,25 +30,52 @@ export interface CatalogNotes {
 }
 
 /**
+ * Opaque 24-hex hash identifying a `(workspace, effective catalog)` database
+ * on the catalog sidecar (docs/prd/SG-sql-gateway-native-catalog.md §4.2).
+ *
+ * Database names (`c_<hash>`) and roles (`r_<hash>`) never reveal workspace,
+ * tenant, or user names, while connections with identical effective views in
+ * the same workspace share a single immutable catalog database.
+ */
+export function computeCatalogHash(
+  workspaceId: string,
+  canonicalCatalogDdlSql: string,
+): string {
+  return createHash('sha256')
+    .update(`v1\0${workspaceId}\0${canonicalCatalogDdlSql}`)
+    .digest('hex')
+    .slice(0, 24);
+}
+
+/**
  * The catalog a SQL connection shows (docs/prd/DQ-data-query.md §5.7): one
  * PostgreSQL schema per source schema, named `<source>.<schema>` so the
  * `source.schema.table` the SQL page uses reads as `"source.schema".table`,
  * and one empty table per table the person may query, with the column types
  * the scan recorded and the business names and descriptions governance gave
  * them as comments — BI tools show those.
+ *
+ * Output is canonically sorted by source and table name so identical effective
+ * access views always hash to the same catalog database.
  */
 export function catalogDdl(
   sources: CatalogSource[],
   notes?: CatalogNotes,
-  username?: string,
 ): CatalogDdl {
   const statements: string[] = [];
   const dataSchemas = new Set<string>();
   const skipped: string[] = [];
   let tables = 0;
   const bytes = (s: string) => Buffer.byteLength(s, 'utf8');
-  for (const source of sources) {
-    for (const table of source.tables) {
+  const sortedSources = [...sources].sort((a, b) =>
+    a.sqlName.localeCompare(b.sqlName),
+  );
+  for (const source of sortedSources) {
+    const sortedTables = [...source.tables].sort(
+      (a, b) =>
+        a.schema.localeCompare(b.schema) || a.table.localeCompare(b.table),
+    );
+    for (const table of sortedTables) {
       if (!table.canQuery) continue;
       const schema = `${source.sqlName}.${table.schema}`;
       if (bytes(schema) > MAX_IDENT || bytes(table.table) > MAX_IDENT) {
@@ -99,27 +127,6 @@ export function catalogDdl(
       }
       tables += 1;
     }
-  }
-  if (username) {
-    // The session runs as the connection, read-only: clients show the right
-    // user, and writes fail with "permission denied" rather than succeeding
-    // on the empty catalog tables.
-    const role = quoteIdent(username);
-    statements.push(`CREATE ROLE ${role} LOGIN;`);
-    statements.push(`GRANT USAGE ON SCHEMA classifyre TO ${role};`);
-    statements.push(
-      `GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA classifyre TO ${role};`,
-    );
-    for (const schema of dataSchemas) {
-      statements.push(
-        `GRANT USAGE ON SCHEMA ${quoteIdent(schema)} TO ${role};`,
-      );
-      statements.push(
-        `GRANT SELECT ON ALL TABLES IN SCHEMA ${quoteIdent(schema)} TO ${role};`,
-      );
-    }
-    statements.push(`REVOKE CREATE ON SCHEMA public FROM PUBLIC;`);
-    statements.push(`SET SESSION AUTHORIZATION ${role};`);
   }
   return { sql: statements.join('\n'), dataSchemas, tables, skipped };
 }
