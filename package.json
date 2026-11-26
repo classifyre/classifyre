@@ -68,6 +68,7 @@
     "zod": "4.5.4"
   },
   "patchedDependencies": {
+    "next@16.1.7": "patches/next@16.1.7.patch",
     "nextra-theme-docs@4.6.1": "patches/nextra-theme-docs@4.6.1.patch"
   }
 }
