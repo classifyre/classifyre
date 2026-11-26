@@ -126,6 +126,7 @@ export function DataRequestCanvasHarness({
         ...initial,
         spec: payload.spec as unknown as Record<string, unknown>,
         specVersion: payload.baseVersion + 1,
+        draftSql: s.getState().draftSql,
       }),
       saveSql: async (_id, payload) => ({
         ...initial,
@@ -184,13 +185,12 @@ export function DataRequestCanvasHarness({
         {/* Helper button exposed for deterministic join wiring in CT */}
         <button
           type="button"
-          className="sr-only"
           style={{
             position: "absolute",
-            width: 1,
-            height: 1,
-            overflow: "hidden",
-            clip: "rect(0, 0, 0, 0)",
+            top: 0,
+            right: 0,
+            zIndex: 50,
+            opacity: 0.01,
           }}
           data-testid="harness-join-orders-customers"
           onClick={() => {
