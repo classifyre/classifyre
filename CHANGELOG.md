@@ -5,6 +5,16 @@ compiled at release time from per-PR fragments in `changelog.d/` (see
 `changelog.d/README.md`). Commit messages and PR titles are never used as
 release notes.
 
+## [0.9.4] - 2026-11-26
+
+### Added
+
+- You can now request a governed shared dataset from a data team under Cases using a visual join canvas. Place catalog tables, draw column-to-column joins, choose columns and filters while SQL generates live, and route the request to a data-team group for review and delivery as a versioned shared dataset — with change requests, self-serve publishing when you already hold publish rights, governance notifications, and MCP tools for AI assistants.
+
+### Changed
+
+- Investigations now live under Cases alongside Data Requests, with a unified picker when starting new work. Existing bookmarks and notification links under /investigations/ redirect automatically to /cases/.
+
 ## [0.9.3] - 2026-11-24
 
 ### Added
