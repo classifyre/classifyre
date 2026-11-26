@@ -30,7 +30,7 @@
     },
     {
       "name": "boto3",
-      "version": "1.44.10",
+      "version": "1.44.12",
       "modules": [
         "boto3"
       ],
@@ -190,7 +190,7 @@
     },
     {
       "name": "litellm",
-      "version": "1.110.3",
+      "version": "1.111.0",
       "modules": [
         "litellm"
       ],
@@ -234,7 +234,7 @@
     },
     {
       "name": "oracledb",
-      "version": "26.1.0",
+      "version": "26.2.0",
       "modules": [
         "oracledb"
       ],
@@ -261,7 +261,7 @@
     },
     {
       "name": "pillow-heif",
-      "version": "1.8.1",
+      "version": "1.9.0",
       "modules": [
         "pillow_heif"
       ],
@@ -350,7 +350,7 @@
     },
     {
       "name": "pymongo",
-      "version": "4.20.1",
+      "version": "4.20.2",
       "modules": [
         "pymongo"
       ],
@@ -386,7 +386,7 @@
     },
     {
       "name": "pypaimon",
-      "version": "2.1.0",
+      "version": "2.1.1",
       "modules": [
         "pypaimon"
       ],
@@ -457,7 +457,7 @@
     },
     {
       "name": "sqlglot",
-      "version": "30.34.0",
+      "version": "30.35.0",
       "modules": [
         "sqlglot"
       ],
