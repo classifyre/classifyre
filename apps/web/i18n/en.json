@@ -8744,5 +8744,121 @@
       "changesRequested": "Changes requested.",
       "conflictReloaded": "Updated elsewhere — reloaded latest version."
     }
+  },
+  "visualSchema": {
+    "color": {
+      "label": "Card color",
+      "reset": "Reset color"
+    },
+    "node": {
+      "collapse": "Collapse columns",
+      "expand": "Expand columns",
+      "openData": "Open table data",
+      "estimatedRows": "Estimated row count from last scan",
+      "rowFilterActive": "Row filter applies to your view of this table",
+      "hiddenColumns": "+{{count}} hidden by governance"
+    },
+    "context": {
+      "color": "Color",
+      "findLinks": "Find links",
+      "removeLinks": "Remove links",
+      "hide": "Hide from canvas",
+      "unhide": "Show on canvas",
+      "remove": "Remove from canvas"
+    },
+    "dock": {
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "fitView": "Fit view",
+      "panMode": "Pan mode",
+      "selectMode": "Select mode",
+      "minimap": "Toggle minimap",
+      "resetZoom": "Reset zoom to 100%"
+    },
+    "toolbar": {
+      "hiddenTables": "Hidden tables",
+      "revealHidden": "Reveal hidden tables",
+      "hideRevealed": "Hide hidden tables",
+      "unhideAll": "Unhide all tables",
+      "grid": "Toggle grid",
+      "arrange": "Auto-arrange",
+      "arrangeConnected": "Connected groups (ELK)",
+      "arrangeGrid": "Grid layout",
+      "findLinks": "Find links",
+      "clear": "Clear canvas",
+      "export": "Export / Import"
+    },
+    "export": {
+      "png1x": "Export PNG (1×)",
+      "png2x": "Export PNG (2× Retina)",
+      "pngBw": "Export B&W PNG (Print)",
+      "svg": "Export SVG",
+      "json": "Export Spec JSON",
+      "dbml": "Export DBML",
+      "importJson": "Import Spec JSON",
+      "imported": "Imported {{tables}} tables.",
+      "failed": "Could not export or import diagram."
+    },
+    "clearDialog": {
+      "title": "Clear schema canvas?",
+      "body": "Remove all {{count}} tables and their joins from the canvas? You can still undo this action."
+    },
+    "rail": {
+      "refresh": "Refresh catalog",
+      "collapse": "Collapse catalog",
+      "expand": "Show catalog",
+      "generateSource": "Place all tables from {{name}}",
+      "onCanvas": "Placed on canvas",
+      "tableCount": "{{count}} tables",
+      "addSelected": "Add {{count}}",
+      "multiSelectHint": "Cmd/Ctrl+Click to multi-select"
+    },
+    "inspector": {
+      "properties": "Properties",
+      "relations": "Relations",
+      "collapse": "Collapse inspector",
+      "expand": "Show inspector"
+    },
+    "properties": {
+      "alias": "SQL alias",
+      "aliasInvalid": "Alias must be lowercase letters/numbers/underscores and unique.",
+      "columns": "Columns",
+      "relation": "Join relation",
+      "joinType": "Join type",
+      "cardinality": "Cardinality",
+      "cardinalityNone": "None",
+      "deleteJoin": "Remove join",
+      "summary": "Canvas summary",
+      "tablesCount": "Tables",
+      "joinsCount": "Joins",
+      "sourcesCount": "Sources",
+      "selectHint": "Select a table or join edge on the canvas to inspect and edit its properties."
+    },
+    "relations": {
+      "filterPlaceholder": "Filter relations…",
+      "add": "Add",
+      "active": "Active joins",
+      "empty": "No joins yet. Drag between columns or click Find links.",
+      "suggested": "Suggested links",
+      "addAll": "Add all",
+      "addOne": "Add",
+      "dialogTitle": "Add relation",
+      "leftTable": "Left table",
+      "leftColumn": "Left column",
+      "rightTable": "Right table",
+      "rightColumn": "Right column"
+    },
+    "origin": {
+      "fk": "Declared FK",
+      "inferred": "Inferred",
+      "manual": "Manual"
+    },
+    "toast": {
+      "linksFound": "Added {{count}} links.",
+      "noLinksFound": "No new links found for placed tables.",
+      "sourceAlreadyPlaced": "All eligible tables from this source are already on the canvas.",
+      "maxTablesReached": "Canvas limit of {{max}} tables reached.",
+      "truncatedTables": "Placed {{added}} of {{total}} tables (canvas limit reached)."
+    }
   }
 }

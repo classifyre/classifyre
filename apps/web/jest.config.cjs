@@ -4,7 +4,9 @@ module.exports = {
   roots: [
     "<rootDir>/lib",
     "<rootDir>/components/case-board",
+    "<rootDir>/components/data-query",
     "<rootDir>/components/data-request",
+    "<rootDir>/components/visual-schema",
   ],
   testMatch: ["**/*.spec.ts"],
   transform: {

@@ -1,0 +1,97 @@
+/*
+ * Shared Visual Schema engine styling (docs/prd/visual-schema/phase-2-shared-visual-schema-engine.md).
+ * Wrap the canvas in `.visual-schema`. Maps React Flow's --xy-* variables onto
+ * Classifyre's brutalist light/dark design tokens with zero hardcoded blues,
+ * zero box-shadow glow stacks, and zero node animations.
+ */
+
+.visual-schema .react-flow {
+  --xy-background-color: var(--background);
+  --xy-background-pattern-color: color-mix(in oklab, var(--foreground) 18%, transparent);
+  --xy-edge-stroke: var(--cb-edge);
+  --xy-edge-stroke-selected: var(--cb-select);
+  --xy-connectionline-stroke: var(--foreground);
+  --xy-connectionline-stroke-width: 2;
+  --xy-selection-background-color: color-mix(in oklab, var(--accent) 16%, transparent);
+  --xy-selection-border: 1px dashed var(--foreground);
+  --xy-minimap-background-color: var(--card);
+  --xy-minimap-mask-background-color: color-mix(in oklab, var(--background) 72%, transparent);
+  --xy-attribution-background-color: transparent;
+  --xy-resize-background-color: var(--foreground);
+  --xy-handle-background-color: var(--card);
+}
+
+.visual-schema .react-flow__node {
+  border-radius: var(--radius);
+}
+
+.visual-schema .react-flow__panel {
+  z-index: 20;
+}
+
+.visual-schema .react-flow__node.vs-dim,
+.visual-schema .react-flow__edge.vs-dim {
+  opacity: 0.2;
+  transition: opacity 0.15s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .visual-schema .react-flow__node.vs-dim,
+  .visual-schema .react-flow__edge.vs-dim {
+    transition: none;
+  }
+}
+
+/* Pan vs Select cursor rules (matching .tool-hand in board.css) */
+.visual-schema .vs-tool-pan .react-flow__pane {
+  cursor: grab;
+}
+.visual-schema .vs-tool-pan .react-flow__pane.dragging {
+  cursor: grabbing;
+}
+.visual-schema .vs-tool-select .react-flow__pane {
+  cursor: crosshair;
+}
+
+/* Legible SVG cardinality markers over grid lines */
+.visual-schema .vs-halo {
+  paint-order: stroke;
+  stroke: var(--background);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+/* Per-column join handles: unobtrusive until hovered or joined */
+.visual-schema .vs-col-handle {
+  width: 9px;
+  height: 9px;
+  min-width: 9px;
+  min-height: 9px;
+  border-radius: 9999px;
+  border: 1.5px solid var(--border);
+  background: var(--card);
+  transition: transform 0.1s, background-color 0.1s, border-color 0.1s;
+}
+
+.visual-schema .vs-col-handle:hover,
+.visual-schema .vs-col-handle.connectingfrom,
+.visual-schema .vs-col-handle.connectingto {
+  transform: scale(1.35);
+  border-color: var(--cb-select);
+  background: var(--cb-select);
+}
+
+.visual-schema .vs-col-handle-joined {
+  border-color: var(--cb-select);
+  background: var(--cb-select);
+}
+
+.visual-schema .react-flow__resize-control.line.bottom {
+  border-color: transparent;
+  height: 6px;
+}
+
+.visual-schema .react-flow__node:hover .react-flow__resize-control.line.bottom,
+.visual-schema .react-flow__node.selected .react-flow__resize-control.line.bottom {
+  border-color: var(--cb-select);
+}
