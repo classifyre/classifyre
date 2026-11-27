@@ -3,12 +3,13 @@
 import { ConnectToolButton } from "@/components/sql-connections/connect-tool-button";
 import * as React from "react";
 import { Suspense } from "react";
+import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslation } from "@/hooks/use-translation";
 import { QueryExplorer } from "@/components/data-query/query-explorer";
 import { QuerySourceTab } from "@/components/data-query/query-source-tab";
 import { QueryAssetTab } from "@/components/data-query/query-asset-tab";
-import { Lock, Table2, TerminalSquare } from "lucide-react";
+import { Lock, Network, Table2, TerminalSquare } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import {
   NamespaceTabs,
@@ -48,6 +49,15 @@ import {
 } from "@/lib/data-query";
 
 const MAIN_QUERY_TAB_ID = "query";
+const WORKSPACE_SCHEMA_TAB_ID = "schema:workspace";
+
+const QuerySchemaTab = dynamic(
+  () =>
+    import("@/components/data-query/query-schema-tab").then(
+      (m) => m.QuerySchemaTab,
+    ),
+  { ssr: false },
+);
 
 type DynamicTab =
   | { kind: "source"; id: string; source: QueryCatalogSource }
@@ -56,7 +66,8 @@ type DynamicTab =
       id: string;
       table: QueryCatalogTable;
       source: QueryCatalogSource;
-    };
+    }
+  | { kind: "schema"; id: string; title: string; sourceId?: string };
 
 /**
  * Computes the exact remaining viewport height from the IDE container's top
@@ -173,6 +184,24 @@ function QueryPageContent() {
     const saved = readQueryTabs(cookieName);
     const tabs = saved.tabs
       .map((tab): DynamicTab | null => {
+        if (tab.kind === "schema") {
+          if (tab.id === "workspace") {
+            return {
+              kind: "schema",
+              id: WORKSPACE_SCHEMA_TAB_ID,
+              title: t("dataQuery.schema.tabTitle"),
+            };
+          }
+          const source = catalog.sources.find((s) => s.id === tab.id);
+          return source
+            ? {
+                kind: "schema",
+                id: `schema:${source.id}`,
+                title: `${source.name} · ${t("dataQuery.schema.shortTitle")}`,
+                sourceId: source.id,
+              }
+            : null;
+        }
         if (tab.kind === "source") {
           const source = catalog.sources.find((s) => s.id === tab.id);
           return source ? { kind: "source", id: `source:${source.id}`, source } : null;
@@ -201,7 +230,9 @@ function QueryPageContent() {
       tabs: openTabs.map((tab) =>
         tab.kind === "source"
           ? { kind: "source", id: tab.source.id }
-          : { kind: "asset", id: tab.table.assetId },
+          : tab.kind === "schema"
+            ? { kind: "schema", id: tab.sourceId ?? "workspace" }
+            : { kind: "asset", id: tab.table.assetId },
       ),
       active: activeTabId,
       recent,
@@ -235,6 +266,22 @@ function QueryPageContent() {
     );
     setActiveTabId(id);
   }, []);
+
+  const openSchemaTab = React.useCallback(
+    (source?: QueryCatalogSource) => {
+      const id = source ? `schema:${source.id}` : WORKSPACE_SCHEMA_TAB_ID;
+      const title = source
+        ? `${source.name} · ${t("dataQuery.schema.shortTitle")}`
+        : t("dataQuery.schema.tabTitle");
+      setOpenTabs((current) =>
+        current.some((tab) => tab.id === id)
+          ? current
+          : [...current, { kind: "schema", id, title, sourceId: source?.id }],
+      );
+      setActiveTabId(id);
+    },
+    [t],
+  );
 
   const openAssetTab = React.useCallback(
     (table: QueryCatalogTable, source: QueryCatalogSource) => {
@@ -340,15 +387,20 @@ function QueryPageContent() {
               icon: <SourceIcon source={tab.source.type} size="sm" />,
               href: nsPath(`/sources/${tab.source.id}`),
             }
-          : {
-              id: tab.id,
-              label: tab.table.table,
-              title: tab.table.sqlName,
-              icon: (
-                <Table2 className="size-3.5 text-sky-600 dark:text-sky-400" />
-              ),
-              href: nsPath(`/assets/${tab.table.assetId}`),
-            },
+          : tab.kind === "schema"
+            ? {
+                id: tab.id,
+                label: tab.title,
+                title: tab.title,
+                icon: <Network className="size-3.5" />,
+              }
+            : {
+                id: tab.id,
+                label: tab.table.table,
+                title: tab.table.sqlName,
+                icon: <Table2 className="size-3.5 text-muted-foreground" />,
+                href: nsPath(`/assets/${tab.table.assetId}`),
+              },
       ),
     ],
     [nsPath, openTabs, t],
@@ -381,6 +433,18 @@ function QueryPageContent() {
             {t("dataQuery.title")}
           </h1>
         </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-8 gap-1.5 text-xs"
+          onClick={() => openSchemaTab()}
+          disabled={!catalog}
+          data-testid="open-visual-schema-btn"
+        >
+          <Network className="size-3.5" />
+          {t("dataQuery.schema.tabTitle")}
+        </Button>
         <ConnectToolButton />
       </div>
 
@@ -480,7 +544,20 @@ function QueryPageContent() {
                         catalog?.sources.find((s) => s.id === tab.source.id) ??
                         tab.source
                       }
+                      catalog={catalog}
                       onOpenTable={openAssetTab}
+                      onEditInQuery={editInQuery}
+                    />
+                  ) : tab.kind === "schema" ? (
+                    <QuerySchemaTab
+                      catalog={catalog}
+                      scopeKey={tab.sourceId ? `source:${tab.sourceId}` : "workspace"}
+                      autoPopulateSourceId={tab.sourceId}
+                      onOpenInSql={editInQuery}
+                      onOpenTable={openAssetTab}
+                      onRefreshCatalog={() => {
+                        fetchCatalog().then(setCatalog).catch(() => undefined);
+                      }}
                     />
                   ) : (
                     <QueryAssetTab
@@ -514,6 +591,7 @@ function QueryPageContent() {
             activeSourceId={activeSourceId}
             activeAssetId={activeAssetId}
             onOpenSource={openSourceTab}
+            onOpenSchema={openSchemaTab}
             onOpenTable={openAssetTab}
             recent={recentTables}
             onInsert={(text) => {

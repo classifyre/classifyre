@@ -17,6 +17,7 @@ import {
   FolderOpen,
   History,
   Lock,
+  Network,
   Search,
   Table2,
 } from "lucide-react";
@@ -184,6 +185,7 @@ export function QueryExplorer({
   catalog,
   onInsert,
   onOpenSource,
+  onOpenSchema,
   onOpenTable,
   activeSourceId,
   activeAssetId,
@@ -202,6 +204,8 @@ export function QueryExplorer({
   onInsert: (text: string) => void;
   /** Opens a database/source overview + tables tab inside the workbench. */
   onOpenSource?: (source: QueryCatalogSource) => void;
+  /** Opens a Visual Schema ER tab pre-populated for this source. */
+  onOpenSchema?: (source: QueryCatalogSource) => void;
   /** Opens a table/asset data + info tab inside the workbench. */
   onOpenTable?: (table: QueryCatalogTable, source: QueryCatalogSource) => void;
   /** Highlights the source row whose tab is currently active. */
@@ -478,6 +482,29 @@ export function QueryExplorer({
                           </TooltipTrigger>
                           <TooltipContent side="left" className="text-xs">
                             {t("dataQuery.explorer.openSourceHint", {
+                              name: source.name,
+                            })}
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                      {onOpenSchema && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              className="invisible shrink-0 cursor-pointer rounded p-1 text-muted-foreground group-hover:visible hover:text-foreground"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onOpenSchema(fullSource);
+                              }}
+                              data-testid={`catalog-schema-source-${source.id}`}
+                              tabIndex={-1}
+                            >
+                              <Network className="h-3 w-3" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="left" className="text-xs">
+                            {t("dataQuery.schema.openSourceSchemaHint", {
                               name: source.name,
                             })}
                           </TooltipContent>

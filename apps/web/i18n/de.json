@@ -7601,9 +7601,21 @@
       "closeLeft": "Tabs links schließen",
       "closeRight": "Tabs rechts schließen"
     },
+    "schema": {
+      "tabTitle": "Visuelles Schema",
+      "shortTitle": "Schema",
+      "viewSql": "SQL",
+      "openSourceSchemaHint": "Visuelles Schema für {{name}} öffnen",
+      "openInSql": "In SQL öffnen",
+      "requestDataset": "Als Dataset anfragen",
+      "emptySqlHint": "Tabellen auf dem Canvas platzieren und verbinden, um SQL zu erzeugen.",
+      "lockedTablesWarning": "{{count}} Tabelle(n) auf dem Canvas sind für direkte Abfragen gesperrt. Fragen Sie diese Auswahl stattdessen als verwaltetes geteiltes Dataset an.",
+      "placeFirstN": "Erste {{count}} von {{total}} platzieren"
+    },
     "objectView": {
       "subtabs": {
         "tables": "Tabellen",
+        "visualSchema": "Visuelles Schema",
         "data": "Daten",
         "overview": "Übersicht",
         "governance": "Governance",

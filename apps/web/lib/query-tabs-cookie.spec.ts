@@ -14,8 +14,9 @@ describe("query tabs cookie", () => {
       tabs: [
         { kind: "source" as const, id: "src-1" },
         { kind: "asset" as const, id: "asset-1" },
+        { kind: "schema" as const, id: "workspace" },
       ],
-      active: "asset:asset-1",
+      active: "schema:workspace",
       recent: ["asset-1", "asset-0"],
     };
     expect(decodeQueryTabs(encodeQueryTabs(state))).toEqual(state);

@@ -7601,9 +7601,21 @@
       "closeLeft": "Close tabs to the left",
       "closeRight": "Close tabs to the right"
     },
+    "schema": {
+      "tabTitle": "Visual Schema",
+      "shortTitle": "Schema",
+      "viewSql": "SQL",
+      "openSourceSchemaHint": "Open Visual Schema for {{name}}",
+      "openInSql": "Open in SQL",
+      "requestDataset": "Request as Dataset",
+      "emptySqlHint": "Place and join tables on the canvas to generate SQL.",
+      "lockedTablesWarning": "{{count}} table(s) on the canvas are locked for direct queries. Request this selection as a governed shared dataset instead.",
+      "placeFirstN": "Place first {{count}} of {{total}}"
+    },
     "objectView": {
       "subtabs": {
         "tables": "Tables",
+        "visualSchema": "Visual Schema",
         "data": "Data",
         "overview": "Overview",
         "governance": "Governance",

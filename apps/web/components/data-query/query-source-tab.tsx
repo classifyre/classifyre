@@ -13,6 +13,7 @@ import {
   GitFork,
   Info,
   Lock,
+  Network,
   Search,
   ShieldAlert,
   ShieldCheck,
@@ -71,7 +72,9 @@ import { useSourceGovernance } from "@/lib/governance";
 import { getSourceSchema } from "@/lib/schema-loader";
 import { formatDate, formatRelative } from "@/lib/date";
 import {
+  catalogOfSource,
   copyText,
+  type QueryCatalog,
   type QueryCatalogSource,
   type QueryCatalogTable,
 } from "@/lib/data-query";
@@ -85,6 +88,11 @@ const ExploreWorkspace = dynamic(
     import("@/components/explore/explore-workspace").then(
       (m) => m.ExploreWorkspace,
     ),
+  { ssr: false },
+);
+
+const QuerySchemaTab = dynamic(
+  () => import("./query-schema-tab").then((m) => m.QuerySchemaTab),
   { ssr: false },
 );
 
@@ -110,10 +118,14 @@ function formatFieldValue(value: unknown): string {
  */
 export function QuerySourceTab({
   source,
+  catalog,
   onOpenTable,
+  onEditInQuery,
 }: {
   source: QueryCatalogSource;
+  catalog?: QueryCatalog | null;
   onOpenTable: (table: QueryCatalogTable, source: QueryCatalogSource) => void;
+  onEditInQuery?: (sql: string) => void;
 }) {
   const { t } = useTranslation();
   const { nsHref } = useNamespace();
@@ -665,6 +677,16 @@ export function QuerySourceTab({
     </div>
   );
 
+  const scopedCatalog = React.useMemo<QueryCatalog>(() => {
+    if (catalog) return catalogOfSource(catalog, source.id);
+    return {
+      canQueryAll: false,
+      limits: { maxRows: 10000, timeoutSeconds: 120, exportMaxRows: 1000000 },
+      sources: [source],
+      relations: [],
+    };
+  }, [catalog, source]);
+
   const tabs: WorkbenchSubtabItem[] = [
     {
       value: "tables",
@@ -677,6 +699,23 @@ export function QuerySourceTab({
       ),
       testId: `source-subtab-tables-${source.id}`,
       content: tablesContent,
+    },
+    {
+      value: "visual-schema",
+      label: t("dataQuery.objectView.subtabs.visualSchema"),
+      icon: <Network className="h-3.5 w-3.5" />,
+      testId: `source-subtab-schema-${source.id}`,
+      content: (
+        <div className="h-full min-h-[540px]">
+          <QuerySchemaTab
+            catalog={scopedCatalog}
+            scopeKey={`source:${source.id}`}
+            autoPopulateSourceId={source.id}
+            onOpenInSql={onEditInQuery}
+            onOpenTable={onOpenTable}
+          />
+        </div>
+      ),
     },
     {
       value: "overview",

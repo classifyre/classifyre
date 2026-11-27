@@ -5,11 +5,11 @@
  * the server never reads it.
  */
 
-export type SavedQueryTab = { kind: "source" | "asset"; id: string };
+export type SavedQueryTab = { kind: "source" | "asset" | "schema"; id: string };
 
 export interface QueryTabsState {
   tabs: SavedQueryTab[];
-  /** `query`, `source:<id>` or `asset:<id>`. */
+  /** `query`, `source:<id>`, `asset:<id>`, or `schema:<id>`. */
   active: string;
   /** Asset ids, most recent first. */
   recent: string[];
@@ -40,7 +40,11 @@ export function encodeQueryTabs(state: QueryTabsState): string {
       v: VERSION,
       t: state.tabs
         .slice(-MAX_SAVED_TABS)
-        .map((tab) => `${tab.kind === "source" ? "s" : "a"}:${tab.id}`),
+        .map((tab) => {
+          const code =
+            tab.kind === "source" ? "s" : tab.kind === "schema" ? "v" : "a";
+          return `${code}:${tab.id}`;
+        }),
       a: state.active,
       r: state.recent.slice(0, MAX_RECENT_ASSETS),
     }),
@@ -65,8 +69,11 @@ export function decodeQueryTabs(
       .map((entry): SavedQueryTab | null => {
         const [kind, ...rest] = entry.split(":");
         const id = rest.join(":");
-        if (!id || (kind !== "s" && kind !== "a")) return null;
-        return { kind: kind === "s" ? "source" : "asset", id };
+        if (!id || (kind !== "s" && kind !== "a" && kind !== "v")) return null;
+        return {
+          kind: kind === "s" ? "source" : kind === "v" ? "schema" : "asset",
+          id,
+        };
       })
       .filter((tab): tab is SavedQueryTab => tab !== null)
       .slice(-MAX_SAVED_TABS);
