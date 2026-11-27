@@ -107,7 +107,7 @@ export default defineVideo({
 
 ## Mr. Fyre (2D Procreate mascot)
 
-New videos use the hand-drawn 2D Procreate poses in `mascot/poses/*.png` (26 aligned `1200×1200` transparent PNGs with opaque white fill and a crisp 4 px white paper edge — works on dark and light backgrounds with **zero Blender dependency**):
+New videos use the hand-drawn 2D Procreate poses in `mascot/poses/*.png` (25 aligned `1200×1200` transparent PNGs with opaque white fill and a crisp 4 px white paper edge — works on dark and light backgrounds with **zero Blender dependency**):
 
 ```tsx
 <Fyre2D pose="point" height={540} flip />
@@ -126,7 +126,7 @@ For narrated videos, use `MascotNarrator` (or `Fyre2DActor` directly) with a fra
 />
 ```
 
-Each cue only lists properties that change. `Fyre2DActor` handles smooth gliding, a subtle 2D `spring` squash-and-stretch pop on pose switches (`bounce={false}` disables it), an automatic 3-frame stride loop for `pose: "walk"`, and an automatic `explain` ↔ `explain-2` talking toggle for `pose: "talk"`. Directional poses face screen right; pass `flip` to mirror him. See `PLAYBOOK.md` (Section 6) for the full 26-pose table and usage guidelines.
+Each cue only lists properties that change. `Fyre2DActor` handles smooth gliding, a subtle 2D `spring` squash-and-stretch pop on pose switches (`bounce={false}` disables it), and an automatic 3-frame stride loop for `pose: "walk"`. Use the single `explain` pose while talking (no two-pose talking toggle). Directional poses face screen right; pass `flip` to mirror him, **except `think`** (which has a drawn `?` above his hat and must always stand on the left facing right). See `PLAYBOOK.md` (Section 6) for the full 25-pose table and usage guidelines.
 
 *(Legacy 3D Blender `MrFyre`, `MrFyreActor`, and `Narrator` remain available in `src/kit` for older videos; see `blender/README.md` if you ever need to re-render 3D sprites.)*
 

@@ -5,5 +5,6 @@ export default {
   "same-or-not-duplicate-matching": "Same or not? Duplicate matching",
   "search-by-meaning": "Search by meaning",
   "decision-models-system-one-explained": "Decision models, explained",
-  "leaked-secrets-on-your-laptop": "Leaked secrets on your laptop"
+  "leaked-secrets-on-your-laptop": "Leaked secrets on your laptop",
+  "five-surprises-in-governed-sql": "Same SQL, five surprises: governed access across five engines"
 };

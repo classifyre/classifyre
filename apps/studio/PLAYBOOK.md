@@ -151,7 +151,7 @@ apps/studio/videos/<name>/
 
 ### Text and callouts
 
-- **Captions:** Use `Captions` from `src/kit` (bottom centre, white on black with lime bar) when burning captions in, or omit `<Captions>` if shipping `.srt` subtitles only. Fit `stops` either way because both subtitles and picture cues rely on them.
+- **No burnt-in captions:** Do **not** render `<Captions>` on video frames. Ship `.srt` subtitle files (`tools/subtitles.ts`) for YouTube and players instead, keeping the picture clean. Still fit `stops` with `tools/stops.ts` because `.srt` timing and scene cues rely on them.
 - **Headlines:** Use `Chip`, `Headline`, and `Mark` (lime mono chip, League Gothic headline with one highlighted word) for title cards, key questions, and closing takeaways. Keep it sparse — 3 to 5 times per video.
 - **Annotations on product UI:** Use lime mono-caps tags and black panels with thin white borders so annotations never look like fake product UI.
 - **Check tag widths:** Mono capitals are wide (~`0.8 × fontSize` per character), and stamps scale up before settling. Check margins so tags and stamps do not clip off-screen or cover app toolbars.
@@ -176,22 +176,21 @@ For diagrams, architecture, SQL/policy examples, or real-world documents that ar
 
 ### Mr. Fyre (2D Procreate mascot)
 
-Mr. Fyre is the presenter across Classifyre videos and editorial visuals. All 26 hand-drawn ink poses live in `mascot/poses/*.png` as `1200×1200` transparent RGBA PNGs (opaque white fill, transparent exterior, subtle 4 px white paper edge so they read cleanly on dark video stages, light blog pages, and colored cards alike).
+Mr. Fyre is the presenter across Classifyre videos and editorial visuals. All 25 hand-drawn ink poses live in `mascot/poses/*.png` as `1200×1200` transparent RGBA PNGs (opaque white fill, transparent exterior, subtle 4 px white paper edge so they read cleanly on dark video stages, light blog pages, and colored cards alike).
 
 Use **`MascotNarrator`** (or `Fyre2D` / `Fyre2DActor`) from `src/kit` — no Blender required. *(The older 3D Blender `Narrator` / `MrFyreActor` stays in `src/kit` only for legacy videos.)*
 
 #### When to use which pose (Remotion videos & blog)
 
-All directional poses face **screen right** by default. Pass `flip` to mirror him when he stands on the right side of the frame.
+All directional poses face **screen right** by default. Pass `flip` to mirror him when he stands on the right side of the frame — **never flip `think`** (its drawn `?` above the hat would invert backwards; always place `think` on the left facing right).
 
 | Category | Pose ID | What it shows | Best use in Remotion videos | Best use in Blog / Thumbnails |
 | :--- | :--- | :--- | :--- | :--- |
 | **Core explaining** | `pockets` | Standing relaxed, hands in coat pockets, calm wry brows | Default idle, listening, scene openings/closings | Neutral inline spot art, About/Docs headers |
-| | `explain` | One open hand gesturing forward calmly | Primary talking pose over UI or paper diagrams | Section dividers explaining how a rule works |
-| | `explain-2` | Slightly higher open gesture, engaged brows | Pair with `explain` (or use `pose: "talk"`) so he moves naturally while talking | — |
+| | `explain` | One open hand gesturing forward calmly | Single steady talking pose over UI or paper diagrams (never alternate between two talking poses) | Section dividers explaining how a rule works |
 | | `point` | Right arm straight out pointing right | Highlighting a specific table column, mask, button, or SQL clause | Annotated diagram callouts, YouTube thumbnails pointing at the topic |
 | | `present` | Open hand held low to the right ("here it is") | Introducing a dashboard, shared dataset, or final result | Feature announcement banners, blog cover art |
-| | `think` | Hand up touching hat, curious brows + `?` ticks | Asking the opening question ("who can see this column?") | Problem-statement intro sections, FAQ headers |
+| | `think` | Hand up touching hat, curious brows + `?` ticks | Asking the opening question — **always on the left facing right (`flip={false}`)** so `?` never mirrors | Problem-statement intro sections, FAQ headers |
 | **Reactions & stance** | `aha` | Index finger raised up beside hat | Key takeaway, "one rule to remember", turning point | Callout boxes (`[!TIP]` / key lesson blocks) |
 | | `wave` | Friendly high wave with motion ticks | Cold open hello, title card greeting, closing goodbye | Welcome / getting-started guides, onboarding posts |
 | | `spread` | Both palms open low to sides | Big picture, 4-pillar overview, "all of it together" | Architecture overview articles, platform summary |
@@ -216,7 +215,8 @@ All directional poses face **screen right** by default. Pass `flip` to mirror hi
 - **Entry and placement:** Enter from below the frame (`y` from ~1900 to ~1090) or walk in from off-screen with `pose: "walk"`, or lean in from a window edge with `pose: "peek"`. Stand in empty areas (sidebar `x ≈ 150`, or bottom right `x ≈ 1750` with `flip`). Size: `430–540` px tall over product UI, `660–740` px on title cards. Never cover the UI element being discussed.
 - **Screen time:** Keep him on screen for roughly half the video — introducing, explaining, highlighting, and wrapping up. Drop him out during dense tables or clean full-screen UI demos.
 - **Natural 2D motion without Blender:**
-  - Use `pose: "talk"` on longer spoken explanations so he automatically alternates `explain` ↔ `explain-2`.
+  - Use the single steady `pose: "explain"` on spoken explanations — never switch rapidly back and forth between two talking poses.
+  - Always place `pose: "think"` on the **left** side facing right (`flip={false}`) so its drawn `?` above his hat is never mirrored.
   - Use `pose: "walk"` whenever his `x` changes across a scene so he runs the 3-frame stride with a subtle step bounce.
   - Keep `bounce={true}` (default) on `MascotNarrator` / `Fyre2DActor` for a subtle 2D `spring` squash-and-stretch pop on pose switches — avoid switching poses faster than once every 1–2 seconds.
   - Set `flip` on entry cues rather than flipping him mid-shot.
@@ -251,7 +251,7 @@ All directional poses face **screen right** by default. Pass `flip` to mirror hi
   - Check OpenRouter credits (`/api/v1/credits`) before long runs — a `402 weight_exceeds_budget` error means the account balance is lower than the max estimated request cost.
 - **Automated word check:** Run `bun apps/studio/tools/hear.ts <name>` (`google/gemini-3.8-flash`). It catches dropped, added, or changed words. It often mishears brand names and homophones, so when a word looks suspicious, ask the audio model directly (for example via a quick two-line `ask.ts` prompt) before re-generating the line. Re-run if any parallel calls return `402` in-flight budget errors.
 - **Subtle sound effects:** Optional lightweight ffmpeg SFX (soft key press or stamp click at volume `0.2`–`0.4`), toggleable via `--props='{"sfx":false}'`.
-- **Background music:** Keep it subtle and non-distracting — a calm, minimal instrumental bed (no lead melody, no vocals, no dramatic build-up, no big ending). `tools/bed.sh` generates a simple stand-in; `tools/loop.sh <name> <piece> <seconds>` crossfades a music track to exact video length, dips 2 kHz by 4 dB for voice clarity, and levels to `-30 LUFS` (played at `0.55`). Re-run `loop.sh` whenever the total duration changes.
+- **Background music:** Keep it warm, positive, and non-distracting — light smooth jazz / mellow Rhodes chords (avoid dark, intense, or ominous minor drones; no vocals, no dramatic build-up). `tools/loop.sh <name> <piece> <seconds>` crossfades a music track to exact video length, dips 2 kHz by 4 dB for voice clarity, and levels to `-30 LUFS` (played at `0.55`). Re-run `loop.sh` whenever the total duration changes.
 
 ---
 

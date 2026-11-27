@@ -31,7 +31,11 @@ Writing and narration rules:
 
 ## Using the kit and Remotion skills
 
-- Reuse `apps/studio/src/kit/` (`Desktop`, `Browser`, `Cursor`, `Camera`, `AppShell`, `FilmBoard`, `cut`, `Captions`, `MascotNarrator`/`Fyre2D`/`Fyre2DActor`, `Chip`/`Headline`, and `src/kit/paper`) instead of rebuilding frames, laptops, captions, or callouts. Prefer `MascotNarrator` (`mascot/poses/*.png`, 26 hand-drawn Procreate poses, zero Blender needed) and check the pose selection guide in `apps/studio/PLAYBOOK.md` (Section 6).
+- Reuse `apps/studio/src/kit/` (`Desktop`, `Browser`, `Cursor`, `Camera`, `AppShell`, `FilmBoard`, `cut`, `MascotNarrator`/`Fyre2D`/`Fyre2DActor`, `Chip`/`Headline`, and `src/kit/paper`) instead of rebuilding frames, laptops, or callouts. Prefer `MascotNarrator` (`mascot/poses/*.png`, 25 hand-drawn Procreate poses, zero Blender needed) and check the pose selection guide in `apps/studio/PLAYBOOK.md` (Section 6).
+- **No burnt-in captions:** Never render `<Captions>` on video frames; export `.srt` subtitle files (`tools/subtitles.ts`) instead.
+- **Mascot rules:** Use the single steady `explain` pose when talking (do not alternate two talking poses; `explain-2` is deleted). Never flip `think` — always place `think` on the left facing right (`flip={false}`) so its drawn `?` above the hat does not mirror backwards.
+- **Music tone:** Use warm, upbeat smooth jazz / mellow chords rather than dark or intense drones.
+- **Highlight accuracy:** Never guess pixel coordinates for highlight overlays over screenshots — always measure exact pixel positions on the rendered target size and verify every highlight still before full export.
 - Reuse `apps/studio/tools/` (`voice.ts`, `hear.ts`, `stops.ts`, `bed.sh`, `loop.sh`, `subtitles.ts`, `youtube.sh`) instead of writing one-off scripts.
 - Use `remotion-best-practices` and its sibling `remotion-*` skills for Remotion APIs, timing, transitions, audio, and rendering. Ignore any advice to scaffold a new project or run `npx remotion ...` directly; use `bun run studio` / `bun run studio:render <id>` (or `bun run --cwd apps/studio ...`).
 

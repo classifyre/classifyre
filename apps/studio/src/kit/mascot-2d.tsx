@@ -11,7 +11,8 @@ import { Img, interpolate, spring, useCurrentFrame, useVideoConfig } from "remot
  *
  * No Blender dependency: pose changes use a snappy 2D spring pop anchored at
  * his feet, `"walk"` cycles walk-1 -> walk-2 -> walk-3 -> walk-2 with a subtle
- * step bounce, and `"talk"` alternates explain <-> explain-2.
+ * step bounce, and `"talk"` holds the single `"explain"` pose (no rapid pose switching).
+ * `"think"` contains a drawn `?` above his hat and is never horizontally flipped.
  */
 
 const sprites = require.context("../../../../mascot/poses", false, /\.png$/);
@@ -20,7 +21,6 @@ export const FYRE_2D_POSES = [
   "pockets",
   "think",
   "explain",
-  "explain-2",
   "point",
   "present",
   "aha",
@@ -47,7 +47,7 @@ export const FYRE_2D_POSES = [
 
 export type Fyre2DPose = (typeof FYRE_2D_POSES)[number];
 
-/** Includes animated virtual poses (`"walk"` and `"talk"`). */
+/** Includes animated virtual poses (`"walk"` and `"talk"` alias for `"explain"`). */
 export type Fyre2DAction = Fyre2DPose | "walk" | "talk";
 
 const CANVAS = 1200;
@@ -58,7 +58,6 @@ const BOX = 0.55;
 const DEFAULT_TRAVEL_FRAMES = 22;
 
 const WALK_CYCLE: readonly Fyre2DPose[] = ["walk-1", "walk-2", "walk-3", "walk-2"];
-const TALK_CYCLE: readonly Fyre2DPose[] = ["explain", "explain-2"];
 
 function sprite(pose: Fyre2DPose): string {
   const found = sprites<string | { default: string }>(`./${pose}.png`);
@@ -255,11 +254,13 @@ export function Fyre2DActor({
     activePose = WALK_CYCLE[Math.floor(elapsed / 5) % WALK_CYCLE.length] ?? "walk-1";
     stepLift = Math.abs(Math.sin((elapsed / 5) * (Math.PI / 2))) * (height * 0.014);
   } else if (pose.now === "talk") {
-    const elapsed = Math.max(0, frame - pose.at);
-    activePose = TALK_CYCLE[Math.floor(elapsed / 14) % TALK_CYCLE.length] ?? "explain";
+    activePose = "explain";
   } else {
     activePose = pose.now;
   }
+
+  // Never mirror "think" because its drawn "?" above the hat would invert backwards.
+  const effectiveFlip = activePose === "think" ? false : flip;
 
   // Subtle 2D cartoon pop when switching from one pose to another
   let scaleX = 1;
@@ -285,7 +286,7 @@ export function Fyre2DActor({
     <Fyre2D
       pose={activePose}
       height={height}
-      flip={flip}
+      flip={effectiveFlip}
       style={{
         position: "absolute",
         left: x - width / 2,
