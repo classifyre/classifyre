@@ -1,10 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Loader2, TableProperties } from "lucide-react";
+import { ArrowLeft, Loader2, Network, TableProperties } from "lucide-react";
 import { toast } from "sonner";
+import type { DataRequestSpec } from "@workspace/schemas/data-request";
+import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import {
   Card,
@@ -27,6 +29,10 @@ import { api, type DataRequestOptionsDto } from "@workspace/api-client";
 import { useTranslation } from "@/hooks/use-translation";
 import { useNsPath } from "@/lib/ns-path";
 import { apiErrorMessage } from "@/lib/data-query";
+import {
+  clearDataRequestDraft,
+  loadDataRequestDraft,
+} from "@/components/data-query/query-schema-store";
 
 type Priority = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
 
@@ -35,7 +41,16 @@ const PRIORITIES: Priority[] = ["CRITICAL", "HIGH", "MEDIUM", "LOW"];
 export function NewDataRequestForm() {
   const { t } = useTranslation();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const nsPath = useNsPath();
+
+  const draftToken = searchParams.get("draft");
+  const [preloadedSpec, setPreloadedSpec] =
+    React.useState<DataRequestSpec | null>(null);
+
+  React.useEffect(() => {
+    setPreloadedSpec(loadDataRequestDraft(draftToken));
+  }, [draftToken]);
 
   const [options, setOptions] = React.useState<DataRequestOptionsDto | null>(
     null,
@@ -87,8 +102,12 @@ export function NewDataRequestForm() {
           priority,
           routeGroupId,
           audienceGroupId,
+          ...(preloadedSpec
+            ? { spec: preloadedSpec as unknown as Record<string, unknown> }
+            : {}),
         },
       });
+      clearDataRequestDraft(draftToken);
       toast.success(t("dataRequest.form.created"));
       router.push(nsPath(`/cases/${created.id}`));
     } catch (err) {
@@ -108,9 +127,9 @@ export function NewDataRequestForm() {
         </Button>
       </div>
 
-      <Card className="border-t-2 border-t-sky-500">
+      <Card className="border-t-2 border-t-foreground">
         <CardHeader>
-          <div className="flex items-center gap-2 text-sky-600 dark:text-sky-400">
+          <div className="flex items-center gap-2 text-foreground">
             <TableProperties className="h-5 w-5" />
             <span className="font-mono text-xs uppercase tracking-wider">
               {t("dataRequest.kindLabel")}
@@ -118,6 +137,20 @@ export function NewDataRequestForm() {
           </div>
           <CardTitle>{t("dataRequest.form.title")}</CardTitle>
           <CardDescription>{t("dataRequest.form.subtitle")}</CardDescription>
+          {preloadedSpec && preloadedSpec.tables.length > 0 && (
+            <div className="pt-2" data-testid="dr-preloaded-spec-chip">
+              <Badge
+                variant="outline"
+                className="gap-1.5 border-border bg-muted font-mono text-[11px] text-foreground"
+              >
+                <Network className="h-3.5 w-3.5 text-[var(--accent-ink)]" />
+                {t("dataRequest.form.preloadedFromSchema", {
+                  tables: preloadedSpec.tables.length,
+                  joins: preloadedSpec.joins.length,
+                })}
+              </Badge>
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           {loading ? (

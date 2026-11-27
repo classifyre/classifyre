@@ -57,6 +57,17 @@ test("adds two tables (one locked), joins them, ticks columns, updates SQL live,
   await expect(sqlEditor).toContainText("shop.public.orders");
   await expect(sqlEditor).toContainText("INNER JOIN crm.public.customers");
 
+  // Shared Visual Schema Properties & Relations tabs are mounted in Data Requests
+  await component.getByTestId("vs-tab-relations").click();
+  await expect(component.getByTestId("vs-relations-panel")).toContainText(
+    "o.customer_id",
+  );
+  await component.getByTestId("vs-tab-properties").click();
+  await expect(component.getByTestId("vs-properties-table")).toBeVisible();
+  await expect(component.getByTestId("vs-properties-table")).toContainText(
+    "crm.public.customers",
+  );
+
   expect(pageErrors).toEqual([]);
 });
 

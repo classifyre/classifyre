@@ -271,6 +271,7 @@ function VisualSchemaWorkspaceInner({
   return (
     <div
       className="relative flex h-full w-full min-h-0 overflow-hidden bg-background"
+      style={{ width: "100%", height: "100%", minHeight: 0 }}
       data-testid="visual-schema-workspace"
     >
       <ResizablePanelGroup orientation="horizontal" className="h-full w-full">

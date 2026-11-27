@@ -8625,7 +8625,8 @@
       "audienceGroupPlaceholder": "Eigene Gruppe wählen",
       "noAudienceGroups": "Sie sind Mitglied keiner Gruppe in diesem Mandanten.",
       "submit": "Entwurf erstellen",
-      "created": "Entwurf der Datenanfrage erstellt."
+      "created": "Entwurf der Datenanfrage erstellt.",
+      "preloadedFromSchema": "{{tables}} Tabellen, {{joins}} Joins aus dem Visuellen Schema übernommen"
     },
     "rail": {
       "title": "Katalog",

@@ -1,15 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, MessageSquarePlus, Redo2, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { api, type DataRequestDetailDto } from "@workspace/api-client";
-import { Button } from "@workspace/ui/components/button";
 import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@workspace/ui/components/resizable";
+  DATA_REQUEST_MAX_TABLES,
+  type DataRequestPinAnchor,
+} from "@workspace/schemas/data-request";
+import { Button } from "@workspace/ui/components/button";
 import { useTranslation } from "@/hooks/use-translation";
 import { apiErrorMessage, fetchCatalog, type QueryCatalog } from "@/lib/data-query";
 import {
@@ -19,19 +18,33 @@ import {
   type SharedDatasetDto,
 } from "@/lib/shared-datasets";
 import { useCaseRoomSocket } from "@/components/case-board/hooks/use-board-socket";
+import { CommentComposerPopover } from "@/components/case-board/ui/composer-popover";
 import {
   ShareDatasetSheet,
   type ShareDatasetPreset,
 } from "@/components/shared-datasets/share-dataset-sheet";
+import type { VisualSchemaAdapter } from "@/components/visual-schema/types";
+import { VisualSchemaWorkspace } from "@/components/visual-schema/visual-schema-workspace";
 import {
   createRequestStore,
+  snapToGrid,
   type RequestStoreApi,
 } from "./store/request-store";
-import { RequestStoreProvider, useRequest } from "./store/request-context";
+import {
+  RequestStoreProvider,
+  useRequest,
+  useRequestStore,
+} from "./store/request-context";
+import {
+  RequestCommentPin,
+  type RequestCommentPinNode,
+} from "./nodes/request-comment-pin";
 import { RequestTopBar } from "./request-top-bar";
-import { RequestCatalogRail } from "./request-catalog-rail";
-import { RequestCanvas } from "./request-canvas";
 import { RequestSqlPanel } from "./request-sql-panel";
+
+const EXTRA_NODE_TYPES = {
+  "request-comment": RequestCommentPin,
+};
 
 export interface DataRequestWorkspaceProps {
   caseId: string;
@@ -192,13 +205,30 @@ function DataRequestWorkspaceInner({
   catalogLoading: boolean;
 }) {
   const { t } = useTranslation();
+  const store = useRequestStore();
+  const caseId = useRequest((s) => s.caseId);
   const request = useRequest((s) => s.request);
   const spec = useRequest((s) => s.spec);
   const draftSql = useRequest((s) => s.draftSql);
+  const diagnostics = useRequest((s) => s.diagnostics);
+  const saving = useRequest((s) => s.saving);
+  const dirty = useRequest((s) => s.dirty);
+  const undoCount = useRequest((s) => s.undoStack.length);
+  const redoCount = useRequest((s) => s.redoStack.length);
+  const commentToolActive = useRequest((s) => s.commentToolActive);
+
   const [publishMode, setPublishMode] = React.useState<
     "team" | "self_serve" | null
   >(null);
   const [canPublishNow, setCanPublishNow] = React.useState(false);
+  const [composer, setComposer] = React.useState<{
+    x: number;
+    y: number;
+    screen: { x: number; y: number };
+    anchor: DataRequestPinAnchor | null;
+    anchorLabel: string | null;
+  } | null>(null);
+  const [postingComment, setPostingComment] = React.useState(false);
 
   // Pull live SharedDatasetDto when publishing a new version after changes requested
   const existingDataset = useSharedDataset(
@@ -247,11 +277,6 @@ function DataRequestWorkspaceInner({
     };
   }, [request, selfServeOwnerId, draftSql]);
 
-  const placedAssetIds = React.useMemo(
-    () => new Set(spec.tables.map((tbl) => tbl.assetId)),
-    [spec.tables],
-  );
-
   const preset: ShareDatasetPreset | undefined = React.useMemo(() => {
     if (!request || !publishMode) return undefined;
     if (publishMode === "self_serve") {
@@ -273,15 +298,188 @@ function DataRequestWorkspaceInner({
   }, [request, publishMode, selfServeOwnerId]);
 
   const hydrate = useRequest((s) => s.hydrate);
-  const addTable = useRequest((s) => s.addTable);
   const triggerDeliverPulse = useRequest((s) => s.triggerDeliverPulse);
 
-  if (!request) return null;
+  const tablesById = React.useMemo(
+    () => new Map(spec.tables.map((tbl) => [tbl.id, tbl])),
+    [spec.tables],
+  );
 
-  const canComment =
-    request.permissions.isRequester ||
-    request.permissions.isTeam ||
-    request.permissions.isManager;
+  const threadsById = React.useMemo(() => {
+    const map = new Map<
+      string,
+      NonNullable<typeof request>["threads"][number]
+    >();
+    for (const th of request?.threads ?? []) map.set(th.id, th);
+    return map;
+  }, [request?.threads]);
+
+  const canComment = Boolean(
+    request &&
+      (request.permissions.isRequester ||
+        request.permissions.isTeam ||
+        request.permissions.isManager),
+  );
+  const canEdit = Boolean(request?.permissions.canEditSpec);
+
+  const pinNodes: RequestCommentPinNode[] = React.useMemo(
+    () =>
+      spec.pins.map((pin) => {
+        const anchoredTable = pin.anchor?.tableId
+          ? tablesById.get(pin.anchor.tableId)
+          : undefined;
+        const anchorLabel = anchoredTable
+          ? pin.anchor?.column
+            ? `${anchoredTable.alias}.${pin.anchor.column}`
+            : anchoredTable.sqlName.split(".").pop() ?? anchoredTable.alias
+          : null;
+        return {
+          id: `pin:${pin.threadId}`,
+          type: "request-comment",
+          position: { x: pin.x, y: pin.y },
+          draggable: false,
+          data: {
+            pin,
+            thread: threadsById.get(pin.threadId) ?? null,
+            anchorLabel,
+            canComment,
+          },
+        };
+      }),
+    [spec.pins, tablesById, threadsById, canComment],
+  );
+
+  const handleAnchorComment = React.useCallback(
+    (
+      anchor: { tableId: string; column?: string },
+      screen: { x: number; y: number },
+    ) => {
+      if (!canComment) return;
+      const tbl = tablesById.get(anchor.tableId);
+      const anchorLabel = tbl
+        ? anchor.column
+          ? `${tbl.alias}.${anchor.column}`
+          : tbl.sqlName.split(".").pop() ?? tbl.alias
+        : null;
+      setComposer({
+        x: snapToGrid(tbl ? tbl.x + 276 : 120),
+        y: snapToGrid(tbl ? tbl.y : 120),
+        screen,
+        anchor,
+        anchorLabel,
+      });
+    },
+    [canComment, tablesById],
+  );
+
+  const submitComment = async (body: string) => {
+    if (!composer || postingComment) return;
+    setPostingComment(true);
+    try {
+      await store.getState().flushSave();
+      const created = await api.dataRequests.dataRequestsControllerAddComment({
+        id: caseId,
+        addDataRequestCommentDto: {
+          body,
+          anchor: composer.anchor
+            ? {
+                tableId: composer.anchor.tableId,
+                ...(composer.anchor.column
+                  ? { column: composer.anchor.column }
+                  : {}),
+              }
+            : null,
+          x: composer.x,
+          y: composer.y,
+        },
+      });
+      store.getState().appendPin(
+        {
+          threadId: created.pin.threadId,
+          anchor: created.pin.anchor
+            ? {
+                tableId: created.pin.anchor.tableId,
+                ...(created.pin.anchor.column
+                  ? { column: created.pin.anchor.column }
+                  : {}),
+              }
+            : null,
+          x: created.pin.x,
+          y: created.pin.y,
+        },
+        created.specVersion,
+      );
+      await store.getState().reloadFromServer();
+      setComposer(null);
+      store.getState().setCommentToolActive(false);
+    } catch (err) {
+      toast.error(await apiErrorMessage(err));
+    } finally {
+      setPostingComment(false);
+    }
+  };
+
+  const adapter: VisualSchemaAdapter = React.useMemo(
+    () => ({
+      mode: "data-request",
+      capabilities: {
+        canEdit,
+        showColumnSelection: true,
+        showFilters: true,
+        showComments: canComment,
+        maxTables: DATA_REQUEST_MAX_TABLES,
+        hideSharedDatasets: true,
+        allowLockedTables: false,
+      },
+      spec,
+      catalog,
+      catalogLoading,
+      diagnostics,
+      saving,
+      dirty,
+      canUndo: undoCount > 0,
+      canRedo: redoCount > 0,
+      addTables: (tables, positions) =>
+        store.getState().addTables(tables, positions),
+      removeTables: (ids) => store.getState().removeTables(ids),
+      moveTables: (updates) => store.getState().moveTables(updates),
+      resizeTable: (id, h) => store.getState().resizeTable(id, h),
+      setTableColor: (ids, color) => store.getState().setTableColor(ids, color),
+      toggleTableCollapsed: (id) => store.getState().toggleTableCollapsed(id),
+      setTablesHidden: (ids, hidden) =>
+        store.getState().setTablesHidden(ids, hidden),
+      renameAlias: (id, alias) => store.getState().renameTableAlias(id, alias),
+      toggleColumn: (id, col) => store.getState().toggleColumn(id, col),
+      setTableColumns: (id, cols) => store.getState().setTableColumns(id, cols),
+      addFilter: (id, filter) => store.getState().addFilter(id, filter),
+      removeFilter: (id, idx) => store.getState().removeFilter(id, idx),
+      addJoin: (l, r, opts) => store.getState().addJoin(l, r, opts),
+      addJoins: (batch) => store.getState().addJoins(batch),
+      updateJoin: (id, patch) => store.getState().updateJoin(id, patch),
+      removeJoin: (id) => store.getState().removeJoin(id),
+      removeTableJoins: (ids) => store.getState().removeTableJoins(ids),
+      applyLayout: (pos) => store.getState().moveTables(pos),
+      clearCanvas: () => store.getState().clearCanvas(),
+      importSpec: (next) => store.getState().importSpec(next),
+      undo: () => store.getState().undo(),
+      redo: () => store.getState().redo(),
+    }),
+    [
+      canEdit,
+      canComment,
+      spec,
+      catalog,
+      catalogLoading,
+      diagnostics,
+      saving,
+      dirty,
+      undoCount,
+      redoCount,
+      store,
+    ],
+  );
+
+  if (!request) return null;
 
   const handleShared = async (saved: SharedDatasetDto) => {
     setPublishMode(null);
@@ -299,6 +497,66 @@ function DataRequestWorkspaceInner({
       toast.error(await apiErrorMessage(err));
     }
   };
+
+  const topLeftSlot = (
+    <div className="flex items-center gap-1 rounded-[6px] border-2 border-border bg-card p-1">
+      {canEdit && (
+        <>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2"
+            disabled={undoCount === 0}
+            onClick={() => store.getState().undo()}
+            title={t("dataRequest.canvas.undo")}
+            data-testid="request-undo"
+          >
+            <Undo2 className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2"
+            disabled={redoCount === 0}
+            onClick={() => store.getState().redo()}
+            title={t("dataRequest.canvas.redo")}
+            data-testid="request-redo"
+          >
+            <Redo2 className="h-3.5 w-3.5" />
+          </Button>
+        </>
+      )}
+      {canComment && (
+        <Button
+          type="button"
+          variant={commentToolActive ? "default" : "ghost"}
+          size="sm"
+          className="h-7 gap-1 px-2 text-xs"
+          onClick={() =>
+            store.getState().setCommentToolActive(!commentToolActive)
+          }
+          data-testid="request-comment-tool"
+        >
+          <MessageSquarePlus className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">
+            {t("dataRequest.canvas.pinComment")}
+          </span>
+        </Button>
+      )}
+      <span
+        className="px-2 font-mono text-[10px] text-muted-foreground"
+        data-testid="request-save-status"
+      >
+        {saving
+          ? t("dataRequest.canvas.saving")
+          : dirty
+            ? t("dataRequest.canvas.unsaved")
+            : t("dataRequest.canvas.saved")}
+      </span>
+    </div>
+  );
 
   return (
     <div
@@ -324,36 +582,57 @@ function DataRequestWorkspaceInner({
       )}
 
       <div className="min-h-0 flex-1" style={{ minHeight: 0, flex: "1 1 0%" }}>
-        <ResizablePanelGroup orientation="horizontal" className="h-full w-full">
-          <ResizablePanel id="rail" defaultSize="20%" minSize="15%" maxSize="32%">
-            <RequestCatalogRail
+        <VisualSchemaWorkspace
+          adapter={adapter}
+          extensions={{
+            extraNodes: pinNodes,
+            extraNodeTypes: EXTRA_NODE_TYPES,
+            topLeftSlot,
+            paneClassName: commentToolActive ? "cursor-crosshair" : undefined,
+            onPinComment: handleAnchorComment,
+            onPaneClick: (event, flowPos) => {
+              if (!commentToolActive || !canComment) return;
+              setComposer({
+                x: snapToGrid(flowPos.x),
+                y: snapToGrid(flowPos.y),
+                screen: { x: event.clientX, y: event.clientY },
+                anchor: null,
+                anchorLabel: null,
+              });
+            },
+          }}
+          customRightPanel={({ propertiesPanel, relationsPanel }) => (
+            <RequestSqlPanel
+              request={request}
               catalog={catalog}
-              loading={catalogLoading}
-              canEdit={request.permissions.canEditSpec}
-              placedAssetIds={placedAssetIds}
-              onAddTable={(tbl) => {
-                addTable(tbl);
-              }}
+              propertiesPanel={propertiesPanel}
+              relationsPanel={relationsPanel}
             />
-          </ResizablePanel>
-
-          <ResizableHandle withHandle />
-
-          <ResizablePanel id="canvas" defaultSize="48%" minSize="30%">
-            <RequestCanvas
-              catalog={catalog}
-              canEdit={request.permissions.canEditSpec}
-              canComment={canComment}
-            />
-          </ResizablePanel>
-
-          <ResizableHandle withHandle />
-
-          <ResizablePanel id="spec-sheet" defaultSize="32%" minSize="22%" maxSize="48%">
-            <RequestSqlPanel request={request} catalog={catalog} />
-          </ResizablePanel>
-        </ResizablePanelGroup>
+          )}
+        />
       </div>
+
+      {/* Reuses case-board CommentComposerPopover with brutalist tokens */}
+      <CommentComposerPopover
+        open={Boolean(composer)}
+        screen={composer?.screen ?? null}
+        placeholder={t("dataRequest.canvas.commentPlaceholder")}
+        submitLabel={t("dataRequest.canvas.postComment")}
+        cancelLabel={t("common.cancel")}
+        busy={postingComment}
+        testId="request-comment-composer"
+        header={
+          composer?.anchorLabel ? (
+            <div className="flex items-center gap-1.5 font-mono text-[10px] text-foreground">
+              <span className="rounded-xs border border-border bg-muted px-1.5 py-0.5">
+                {composer.anchorLabel}
+              </span>
+            </div>
+          ) : undefined
+        }
+        onClose={() => setComposer(null)}
+        onSubmit={submitComment}
+      />
 
       <ShareDatasetSheet
         open={Boolean(publishMode)}

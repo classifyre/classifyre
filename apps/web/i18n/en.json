@@ -8625,7 +8625,8 @@
       "audienceGroupPlaceholder": "Pick your group",
       "noAudienceGroups": "You are not a member of any group in this tenant.",
       "submit": "Create draft",
-      "created": "Data request draft created."
+      "created": "Data request draft created.",
+      "preloadedFromSchema": "{{tables}} tables, {{joins}} joins preloaded from Visual Schema"
     },
     "rail": {
       "title": "Catalog",

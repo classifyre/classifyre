@@ -247,7 +247,7 @@ export function RequestTopBar({
 
       <Badge
         variant="outline"
-        className="gap-1 border-sky-500/40 bg-sky-500/10 font-mono text-[10px] uppercase tracking-wider text-sky-700 dark:text-sky-300"
+        className="gap-1 border-border bg-muted font-mono text-[10px] uppercase tracking-wider text-foreground"
       >
         <TableProperties className="h-3 w-3" />
         {t("dataRequest.kindLabel")}
@@ -308,7 +308,7 @@ export function RequestTopBar({
                   <span
                     className={cn(
                       "h-px w-3 transition-colors duration-500",
-                      done || current ? "bg-sky-500" : "bg-border",
+                      done || current ? "bg-foreground" : "bg-border",
                     )}
                   />
                 )}
@@ -317,7 +317,7 @@ export function RequestTopBar({
                   className={cn(
                     "inline-flex items-center gap-1 rounded-xs px-1.5 py-0.5 font-mono text-[10px] transition-all duration-300",
                     current &&
-                      "bg-sky-500/15 font-semibold text-sky-700 dark:text-sky-300",
+                      "bg-accent font-semibold text-accent-foreground",
                     done && "text-foreground/80",
                     !done && !current && "text-muted-foreground",
                     isDeliverStep &&
@@ -368,7 +368,7 @@ export function RequestTopBar({
               onClick={() => void openPublishAfterDescribe("self_serve")}
               data-testid="request-publish-now-btn"
             >
-              <Sparkles className="h-3.5 w-3.5 text-sky-600" />
+              <Sparkles className="h-3.5 w-3.5 text-[var(--accent-ink)]" />
               {t("dataRequest.actions.publishNow")}
             </Button>
           )}
