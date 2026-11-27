@@ -272,9 +272,7 @@ def _build_bindings(sources: list[dict[str, Any]]) -> dict[str, SourceBinding]:
         alias = str(entry.get("alias") or "").lower()
         recipe = entry.get("recipe")
         if alias and isinstance(recipe, dict):
-            bindings[alias] = SourceBinding(
-                alias, index, recipe, str(entry.get("sourceId") or "")
-            )
+            bindings[alias] = SourceBinding(alias, index, recipe, str(entry.get("sourceId") or ""))
     return bindings
 
 
@@ -389,9 +387,7 @@ class StickyDuckDbState:
 class QuerySession:
     """Runs one :class:`QueryRequest`; use as a context manager."""
 
-    def __init__(
-        self, request: QueryRequest, *, sticky: StickyDuckDbState | None = None
-    ) -> None:
+    def __init__(self, request: QueryRequest, *, sticky: StickyDuckDbState | None = None) -> None:
         self.request = request
         self._duckdb = require_duckdb()
         self._sticky = sticky
@@ -899,11 +895,7 @@ class QuerySession:
             "setupMs": int((setup_done - started) * 1000),
             "executeMs": int((executed - setup_done) * 1000),
             "totalMs": int((time.monotonic() - started) * 1000),
-            **(
-                {"stickyReuse": self._sticky.reuse_count}
-                if self._sticky is not None
-                else {}
-            ),
+            **({"stickyReuse": self._sticky.reuse_count} if self._sticky is not None else {}),
         }
         result.tables = sorted(str(t) for t in validated.tables)
         result.scans = self._scan_stats()
