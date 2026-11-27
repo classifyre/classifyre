@@ -37,9 +37,9 @@ export function generateDocsSiteSchema(docsSiteUrl: string): SiteLikeSchema {
     "@context": "https://schema.org",
     "@type": "WebSite",
     "@id": `${docsSiteUrl}/#website`,
-    name: "Classifyre Docs",
+    name: "Classifyre Docs – Sovereign Data Governance Platform",
     description:
-      "Documentation for the Classifyre platform: architecture notes, deployment patterns, and practical implementation guides.",
+      "Documentation for Classifyre, the sovereign data governance platform: architecture notes, deployment patterns, and practical implementation guides.",
     url: docsSiteUrl,
     inLanguage: "en-US",
   };
@@ -54,7 +54,7 @@ export function generateDocsCollectionSchema(
     "@id": `${docsSiteUrl}/#collection`,
     name: "Classifyre Documentation",
     description:
-      "Technical documentation pages for setup, deployment, and SEO/sitemap configuration.",
+      "Technical documentation for Classifyre, the sovereign data governance platform: sources, masking, access control, SQL/BI & MCP gateway, and deployment.",
     url: docsSiteUrl,
     isPartOf: {
       "@type": "WebSite",

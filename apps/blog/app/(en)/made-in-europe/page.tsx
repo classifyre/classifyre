@@ -28,9 +28,9 @@ import {
 import "../../landing.css";
 
 export const metadata: Metadata = {
-  title: { absolute: "About Classifyre — Open-Source Data Governance" },
+  title: { absolute: "About Classifyre – Sovereign Data Governance Platform" },
   description:
-    "Classifyre is an open-source data governance platform engineered in Austria to European privacy and security standards, deployed by organisations across Europe, North America, and worldwide.",
+    "Classifyre is a sovereign data governance platform engineered in Austria to European privacy and security standards, deployed by organisations across Europe, North America, and worldwide.",
   alternates: {
     canonical: "/made-in-europe/",
     languages: {
@@ -40,9 +40,9 @@ export const metadata: Metadata = {
     },
   },
   openGraph: {
-    title: "About Classifyre — Built in Austria, deployed worldwide",
+    title: "About Classifyre – Sovereign Data Governance Platform",
     description:
-      "100% Apache-2.0 open-source data governance built in Austria to European standards and deployed globally on your own infrastructure.",
+      "Sovereign data governance platform built in Austria to European standards and deployed globally on your own infrastructure.",
     type: "website",
     locale: "en_US",
   },
@@ -158,7 +158,7 @@ export default function MadeInEuropePage() {
         }
         lede={
           <>
-            Classifyre is an open-source data governance platform engineered in
+            Classifyre is a sovereign data governance platform engineered in
             Austria to European privacy and security standards, built for
             organisations across Europe, North America, and beyond. We believe
             critical data governance infrastructure should be transparent,

@@ -15,7 +15,10 @@ import { TOPIC_IDS, getTopic } from "@/content/topics";
 import { renderOg } from "@/lib/og";
 import { ogImageName } from "@/lib/og-image";
 
-const KICKER = { en: "Open-Source Data Governance", de: "Open-Source Data Governance" };
+const KICKER = {
+  en: "Sovereign Data Governance Platform",
+  de: "Souveräne Data-Governance-Plattform",
+};
 
 const cards: { name: string; title: string; kicker: string }[] = [
   { name: ogImageName("en", "home"), title: "Control who sees what.\nEnforced on every query.", kicker: KICKER.en },

@@ -108,7 +108,7 @@ const deDemo = {
 
 const de: LandingCopy = {
   hero: {
-    chips: ["Open-Source Data-Governance-Plattform · Apache-2.0"],
+    chips: ["Souveräne Data-Governance-Plattform"],
     titleA: "Erkennen. Steuern.",
     titleBLead: "Sicher",
     titleBHighlight: "nutzen.",

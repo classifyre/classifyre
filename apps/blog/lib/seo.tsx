@@ -23,8 +23,8 @@ export function generateBlogSiteSchema(
     name: "Classifyre",
     description:
       locale === "de"
-        ? "Open-Source Data Governance für Ihre bestehenden Systeme. Sensible Daten klassifizieren, Zeilen- und Spaltenmaskierung nach Gruppen durchsetzen, Datenprodukte teilen und SQL, Power BI sowie Excel protokollieren."
-        : "Open-source data governance platform for the systems you already run. Classify sensitive data, enforce row and column masking by group, publish governed data products, and serve SQL, Power BI, and Excel with full audit logging.",
+        ? "Souveräne Data-Governance-Plattform für Ihre bestehenden Systeme. Sensible Daten klassifizieren, Zeilen- und Spaltenmaskierung nach Gruppen durchsetzen, Datenprodukte teilen und SQL, Power BI sowie Excel protokollieren."
+        : "Sovereign data governance platform for the systems you already run. Classify sensitive data, enforce row and column masking by group, publish governed data products, and serve SQL, Power BI, and Excel with full audit logging.",
     url: siteUrl,
     inLanguage: locale === "de" ? "de-DE" : "en-US",
   };
@@ -42,8 +42,8 @@ export function generateOrganizationSchema(
     url: siteUrl,
     description:
       locale === "de"
-        ? "Classifyre entwickelt eine Open-Source Data-Governance-Plattform unter Apache-2.0. Entwickelt in Österreich nach europäischen Datenschutz- und Sicherheitsstandards, im Einsatz in Europa, Nordamerika und weltweit."
-        : "Classifyre develops an open-source data governance platform under Apache-2.0. Built in Austria to European privacy and security standards, deployed by organisations across Europe, North America, and worldwide.",
+        ? "Classifyre entwickelt eine souveräne Data-Governance-Plattform unter Apache-2.0. Entwickelt in Österreich nach europäischen Datenschutz- und Sicherheitsstandards, im Einsatz in Europa, Nordamerika und weltweit."
+        : "Classifyre develops a sovereign data governance platform under Apache-2.0. Built in Austria to European privacy and security standards, deployed by organisations across Europe, North America, and worldwide.",
     // Where the project is built. Search and AI answer engines read this to
     // answer "who makes it / where are they", which the About page says in
     // prose — the two must not drift apart.
@@ -101,9 +101,11 @@ export function generateSoftwareSchema(
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
     "@id": `${siteUrl}/#software`,
-    name: "Classifyre",
+    name: de
+      ? "Classifyre – Souveräne Data-Governance-Plattform"
+      : "Classifyre – Sovereign Data Governance Platform",
     applicationCategory: "BusinessApplication",
-    applicationSubCategory: de ? "Open-Source Data Governance" : "Open-source data governance",
+    applicationSubCategory: de ? "Souveräne Data-Governance-Plattform" : "Sovereign Data Governance Platform",
     operatingSystem: "Docker, Linux, macOS, Windows, Kubernetes, OpenShift",
     url: de ? `${siteUrl}/de/` : `${siteUrl}/`,
     inLanguage: de ? "de" : "en",
@@ -112,8 +114,8 @@ export function generateSoftwareSchema(
     downloadUrl: "https://hub.docker.com/r/classifyre/all-in-one",
     codeRepository: "https://github.com/classifyre/classifyre",
     description: de
-      ? "Durchgängige Open-Source Data Governance für Ihre bestehenden Systeme: Quellen verbinden, sensible und fachspezifische Daten erkennen, Zeilen- und Spaltenmaskierung nach Gruppen durchsetzen, Datenprodukte anfordern und teilen sowie SQL, Power BI und Excel lückenlos protokollieren."
-      : "End-to-end open-source data governance for the systems you already run: connect sources, classify sensitive and business-specific data, enforce row and column masking by group, request and publish governed data products, and serve SQL, Power BI, Excel, and ODBC with full audit logging.",
+      ? "Durchgängige souveräne Data-Governance-Plattform für Ihre bestehenden Systeme: Quellen verbinden, sensible und fachspezifische Daten erkennen, Zeilen- und Spaltenmaskierung nach Gruppen durchsetzen, Datenprodukte anfordern und teilen sowie SQL, Power BI und Excel lückenlos protokollieren."
+      : "End-to-end sovereign data governance platform for the systems you already run: connect sources, classify sensitive and business-specific data, enforce row and column masking by group, request and publish governed data products, and serve SQL, Power BI, Excel, and ODBC with full audit logging.",
     featureList: de
       ? [
           "Integration mit bestehenden Systemen (40+ Datenbanken, Iceberg, Delta, Parquet, Cloud-Speicher) und bestehendem IAM (Entra ID, Active Directory, Okta, OIDC/SAML)",

@@ -4,7 +4,7 @@ import type { TopicChrome, TopicCopy, TopicId } from "./types";
 
 export const deChrome: TopicChrome = {
   home: "Start",
-  chip: "Open-Source Data Governance",
+  chip: "Souveräne Data-Governance-Plattform",
   marks: {
     points: "So funktioniert es",
     detail: "In der Praxis",
@@ -34,16 +34,17 @@ export const deChrome: TopicChrome = {
 const accessGovernance: TopicCopy = {
   id: "data-access-governance",
   name: "Berechtigungskonzept umsetzen",
-  metaTitle: "Berechtigungskonzept umsetzen: Open-Source Data Governance",
+  metaTitle: "Berechtigungskonzept umsetzen: Souveräne Data Governance",
   metaDescription:
     "Setzen Sie Ihr Berechtigungskonzept auf 40+ Systemen durch: AD-Gruppen, Zeilenfilter, mehrstufige Spaltenmaskierung, SQL/BI-Zugriff und lückenlose Protokollierung unter Apache-2.0.",
   keywords: [
+    "Souveräne Data-Governance-Plattform",
+    "Souveräne Data Governance",
     "Berechtigungskonzept umsetzen",
     "Datenzugriff steuern",
-    "Data Governance Open Source",
     "Rollen- und Rechtekonzept",
     "Zeilenfilter",
-    "Datenmaskierung Open Source",
+    "Datenmaskierung",
     "On-Premises Data Governance",
   ],
   h1: "Berechtigungskonzept umsetzen: auf den Daten, nicht nur auf Papier",
@@ -111,9 +112,9 @@ const accessGovernance: TopicCopy = {
 const immuta: TopicCopy = {
   id: "immuta-alternative",
   name: "Classifyre vs. Immuta",
-  metaTitle: "Classifyre vs. Immuta: Ehrlicher Open-Source-Vergleich (2026)",
+  metaTitle: "Classifyre vs. Immuta: Ehrlicher Architekturvergleich (2026)",
   metaDescription:
-    "Objektiver Architekturvergleich zwischen Classifyre und Immuta: Cloud-Warehouse-Pushdown vs. quellübergreifende Open-Source Data Governance, Stärken, Grenzen und Entscheidungshilfe.",
+    "Objektiver Architekturvergleich zwischen Classifyre und Immuta: Cloud-Warehouse-Pushdown vs. quellübergreifende souveräne Data Governance, Stärken, Grenzen und Entscheidungshilfe.",
   keywords: [
     "Immuta Alternative",
     "Classifyre vs Immuta",
@@ -386,7 +387,7 @@ const unity: TopicCopy = {
   name: "Classifyre vs. Unity Catalog",
   metaTitle: "Classifyre vs. Unity Catalog: Ehrlicher Governance-Vergleich (2026)",
   metaDescription:
-    "Objektiver Architekturvergleich zwischen Classifyre und Databricks Unity Catalog: Databricks-native Lakehouse-Governance vs. herstellerunabhängige Open-Source Data Governance.",
+    "Objektiver Architekturvergleich zwischen Classifyre und Databricks Unity Catalog: Databricks-native Lakehouse-Governance vs. herstellerunabhängige souveräne Data Governance.",
   keywords: [
     "Unity Catalog Alternative",
     "Classifyre vs Unity Catalog",

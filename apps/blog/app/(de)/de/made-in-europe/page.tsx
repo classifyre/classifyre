@@ -29,9 +29,9 @@ import { withLocalePrefix } from "@/lib/locale";
 import "../../../landing.css";
 
 export const metadata: Metadata = {
-  title: { absolute: "Über Classifyre — Open-Source Data Governance" },
+  title: { absolute: "Über Classifyre – Souveräne Data-Governance-Plattform" },
   description:
-    "Classifyre ist eine Open-Source Data-Governance-Plattform aus Österreich, entwickelt nach europäischen Datenschutz- und Sicherheitsstandards und weltweit im Einsatz.",
+    "Classifyre ist eine souveräne Data-Governance-Plattform aus Österreich, entwickelt nach europäischen Datenschutz- und Sicherheitsstandards und weltweit im Einsatz.",
   alternates: {
     canonical: "/de/made-in-europe/",
     languages: {
@@ -41,9 +41,9 @@ export const metadata: Metadata = {
     },
   },
   openGraph: {
-    title: "Über Classifyre — Entwickelt in Österreich, weltweit im Einsatz",
+    title: "Über Classifyre – Souveräne Data-Governance-Plattform",
     description:
-      "100 % Apache-2.0 Open-Source Data Governance aus Österreich nach europäischen Standards – weltweit selbst betrieben auf eigener Infrastruktur.",
+      "Souveräne Data-Governance-Plattform aus Österreich nach europäischen Standards – weltweit selbst betrieben auf eigener Infrastruktur.",
     type: "website",
     locale: "de_AT",
   },
@@ -161,7 +161,7 @@ export default function MadeInEuropePageDe() {
         }
         lede={
           <>
-            Classifyre ist eine Open-Source Data-Governance-Plattform, entwickelt
+            Classifyre ist eine souveräne Data-Governance-Plattform, entwickelt
             in Österreich nach europäischen Datenschutz- und Sicherheitsstandards
             – für Organisationen in Österreich, der EU, Nordamerika und weltweit.
             Zentrale Data-Governance-Infrastruktur sollte transparent, selbst

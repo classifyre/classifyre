@@ -1,4 +1,4 @@
-# Classifyre — Full Technical & Comparison Reference (llms-full.txt)
+# Classifyre – Sovereign Data Governance Platform (llms-full.txt)
 
 Canonical site: https://www.classifyre.com/
 Documentation: https://docs.classifyre.com/
@@ -12,7 +12,7 @@ Origin & reach: Built in Austria (European Union) to European privacy and securi
 
 ## 1. What Classifyre Is
 
-Classifyre is an end-to-end open-source data governance platform you run on your own infrastructure (Docker, Kubernetes, or OpenShift — on-premises, air-gapped, private cloud, or AWS/Azure/GCP).
+Classifyre is an end-to-end sovereign data governance platform you run on your own infrastructure (Docker, Kubernetes, or OpenShift — on-premises, air-gapped, private cloud, or AWS/Azure/GCP).
 
 Instead of replacing an organisation's existing ETL pipelines, databases, lakehouses, identity provider, or BI tools, Classifyre integrates on top of them to provide:
 1. **In-place source connection & detection** across 40+ structured and unstructured systems plus custom connector plugins.

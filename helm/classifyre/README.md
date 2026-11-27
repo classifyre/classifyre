@@ -1,10 +1,10 @@
 # classifyre-core
 
-Production-ready Helm chart for Classifyre, open-source data governance — web, api, SQL gateway, and Kubernetes CLI jobs
+Production-ready Helm chart for Classifyre, the sovereign data governance platform — web, api, SQL gateway, and Kubernetes CLI jobs
 
 ## Purpose
 
-This chart deploys Classifyre, open-source data governance: the API, the web app and the SQL gateway, with Kubernetes-native CLI jobs that scan your sources for personal data and secrets.
+This chart deploys Classifyre, the sovereign data governance platform: the API, the web app and the SQL gateway, with Kubernetes-native CLI jobs that scan your sources for personal data and secrets.
 
 ## Installation
 

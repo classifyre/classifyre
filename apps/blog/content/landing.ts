@@ -20,7 +20,7 @@ import { docs, routes } from "@/lib/site";
 /* ── Hero ───────────────────────────────────────────────────────────────── */
 
 const enHero = {
-  chips: ["Open-Source Data Governance Platform · Apache-2.0"],
+  chips: ["Sovereign Data Governance Platform"],
   titleA: "Find it. Govern it.",
   titleBLead: "Use it",
   titleBHighlight: "safely.",

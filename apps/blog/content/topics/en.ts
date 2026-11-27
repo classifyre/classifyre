@@ -4,7 +4,7 @@ import type { TopicChrome, TopicCopy, TopicId } from "./types";
 
 export const enChrome: TopicChrome = {
   home: "Home",
-  chip: "Open-Source Data Governance",
+  chip: "Sovereign Data Governance Platform",
   marks: {
     points: "How it works",
     detail: "In practice",
@@ -34,16 +34,17 @@ export const enChrome: TopicChrome = {
 const accessGovernance: TopicCopy = {
   id: "data-access-governance",
   name: "Data access governance",
-  metaTitle: "Open-Source Data Access Governance, Self-Hosted",
+  metaTitle: "Sovereign Data Access Governance, Self-Hosted",
   metaDescription:
     "Enforce who sees which tables, rows, and columns across 40+ systems: directory groups, multi-level masking, governed SQL/BI access, and verifiable audit logs under Apache-2.0.",
   keywords: [
+    "sovereign data governance",
+    "sovereign data governance platform",
     "data access governance",
     "governed data access",
-    "open source data governance",
     "role-based access control for data",
     "row-level security across sources",
-    "dynamic data masking open source",
+    "dynamic data masking",
     "self-hosted data governance",
   ],
   h1: "Data access governance: your rules enforced on every query",
@@ -387,7 +388,7 @@ const unity: TopicCopy = {
   name: "Classifyre vs Unity Catalog",
   metaTitle: "Classifyre vs Unity Catalog: Honest Governance Comparison (2026)",
   metaDescription:
-    "An objective engineering comparison of Classifyre and Databricks Unity Catalog: Databricks-native lakehouse governance vs. cross-system open-source data governance across databases, Iceberg, Delta, and BI tools.",
+    "An objective engineering comparison of Classifyre and Databricks Unity Catalog: Databricks-native lakehouse governance vs. cross-system sovereign data governance across databases, Iceberg, Delta, and BI tools.",
   keywords: [
     "Unity Catalog alternative",
     "Classifyre vs Unity Catalog",

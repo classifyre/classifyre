@@ -14,8 +14,8 @@
     "githubLabel": "Classifyre auf GitHub"
   },
   "footer": {
-    "tagline": "Open-Source Data Governance",
-    "blurb": "Durchgängige Open-Source Data Governance für die Systeme, die Sie bereits betreiben. Quellen verbinden, sensible Daten klassifizieren, Zeilen- und Spaltenmaskierung nach Gruppen durchsetzen, Datenprodukte bereitstellen und Teams direkten Zugriff in SQL, Power BI und Excel geben.",
+    "tagline": "Souveräne Data Governance",
+    "blurb": "Durchgängige souveräne Data-Governance-Plattform für die Systeme, die Sie bereits betreiben. Quellen verbinden, sensible Daten klassifizieren, Zeilen- und Spaltenmaskierung nach Gruppen durchsetzen, Datenprodukte bereitstellen und Teams direkten Zugriff in SQL, Power BI und Excel geben.",
     "navHeading": "Navigation",
     "navHome": "Start",
     "navAbout": "Über uns",
@@ -163,11 +163,11 @@
     "englishName": "English"
   },
   "site": {
-    "title": "Classifyre",
-    "description": "Open-Source Data Governance für Ihre bestehenden Systeme. Sensible Daten klassifizieren, Zeilen- und Spaltenmaskierung nach Gruppen durchsetzen, Datenprodukte teilen und SQL, Power BI sowie Excel lückenlos protokollieren.",
-    "websiteDescription": "Open-Source Data Governance für Ihre bestehenden Systeme. Sensible Daten klassifizieren, Zeilen- und Spaltenmaskierung nach Gruppen durchsetzen, Datenprodukte teilen und SQL, Power BI sowie Excel lückenlos protokollieren.",
+    "title": "Classifyre – Souveräne Data-Governance-Plattform",
+    "description": "Souveräne Data-Governance-Plattform für Ihre bestehenden Systeme. Sensible Daten klassifizieren, Zeilen- und Spaltenmaskierung nach Gruppen durchsetzen, Datenprodukte teilen und SQL, Power BI sowie Excel lückenlos protokollieren.",
+    "websiteDescription": "Souveräne Data-Governance-Plattform für Ihre bestehenden Systeme. Sensible Daten klassifizieren, Zeilen- und Spaltenmaskierung nach Gruppen durchsetzen, Datenprodukte teilen und SQL, Power BI sowie Excel lückenlos protokollieren.",
     "blogDescription": "Produkt-Updates, Architektur-Artikel zu Data Governance, Deployment-Leitfäden und Detektor-Designs von Classifyre.",
-    "orgDescription": "Classifyre entwickelt eine Open-Source Data-Governance-Plattform unter Apache-2.0. Entwickelt in Österreich nach europäischen Datenschutz- und Sicherheitsstandards, im Einsatz in Europa, Nordamerika und weltweit."
+    "orgDescription": "Classifyre entwickelt eine souveräne Data-Governance-Plattform unter Apache-2.0. Entwickelt in Österreich nach europäischen Datenschutz- und Sicherheitsstandards, im Einsatz in Europa, Nordamerika und weltweit."
   },
   "findingTags": [
     "geleakte E-Mail",

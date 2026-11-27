@@ -1,6 +1,6 @@
-# Classifyre — all-in-one Docker image
+# Classifyre – Sovereign Data Governance Platform (All-in-One Docker Image)
 
-Open-source data governance in one container. Classifyre finds personal data
+Sovereign data governance in one container. Classifyre finds personal data
 and secrets across the systems you already run, masks them automatically inside
 the query, and lets people read everything with SQL, Excel and Power BI, with
 every read logged. Everything is Apache-2.0, including sign-in, roles and

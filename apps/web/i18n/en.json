@@ -1,7 +1,7 @@
 {
   "app": {
     "name": "Classifyre",
-    "tagline": "Detection Platform"
+    "tagline": "Sovereign Data Governance Platform"
   },
   "assistant": {
     "open": "Ask the assistant",
@@ -6553,13 +6553,13 @@
   },
   "seo": {
     "site": {
-      "title": "Classifyre — Detection Platform for Unstructured Data",
-      "description": "Open source detection platform that scans Confluence, Jira, SharePoint, Notion, databases and file shares to surface PII, secrets, security issues and duplicates — then triages findings into investigations with an AI autopilot. Self-hosted, private by default.",
-      "keywords": "Classifyre, detection platform, PII detection, secrets scanning, unstructured data, DLP, data security, Confluence scanner, Jira scanner, SharePoint DLP, duplicate detection, entity resolution, AI autopilot, open source security",
-      "ogTitle": "Classifyre — Detection Platform for Unstructured Data",
-      "ogDescription": "Scan every source you already run, surface what matters, and investigate with an AI autopilot. Open source, self-hosted, private by default.",
-      "twitterTitle": "Classifyre — Detection Platform for Unstructured Data",
-      "twitterDescription": "Open source detection platform for PII, secrets, security and duplicates across all your unstructured data."
+      "title": "Classifyre – Sovereign Data Governance Platform",
+      "description": "Sovereign data governance platform for your existing databases, lakehouses, and files: classify sensitive data in place, enforce row and column masking by group, serve SQL, Power BI, Excel, and AI agents with full audit logging, and resolve leaks.",
+      "keywords": "Classifyre, sovereign data governance, sovereign data governance platform, data access governance, dynamic data masking, row-level security, PII detection, secrets scanning, data products, self-hosted data governance",
+      "ogTitle": "Classifyre – Sovereign Data Governance Platform",
+      "ogDescription": "Sovereign data governance across your existing databases, lakehouses, and files — live masking, governed SQL/BI & AI access, and complete audit logging on your own infrastructure.",
+      "twitterTitle": "Classifyre – Sovereign Data Governance Platform",
+      "twitterDescription": "Sovereign data governance platform for in-place classification, live masking, governed SQL/BI & AI access, and leak cases."
     },
     "workspaces": {
       "title": "Workspaces",

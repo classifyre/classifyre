@@ -194,18 +194,20 @@ function withSourceSidebarChildren(pageMap: PageMapItem[]): PageMapItem[] {
 export const metadata: Metadata = {
   metadataBase: new URL(siteOrigin),
   title: {
-    default: "Classifyre Docs",
+    default: "Classifyre Docs – Sovereign Data Governance Platform",
     template: "%s | Classifyre Docs",
   },
   description:
-    "Documentation for Classifyre, the open-source data governance platform: integrate 40+ sources, classify sensitive data, enforce row and column masking by group, publish governed data products, and serve SQL, Power BI, and Excel with full audit logging.",
+    "Documentation for Classifyre, the sovereign data governance platform: integrate 40+ sources, classify sensitive data, enforce row and column masking by group, publish governed data products, and serve SQL, Power BI, and Excel with full audit logging.",
   keywords: [
     "classifyre",
     "documentation",
+    "sovereign data governance",
+    "sovereign data governance platform",
     "data governance",
     "data masking",
     "PII detection",
-    "open source",
+    "self-hosted",
   ],
   // No site-wide canonical: every page inherits this object, and a canonical
   // here told search engines that each page was a copy of the home page. A
@@ -224,17 +226,17 @@ export const metadata: Metadata = {
   },
   openGraph: {
     type: "website",
-    title: "Classifyre Docs",
+    title: "Classifyre Docs – Sovereign Data Governance Platform",
     description:
-      "Documentation for Classifyre, the open-source data governance platform: integrate 40+ sources, classify sensitive data, enforce row and column masking by group, publish governed data products, and serve SQL, Power BI, and Excel with full audit logging.",
+      "Documentation for Classifyre, the sovereign data governance platform: integrate 40+ sources, classify sensitive data, enforce row and column masking by group, publish governed data products, and serve SQL, Power BI, and Excel with full audit logging.",
     url: docsSiteUrl,
     siteName: "Classifyre Docs",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Classifyre Docs",
+    title: "Classifyre Docs – Sovereign Data Governance Platform",
     description:
-      "Documentation for Classifyre, the open-source data governance platform: integrate 40+ sources, classify sensitive data, enforce row and column masking by group, publish governed data products, and serve SQL, Power BI, and Excel with full audit logging.",
+      "Documentation for Classifyre, the sovereign data governance platform: integrate 40+ sources, classify sensitive data, enforce row and column masking by group, publish governed data products, and serve SQL, Power BI, and Excel with full audit logging.",
   },
 };
 

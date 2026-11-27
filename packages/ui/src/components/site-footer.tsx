@@ -105,9 +105,9 @@ export interface SiteFooterCopy {
 }
 
 const DEFAULT_COPY: SiteFooterCopy = {
-  tagline: "Open-source data governance",
+  tagline: "Sovereign Data Governance",
   blurb:
-    "End-to-end open-source data governance for the systems you already run. Connect your sources, classify sensitive data, enforce row and column masking by group, publish governed data products, and give teams live SQL, Power BI, and Excel access with every read logged.",
+    "End-to-end sovereign data governance for the systems you already run. Connect your sources, classify sensitive data, enforce row and column masking by group, publish governed data products, and give teams live SQL, Power BI, and Excel access with every read logged.",
   navHeading: "Navigate",
   navHome: "Home",
   navAbout: "About",
