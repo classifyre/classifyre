@@ -3,11 +3,11 @@
 
 # Classifyre API
 
-**Backend service of Classifyre, open-source data access governance — REST API, scan orchestration, masking, access control, the read audit and the SQL gateway.**
+**Backend service of Classifyre, the sovereign data governance platform — REST API, scan orchestration, masking, access control, the read audit and the SQL gateway.**
 
 </div>
 
-Classifyre is open-source data access governance you run yourself: one governed way into the systems you already run (databases, lakehouses, file shares, Confluence, Jira, SharePoint, S3, Git). Departments, roles and groups from your directory decide who sees which tables, rows and columns; personal data is **masked inside the query** until someone is cleared to see it; people use the result in SQL, Excel, Power BI and AI agents. Every read is logged; nothing leaves your servers.
+Classifyre is a sovereign data governance platform you run yourself: one governed way into the systems you already run (databases, lakehouses, file shares, Confluence, Jira, SharePoint, S3, Git). Departments, roles and groups from your directory decide who sees which tables, rows and columns; personal data is **masked inside the query** until someone is cleared to see it; people use the result in SQL, Excel, Power BI and AI agents. Every read is logged; nothing leaves your servers.
 
 This `classifyre/api` image is the Classifyre backend (NestJS): it serves the REST API and WebSockets, orchestrates scans, runs the background job queues (pg-boss) and semantic embeddings, and spawns scan workers. It is one of three service images — together with [`classifyre/web`](https://hub.docker.com/r/classifyre/web) (frontend) and [`classifyre/cli`](https://hub.docker.com/r/classifyre/cli) (scan jobs) — composed into the [`classifyre/all-in-one`](https://hub.docker.com/r/classifyre/all-in-one) image and deployed separately by the [`classifyre/classifyre-core`](https://hub.docker.com/r/classifyre/classifyre-core) Helm chart.
 

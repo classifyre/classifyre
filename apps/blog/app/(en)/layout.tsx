@@ -29,19 +29,20 @@ const siteUrl = normalizeSiteUrl(
 );
 
 const siteDescription =
-    "Open-source data governance platform for the systems you already run. Classify sensitive data, enforce row and column masking by group, publish governed data products, and serve SQL, Power BI, and Excel with full audit logging.";
+    "Sovereign data governance platform for the systems you already run. Classify sensitive data, enforce row and column masking by group, publish governed data products, and serve SQL, Power BI, and Excel with full audit logging.";
 
 export const metadata: Metadata = {
     metadataBase: new URL(siteUrl),
     title: {
-        default: "Classifyre",
+        default: "Classifyre – Sovereign Data Governance Platform",
         template: "%s | Classifyre",
     },
     description: siteDescription,
     keywords: [
+        "sovereign data governance",
+        "sovereign data governance platform",
         "data access governance",
         "governed data access",
-        "open source data governance",
         "self-hosted data governance",
         "role-based access control",
         "row-level security",
@@ -69,14 +70,14 @@ export const metadata: Metadata = {
     },
     openGraph: {
         type: "website",
-        title: "Classifyre",
+        title: "Classifyre – Sovereign Data Governance Platform",
         description: siteDescription,
         url: siteUrl,
         siteName: "Classifyre",
     },
     twitter: {
         card: "summary_large_image",
-        title: "Classifyre",
+        title: "Classifyre – Sovereign Data Governance Platform",
         description: siteDescription,
     },
 };
@@ -99,7 +100,7 @@ const navbar = (
                 <div className="grid flex-1 text-left text-sm leading-tight">
                     <span className="truncate font-serif font-bold">Classifyre</span>
                     <span className="truncate font-mono text-[10px] text-muted-foreground">
-            Open-source data governance
+            Sovereign Data Governance
 </span>
                 </div>
             </div>

@@ -3,9 +3,7 @@
 
 # Classifyre
 
-## Self-Hosted Open-Source Data Governance Platform
-
-**Find it. Govern it. Use it safely.**
+## Sovereign Data Governance Platform
 
 [![CI](https://img.shields.io/github/actions/workflow/status/classifyre/classifyre/ci.yml?branch=develop&style=flat-square&label=CI&logo=github)](https://github.com/classifyre/classifyre/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/classifyre/classifyre?sort=semver&style=flat-square&label=release)](https://github.com/classifyre/classifyre/releases/latest)

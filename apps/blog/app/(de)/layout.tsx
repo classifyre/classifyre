@@ -32,15 +32,17 @@ const siteUrl = normalizeSiteUrl(
 export const metadata: Metadata = {
     metadataBase: new URL(siteUrl),
     title: {
-        default: "Classifyre",
+        default: "Classifyre – Souveräne Data-Governance-Plattform",
         template: "%s | Classifyre",
     },
     description: deTranslations.site.description,
     keywords: [
+        "Souveräne Data-Governance-Plattform",
+        "Souveräne Data Governance",
         "Berechtigungskonzept",
         "Datenzugriff steuern",
         "Zugriffssteuerung",
-        "Data Governance Open Source",
+        "Data-Governance-Plattform",
         "Datenmaskierung",
         "Pseudonymisierung",
         "Protokollierung",
@@ -68,7 +70,7 @@ export const metadata: Metadata = {
     },
     openGraph: {
         type: "website",
-        title: "Classifyre",
+        title: "Classifyre – Souveräne Data-Governance-Plattform",
         description: deTranslations.site.description,
         url: `${siteUrl}/de/`,
         siteName: "Classifyre",
@@ -76,7 +78,7 @@ export const metadata: Metadata = {
     },
     twitter: {
         card: "summary_large_image",
-        title: "Classifyre",
+        title: "Classifyre – Souveräne Data-Governance-Plattform",
         description: deTranslations.site.description,
     },
 };

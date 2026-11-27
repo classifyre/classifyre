@@ -1,7 +1,7 @@
 {
   "app": {
     "name": "Classifyre",
-    "tagline": "Erkennungsplattform"
+    "tagline": "Souveräne Data-Governance-Plattform"
   },
   "assistant": {
     "open": "Assistent fragen",
@@ -6553,13 +6553,13 @@
   },
   "seo": {
     "site": {
-      "title": "Classifyre — Erkennungsplattform für unstrukturierte Daten",
-      "description": "Open-Source-Erkennungsplattform, die Confluence, Jira, SharePoint, Notion, Datenbanken und Dateifreigaben durchsucht, um personenbezogene Daten, Geheimnisse, Sicherheitsprobleme und Duplikate aufzudecken — und Funde anschließend mit einem KI-Autopiloten zu Ermittlungen triagiert. Selbst gehostet, standardmäßig privat.",
-      "keywords": "Classifyre, Erkennungsplattform, PII-Erkennung, Secrets-Scanning, unstrukturierte Daten, DLP, Datensicherheit, Confluence-Scanner, Jira-Scanner, SharePoint-DLP, Duplikaterkennung, Entitätsauflösung, KI-Autopilot, Open-Source-Sicherheit",
-      "ogTitle": "Classifyre — Erkennungsplattform für unstrukturierte Daten",
-      "ogDescription": "Durchsuchen Sie jede Quelle, die Sie ohnehin betreiben, decken Sie das Wesentliche auf und ermitteln Sie mit einem KI-Autopiloten. Open Source, selbst gehostet, standardmäßig privat.",
-      "twitterTitle": "Classifyre — Erkennungsplattform für unstrukturierte Daten",
-      "twitterDescription": "Open-Source-Erkennungsplattform für personenbezogene Daten, Geheimnisse, Sicherheit und Duplikate in all Ihren unstrukturierten Daten."
+      "title": "Classifyre – Souveräne Data-Governance-Plattform",
+      "description": "Souveräne Data-Governance-Plattform für Ihre bestehenden Datenbanken, Lakehouses und Dateien: sensible Daten direkt an der Quelle klassifizieren, Zeilen- und Spaltenmaskierung nach Gruppen durchsetzen, SQL, Power BI, Excel und KI-Agenten protokolliert bereitstellen und Datenabflüsse klären.",
+      "keywords": "Classifyre, Souveräne Data-Governance-Plattform, Souveräne Data Governance, Berechtigungskonzept, Datenmaskierung, Zeilenfilter, PII-Erkennung, Secrets-Scanning, Datenprodukte, Datensouveränität, On-Premises",
+      "ogTitle": "Classifyre – Souveräne Data-Governance-Plattform",
+      "ogDescription": "Souveräne Data-Governance-Plattform für Ihre bestehenden Datenbanken, Lakehouses und Dateien – Live-Maskierung, gesteuerter SQL/BI- & KI-Zugriff und lückenlose Protokollierung auf Ihrer eigenen Infrastruktur.",
+      "twitterTitle": "Classifyre – Souveräne Data-Governance-Plattform",
+      "twitterDescription": "Souveräne Data-Governance-Plattform für Klassifizierung an der Quelle, Live-Maskierung, gesteuerten SQL/BI- & KI-Zugriff und Fallbearbeitung."
     },
     "workspaces": {
       "title": "Arbeitsbereiche",

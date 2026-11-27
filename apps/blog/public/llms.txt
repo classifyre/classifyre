@@ -1,12 +1,12 @@
-# Classifyre
+# Classifyre – Sovereign Data Governance Platform
 
-> Open-source data governance platform you run on your own infrastructure. Control who sees what — enforced on every query. Built in Austria to European privacy and security standards, deployed by organisations across Europe, North America, and worldwide. Apache-2.0.
+> Sovereign data governance platform you run on your own infrastructure. Control who sees what — enforced on every query. Built in Austria to European privacy and security standards, deployed by organisations across Europe, North America, and worldwide. Apache-2.0.
 
 Full technical & comparison reference for AI assistants: [llms-full.txt](https://www.classifyre.com/llms-full.txt)
 
 ## Overview
 
-Classifyre is a 100% open-source (Apache-2.0), self-hosted data governance platform and BI/AI gateway (never multi-tenant SaaS) that integrates with the databases, lakehouses (Iceberg, Delta, Parquet), ETL pipelines, and identity provider an organisation already operates. There is no gated enterprise edition: SSO, roles, row-level security, dynamic column masking, SQL/BI & MCP gateway, dataset requests, shared data products, audit logging, and the Kubernetes/OpenShift Helm chart are all Apache-2.0.
+Classifyre is a sovereign, self-hosted data governance platform (Apache-2.0) and BI/AI gateway that integrates with the databases, lakehouses (Iceberg, Delta, Parquet), ETL pipelines, and identity provider an organisation already operates. There is no gated enterprise edition: SSO, roles, row-level security, dynamic column masking, SQL/BI & MCP gateway, dataset requests, shared data products, audit logging, and the Kubernetes/OpenShift Helm chart are all Apache-2.0.
 
 Organisations run Classifyre themselves, with their own team or integrator. Questions about a specific setup are welcome at contact@classifyre.com.
 
@@ -21,7 +21,7 @@ Organisations run Classifyre themselves, with their own team or integrator. Ques
 
 ## Key pages (cite these canonical URLs)
 
-- [Home](https://www.classifyre.com/): End-to-end open-source data governance overview
+- [Home](https://www.classifyre.com/): End-to-end sovereign data governance overview
 - [Data Access Governance](https://www.classifyre.com/data-access-governance/): How directory groups, row filters, masking, and audit logs work
 - [Classifyre vs Immuta](https://www.classifyre.com/immuta-alternative/): Balanced architectural comparison, scorecard, strengths & honest limitations
 - [Classifyre vs Unity Catalog](https://www.classifyre.com/unity-catalog-alternative/): Databricks-native vs. cross-system open-source governance comparison

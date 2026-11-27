@@ -3,11 +3,11 @@
 
 # Classifyre All-in-One
 
-**Open-source data access governance in a single Docker image: your access rules, enforced on every query.**
+**Sovereign data governance platform in a single Docker image: your access rules, enforced on every query.**
 
 </div>
 
-Classifyre is open-source data access governance you run yourself: one governed way into the systems you already run (databases, lakehouses, file shares, Confluence, Jira, SharePoint, S3, Git). Departments, roles and groups from your directory decide who sees which tables, rows and columns; personal data is **masked inside the query** until someone is cleared to see it; people use the result in SQL, Excel, Power BI and AI agents. Every read is logged; nothing leaves your servers. Detectors classify what is personal (PII, secrets, security misconfigurations), and when something does leak you work it like an analyst: standing inquiries, duplicate detection, cases and hypotheses, with an AI autopilot doing the legwork in between.
+Classifyre is a sovereign data governance platform you run yourself: one governed way into the systems you already run (databases, lakehouses, file shares, Confluence, Jira, SharePoint, S3, Git). Departments, roles and groups from your directory decide who sees which tables, rows and columns; personal data is **masked inside the query** until someone is cleared to see it; people use the result in SQL, Excel, Power BI and AI agents. Every read is logged; nothing leaves your servers. Detectors classify what is personal (PII, secrets, security misconfigurations), and when something does leak you work it like an analyst: standing inquiries, duplicate detection, cases and hypotheses, with an AI autopilot doing the legwork in between.
 
 This `classifyre/all-in-one` image is the fastest way to try Classifyre: the web UI, the API, the background worker, the Python scan workers, and a PostgreSQL database with pgvector — all in one container. One `docker run`, no dependencies to provision, nothing to connect. Ideal for local scanning, evaluations, and rapid prototyping.
 

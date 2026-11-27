@@ -4,7 +4,7 @@
 
 ## Positioning & voice
 
-Classifyre is positioned as an **end-to-end open-source data governance platform** (Apache-2.0) — a transparent, self-hosted alternative to closed-source enterprise governance suites:
+Classifyre is positioned as an **end-to-end sovereign data governance platform** (Apache-2.0) — a transparent, self-hosted alternative to closed-source enterprise governance suites:
 
 1. **Integrates with existing tools**: does not replace ETL pipelines, IAM (Entra ID, Active Directory, Okta, OIDC/SAML), databases, lakehouses (Iceberg, Delta, Parquet), or BI tools.
 2. **Connect & detect**: 40+ known sources or custom connectors; built-in PII & secrets plus business-specific custom detectors from regex and Python checks to local CPU AI extraction models and private LLMs.

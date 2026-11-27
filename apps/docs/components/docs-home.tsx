@@ -160,7 +160,7 @@ export function DocsHome() {
       {/* ── Hero ─────────────────────────────────────────────────── */}
       <header className="border-b-2 border-border pb-10 pt-4">
         <p className="mb-6 inline-block border-2 border-border bg-background px-3 py-1 font-mono text-[11px] font-bold uppercase tracking-[0.22em]">
-          Classifyre · Documentation
+          Classifyre · Sovereign Data Governance Platform
         </p>
         <h1
           className="text-[17vw] leading-[0.88] uppercase sm:text-7xl md:text-8xl"
@@ -174,7 +174,7 @@ export function DocsHome() {
           </span>
         </h1>
         <p className="mt-6 max-w-2xl text-lg leading-7 text-muted-foreground">
-          Classifyre is an open-source data governance platform you run on your
+          Classifyre is a sovereign data governance platform you run on your
           own infrastructure. Integrate your existing sources and directory
           groups, detect sensitive and business-specific data, enforce column
           and row masking, publish governed data products, and give teams live

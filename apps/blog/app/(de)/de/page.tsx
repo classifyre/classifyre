@@ -19,25 +19,27 @@ import "../../landing.css";
  */
 
 const description =
-  "Selbst gehostete Open-Source Data Governance für Ihre bestehenden Datenbanken, Lakehouses und Dateien: sensible Daten erkennen, Live-Maskierung für SQL, Power BI, Excel und KI-Agenten durchsetzen, Datenqualität und Nutzung überwachen und Datenabflüsse klären.";
+  "Souveräne Data-Governance-Plattform für Ihre bestehenden Datenbanken, Lakehouses und Dateien: sensible Daten erkennen, Live-Maskierung für SQL, Power BI, Excel und KI-Agenten durchsetzen, Datenqualität und Nutzung überwachen und Datenabflüsse klären.";
 
-const ogTitle = "Classifyre: Erkennen. Steuern. Sicher nutzen.";
+const ogTitle = "Classifyre – Souveräne Data-Governance-Plattform";
 const ogDescription =
-  "Open-Source Data Governance für Ihre bestehenden Datenbanken, Lakehouses und Verzeichnisdienste: Erkennung, Live-Maskierung für SQL, Power BI, Excel & KI-Agenten, Datenqualität, Nutzungsanalyse, Datenprodukte und Fallbearbeitung.";
+  "Souveräne Data-Governance-Plattform für Ihre bestehenden Datenbanken, Lakehouses und Verzeichnisdienste: Erkennung, Live-Maskierung für SQL, Power BI, Excel & KI-Agenten, Datenqualität, Nutzungsanalyse, Datenprodukte und Fallbearbeitung.";
 
 export const metadata: Metadata = {
   title: {
-    absolute: "Classifyre — Open-Source Data Governance Plattform",
+    absolute: "Classifyre – Souveräne Data-Governance-Plattform",
   },
   description,
   keywords: [
+    "Souveräne Data-Governance-Plattform",
+    "Souveräne Data Governance",
     "Berechtigungskonzept",
     "Berechtigungskonzept umsetzen",
     "Datenzugriff steuern",
     "Zugriffssteuerung",
     "Rollen- und Rechtekonzept",
     "Need-to-know-Prinzip",
-    "Data Governance Plattform Open Source",
+    "Data-Governance-Plattform",
     "Datenmaskierung",
     "Pseudonymisierung",
     "Zeilenfilter",

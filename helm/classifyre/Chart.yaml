@@ -1,6 +1,6 @@
 apiVersion: v2
 name: classifyre-core
-description: Production-ready Helm chart for Classifyre, open-source data governance — web, api, SQL gateway, and Kubernetes CLI jobs
+description: Production-ready Helm chart for Classifyre, the sovereign data governance platform — web, api, SQL gateway, and Kubernetes CLI jobs
 type: application
 version: 0.9.5-SNAPSHOT
 appVersion: "0.9.5-SNAPSHOT"

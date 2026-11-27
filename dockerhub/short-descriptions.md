@@ -4,7 +4,7 @@ Copy each line into the repository's short-description field on Docker Hub.
 
 | Repository | Short description |
 |---|---|
-| `classifyre/all-in-one` | Open-source data access governance in one image: access by role, masking, every read logged. |
+| `classifyre/all-in-one` | Sovereign data governance platform in one image: access by role, masking, every read logged. |
 | `classifyre/api` | Classifyre API — scans, masking, access control, read audit and the PostgreSQL SQL gateway. |
 | `classifyre/web` | Classifyre Web UI — grant access by group, mask personal data and query your tables. |
 | `classifyre/cli` | Classifyre CLI scan worker — source extraction and detector execution. |

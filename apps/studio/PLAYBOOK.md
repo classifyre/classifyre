@@ -10,7 +10,7 @@ Videos themselves are not committed (`videos/` is gitignored). Shared components
 
 ## 1. Product focus: data governance first
 
-Classifyre is a **self-hosted, open-source (Apache-2.0) data governance platform**. It sits between the data systems and identity directories an organisation already runs and the tools its teams use — without migrating data into a new warehouse.
+Classifyre is a **sovereign data governance platform** (Apache-2.0, self-hosted). It sits between the data systems and identity directories an organisation already runs and the tools its teams use — without migrating data into a new warehouse.
 
 Build videos and blog posts around these core topics:
 
@@ -27,7 +27,7 @@ Use clear terms that IT leads, data teams, DPOs, and CISOs actually search for:
 
 | Idea | English | German |
 | --- | --- | --- |
-| Category | data access governance, self-hosted data governance | Datenzugriff steuern, Zugriffssteuerung, Data-Governance-Plattform |
+| Category | sovereign data governance platform, data access governance | souveräne Data-Governance-Plattform, Datenzugriff steuern, Zugriffssteuerung |
 | Org permissions | access by role, permissions model, row filter | Berechtigungskonzept, Rollen- und Rechtekonzept, Zeilenfilter |
 | Masking | dynamic data masking, column masking, pseudonymisation | Datenmaskierung, Pseudonymisierung, Datenminimierung |
 | Data products | shared dataset, data product, self-service analytics | Datenprodukt, geteilter Datensatz, Self-Service-Analytics |

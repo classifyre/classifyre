@@ -14,7 +14,7 @@ Read these two files before writing code or copy:
 
 ## Product focus and tone
 
-Classifyre is a self-hosted, open-source **data governance platform** (Apache-2.0). Videos and blog posts focus on practical data governance work:
+Classifyre is a **sovereign data governance platform** (Apache-2.0, self-hosted). Videos and blog posts focus on practical data governance work:
 
 - **Access by organisation:** syncing Entra ID / AD / Keycloak groups, setting roles, row filters, and expiring grants (admins do not get clear data by default).
 - **Dynamic column masking:** masking PII inside the query engine (redacted, last four, deterministic hash, empty, hidden) so `WHERE` and `JOIN` cannot leak hidden values.
