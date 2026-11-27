@@ -497,6 +497,9 @@ function EditorShell({
       className="relative overflow-hidden rounded-md border bg-background"
       data-testid="sql-editor"
       data-readonly={readOnly ? "true" : "false"}
+      // A percentage height resolves against this box: without its own it
+      // collapses to one line of Monaco.
+      style={height === "100%" ? { height } : undefined}
     >
       {!readOnly && (
         <div className="absolute right-8 top-1 z-10 flex gap-0.5 rounded border bg-background/90 shadow-sm">
