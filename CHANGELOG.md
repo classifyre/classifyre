@@ -5,6 +5,12 @@ compiled at release time from per-PR fragments in `changelog.d/` (see
 `changelog.d/README.md`). Commit messages and PR titles are never used as
 release notes.
 
+## [0.9.5] - 2026-11-27
+
+### Changed
+
+- TLS and certificate usage on the SQL gateway is now optional (`sqlGateway.tls.enabled` in Helm, `SQL_GATEWAY_TLS_ENABLED` in the environment). It stays enabled by default in Helm and general deployments, while the all-in-one Docker image now disables SQL gateway TLS by default so BI tools and ODBC clients can connect without downloading a certificate.
+
 ## [0.9.4] - 2026-11-26
 
 ### Added
