@@ -145,14 +145,24 @@ ok "without a session nothing is listed and a workspace asks to sign in"
 
 # ── SQL connections ───────────────────────────────────────────────────────────
 # On by default, on its own port (5433: the bundled PostgreSQL holds 5432 inside
-# the container). Always TLS 1.3, with the certificate the container made for the
-# host in CLASSIFYRE_URL; the Playwright smoke test below covers the app's side.
+# the container). TLS is disabled by default in the all-in-one image (no
+# certificate is generated); PostgreSQL's SSLRequest receives 'N'. The
+# Playwright smoke test below covers the app's side.
+pg_ssl_probe() {
+  python3 - "$1" <<'PY'
+import socket, struct, sys
+port = int(sys.argv[1])
+with socket.create_connection(("127.0.0.1", port), timeout=5) as s:
+    s.sendall(struct.pack("!II", 8, 80877103))  # PostgreSQL SSLRequest
+    resp = s.recv(1)
+    sys.exit(0 if resp == b"N" else 1)
+PY
+}
 step "Checking the SQL gateway"
-wait_for "the SQL gateway" 120 sh -c "echo | openssl s_client -connect localhost:${SQL_PORT} -tls1_3 -alpn postgresql 2>&1 | grep -q 'TLSv1.3'"
-sql_tls="$(echo | openssl s_client -connect "localhost:${SQL_PORT}" -tls1_3 -alpn postgresql -showcerts 2>/dev/null)"
-printf '%s\n' "${sql_tls}" | grep -q 'TLSv1.3' || fail "the SQL gateway on :${SQL_PORT} did not negotiate TLS 1.3"
-printf '%s\n' "${sql_tls}" | grep -q 'CN *= *localhost' || fail "the SQL gateway's certificate is not for localhost (CLASSIFYRE_URL's host)"
-ok "SQL gateway answers on :${SQL_PORT} with TLS 1.3 and a certificate for localhost"
+wait_for "the SQL gateway" 120 pg_ssl_probe "${SQL_PORT}"
+docker exec "${CONTAINER}" sh -c '[ ! -e /var/lib/classifyre/sql-tls ]' \
+  || fail "/var/lib/classifyre/sql-tls was created even though SQL_GATEWAY_TLS_ENABLED defaults to false"
+ok "SQL gateway answers on :${SQL_PORT} without TLS (no certificate generated)"
 
 # ── Database ──────────────────────────────────────────────────────────────────
 step "Checking the databases"
@@ -190,7 +200,7 @@ wait_for "the realm after a restart" "${BOOT_WAIT}" \
 [ "${secrets_before}" = "$(docker exec "${CONTAINER}" cat /var/lib/classifyre/iam.secrets)" ] \
   || fail "the sign-in secrets were regenerated — tenant databases would no longer open"
 ok "keys survived the restart"
-wait_for "the SQL gateway after a restart" 120 sh -c "echo | openssl s_client -connect localhost:${SQL_PORT} -tls1_3 -alpn postgresql 2>&1 | grep -q 'TLSv1.3'"
+wait_for "the SQL gateway after a restart" 120 pg_ssl_probe "${SQL_PORT}"
 ok "SQL gateway answers again after the restart"
 
 (cd "${ROOT}/apps/e2e" && SMOKE_RUN="${RUN}" SMOKE_AFTER_RESTART=1 bunx playwright test --grep @after-restart)

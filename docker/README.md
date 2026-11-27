@@ -87,7 +87,7 @@ no emulation on either.
 | Process | Port | What it is |
 |---|---|---|
 | Caddy | **3000** | the app and its API; routes to the two servers below |
-| SQL gateway | **5433** | SQL connections for Power BI, Excel, DBeaver, `psql` (PostgreSQL protocol, TLS) |
+| SQL gateway | **5433** | SQL connections for Power BI, Excel, DBeaver, `psql` (PostgreSQL protocol; TLS optional, off by default) |
 | Web UI | 3100 (internal) | Next.js, and the bundled documentation at `/docs` |
 | API + worker | 8000 (internal) | REST, WebSockets, job queues, embeddings, and the parent of every scan |
 | Identity server (Keycloak) | 8180 (internal) | sign-in, people, groups and tenants; reached through the web UI at `/iam` |
@@ -121,17 +121,20 @@ Every command above publishes it:
 ```
 
 Make a connection in the app (**Settings → SQL connections**), then connect a
-tool to `localhost:5433`. The connection is always TLS 1.3. Without a mounted
-certificate, the container makes a CA and a certificate for the address in
-`CLASSIFYRE_URL` once, keeps them beside the data, and the app offers the CA for
-download.
+tool to `localhost:5433`. In the all-in-one image **TLS is disabled by default**
+(`SQL_GATEWAY_TLS_ENABLED=false`), so no certificate is generated or needed in
+BI tools or ODBC (`sslmode=disable`). Pass `-e SQL_GATEWAY_TLS_ENABLED=true` to
+turn TLS 1.3 on — without a mounted certificate, the container then makes a CA
+and a certificate for the address in `CLASSIFYRE_URL` once, keeps them beside
+the data, and the app offers the CA for download.
 
 | You want | Do this |
 |---|---|
 | Another host port, e.g. `15433` | `-p 15433:5433 -e SQL_GATEWAY_PUBLIC_PORT=15433` (the app shows tools the port to use) |
 | Another port inside the container | `-e PORT_SQL=6543 -p 6543:6543` |
-| Another name than `CLASSIFYRE_URL`'s host | `-e SQL_GATEWAY_PUBLIC_HOST=sql.example.com` (remove `/var/lib/classifyre/sql-tls` to make the certificate again) |
-| Your own certificate | `tls.crt` and `tls.key` in `/var/lib/classifyre/sql-tls` before the first start |
+| Enable TLS (auto-generated CA) | `-e SQL_GATEWAY_TLS_ENABLED=true` (download the CA from the connection dialog) |
+| Another name than `CLASSIFYRE_URL`'s host | `-e SQL_GATEWAY_PUBLIC_HOST=sql.example.com` (if TLS is on, remove `/var/lib/classifyre/sql-tls` to make the certificate again) |
+| Your own certificate | `-e SQL_GATEWAY_TLS_ENABLED=true` and put `tls.crt` and `tls.key` in `/var/lib/classifyre/sql-tls` before the first start |
 | No SQL connections | `-e SQL_GATEWAY_ENABLED=false` |
 
 Full guide, tools and troubleshooting: <https://docs.classifyre.com/deployment/docker/#sql-connections>.
@@ -176,9 +179,10 @@ Pass them with `-e NAME=value`, or put them in a file and use `--env-file`.
 | `TELEMETRY_DISABLED` / `DO_NOT_TRACK` | unset | Set either to `1` to disable anonymous usage telemetry. |
 | `CORS_ORIGIN` | same-origin | Only needed if you serve the UI from another host. |
 | `SQL_GATEWAY_ENABLED` | `true` | `false` runs without SQL connections. |
+| `SQL_GATEWAY_TLS_ENABLED` | `false` | `true` enables TLS 1.3 (auto-generates or uses mounted certs in `/var/lib/classifyre/sql-tls`). |
 | `PORT_SQL` | `5433` | Port of the SQL gateway inside the container. Publish it: `-p 5433:5433`. |
 | `SQL_GATEWAY_PUBLIC_PORT` | `PORT_SQL` | Port the app tells tools to use; set it when you publish another host port. |
-| `SQL_GATEWAY_PUBLIC_HOST` | host of `CLASSIFYRE_URL` | Name tools connect to and the certificate carries. |
+| `SQL_GATEWAY_PUBLIC_HOST` | host of `CLASSIFYRE_URL` | Name tools connect to (and the certificate carries when TLS is enabled). |
 
 ### Database
 

@@ -30,3 +30,36 @@ export function endpointState(
  */
 export const SQL_SETUP_DOCS_HREF =
   "/docs/sql-connections/#making-the-endpoint-reachable";
+
+const NPGSQL_SSL_MODE: Record<string, string> = {
+  "verify-full": "VerifyFull",
+  "verify-ca": "VerifyCA",
+  require: "Require",
+  disable: "Disable",
+};
+
+/** How common tools connect, from the endpoint and a connection's user name. */
+export function connectionStrings(
+  endpoint: Pick<
+    DataConnectionEndpointDto,
+    "host" | "port" | "database" | "sslMode" | "caCertificate"
+  >,
+  username: string,
+  password = "<password>",
+) {
+  const host = endpoint.host ?? "<host>";
+  const { port, database, sslMode } = endpoint;
+  const caPath = "classifyre-sql-ca.crt";
+  const tlsEnabled = sslMode !== "disable";
+  const withCa = tlsEnabled && Boolean(endpoint.caCertificate);
+  const npgsqlMode = NPGSQL_SSL_MODE[sslMode] ?? "VerifyFull";
+  return {
+    psql: `psql "host=${host} port=${port} dbname=${database} user=${username} sslmode=${sslMode}${withCa ? ` sslrootcert=${caPath}` : ""}"`,
+    uri: `postgresql://${encodeURIComponent(username)}@${host}:${port}/${encodeURIComponent(database)}?sslmode=${sslMode}`,
+    jdbc: tlsEnabled
+      ? `jdbc:postgresql://${host}:${port}/${database}?user=${username}&ssl=true&sslmode=${sslMode}${withCa ? `&sslrootcert=${caPath}` : ""}`
+      : `jdbc:postgresql://${host}:${port}/${database}?user=${username}&ssl=false&sslmode=disable`,
+    odbc: `Driver={PostgreSQL Unicode};Server=${host};Port=${port};Database=${database};Uid=${username};Pwd=${password};SSLMode=${sslMode};`,
+    npgsql: `Host=${host};Port=${port};Database=${database};Username=${username};Password=${password};SSL Mode=${npgsqlMode}${withCa ? `;Root Certificate=${caPath}` : ""}`,
+  };
+}

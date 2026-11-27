@@ -8348,6 +8348,8 @@
     "jdbcHint": "DBeaver, Tableau, Metabase, DataGrip: PostgreSQL driver, this URL, the password.",
     "odbcHint": "Excel and other ODBC tools: the psqlODBC driver (PostgreSQL Unicode).",
     "powerBiHint": "Power BI: Get data → PostgreSQL database, server host:port, database as above; install the certificate authority in Windows’ trusted roots.",
+    "powerBiHintPublicCa": "Power BI: Get data → PostgreSQL database, server host:port, database as above; the certificate is signed by a trusted CA, so no extra certificate file is needed.",
+    "powerBiHintNoTls": "Power BI: Get data → PostgreSQL database, server host:port, database as above; TLS is disabled on this gateway, so no certificate is needed (disable encrypted connection in Power BI if prompted).",
     "governanceTitle": "Access through SQL connections",
     "governanceLead": "Who reads this from BI tools and drivers, when and how often. Owners and stewards can give a connection for it, or close it to one.",
     "reads": "{{count}} reads here",

@@ -78,6 +78,7 @@ import {
   refusalReason,
 } from './sign-in';
 import { resolveApplicationSecretKey } from '../secret-key.util';
+import { isSqlGatewayTlsEnabled } from './tls-config';
 
 /** A connection's session settings a client may bring in its startup packet. */
 const STARTUP_SETTINGS = new Set([
@@ -118,6 +119,7 @@ const SQLSTATE: Record<string, string> = {
 interface Config {
   port: number;
   host: string;
+  tlsEnabled: boolean;
   tls: SecureContext | null;
   allowPlaintext: boolean;
   proxyProtocol: boolean;
@@ -142,8 +144,13 @@ interface Live {
 function readConfig(): Config | null {
   if (!/^(1|true|yes|on)$/i.test(process.env.SQL_GATEWAY_ENABLED ?? ''))
     return null;
-  const cert = process.env.SQL_GATEWAY_TLS_CERT_FILE?.trim();
-  const key = process.env.SQL_GATEWAY_TLS_KEY_FILE?.trim();
+  const tlsEnabled = isSqlGatewayTlsEnabled();
+  const cert = tlsEnabled
+    ? process.env.SQL_GATEWAY_TLS_CERT_FILE?.trim()
+    : undefined;
+  const key = tlsEnabled
+    ? process.env.SQL_GATEWAY_TLS_KEY_FILE?.trim()
+    : undefined;
   const tls =
     cert && key
       ? createSecureContext({
@@ -152,13 +159,15 @@ function readConfig(): Config | null {
           minVersion: 'TLSv1.3',
         })
       : null;
+  const allowPlaintext =
+    !tlsEnabled ||
+    /^(1|true|yes|on)$/i.test(process.env.SQL_GATEWAY_ALLOW_PLAINTEXT ?? '');
   return {
     port: Number(process.env.SQL_GATEWAY_PORT) || 5432,
     host: process.env.SQL_GATEWAY_HOST?.trim() || '0.0.0.0',
+    tlsEnabled,
     tls,
-    allowPlaintext: /^(1|true|yes|on)$/i.test(
-      process.env.SQL_GATEWAY_ALLOW_PLAINTEXT ?? '',
-    ),
+    allowPlaintext,
     proxyProtocol: /^(1|true|yes|on)$/i.test(
       process.env.SQL_GATEWAY_PROXY_PROTOCOL ?? '',
     ),
@@ -370,7 +379,7 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
     if (!config) return;
     if (!config.tls && !config.allowPlaintext) {
       this.logger.error(
-        'SQL gateway not started: set SQL_GATEWAY_TLS_CERT_FILE and SQL_GATEWAY_TLS_KEY_FILE (or SQL_GATEWAY_ALLOW_PLAINTEXT for local development only).',
+        'SQL gateway not started: set SQL_GATEWAY_TLS_CERT_FILE and SQL_GATEWAY_TLS_KEY_FILE (or set SQL_GATEWAY_TLS_ENABLED=false to run without TLS).',
       );
       return;
     }
@@ -395,11 +404,16 @@ export class SqlGatewayService implements OnModuleInit, OnApplicationShutdown {
     this.server.on('error', (error) =>
       this.logger.error(`SQL gateway listener: ${error.message}`),
     );
-    this.server.listen(config.port, config.host, () =>
+    this.server.listen(config.port, config.host, () => {
+      const mode = config.tls
+        ? 'TLS'
+        : config.tlsEnabled
+          ? 'PLAINTEXT — development only'
+          : 'TLS disabled (plaintext)';
       this.logger.log(
-        `SQL gateway listening on ${config.host}:${config.port} (${config.tls ? 'TLS' : 'PLAINTEXT — development only'})`,
-      ),
-    );
+        `SQL gateway listening on ${config.host}:${config.port} (${mode})`,
+      );
+    });
     this.sweeper = setInterval(() => void this.sweep(), SWEEP_MS);
     this.sweeper.unref();
   }

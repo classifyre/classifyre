@@ -539,13 +539,15 @@ queryWorker:
 ```yaml
 sqlGateway:
   enabled: true              # the default; false removes the gateway, and the app says it is switched off
-  publicHost: sql.example.com  # the name tools connect to; also on the gateway's certificate
+  publicHost: sql.example.com  # the name tools connect to; also on the gateway's certificate when TLS is enabled
   publicPort: 5432
   service:
     type: LoadBalancer       # or NodePort; or sqlGateway.traefik for Traefik v3
+  tls:
+    enabled: true            # default; set false to disable TLS and certificates (sslmode=disable)
 ```
 
-An HTTP Ingress cannot carry the PostgreSQL protocol, and the gateway does its own TLS, so it needs a TCP path of its own. [Making the endpoint reachable](/sql-connections/#making-the-endpoint-reachable) has the recipe for each: LoadBalancer, NodePort, Traefik, ingress-nginx, any other TCP proxy, a local cluster, and a check that it works. The gateway pod requests 250m CPU and 1 GiB (limit 4 GiB); on a small node lower `sqlGateway.resources.requests`, or set `sqlGateway.enabled: false` if you do not need it.
+An HTTP Ingress cannot carry the PostgreSQL protocol, so the gateway needs a TCP path of its own. By default (`sqlGateway.tls.enabled: true`), the gateway serves TLS 1.3 using a chart-generated CA and certificate (downloadable from the app), or you can supply a certificate via `sqlGateway.tls.existingSecret` or `sqlGateway.tls.certManager`; set `sqlGateway.tls.enabled: false` to opt out of TLS and certificates on a trusted private network. [Making the endpoint reachable](/sql-connections/#making-the-endpoint-reachable) and [TLS and certificates](/sql-connections/#tls-and-certificates) cover every ingress option (LoadBalancer, NodePort, Traefik, ingress-nginx, TCP proxy, local cluster) and certificate setup. Set `sqlGateway.enabled: false` if you do not need SQL connections.
 
 ---
 

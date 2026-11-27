@@ -10,7 +10,11 @@ import {
   type DataConnectionSecretDto,
 } from "@workspace/api-client";
 
-export { endpointState, SQL_SETUP_DOCS_HREF } from "./sql-endpoint-state";
+export {
+  connectionStrings,
+  endpointState,
+  SQL_SETUP_DOCS_HREF,
+} from "./sql-endpoint-state";
 export type { EndpointState } from "./sql-endpoint-state";
 
 export type {
@@ -128,25 +132,6 @@ export const blockConnection = (
 
 export const unblockConnection = (id: string, blockId: string) =>
   api.sqlConnections.dataConnectionControllerUnblock({ id, blockId });
-
-/** How common tools connect, from the endpoint and a connection's user name. */
-export function connectionStrings(
-  endpoint: DataConnectionEndpointDto,
-  username: string,
-  password = "<password>",
-) {
-  const host = endpoint.host ?? "<host>";
-  const { port, database } = endpoint;
-  const caPath = "classifyre-sql-ca.crt";
-  const withCa = Boolean(endpoint.caCertificate);
-  return {
-    psql: `psql "host=${host} port=${port} dbname=${database} user=${username} sslmode=${endpoint.sslMode}${withCa ? ` sslrootcert=${caPath}` : ""}"`,
-    uri: `postgresql://${encodeURIComponent(username)}@${host}:${port}/${encodeURIComponent(database)}?sslmode=${endpoint.sslMode}`,
-    jdbc: `jdbc:postgresql://${host}:${port}/${database}?user=${username}&ssl=true&sslmode=${endpoint.sslMode}${withCa ? `&sslrootcert=${caPath}` : ""}`,
-    odbc: `Driver={PostgreSQL Unicode};Server=${host};Port=${port};Database=${database};Uid=${username};Pwd=${password};SSLMode=${endpoint.sslMode};`,
-    npgsql: `Host=${host};Port=${port};Database=${database};Username=${username};Password=${password};SSL Mode=VerifyFull${withCa ? `;Root Certificate=${caPath}` : ""}`,
-  };
-}
 
 /** What the caller may put in a connection: readable by them and open to SQL connections. */
 export function useReachable(enabled = true) {

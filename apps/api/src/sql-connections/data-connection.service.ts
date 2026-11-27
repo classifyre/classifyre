@@ -26,6 +26,7 @@ import { GovernanceService } from '../governance/governance.service';
 import { GovernanceNotifier } from '../governance/governance-notifier';
 import type { ScopeIds } from '../data-query/connection-scope';
 import { scramVerifier } from './scram';
+import { isSqlGatewayTlsEnabled } from '../sql-gateway/tls-config';
 import { ConnectionRightsService } from './connection-rights.service';
 import { ConnectionExposureService } from './connection-exposure.service';
 import {
@@ -184,7 +185,10 @@ export class DataConnectionService {
 
   endpoint(): DataConnectionEndpointDto {
     const host = process.env.SQL_GATEWAY_PUBLIC_HOST?.trim() || null;
-    const caFile = process.env.SQL_GATEWAY_TLS_CA_FILE?.trim();
+    const tlsEnabled = isSqlGatewayTlsEnabled();
+    const caFile = tlsEnabled
+      ? process.env.SQL_GATEWAY_TLS_CA_FILE?.trim()
+      : undefined;
     let caCertificate: string | null = null;
     if (caFile) {
       try {
@@ -206,9 +210,11 @@ export class DataConnectionService {
       host,
       port: Number(process.env.SQL_GATEWAY_PUBLIC_PORT) || 5432,
       database: slug,
-      // The gateway's certificate names the public host, from a public CA or
-      // from the CA shipped here: either way the client can check both.
-      sslMode: 'verify-full',
+      // When TLS is enabled (default), the gateway's certificate names the
+      // public host, from a public CA or from the CA shipped here: either way
+      // the client can check both (`verify-full`). When TLS is disabled
+      // (`SQL_GATEWAY_TLS_ENABLED=false`), clients connect without TLS.
+      sslMode: tlsEnabled ? 'verify-full' : 'disable',
       caCertificate,
     };
   }

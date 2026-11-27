@@ -3,6 +3,9 @@
 {{- if not (has $mode (list "none" "passthrough")) }}
 {{- fail "sqlGateway.traefik.tls is none or passthrough: TLS always ends at the gateway (TLS 1.3)" }}
 {{- end }}
+{{- if and (eq $mode "passthrough") (not .Values.sqlGateway.tls.enabled) }}
+{{- fail "sqlGateway.traefik.tls passthrough requires sqlGateway.tls.enabled=true; use tls: none when TLS is disabled" }}
+{{- end }}
 {{- if and (eq $mode "passthrough") (not .Values.sqlGateway.publicHost) }}
 {{- fail "sqlGateway.traefik.tls passthrough routes by name (SNI): set sqlGateway.publicHost" }}
 {{- end }}

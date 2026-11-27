@@ -140,6 +140,16 @@ helm upgrade --install classifyre ./helm/classifyre \
 
 The chart uses `lookup` to reuse an existing generated key on upgrades.
 
+## SQL Gateway TLS & Certificates
+
+The SQL gateway (`sqlGateway.enabled`, on by default) serves BI tools and drivers (Power BI, Excel, Tableau, DBeaver, `psql`, JDBC, ODBC) over the PostgreSQL protocol. **TLS 1.3 is enabled by default (`sqlGateway.tls.enabled: true`)** with three ways to manage certificates, plus the option to disable TLS entirely:
+
+1. **Chart-managed CA & certificate (default):** Leave `sqlGateway.tls.existingSecret` empty and `sqlGateway.tls.certManager.enabled: false`. On first install the chart generates a CA and leaf certificate for `sqlGateway.publicHost`, keeps them in Secret `<release>-sql-tls` across upgrades, and the app offers the CA (`classifyre-sql-ca.crt`) for download so clients verify with `sslmode=verify-full`. After changing `publicHost`, delete `<release>-sql-tls` and run `helm upgrade` to re-issue.
+2. **Your own or publicly trusted certificate:** Supply a `kubernetes.io/tls` Secret via `sqlGateway.tls.existingSecret` (`tls.crt`, `tls.key`, and optionally `ca.crt` for private CAs) or enable `sqlGateway.tls.certManager.enabled: true`. When signed by a public CA (e.g. Let's Encrypt) or an enterprise CA already trusted on user machines, omit `ca.crt` — tools connect with `sslmode=verify-full` and no CA download is shown.
+3. **Disable TLS (`sqlGateway.tls.enabled: false`):** Opt out of TLS and certificates altogether. No TLS Secret or Certificate is created or mounted, no CA download is shown in the app, and BI tools/ODBC connect directly with `sslmode=disable`. Passwords still use SCRAM-SHA-256, but queries and results travel unencrypted — only use this on a trusted private network or behind a VPN/tunnel.
+
+See the [SQL connections guide](https://docs.classifyre.com/sql-connections/) for client setup details.
+
 ## Quick Start (External Postgres)
 
 ```bash

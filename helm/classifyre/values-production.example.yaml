@@ -55,6 +55,17 @@ sqlGateway:
     type: LoadBalancer
     # loadBalancerSourceRanges: [203.0.113.0/24]
   # allowedCidrs: [203.0.113.0/24]
+  # TLS 1.3 is enabled by default with a chart-generated CA (downloadable in the app).
+  # Use existingSecret or certManager for a public/enterprise certificate, or set
+  # tls.enabled: false to opt out of TLS on a trusted private network.
+  # tls:
+  #   enabled: true
+  #   existingSecret: ""
+  #   certManager:
+  #     enabled: false
+  #     issuerRef:
+  #       name: letsencrypt-prod
+  #       kind: ClusterIssuer
 
 # ── Database ──────────────────────────────────────────────────────────────────
 # Use mode=cnpg (CloudNativePG) or mode=external for production.

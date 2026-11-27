@@ -350,10 +350,15 @@ default JAVA_OPTS_KC_HEAP        "-Xms64m -Xmx${CLASSIFYRE_IAM_HEAP_MB:-512}m"
 # publishes it: `-p 5433:5433`. Published under another port
 # (`-p 15433:5433`), say so with SQL_GATEWAY_PUBLIC_PORT=15433 — the app shows
 # that port to tools. The host they connect to is the one in CLASSIFYRE_URL
-# (localhost by default); SQL_GATEWAY_PUBLIC_HOST overrides it. TLS always:
-# without a mounted certificate a CA and a certificate for the public host are
-# made once and kept beside the data; the app offers the CA for download.
+# (localhost by default); SQL_GATEWAY_PUBLIC_HOST overrides it.
+#
+# TLS is disabled by default in the all-in-one image (no certificate is
+# generated or required by BI tools/ODBC). Set SQL_GATEWAY_TLS_ENABLED=true to
+# turn TLS 1.3 on: without a mounted certificate a CA and a certificate for the
+# public host are made once and kept beside the data, and the app offers the CA
+# for download.
 default SQL_GATEWAY_ENABLED "true"
+default SQL_GATEWAY_TLS_ENABLED "false"
 default SQL_GATEWAY_PORT "${PORT_SQL:-5433}"
 if [ "${SQL_GATEWAY_ENABLED}" = "true" ]; then
   default SQL_GATEWAY_CATALOG_PG_SOCKET "/var/run/sql-catalog-pg"
@@ -362,30 +367,36 @@ fi
 sql_url_host="${CLASSIFYRE_URL#*://}"; sql_url_host="${sql_url_host%%[:/]*}"
 default SQL_GATEWAY_PUBLIC_HOST "${sql_url_host:-localhost}"
 default SQL_GATEWAY_PUBLIC_PORT "${SQL_GATEWAY_PORT}"
-sql_tls="${CLASSIFYRE_SQL_TLS_DIR:-/var/lib/classifyre/sql-tls}"
-if [ "${SQL_GATEWAY_ENABLED}" = "true" ] && [ ! -s "${sql_tls}/tls.crt" ]; then
-  mkdir -p "${sql_tls}"
-  ( umask 077
-    openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
-      -subj "/CN=Classifyre SQL gateway CA" \
-      -keyout "${sql_tls}/ca.key" -out "${sql_tls}/ca.crt" >/dev/null 2>&1
-    openssl req -newkey rsa:2048 -nodes -subj "/CN=${SQL_GATEWAY_PUBLIC_HOST}" \
-      -keyout "${sql_tls}/tls.key" -out "${sql_tls}/tls.csr" >/dev/null 2>&1
-    printf 'subjectAltName=DNS:%s,DNS:localhost,IP:127.0.0.1\n' "${SQL_GATEWAY_PUBLIC_HOST}" > "${sql_tls}/san.ext"
-    openssl x509 -req -in "${sql_tls}/tls.csr" -CA "${sql_tls}/ca.crt" -CAkey "${sql_tls}/ca.key" \
-      -CAcreateserial -days 825 -extfile "${sql_tls}/san.ext" -out "${sql_tls}/tls.crt" >/dev/null 2>&1
-    rm -f "${sql_tls}/tls.csr" "${sql_tls}/san.ext" "${sql_tls}/ca.srl" )
-  chmod 644 "${sql_tls}/ca.crt" "${sql_tls}/tls.crt"
-  chown -R 10001:10001 "${sql_tls}"
-  log "Made a certificate authority and a certificate for ${SQL_GATEWAY_PUBLIC_HOST} in ${sql_tls} (SQL connections)."
+sql_tls_on=false
+case "${SQL_GATEWAY_TLS_ENABLED}" in
+  1|true|TRUE|yes|YES|on|ON) sql_tls_on=true ;;
+esac
+if [ "${SQL_GATEWAY_ENABLED}" = "true" ] && [ "${sql_tls_on}" = "true" ]; then
+  sql_tls="${CLASSIFYRE_SQL_TLS_DIR:-/var/lib/classifyre/sql-tls}"
+  if [ ! -s "${sql_tls}/tls.crt" ]; then
+    mkdir -p "${sql_tls}"
+    ( umask 077
+      openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
+        -subj "/CN=Classifyre SQL gateway CA" \
+        -keyout "${sql_tls}/ca.key" -out "${sql_tls}/ca.crt" >/dev/null 2>&1
+      openssl req -newkey rsa:2048 -nodes -subj "/CN=${SQL_GATEWAY_PUBLIC_HOST}" \
+        -keyout "${sql_tls}/tls.key" -out "${sql_tls}/tls.csr" >/dev/null 2>&1
+      printf 'subjectAltName=DNS:%s,DNS:localhost,IP:127.0.0.1\n' "${SQL_GATEWAY_PUBLIC_HOST}" > "${sql_tls}/san.ext"
+      openssl x509 -req -in "${sql_tls}/tls.csr" -CA "${sql_tls}/ca.crt" -CAkey "${sql_tls}/ca.key" \
+        -CAcreateserial -days 825 -extfile "${sql_tls}/san.ext" -out "${sql_tls}/tls.crt" >/dev/null 2>&1
+      rm -f "${sql_tls}/tls.csr" "${sql_tls}/san.ext" "${sql_tls}/ca.srl" )
+    chmod 644 "${sql_tls}/ca.crt" "${sql_tls}/tls.crt"
+    chown -R 10001:10001 "${sql_tls}"
+    log "Made a certificate authority and a certificate for ${SQL_GATEWAY_PUBLIC_HOST} in ${sql_tls} (SQL connections)."
+  fi
+  # The CA only ever signs the one certificate above. Its key is not kept: a
+  # copy left on the volume could sign a certificate clients would trust
+  # (they pin this CA). Without tls.crt both are made again, a new CA included.
+  rm -f "${sql_tls}/ca.key"
+  default SQL_GATEWAY_TLS_CERT_FILE "${sql_tls}/tls.crt"
+  default SQL_GATEWAY_TLS_KEY_FILE "${sql_tls}/tls.key"
+  [ -s "${sql_tls}/ca.crt" ] && default SQL_GATEWAY_TLS_CA_FILE "${sql_tls}/ca.crt"
 fi
-# The CA only ever signs the one certificate above. Its key is not kept: a
-# copy left on the volume could sign a certificate clients would trust
-# (they pin this CA). Without tls.crt both are made again, a new CA included.
-rm -f "${sql_tls}/ca.key"
-default SQL_GATEWAY_TLS_CERT_FILE "${sql_tls}/tls.crt"
-default SQL_GATEWAY_TLS_KEY_FILE "${sql_tls}/tls.key"
-[ -s "${sql_tls}/ca.crt" ] && default SQL_GATEWAY_TLS_CA_FILE "${sql_tls}/ca.crt"
 
 # ── Runtime directories ───────────────────────────────────────────────────────
 # The Dockerfile creates these, but a mount replaces whatever the image had at
@@ -415,6 +426,6 @@ log "postgres shared_buffers=${PG_SHARED_BUFFERS} work_mem=${PG_WORK_MEM} effect
 log "scans: ${MAX_CONCURRENT_RUNNERS} concurrent, ${CLASSIFYRE_MAX_POOL_WORKERS} worker(s) each"
 [ "${QUERY_WORKER_ENABLED}" = "true" ] && log "sql queries: ${QUERY_WORKER_SLOTS} at once on the query worker, planned in ${QUERY_WORKER_MEMORY_MB} MB"
 log "listening on :${PORT_HTTP}, for ${CLASSIFYRE_URL}"
-[ "${SQL_GATEWAY_ENABLED}" = "true" ] && log "SQL connections on :${SQL_GATEWAY_PORT}, advertised as ${SQL_GATEWAY_PUBLIC_HOST}:${SQL_GATEWAY_PUBLIC_PORT} (publish it: -p ${SQL_GATEWAY_PUBLIC_PORT}:${SQL_GATEWAY_PORT})"
+[ "${SQL_GATEWAY_ENABLED}" = "true" ] && log "SQL connections on :${SQL_GATEWAY_PORT}, advertised as ${SQL_GATEWAY_PUBLIC_HOST}:${SQL_GATEWAY_PUBLIC_PORT} (TLS=${sql_tls_on}; publish it: -p ${SQL_GATEWAY_PUBLIC_PORT}:${SQL_GATEWAY_PORT})"
 
 exec /init "$@"

@@ -60,9 +60,10 @@ function downloadCa(pem: string) {
 /**
  * How a tool connects (docs/prd/DQ-data-query.md §5.7): host, port, database
  * and user, then the same as a psql line, a JDBC URL (DBeaver, Tableau,
- * Metabase), an ODBC string (Excel) and an Npgsql string (Power BI). Always
- * TLS with the certificate checked; the CA is offered when it is not a public
- * one.
+ * Metabase), an ODBC string (Excel) and an Npgsql string (Power BI). When TLS
+ * is enabled, the certificate is checked (`verify-full`) and the CA is offered
+ * when it is not a public one; when TLS is disabled (`sslmode=disable`), tools
+ * connect without a certificate.
  */
 export function ConnectDetails({
   endpoint,
@@ -84,6 +85,13 @@ export function ConnectDetails({
     return showNotice ? <SqlEndpointNotice endpoint={endpoint} /> : null;
   }
   const strings = connectionStrings(endpoint, username, password);
+  const tlsEnabled = endpoint.sslMode !== "disable";
+  const hasCa = tlsEnabled && Boolean(endpoint.caCertificate);
+  const powerBiHintKey = !tlsEnabled
+    ? "sqlConnections.powerBiHintNoTls"
+    : hasCa
+      ? "sqlConnections.powerBiHint"
+      : "sqlConnections.powerBiHintPublicCa";
   const facts: [string, string][] = [
     [t("sqlConnections.host"), endpoint.host ?? ""],
     [t("sqlConnections.port"), String(endpoint.port)],
@@ -126,15 +134,13 @@ export function ConnectDetails({
         </TabsContent>
         <TabsContent value="npgsql" className="space-y-1">
           <CopyLine value={strings.npgsql} label="Npgsql" />
-          <p className="text-xs text-muted-foreground">
-            {t("sqlConnections.powerBiHint")}
-          </p>
+          <p className="text-xs text-muted-foreground">{t(powerBiHintKey)}</p>
         </TabsContent>
         <TabsContent value="uri" className="space-y-1">
           <CopyLine value={strings.uri} label="URI" />
         </TabsContent>
       </Tabs>
-      {endpoint.caCertificate && (
+      {hasCa && (
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           <Button
             type="button"

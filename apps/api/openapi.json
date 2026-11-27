@@ -42327,13 +42327,14 @@
             "enum": [
               "verify-full",
               "verify-ca",
-              "require"
+              "require",
+              "disable"
             ]
           },
           "caCertificate": {
             "type": "string",
             "nullable": true,
-            "description": "PEM of the CA that signed the gateway certificate, when it is not a public one."
+            "description": "PEM of the CA that signed the gateway certificate, when TLS is enabled and the certificate is not signed by a public CA."
           }
         },
         "required": [

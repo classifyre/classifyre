@@ -676,8 +676,12 @@ which each deployment sets on its own after including this block.
   value: {{ .Values.sqlGateway.publicHost | quote }}
 - name: SQL_GATEWAY_PUBLIC_PORT
   value: {{ .Values.sqlGateway.publicPort | quote }}
+- name: SQL_GATEWAY_TLS_ENABLED
+  value: {{ .Values.sqlGateway.tls.enabled | quote }}
+{{- if .Values.sqlGateway.tls.enabled }}
 - name: SQL_GATEWAY_TLS_CA_FILE
   value: /etc/classifyre/sql-tls/ca.crt
+{{- end }}
 {{- end }}
 {{- with .Values.api.extraEnv }}
 {{- toYaml . | nindent 0 }}

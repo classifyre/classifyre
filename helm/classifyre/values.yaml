@@ -876,11 +876,11 @@ sqlGateway:
   port: 5432
 
   # -- The host name people connect to, shown in the app next to each
-  # connection, and put in the generated certificate. Set it for SQL
-  # connections to work: while it is empty the app warns that the endpoint is
-  # not configured instead of showing connection details; e.g. `sql.example.com`.
-  # Changing it later: delete the generated TLS Secret so the certificate is
-  # made again with the new name.
+  # connection, and put in the generated certificate when `tls.enabled` is
+  # `true`. Set it for SQL connections to work: while it is empty the app warns
+  # that the endpoint is not configured instead of showing connection details;
+  # e.g. `sql.example.com`. Changing it later with `tls.enabled: true`: delete
+  # the generated TLS Secret so the certificate is made again with the new name.
   publicHost: ""
 
   # -- The port people connect to (the Service's, a NodePort, or a Traefik
@@ -988,21 +988,35 @@ sqlGateway:
     externalTrafficPolicy: ""
 
   tls:
+    # -- Enable TLS (TLS 1.3) on the SQL gateway. On by default: the gateway
+    # presents a certificate for `publicHost` (from `existingSecret`,
+    # `certManager`, or the self-signed CA + certificate the chart generates
+    # once and keeps, with the CA downloadable in the app). Set to `false` to
+    # opt out of TLS and run without certificates — no TLS Secret is created or
+    # mounted, no CA download is shown in the app, and clients connect with
+    # `sslmode=disable` (only suitable on a trusted private network or behind a
+    # VPN/tunnel).
+    enabled: true
     # -- A `kubernetes.io/tls` Secret (`tls.crt`, `tls.key`, optionally
-    # `ca.crt`) for `publicHost`. Empty: cert-manager below, or a CA and
-    # certificate the chart makes once and keeps (its CA is downloadable in
-    # the app, so clients can use `sslmode=verify-full`).
+    # `ca.crt`) for `publicHost` (used when `tls.enabled` is `true`). Empty:
+    # cert-manager below, or a CA and certificate the chart makes once and
+    # keeps (its CA is downloadable in the app, so clients can use
+    # `sslmode=verify-full`). Omit `ca.crt` when using a publicly trusted
+    # certificate (e.g. Let's Encrypt) so no CA download is offered.
     existingSecret: ""
     certManager:
-      # -- Let cert-manager issue the certificate for `publicHost`.
+      # -- Let cert-manager issue the certificate for `publicHost` (requires
+      # `tls.enabled: true`).
       enabled: false
       issuerRef:
         name: ""
         kind: ClusterIssuer
     # -- Extra names for the generated certificate (besides `publicHost`,
-    # `localhost` and the Service's names).
+    # `localhost` and the Service's names) when `tls.enabled` is `true`.
     extraSans: []
-    # -- Development only: accept connections without TLS.
+    # -- Development only: accept plaintext connections alongside TLS when
+    # `tls.enabled` is `true`. To disable TLS and certificates altogether, set
+    # `tls.enabled: false`.
     allowPlaintext: false
 
   traefik:
@@ -1012,10 +1026,12 @@ sqlGateway:
     entryPoints:
       - postgres
     # -- `none`: Traefik forwards raw TCP from a dedicated entrypoint
-    # (`HostSNI(*)`) and TLS is negotiated with the gateway, end to end —
-    # works with every client. `passthrough`: route by `publicHost` (SNI) on
-    # a shared entrypoint; Traefik answers PostgreSQL's SSLRequest and passes
-    # the TLS stream through. TLS always ends at the gateway (TLS 1.3).
+    # (`HostSNI(*)`) and TLS (when `sqlGateway.tls.enabled` is `true`) is
+    # negotiated with the gateway, end to end — works with every client.
+    # `passthrough`: route by `publicHost` (SNI) on a shared entrypoint
+    # (requires `sqlGateway.tls.enabled: true`); Traefik answers PostgreSQL's
+    # SSLRequest and passes the TLS stream through. TLS always ends at the
+    # gateway (TLS 1.3).
     tls: none
 
 worker:

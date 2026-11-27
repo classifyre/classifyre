@@ -8348,6 +8348,8 @@
     "jdbcHint": "DBeaver, Tableau, Metabase, DataGrip: PostgreSQL-Treiber, diese URL, das Passwort.",
     "odbcHint": "Excel und andere ODBC-Werkzeuge: der psqlODBC-Treiber (PostgreSQL Unicode).",
     "powerBiHint": "Power BI: Daten abrufen → PostgreSQL-Datenbank, Server host:port, Datenbank wie oben; die Zertifizierungsstelle in Windows als vertrauenswürdig installieren.",
+    "powerBiHintPublicCa": "Power BI: Daten abrufen → PostgreSQL-Datenbank, Server host:port, Datenbank wie oben; das Zertifikat stammt von einer vertrauenswürdigen Zertifizierungsstelle, es wird keine zusätzliche Zertifikatsdatei benötigt.",
+    "powerBiHintNoTls": "Power BI: Daten abrufen → PostgreSQL-Datenbank, Server host:port, Datenbank wie oben; TLS ist für dieses Gateway deaktiviert, es wird kein Zertifikat benötigt (verschlüsselte Verbindung in Power BI ggf. deaktivieren).",
     "governanceTitle": "Zugriff über SQL-Verbindungen",
     "governanceLead": "Wer dies aus BI-Werkzeugen und Treibern liest, wann und wie oft. Eigentümer und Verwalter können dafür eine Verbindung vergeben oder es für eine sperren.",
     "reads": "{{count}} Lesezugriffe hier",

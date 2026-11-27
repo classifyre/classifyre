@@ -43,39 +43,68 @@ A table's or source's owner or steward can **give a connection** for it to someo
 
 ## Connect your tool
 
-Every connection uses TLS and checks the server's certificate (`sslmode=verify-full`). When your installation uses its own certificate authority, download it from the connection dialog (**Download the certificate authority**) and point your tool at it.
+The connection dialog adapts to your installation's TLS setting (see [TLS and certificates](#tls-and-certificates)):
+
+- **TLS with a private or chart-managed CA** *(Helm chart default)*: connections use TLS 1.3 with `sslmode=verify-full`. Click **Download the certificate authority** (`classifyre-sql-ca.crt`) in the dialog and point your tool at it.
+- **TLS with a publicly trusted certificate** *(Let's Encrypt / `certManager` / `existingSecret` without `ca.crt`)*: connections use TLS 1.3 with `sslmode=verify-full`; your operating system or driver already trusts the CA, so no download is shown or needed.
+- **TLS disabled** *(all-in-one Docker default, or Helm `sqlGateway.tls.enabled: false`)*: no certificate is used or downloaded; tools connect with `sslmode=disable`.
+
+Copy the ready-made strings straight from the dialog — they already match your deployment's SSL mode and whether a CA file is needed.
 
 <Tabs items={["psql", "DBeaver / JDBC", "Power BI", "Excel / ODBC", "Tableau", "Metabase"]}>
 <Tabs.Tab>
+With TLS and a downloaded CA:
+
 ```bash
 psql "host=sql.example.com port=5432 dbname=finance user=ana_power_bi sslmode=verify-full sslrootcert=classifyre-sql-ca.crt"
 ```
+
+With a publicly trusted certificate, drop `sslrootcert=…`. With TLS disabled (e.g. Docker all-in-one default):
+
+```bash
+psql "host=localhost port=5433 dbname=default user=ana_power_bi sslmode=disable"
+```
+
 `\dn` lists the schemas (`<source>.<schema>`), `\dt "lake_finance.ledger".*` their tables, `\d+` shows the descriptions the table's stewards wrote.
 </Tabs.Tab>
 <Tabs.Tab>
-New connection → PostgreSQL. Host, port, database and user from the dialog, the password, and on **SSL**: *Use SSL*, mode `verify-full`, root certificate the downloaded CA. Or paste the JDBC URL:
+New connection → PostgreSQL. Enter host, port, database and user from the dialog, plus the password. On the **SSL** tab: when TLS is enabled, turn on *Use SSL*, set mode to `verify-full`, and give the downloaded CA as root certificate (omit it if your installation uses a publicly trusted certificate). When TLS is disabled, leave *Use SSL* off (`sslmode=disable`). Or paste the JDBC URL from the dialog:
 
 ```text
+# TLS enabled (with downloaded CA)
 jdbc:postgresql://sql.example.com:5432/finance?user=ana_dbeaver&ssl=true&sslmode=verify-full&sslrootcert=classifyre-sql-ca.crt
+
+# TLS disabled (no certificate)
+jdbc:postgresql://localhost:5433/default?user=ana_dbeaver&ssl=false&sslmode=disable
 ```
 </Tabs.Tab>
 <Tabs.Tab>
-**Get data → PostgreSQL database**. Server `sql.example.com:5432`, database `finance`, **Database** credentials with the user and password. Power BI checks the certificate against Windows: install the downloaded CA in *Trusted Root Certification Authorities* first. Import mode works best; DirectQuery sends a query per visual, and each query takes seconds (see [Speed](#speed)).
+**Get data → PostgreSQL database**. Server `sql.example.com:5432` (or `localhost:5433` in Docker), database `finance`, **Database** credentials with the user and password.
+
+- **With a downloaded CA**: Power BI checks the certificate against Windows — install `classifyre-sql-ca.crt` in *Trusted Root Certification Authorities* first.
+- **With a publicly trusted certificate**: no extra certificate setup is required.
+- **With TLS disabled**: no certificate is needed; if Power BI prompts about an unencrypted connection, allow connecting without encryption (uncheck *Encrypt connections* in Data Source Settings).
+
+Import mode works best; DirectQuery sends a query per visual, and each query takes seconds (see [Speed](#speed)).
 </Tabs.Tab>
 <Tabs.Tab>
-Install the PostgreSQL ODBC driver (*psqlODBC*, "PostgreSQL Unicode"), then in Excel **Data → Get Data → From Other Sources → From ODBC** with:
+Install the PostgreSQL ODBC driver (*psqlODBC*, "PostgreSQL Unicode"), then in Excel **Data → Get Data → From Other Sources → From ODBC** with the string from the dialog:
 
 ```text
+# TLS enabled
 Driver={PostgreSQL Unicode};Server=sql.example.com;Port=5432;Database=finance;Uid=ana_excel;Pwd=…;SSLMode=verify-full;
+
+# TLS disabled (no certificate)
+Driver={PostgreSQL Unicode};Server=localhost;Port=5433;Database=default;Uid=ana_excel;Pwd=…;SSLMode=disable;
 ```
 
-*Use Declare/Fetch* (`UseDeclareFetch=1`, which reads a large result in pages) works; the driver's server-side prepare works either way.
+With a downloaded CA, place `classifyre-sql-ca.crt` in the path libpq checks (`%APPDATA%\postgresql\root.crt` on Windows, `~/.postgresql/root.crt` on macOS/Linux) or set `PGSSLROOTCERT`. *Use Declare/Fetch* (`UseDeclareFetch=1`, which reads a large result in pages) works; the driver's server-side prepare works either way.
 </Tabs.Tab>
 <Tabs.Tab>
-**Connect → PostgreSQL**: server, port, database, username and password; tick **Require SSL**. Tableau uses its bundled JDBC driver and the JDBC settings above.
+**Connect → PostgreSQL**: server, port, database, username and password. Tick **Require SSL** when TLS is enabled (Tableau uses its bundled PostgreSQL JDBC driver and the JDBC settings above); leave it unticked when TLS is disabled.
 </Tabs.Tab>
 <Tabs.Tab>
-**Admin → Databases → Add database → PostgreSQL**. Host, port, database name (the workspace), username and password from the dialog; turn on **Use a secure connection (SSL)**, mode `verify-full`, and give the downloaded CA as the server SSL certificate. Then:
+**Admin → Databases → Add database → PostgreSQL**. Host, port, database name (the workspace), username and password from the dialog. When TLS is enabled, turn on **Use a secure connection (SSL)**, mode `verify-full`, and paste the downloaded CA as the server SSL certificate (leave it empty for a publicly trusted certificate); when TLS is disabled, leave SSL off. Then:
 
 - Set `MB_JDBC_DATA_WAREHOUSE_MAX_CONNECTION_POOL_SIZE=4` on the Metabase server (see [Tools that pool connections](#tools-that-pool-connections)).
 - Under **Scheduling**, scan field values *Only when adding a new filter widget* and turn refingerprinting off: every scan is a query against your sources.
@@ -153,8 +182,8 @@ Administrators: the endpoint is the **SQL gateway**, a separate service of the s
 
 You see it on **Connect a tool** (which also carries a warning icon), on **Settings → SQL connections** and on a table's or source's **Governance** tab, each with a link to this section. Two things clear it:
 
-1. **A public host**: the name your tools connect to (`sqlGateway.publicHost`, or `SQL_GATEWAY_PUBLIC_HOST` in Docker). It is shown in the app next to every connection and put in the gateway's certificate. `sqlGateway.publicPort` is the port as your tools see it (the default 5432; a NodePort's or an entrypoint's port otherwise).
-2. **A TCP path to the gateway's port.** The gateway does its own TLS (TLS 1.3 only) and speaks the PostgreSQL protocol, so a plain HTTP Ingress or an HTTPRoute **cannot** carry it. Pick the row that matches your cluster:
+1. **A public host**: the name your tools connect to (`sqlGateway.publicHost`, or `SQL_GATEWAY_PUBLIC_HOST` in Docker). It is shown in the app next to every connection (and put in the gateway's certificate when TLS is enabled). `sqlGateway.publicPort` is the port as your tools see it (the default 5432; a NodePort's or an entrypoint's port otherwise).
+2. **A TCP path to the gateway's port.** The gateway speaks the PostgreSQL protocol (with optional TLS 1.3 terminated at the gateway), so a plain HTTP Ingress or an HTTPRoute **cannot** carry it. Pick the row that matches your cluster:
 
 | Where it runs | Use | `publicHost` | `publicPort` |
 | --- | --- | --- | --- |
@@ -182,7 +211,7 @@ sqlGateway:
   allowedCidrs: [203.0.113.0/24]
 ```
 
-For a `NodePort`, set `publicPort` to the node port and open that port in the node's firewall. The chart makes a certificate authority and a certificate for `publicHost` and keeps them across upgrades; people download the CA from the app. To use your own certificate, set `sqlGateway.tls.existingSecret` (a `kubernetes.io/tls` Secret) or let cert-manager issue one (`sqlGateway.tls.certManager`).
+For a `NodePort`, set `publicPort` to the node port and open that port in the node's firewall. By default (`sqlGateway.tls.enabled: true`), the chart makes a certificate authority and a certificate for `publicHost` and keeps them across upgrades; people download the CA from the app. You can also bring your own certificate (`sqlGateway.tls.existingSecret`), use cert-manager (`sqlGateway.tls.certManager`), or opt out of TLS (`sqlGateway.tls.enabled: false`). See [TLS and certificates](#tls-and-certificates).
 </Tabs.Tab>
 <Tabs.Tab>
 Traefik v3 routes PostgreSQL with an `IngressRouteTCP`. Give it an entrypoint (`--entryPoints.postgres.address=:5432`) and:
@@ -198,7 +227,7 @@ sqlGateway:
   proxyProtocol: true  # optional: real client addresses for lockouts and allowedCidrs
 ```
 
-`tls: passthrough` routes by host name (SNI) on a shared entrypoint: Traefik answers PostgreSQL's SSL request and passes the encrypted stream to the gateway, which still holds the certificate. It needs `publicHost` (the chart refuses to render without it). TLS always ends at the gateway (TLS 1.3); Traefik never sees the plain protocol.
+`tls: passthrough` routes by host name (SNI) on a shared entrypoint: Traefik answers PostgreSQL's SSL request and passes the encrypted stream to the gateway, which still holds the certificate. It requires `sqlGateway.tls.enabled: true` and `publicHost` (the chart refuses to render otherwise). TLS always ends at the gateway (TLS 1.3); Traefik never sees the plain protocol. With `sqlGateway.tls.enabled: false`, use `tls: none`.
 
 With `proxyProtocol: true`, also set `trustedProxies` to Traefik's pod or node networks: the gateway then accepts a PROXY header only from there, so nobody reaching the pod directly can claim another client address.
 </Tabs.Tab>
@@ -265,19 +294,79 @@ docker run -p 3000:3000 -p 15433:5433 \
   classifyre/all-in-one
 ```
 
-It makes a certificate authority and a certificate under `/var/lib/classifyre/sql-tls` on first start unless `tls.crt` and `tls.key` are already there (mount your own). `SQL_GATEWAY_ENABLED=false` turns it off; `PORT_SQL` changes the port inside the container. All variables are in the [Docker guide](/deployment/docker/#sql-connections).
+In the all-in-one image **TLS is disabled by default** (`SQL_GATEWAY_TLS_ENABLED=false`), so no certificate is generated or needed in BI tools or ODBC. Pass `-e SQL_GATEWAY_TLS_ENABLED=true` to turn TLS 1.3 on — it then generates a CA and certificate under `/var/lib/classifyre/sql-tls` on first start unless `tls.crt` and `tls.key` are already mounted there. `SQL_GATEWAY_ENABLED=false` turns the gateway off; `PORT_SQL` changes the port inside the container. All variables are in the [Docker guide](/deployment/docker/#sql-connections).
 </Tabs.Tab>
 </Tabs>
 
+### TLS and certificates
+
+TLS on the SQL gateway is controlled by `sqlGateway.tls.enabled` in Helm and `SQL_GATEWAY_TLS_ENABLED` in the environment:
+
+- **Default in general & in Helm**: **enabled** (`true`). Every connection negotiates TLS 1.3 and verifies the server certificate (`sslmode=verify-full`).
+- **Default in the Docker all-in-one image**: **disabled** (`false`). No certificate is generated or mounted, and BI tools / ODBC connect directly without downloading a CA (`sslmode=disable`).
+
+How the three certificate modes work:
+
+| Mode | Configuration | Certificate | App shows CA download? | Client SSL mode |
+| --- | --- | --- | --- | --- |
+| **Chart-managed CA** *(Helm default)* | `sqlGateway.tls.enabled: true` (no `existingSecret`, `certManager.enabled: false`) | Chart generates a private CA + leaf cert for `publicHost` once and keeps them in Secret `<release>-sql-tls` | Yes (`classifyre-sql-ca.crt`) | `verify-full` + `sslrootcert` |
+| **Public or enterprise CA** | `sqlGateway.tls.enabled: true` + `existingSecret` or `certManager.enabled: true` | Your `kubernetes.io/tls` Secret (`tls.crt`, `tls.key`, optional `ca.crt`) or cert-manager Certificate | Only if `ca.crt` is present in the Secret | `verify-full` (no CA file needed for public CAs) |
+| **No TLS / no certificate** *(Docker default, opt-out in Helm)* | Helm: `sqlGateway.tls.enabled: false`<br/>Docker / env: `SQL_GATEWAY_TLS_ENABLED=false` | None generated, none mounted | No | `disable` |
+
+#### How the certificate download works
+
+When TLS is enabled, the gateway loads `tls.crt` and `tls.key` (`SQL_GATEWAY_TLS_CERT_FILE`, `SQL_GATEWAY_TLS_KEY_FILE`) and requires TLS 1.3 (both PostgreSQL `SSLRequest` and direct TLS `sslnegotiation=direct` are supported). Separately, the API reads the public CA certificate from `SQL_GATEWAY_TLS_CA_FILE` (only `ca.crt` is mounted into the API pod — never the private key) and returns it from the connection endpoint so the UI shows **Download the certificate authority** (`classifyre-sql-ca.crt`) and adds `sslrootcert=classifyre-sql-ca.crt` to the copy-paste connection strings.
+
+- **If you want TLS without users downloading a CA**: use a certificate signed by a public CA (such as Let's Encrypt via `sqlGateway.tls.certManager`) or your organization's already-trusted enterprise CA in `sqlGateway.tls.existingSecret`, and omit `ca.crt` from the Secret. The app then hides the CA download button while keeping `sslmode=verify-full`.
+- **If you want to opt out of TLS and certificates completely**: set `sqlGateway.tls.enabled: false` in Helm (or `SQL_GATEWAY_TLS_ENABLED=false` in the environment). No TLS Secret or Certificate resource is created, no certificate files are mounted, the gateway answers PostgreSQL's `SSLRequest` with `N` and accepts plain TCP connections, and the app switches every connection string to `sslmode=disable` with no CA download.
+
+```yaml
+# Opt out of SQL gateway TLS in Helm (trusted private network / VPN only)
+sqlGateway:
+  publicHost: sql.internal.example
+  tls:
+    enabled: false
+```
+
+```yaml
+# Use a publicly trusted Let's Encrypt certificate via cert-manager (no CA download needed)
+sqlGateway:
+  publicHost: sql.example.com
+  tls:
+    enabled: true
+    certManager:
+      enabled: true
+      issuerRef:
+        name: letsencrypt-prod
+        kind: ClusterIssuer
+```
+
+<Callout type="warning">
+  With TLS disabled, passwords still never cross the network in plain text (every sign-in uses SCRAM-SHA-256), and all masking, row filters and audit logs remain enforced. However, SQL queries and result rows travel unencrypted over TCP. Keep `sqlGateway.tls.enabled: true` whenever traffic crosses an untrusted network; disable it only for local use, a trusted private network, or behind a VPN/tunnel.
+</Callout>
+
+#### Rotating or regenerating the chart-managed certificate
+
+The chart-managed Secret (`<release>-sql-tls`) carries `helm.sh/resource-policy: keep` and is looked up on upgrades so clients that downloaded `classifyre-sql-ca.crt` keep working. If you change `sqlGateway.publicHost` or `sqlGateway.tls.extraSans`, delete the Secret and upgrade so a new certificate carrying the new name is issued:
+
+```bash
+kubectl -n <namespace> delete secret <release>-sql-tls
+helm upgrade <release> …
+```
+
+In Docker with `SQL_GATEWAY_TLS_ENABLED=true`, remove `/var/lib/classifyre/sql-tls` and restart the container to regenerate the CA and certificate for a new `SQL_GATEWAY_PUBLIC_HOST`.
+
 ### Check that it works
 
-From a machine outside the cluster (or the Docker host), the handshake tells you whether the path is open and the certificate carries the name you set:
+When TLS is enabled, the handshake from a machine outside the cluster (or the Docker host) confirms that the path is open and the certificate carries the name you set:
 
 ```bash
 echo | openssl s_client -connect sql.example.com:5432 -tls1_3 -alpn postgresql 2>/dev/null | grep -E "Protocol|subject"
 # Protocol: TLSv1.3
 # subject=CN=sql.example.com
 ```
+
+When TLS is disabled, test directly with `psql` using `sslmode=disable` (e.g. `psql "host=localhost port=5433 dbname=default user=<user> sslmode=disable"`).
 
 Then reload the app: the warning is gone and **Connect a tool** shows the host and port. Troubleshooting:
 
@@ -288,9 +377,9 @@ Then reload the app: the warning is gone and **Connect a tool** shows the host a
 
 ### Turning it off, and what it costs
 
-If you do not want SQL connections, set `sqlGateway.enabled: false`: no pod, no Service, and the app says they are switched off. With it on, the gateway pod requests 250m CPU and 1 GiB (limit 4 GiB); on a small or shared node lower `sqlGateway.resources.requests`.
+If you do not want SQL connections, set `sqlGateway.enabled: false`: no pod, no Service, and the app says they are switched off. With it on, the gateway pod requests 100m CPU and 256 MiB (limit 1 GiB) plus its `catalog-postgres` sidecar; on a small or shared node adjust `sqlGateway.resources`.
 
-Connections use TLS 1.3 only. Other settings: `maxSessions` per gateway pod (each session holds a catalog of about 150 MB), `maxSessionsPerConnection`, `idleMinutes`. Ten failed sign-ins within 15 minutes lock a user name, and an address, out for 15 minutes.
+When TLS is enabled, connections use TLS 1.3 only. Other settings: `maxSessions` per gateway pod, `maxSessionsPerConnection`, `idleMinutes`. Ten failed sign-ins within 15 minutes lock a user name, and an address, out for 15 minutes.
 
 ## Preventing direct database bypass in production
 

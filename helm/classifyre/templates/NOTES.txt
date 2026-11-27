@@ -76,8 +76,15 @@ Sign-in: the identity server answers through the web app at {{ include "classify
 
 SQL connections are on but not configured:
   !! sqlGateway.publicHost is empty, so the app cannot tell people where to connect
-  !! Power BI, Excel, DBeaver or psql, and the gateway's certificate carries no public name.
+  !! Power BI, Excel, DBeaver or psql{{- if .Values.sqlGateway.tls.enabled }}, and the gateway's certificate carries no public name{{- end }}.
   !! Set sqlGateway.publicHost and expose the port (service.type LoadBalancer or NodePort,
   !! or sqlGateway.traefik), or turn the gateway off with sqlGateway.enabled=false.
   !! Guide: https://docs.classifyre.com/sql-connections/#making-the-endpoint-reachable
+{{- end }}
+{{- if and .Values.sqlGateway.enabled (not .Values.sqlGateway.tls.enabled) }}
+
+SQL gateway TLS is disabled:
+  !! WARNING: sqlGateway.tls.enabled=false — SQL connections are unencrypted (no TLS certificate).
+  !! Only use this on a trusted private network or behind a VPN/tunnel.
+  !! Set sqlGateway.tls.enabled=true for TLS 1.3 in production.
 {{- end }}

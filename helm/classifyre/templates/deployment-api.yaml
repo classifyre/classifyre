@@ -101,7 +101,7 @@ spec:
             {{- toYaml . | nindent 12 }}
           {{- end }}
           volumeMounts:
-            {{- if .Values.sqlGateway.enabled }}
+            {{- if and .Values.sqlGateway.enabled .Values.sqlGateway.tls.enabled }}
             - name: sql-tls
               mountPath: /etc/classifyre/sql-tls
               readOnly: true
@@ -161,7 +161,7 @@ spec:
             {{- toYaml . | nindent 12 }}
           {{- end }}
       volumes:
-        {{- if .Values.sqlGateway.enabled }}
+        {{- if and .Values.sqlGateway.enabled .Values.sqlGateway.tls.enabled }}
         - name: sql-tls
           secret:
             secretName: {{ include "classifyre.sqlGateway.tlsSecret" . }}

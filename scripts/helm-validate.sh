@@ -29,7 +29,7 @@ assert_contains() {
   local description="$1"
   local pattern="$2"
   local rendered="$3"
-  if echo "${rendered}" | grep -qF "${pattern}"; then
+  if grep -qF -- "${pattern}" <<<"${rendered}"; then
     echo "  ✓ ${description}"
     PASS=$((PASS + 1))
   else
@@ -42,7 +42,7 @@ assert_not_contains() {
   local description="$1"
   local pattern="$2"
   local rendered="$3"
-  if ! echo "${rendered}" | grep -qF "${pattern}"; then
+  if ! grep -qF -- "${pattern}" <<<"${rendered}"; then
     echo "  ✓ ${description}"
     PASS=$((PASS + 1))
   else
@@ -218,6 +218,47 @@ run_env_uniqueness_checks "default values" "${CHART_DIR}/values.yaml"
 # The VPS profile overrides UNDER_PRESSURE_MAX_RSS_BYTES to "0" via api.env —
 # the exact combination that duplicated the entry and broke release upgrades.
 run_env_uniqueness_checks "VPS profile (api.env overrides)" "${REPO_ROOT}/helm/develop/values-vps.yaml"
+
+echo ""
+echo "── SQL gateway TLS optionality ──"
+rendered_tls_on="$(helm template classifyre "${CHART_DIR}" "${HELM_COMMON_ARGS[@]}" \
+  --set postgres.mode=embedded --set postgres.embedded.password=validate-password)"
+assert_contains \
+  "Default render enables SQL gateway TLS" \
+  'SQL_GATEWAY_TLS_ENABLED' \
+  "${rendered_tls_on}"
+assert_contains \
+  "Default render creates the SQL gateway TLS secret" \
+  'name: classifyre-sql-tls' \
+  "${rendered_tls_on}"
+assert_contains \
+  "Default render sets SQL_GATEWAY_TLS_CA_FILE" \
+  'SQL_GATEWAY_TLS_CA_FILE' \
+  "${rendered_tls_on}"
+
+rendered_tls_off="$(helm template classifyre "${CHART_DIR}" "${HELM_COMMON_ARGS[@]}" \
+  --set postgres.mode=embedded --set postgres.embedded.password=validate-password \
+  --set sqlGateway.tls.enabled=false)"
+assert_contains \
+  "Opt-out render sets SQL_GATEWAY_TLS_ENABLED to false" \
+  'value: "false"' \
+  "${rendered_tls_off}"
+assert_not_contains \
+  "Opt-out render creates no SQL gateway TLS secret" \
+  'name: classifyre-sql-tls' \
+  "${rendered_tls_off}"
+assert_not_contains \
+  "Opt-out render omits SQL_GATEWAY_TLS_CA_FILE" \
+  'SQL_GATEWAY_TLS_CA_FILE' \
+  "${rendered_tls_off}"
+assert_not_contains \
+  "Opt-out render omits SQL_GATEWAY_TLS_CERT_FILE" \
+  'SQL_GATEWAY_TLS_CERT_FILE' \
+  "${rendered_tls_off}"
+assert_not_contains \
+  "Opt-out render omits sql-tls volume" \
+  'name: sql-tls' \
+  "${rendered_tls_off}"
 
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"

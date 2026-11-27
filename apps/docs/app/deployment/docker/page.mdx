@@ -114,9 +114,13 @@ The gateway is on by default, so every command on this page publishes its port,
 `-p 5433:5433`. It is **not 5432** on purpose: the PostgreSQL inside the
 container holds 5432 internally, and a laptop often runs its own PostgreSQL on
 the host. Tools connect to `localhost:5433` with a SQL connection made in the
-app (**Settings → SQL connections**), over TLS 1.3 with a certificate the
-container made for the host in `CLASSIFYRE_URL`; the app offers the certificate
-authority for download. Everything about connections, masks and tools is in
+app (**Settings → SQL connections**). In the all-in-one image **TLS is disabled
+by default** (`SQL_GATEWAY_TLS_ENABLED=false`), so no certificate is generated
+and BI tools / ODBC connect without downloading a CA (`sslmode=disable`). Pass
+`-e SQL_GATEWAY_TLS_ENABLED=true` to turn TLS 1.3 on — the container then
+generates a CA and certificate for the host in `CLASSIFYRE_URL` (unless you
+mount your own) and the app offers the CA for download. Everything about
+connections, certificates, masks and tools is in
 [SQL connections](/sql-connections/).
 
 Change what is published, or what the app shows:
@@ -126,8 +130,9 @@ Change what is published, or what the app shows:
 | Keep an older `-p 5432:5433` | `-e SQL_GATEWAY_PUBLIC_PORT=5432`: the app used to show 5432, and now shows 5433 unless told otherwise. |
 | Another host port, `15433` | `-p 15433:5433 -e SQL_GATEWAY_PUBLIC_PORT=15433`. The app shows the port tools use, so it has to know it. |
 | Another port inside the container | `-e PORT_SQL=6543 -p 6543:6543` (the shown port follows it). |
-| People reach it under another name than `CLASSIFYRE_URL`'s host | `-e SQL_GATEWAY_PUBLIC_HOST=sql.example.com`. Delete `/var/lib/classifyre/sql-tls` if the container already made its certificate for the old name. |
-| Your own certificate | Put `tls.crt` and `tls.key` in `/var/lib/classifyre/sql-tls` before the first start. |
+| Enable TLS (auto-generated CA) | `-e SQL_GATEWAY_TLS_ENABLED=true`. Download the CA from the connection dialog. |
+| People reach it under another name than `CLASSIFYRE_URL`'s host | `-e SQL_GATEWAY_PUBLIC_HOST=sql.example.com`. If TLS is enabled, delete `/var/lib/classifyre/sql-tls` so the container makes its certificate for the new name. |
+| Your own certificate | `-e SQL_GATEWAY_TLS_ENABLED=true` and put `tls.crt` and `tls.key` in `/var/lib/classifyre/sql-tls` before the first start. |
 | Only this machine can reach it | `-p 127.0.0.1:5433:5433` (and `-p 127.0.0.1:3000:3000` for the app). |
 | No SQL connections | `-e SQL_GATEWAY_ENABLED=false`. The app then says they are switched off, and `-p 5433:5433` is not needed. |
 
@@ -185,9 +190,10 @@ Pass them with `-e NAME=value`, or with `--env-file`.
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `SQL_GATEWAY_ENABLED` | `true` | `false` runs without the SQL gateway. |
+| `SQL_GATEWAY_TLS_ENABLED` | `false` | `true` enables TLS 1.3 (auto-generates a CA and certificate or uses mounted files in `/var/lib/classifyre/sql-tls`). |
 | `PORT_SQL` | `5433` | Port the gateway listens on inside the container. Publish it: `-p 5433:5433`. |
 | `SQL_GATEWAY_PUBLIC_PORT` | `PORT_SQL` | The port the app tells tools to use. Set it when you publish another host port (`-p 15433:5433`). |
-| `SQL_GATEWAY_PUBLIC_HOST` | host of `CLASSIFYRE_URL` | The name tools connect to; also the name on the certificate. |
+| `SQL_GATEWAY_PUBLIC_HOST` | host of `CLASSIFYRE_URL` | The name tools connect to (and the name on the certificate when TLS is enabled). |
 
 ### Sign-in
 
@@ -372,12 +378,15 @@ the identity server's.
   <Tabs.Tab>
     Connection refused: the port is not published. Add `-p 5433:5433` (the
     container's PostgreSQL holds 5432, so 5432 is the wrong port unless you
-    published `-p 5432:5433` and set `-e SQL_GATEWAY_PUBLIC_PORT=5432`). A
-    certificate error: the tool reaches the container under a name the
-    certificate does not carry. Open it by the host in `CLASSIFYRE_URL`
-    (`localhost` by default) or set `SQL_GATEWAY_PUBLIC_HOST`, and give the tool
-    the downloaded certificate authority. The app's **Connect a tool** dialog
-    shows the host and port the container believes it has.
+    published `-p 5432:5433` and set `-e SQL_GATEWAY_PUBLIC_PORT=5432`). If your
+    tool complains about SSL when using the default image settings, set
+    `sslmode=disable` (TLS is off by default in Docker). If you turned TLS on
+    with `SQL_GATEWAY_TLS_ENABLED=true` and get a certificate error: the tool
+    reaches the container under a name the certificate does not carry. Open it
+    by the host in `CLASSIFYRE_URL` (`localhost` by default) or set
+    `SQL_GATEWAY_PUBLIC_HOST`, and give the tool the downloaded certificate
+    authority. The app's **Connect a tool** dialog shows the host, port and SSL
+    mode the container expects.
   </Tabs.Tab>
 </Tabs>
 

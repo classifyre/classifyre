@@ -265,14 +265,14 @@ export class DataConnectionEndpointDto {
   @ApiProperty({ description: 'The PostgreSQL database: this workspace.' })
   database: string;
 
-  @ApiProperty({ enum: ['verify-full', 'verify-ca', 'require'] })
-  sslMode: 'verify-full' | 'verify-ca' | 'require';
+  @ApiProperty({ enum: ['verify-full', 'verify-ca', 'require', 'disable'] })
+  sslMode: 'verify-full' | 'verify-ca' | 'require' | 'disable';
 
   @ApiProperty({
     type: String,
     nullable: true,
     description:
-      'PEM of the CA that signed the gateway certificate, when it is not a public one.',
+      'PEM of the CA that signed the gateway certificate, when TLS is enabled and the certificate is not signed by a public CA.',
   })
   caCertificate: string | null;
 }

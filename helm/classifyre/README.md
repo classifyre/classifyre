@@ -140,6 +140,16 @@ helm upgrade --install classifyre ./helm/classifyre \
 
 The chart uses `lookup` to reuse an existing generated key on upgrades.
 
+## SQL Gateway TLS & Certificates
+
+The SQL gateway (`sqlGateway.enabled`, on by default) serves BI tools and drivers (Power BI, Excel, Tableau, DBeaver, `psql`, JDBC, ODBC) over the PostgreSQL protocol. **TLS 1.3 is enabled by default (`sqlGateway.tls.enabled: true`)** with three ways to manage certificates, plus the option to disable TLS entirely:
+
+1. **Chart-managed CA & certificate (default):** Leave `sqlGateway.tls.existingSecret` empty and `sqlGateway.tls.certManager.enabled: false`. On first install the chart generates a CA and leaf certificate for `sqlGateway.publicHost`, keeps them in Secret `<release>-sql-tls` across upgrades, and the app offers the CA (`classifyre-sql-ca.crt`) for download so clients verify with `sslmode=verify-full`. After changing `publicHost`, delete `<release>-sql-tls` and run `helm upgrade` to re-issue.
+2. **Your own or publicly trusted certificate:** Supply a `kubernetes.io/tls` Secret via `sqlGateway.tls.existingSecret` (`tls.crt`, `tls.key`, and optionally `ca.crt` for private CAs) or enable `sqlGateway.tls.certManager.enabled: true`. When signed by a public CA (e.g. Let's Encrypt) or an enterprise CA already trusted on user machines, omit `ca.crt` — tools connect with `sslmode=verify-full` and no CA download is shown.
+3. **Disable TLS (`sqlGateway.tls.enabled: false`):** Opt out of TLS and certificates altogether. No TLS Secret or Certificate is created or mounted, no CA download is shown in the app, and BI tools/ODBC connect directly with `sslmode=disable`. Passwords still use SCRAM-SHA-256, but queries and results travel unencrypted — only use this on a trusted private network or behind a VPN/tunnel.
+
+See the [SQL connections guide](https://docs.classifyre.com/sql-connections/) for client setup details.
+
 ## Quick Start (External Postgres)
 
 ```bash
@@ -602,7 +612,7 @@ helm upgrade --install classifyre ./helm/classifyre \
 | sqlGateway.maxSessionsPerConnection | int | `16` | Sessions one SQL connection may have open at once (16 matches Metabase's default 15-connection pool out of the box). |
 | sqlGateway.port | int | `5432` | Port the gateway listens on inside the pod and on its Service. |
 | sqlGateway.proxyProtocol | bool | `false` | Expect a PROXY protocol header (v1 or v2) on every connection, so the gateway sees the real client behind a TCP proxy (Traefik, HAProxy, a cloud load balancer) for lockouts and `allowedCidrs`. Turn on only when every connection comes through such a proxy. |
-| sqlGateway.publicHost | string | `""` | The host name people connect to, shown in the app next to each connection, and put in the generated certificate. Set it for SQL connections to work: while it is empty the app warns that the endpoint is not configured instead of showing connection details; e.g. `sql.example.com`. Changing it later: delete the generated TLS Secret so the certificate is made again with the new name. |
+| sqlGateway.publicHost | string | `""` | The host name people connect to, shown in the app next to each connection, and put in the generated certificate when `tls.enabled` is `true`. Set it for SQL connections to work: while it is empty the app warns that the endpoint is not configured instead of showing connection details; e.g. `sql.example.com`. Changing it later with `tls.enabled: true`: delete the generated TLS Secret so the certificate is made again with the new name. |
 | sqlGateway.publicPort | int | `5432` | The port people connect to (the Service's, a NodePort, or a Traefik entrypoint's). |
 | sqlGateway.replicaCount | int | `1` | Gateway replicas. A client session stays on one pod with its pod-local catalog Postgres sidecar; more replicas spread sessions and blast radius. |
 | sqlGateway.resources.limits.memory | string | `"1Gi"` |  |
@@ -614,15 +624,16 @@ helm upgrade --install classifyre ./helm/classifyre \
 | sqlGateway.service.nodePort | string | `nil` | Fixed node port for `NodePort`/`LoadBalancer`. |
 | sqlGateway.service.type | string | `"ClusterIP"` | `ClusterIP` when a TCP proxy (Traefik) exposes it; `LoadBalancer` or `NodePort` to expose it directly — the gateway does its own TLS, so no reverse proxy is needed at all. |
 | sqlGateway.sessionMemoryMb | int | `32` | What one more session is allowed for on the Node gateway container when deciding whether the pod has room for it (MB). |
-| sqlGateway.tls.allowPlaintext | bool | `false` | Development only: accept connections without TLS. |
-| sqlGateway.tls.certManager.enabled | bool | `false` | Let cert-manager issue the certificate for `publicHost`. |
+| sqlGateway.tls.allowPlaintext | bool | `false` | Development only: accept plaintext connections alongside TLS when `tls.enabled` is `true`. To disable TLS and certificates altogether, set `tls.enabled: false`. |
+| sqlGateway.tls.certManager.enabled | bool | `false` | Let cert-manager issue the certificate for `publicHost` (requires `tls.enabled: true`). |
 | sqlGateway.tls.certManager.issuerRef.kind | string | `"ClusterIssuer"` |  |
 | sqlGateway.tls.certManager.issuerRef.name | string | `""` |  |
-| sqlGateway.tls.existingSecret | string | `""` | A `kubernetes.io/tls` Secret (`tls.crt`, `tls.key`, optionally `ca.crt`) for `publicHost`. Empty: cert-manager below, or a CA and certificate the chart makes once and keeps (its CA is downloadable in the app, so clients can use `sslmode=verify-full`). |
-| sqlGateway.tls.extraSans | list | `[]` | Extra names for the generated certificate (besides `publicHost`, `localhost` and the Service's names). |
+| sqlGateway.tls.enabled | bool | `true` | Enable TLS (TLS 1.3) on the SQL gateway. On by default: the gateway presents a certificate for `publicHost` (from `existingSecret`, `certManager`, or the self-signed CA + certificate the chart generates once and keeps, with the CA downloadable in the app). Set to `false` to opt out of TLS and run without certificates — no TLS Secret is created or mounted, no CA download is shown in the app, and clients connect with `sslmode=disable` (only suitable on a trusted private network or behind a VPN/tunnel). |
+| sqlGateway.tls.existingSecret | string | `""` | A `kubernetes.io/tls` Secret (`tls.crt`, `tls.key`, optionally `ca.crt`) for `publicHost` (used when `tls.enabled` is `true`). Empty: cert-manager below, or a CA and certificate the chart makes once and keeps (its CA is downloadable in the app, so clients can use `sslmode=verify-full`). Omit `ca.crt` when using a publicly trusted certificate (e.g. Let's Encrypt) so no CA download is offered. |
+| sqlGateway.tls.extraSans | list | `[]` | Extra names for the generated certificate (besides `publicHost`, `localhost` and the Service's names) when `tls.enabled` is `true`. |
 | sqlGateway.traefik.enabled | bool | `false` | Expose through Traefik (v3) as an IngressRouteTCP. Needs a Traefik entrypoint for it (e.g. `--entryPoints.postgres.address=:5432`). |
 | sqlGateway.traefik.entryPoints[0] | string | `"postgres"` |  |
-| sqlGateway.traefik.tls | string | `"none"` | `none`: Traefik forwards raw TCP from a dedicated entrypoint (`HostSNI(*)`) and TLS is negotiated with the gateway, end to end — works with every client. `passthrough`: route by `publicHost` (SNI) on a shared entrypoint; Traefik answers PostgreSQL's SSLRequest and passes the TLS stream through. TLS always ends at the gateway (TLS 1.3). |
+| sqlGateway.traefik.tls | string | `"none"` | `none`: Traefik forwards raw TCP from a dedicated entrypoint (`HostSNI(*)`) and TLS (when `sqlGateway.tls.enabled` is `true`) is negotiated with the gateway, end to end — works with every client. `passthrough`: route by `publicHost` (SNI) on a shared entrypoint (requires `sqlGateway.tls.enabled: true`); Traefik answers PostgreSQL's SSLRequest and passes the TLS stream through. TLS always ends at the gateway (TLS 1.3). |
 | sqlGateway.trustedProxies | list | `[]` | With `proxyProtocol`: the networks of the proxies themselves (pod or node CIDRs of Traefik, a load balancer). A PROXY header from anywhere else is refused, so a client reaching the pod directly cannot claim another address. Required with `proxyProtocol`: the gateway does not start without it, and a malformed CIDR also stops it. |
 | telemetry.deployEnv | string | `"production"` | Deployment environment tag attached to every span/metric/log. |
 | telemetry.enabled | bool | `false` | Enable OpenTelemetry instrumentation for API, web, and CLI components. Disabled by default. When enabled, traces/metrics/logs are exported via OTLP to telemetry.otlpEndpoint. Opt out (already default): set enabled=false, or set TELEMETRY_DISABLED=1 / DO_NOT_TRACK=1 at runtime. |

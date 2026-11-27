@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { DataConnectionService } from './data-connection.service';
 
@@ -176,8 +179,11 @@ describe('DataConnectionService', () => {
       'SQL_GATEWAY_ENABLED',
       'SQL_GATEWAY_PUBLIC_HOST',
       'SQL_GATEWAY_PUBLIC_PORT',
+      'SQL_GATEWAY_TLS_ENABLED',
+      'SQL_GATEWAY_TLS_CA_FILE',
     ] as const;
     const saved: Partial<Record<string, string | undefined>> = {};
+    let tmpDir: string | null = null;
     beforeEach(() => {
       for (const key of keys) {
         saved[key] = process.env[key];
@@ -189,6 +195,10 @@ describe('DataConnectionService', () => {
         if (saved[key] === undefined) delete process.env[key];
         else process.env[key] = saved[key];
       }
+      if (tmpDir) {
+        rmSync(tmpDir, { recursive: true, force: true });
+        tmpDir = null;
+      }
     });
 
     it('is off when the deployment has no gateway', () => {
@@ -197,6 +207,8 @@ describe('DataConnectionService', () => {
         enabled: false,
         configured: false,
         host: null,
+        sslMode: 'verify-full',
+        caCertificate: null,
       });
     });
 
@@ -208,6 +220,7 @@ describe('DataConnectionService', () => {
         enabled: true,
         configured: false,
         host: null,
+        sslMode: 'verify-full',
       });
     });
 
@@ -221,6 +234,50 @@ describe('DataConnectionService', () => {
         configured: true,
         host: 'sql.example.com',
         port: 5433,
+        sslMode: 'verify-full',
+        caCertificate: null,
+      });
+    });
+
+    it('includes the CA certificate when TLS is enabled (default) and a CA file exists', () => {
+      tmpDir = mkdtempSync(join(tmpdir(), 'sql-gw-ca-'));
+      const caPath = join(tmpDir, 'ca.crt');
+      const pem =
+        '-----BEGIN CERTIFICATE-----\nTEST\n-----END CERTIFICATE-----\n';
+      writeFileSync(caPath, pem, 'utf8');
+      process.env.SQL_GATEWAY_ENABLED = 'true';
+      process.env.SQL_GATEWAY_PUBLIC_HOST = 'sql.example.com';
+      process.env.SQL_GATEWAY_TLS_CA_FILE = caPath;
+      const { service } = setup();
+      expect(service.endpoint()).toMatchObject({
+        enabled: true,
+        configured: true,
+        sslMode: 'verify-full',
+        caCertificate: pem,
+      });
+    });
+
+    it('reports sslMode=disable and suppresses the CA when TLS is disabled', () => {
+      tmpDir = mkdtempSync(join(tmpdir(), 'sql-gw-ca-'));
+      const caPath = join(tmpDir, 'ca.crt');
+      writeFileSync(
+        caPath,
+        '-----BEGIN CERTIFICATE-----\nTEST\n-----END CERTIFICATE-----\n',
+        'utf8',
+      );
+      process.env.SQL_GATEWAY_ENABLED = 'true';
+      process.env.SQL_GATEWAY_PUBLIC_HOST = 'localhost';
+      process.env.SQL_GATEWAY_PUBLIC_PORT = '5433';
+      process.env.SQL_GATEWAY_TLS_ENABLED = 'false';
+      process.env.SQL_GATEWAY_TLS_CA_FILE = caPath;
+      const { service } = setup();
+      expect(service.endpoint()).toMatchObject({
+        enabled: true,
+        configured: true,
+        host: 'localhost',
+        port: 5433,
+        sslMode: 'disable',
+        caCertificate: null,
       });
     });
 

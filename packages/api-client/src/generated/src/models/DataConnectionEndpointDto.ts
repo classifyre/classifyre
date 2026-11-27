@@ -56,7 +56,7 @@ export interface DataConnectionEndpointDto {
      */
     sslMode: DataConnectionEndpointDtoSslModeEnum;
     /**
-     * PEM of the CA that signed the gateway certificate, when it is not a public one.
+     * PEM of the CA that signed the gateway certificate, when TLS is enabled and the certificate is not signed by a public CA.
      * @type {string}
      * @memberof DataConnectionEndpointDto
      */
@@ -70,7 +70,8 @@ export interface DataConnectionEndpointDto {
 export const DataConnectionEndpointDtoSslModeEnum = {
     VerifyFull: 'verify-full',
     VerifyCa: 'verify-ca',
-    Require: 'require'
+    Require: 'require',
+    Disable: 'disable'
 } as const;
 export type DataConnectionEndpointDtoSslModeEnum = typeof DataConnectionEndpointDtoSslModeEnum[keyof typeof DataConnectionEndpointDtoSslModeEnum];
 
