@@ -137,6 +137,29 @@ describe('columnsAsSeen', () => {
   it('changes nothing without masks', () => {
     expect(columnsAsSeen(columns, [], false)).toEqual({ columns, hidden: 0 });
   });
+
+  it('preserves isPrimaryKey and nullable on visible and masked columns while stripping hidden ones', () => {
+    const richColumns = [
+      { name: 'id', type: 'BIGINT', isPrimaryKey: true, nullable: false },
+      { name: 'Email', type: 'VARCHAR', isPrimaryKey: false, nullable: true },
+      { name: 'ssn', type: 'VARCHAR', isPrimaryKey: true, nullable: false },
+    ];
+    const seen = columnsAsSeen(richColumns, masks, false);
+    expect(seen).toEqual({
+      columns: [
+        { name: 'id', type: 'BIGINT', isPrimaryKey: true, nullable: false },
+        {
+          name: 'Email',
+          type: 'VARCHAR',
+          isPrimaryKey: false,
+          nullable: true,
+          access: 'mask',
+          mask: 'partial',
+        },
+      ],
+      hidden: 1,
+    });
+  });
 });
 
 describe('maskedType and maskSalt', () => {

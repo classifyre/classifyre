@@ -468,6 +468,7 @@ docs/QualityRuleDto.md
 docs/QualityRuleDtoThreshold.md
 docs/QualityTestResultDto.md
 docs/QueryCatalogDto.md
+docs/QueryCatalogRelationDto.md
 docs/QueryCatalogSourceDto.md
 docs/QueryCatalogTableDto.md
 docs/QueryColumnDto.md
@@ -1234,6 +1235,7 @@ src/models/QualityRuleDto.ts
 src/models/QualityRuleDtoThreshold.ts
 src/models/QualityTestResultDto.ts
 src/models/QueryCatalogDto.ts
+src/models/QueryCatalogRelationDto.ts
 src/models/QueryCatalogSourceDto.ts
 src/models/QueryCatalogTableDto.ts
 src/models/QueryColumnDto.ts

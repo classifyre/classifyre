@@ -95,6 +95,12 @@ export interface QueryCatalogTableDto {
      */
     reason?: string;
     /**
+     * Estimated row count from the last scan, when known and unfiltered.
+     * @type {number}
+     * @memberof QueryCatalogTableDto
+     */
+    rowCount?: number;
+    /**
      * How many columns governance hides from you (DQ §5.8).
      * @type {number}
      * @memberof QueryCatalogTableDto
@@ -144,6 +150,7 @@ export function QueryCatalogTableDtoFromJSONTyped(json: any, ignoreDiscriminator
         'queryable': json['queryable'],
         'canQuery': json['canQuery'],
         'reason': json['reason'] == null ? undefined : json['reason'],
+        'rowCount': json['rowCount'] == null ? undefined : json['rowCount'],
         'hiddenColumns': json['hiddenColumns'] == null ? undefined : json['hiddenColumns'],
         'rowFilter': json['rowFilter'] == null ? undefined : RowFilterDtoFromJSON(json['rowFilter']),
     };
@@ -170,6 +177,7 @@ export function QueryCatalogTableDtoToJSONTyped(value?: QueryCatalogTableDto | n
         'queryable': value['queryable'],
         'canQuery': value['canQuery'],
         'reason': value['reason'],
+        'rowCount': value['rowCount'],
         'hiddenColumns': value['hiddenColumns'],
         'rowFilter': RowFilterDtoToJSON(value['rowFilter']),
     };

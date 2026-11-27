@@ -1025,6 +1025,7 @@ All URIs are relative to *http://localhost*
 - [QualityRuleDtoThreshold](docs/QualityRuleDtoThreshold.md)
 - [QualityTestResultDto](docs/QualityTestResultDto.md)
 - [QueryCatalogDto](docs/QueryCatalogDto.md)
+- [QueryCatalogRelationDto](docs/QueryCatalogRelationDto.md)
 - [QueryCatalogSourceDto](docs/QueryCatalogSourceDto.md)
 - [QueryCatalogTableDto](docs/QueryCatalogTableDto.md)
 - [QueryColumnDto](docs/QueryColumnDto.md)

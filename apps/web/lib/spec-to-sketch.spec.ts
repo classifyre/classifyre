@@ -55,9 +55,55 @@ describe("specToSketch", () => {
     const sketch = specToSketch(spec);
     expect(sketch).not.toBeNull();
     expect(sketch!.nodes).toHaveLength(3);
+    expect(sketch!.nodes[0]).toMatchObject({ t: "h", c: "#0a0a0a" });
+    expect(JSON.stringify(sketch)).not.toContain("#0284c7");
     expect(sketch!.edges).toEqual([{ a: 0, b: 1, t: "s" }]);
     // Must validate against BoardSketchCanvas's BoardSketchSchema
     const parsed = BoardSketchSchema.safeParse(sketch);
     expect(parsed.success).toBe(true);
+  });
+
+  it("applies table color swatches and omits hidden tables", () => {
+    const spec: DataRequestSpec = {
+      tables: [
+        {
+          id: "t1",
+          assetId: "a1",
+          sqlName: "shop.public.orders",
+          alias: "o",
+          x: 0,
+          y: 0,
+          keep: ["id"],
+          filters: [],
+          color: "violet",
+        },
+        {
+          id: "t2",
+          assetId: "a2",
+          sqlName: "shop.public.hidden_t",
+          alias: "h",
+          x: 280,
+          y: 0,
+          keep: ["id"],
+          filters: [],
+          hidden: true,
+        },
+      ],
+      joins: [
+        {
+          id: "j1",
+          left: { tableId: "t1", column: "id" },
+          right: { tableId: "t2", column: "id" },
+          type: "INNER",
+        },
+      ],
+      pins: [],
+    };
+    const sketch = specToSketch(spec);
+    expect(sketch).not.toBeNull();
+    expect(sketch!.nodes).toHaveLength(1);
+    expect(sketch!.nodes[0]).toMatchObject({ t: "h", c: "#7c3aed" });
+    expect(sketch!.edges).toEqual([]);
+    expect(BoardSketchSchema.safeParse(sketch).success).toBe(true);
   });
 });

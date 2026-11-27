@@ -38100,6 +38100,14 @@
             "type": "string",
             "description": "Type as the source or Arrow names it."
           },
+          "isPrimaryKey": {
+            "type": "boolean",
+            "description": "Part of the table primary key, when scanned."
+          },
+          "nullable": {
+            "type": "boolean",
+            "description": "Whether the column allows NULL values, when known."
+          },
           "access": {
             "type": "string",
             "enum": [
@@ -38189,6 +38197,10 @@
             "type": "string",
             "description": "Why it cannot be queried, when it cannot."
           },
+          "rowCount": {
+            "type": "number",
+            "description": "Estimated row count from the last scan, when known and unfiltered."
+          },
           "hiddenColumns": {
             "type": "number",
             "description": "How many columns governance hides from you (DQ §5.8)."
@@ -38249,6 +38261,42 @@
           "tables"
         ]
       },
+      "QueryCatalogRelationDto": {
+        "type": "object",
+        "properties": {
+          "fromAssetId": {
+            "type": "string"
+          },
+          "fromColumn": {
+            "type": "string",
+            "description": "FK column on the source table, when scanned."
+          },
+          "toAssetId": {
+            "type": "string"
+          },
+          "toColumn": {
+            "type": "string",
+            "description": "Referenced column on the target table, when scanned."
+          },
+          "constraintName": {
+            "type": "string",
+            "description": "Database constraint name, when scanned."
+          },
+          "cardinality": {
+            "type": "string",
+            "enum": [
+              "1-1",
+              "1-N",
+              "N-1",
+              "N-N"
+            ]
+          }
+        },
+        "required": [
+          "fromAssetId",
+          "toAssetId"
+        ]
+      },
       "QueryCatalogDto": {
         "type": "object",
         "properties": {
@@ -38263,6 +38311,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/QueryCatalogSourceDto"
+            }
+          },
+          "relations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QueryCatalogRelationDto"
             }
           }
         },

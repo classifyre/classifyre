@@ -400,6 +400,7 @@ export type {
   GrantDto,
   CreateGrantDto,
   QueryCatalogDto,
+  QueryCatalogRelationDto,
   QueryCatalogSourceDto,
   QueryCatalogTableDto,
   QueryColumnDto,

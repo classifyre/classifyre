@@ -32,6 +32,18 @@ export interface QueryColumnDto {
      */
     type: string;
     /**
+     * Part of the table primary key, when scanned.
+     * @type {boolean}
+     * @memberof QueryColumnDto
+     */
+    isPrimaryKey?: boolean;
+    /**
+     * Whether the column allows NULL values, when known.
+     * @type {boolean}
+     * @memberof QueryColumnDto
+     */
+    nullable?: boolean;
+    /**
      * Governance masks or hides this column (DQ §5.8). Hidden columns are left out unless you read them in clear.
      * @type {string}
      * @memberof QueryColumnDto
@@ -96,6 +108,8 @@ export function QueryColumnDtoFromJSONTyped(json: any, ignoreDiscriminator: bool
         
         'name': json['name'],
         'type': json['type'],
+        'isPrimaryKey': json['isPrimaryKey'] == null ? undefined : json['isPrimaryKey'],
+        'nullable': json['nullable'] == null ? undefined : json['nullable'],
         'access': json['access'] == null ? undefined : json['access'],
         'mask': json['mask'] == null ? undefined : json['mask'],
         'inClear': json['inClear'] == null ? undefined : json['inClear'],
@@ -115,6 +129,8 @@ export function QueryColumnDtoToJSONTyped(value?: QueryColumnDto | null, ignoreD
         
         'name': value['name'],
         'type': value['type'],
+        'isPrimaryKey': value['isPrimaryKey'],
+        'nullable': value['nullable'],
         'access': value['access'],
         'mask': value['mask'],
         'inClear': value['inClear'],

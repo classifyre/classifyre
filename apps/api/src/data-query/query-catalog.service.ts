@@ -58,6 +58,15 @@ import {
   type ConnectionScope,
 } from './connection-scope';
 
+export interface CatalogRelation {
+  fromAssetId: string;
+  fromColumn?: string;
+  toAssetId: string;
+  toColumn?: string;
+  constraintName?: string;
+  cardinality?: '1-1' | '1-N' | 'N-1' | 'N-N';
+}
+
 export interface CatalogTable {
   assetId: string;
   sourceId: string;
@@ -75,6 +84,8 @@ export interface CatalogTable {
   canQuery: boolean;
   reason?: string;
   location: TableLocation | null;
+  /** Estimated row count from the last scan (omitted when row-filtered). */
+  rowCount?: number;
   /** Columns governance hides from this person (DQ §5.8), by count. */
   hiddenColumns?: number;
   /**
@@ -104,6 +115,8 @@ export interface QueryCatalog {
   canQueryAll: boolean;
   limits: { maxRows: number; timeoutSeconds: number; exportMaxRows: number };
   sources: CatalogSource[];
+  /** Governance-filtered foreign-key relations between visible tables/columns. */
+  relations?: CatalogRelation[];
 }
 
 export interface QuerySettings {
@@ -118,6 +131,7 @@ interface CachedTables {
   at: number;
   sources: Omit<CatalogSource, 'tables'>[];
   tables: Omit<CatalogTable, 'canQuery'>[];
+  relations?: CatalogRelation[];
 }
 
 /** How long the table list of one workspace is reused (it changes with scans). */
@@ -583,6 +597,7 @@ export class QueryCatalogService {
       !principal && this.cls.isActive()
         ? this.cls.get<ConnectionScope | undefined>(CLS_CONNECTION_SCOPE)
         : undefined;
+    const visibleTablesById = new Map<string, CatalogTable>();
     for (const table of cached.tables) {
       // Through a SQL connection only what it opens shows at all: a BI tool
       // has no use for locked tables, and blocked ones are not its business.
@@ -611,18 +626,28 @@ export class QueryCatalogService {
         governsTable,
       );
       const applied = jobMasks(tableMasks, inClear, governsTable);
-      sources.get(table.sourceId)?.tables.push({
-        ...table,
+      const hasRowFilter = rows.has(table.assetId);
+      const { rowCount: rawRowCount, ...tableBase } = table;
+      const entry: CatalogTable = {
+        ...tableBase,
         columns: seen.columns,
         canQuery: table.queryable && granted,
+        // Never leak unfiltered total row counts when a row filter applies to this caller.
+        ...(!hasRowFilter && rawRowCount !== undefined
+          ? { rowCount: rawRowCount }
+          : {}),
         ...(reason ? { reason } : {}),
         ...(seen.hidden ? { hiddenColumns: seen.hidden } : {}),
         ...(applied.length ? { masks: applied } : {}),
-        ...(rows.has(table.assetId)
-          ? { rowFilter: rows.get(table.assetId) }
-          : {}),
-      });
+        ...(hasRowFilter ? { rowFilter: rows.get(table.assetId) } : {}),
+      };
+      sources.get(table.sourceId)?.tables.push(entry);
+      visibleTablesById.set(entry.assetId, entry);
     }
+    const relations = filterRelationsForCatalog(
+      cached.relations ?? [],
+      visibleTablesById,
+    );
     return {
       canQueryAll: scope.all,
       limits: {
@@ -631,6 +656,7 @@ export class QueryCatalogService {
         exportMaxRows: settings.exportMaxRows,
       },
       sources: [...sources.values()].filter((source) => source.tables.length),
+      relations,
     };
   }
 
@@ -731,6 +757,7 @@ export class QueryCatalogService {
         const name = names.get(asset.id)!;
         const metadata = (asset.metadata ?? {}) as Record<string, unknown>;
         const queryable = sourceQueryable && address.location !== null;
+        const rowCount = rowCountOf(metadata);
         tables.push({
           assetId: asset.id,
           sourceId: source.id,
@@ -740,6 +767,7 @@ export class QueryCatalogService {
           sqlName: `${source.sqlName}.${name.schema}.${name.table}`,
           columns: columnsOf(metadata),
           queryable,
+          ...(rowCount !== undefined ? { rowCount } : {}),
           ...(queryable
             ? {}
             : {
@@ -753,6 +781,9 @@ export class QueryCatalogService {
     }
     tables.sort((a, b) => a.sqlName.localeCompare(b.sqlName));
 
+    const assetIds = tables.map((t) => t.assetId);
+    const relations = await this.loadForeignKeyRelations(assetIds);
+
     const entry: CachedTables = {
       at: Date.now(),
       sources: sourceRows.map((source) => ({
@@ -763,9 +794,36 @@ export class QueryCatalogService {
         queryable: queryableIds.includes(source.id),
       })),
       tables,
+      relations,
     };
     this.cache.set(key, entry);
     return entry;
+  }
+
+  private async loadForeignKeyRelations(
+    assetIds: readonly string[],
+  ): Promise<CatalogRelation[]> {
+    if (!assetIds.length || !this.prisma.edge?.findMany) return [];
+    const edges = await this.prisma.edge.findMany({
+      where: {
+        relationType: 'FOREIGN_KEY',
+        fromType: 'asset',
+        toType: 'asset',
+        fromId: { in: [...assetIds] },
+        toId: { in: [...assetIds] },
+      },
+      select: {
+        fromId: true,
+        toId: true,
+        metadata: true,
+        fieldMappings: true,
+      },
+    });
+    const out: CatalogRelation[] = [];
+    for (const edge of edges) {
+      out.push(...parseForeignKeyEdge(edge));
+    }
+    return out;
   }
 
   /** Give every source a SQL name the first time it is needed, and keep it. */
@@ -800,19 +858,219 @@ export class QueryCatalogService {
   }
 }
 
+const VALID_CARDINALITIES = new Set(['1-1', '1-N', 'N-1', 'N-N'] as const);
+
+function parseCardinality(
+  value: unknown,
+): CatalogRelation['cardinality'] | undefined {
+  return typeof value === 'string' &&
+    VALID_CARDINALITIES.has(value as '1-1' | '1-N' | 'N-1' | 'N-N')
+    ? (value as CatalogRelation['cardinality'])
+    : undefined;
+}
+
+function rowCountOf(metadata: Record<string, unknown>): number | undefined {
+  const raw = metadata.row_count ?? metadata.rowCount;
+  if (typeof raw === 'number' && Number.isFinite(raw) && raw >= 0) {
+    return Math.trunc(raw);
+  }
+  return undefined;
+}
+
 function columnsOf(metadata: Record<string, unknown>): MaskedColumn[] {
   const columns = metadata.columns;
   if (!Array.isArray(columns)) return [];
+  const pkSet = new Set<string>();
+  const addPk = (value: unknown) => {
+    if (typeof value === 'string' && value.trim()) {
+      pkSet.add(value.trim().toLowerCase());
+    }
+  };
+  if (Array.isArray(metadata.primary_keys)) {
+    for (const pk of metadata.primary_keys) addPk(pk);
+  }
+  if (Array.isArray(metadata.primary_key)) {
+    for (const pk of metadata.primary_key) addPk(pk);
+  } else {
+    addPk(metadata.primary_key);
+  }
+
   const out: MaskedColumn[] = [];
   for (const column of columns) {
     if (typeof column === 'string') {
-      out.push({ name: column, type: '' });
+      const isPrimaryKey = pkSet.has(column.toLowerCase());
+      out.push({
+        name: column,
+        type: '',
+        ...(isPrimaryKey ? { isPrimaryKey: true } : {}),
+      });
     } else if (column && typeof column === 'object') {
-      const { name, type } = column as Record<string, unknown>;
+      const rec = column as Record<string, unknown>;
+      const { name, type } = rec;
       if (typeof name === 'string' && name) {
-        out.push({ name, type: typeof type === 'string' ? type : '' });
+        const isPrimaryKey =
+          pkSet.has(name.toLowerCase()) ||
+          rec.is_primary_key === true ||
+          rec.isPrimaryKey === true ||
+          rec.pk === true;
+        const nullable =
+          typeof rec.nullable === 'boolean'
+            ? rec.nullable
+            : typeof rec.is_nullable === 'boolean'
+              ? rec.is_nullable
+              : undefined;
+        out.push({
+          name,
+          type: typeof type === 'string' ? type : '',
+          ...(isPrimaryKey ? { isPrimaryKey: true } : {}),
+          ...(nullable !== undefined ? { nullable } : {}),
+        });
       }
     }
+  }
+  return out;
+}
+
+function parseColumnFkEntry(
+  fromAssetId: string,
+  toAssetId: string,
+  entry: unknown,
+): CatalogRelation | null {
+  if (!entry || typeof entry !== 'object') return null;
+  const rec = entry as Record<string, unknown>;
+  const fromColumn =
+    typeof rec.fromColumn === 'string'
+      ? rec.fromColumn.trim()
+      : typeof rec.from_column === 'string'
+        ? rec.from_column.trim()
+        : '';
+  const toColumn =
+    typeof rec.toColumn === 'string'
+      ? rec.toColumn.trim()
+      : typeof rec.to_column === 'string'
+        ? rec.to_column.trim()
+        : '';
+  if (!fromColumn || !toColumn) return null;
+  const rawConstraint =
+    typeof rec.constraintName === 'string'
+      ? rec.constraintName.trim()
+      : typeof rec.constraint_name === 'string'
+        ? rec.constraint_name.trim()
+        : '';
+  const cardinality = parseCardinality(rec.cardinality) ?? 'N-1';
+  return {
+    fromAssetId,
+    fromColumn,
+    toAssetId,
+    toColumn,
+    ...(rawConstraint ? { constraintName: rawConstraint } : {}),
+    cardinality,
+  };
+}
+
+function parseForeignKeyEdge(edge: {
+  fromId: string;
+  toId: string;
+  metadata: unknown;
+  fieldMappings: unknown;
+}): CatalogRelation[] {
+  const meta =
+    edge.metadata && typeof edge.metadata === 'object'
+      ? (edge.metadata as Record<string, unknown>)
+      : null;
+  const rawLists: unknown[] = [];
+  if (meta && Array.isArray(meta.foreign_keys)) rawLists.push(meta.foreign_keys);
+  if (meta && Array.isArray(meta.columns)) rawLists.push(meta.columns);
+  if (Array.isArray(edge.fieldMappings)) rawLists.push(edge.fieldMappings);
+
+  const detailed: CatalogRelation[] = [];
+  for (const list of rawLists) {
+    if (!Array.isArray(list)) continue;
+    for (const item of list) {
+      const parsed = parseColumnFkEntry(edge.fromId, edge.toId, item);
+      if (parsed) detailed.push(parsed);
+    }
+  }
+  if (detailed.length > 0) return detailed;
+
+  // Legacy table-level FOREIGN_KEY edge (no column pairs scanned yet):
+  // omit constraintName so hidden column names cannot leak through constraint names.
+  return [
+    {
+      fromAssetId: edge.fromId,
+      toAssetId: edge.toId,
+      cardinality: parseCardinality(meta?.cardinality) ?? 'N-1',
+    },
+  ];
+}
+
+/**
+ * Governance fail-closed filter on FK relations:
+ * - Both endpoint tables must be visible to the caller (respects connection scope and seeLocked).
+ * - When column-level, BOTH endpoint columns must exist in the caller's post-mask visible
+ *   columns (hidden/restricted columns drop the relation completely, including constraintName).
+ * - Table-level edges never carry constraintName.
+ */
+function filterRelationsForCatalog(
+  relations: readonly CatalogRelation[],
+  visibleTablesById: ReadonlyMap<string, CatalogTable>,
+): CatalogRelation[] {
+  const colSets = new Map<string, Set<string>>();
+  const colsOf = (table: CatalogTable): Set<string> => {
+    let set = colSets.get(table.assetId);
+    if (!set) {
+      set = new Set(table.columns.map((c) => c.name.toLowerCase()));
+      colSets.set(table.assetId, set);
+    }
+    return set;
+  };
+
+  const seen = new Set<string>();
+  const out: CatalogRelation[] = [];
+  for (const rel of relations) {
+    const fromTable = visibleTablesById.get(rel.fromAssetId);
+    const toTable = visibleTablesById.get(rel.toAssetId);
+    if (!fromTable || !toTable) continue;
+
+    const hasFrom = Boolean(rel.fromColumn);
+    const hasTo = Boolean(rel.toColumn);
+    if (hasFrom !== hasTo) continue;
+
+    if (hasFrom && hasTo) {
+      if (
+        !colsOf(fromTable).has(rel.fromColumn!.toLowerCase()) ||
+        !colsOf(toTable).has(rel.toColumn!.toLowerCase())
+      ) {
+        continue;
+      }
+    }
+
+    const clean: CatalogRelation =
+      hasFrom && hasTo
+        ? {
+            fromAssetId: rel.fromAssetId,
+            fromColumn: rel.fromColumn,
+            toAssetId: rel.toAssetId,
+            toColumn: rel.toColumn,
+            ...(rel.constraintName ? { constraintName: rel.constraintName } : {}),
+            ...(rel.cardinality ? { cardinality: rel.cardinality } : {}),
+          }
+        : {
+            fromAssetId: rel.fromAssetId,
+            toAssetId: rel.toAssetId,
+            ...(rel.cardinality ? { cardinality: rel.cardinality } : {}),
+          };
+
+    const key = [
+      clean.fromAssetId,
+      clean.fromColumn?.toLowerCase() ?? '',
+      clean.toAssetId,
+      clean.toColumn?.toLowerCase() ?? '',
+      clean.constraintName ?? '',
+    ].join('\u0000');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(clean);
   }
   return out;
 }

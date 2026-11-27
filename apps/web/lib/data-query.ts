@@ -3,6 +3,7 @@
 import { api } from "@workspace/api-client";
 import type {
   QueryCatalogDto,
+  QueryCatalogRelationDto,
   QueryCatalogSourceDto,
   QueryCatalogTableDto,
   QueryRunDto,
@@ -14,6 +15,7 @@ import type {
  */
 
 export type QueryCatalog = QueryCatalogDto;
+export type QueryCatalogRelation = QueryCatalogRelationDto;
 export type QueryCatalogSource = QueryCatalogSourceDto;
 export type QueryCatalogTable = QueryCatalogTableDto;
 export type QueryRun = QueryRunDto;
@@ -304,8 +306,18 @@ export function catalogOfSource(
   catalog: QueryCatalog,
   sourceId: string,
 ): QueryCatalog {
+  const sources = (catalog.sources ?? []).filter(
+    (source) => source.id === sourceId,
+  );
+  const assetIds = new Set(
+    sources.flatMap((source) => source.tables.map((t) => t.assetId)),
+  );
+  const relations = (catalog.relations ?? []).filter(
+    (rel) => assetIds.has(rel.fromAssetId) && assetIds.has(rel.toAssetId),
+  );
   return {
     ...catalog,
-    sources: (catalog.sources ?? []).filter((source) => source.id === sourceId),
+    sources,
+    relations,
   };
 }
