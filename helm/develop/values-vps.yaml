@@ -186,3 +186,8 @@ sqlGateway:
     requests:
       cpu: 50m
       memory: 256Mi
+  catalog:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi

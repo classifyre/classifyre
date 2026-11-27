@@ -26,6 +26,15 @@ api:
     minReplicas: 1
     maxReplicas: 1
 
+  # Shared-node diet (requests only; limits stay at chart defaults so runtime
+  # headroom is unchanged). Without this, prod + develop + the new
+  # catalog-postgres sidecar leave < 1Gi free and the smoke extract job sits
+  # Pending indefinitely on the 11.4Gi VPS node.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
   # The smoke test's folder, from the ConfigMap scripts/smoke/seed.sh makes.
   localFolders:
     - name: smoke
@@ -54,7 +63,7 @@ api:
     resources:
       requests:
         cpu: 250m
-        memory: 1Gi
+        memory: 512Mi
         ephemeral-storage: 2Gi
       limits:
         cpu: "1"
@@ -71,6 +80,11 @@ frontend:
   autoscaling:
     minReplicas: 1
     maxReplicas: 1
+  # Shared-node diet (requests only; limit stays 1Gi).
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
   posthog:
     enabled: true
     token: "phc_ocaaqUW6YaGFTFqKTvydnaEHmouSWnHnTuKuPQtjmfLe"
@@ -99,8 +113,8 @@ postgres:
     # headroom. This changes scheduler placement, not runtime caps.
     resources:
       requests:
-        cpu: 500m
-        memory: 512Mi
+        cpu: 250m
+        memory: 256Mi
 
 worker:
   # Same shared-node diet as postgres above. Requests only; limits stay at
@@ -125,7 +139,7 @@ iam:
   resources:
     requests:
       cpu: 100m
-      memory: 512Mi
+      memory: 256Mi
     limits:
       memory: 1Gi
 
@@ -140,19 +154,25 @@ queryWorker:
   resources:
     requests:
       cpu: 100m
-      memory: 512Mi
+      memory: 256Mi
   networkPolicy:
     clusterCidrs:
       - 10.42.0.0/16
       - 10.43.0.0/16
 
 # SQL connections are on by default. Same shared-node diet as the query worker
-# (requests only; the chart's 1Gi request would be counted by the scheduler and
-# starve the extract jobs). No publicHost and no exposed port here (single-node
-# k3s without a TCP ingress): the app shows "not configured" with a link to the
-# setup guide. To use it, set publicHost and `service.type: NodePort`.
+# (requests only; the chart defaults for both the gateway and catalog-postgres
+# sidecar would be counted by the scheduler and starve the extract jobs). No
+# publicHost and no exposed port here (single-node k3s without a TCP ingress):
+# the app shows "not configured" with a link to the setup guide. To use it, set
+# publicHost and `service.type: NodePort`.
 sqlGateway:
   resources:
     requests:
       cpu: 50m
-      memory: 256Mi
+      memory: 128Mi
+  catalog:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
