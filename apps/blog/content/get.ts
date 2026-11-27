@@ -1,3 +1,4 @@
+import type { DockerTrialHintCopy } from "@/components/docker-trial-hint";
 import type { Locale } from "@/lib/locale";
 
 import de from "./get-de";
@@ -40,13 +41,9 @@ export type GetCopy = {
     title: string;
     lede: string;
     cardLabel: string;
-    /** The localhost footnote: `beforeHost` + mono `host` + `afterHost` + mono `credentials` + `afterCredentials` + link + `afterLink`. */
-    footnote: {
-      beforeHost: string;
-      host: string;
-      afterHost: string;
-      credentials: string;
-      afterCredentials: string;
+    /** The localhost footnote: `DockerTrialHintCopy` + closing suffix + Docker guide link. */
+    footnote: DockerTrialHintCopy & {
+      closingAfterCredentials: string;
       linkLabel: string;
       afterLink: string;
     };
@@ -132,6 +129,8 @@ const enDocker = {
     credentials: "admin / admin",
     afterCredentials:
       " (temporary password — you will be prompted to set a new one on first sign-in). Requires Docker and 4 GB RAM. Mounted volumes preserve your configuration across upgrades — see the ",
+    closingAfterCredentials:
+      " (temporary password — you will be asked to choose a new one on first sign-in).",
     linkLabel: "Docker guide",
     afterLink:
       " for environment variables, external databases, and object storage.",

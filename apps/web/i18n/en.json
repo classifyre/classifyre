@@ -7475,8 +7475,6 @@
     "stateReady": "Ready",
     "stateWaiting": "Setting up…",
     "firstBootNote": "The first start can take a minute or two while the database, sign-in realm, and default workspace initialise.",
-    "trialLoginPrefix": "First trial sign-in:",
-    "trialLoginSuffix": "(temporary — you will be asked to choose a new password on first sign-in).",
     "polling": "Checking automatically every 2 seconds…",
     "redirecting": "Ready — opening Classifyre…",
     "checkNow": "Check now"

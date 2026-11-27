@@ -602,21 +602,6 @@ export function TopicPage({ locale, id }: { locale: Locale; id: TopicId }) {
               <div className="space-y-6 lg:col-span-7">
                 <div className="border-2 border-white/20 bg-white/[0.04] p-5 sm:p-6">
                   <DockerRunBlock tone="dark" tag={softwareVersion} showNotes={false} />
-                  <p className="mt-3 text-xs leading-6 text-white/70">
-                    {locale === "de" ? (
-                      <>
-                        Anschließend <span className="font-mono text-white">localhost:3000</span>{" "}
-                        öffnen und mit <span className="font-mono text-accent">admin / admin</span>{" "}
-                        anmelden (temporäres Passwort – beim ersten Anmelden vergeben Sie ein neues).
-                      </>
-                    ) : (
-                      <>
-                        Then open <span className="font-mono text-white">localhost:3000</span> and
-                        sign in with <span className="font-mono text-accent">admin / admin</span>{" "}
-                        (temporary password — you will be asked to choose a new one on first sign-in).
-                      </>
-                    )}
-                  </p>
                   <a
                     href={`${withLocalePrefix(locale, routes.get)}/`}
                     className="mt-4 inline-block font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-accent underline-offset-4 hover:underline"

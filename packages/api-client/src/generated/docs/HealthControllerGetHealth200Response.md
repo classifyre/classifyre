@@ -7,7 +7,7 @@
 Name | Type
 ------------ | -------------
 `status` | string
-`iamReady` | boolean
+`tenantReady` | boolean
 `timestamp` | string
 `service` | string
 `version` | string
@@ -20,7 +20,7 @@ import type { HealthControllerGetHealth200Response } from '@workspace/api-client
 // TODO: Update the object below with actual values
 const example = {
   "status": ok,
-  "iamReady": true,
+  "tenantReady": true,
   "timestamp": 2026-01-31T10:00:00.000Z,
   "service": Classifyre API,
   "version": 1.0.0,

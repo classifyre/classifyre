@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
  * and (in Docker all-in-one) first-run workspace bootstrap are all ready.
  */
 export async function GET() {
-  const status = await checkDeploymentReadiness({ force: true });
+  const status = await checkDeploymentReadiness();
   return NextResponse.json(status, {
     status: status.ready ? 200 : 503,
     headers: { "Cache-Control": "no-store" },

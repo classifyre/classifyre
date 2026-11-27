@@ -139,24 +139,6 @@ export default function LandingPage() {
       setNamespaces(await api.namespaces.list());
       setError(null);
     } catch (e) {
-      // If the deployment is still starting up (API or sign-in not ready yet),
-      // send the browser to the auto-refreshing setup screen instead of showing
-      // a raw 401/502 error card.
-      try {
-        const readyRes = await fetch("/auth/ready/", {
-          cache: "no-store",
-          credentials: "same-origin",
-        });
-        if (readyRes.status === 503) {
-          const returnTo = `${window.location.pathname}${window.location.search}`;
-          window.location.assign(
-            `/auth/starting/?returnTo=${encodeURIComponent(returnTo)}`,
-          );
-          return;
-        }
-      } catch {
-        // Fall through to normal error state if the readiness check itself fails.
-      }
       setError(e instanceof Error ? e.message : t("workspaces.loadFailed"));
     }
   }, [t]);

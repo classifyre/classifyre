@@ -27,19 +27,13 @@ ready() {
   touch "${READY_FILE}"
   chmod 644 "${READY_FILE}"
   local password="the one you set in CLASSIFYRE_ADMIN_PASSWORD"
-  local hint="Change it after signing in: account menu → Your account → Signing in."
-  if [ "${CLASSIFYRE_ADMIN_PASSWORD}" = "admin" ]; then
-    password="admin"
-  fi
-  if [ "${CLASSIFYRE_ADMIN_PASSWORD_TEMPORARY:-true}" = "true" ]; then
-    hint="The password is temporary — you will be asked to choose a new one on first sign-in."
-  fi
+  [ "${CLASSIFYRE_ADMIN_PASSWORD}" = "admin" ] && password="admin"
   cat >&2 <<MSG
 
 [classifyre] ─────────────────────────────────────────────────────────────
 [classifyre]  Classifyre is ready at ${CLASSIFYRE_URL}
 [classifyre]  Sign in as ${CLASSIFYRE_ADMIN_USER}, password ${password}.
-[classifyre]  ${hint}
+[classifyre]  The password is temporary — you will be asked to choose a new one on first sign-in.
 [classifyre] ─────────────────────────────────────────────────────────────
 
 MSG

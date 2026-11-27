@@ -1,8 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import de from "@/i18n/de.json";
 import en from "@/i18n/en.json";
+import { escapeHtml, safeInlineJson } from "@/lib/iam/html";
 import { checkDeploymentReadiness } from "@/lib/iam/readiness";
-import { safeReturnTo } from "@/lib/iam/session";
+import { iamWebConfig, safeReturnTo } from "@/lib/iam/session";
+import { signInLocale } from "@/lib/iam/sign-in-locale";
 import { LANGUAGE_COOKIE } from "@/lib/language-cookie";
 
 export const runtime = "nodejs";
@@ -21,29 +23,35 @@ const TEXT = { en: en.startingPage, de: de.startingPage } as const;
  */
 export async function GET(request: NextRequest) {
   const returnTo = safeReturnTo(request.nextUrl.searchParams.get("returnTo"));
+  const unavailable =
+    request.nextUrl.searchParams.get("reason") === "unavailable";
   const status = await checkDeploymentReadiness();
 
-  if (status.ready) {
-    return NextResponse.redirect(new URL(returnTo, request.url), {
+  // Never synchronously bounce back when we arrived from an upstream token
+  // error (`reason=unavailable`): discovery may still return 200 while `/token`
+  // is returning 5xx/timing out, which would otherwise create a tight 307 loop.
+  if (status.ready && !unavailable) {
+    const config = iamWebConfig();
+    return NextResponse.redirect(new URL(returnTo, config.appUrl), {
       status: 307,
       headers: { "Cache-Control": "no-store" },
     });
   }
 
-  const langCookie = request.cookies.get(LANGUAGE_COOKIE)?.value?.toLowerCase();
-  const isGerman =
-    langCookie === "de" ||
-    (!langCookie &&
-      request.headers.get("accept-language")?.toLowerCase().startsWith("de"));
-  const t = isGerman ? TEXT.de : TEXT.en;
-  const lang = isGerman ? "de" : "en";
+  const chosenLocale = signInLocale(
+    returnTo,
+    request.cookies.get(LANGUAGE_COOKIE)?.value,
+  );
+  const lang =
+    chosenLocale ??
+    (request.headers.get("accept-language")?.toLowerCase().startsWith("de")
+      ? "de"
+      : "en");
+  const t = TEXT[lang];
 
-  const showTrialLogin =
-    process.env.CLASSIFYRE_ALLINONE === "1" &&
-    process.env.CLASSIFYRE_ADMIN_USER === "admin" &&
-    process.env.CLASSIFYRE_ADMIN_PASSWORD === "admin";
-
+  const iamReady = unavailable ? false : status.checks.iam;
   const workspaceReady = status.checks.tenant && status.checks.bootstrap;
+  const pollDelayMs = unavailable ? 4000 : 2000;
 
   const html = `<!doctype html>
 <html lang="${lang}">
@@ -187,22 +195,9 @@ export async function GET(request: NextRequest) {
   }
   li[data-ready="true"] .step-state { color: var(--done); }
   .hint {
-    margin: 0 0 1rem;
+    margin: 0 0 1.25rem;
     font-size: .86rem;
     color: var(--muted);
-  }
-  .trial {
-    margin: 0 0 1.25rem;
-    padding: .75rem .9rem;
-    border: 1px solid var(--line);
-    background: var(--bg);
-    font-size: .86rem;
-  }
-  .trial code {
-    font: 600 .9em/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    padding: .1rem .3rem;
-    border: 1px solid var(--line);
-    background: var(--card);
   }
   .footer {
     display: flex;
@@ -254,9 +249,9 @@ export async function GET(request: NextRequest) {
       <span class="step-label"><span class="dot" aria-hidden="true"></span>${escapeHtml(t.stepApi)}</span>
       <span class="step-state">${escapeHtml(status.checks.api ? t.stateReady : t.stateWaiting)}</span>
     </li>
-    <li id="step-iam" data-ready="${String(status.checks.iam)}">
+    <li id="step-iam" data-ready="${String(iamReady)}">
       <span class="step-label"><span class="dot" aria-hidden="true"></span>${escapeHtml(t.stepIam)}</span>
-      <span class="step-state">${escapeHtml(status.checks.iam ? t.stateReady : t.stateWaiting)}</span>
+      <span class="step-state">${escapeHtml(iamReady ? t.stateReady : t.stateWaiting)}</span>
     </li>
     <li id="step-workspace" data-ready="${String(workspaceReady)}">
       <span class="step-label"><span class="dot" aria-hidden="true"></span>${escapeHtml(t.stepWorkspace)}</span>
@@ -264,11 +259,6 @@ export async function GET(request: NextRequest) {
     </li>
   </ul>
   <p class="hint">${escapeHtml(t.firstBootNote)}</p>
-  ${
-    showTrialLogin
-      ? `<p class="trial">${escapeHtml(t.trialLoginPrefix)} <code>admin</code> / <code>admin</code> ${escapeHtml(t.trialLoginSuffix)}</p>`
-      : ""
-  }
   <div class="footer">
     <span id="status-line" class="status-line" aria-live="polite">${escapeHtml(t.polling)}</span>
     <button id="check-now" type="button">${escapeHtml(t.checkNow)}</button>
@@ -276,11 +266,11 @@ export async function GET(request: NextRequest) {
 </main>
 <script>
 (function () {
-  var returnTo = ${JSON.stringify(returnTo)};
-  var readyLabel = ${JSON.stringify(t.stateReady)};
-  var waitingLabel = ${JSON.stringify(t.stateWaiting)};
-  var readyRedirect = ${JSON.stringify(t.redirecting)};
-  var pollingLabel = ${JSON.stringify(t.polling)};
+  var returnTo = ${safeInlineJson(returnTo)};
+  var readyLabel = ${safeInlineJson(t.stateReady)};
+  var waitingLabel = ${safeInlineJson(t.stateWaiting)};
+  var readyRedirect = ${safeInlineJson(t.redirecting)};
+  var pollingLabel = ${safeInlineJson(t.polling)};
   var statusLine = document.getElementById("status-line");
   var button = document.getElementById("check-now");
   var timer = null;
@@ -324,7 +314,7 @@ export async function GET(request: NextRequest) {
           return;
         }
         if (statusLine) statusLine.textContent = pollingLabel;
-        timer = window.setTimeout(poll, 2000);
+        timer = window.setTimeout(poll, ${pollDelayMs});
       })
       .catch(function () {
         timer = window.setTimeout(poll, 2500);
@@ -341,7 +331,7 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  timer = window.setTimeout(poll, 2000);
+  timer = window.setTimeout(poll, ${pollDelayMs});
 })();
 </script>
 </body>
@@ -355,12 +345,4 @@ export async function GET(request: NextRequest) {
       "Retry-After": "3",
     },
   });
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }

@@ -3,13 +3,14 @@ import { apiBaseUrls } from "@/lib/api-upstream";
 import { upstreamIamBaseUrl } from "@/lib/iam/proxy-target";
 
 /**
- * Startup readiness for the web server: checks whether the API, the identity
+ * Stateless startup readiness check: probes whether the API, the identity
  * server's realm, the API's first-tenant bootstrap, and (in the all-in-one
- * Docker image) the first-run bootstrap script have all finished.
+ * Docker image) the first-run bootstrap script are all ready.
  *
- * Used by `proxy.ts`, `/auth/login/`, `/auth/ready/`, and `/auth/starting/`
- * so people who open the app while a fresh deployment is still coming up see
- * an auto-refreshing preparation screen instead of 401/502/404 errors.
+ * Deliberately holds no module-level cache or latch: Next.js 16 executes
+ * `proxy.ts` separately from route handlers, so module globals cannot be
+ * assumed to be shared across them — and a stateless probe also notices
+ * restarts or outages immediately without a stale latch.
  */
 
 export interface ReadinessChecks {
@@ -25,33 +26,7 @@ export interface ReadinessStatus {
 }
 
 const PROBE_TIMEOUT_MS = 1_500;
-const CACHE_MS = 1_500;
 const DEFAULT_READY_FILE = "/run/classifyre/bootstrap.ready";
-
-let everReady = false;
-let cached: { status: ReadinessStatus; at: number } | null = null;
-let inflight: Promise<ReadinessStatus> | null = null;
-
-/** Fast synchronous check used by `proxy.ts` once startup has completed. */
-export function isDeploymentKnownReady(): boolean {
-  return everReady;
-}
-
-/**
- * Called when an upstream error (e.g. `IdentityUnavailableError`) signals that
- * a previously ready service is restarting or temporarily away.
- */
-export function markDeploymentNotReady(): void {
-  everReady = false;
-  cached = null;
-}
-
-/** Test-only helper to clear module-level readiness state between specs. */
-export function resetReadinessForTests(): void {
-  everReady = false;
-  cached = null;
-  inflight = null;
-}
 
 async function probeApi(
   urls: string[],
@@ -64,16 +39,16 @@ async function probeApi(
         signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
       });
       if (!response.ok) continue;
-      let iamReady = true;
+      let tenantReady = true;
       try {
-        const body = (await response.json()) as { iamReady?: unknown };
-        if (typeof body?.iamReady === "boolean") {
-          iamReady = body.iamReady;
+        const body = (await response.json()) as { tenantReady?: unknown };
+        if (typeof body?.tenantReady === "boolean") {
+          tenantReady = body.tenantReady;
         }
       } catch {
         // Older API builds or non-JSON responses still count as API reachable.
       }
-      return { api: true, tenant: iamReady };
+      return { api: true, tenant: tenantReady };
     } catch {
       // Try the next configured upstream candidate.
     }
@@ -123,52 +98,29 @@ function probeBootstrap(
 }
 
 export async function checkDeploymentReadiness(options?: {
-  force?: boolean;
   env?: Record<string, string | undefined>;
   apiUrls?: string[];
   fetchImpl?: typeof fetch;
   existsImpl?: (path: string) => boolean;
 }): Promise<ReadinessStatus> {
-  const useCache = !options?.env && !options?.apiUrls && !options?.fetchImpl && !options?.existsImpl;
-  if (useCache && !options?.force && cached && Date.now() - cached.at < CACHE_MS) {
-    return cached.status;
-  }
-  if (useCache && inflight) {
-    return inflight;
-  }
-
   const env = options?.env ?? process.env;
   const urls = options?.apiUrls ?? apiBaseUrls();
   const fetchImpl = options?.fetchImpl ?? fetch;
   const existsImpl = options?.existsImpl ?? existsSync;
 
-  const run = (async (): Promise<ReadinessStatus> => {
-    const [apiResult, iam] = await Promise.all([
-      probeApi(urls, fetchImpl),
-      probeIam(env, fetchImpl),
-    ]);
-    const bootstrap = probeBootstrap(env, existsImpl);
-    const checks: ReadinessChecks = {
-      api: apiResult.api,
-      iam,
-      tenant: apiResult.tenant,
-      bootstrap,
-    };
-    const ready = checks.api && checks.iam && checks.tenant && checks.bootstrap;
-    const status: ReadinessStatus = { ready, checks };
-    if (useCache) {
-      cached = { status, at: Date.now() };
-      if (ready) everReady = true;
-    }
-    return status;
-  })();
-
-  if (!useCache) return run;
-
-  inflight = run;
-  try {
-    return await run;
-  } finally {
-    if (inflight === run) inflight = null;
-  }
+  const [apiResult, iam] = await Promise.all([
+    probeApi(urls, fetchImpl),
+    probeIam(env, fetchImpl),
+  ]);
+  const bootstrap = probeBootstrap(env, existsImpl);
+  const checks: ReadinessChecks = {
+    api: apiResult.api,
+    iam,
+    tenant: apiResult.tenant,
+    bootstrap,
+  };
+  return {
+    ready: checks.api && checks.iam && checks.tenant && checks.bootstrap,
+    checks,
+  };
 }

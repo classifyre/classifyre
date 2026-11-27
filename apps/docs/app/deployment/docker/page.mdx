@@ -206,7 +206,6 @@ and serves the identity server under `/iam` of the same address.
 | `CLASSIFYRE_URL` | `http://localhost:3000` | The address people open. The identity server signs tokens for it and only sends people back to it: set it when you publish another port (`-p 8080:3000` → `http://localhost:8080`) or a host name. |
 | `CLASSIFYRE_ADMIN_USER` | `admin` | The first admin, made on the first start. Also the identity server's own administrator. |
 | `CLASSIFYRE_ADMIN_PASSWORD` | `admin` | Their first temporary password (you are asked to set a new one on first sign-in); setting this later changes nothing. |
-| `CLASSIFYRE_ADMIN_PASSWORD_TEMPORARY` | `true` | Requires choosing a new password on first sign-in. Set `false` to keep the initial password in automated setups. |
 | `CLASSIFYRE_ADMIN_EMAIL` | `admin@classifyre.example` | Their email. |
 | `CLASSIFYRE_IAM_HEAP_MB` | `512` | The identity server's Java heap. |
 

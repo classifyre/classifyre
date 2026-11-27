@@ -7475,8 +7475,6 @@
     "stateReady": "Bereit",
     "stateWaiting": "Wird eingerichtet…",
     "firstBootNote": "Der erste Start dauert ein bis zwei Minuten, während Datenbank, Anmelde-Realm und Standard-Arbeitsbereich eingerichtet werden.",
-    "trialLoginPrefix": "Erste Test-Anmeldung:",
-    "trialLoginSuffix": "(temporär – beim ersten Anmelden werden Sie aufgefordert, ein neues Passwort zu wählen).",
     "polling": "Wird alle 2 Sekunden automatisch geprüft…",
     "redirecting": "Bereit – Classifyre wird geöffnet…",
     "checkNow": "Jetzt prüfen"

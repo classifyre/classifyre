@@ -30,7 +30,7 @@ export interface HealthControllerGetHealth200Response {
      * @type {boolean}
      * @memberof HealthControllerGetHealth200Response
      */
-    iamReady?: boolean;
+    tenantReady?: boolean;
     /**
      * 
      * @type {string}
@@ -69,7 +69,7 @@ export function HealthControllerGetHealth200ResponseFromJSONTyped(json: any, ign
     return {
         
         'status': json['status'] == null ? undefined : json['status'],
-        'iamReady': json['iamReady'] == null ? undefined : json['iamReady'],
+        'tenantReady': json['tenantReady'] == null ? undefined : json['tenantReady'],
         'timestamp': json['timestamp'] == null ? undefined : json['timestamp'],
         'service': json['service'] == null ? undefined : json['service'],
         'version': json['version'] == null ? undefined : json['version'],
@@ -88,7 +88,7 @@ export function HealthControllerGetHealth200ResponseToJSONTyped(value?: HealthCo
     return {
         
         'status': value['status'],
-        'iamReady': value['iamReady'],
+        'tenantReady': value['tenantReady'],
         'timestamp': value['timestamp'],
         'service': value['service'],
         'version': value['version'],

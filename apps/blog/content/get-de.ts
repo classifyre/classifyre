@@ -30,6 +30,8 @@ const deDocker = {
     credentials: "admin / admin",
     afterCredentials:
       " anmelden (temporäres Passwort – beim ersten Anmelden werden Sie aufgefordert, ein neues zu vergeben). Benötigt Docker und 4 GB RAM. Die Volumes erhalten Ihre Konfiguration über Upgrades hinweg – der ",
+    closingAfterCredentials:
+      " anmelden (temporäres Passwort – beim ersten Anmelden vergeben Sie ein neues).",
     linkLabel: "Docker-Leitfaden",
     afterLink:
       " beschreibt Umgebungsvariablen, externe Datenbanken und Object Storage.",

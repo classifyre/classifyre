@@ -4,7 +4,9 @@ import * as React from "react";
 import {
   namespaceSlugFromPath,
   setUnauthorizedHandler,
+  setUnavailableHandler,
 } from "@workspace/api-client";
+import { redirectIfStarting } from "@/lib/iam/client-readiness";
 
 const IamConsoleContext = React.createContext(false);
 
@@ -73,26 +75,6 @@ function readsPublicWorkspace(): Promise<boolean> {
   return known;
 }
 
-/** Redirect to the auto-refreshing setup page if the deployment is still starting up. */
-async function redirectIfStarting(): Promise<boolean> {
-  try {
-    const response = await fetch("/auth/ready/", {
-      cache: "no-store",
-      credentials: "same-origin",
-    });
-    if (response.status === 503) {
-      const returnTo = `${window.location.pathname}${window.location.search}`;
-      window.location.assign(
-        `/auth/starting/?returnTo=${encodeURIComponent(returnTo)}`,
-      );
-      return true;
-    }
-  } catch {
-    // Ignore transient fetch errors here and let normal handling proceed.
-  }
-  return false;
-}
-
 export function IamProvider({
   console: consoleEnabled = false,
   children,
@@ -101,6 +83,7 @@ export function IamProvider({
   children: React.ReactNode;
 }) {
   React.useEffect(() => {
+    setUnavailableHandler(() => redirectIfStarting());
     setUnauthorizedHandler(async ({ code }) => {
       // Signed in, but in no tenant, in several or in a suspended one: a new
       // session would be refused the same way, so say so instead of retrying.
@@ -146,7 +129,10 @@ export function IamProvider({
       );
       return false;
     });
-    return () => setUnauthorizedHandler(null);
+    return () => {
+      setUnauthorizedHandler(null);
+      setUnavailableHandler(null);
+    };
   }, []);
 
   return (

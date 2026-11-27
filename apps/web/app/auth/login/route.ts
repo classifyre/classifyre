@@ -1,8 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import {
-  checkDeploymentReadiness,
-  isDeploymentKnownReady,
-} from "@/lib/iam/readiness";
+import { checkDeploymentReadiness } from "@/lib/iam/readiness";
 import {
   FLOW_COOKIE,
   cookieOptions,
@@ -12,6 +9,7 @@ import {
   seal,
 } from "@/lib/iam/session";
 import { signInLocale } from "@/lib/iam/sign-in-locale";
+import { redirectToStarting } from "@/lib/iam/starting";
 import { LANGUAGE_COOKIE } from "@/lib/language-cookie";
 
 /**
@@ -23,17 +21,9 @@ export async function GET(request: NextRequest) {
   const config = iamWebConfig();
   const returnTo = safeReturnTo(request.nextUrl.searchParams.get("returnTo"));
 
-  if (!isDeploymentKnownReady()) {
-    const readiness = await checkDeploymentReadiness();
-    if (!readiness.ready) {
-      return NextResponse.redirect(
-        new URL(
-          `/auth/starting/?returnTo=${encodeURIComponent(returnTo)}`,
-          config.appUrl,
-        ),
-        { status: 307, headers: { "Cache-Control": "no-store" } },
-      );
-    }
+  const readiness = await checkDeploymentReadiness();
+  if (!readiness.ready) {
+    return redirectToStarting(returnTo, config.appUrl);
   }
 
   const flow = newFlow();

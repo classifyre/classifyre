@@ -1,4 +1,4 @@
-import { Controller, Get, Optional } from '@nestjs/common';
+import { Controller, Get } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { PublicRoute } from '../identity/access.decorators';
 import { IamBootstrapService } from '../identity/iam-bootstrap.service';
@@ -7,9 +7,7 @@ import { IamBootstrapService } from '../identity/iam-bootstrap.service';
 @Controller()
 @ApiTags('Health')
 export class HealthController {
-  constructor(
-    @Optional() private readonly iamBootstrap?: IamBootstrapService,
-  ) {}
+  constructor(private readonly iamBootstrap: IamBootstrapService) {}
 
   @Get()
   @ApiOperation({
@@ -23,7 +21,7 @@ export class HealthController {
       type: 'object',
       properties: {
         status: { type: 'string', example: 'ok' },
-        iamReady: { type: 'boolean', example: true },
+        tenantReady: { type: 'boolean', example: true },
         timestamp: { type: 'string', example: '2026-01-31T10:00:00.000Z' },
         service: { type: 'string', example: 'Classifyre API' },
         version: { type: 'string', example: '1.0.0' },
@@ -33,7 +31,7 @@ export class HealthController {
   getHealth() {
     return {
       status: 'ok',
-      iamReady: this.iamBootstrap ? this.iamBootstrap.isReady() : true,
+      tenantReady: this.iamBootstrap.isReady(),
       timestamp: new Date().toISOString(),
       service: 'Classifyre API',
       version: '1.0.0',

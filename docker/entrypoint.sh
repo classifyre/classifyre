@@ -303,9 +303,8 @@ CLASSIFYRE_URL="${CLASSIFYRE_URL%/}"
 # One login for trying it out: the first tenant admin of Classifyre (with a
 # temporary password, prompted to change on first sign-in) and the identity
 # server's own administrator.
-default CLASSIFYRE_ADMIN_USER               "admin"
-default CLASSIFYRE_ADMIN_PASSWORD           "admin"
-default CLASSIFYRE_ADMIN_PASSWORD_TEMPORARY "true"
+default CLASSIFYRE_ADMIN_USER     "admin"
+default CLASSIFYRE_ADMIN_PASSWORD "admin"
 
 # Machine secrets nobody types: generated once and kept beside the data, like
 # the credential key. The tenant database key derives every tenant database's
@@ -429,5 +428,10 @@ log "scans: ${MAX_CONCURRENT_RUNNERS} concurrent, ${CLASSIFYRE_MAX_POOL_WORKERS}
 [ "${QUERY_WORKER_ENABLED}" = "true" ] && log "sql queries: ${QUERY_WORKER_SLOTS} at once on the query worker, planned in ${QUERY_WORKER_MEMORY_MB} MB"
 log "listening on :${PORT_HTTP}, for ${CLASSIFYRE_URL}"
 [ "${SQL_GATEWAY_ENABLED}" = "true" ] && log "SQL connections on :${SQL_GATEWAY_PORT}, advertised as ${SQL_GATEWAY_PUBLIC_HOST}:${SQL_GATEWAY_PUBLIC_PORT} (TLS=${sql_tls_on}; publish it: -p ${SQL_GATEWAY_PUBLIC_PORT}:${SQL_GATEWAY_PORT})"
+
+# Clear any readiness marker left over from a previous run before s6 starts
+# Caddy and the web server, so `docker restart` never reports ready before
+# iam-setup and bootstrap have finished.
+rm -f "${CLASSIFYRE_READY_FILE:-/run/classifyre/bootstrap.ready}"
 
 exec /init "$@"

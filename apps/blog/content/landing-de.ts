@@ -199,12 +199,14 @@ const de: LandingCopy = {
     lede: "Prüfen Sie den offenen Quellcode, testen Sie lokal mit echten Daten in wenigen Minuten und betreiben Sie exakt denselben Kern im Cluster – ohne versteckte Enterprise-Schranken.",
     dockerLabel: "All-in-One-Container · ohne Registrierung",
     dockerTitle: "Lokale Evaluierung mit Docker",
-    dockerHintBeforeHost: "Anschließend ",
-    dockerHintHost: "localhost:3000",
-    dockerHintAfterHost: " öffnen und mit ",
-    dockerHintCredentials: "admin / admin",
-    dockerHintAfterCredentials:
-      " anmelden (temporäres Passwort – beim ersten Anmelden vergeben Sie ein eigenes).",
+    dockerHint: {
+      beforeHost: "Anschließend ",
+      host: "localhost:3000",
+      afterHost: " öffnen und mit ",
+      credentials: "admin / admin",
+      afterCredentials:
+        " anmelden (temporäres Passwort – beim ersten Anmelden vergeben Sie ein eigenes).",
+    },
     dockerCta: "Installationsleitfaden",
     helmLabel: "Helm-Chart · Kubernetes & OpenShift",
     helmTitle: "Skalierbar auf Ihrem Cluster",
