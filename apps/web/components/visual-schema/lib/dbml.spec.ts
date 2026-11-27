@@ -101,6 +101,7 @@ describe("specToDbml", () => {
         },
       ],
       pins: [],
+      groups: [],
     };
 
     const dbml = specToDbml(spec, CATALOG);
@@ -150,6 +151,7 @@ describe("specToDbml", () => {
         },
       ],
       pins: [],
+      groups: [],
     };
 
     const dbml = specToDbml(spec, CATALOG);

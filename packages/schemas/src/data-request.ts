@@ -125,7 +125,7 @@ export const DataRequestSpecSchema = z.strictObject({
   tables: z.array(DataRequestTableSchema).max(DATA_REQUEST_MAX_TABLES + 4).default([]),
   joins: z.array(DataRequestJoinSchema).max(DATA_REQUEST_MAX_JOINS).default([]),
   pins: z.array(DataRequestPinSchema).max(DATA_REQUEST_MAX_PINS).default([]),
-  groups: z.array(DataRequestGroupSchema).max(DATA_REQUEST_MAX_GROUPS).optional(),
+  groups: z.array(DataRequestGroupSchema).max(DATA_REQUEST_MAX_GROUPS).default([]),
 });
 export type DataRequestSpec = z.infer<typeof DataRequestSpecSchema>;
 
@@ -133,6 +133,7 @@ export const EMPTY_DATA_REQUEST_SPEC: DataRequestSpec = {
   tables: [],
   joins: [],
   pins: [],
+  groups: [],
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

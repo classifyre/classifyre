@@ -639,59 +639,6 @@ class OracleSource(BaseTabularSource):
             logger.warning("Could not resolve Oracle foreign key details: %s", exc)
         return details
 
-    def _collect_foreign_key_links(
-        self,
-        tables: list[TableRef],
-    ) -> dict[tuple[str, ...], set[tuple[str, ...]]]:
-        # Only declared constraints: a view's dependencies are lineage, and
-        # _collect_view_lineage already emits them as FLOW.
-        table_keys = {t.table_key for t in tables if t.object_type == "TABLE"}
-        if not table_keys:
-            return {}
-
-        links: dict[tuple[str, ...], set[tuple[str, ...]]] = {}
-        try:
-            conn = self._get_cached_connection(self._service_name)
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT
-                        src.owner AS source_owner,
-                        src.table_name AS source_table,
-                        tgt.owner AS target_owner,
-                        tgt.table_name AS target_table
-                    FROM all_constraints src
-                    JOIN all_constraints tgt
-                      ON src.r_owner = tgt.owner
-                     AND src.r_constraint_name = tgt.constraint_name
-                    WHERE src.constraint_type = 'R'
-                    """
-                )
-                for row in cursor.fetchall():
-                    if not isinstance(row, tuple) or len(row) < 4:
-                        continue
-                    source_schema, source_name, target_schema, target_name = (
-                        row[0],
-                        row[1],
-                        row[2],
-                        row[3],
-                    )
-                    if not all(
-                        isinstance(v, str)
-                        for v in (source_schema, source_name, target_schema, target_name)
-                    ):
-                        continue
-
-                    source_key = (self._service_name, str(source_schema).upper(), str(source_name))
-                    target_key = (self._service_name, str(target_schema).upper(), str(target_name))
-                    if source_key not in table_keys or target_key not in table_keys:
-                        continue
-                    links.setdefault(source_key, set()).add(target_key)
-        except Exception as exc:
-            logger.warning("Could not resolve Oracle foreign key links: %s", exc)
-
-        return links
-
     # ── External URL ─────────────────────────────────────────────────────
 
     def _build_external_url(self, table_ref: TableRef) -> str:

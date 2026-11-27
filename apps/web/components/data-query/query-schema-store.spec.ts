@@ -115,6 +115,7 @@ describe("query-schema-store", () => {
         },
       ],
       pins: [],
+      groups: [],
     };
 
     const clean = sanitizeSpecAgainstCatalog(staleSpec, CATALOG);

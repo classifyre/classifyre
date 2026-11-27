@@ -476,54 +476,6 @@ class OdbcSource(BaseTabularSource):
                     )
         return details
 
-    def _collect_foreign_key_links(
-        self, tables: list[TableRef]
-    ) -> dict[tuple[str, ...], set[tuple[str, ...]]]:
-        if self._option("extraction", "include_foreign_keys", True) is False:
-            return {}
-        links: dict[tuple[str, ...], set[tuple[str, ...]]] = {}
-        for table_ref in tables:
-            if self._aborted:
-                break
-            if (table_ref.object_type or "").upper() == "VIEW":
-                continue
-            try:
-                conn = self._get_cached_connection(table_ref.database)
-                cursor = self._cursor(conn)
-                try:
-                    rows = [
-                        tuple(row)
-                        for row in cursor.foreignKeys(
-                            foreignTable=table_ref.table,
-                            foreignCatalog=self._real_catalog(table_ref),
-                            foreignSchema=table_ref.schema,
-                        )
-                    ]
-                finally:
-                    cursor.close()
-            except Exception as exc:
-                # A driver without SQLForeignKeys: no links, not a failed scan.
-                logger.debug("No foreign keys for %s: %s", table_ref.display_name, exc)
-                if "optional feature not implemented" in str(exc).lower():
-                    break  # the driver has no SQLForeignKeys at all
-                continue
-            for row in rows:
-                # (pk catalog, schema, table, column, fk catalog, schema, table, column, …)
-                if len(row) < 8 or not self._same(row[6], table_ref.table):
-                    continue
-                if not self._same(row[5], table_ref.schema):
-                    continue
-                target_schema = str(row[1]) if row[1] else None
-                target_db = str(row[0]) if row[0] else _NO_CATALOG_LABEL
-                target = (
-                    (target_db, target_schema, str(row[2]))
-                    if target_schema is not None
-                    else (target_db, str(row[2]))
-                )
-                if target != table_ref.table_key:
-                    links.setdefault(table_ref.table_key, set()).add(target)
-        return links
-
     # ── Dialect ──────────────────────────────────────────────────────────
 
     def _quote_identifier(self, identifier: str) -> str:

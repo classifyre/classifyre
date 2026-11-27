@@ -7,6 +7,7 @@ import {
   ChevronRight,
   EyeOff,
   KeyRound,
+  Link2,
   Lock,
   PanelLeftClose,
   Plus,
@@ -36,6 +37,7 @@ import {
   LEGACY_REQUEST_TABLE_DRAG_MIME,
   SCHEMA_DRAG_MIME,
 } from "./types";
+import { indexFkColumnsByAsset } from "./lib/catalog-helpers";
 
 export interface SchemaCatalogRailProps {
   catalog: QueryCatalog | null;
@@ -109,6 +111,11 @@ export function SchemaCatalogRail({
     }
     return map;
   }, [sources]);
+
+  const fkColumnsByAsset = React.useMemo(
+    () => indexFkColumnsByAsset(catalog),
+    [catalog],
+  );
 
   const toggleSource = (id: string) => {
     setCollapsedSources((prev) => {
@@ -366,31 +373,46 @@ export function SchemaCatalogRail({
                                     {t("dataRequest.rail.noColumns")}
                                   </li>
                                 ) : (
-                                  table.columns.map((col) => (
-                                    <li
-                                      key={col.name}
-                                      className="flex items-center gap-1.5 text-[11px]"
-                                    >
-                                      {col.isPrimaryKey && (
-                                        <KeyRound className="h-2.5 w-2.5 shrink-0 text-[var(--cb-amber)]" />
-                                      )}
-                                      <span className="truncate font-mono text-foreground/90">
-                                        {col.name}
-                                      </span>
-                                      <span className="ml-auto shrink-0 font-mono text-[10px] text-muted-foreground">
-                                        {col.type}
-                                        {col.nullable === true ? "?" : ""}
-                                      </span>
-                                      {col.access && (
-                                        <ColumnAccessChip
-                                          action={col.access as ColumnAction}
-                                          mask={col.mask as MaskKind | undefined}
-                                          inClear={col.inClear}
-                                          compact
-                                        />
-                                      )}
-                                    </li>
-                                  ))
+                                  table.columns.map((col) => {
+                                    const isFk =
+                                      fkColumnsByAsset
+                                        .get(table.assetId)
+                                        ?.has(col.name.toLowerCase()) ?? false;
+                                    return (
+                                      <li
+                                        key={col.name}
+                                        className="flex items-center gap-1.5 text-[11px]"
+                                      >
+                                        {col.isPrimaryKey && (
+                                          <KeyRound
+                                            className="h-2.5 w-2.5 shrink-0 text-[var(--cb-amber)]"
+                                            aria-label="PK"
+                                          />
+                                        )}
+                                        {isFk && (
+                                          <Link2
+                                            className="h-2.5 w-2.5 shrink-0 text-[var(--cb-violet)]"
+                                            aria-label="FK"
+                                          />
+                                        )}
+                                        <span className="truncate font-mono text-foreground/90">
+                                          {col.name}
+                                        </span>
+                                        <span className="ml-auto shrink-0 font-mono text-[10px] text-muted-foreground">
+                                          {col.type}
+                                          {col.nullable === true ? "?" : ""}
+                                        </span>
+                                        {col.access && (
+                                          <ColumnAccessChip
+                                            action={col.access as ColumnAction}
+                                            mask={col.mask as MaskKind | undefined}
+                                            inClear={col.inClear}
+                                            compact
+                                          />
+                                        )}
+                                      </li>
+                                    );
+                                  })
                                 )}
                                 {(table.hiddenColumns ?? 0) > 0 && (
                                   <li className="flex items-center gap-1 pt-0.5 font-mono text-[10px] text-muted-foreground">

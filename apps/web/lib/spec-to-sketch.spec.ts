@@ -50,6 +50,7 @@ describe("specToSketch", () => {
           y: 150,
         },
       ],
+      groups: [],
     };
 
     const sketch = specToSketch(spec);
@@ -98,6 +99,7 @@ describe("specToSketch", () => {
         },
       ],
       pins: [],
+      groups: [],
     };
     const sketch = specToSketch(spec);
     expect(sketch).not.toBeNull();

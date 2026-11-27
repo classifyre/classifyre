@@ -33,6 +33,7 @@ function spec(partial: Partial<DataRequestSpec>): DataRequestSpec {
     tables: [],
     joins: [],
     pins: [],
+    groups: [],
     ...partial,
   };
 }
@@ -518,7 +519,7 @@ describe('generateRequestSql', () => {
     expect(precheckSql(sql, allowed, sources)).toBeNull();
   });
 
-  it('rejects unknown keys in DataRequestSpecSchema', () => {
+  it('rejects unknown keys in DataRequestSpecSchema and defaults groups to []', () => {
     expect(
       DataRequestSpecSchema.safeParse({
         tables: [],
@@ -527,6 +528,13 @@ describe('generateRequestSql', () => {
         unexpected: true,
       }).success,
     ).toBe(false);
+
+    const parsed = DataRequestSpecSchema.parse({
+      tables: [],
+      joins: [],
+      pins: [],
+    });
+    expect(parsed.groups).toEqual([]);
   });
 
   it('parses v1 specs without visual fields and ignores visual fields in generated SQL', () => {

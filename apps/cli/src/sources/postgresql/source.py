@@ -240,47 +240,6 @@ class PostgreSQLSource(BaseTabularSource):
                 )
         return details
 
-    def _collect_foreign_key_links(
-        self,
-        tables: list[TableRef],
-    ) -> dict[tuple[str, ...], set[tuple[str, ...]]]:
-        by_database: dict[str, set[tuple[str, ...]]] = {}
-        for t in tables:
-            by_database.setdefault(t.database, set()).add(t.table_key)
-
-        links: dict[tuple[str, ...], set[tuple[str, ...]]] = {}
-        for database, scoped_keys in by_database.items():
-            try:
-                conn = self._get_cached_connection(database)
-                with conn.cursor() as cursor:
-                    cursor.execute(
-                        """
-                        SELECT
-                            source_ns.nspname  AS source_schema,
-                            source_tbl.relname AS source_table,
-                            target_ns.nspname  AS target_schema,
-                            target_tbl.relname AS target_table
-                        FROM pg_constraint AS fk
-                        JOIN pg_class     AS source_tbl ON source_tbl.oid = fk.conrelid
-                        JOIN pg_namespace AS source_ns  ON source_ns.oid  = source_tbl.relnamespace
-                        JOIN pg_class     AS target_tbl ON target_tbl.oid = fk.confrelid
-                        JOIN pg_namespace AS target_ns  ON target_ns.oid  = target_tbl.relnamespace
-                        WHERE fk.contype = 'f'
-                        """
-                    )
-                    for src_schema, src_table, tgt_schema, tgt_table in cursor.fetchall():
-                        source_key = (database, src_schema, src_table)
-                        target_key = (database, tgt_schema, tgt_table)
-                        if source_key in scoped_keys and target_key in scoped_keys:
-                            links.setdefault(source_key, set()).add(target_key)
-            except Exception as exc:
-                logger.warning(
-                    "Could not resolve foreign key links for database %s: %s",
-                    database,
-                    exc,
-                )
-        return links
-
     # ── View lineage (pg_depend / pg_rewrite) ────────────────────────────
 
     def _collect_view_lineage(self, tables: list[TableRef]) -> list[ViewLineage]:

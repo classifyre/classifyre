@@ -242,8 +242,8 @@ export function RequestSqlPanel({
           )}
 
           <div
-            className="min-h-[260px] flex-1"
-            style={{ minHeight: 260, height: "100%" }}
+            className="grid min-h-[260px] flex-1"
+            style={{ display: "grid", minHeight: 260 }}
             data-testid="request-sql-editor-wrap"
           >
             <SqlEditor
@@ -257,7 +257,7 @@ export function RequestSqlPanel({
                 }
               }}
               catalog={catalog}
-              height={260}
+              height="100%"
               path={`data-request-${request.id}.sql`}
               readOnly={!canEditSql}
             />

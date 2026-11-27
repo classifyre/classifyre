@@ -124,7 +124,11 @@ def test_mssql_view_dependencies_are_not_foreign_keys() -> None:
     items = TableRef("shop", "dbo", "order_items")
     view = TableRef("shop", "dbo", "v_orders", object_type="VIEW")
     answers = [
-        ("sys.foreign_keys", [], [("dbo", "order_items", "dbo", "orders")]),
+        (
+            "sys.foreign_keys",
+            [],
+            [("FK_items_orders", "dbo", "order_items", "order_id", "dbo", "orders", "id")],
+        ),
         ("sys.sql_expression_dependencies", [], [("dbo", "v_orders", "dbo", "orders")]),
     ]
 
@@ -149,7 +153,11 @@ def test_oracle_view_dependencies_are_not_foreign_keys() -> None:
     items = TableRef("shop", "SALES", "ORDER_ITEMS")
     view = TableRef("shop", "SALES", "V_ORDERS", object_type="VIEW")
     answers = [
-        ("all_constraints", [], [("SALES", "ORDER_ITEMS", "SALES", "ORDERS")]),
+        (
+            "all_constraints",
+            [],
+            [("FK_ITEMS_ORDERS", "SALES", "ORDER_ITEMS", "ORDER_ID", "SALES", "ORDERS", "ID")],
+        ),
         ("all_dependencies", [], [("SALES", "V_ORDERS", "SALES", "ORDERS", "TABLE")]),
     ]
 
@@ -181,9 +189,17 @@ def test_snowflake_view_dependencies_are_not_foreign_keys() -> None:
     view = TableRef("SHOP", "PUBLIC", "V_ORDERS", object_type="VIEW")
     answers = [
         (
-            "REFERENTIAL_CONSTRAINTS",
-            ["SOURCE_SCHEMA", "SOURCE_TABLE", "TARGET_SCHEMA", "TARGET_TABLE"],
-            [("PUBLIC", "ORDER_ITEMS", "PUBLIC", "ORDERS")],
+            "SHOW IMPORTED KEYS",
+            [
+                "pk_schema_name",
+                "pk_table_name",
+                "pk_column_name",
+                "fk_schema_name",
+                "fk_table_name",
+                "fk_column_name",
+                "fk_name",
+            ],
+            [("PUBLIC", "ORDERS", "ID", "PUBLIC", "ORDER_ITEMS", "ORDER_ID", "FK_ITEMS_ORDERS")],
         ),
         (
             "OBJECT_DEPENDENCIES",

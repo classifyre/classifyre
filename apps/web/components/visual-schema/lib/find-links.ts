@@ -9,6 +9,7 @@ import type {
   QueryCatalog,
   QueryCatalogTable,
 } from "@/lib/data-query";
+import { indexCatalogByAsset } from "./catalog-helpers";
 
 export interface SuggestedLink {
   left: DataRequestJoinEndpoint;
@@ -134,12 +135,7 @@ export function findLinks(
 ): SuggestedLink[] {
   if (!catalog || tables.length < 2) return [];
 
-  const catalogByAsset = new Map<string, QueryCatalogTable>();
-  for (const src of catalog.sources ?? []) {
-    for (const tbl of src.tables) {
-      catalogByAsset.set(tbl.assetId, tbl);
-    }
-  }
+  const catalogByAsset = indexCatalogByAsset(catalog);
 
   const tablesByAsset = new Map<string, DataRequestTable[]>();
   for (const tbl of tables) {

@@ -333,11 +333,13 @@ def test_mssql_collect_foreign_key_links_respects_table_lineage_toggle(
             }
         )
     )
-    monkeypatch.setattr(
-        source, "_collect_fk_links", lambda _tables: {("a", "b", "c"): {("x", "y", "z")}}
+    source._get_cached_connection = lambda *_a, **_k: pytest.fail(  # type: ignore[method-assign]
+        "no catalog query when table lineage is off"
     )
 
-    links = source._collect_foreign_key_links([])
+    links = source._collect_foreign_key_links(
+        [TableRef(database="some_db", schema="dbo", table="orders", object_type="TABLE")]
+    )
 
     assert links == {}
 

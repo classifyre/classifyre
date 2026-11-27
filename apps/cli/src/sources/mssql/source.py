@@ -598,57 +598,6 @@ class MSSQLSource(BaseTabularSource):
                 )
         return details
 
-    def _collect_foreign_key_links(
-        self,
-        tables: list[TableRef],
-    ) -> dict[tuple[str, ...], set[tuple[str, ...]]]:
-        # Only declared constraints: a view's dependencies are lineage, and
-        # _collect_view_lineage already emits them as FLOW.
-        if not self._include_table_lineage_enabled():
-            return {}
-        return self._collect_fk_links(tables)
-
-    def _collect_fk_links(
-        self,
-        tables: list[TableRef],
-    ) -> dict[tuple[str, ...], set[tuple[str, ...]]]:
-        table_keys = {t.table_key for t in tables if t.object_type == "TABLE"}
-        by_database: dict[str, set[tuple[str, ...]]] = {}
-        for t in tables:
-            if t.object_type != "TABLE":
-                continue
-            by_database.setdefault(t.database, set()).add(t.table_key)
-
-        links: dict[tuple[str, ...], set[tuple[str, ...]]] = {}
-        for database, scoped_keys in by_database.items():
-            try:
-                conn = self._get_cached_connection(database)
-                with conn.cursor() as cursor:
-                    cursor.execute(
-                        """
-                        SELECT
-                            OBJECT_SCHEMA_NAME(fk.parent_object_id) AS source_schema,
-                            OBJECT_NAME(fk.parent_object_id) AS source_table,
-                            OBJECT_SCHEMA_NAME(fk.referenced_object_id) AS target_schema,
-                            OBJECT_NAME(fk.referenced_object_id) AS target_table
-                        FROM sys.foreign_keys fk
-                        """
-                    )
-                    for row in cursor.fetchall():
-                        if not isinstance(row, tuple) or len(row) < 4:
-                            continue
-                        source_schema, source_table, target_schema, target_table = row
-                        source_key = (database, str(source_schema), str(source_table))
-                        target_key = (database, str(target_schema), str(target_table))
-                        if source_key not in scoped_keys or target_key not in table_keys:
-                            continue
-                        links.setdefault(source_key, set()).add(target_key)
-            except Exception as exc:
-                logger.warning(
-                    "Could not resolve foreign key links for database %s: %s", database, exc
-                )
-        return links
-
     # ── Unsupported extraction feature warnings ──────────────────────────
 
     def _log_unsupported_extraction_features(self) -> None:

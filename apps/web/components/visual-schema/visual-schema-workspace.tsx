@@ -23,6 +23,10 @@ import {
 } from "@workspace/ui/components/tabs";
 import { useTranslation } from "@/hooks/use-translation";
 import type { QueryCatalogSource } from "@/lib/data-query";
+import {
+  addSuggestedJoins,
+  addTablesWithCapToast,
+} from "./lib/catalog-helpers";
 import { exportDiagramDbml } from "./lib/dbml";
 import { findLinks } from "./lib/find-links";
 import { layoutConnectedGroups, layoutGrid } from "./lib/layout";
@@ -40,15 +44,8 @@ export interface VisualSchemaWorkspaceProps {
   extensions?: VisualSchemaExtensions;
   /** Optional custom right-panel component replacing the default Properties/Relations Tabs. */
   customRightPanel?: (ctx: {
-    selectedTableId: string | null;
-    selectedJoinId: string | null;
     propertiesPanel: React.ReactNode;
     relationsPanel: React.ReactNode;
-    onSelectAndFrameJoin: (
-      joinId: string,
-      leftTableId: string,
-      rightTableId: string,
-    ) => void;
   }) => React.ReactNode;
   onExportDbml?: () => void;
 }
@@ -107,29 +104,7 @@ function VisualSchemaWorkspaceInner({
         toast.info(t("visualSchema.toast.noLinksFound"));
         return;
       }
-      if (adapter.addJoins) {
-        adapter.addJoins(
-          found.map((link) => ({
-            left: link.left,
-            right: link.right,
-            options: {
-              type: "INNER",
-              cardinality: link.cardinality,
-              origin: link.origin,
-              constraintName: link.constraintName,
-            },
-          })),
-        );
-      } else {
-        for (const link of found) {
-          adapter.addJoin(link.left, link.right, {
-            type: "INNER",
-            cardinality: link.cardinality,
-            origin: link.origin,
-            constraintName: link.constraintName,
-          });
-        }
-      }
+      addSuggestedJoins(adapter, found);
       toast.success(t("visualSchema.toast.linksFound", { count: found.length }));
     },
     [adapter, t],
@@ -166,25 +141,8 @@ function VisualSchemaWorkspaceInner({
         toast.info(t("visualSchema.toast.sourceAlreadyPlaced"));
         return;
       }
-      const cap = adapter.capabilities.maxTables;
-      const room =
-        cap !== null ? Math.max(0, cap - adapter.spec.tables.length) : eligible.length;
-      if (room === 0) {
-        toast.warning(
-          t("visualSchema.toast.maxTablesReached", { max: cap ?? 0 }),
-        );
-        return;
-      }
-      const batch = eligible.slice(0, room);
-      const added = adapter.addTables(batch);
-      if (batch.length < eligible.length) {
-        toast.warning(
-          t("visualSchema.toast.truncatedTables", {
-            added: added.length,
-            total: eligible.length,
-          }),
-        );
-      }
+      const added = addTablesWithCapToast(adapter, eligible, undefined, t);
+      if (added.length === 0) return;
 
       const nextTables = [...adapter.spec.tables, ...added];
       const discovered = findLinks(
@@ -193,29 +151,7 @@ function VisualSchemaWorkspaceInner({
         adapter.catalog,
       );
       if (discovered.length > 0) {
-        if (adapter.addJoins) {
-          adapter.addJoins(
-            discovered.map((link) => ({
-              left: link.left,
-              right: link.right,
-              options: {
-                type: "INNER",
-                cardinality: link.cardinality,
-                origin: link.origin,
-                constraintName: link.constraintName,
-              },
-            })),
-          );
-        } else {
-          for (const link of discovered) {
-            adapter.addJoin(link.left, link.right, {
-              type: "INNER",
-              cardinality: link.cardinality,
-              origin: link.origin,
-              constraintName: link.constraintName,
-            });
-          }
-        }
+        addSuggestedJoins(adapter, discovered);
       }
       const nextJoins = [
         ...adapter.spec.joins,
@@ -300,7 +236,7 @@ function VisualSchemaWorkspaceInner({
                 allowLockedTables={adapter.capabilities.allowLockedTables}
                 placedAssetIds={placedAssetIds}
                 onAddTables={(tbls) => {
-                  adapter.addTables(tbls);
+                  addTablesWithCapToast(adapter, tbls, undefined, t);
                 }}
                 onGenerateSource={(src) => void handleGenerateSource(src)}
                 onRefresh={adapter.onRefreshCatalog}
@@ -378,11 +314,8 @@ function VisualSchemaWorkspaceInner({
             >
               {customRightPanel ? (
                 customRightPanel({
-                  selectedTableId,
-                  selectedJoinId,
                   propertiesPanel,
                   relationsPanel,
-                  onSelectAndFrameJoin: handleSelectAndFrameJoin,
                 })
               ) : (
                 <Tabs

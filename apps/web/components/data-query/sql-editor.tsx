@@ -494,7 +494,12 @@ function EditorShell({
 }) {
   return (
     <div
-      className="relative overflow-hidden rounded-md border bg-background"
+      className={
+        height === "100%"
+          ? "relative h-full overflow-hidden rounded-md border bg-background"
+          : "relative overflow-hidden rounded-md border bg-background"
+      }
+      style={height === "100%" ? { height: "100%" } : undefined}
       data-testid="sql-editor"
       data-readonly={readOnly ? "true" : "false"}
     >

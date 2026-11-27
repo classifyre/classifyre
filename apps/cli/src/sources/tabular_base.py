@@ -383,9 +383,14 @@ class BaseTabularSource(BaseSource):
     ) -> dict[tuple[str, ...], set[tuple[str, ...]]]:
         """Return a mapping from table-key to set of linked table-keys.
 
-        Default returns an empty dict.  Override to query FK metadata.
+        Derived from ``_collect_foreign_key_details`` so connectors only query
+        database FK catalogs once. Subclasses without column-level FK metadata
+        may still override this method directly as a fallback.
         """
-        return {}
+        links: dict[tuple[str, ...], set[tuple[str, ...]]] = {}
+        for detail in self._collect_foreign_key_details(tables):
+            links.setdefault(detail.source_key, set()).add(detail.target_key)
+        return links
 
     def _collect_foreign_key_details(
         self,
@@ -1213,9 +1218,18 @@ class BaseTabularSource(BaseSource):
         }
         self._declare_listing_if_whole()
         fk_details = self._collect_foreign_key_details(tables)
-        fk_links = self._collect_foreign_key_links(tables)
-        for detail in fk_details:
-            fk_links.setdefault(detail.source_key, set()).add(detail.target_key)
+        fk_links: dict[tuple[str, ...], set[tuple[str, ...]]] = {}
+        if fk_details:
+            for detail in fk_details:
+                fk_links.setdefault(detail.source_key, set()).add(detail.target_key)
+        elif (
+            type(self)._collect_foreign_key_links
+            is not BaseTabularSource._collect_foreign_key_links
+            or "_collect_foreign_key_links" in self.__dict__
+        ):
+            # Fallback only when a subclass or test monkeypatch supplies
+            # table-level FK links without column-level details.
+            fk_links = self._collect_foreign_key_links(tables)
         self._emit_relationship_edges(tables, table_hash_by_key, fk_links, fk_details=fk_details)
 
         batch: list[SingleAssetScanResults] = []

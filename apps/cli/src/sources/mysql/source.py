@@ -402,45 +402,6 @@ class MySQLSource(BaseTabularSource):
                 )
         return details
 
-    def _collect_foreign_key_links(
-        self,
-        tables: list[TableRef],
-    ) -> dict[tuple[str, ...], set[tuple[str, ...]]]:
-        all_keys = {t.table_key for t in tables}
-        by_database: dict[str, set[tuple[str, ...]]] = {}
-        for t in tables:
-            by_database.setdefault(t.database, set()).add(t.table_key)
-
-        links: dict[tuple[str, ...], set[tuple[str, ...]]] = {}
-        for database, scoped_keys in by_database.items():
-            try:
-                conn = self._get_cached_connection(database)
-                with conn.cursor() as cursor:
-                    cursor.execute(
-                        """
-                        SELECT
-                            TABLE_SCHEMA   AS source_database,
-                            TABLE_NAME     AS source_table,
-                            REFERENCED_TABLE_SCHEMA AS target_database,
-                            REFERENCED_TABLE_NAME   AS target_table
-                        FROM information_schema.KEY_COLUMN_USAGE
-                        WHERE TABLE_SCHEMA = %s
-                          AND REFERENCED_TABLE_SCHEMA IS NOT NULL
-                          AND REFERENCED_TABLE_NAME IS NOT NULL
-                        """,
-                        (database,),
-                    )
-                    for src_db, src_table, tgt_db, tgt_table in cursor.fetchall():
-                        source_key = (src_db, src_table)
-                        target_key = (tgt_db, tgt_table)
-                        if source_key in scoped_keys and target_key in all_keys:
-                            links.setdefault(source_key, set()).add(target_key)
-            except Exception as exc:
-                logger.warning(
-                    "Could not resolve foreign key links for database %s: %s", database, exc
-                )
-        return links
-
     # ── External URL ─────────────────────────────────────────────────────
 
     def _build_external_url(self, table_ref: TableRef) -> str:

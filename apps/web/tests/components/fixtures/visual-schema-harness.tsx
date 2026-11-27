@@ -99,7 +99,6 @@ export function VisualSchemaHarness({ dark = false }: { dark?: boolean }) {
 
   const adapter: VisualSchemaAdapter = React.useMemo(
     () => ({
-      mode: "query-builder",
       capabilities: {
         canEdit: true,
         showColumnSelection: true,
@@ -177,6 +176,13 @@ export function VisualSchemaHarness({ dark = false }: { dark?: boolean }) {
           ),
         }));
       },
+      setTablesCollapsed: (ids, collapsed) => {
+        const set = new Set(ids);
+        commit((prev) => ({
+          ...prev,
+          tables: prev.tables.map((t) => (set.has(t.id) ? { ...t, collapsed } : t)),
+        }));
+      },
       setTablesHidden: (ids, hidden) => {
         const set = new Set(ids);
         commit((prev) => ({
@@ -210,6 +216,14 @@ export function VisualSchemaHarness({ dark = false }: { dark?: boolean }) {
           ...prev,
           tables: prev.tables.map((t) =>
             t.id === tableId ? { ...t, keep: [...columns] } : t,
+          ),
+        }));
+      },
+      setTablesColumns: (updates) => {
+        commit((prev) => ({
+          ...prev,
+          tables: prev.tables.map((t) =>
+            updates[t.id] ? { ...t, keep: [...updates[t.id]!] } : t,
           ),
         }));
       },

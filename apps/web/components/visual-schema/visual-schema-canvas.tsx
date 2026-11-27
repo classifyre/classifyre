@@ -28,12 +28,21 @@ import { CanvasFloatingToolbar } from "./canvas-floating-toolbar";
 import { CanvasZoomDock } from "./canvas-zoom-dock";
 import { SchemaRelationEdge } from "./edges/schema-relation-edge";
 import {
+  addTablesWithCapToast,
+  indexCatalogByAsset,
+  indexFkColumnsByAsset,
+} from "./lib/catalog-helpers";
+import {
   exportDiagramPng,
   exportDiagramSvg,
   exportSpecJson,
   parseImportedSpecJson,
 } from "./lib/export-diagram";
 import { SchemaTableNode } from "./nodes/schema-table-node";
+import {
+  SchemaTableActionsProvider,
+  type SchemaTableActions,
+} from "./schema-table-actions-context";
 import {
   colHandleId,
   LEGACY_REQUEST_TABLE_DRAG_MIME,
@@ -63,6 +72,7 @@ export interface VisualSchemaCanvasHandle {
 }
 
 export interface VisualSchemaCanvasProps {
+  ref?: React.Ref<VisualSchemaCanvasHandle>;
   adapter: VisualSchemaAdapter;
   extensions?: VisualSchemaExtensions;
   selectedTableIds: string[];
@@ -74,23 +84,18 @@ export interface VisualSchemaCanvasProps {
   onExportDbml?: () => void;
 }
 
-export const VisualSchemaCanvas = React.forwardRef<
-  VisualSchemaCanvasHandle,
-  VisualSchemaCanvasProps
->(function VisualSchemaCanvas(
-  {
-    adapter,
-    extensions,
-    selectedTableIds,
-    selectedJoinId,
-    onSelectionChange,
-    onFindLinks,
-    onArrangeConnected,
-    onArrangeGrid,
-    onExportDbml,
-  },
+export function VisualSchemaCanvas({
   ref,
-) {
+  adapter,
+  extensions,
+  selectedTableIds,
+  selectedJoinId,
+  onSelectionChange,
+  onFindLinks,
+  onArrangeConnected,
+  onArrangeGrid,
+  onExportDbml,
+}: VisualSchemaCanvasProps) {
   const { t } = useTranslation();
   const rf = useReactFlow();
   const wrapperRef = React.useRef<HTMLDivElement | null>(null);
@@ -136,25 +141,15 @@ export const VisualSchemaCanvas = React.forwardRef<
     [extensions?.extraNodeTypes],
   );
 
-  const catalogByAsset = React.useMemo(() => {
-    const map = new Map<string, QueryCatalogTable>();
-    for (const src of catalog?.sources ?? []) {
-      for (const tbl of src.tables) map.set(tbl.assetId, tbl);
-    }
-    return map;
-  }, [catalog]);
+  const catalogByAsset = React.useMemo(
+    () => indexCatalogByAsset(catalog),
+    [catalog],
+  );
 
-  const fkColumnsByAsset = React.useMemo(() => {
-    const map = new Map<string, Set<string>>();
-    for (const rel of catalog?.relations ?? []) {
-      if (rel.fromColumn) {
-        const set = map.get(rel.fromAssetId) ?? new Set<string>();
-        set.add(rel.fromColumn);
-        map.set(rel.fromAssetId, set);
-      }
-    }
-    return map;
-  }, [catalog]);
+  const fkColumnsByAsset = React.useMemo(
+    () => indexFkColumnsByAsset(catalog),
+    [catalog],
+  );
 
   const errorTableIds = React.useMemo(() => {
     const set = new Set<string>();
@@ -230,6 +225,56 @@ export const VisualSchemaCanvas = React.forwardRef<
     [spec.joins, adapter],
   );
 
+  const handleSetTablesAllColumns = React.useCallback(
+    (tableIds: string[], selectAll: boolean) => {
+      const updates: Record<string, string[]> = {};
+      for (const id of tableIds) {
+        const tbl = spec.tables.find((item) => item.id === id);
+        if (!tbl) continue;
+        if (!selectAll) {
+          updates[id] = [];
+          continue;
+        }
+        const cat = catalogByAsset.get(tbl.assetId);
+        if (cat) {
+          updates[id] = cat.columns.map((c) => c.name);
+        } else {
+          const joined = [...(joinedColsByTable.get(id) ?? [])];
+          updates[id] = [...new Set([...tbl.keep, ...joined])];
+        }
+      }
+      adapter.setTablesColumns(updates);
+    },
+    [spec.tables, catalogByAsset, joinedColsByTable, adapter],
+  );
+
+  const tableActions = React.useMemo<SchemaTableActions>(
+    () => ({
+      onToggleCollapsed: adapter.toggleTableCollapsed,
+      onSetTablesCollapsed: adapter.setTablesCollapsed,
+      onToggleColumn: adapter.toggleColumn,
+      onSetTableColumns: adapter.setTableColumns,
+      onSetTablesAllColumns: handleSetTablesAllColumns,
+      onAddFilter: adapter.addFilter,
+      onRemoveFilter: adapter.removeFilter,
+      onResizeTable: adapter.resizeTable,
+      onSetColor: adapter.setTableColor,
+      onFindLinks: (ids) => onFindLinks(ids),
+      onRemoveLinks: adapter.removeTableJoins,
+      onSetHidden: adapter.setTablesHidden,
+      onRemoveTables: adapter.removeTables,
+      onInspectTableData: extensions?.onInspectTableData,
+      onPinComment: extensions?.onPinComment,
+    }),
+    [
+      adapter,
+      handleSetTablesAllColumns,
+      onFindLinks,
+      extensions?.onInspectTableData,
+      extensions?.onPinComment,
+    ],
+  );
+
   const nodes: Node[] = React.useMemo(() => {
     const selectedSet = new Set(selectedTableIds);
     const tableNodes: SchemaTableFlowNode[] = visibleTables.map((table) => {
@@ -257,19 +302,6 @@ export const VisualSchemaCanvas = React.forwardRef<
           hasError: errorTableIds.has(table.id),
           isHiddenRevealed: Boolean(table.hidden),
           selectedTableIds,
-          onToggleCollapsed: adapter.toggleTableCollapsed,
-          onToggleColumn: adapter.toggleColumn,
-          onSetTableColumns: adapter.setTableColumns,
-          onAddFilter: adapter.addFilter,
-          onRemoveFilter: adapter.removeFilter,
-          onResizeTable: adapter.resizeTable,
-          onSetColor: adapter.setTableColor,
-          onFindLinks: (ids) => onFindLinks(ids),
-          onRemoveLinks: adapter.removeTableJoins,
-          onSetHidden: adapter.setTablesHidden,
-          onRemoveTables: adapter.removeTables,
-          onInspectTableData: extensions?.onInspectTableData,
-          onPinComment: extensions?.onPinComment,
         },
       };
     });
@@ -285,10 +317,6 @@ export const VisualSchemaCanvas = React.forwardRef<
     joinedColsByTable,
     fkColumnsByAsset,
     errorTableIds,
-    adapter,
-    onFindLinks,
-    extensions?.onInspectTableData,
-    extensions?.onPinComment,
     extensions?.extraNodes,
   ]);
 
@@ -461,7 +489,7 @@ export const VisualSchemaCanvas = React.forwardRef<
           x: snapSchemaCoord(basePos.x - 130 + (idx % 3) * 300),
           y: snapSchemaCoord(basePos.y - 30 + Math.floor(idx / 3) * 260),
         }));
-        adapter.addTables(picked, positions);
+        addTablesWithCapToast(adapter, picked, positions, t);
       } catch {
         // Ignore malformed drop payload
       }
@@ -472,10 +500,12 @@ export const VisualSchemaCanvas = React.forwardRef<
       catalogByAsset,
       rf,
       adapter,
+      t,
     ],
   );
 
   // Keyboard shortcuts
+  const onEscape = extensions?.onEscape;
   React.useEffect(() => {
     const el = wrapperRef.current;
     if (!el) return;
@@ -534,6 +564,7 @@ export const VisualSchemaCanvas = React.forwardRef<
         }
         if (key === "escape") {
           onSelectionChange([], null);
+          onEscape?.();
           return;
         }
         if ((e.key === "Delete" || e.key === "Backspace") && capabilities.canEdit) {
@@ -558,6 +589,7 @@ export const VisualSchemaCanvas = React.forwardRef<
     selectedTableIds,
     selectedJoinId,
     onSelectionChange,
+    onEscape,
     rf,
     duration,
   ]);
@@ -606,12 +638,24 @@ export const VisualSchemaCanvas = React.forwardRef<
         toast.error(parsed.error);
         return;
       }
-      adapter.importSpec(parsed.spec);
+      const imported = adapter.importSpec(parsed.spec);
+      const importedCount =
+        imported !== undefined && imported !== null
+          ? imported.tables.length
+          : parsed.spec.tables.length;
       toast.success(
         t("visualSchema.export.imported", {
-          tables: parsed.spec.tables.length,
+          tables: importedCount,
         }),
       );
+      if (importedCount < parsed.spec.tables.length) {
+        toast.warning(
+          t("visualSchema.toast.truncatedTables", {
+            added: importedCount,
+            total: parsed.spec.tables.length,
+          }),
+        );
+      }
     } catch {
       toast.error(t("visualSchema.export.failed"));
     }
@@ -631,7 +675,8 @@ export const VisualSchemaCanvas = React.forwardRef<
       data-testid={extensions?.canvasTestId ?? "request-canvas"}
       data-interaction-mode={interactionMode}
     >
-      <ReactFlow
+      <SchemaTableActionsProvider value={tableActions}>
+        <ReactFlow
         className={
           interactionMode === "pan" ? "vs-tool-pan" : "vs-tool-select"
         }
@@ -728,7 +773,8 @@ export const VisualSchemaCanvas = React.forwardRef<
             size={1}
           />
         )}
-      </ReactFlow>
+        </ReactFlow>
+      </SchemaTableActionsProvider>
 
       {/* Empty state */}
       {spec.tables.length === 0 && (
@@ -749,4 +795,4 @@ export const VisualSchemaCanvas = React.forwardRef<
       )}
     </div>
   );
-});
+}

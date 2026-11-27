@@ -24,7 +24,6 @@ export const VISUAL_SCHEMA_GRID_SNAP = 20;
 export const SCHEMA_TABLE_WIDTH = 268;
 export const LOD_ZOOM_THRESHOLD = 0.45;
 
-export type VisualSchemaMode = "explore" | "query-builder" | "data-request";
 export type CanvasInteractionMode = "pan" | "select";
 
 export interface VisualSchemaCapabilities {
@@ -56,15 +55,7 @@ export interface JoinPatch {
   origin?: DataRequestJoinOrigin;
 }
 
-export interface AddJoinOptions {
-  type?: DataRequestJoinType;
-  cardinality?: DataRequestCardinality;
-  constraintName?: string;
-  origin?: DataRequestJoinOrigin;
-}
-
 export interface VisualSchemaAdapter {
-  mode: VisualSchemaMode;
   capabilities: VisualSchemaCapabilities;
   spec: DataRequestSpec;
   catalog: QueryCatalog | null;
@@ -87,22 +78,24 @@ export interface VisualSchemaAdapter {
     color: SchemaTableColor | undefined,
   ) => void;
   toggleTableCollapsed: (tableId: string) => void;
+  setTablesCollapsed: (tableIds: string[], collapsed: boolean) => void;
   setTablesHidden: (tableIds: string[], hidden: boolean) => void;
   renameAlias: (tableId: string, alias: string) => boolean;
   toggleColumn: (tableId: string, column: string) => void;
   setTableColumns: (tableId: string, columns: string[]) => void;
+  setTablesColumns: (updates: Record<string, string[]>) => void;
   addFilter: (tableId: string, filter: DataRequestFilter) => void;
   removeFilter: (tableId: string, indexOrId: number | string) => void;
   addJoin: (
     left: DataRequestJoinEndpoint,
     right: DataRequestJoinEndpoint,
-    options?: AddJoinOptions,
+    options?: JoinPatch,
   ) => DataRequestJoin | null;
   addJoins?: (
     joins: Array<{
       left: DataRequestJoinEndpoint;
       right: DataRequestJoinEndpoint;
-      options?: AddJoinOptions;
+      options?: JoinPatch;
     }>,
   ) => DataRequestJoin[];
   updateJoin: (joinId: string, patch: JoinPatch) => void;
@@ -110,7 +103,7 @@ export interface VisualSchemaAdapter {
   removeTableJoins: (tableIds: string[]) => void;
   applyLayout: (positions: Record<string, { x: number; y: number }>) => void;
   clearCanvas: () => void;
-  importSpec: (spec: DataRequestSpec) => void;
+  importSpec: (spec: DataRequestSpec) => DataRequestSpec | null | void;
   undo: () => void;
   redo: () => void;
   onRefreshCatalog?: () => void;
@@ -128,22 +121,6 @@ export interface SchemaTableNodeData extends Record<string, unknown> {
   hasError: boolean;
   isHiddenRevealed: boolean;
   selectedTableIds: string[];
-  onToggleCollapsed: (tableId: string) => void;
-  onToggleColumn: (tableId: string, column: string) => void;
-  onSetTableColumns: (tableId: string, columns: string[]) => void;
-  onAddFilter: (tableId: string, filter: DataRequestFilter) => void;
-  onRemoveFilter: (tableId: string, indexOrId: number | string) => void;
-  onResizeTable: (tableId: string, height: number) => void;
-  onSetColor: (tableIds: string[], color: SchemaTableColor | undefined) => void;
-  onFindLinks: (tableIds: string[]) => void;
-  onRemoveLinks: (tableIds: string[]) => void;
-  onSetHidden: (tableIds: string[], hidden: boolean) => void;
-  onRemoveTables: (tableIds: string[]) => void;
-  onInspectTableData?: (table: QueryCatalogTable) => void;
-  onPinComment?: (
-    anchor: { tableId: string; column?: string },
-    screen: { x: number; y: number },
-  ) => void;
 }
 
 export type SchemaTableFlowNode = Node<SchemaTableNodeData, "schema-table">;
@@ -173,6 +150,7 @@ export interface VisualSchemaExtensions {
     screen: { x: number; y: number },
   ) => void;
   onPaneClick?: (event: React.MouseEvent, flowPos: { x: number; y: number }) => void;
+  onEscape?: () => void;
   paneClassName?: string;
   canvasTestId?: string;
   railTestId?: string;

@@ -1,10 +1,10 @@
 import { createStore } from "zustand/vanilla";
 import {
+  DATA_REQUEST_MAX_JOINS,
   DATA_REQUEST_MAX_TABLES,
   DataRequestSpecSchema,
   EMPTY_DATA_REQUEST_SPEC,
   generateRequestSql,
-  suggestTableAlias,
   type DataRequestFilter,
   type DataRequestJoin,
   type DataRequestJoinEndpoint,
@@ -13,7 +13,6 @@ import {
   type DataRequestSpec,
   type DataRequestTable,
   type RequestSqlDiagnostic,
-  type RequestTableMeta,
   type SchemaTableColor,
 } from "@workspace/schemas/data-request";
 import type {
@@ -23,12 +22,31 @@ import type {
   QueryCatalogDto,
   QueryCatalogTableDto,
 } from "@workspace/api-client";
-import type {
-  AddJoinOptions,
-  JoinPatch,
-} from "@/components/visual-schema/types";
-
-const PLAIN_IDENT = /^[a-z_][a-z0-9_]*$/;
+import type { JoinPatch } from "@/components/visual-schema/types";
+import {
+  addFilterInSpec,
+  addJoinsToSpec,
+  addTablesToSpec,
+  buildCatalogLookup as buildSharedCatalogLookup,
+  makeSpecId,
+  moveTablesInSpec,
+  removeFilterInSpec,
+  removeJoinFromSpec,
+  removeTableJoinsFromSpec,
+  removeTablesFromSpec,
+  renameTableAliasInSpec,
+  resizeTableInSpec,
+  sanitizeSpecAgainstCatalog,
+  setTableColorInSpec,
+  setTableColumnsInSpec,
+  setTablesCollapsedInSpec,
+  setTablesColumnsInSpec,
+  setTablesHiddenInSpec,
+  toggleColumnInSpec,
+  toggleTableCollapsedInSpec,
+  updateJoinInSpec,
+  VisualSchemaSpecSchema,
+} from "@/components/visual-schema/lib/spec-reducer";
 
 export const SPEC_SAVE_DEBOUNCE_MS = 800;
 export const CHECK_DEBOUNCE_MS = 600;
@@ -59,21 +77,8 @@ export function parseSpec(raw: unknown): DataRequestSpec {
   return res.success ? res.data : EMPTY_DATA_REQUEST_SPEC;
 }
 
-export function buildCatalogLookup(
-  catalog: QueryCatalogDto | null,
-): Map<string, RequestTableMeta> | undefined {
-  if (!catalog) return undefined;
-  const map = new Map<string, RequestTableMeta>();
-  for (const source of catalog.sources) {
-    for (const table of source.tables) {
-      map.set(table.assetId, {
-        sqlName: table.sqlName,
-        exists: true,
-        columns: table.columns.map((c) => ({ name: c.name, type: c.type })),
-      });
-    }
-  }
-  return map;
+export function buildCatalogLookup(catalog: QueryCatalogDto | null) {
+  return buildSharedCatalogLookup(catalog);
 }
 
 export interface RequestStoreDeps {
@@ -154,22 +159,24 @@ export interface RequestStoreState {
     color: SchemaTableColor | undefined,
   ) => void;
   toggleTableCollapsed: (tableId: string) => void;
+  setTablesCollapsed: (tableIds: string[], collapsed: boolean) => void;
   setTablesHidden: (tableIds: string[], hidden: boolean) => void;
   renameTableAlias: (tableId: string, alias: string) => boolean;
   toggleColumn: (tableId: string, column: string) => void;
   setTableColumns: (tableId: string, columns: string[]) => void;
+  setTablesColumns: (updates: Record<string, string[]>) => void;
   addFilter: (tableId: string, filter: DataRequestFilter) => void;
   removeFilter: (tableId: string, indexOrId: number | string) => void;
   addJoin: (
     left: DataRequestJoinEndpoint,
     right: DataRequestJoinEndpoint,
-    typeOrOptions?: DataRequestJoinType | AddJoinOptions,
+    typeOrOptions?: DataRequestJoinType | JoinPatch,
   ) => DataRequestJoin | null;
   addJoins: (
     batch: Array<{
       left: DataRequestJoinEndpoint;
       right: DataRequestJoinEndpoint;
-      options?: AddJoinOptions;
+      options?: JoinPatch;
     }>,
   ) => DataRequestJoin[];
   updateJoin: (joinId: string, patch: JoinPatch) => void;
@@ -177,7 +184,7 @@ export interface RequestStoreState {
   removeJoin: (joinId: string) => void;
   removeTableJoins: (tableIds: string[]) => void;
   clearCanvas: () => void;
-  importSpec: (nextSpec: DataRequestSpec) => void;
+  importSpec: (nextSpec: DataRequestSpec) => DataRequestSpec | null;
   appendPin: (pin: DataRequestPin, nextVersion: number) => void;
 
   undo: () => void;
@@ -191,15 +198,8 @@ export interface RequestStoreState {
   dispose: () => void;
 }
 
-function makeId(prefix: string): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return `${prefix}_${crypto.randomUUID().slice(0, 8)}`;
-  }
-  return `${prefix}_${Math.random().toString(36).slice(2, 10)}`;
-}
-
 export function createRequestStore(caseId: string, deps: RequestStoreDeps) {
-  const clientId = makeId("tab");
+  const clientId = makeSpecId("tab");
   const saveMs = deps.saveDebounceMs ?? SPEC_SAVE_DEBOUNCE_MS;
   const checkMs = deps.checkDebounceMs ?? CHECK_DEBOUNCE_MS;
   const describeMs = deps.describeDebounceMs ?? DESCRIBE_SQL_EDIT_DEBOUNCE_MS;
@@ -383,41 +383,15 @@ export function createRequestStore(caseId: string, deps: RequestStoreDeps) {
       },
 
       addTables: (tables, positions) => {
-        const s = get();
-        const remaining = Math.max(
-          0,
-          DATA_REQUEST_MAX_TABLES - s.spec.tables.length,
-        );
-        if (remaining === 0 || tables.length === 0) return [];
-        const batch = tables.slice(0, remaining);
-        const taken = new Set(s.spec.tables.map((t) => t.alias.toLowerCase()));
-        const nextTables = [...s.spec.tables];
-        const created: DataRequestTable[] = [];
-
-        batch.forEach((table, idx) => {
-          const alias = suggestTableAlias(table.sqlName, taken);
-          taken.add(alias.toLowerCase());
-          const pos = positions?.[idx];
-          const count = nextTables.length;
-          const entry: DataRequestTable = {
-            id: makeId("tbl"),
-            assetId: table.assetId,
-            sqlName: table.sqlName,
-            alias,
-            x: snapToGrid(pos?.x ?? 60 + (count % 3) * 300),
-            y: snapToGrid(pos?.y ?? 60 + Math.floor(count / 3) * 260),
-            keep: table.columns.slice(0, 8).map((c) => c.name),
-            filters: [],
-          };
-          nextTables.push(entry);
-          created.push(entry);
+        const res = addTablesToSpec(get().spec, tables, {
+          maxTables: DATA_REQUEST_MAX_TABLES,
+          positions,
+          colStepX: 300,
+          colStepY: 260,
         });
-
-        commitSpec({
-          ...s.spec,
-          tables: nextTables,
-        });
-        return created;
+        if (!res) return [];
+        commitSpec(res.spec);
+        return res.created;
       },
 
       removeTable: (tableId) => {
@@ -426,22 +400,12 @@ export function createRequestStore(caseId: string, deps: RequestStoreDeps) {
 
       removeTables: (tableIds) => {
         const s = get();
-        const ids = new Set(tableIds);
-        if (ids.size === 0) return;
-        const nextSpec: DataRequestSpec = {
-          ...s.spec,
-          tables: s.spec.tables.filter((t) => !ids.has(t.id)),
-          joins: s.spec.joins.filter(
-            (j) => !ids.has(j.left.tableId) && !ids.has(j.right.tableId),
-          ),
-          pins: s.spec.pins.map((p) =>
-            p.anchor?.tableId && ids.has(p.anchor.tableId)
-              ? { ...p, anchor: null }
-              : p,
-          ),
-        };
+        const nextSpec = removeTablesFromSpec(s.spec, tableIds, {
+          unanchorPins: true,
+        });
+        if (!nextSpec) return;
         commitSpec(nextSpec);
-        if (s.selectedTableId && ids.has(s.selectedTableId)) {
+        if (s.selectedTableId && tableIds.includes(s.selectedTableId)) {
           set({ selectedTableId: null });
         }
       },
@@ -451,154 +415,63 @@ export function createRequestStore(caseId: string, deps: RequestStoreDeps) {
       },
 
       moveTables: (updates) => {
-        const s = get();
-        let changed = false;
-        const nextTables = s.spec.tables.map((t) => {
-          const u = updates[t.id];
-          if (!u) return t;
-          const sx = snapToGrid(u.x);
-          const sy = snapToGrid(u.y);
-          if (t.x === sx && t.y === sy) return t;
-          changed = true;
-          return { ...t, x: sx, y: sy };
-        });
-        if (!changed) return;
-        commitSpec({
-          ...s.spec,
-          tables: nextTables,
-        });
+        const next = moveTablesInSpec(get().spec, updates);
+        if (next) commitSpec(next);
       },
 
       resizeTable: (tableId, height) => {
-        const s = get();
-        const clamped = Math.max(120, Math.min(960, Math.round(height)));
-        commitSpec({
-          ...s.spec,
-          tables: s.spec.tables.map((t) =>
-            t.id === tableId ? { ...t, height: clamped } : t,
-          ),
-        });
+        commitSpec(resizeTableInSpec(get().spec, tableId, height));
       },
 
       setTableColor: (tableIds, color) => {
-        const s = get();
-        const ids = new Set(tableIds);
-        if (ids.size === 0) return;
-        commitSpec({
-          ...s.spec,
-          tables: s.spec.tables.map((t) => {
-            if (!ids.has(t.id)) return t;
-            const next = { ...t };
-            if (color) next.color = color;
-            else delete next.color;
-            return next;
-          }),
-        });
+        const next = setTableColorInSpec(get().spec, tableIds, color);
+        if (next) commitSpec(next);
       },
 
       toggleTableCollapsed: (tableId) => {
-        const s = get();
-        commitSpec({
-          ...s.spec,
-          tables: s.spec.tables.map((t) =>
-            t.id === tableId ? { ...t, collapsed: !t.collapsed } : t,
-          ),
-        });
+        commitSpec(toggleTableCollapsedInSpec(get().spec, tableId));
+      },
+
+      setTablesCollapsed: (tableIds, collapsed) => {
+        const next = setTablesCollapsedInSpec(get().spec, tableIds, collapsed);
+        if (next) commitSpec(next);
       },
 
       setTablesHidden: (tableIds, hidden) => {
-        const s = get();
-        const ids = new Set(tableIds);
-        if (ids.size === 0) return;
-        commitSpec({
-          ...s.spec,
-          tables: s.spec.tables.map((t) =>
-            ids.has(t.id) ? { ...t, hidden } : t,
-          ),
-        });
+        const next = setTablesHiddenInSpec(get().spec, tableIds, hidden);
+        if (next) commitSpec(next);
       },
 
       renameTableAlias: (tableId, alias) => {
-        const clean = alias.trim().toLowerCase();
-        if (!PLAIN_IDENT.test(clean)) return false;
-        const s = get();
-        const clash = s.spec.tables.some(
-          (t) => t.id !== tableId && t.alias.toLowerCase() === clean,
-        );
-        if (clash) return false;
-        commitSpec({
-          ...s.spec,
-          tables: s.spec.tables.map((t) =>
-            t.id === tableId ? { ...t, alias: clean } : t,
-          ),
-        });
+        const next = renameTableAliasInSpec(get().spec, tableId, alias);
+        if (!next) return false;
+        commitSpec(next);
         return true;
       },
 
       toggleColumn: (tableId, column) => {
-        const s = get();
-        const nextSpec: DataRequestSpec = {
-          ...s.spec,
-          tables: s.spec.tables.map((t) => {
-            if (t.id !== tableId) return t;
-            const has = t.keep.includes(column);
-            return {
-              ...t,
-              keep: has
-                ? t.keep.filter((c) => c !== column)
-                : [...t.keep, column],
-            };
-          }),
-        };
-        commitSpec(nextSpec);
+        commitSpec(toggleColumnInSpec(get().spec, tableId, column));
       },
 
       setTableColumns: (tableId, columns) => {
-        const s = get();
-        const nextSpec: DataRequestSpec = {
-          ...s.spec,
-          tables: s.spec.tables.map((t) =>
-            t.id === tableId ? { ...t, keep: [...columns] } : t,
-          ),
-        };
-        commitSpec(nextSpec);
+        commitSpec(setTableColumnsInSpec(get().spec, tableId, columns));
+      },
+
+      setTablesColumns: (updates) => {
+        const next = setTablesColumnsInSpec(get().spec, updates);
+        if (next) commitSpec(next);
       },
 
       addFilter: (tableId, filter) => {
-        const s = get();
-        const withId: DataRequestFilter = {
-          ...filter,
-          id: filter.id ?? makeId("flt"),
-        };
-        const nextSpec: DataRequestSpec = {
-          ...s.spec,
-          tables: s.spec.tables.map((t) =>
-            t.id === tableId
-              ? { ...t, filters: [...t.filters, withId] }
-              : t,
-          ),
-        };
-        commitSpec(nextSpec);
+        commitSpec(addFilterInSpec(get().spec, tableId, filter));
       },
 
       removeFilter: (tableId, indexOrId) => {
-        const s = get();
-        const nextSpec: DataRequestSpec = {
-          ...s.spec,
-          tables: s.spec.tables.map((t) => {
-            if (t.id !== tableId) return t;
-            const filters =
-              typeof indexOrId === "number"
-                ? t.filters.filter((_, i) => i !== indexOrId)
-                : t.filters.filter((f) => f.id !== indexOrId);
-            return { ...t, filters };
-          }),
-        };
-        commitSpec(nextSpec);
+        commitSpec(removeFilterInSpec(get().spec, tableId, indexOrId));
       },
 
       addJoin: (left, right, typeOrOptions = "INNER") => {
-        const options: AddJoinOptions =
+        const options: JoinPatch =
           typeof typeOrOptions === "string"
             ? { type: typeOrOptions }
             : typeOrOptions;
@@ -607,96 +480,33 @@ export function createRequestStore(caseId: string, deps: RequestStoreDeps) {
       },
 
       addJoins: (batch) => {
-        const s = get();
-        const nextJoins = [...s.spec.joins];
-        const created: DataRequestJoin[] = [];
-
-        for (const item of batch) {
-          if (item.left.tableId === item.right.tableId) continue;
-          const duplicate = nextJoins.some(
-            (j) =>
-              (j.left.tableId === item.left.tableId &&
-                j.left.column === item.left.column &&
-                j.right.tableId === item.right.tableId &&
-                j.right.column === item.right.column) ||
-              (j.left.tableId === item.right.tableId &&
-                j.left.column === item.right.column &&
-                j.right.tableId === item.left.tableId &&
-                j.right.column === item.left.column),
-          );
-          if (duplicate) continue;
-          const join: DataRequestJoin = {
-            id: makeId("jn"),
-            left: item.left,
-            right: item.right,
-            type: item.options?.type ?? "INNER",
-            ...(item.options?.cardinality
-              ? { cardinality: item.options.cardinality }
-              : {}),
-            ...(item.options?.origin ? { origin: item.options.origin } : {}),
-            ...(item.options?.constraintName
-              ? { constraintName: item.options.constraintName }
-              : {}),
-          };
-          nextJoins.push(join);
-          created.push(join);
-        }
-
-        if (created.length === 0) return [];
-        commitSpec({
-          ...s.spec,
-          joins: nextJoins,
-        });
-        return created;
+        const res = addJoinsToSpec(get().spec, batch);
+        if (!res) return [];
+        commitSpec(res.spec);
+        return res.created;
       },
 
       updateJoin: (joinId, patch) => {
-        const s = get();
-        commitSpec({
-          ...s.spec,
-          joins: s.spec.joins.map((j) => {
-            if (j.id !== joinId) return j;
-            const next: DataRequestJoin = { ...j, ...patch };
-            if ("cardinality" in patch && patch.cardinality === undefined) {
-              delete next.cardinality;
-            }
-            return next;
-          }),
-        });
+        commitSpec(updateJoinInSpec(get().spec, joinId, patch));
       },
 
       toggleJoinType: (joinId) => {
-        const s = get();
-        const nextSpec: DataRequestSpec = {
-          ...s.spec,
-          joins: s.spec.joins.map((j) =>
-            j.id === joinId
-              ? { ...j, type: j.type === "INNER" ? "LEFT" : "INNER" }
-              : j,
-          ),
-        };
-        commitSpec(nextSpec);
+        const target = get().spec.joins.find((j) => j.id === joinId);
+        if (!target) return;
+        commitSpec(
+          updateJoinInSpec(get().spec, joinId, {
+            type: target.type === "INNER" ? "LEFT" : "INNER",
+          }),
+        );
       },
 
       removeJoin: (joinId) => {
-        const s = get();
-        commitSpec({
-          ...s.spec,
-          joins: s.spec.joins.filter((j) => j.id !== joinId),
-        });
+        commitSpec(removeJoinFromSpec(get().spec, joinId));
       },
 
       removeTableJoins: (tableIds) => {
-        const s = get();
-        const ids = new Set(tableIds);
-        const nextJoins = s.spec.joins.filter(
-          (j) => !ids.has(j.left.tableId) && !ids.has(j.right.tableId),
-        );
-        if (nextJoins.length === s.spec.joins.length) return;
-        commitSpec({
-          ...s.spec,
-          joins: nextJoins,
-        });
+        const next = removeTableJoinsFromSpec(get().spec, tableIds);
+        if (next) commitSpec(next);
       },
 
       clearCanvas: () => {
@@ -712,56 +522,16 @@ export function createRequestStore(caseId: string, deps: RequestStoreDeps) {
 
       importSpec: (nextSpec) => {
         const s = get();
-        const parsed = DataRequestSpecSchema.safeParse(nextSpec);
-        if (!parsed.success) return;
-        const cappedTables = parsed.data.tables.slice(0, DATA_REQUEST_MAX_TABLES);
-        // Security: if catalog is loaded, strip columns/filters/joins referencing
-        // columns not visible to the caller (e.g. governance-hidden columns).
-        const catalogByAsset = new Map<string, Set<string>>();
-        if (s.catalog) {
-          for (const src of s.catalog.sources) {
-            for (const tbl of src.tables) {
-              catalogByAsset.set(
-                tbl.assetId,
-                new Set(tbl.columns.map((c) => c.name.toLowerCase())),
-              );
-            }
-          }
-        }
-        const validTables = cappedTables.map((tbl) => {
-          const cols = catalogByAsset.get(tbl.assetId);
-          if (!cols) return tbl;
-          return {
-            ...tbl,
-            keep: tbl.keep.filter((c) => cols.has(c.toLowerCase())),
-            filters: tbl.filters.filter((f) => cols.has(f.column.toLowerCase())),
-          };
+        const parsed = VisualSchemaSpecSchema.safeParse(nextSpec);
+        if (!parsed.success) return null;
+        const sanitized = sanitizeSpecAgainstCatalog(parsed.data, s.catalog, {
+          dropMissingTables: false,
+          maxTables: DATA_REQUEST_MAX_TABLES,
+          maxJoins: DATA_REQUEST_MAX_JOINS,
+          preservePins: s.spec.pins,
         });
-        const tableIds = new Set(validTables.map((t) => t.id));
-        const validJoins = parsed.data.joins.filter((j) => {
-          if (!tableIds.has(j.left.tableId) || !tableIds.has(j.right.tableId)) {
-            return false;
-          }
-          const leftTbl = validTables.find((t) => t.id === j.left.tableId);
-          const rightTbl = validTables.find((t) => t.id === j.right.tableId);
-          const lCols = leftTbl ? catalogByAsset.get(leftTbl.assetId) : undefined;
-          const rCols = rightTbl ? catalogByAsset.get(rightTbl.assetId) : undefined;
-          if (lCols && !lCols.has(j.left.column.toLowerCase())) return false;
-          if (rCols && !rCols.has(j.right.column.toLowerCase())) return false;
-          return true;
-        });
-        // Preserve server-managed comment pins (unanchoring those whose table changed)
-        const preservedPins = s.spec.pins.map((p) =>
-          p.anchor?.tableId && !tableIds.has(p.anchor.tableId)
-            ? { ...p, anchor: null }
-            : p,
-        );
-        commitSpec({
-          tables: validTables,
-          joins: validJoins,
-          pins: preservedPins,
-          ...(parsed.data.groups ? { groups: parsed.data.groups } : {}),
-        });
+        commitSpec(sanitized);
+        return sanitized;
       },
 
       appendPin: (pin, nextVersion) => {

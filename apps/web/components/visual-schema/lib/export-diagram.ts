@@ -1,9 +1,11 @@
 import { getNodesBounds, getViewportForBounds, type Node } from "@xyflow/react";
 import { toPng, toSvg } from "html-to-image";
+import type { DataRequestSpec } from "@workspace/schemas/data-request";
 import {
-  DataRequestSpecSchema,
-  type DataRequestSpec,
-} from "@workspace/schemas/data-request";
+  createVisualSchemaSpecSchema,
+  VISUAL_SCHEMA_MAX_JOINS,
+  VISUAL_SCHEMA_MAX_TABLES,
+} from "./spec-reducer";
 
 function downloadDataUrl(dataUrl: string, filename: string): void {
   const link = document.createElement("a");
@@ -14,7 +16,7 @@ function downloadDataUrl(dataUrl: string, filename: string): void {
   link.remove();
 }
 
-function downloadBlob(blob: Blob, filename: string): void {
+export function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   downloadDataUrl(url, filename);
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
@@ -98,11 +100,13 @@ export function exportSpecJson(
 }
 
 /**
- * Strictly validate imported JSON via `DataRequestSpecSchema` (z.strictObject),
- * supporting both `{ version: 1, spec }` envelopes and raw specs.
+ * Strictly validate imported JSON via `createVisualSchemaSpecSchema` (z.strictObject),
+ * supporting both `{ version: 1, spec }` envelopes and raw specs up to the caller's
+ * table/join capacity (defaulting to 40 tables / 160 joins for Data Query exports).
  */
 export function parseImportedSpecJson(
   rawText: string,
+  options?: { maxTables?: number | null; maxJoins?: number },
 ): { ok: true; spec: DataRequestSpec } | { ok: false; error: string } {
   try {
     const parsed: unknown = JSON.parse(rawText);
@@ -113,7 +117,13 @@ export function parseImportedSpecJson(
       (parsed as Record<string, unknown>).spec !== undefined
         ? (parsed as Record<string, unknown>).spec
         : parsed;
-    const res = DataRequestSpecSchema.safeParse(candidate);
+    const maxTables =
+      options?.maxTables === null
+        ? VISUAL_SCHEMA_MAX_TABLES
+        : (options?.maxTables ?? VISUAL_SCHEMA_MAX_TABLES);
+    const maxJoins = options?.maxJoins ?? VISUAL_SCHEMA_MAX_JOINS;
+    const schema = createVisualSchemaSpecSchema(maxTables, maxJoins);
+    const res = schema.safeParse(candidate);
     if (!res.success) {
       return {
         ok: false,

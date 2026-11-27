@@ -35,7 +35,10 @@ import {
 } from "@workspace/ui/components/select";
 import { cn } from "@workspace/ui/lib/utils";
 import { useTranslation } from "@/hooks/use-translation";
-import type { QueryCatalogTable } from "@/lib/data-query";
+import {
+  addSuggestedJoins,
+  indexCatalogByAsset,
+} from "../lib/catalog-helpers";
 import { findLinks, type SuggestedLink } from "../lib/find-links";
 import type { VisualSchemaAdapter } from "../types";
 
@@ -72,13 +75,10 @@ export function SchemaRelationsPanel({
     [spec.tables],
   );
 
-  const catalogByAsset = React.useMemo(() => {
-    const map = new Map<string, QueryCatalogTable>();
-    for (const src of catalog?.sources ?? []) {
-      for (const tbl of src.tables) map.set(tbl.assetId, tbl);
-    }
-    return map;
-  }, [catalog]);
+  const catalogByAsset = React.useMemo(
+    () => indexCatalogByAsset(catalog),
+    [catalog],
+  );
 
   const suggestions = React.useMemo(
     () => findLinks(spec.tables, spec.joins, catalog),
@@ -138,23 +138,7 @@ export function SchemaRelationsPanel({
   };
 
   const addAllSuggestions = () => {
-    if (suggestions.length === 0) return;
-    if (adapter.addJoins) {
-      adapter.addJoins(
-        suggestions.map((s) => ({
-          left: s.left,
-          right: s.right,
-          options: {
-            type: "INNER",
-            cardinality: s.cardinality,
-            origin: s.origin,
-            constraintName: s.constraintName,
-          },
-        })),
-      );
-    } else {
-      for (const s of suggestions) addSuggestion(s);
-    }
+    addSuggestedJoins(adapter, suggestions);
   };
 
   const handleCreateManualJoin = (e: React.FormEvent) => {

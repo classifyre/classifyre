@@ -55,6 +55,7 @@ import {
 } from "../types";
 import { SchemaFilterPopover } from "./schema-filter-popover";
 import { TableColorSwatches } from "./table-color-swatches";
+import { useSchemaTableActions } from "../schema-table-actions-context";
 
 export const SchemaTableNode = React.memo(function SchemaTableNode({
   data,
@@ -76,9 +77,14 @@ export const SchemaTableNode = React.memo(function SchemaTableNode({
     hasError,
     isHiddenRevealed,
     selectedTableIds,
+  } = data;
+
+  const {
     onToggleCollapsed,
+    onSetTablesCollapsed,
     onToggleColumn,
     onSetTableColumns,
+    onSetTablesAllColumns,
     onAddFilter,
     onRemoveFilter,
     onResizeTable,
@@ -89,7 +95,7 @@ export const SchemaTableNode = React.memo(function SchemaTableNode({
     onRemoveTables,
     onInspectTableData,
     onPinComment,
-  } = data;
+  } = useSchemaTableActions();
 
   const isMissing = catalogTable === null;
   const isLocked = Boolean(catalogTable && !catalogTable.canQuery);
@@ -590,16 +596,13 @@ export const SchemaTableNode = React.memo(function SchemaTableNode({
               <>
                 <ContextMenuSeparator />
                 <ContextMenuItem
-                  onClick={() =>
-                    onSetTableColumns(
-                      table.id,
-                      columns.map((c) => c.name),
-                    )
-                  }
+                  onClick={() => onSetTablesAllColumns(targetIds, true)}
                 >
                   {t("dataRequest.canvas.selectAll")}
                 </ContextMenuItem>
-                <ContextMenuItem onClick={() => onSetTableColumns(table.id, [])}>
+                <ContextMenuItem
+                  onClick={() => onSetTablesAllColumns(targetIds, false)}
+                >
                   {t("dataRequest.canvas.selectNone")}
                 </ContextMenuItem>
               </>
@@ -608,7 +611,9 @@ export const SchemaTableNode = React.memo(function SchemaTableNode({
           </>
         )}
 
-        <ContextMenuItem onClick={() => onToggleCollapsed(table.id)}>
+        <ContextMenuItem
+          onClick={() => onSetTablesCollapsed(targetIds, !table.collapsed)}
+        >
           {table.collapsed
             ? t("visualSchema.node.expand")
             : t("visualSchema.node.collapse")}

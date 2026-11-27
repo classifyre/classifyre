@@ -6,20 +6,10 @@ import type {
   QueryCatalog,
   QueryCatalogTable,
 } from "@/lib/data-query";
+import { indexCatalogByAsset } from "./catalog-helpers";
+import { downloadBlob } from "./export-diagram";
 
 type QueryCatalogColumn = QueryCatalogTable["columns"][number];
-
-function findCatalogTable(
-  catalog: QueryCatalog | null,
-  assetId: string,
-): QueryCatalogTable | undefined {
-  if (!catalog) return undefined;
-  for (const src of catalog.sources) {
-    const found = src.tables.find((t) => t.assetId === assetId);
-    if (found) return found;
-  }
-  return undefined;
-}
 
 function quoteDbmlIdent(ident: string): string {
   if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(ident)) return ident;
@@ -74,13 +64,14 @@ export function specToDbml(
 ): string {
   const visibleTables = spec.tables.filter((t) => !t.hidden);
   const tableById = new Map(visibleTables.map((t) => [t.id, t]));
+  const catalogByAsset = indexCatalogByAsset(catalog);
   const catalogById = new Map<string, QueryCatalogTable>();
   const visibleColsById = new Map<string, Set<string>>();
 
   const blocks: string[] = [];
 
   for (const table of visibleTables) {
-    const catTable = findCatalogTable(catalog, table.assetId);
+    const catTable = catalogByAsset.get(table.assetId);
     if (!catTable) continue;
     catalogById.set(table.id, catTable);
     const visibleCols = new Set(
@@ -136,12 +127,5 @@ export function exportDiagramDbml(
 ): void {
   const content = specToDbml(spec, catalog);
   const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.download = filename;
-  link.href = url;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  downloadBlob(blob, filename);
 }

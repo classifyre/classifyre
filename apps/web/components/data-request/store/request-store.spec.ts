@@ -296,6 +296,7 @@ describe("request-store", () => {
       ],
       joins: [],
       pins: [],
+      groups: [],
     });
 
     expect(store.getState().spec.tables[0]!.keep).toEqual(["id"]);

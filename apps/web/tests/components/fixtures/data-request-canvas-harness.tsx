@@ -92,7 +92,7 @@ function buildDetail(role: "requester" | "team"): DataRequestDetailDto {
     closedAt: null,
     createdAt: new Date("2026-11-24T10:00:00Z"),
     updatedAt: new Date("2026-11-24T10:00:00Z"),
-    spec: { tables: [], joins: [], pins: [] },
+    spec: { tables: [], joins: [], pins: [], groups: [] },
     specVersion: 1,
     draftSql: "",
     sqlEdited: false,

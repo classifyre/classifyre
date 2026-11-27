@@ -419,9 +419,21 @@ function DataRequestWorkspaceInner({
     }
   };
 
+  // Exit Comment Pin tool on Escape even when focus is outside the canvas wrapper
+  React.useEffect(() => {
+    if (!commentToolActive) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        store.getState().setCommentToolActive(false);
+        setComposer(null);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [commentToolActive, store]);
+
   const adapter: VisualSchemaAdapter = React.useMemo(
     () => ({
-      mode: "data-request",
       capabilities: {
         canEdit,
         showColumnSelection: true,
@@ -446,11 +458,14 @@ function DataRequestWorkspaceInner({
       resizeTable: (id, h) => store.getState().resizeTable(id, h),
       setTableColor: (ids, color) => store.getState().setTableColor(ids, color),
       toggleTableCollapsed: (id) => store.getState().toggleTableCollapsed(id),
+      setTablesCollapsed: (ids, collapsed) =>
+        store.getState().setTablesCollapsed(ids, collapsed),
       setTablesHidden: (ids, hidden) =>
         store.getState().setTablesHidden(ids, hidden),
       renameAlias: (id, alias) => store.getState().renameTableAlias(id, alias),
       toggleColumn: (id, col) => store.getState().toggleColumn(id, col),
       setTableColumns: (id, cols) => store.getState().setTableColumns(id, cols),
+      setTablesColumns: (updates) => store.getState().setTablesColumns(updates),
       addFilter: (id, filter) => store.getState().addFilter(id, filter),
       removeFilter: (id, idx) => store.getState().removeFilter(id, idx),
       addJoin: (l, r, opts) => store.getState().addJoin(l, r, opts),
@@ -590,6 +605,10 @@ function DataRequestWorkspaceInner({
             topLeftSlot,
             paneClassName: commentToolActive ? "cursor-crosshair" : undefined,
             onPinComment: handleAnchorComment,
+            onEscape: () => {
+              store.getState().setCommentToolActive(false);
+              setComposer(null);
+            },
             onPaneClick: (event, flowPos) => {
               if (!commentToolActive || !canComment) return;
               setComposer({

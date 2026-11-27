@@ -31,9 +31,12 @@ import {
   SelectValue,
 } from "@workspace/ui/components/select";
 import { useTranslation } from "@/hooks/use-translation";
-import type { QueryCatalogTable } from "@/lib/data-query";
 import { ColumnAccessChip } from "@/components/governance/column-access-chip";
 import type { ColumnAction, MaskKind } from "@/lib/column-access";
+import {
+  indexCatalogByAsset,
+  indexFkColumnsByAsset,
+} from "../lib/catalog-helpers";
 import { formatRowCount, type VisualSchemaAdapter } from "../types";
 import { TableColorSwatches } from "../nodes/table-color-swatches";
 import { SchemaFilterPopover } from "../nodes/schema-filter-popover";
@@ -56,13 +59,15 @@ export function SchemaPropertiesPanel({
   const { t } = useTranslation();
   const { spec, catalog, capabilities } = adapter;
 
-  const catalogByAsset = React.useMemo(() => {
-    const map = new Map<string, QueryCatalogTable>();
-    for (const src of catalog?.sources ?? []) {
-      for (const tbl of src.tables) map.set(tbl.assetId, tbl);
-    }
-    return map;
-  }, [catalog]);
+  const catalogByAsset = React.useMemo(
+    () => indexCatalogByAsset(catalog),
+    [catalog],
+  );
+
+  const fkColumnsByAsset = React.useMemo(
+    () => indexFkColumnsByAsset(catalog),
+    [catalog],
+  );
 
   const selectedTable = React.useMemo(
     () => spec.tables.find((tbl) => tbl.id === selectedTableId) ?? null,
@@ -91,12 +96,7 @@ export function SchemaPropertiesPanel({
     const columns = catalogTable?.columns ?? [];
     const keepSet = new Set(selectedTable.keep);
 
-    const fkCols = new Set<string>();
-    for (const rel of catalog?.relations ?? []) {
-      if (rel.fromAssetId === selectedTable.assetId && rel.fromColumn) {
-        fkCols.add(rel.fromColumn.toLowerCase());
-      }
-    }
+    const fkCols = fkColumnsByAsset.get(selectedTable.assetId) ?? new Set<string>();
 
     const commitAlias = () => {
       if (!capabilities.canEdit) return;

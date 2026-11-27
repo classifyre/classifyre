@@ -27,6 +27,7 @@ import {
   type QueryCatalogSource,
   type QueryCatalogTable,
 } from "@/lib/data-query";
+import { indexCatalogWithSource } from "@/components/visual-schema/lib/catalog-helpers";
 import { findLinks } from "@/components/visual-schema/lib/find-links";
 import { layoutConnectedGroups } from "@/components/visual-schema/lib/layout";
 import type { VisualSchemaAdapter } from "@/components/visual-schema/types";
@@ -156,18 +157,10 @@ export function QuerySchemaTab({
     }
   }, [initialized, targetSource, spec.tables.length, store, placeTablesAndLayout]);
 
-  const catalogByAsset = React.useMemo(() => {
-    const map = new Map<
-      string,
-      { table: QueryCatalogTable; source: QueryCatalogSource }
-    >();
-    for (const src of catalog?.sources ?? []) {
-      for (const tbl of src.tables) {
-        map.set(tbl.assetId, { table: tbl, source: src });
-      }
-    }
-    return map;
-  }, [catalog]);
+  const catalogByAsset = React.useMemo(
+    () => indexCatalogWithSource(catalog),
+    [catalog],
+  );
 
   const lockedTablesOnCanvas = React.useMemo(
     () =>
@@ -182,7 +175,6 @@ export function QuerySchemaTab({
 
   const adapter: VisualSchemaAdapter = React.useMemo(
     () => ({
-      mode: "query-builder",
       capabilities: {
         canEdit: true,
         showColumnSelection: true,
@@ -203,11 +195,14 @@ export function QuerySchemaTab({
       resizeTable: (id, h) => store.getState().resizeTable(id, h),
       setTableColor: (ids, color) => store.getState().setTableColor(ids, color),
       toggleTableCollapsed: (id) => store.getState().toggleTableCollapsed(id),
+      setTablesCollapsed: (ids, collapsed) =>
+        store.getState().setTablesCollapsed(ids, collapsed),
       setTablesHidden: (ids, hidden) =>
         store.getState().setTablesHidden(ids, hidden),
       renameAlias: (id, alias) => store.getState().renameAlias(id, alias),
       toggleColumn: (id, col) => store.getState().toggleColumn(id, col),
       setTableColumns: (id, cols) => store.getState().setTableColumns(id, cols),
+      setTablesColumns: (updates) => store.getState().setTablesColumns(updates),
       addFilter: (id, filter) => store.getState().addFilter(id, filter),
       removeFilter: (id, idx) => store.getState().removeFilter(id, idx),
       addJoin: (l, r, opts) => store.getState().addJoin(l, r, opts),

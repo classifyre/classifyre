@@ -366,3 +366,58 @@ class TestSqlConnectorForeignKeyDetails:
                 orders.table_key, customers.table_key, "CUSTOMER_ID", "ID", "FK_ORD_CUST"
             )
         ]
+
+    @pytest.mark.asyncio
+    async def test_extract_raw_queries_fk_catalog_only_once(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            "src.sources.postgresql.source.require_module",
+            lambda **_kwargs: object(),
+        )
+        src = PostgreSQLSource(
+            {
+                "type": "POSTGRESQL",
+                "required": {"host": "db.local", "port": 5432},
+                "masked": {"username": "u", "password": "p"},
+                "optional": {"scope": {"database": "shop"}},
+                "sampling": {"strategy": "RANDOM"},
+            }
+        )
+        orders = TableRef("shop", "public", "orders")
+        customers = TableRef("shop", "public", "customers")
+        fk_queries: list[str] = []
+
+        class _CountingCursor(_FakeCursor):
+            def execute(self, sql: str, params: Any = None) -> None:
+                if "pg_constraint" in sql:
+                    fk_queries.append(sql)
+                super().execute(sql, params)
+
+        cursor = _CountingCursor(
+            [("fk_orders_cust", "public", "orders", "customer_id", "public", "customers", "id")]
+        )
+        src._get_cached_connection = lambda _db: _FakeConn(cursor)  # type: ignore[method-assign]
+        src._iter_tables = lambda: [orders, customers]  # type: ignore[method-assign]
+        src._collect_view_lineage = lambda _tables: []  # type: ignore[method-assign]
+        src._cached_columns = lambda _t: []  # type: ignore[method-assign]
+        src._cached_column_types = lambda _t: {}  # type: ignore[method-assign]
+        src._cached_primary_key_columns = lambda _t: []  # type: ignore[method-assign]
+        src._cached_column_nullability = lambda _t: {}  # type: ignore[method-assign]
+        src._cached_row_count = lambda _t: None  # type: ignore[method-assign]
+
+        batches = [b async for b in src.extract_raw()]
+        assert len(fk_queries) == 1
+        assert sum(len(b) for b in batches) == 2
+        edges = src.drain_edges()
+        fk_edges = [e for e in edges if e.relation_type == "FOREIGN_KEY"]
+        assert len(fk_edges) == 1
+        assert fk_edges[0].evidence == {
+            "foreign_keys": [
+                {
+                    "fromColumn": "customer_id",
+                    "toColumn": "id",
+                    "constraintName": "fk_orders_cust",
+                }
+            ]
+        }
