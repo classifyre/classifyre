@@ -173,8 +173,10 @@ export function DockerRunHint({ className }: { className?: string }) {
         className="font-mono underline-offset-4 hover:underline"
       >
         localhost:3000
-      </a>
-       and sign in as classifyre / classifyre. Needs Docker and 4 GB of memory.
+      </a>{" "}
+      and sign in as <span className="font-mono">admin</span> /{" "}
+      <span className="font-mono">admin</span> (temporary password, changed on
+      first sign-in). Needs Docker and 4 GB of memory.
     </p>
   );
 }

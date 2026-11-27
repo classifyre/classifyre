@@ -7466,6 +7466,21 @@
     "retry": "Erneut versuchen",
     "signOut": "Abmelden"
   },
+  "startingPage": {
+    "title": "Classifyre wird vorbereitet",
+    "description": "Das Deployment startet noch und richtet die Anmeldung ein. Diese Seite lädt automatisch neu, sobald alles bereit ist.",
+    "stepApi": "Datenbank und API",
+    "stepIam": "Identitätsdienst und Anmeldung",
+    "stepWorkspace": "Erster Mandant und Arbeitsbereich",
+    "stateReady": "Bereit",
+    "stateWaiting": "Wird eingerichtet…",
+    "firstBootNote": "Der erste Start dauert ein bis zwei Minuten, während Datenbank, Anmelde-Realm und Standard-Arbeitsbereich eingerichtet werden.",
+    "trialLoginPrefix": "Erste Test-Anmeldung:",
+    "trialLoginSuffix": "(temporär – beim ersten Anmelden werden Sie aufgefordert, ein neues Passwort zu wählen).",
+    "polling": "Wird alle 2 Sekunden automatisch geprüft…",
+    "redirecting": "Bereit – Classifyre wird geöffnet…",
+    "checkNow": "Jetzt prüfen"
+  },
   "dataQuery": {
     "title": "Daten abfragen",
     "run": "Ausführen",

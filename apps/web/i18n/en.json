@@ -7466,6 +7466,21 @@
     "retry": "Try again",
     "signOut": "Sign out"
   },
+  "startingPage": {
+    "title": "Preparing Classifyre",
+    "description": "The deployment is still starting up and configuring sign-in. This page refreshes automatically as soon as everything is ready.",
+    "stepApi": "Database and API",
+    "stepIam": "Identity service and sign-in",
+    "stepWorkspace": "Initial tenant and workspace",
+    "stateReady": "Ready",
+    "stateWaiting": "Setting up…",
+    "firstBootNote": "The first start can take a minute or two while the database, sign-in realm, and default workspace initialise.",
+    "trialLoginPrefix": "First trial sign-in:",
+    "trialLoginSuffix": "(temporary — you will be asked to choose a new password on first sign-in).",
+    "polling": "Checking automatically every 2 seconds…",
+    "redirecting": "Ready — opening Classifyre…",
+    "checkNow": "Check now"
+  },
   "dataQuery": {
     "title": "Query data",
     "run": "Run",

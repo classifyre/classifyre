@@ -43,4 +43,22 @@
 	handle {
 		reverse_proxy 127.0.0.1:{$WEB_PORT:3100}
 	}
+
+	# While the web server is still binding its port (the first second or two of
+	# container boot), show a self-refreshing setup page instead of a blank 502.
+	# API, Socket.IO and MCP callers keep their raw status codes so HEALTHCHECK
+	# (/api/ping) and clients behave normally.
+	handle_errors {
+		@ui_boot {
+			expression {err.status_code} in [502, 503, 504]
+			not path /api /api/* /socket.io /socket.io/*
+			not path_regexp mcp ^/[^/]+/mcp(/.*)?$
+		}
+		handle @ui_boot {
+			header Content-Type "text/html; charset=utf-8"
+			header Cache-Control "no-store"
+			header Retry-After "2"
+			respond "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><meta http-equiv=\"refresh\" content=\"2\"><title>Preparing · Classifyre</title><style>:root{color-scheme:light dark;--bg:#f6f5f2;--fg:#1a1a1a;--muted:#5f5f5f;--line:#d8d6d0}@media(prefers-color-scheme:dark){:root{--bg:#161616;--fg:#eeeeec;--muted:#a3a3a0;--line:#333}}body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--fg);font:15px/1.55 system-ui,sans-serif}main{max-width:28rem;margin:1rem;padding:2rem;border:2px solid var(--line)}h1{margin:0 0 .5rem;font-size:1.25rem}p{margin:0;color:var(--muted)}</style></head><body><main><h1>Preparing Classifyre…</h1><p>Starting the services. This page will refresh automatically in a moment.</p></main></body></html>" 503
+		}
+	}
 }

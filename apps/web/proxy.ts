@@ -1,5 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import {
+  checkDeploymentReadiness,
+  isDeploymentKnownReady,
+  markDeploymentNotReady,
+} from "@/lib/iam/readiness";
+import {
   IdentityUnavailableError,
   REFRESH_COOKIE,
   SESSION_COOKIE,
@@ -12,6 +17,24 @@ import {
   type TokenSet,
 } from "@/lib/iam/session";
 
+function isPageNavigation(request: NextRequest): boolean {
+  const pathname = request.nextUrl.pathname;
+  return (
+    (request.method === "GET" || request.method === "HEAD") &&
+    !pathname.startsWith("/api/") &&
+    !request.headers.has("rsc") &&
+    !request.headers.has("next-router-prefetch")
+  );
+}
+
+function rewriteToStarting(request: NextRequest): NextResponse {
+  const url = request.nextUrl.clone();
+  const returnTo = `${request.nextUrl.pathname}${request.nextUrl.search}`;
+  url.pathname = "/auth/starting/";
+  url.search = `?returnTo=${encodeURIComponent(returnTo)}`;
+  return NextResponse.rewrite(url);
+}
+
 /**
  * Sign-in (docs/prd/IAM-access-management.md §12.1): renews a session about
  * to expire, handing the new token to this very request, and sends people
@@ -21,6 +44,11 @@ import {
  * in.
  */
 export async function proxy(request: NextRequest) {
+  if (isPageNavigation(request) && !isDeploymentKnownReady()) {
+    const readiness = await checkDeploymentReadiness();
+    if (!readiness.ready) return rewriteToStarting(request);
+  }
+
   const config = iamWebConfig();
 
   const session = request.cookies.get(SESSION_COOKIE)?.value;
@@ -35,6 +63,10 @@ export async function proxy(request: NextRequest) {
     // session while it is still valid rather than send anyone to sign in.
     if ((secondsLeft(session) ?? 0) > 0 || request.nextUrl.pathname.startsWith("/api/")) {
       return NextResponse.next();
+    }
+    markDeploymentNotReady();
+    if (isPageNavigation(request)) {
+      return rewriteToStarting(request);
     }
     return new NextResponse(
       "Sign-in is unavailable for a moment. Try again in a minute.",

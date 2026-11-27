@@ -40,11 +40,13 @@ export type GetCopy = {
     title: string;
     lede: string;
     cardLabel: string;
-    /** The localhost footnote: `beforeHost` + mono `host` + `afterHost` + link + `afterLink`. */
+    /** The localhost footnote: `beforeHost` + mono `host` + `afterHost` + mono `credentials` + `afterCredentials` + link + `afterLink`. */
     footnote: {
       beforeHost: string;
       host: string;
       afterHost: string;
+      credentials: string;
+      afterCredentials: string;
       linkLabel: string;
       afterLink: string;
     };
@@ -126,8 +128,10 @@ const enDocker = {
   footnote: {
     beforeHost: "Then open ",
     host: "localhost:3000",
-    afterHost:
-      ". Requires Docker and 4 GB RAM. Mounted volumes preserve your configuration across upgrades — see the ",
+    afterHost: " and sign in with ",
+    credentials: "admin / admin",
+    afterCredentials:
+      " (temporary password — you will be prompted to set a new one on first sign-in). Requires Docker and 4 GB RAM. Mounted volumes preserve your configuration across upgrades — see the ",
     linkLabel: "Docker guide",
     afterLink:
       " for environment variables, external databases, and object storage.",
@@ -160,8 +164,8 @@ const enFirstRun = {
   steps: [
     {
       step: "01",
-      title: "Start the container",
-      body: "Run the Docker command and open localhost:3000. On first boot, Classifyre initialises the database, identity service, and default workspace.",
+      title: "Start the container & sign in",
+      body: "Run the Docker command and open localhost:3000. On first boot, Classifyre initialises the database, identity service, and default workspace automatically, then sign in with admin / admin (temporary password — you will be asked to change it on first sign-in).",
     },
     {
       step: "02",

@@ -30,15 +30,17 @@ docker run -d --name classifyre \
   classifyre/all-in-one:latest
 ```
 
-Then open **http://localhost:3000** and sign in as **`classifyre`**, password
-**`classifyre`**. Change it once you are in: account menu → **Your account** →
-**Account security** → **Signing in** → **Update**. On another port or host,
-tell the container its address with `-e CLASSIFYRE_URL=http://localhost:8080`:
-sign-in only sends people back to that address.
+Then open **http://localhost:3000** and sign in as **`admin`**, temporary
+password **`admin`** — no need to look up a bootstrap secret. On first sign-in
+you will be asked to choose a new password. On another port or host, tell the
+container its address with `-e CLASSIFYRE_URL=http://localhost:8080`: sign-in
+only sends people back to that address.
 
 The first boot initialises the database, applies the migrations, sets up
-sign-in and creates a workspace called `default`. On a laptop that takes a few minutes; the container
-reports `starting` until it is done. Watch it with:
+sign-in and creates a workspace called `default`. On a laptop that takes a
+minute or two; opening **http://localhost:3000** while it prepares shows a
+status screen that refreshes automatically as soon as everything is ready. You
+can also watch progress with:
 
 ```bash
 docker logs -f classifyre

@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { markDeploymentNotReady } from "@/lib/iam/readiness";
 import {
   FLOW_COOKIE,
   IdentityUnavailableError,
@@ -39,9 +40,14 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     if (!(error instanceof IdentityUnavailableError)) throw error;
-    return new NextResponse(
-      "Sign-in is unavailable for a moment. Try again in a minute.",
-      { status: 503, headers: { "Content-Type": "text/plain; charset=utf-8", "Retry-After": "30" } },
+    markDeploymentNotReady();
+    const target = safeReturnTo(flow.returnTo);
+    return NextResponse.redirect(
+      new URL(
+        `/auth/starting/?returnTo=${encodeURIComponent(target)}`,
+        config.appUrl,
+      ),
+      { status: 307, headers: { "Cache-Control": "no-store" } },
     );
   }
   if (!tokens) {

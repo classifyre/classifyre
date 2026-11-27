@@ -69,18 +69,19 @@ natively with no emulation.
 ### Run it
 
 The command above. The first boot initialises the database, applies the
-migrations, sets up sign-in and creates a workspace called `default` — a few
-minutes on a laptop. Follow it with `docker logs -f classifyre`: it ends with
-_Classifyre is ready_.
+migrations, sets up sign-in and creates a workspace called `default` — a minute
+or two on a laptop. If you open [localhost:3000](http://localhost:3000) right
+away, Classifyre shows a preparation screen and refreshes automatically as soon
+as everything is ready. You can also follow the startup in `docker logs -f classifyre`.
 
 ### Sign in
 
-Open [localhost:3000](http://localhost:3000) and sign in as **`classifyre`**, password
-**`classifyre`**. That account is the first tenant's admin, so it sees every
-workspace and can give others access. Change the password right away: account
-menu (top right) → **Your account** → **Account security** → **Signing in** →
-**Update**. The identity server keeps it; restarts and upgrades never reset
-it. To add people and groups, see [Getting started with
+Open [localhost:3000](http://localhost:3000) and sign in as **`admin`**,
+temporary password **`admin`**. On first sign-in, the identity server prompts
+you to choose a new password right away — no need to look up a bootstrap secret.
+That account is the first tenant's admin, so it sees every workspace and can
+give others access. The identity server keeps your new password; restarts and
+upgrades never reset it. To add people and groups, see [Getting started with
 sign-in](/access/getting-started/).
 
 ### Connect a source
@@ -203,8 +204,9 @@ and serves the identity server under `/iam` of the same address.
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `CLASSIFYRE_URL` | `http://localhost:3000` | The address people open. The identity server signs tokens for it and only sends people back to it: set it when you publish another port (`-p 8080:3000` → `http://localhost:8080`) or a host name. |
-| `CLASSIFYRE_ADMIN_USER` | `classifyre` | The first admin, made on the first start. Also the identity server's own administrator. |
-| `CLASSIFYRE_ADMIN_PASSWORD` | `classifyre` | Their first password. Change it in the app afterwards; setting this later changes nothing. |
+| `CLASSIFYRE_ADMIN_USER` | `admin` | The first admin, made on the first start. Also the identity server's own administrator. |
+| `CLASSIFYRE_ADMIN_PASSWORD` | `admin` | Their first temporary password (you are asked to set a new one on first sign-in); setting this later changes nothing. |
+| `CLASSIFYRE_ADMIN_PASSWORD_TEMPORARY` | `true` | Requires choosing a new password on first sign-in. Set `false` to keep the initial password in automated setups. |
 | `CLASSIFYRE_ADMIN_EMAIL` | `admin@classifyre.example` | Their email. |
 | `CLASSIFYRE_IAM_HEAP_MB` | `512` | The identity server's Java heap. |
 
@@ -329,9 +331,9 @@ happens. Downgrades are not supported — migrations only go forwards. See
 
 <Callout type="info">
   **From a version without sign-in** (0.7 and older): the new image signs you
-  in as `classifyre` and starts with an empty `default` workspace; your
-  workspaces are still in the database, out of sight. Copy them into the
-  tenant once:
+  in as `admin` (temporary password `admin`) and starts with an empty `default`
+  workspace; your workspaces are still in the database, out of sight. Copy them
+  into the tenant once:
   `docker exec classifyre sh -c 'cd /app/api && node dist/src/admin.js workspaces copy --to-tenant default --all'`.
   See [Workspaces made without sign-in](/access/operations/#workspaces-made-without-sign-in).
 </Callout>

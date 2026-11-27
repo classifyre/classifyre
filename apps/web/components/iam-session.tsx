@@ -73,6 +73,26 @@ function readsPublicWorkspace(): Promise<boolean> {
   return known;
 }
 
+/** Redirect to the auto-refreshing setup page if the deployment is still starting up. */
+async function redirectIfStarting(): Promise<boolean> {
+  try {
+    const response = await fetch("/auth/ready/", {
+      cache: "no-store",
+      credentials: "same-origin",
+    });
+    if (response.status === 503) {
+      const returnTo = `${window.location.pathname}${window.location.search}`;
+      window.location.assign(
+        `/auth/starting/?returnTo=${encodeURIComponent(returnTo)}`,
+      );
+      return true;
+    }
+  } catch {
+    // Ignore transient fetch errors here and let normal handling proceed.
+  }
+  return false;
+}
+
 export function IamProvider({
   console: consoleEnabled = false,
   children,
@@ -105,6 +125,7 @@ export function IamProvider({
       // workspace the refused request just fails — never an automatic trip
       // to the sign-in page; **Sign in** is in the header for that.
       if (code === "SIGN_IN_REQUIRED" && (await readsPublicWorkspace())) {
+        if (await redirectIfStarting()) return false;
         return false;
       }
       const response = await fetch("/auth/refresh/", {
@@ -112,9 +133,13 @@ export function IamProvider({
         credentials: "same-origin",
       });
       if (response.status === 204) return true;
-      // The identity server is away for a moment: the request fails, the
-      // session stays, and the next one tries again.
-      if (response.status === 503) return false;
+      // The identity server is away for a moment: if the deployment is still
+      // preparing, show the auto-refreshing setup screen; otherwise keep the
+      // session and let the next request try again.
+      if (response.status === 503) {
+        await redirectIfStarting();
+        return false;
+      }
       const returnTo = `${window.location.pathname}${window.location.search}`;
       window.location.assign(
         `/auth/login/?returnTo=${encodeURIComponent(returnTo)}`,

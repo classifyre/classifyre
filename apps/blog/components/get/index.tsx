@@ -197,6 +197,10 @@ export function GetPage({ locale }: { locale: Locale }) {
                     {copy.docker.footnote.host}
                   </span>
                   {copy.docker.footnote.afterHost}
+                  <span className="font-mono text-foreground">
+                    {copy.docker.footnote.credentials}
+                  </span>
+                  {copy.docker.footnote.afterCredentials}
                   <a
                     href={docs.docker}
                     target="_blank"
@@ -522,6 +526,19 @@ export function GetPage({ locale }: { locale: Locale }) {
                     lines={dockerLines}
                     copy={dockerCopy}
                   />
+                  <p className="mt-3 text-left text-xs leading-6 text-white/70">
+                    {copy.docker.footnote.beforeHost}
+                    <span className="font-mono text-white">
+                      {copy.docker.footnote.host}
+                    </span>
+                    {copy.docker.footnote.afterHost}
+                    <span className="font-mono text-accent">
+                      {copy.docker.footnote.credentials}
+                    </span>
+                    {locale === "de"
+                      ? " anmelden (temporäres Passwort – beim ersten Anmelden vergeben Sie ein neues)."
+                      : " (temporary password — you will be asked to choose a new one on first sign-in)."}
+                  </p>
                 </div>
                 <a
                   href={showcase}

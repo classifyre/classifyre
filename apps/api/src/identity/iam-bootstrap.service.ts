@@ -8,8 +8,8 @@ import {
 import type { IdentityService } from './identity.service';
 import { IDENTITY } from './identity.tokens';
 
-const RETRY_MS = 15_000;
-const MAX_ATTEMPTS = 40;
+const RETRY_MS = 5_000;
+const MAX_ATTEMPTS = 120;
 
 /**
  * Runs the first-tenant setup ({@link IdentityService.bootstrap}) once the
@@ -22,8 +22,14 @@ export class IamBootstrapService
 {
   private readonly logger = new Logger(IamBootstrapService.name);
   private timer: ReturnType<typeof setTimeout> | null = null;
+  private ready = false;
 
   constructor(@Inject(IDENTITY) private readonly identity: IdentityService) {}
+
+  /** True once the bootstrap tenant has been verified/created in the control database. */
+  isReady(): boolean {
+    return this.ready;
+  }
 
   onApplicationBootstrap(): void {
     this.attempt(1);
@@ -36,7 +42,10 @@ export class IamBootstrapService
   private attempt(n: number): void {
     void this.identity
       .bootstrap()
-      .then(() => this.logger.log('Sign-in tenants are set up'))
+      .then(() => {
+        this.ready = true;
+        this.logger.log('Sign-in tenants are set up');
+      })
       .catch((error: unknown) => {
         if (n >= MAX_ATTEMPTS) {
           this.logger.error(`Sign-in tenant setup gave up: ${String(error)}`);

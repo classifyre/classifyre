@@ -71,6 +71,17 @@ export function Convert({ locale }: { locale: Locale }) {
                 className="mt-3"
                 showNotes={false}
               />
+              <p className="mt-3 text-xs leading-6 text-white/70">
+                {copy.install.dockerHintBeforeHost}
+                <span className="font-mono text-white">
+                  {copy.install.dockerHintHost}
+                </span>
+                {copy.install.dockerHintAfterHost}
+                <span className="font-mono text-accent">
+                  {copy.install.dockerHintCredentials}
+                </span>
+                {copy.install.dockerHintAfterCredentials}
+              </p>
             </div>
 
             <div className="border-2 border-white/20 bg-white/[0.04] p-5 sm:p-6">

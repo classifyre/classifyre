@@ -300,10 +300,12 @@ fi
 # sends people back to it, so a different host or port needs CLASSIFYRE_URL.
 default CLASSIFYRE_URL "http://localhost:${PORT_HTTP}"
 CLASSIFYRE_URL="${CLASSIFYRE_URL%/}"
-# One login for trying it out: the first tenant admin of Classifyre and the
-# identity server's own administrator. Change it after signing in.
-default CLASSIFYRE_ADMIN_USER     "classifyre"
-default CLASSIFYRE_ADMIN_PASSWORD "classifyre"
+# One login for trying it out: the first tenant admin of Classifyre (with a
+# temporary password, prompted to change on first sign-in) and the identity
+# server's own administrator.
+default CLASSIFYRE_ADMIN_USER               "admin"
+default CLASSIFYRE_ADMIN_PASSWORD           "admin"
+default CLASSIFYRE_ADMIN_PASSWORD_TEMPORARY "true"
 
 # Machine secrets nobody types: generated once and kept beside the data, like
 # the credential key. The tenant database key derives every tenant database's

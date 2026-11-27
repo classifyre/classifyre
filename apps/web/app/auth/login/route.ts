@@ -1,5 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import {
+  checkDeploymentReadiness,
+  isDeploymentKnownReady,
+} from "@/lib/iam/readiness";
+import {
   FLOW_COOKIE,
   cookieOptions,
   iamWebConfig,
@@ -15,11 +19,24 @@ import { LANGUAGE_COOKIE } from "@/lib/language-cookie";
  * organization (switching tenants); without it the identity server picks the
  * person's only one, or shows its own picker when there are several.
  */
-export function GET(request: NextRequest) {
+export async function GET(request: NextRequest) {
   const config = iamWebConfig();
+  const returnTo = safeReturnTo(request.nextUrl.searchParams.get("returnTo"));
+
+  if (!isDeploymentKnownReady()) {
+    const readiness = await checkDeploymentReadiness();
+    if (!readiness.ready) {
+      return NextResponse.redirect(
+        new URL(
+          `/auth/starting/?returnTo=${encodeURIComponent(returnTo)}`,
+          config.appUrl,
+        ),
+        { status: 307, headers: { "Cache-Control": "no-store" } },
+      );
+    }
+  }
 
   const flow = newFlow();
-  const returnTo = safeReturnTo(request.nextUrl.searchParams.get("returnTo"));
   const tenant = request.nextUrl.searchParams.get("tenant");
   const scope = `openid organization${tenant && /^[a-z0-9-]+$/i.test(tenant) ? `:${tenant}` : ""}`;
 

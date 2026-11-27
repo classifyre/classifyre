@@ -37,8 +37,8 @@ case "$TARGET" in
     ;;
   docker)
     CONTAINER=${CONTAINER:?set CONTAINER to the all-in-one container}
-    ADMIN_USER=${CLASSIFYRE_ADMIN_USER:-classifyre}
-    ADMIN_PW=${CLASSIFYRE_ADMIN_PASSWORD:-classifyre}
+    ADMIN_USER=${CLASSIFYRE_ADMIN_USER:-admin}
+    ADMIN_PW=${CLASSIFYRE_ADMIN_PASSWORD:-admin}
     KC_URL=http://127.0.0.1:8180/iam
     FOLDER=/data/smoke
     in_iam() { docker exec -i -e HOME=/tmp "$CONTAINER" "$@"; }

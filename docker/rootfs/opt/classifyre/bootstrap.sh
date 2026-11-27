@@ -16,18 +16,30 @@ set -euo pipefail
 SLUG="${CLASSIFYRE_BOOTSTRAP_NAMESPACE:-}"
 API="http://127.0.0.1:${API_PORT:-8000}"
 MARKER=/var/lib/classifyre/bootstrap.done
+READY_FILE="${CLASSIFYRE_READY_FILE:-/run/classifyre/bootstrap.ready}"
+
+rm -f "${READY_FILE}"
 
 log() { printf '[classifyre] bootstrap: %s\n' "$*" >&2; }
 
 ready() {
+  mkdir -p "$(dirname "${READY_FILE}")"
+  touch "${READY_FILE}"
+  chmod 644 "${READY_FILE}"
   local password="the one you set in CLASSIFYRE_ADMIN_PASSWORD"
-  [ "${CLASSIFYRE_ADMIN_PASSWORD}" = "classifyre" ] && password="classifyre"
+  local hint="Change it after signing in: account menu → Your account → Signing in."
+  if [ "${CLASSIFYRE_ADMIN_PASSWORD}" = "admin" ]; then
+    password="admin"
+  fi
+  if [ "${CLASSIFYRE_ADMIN_PASSWORD_TEMPORARY:-true}" = "true" ]; then
+    hint="The password is temporary — you will be asked to choose a new one on first sign-in."
+  fi
   cat >&2 <<MSG
 
 [classifyre] ─────────────────────────────────────────────────────────────
 [classifyre]  Classifyre is ready at ${CLASSIFYRE_URL}
 [classifyre]  Sign in as ${CLASSIFYRE_ADMIN_USER}, password ${password}.
-[classifyre]  Change it after signing in: account menu → Your account → Signing in.
+[classifyre]  ${hint}
 [classifyre] ─────────────────────────────────────────────────────────────
 
 MSG

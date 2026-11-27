@@ -74,6 +74,7 @@ import { SocketAccessService } from './socket-access.service';
     ACCESS_POLICY,
     IDENTITY,
     IAM_CONFIG,
+    IamBootstrapService,
   ],
 })
 export class IdentityModule {}

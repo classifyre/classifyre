@@ -722,5 +722,8 @@ export class IdentityService {
       );
     }
     await this.tenancy.grantAdminsOnce(tenant.id, admins.id);
+    // Drop any cached "not set up yet" visitor miss from requests that arrived
+    // while the identity server was still starting up.
+    this.visitorCache = null;
   }
 }

@@ -30,11 +30,11 @@ docker run -d --name classifyre \
   classifyre/all-in-one:latest
 ```
 
-Then open **http://localhost:3000**. `-p 5433:5433` publishes **SQL connections** (Power BI, Excel, DBeaver, `psql` over the PostgreSQL protocol): make one in *Settings → SQL connections*, then connect a tool to `localhost:5433` (TLS is disabled by default in the all-in-one image, so no certificate is needed; pass `-e SQL_GATEWAY_TLS_ENABLED=true` to enable TLS 1.3). It is 5433, not 5432, because the PostgreSQL inside the container holds 5432. Another host port: `-p 15433:5433 -e SQL_GATEWAY_PUBLIC_PORT=15433`; none: `-e SQL_GATEWAY_ENABLED=false`. See the [SQL connections guide](https://docs.classifyre.com/deployment/docker/#sql-connections).
+Then open **http://localhost:3000** and sign in as **`admin`** with temporary password **`admin`** (you will be asked to choose a new password on first sign-in). `-p 5433:5433` publishes **SQL connections** (Power BI, Excel, DBeaver, `psql` over the PostgreSQL protocol): make one in *Settings → SQL connections*, then connect a tool to `localhost:5433` (TLS is disabled by default in the all-in-one image, so no certificate is needed; pass `-e SQL_GATEWAY_TLS_ENABLED=true` to enable TLS 1.3). It is 5433, not 5432, because the PostgreSQL inside the container holds 5432. Another host port: `-p 15433:5433 -e SQL_GATEWAY_PUBLIC_PORT=15433`; none: `-e SQL_GATEWAY_ENABLED=false`. See the [SQL connections guide](https://docs.classifyre.com/deployment/docker/#sql-connections).
 
-The first boot initialises the database, applies the migrations and creates a workspace called `default`. On a laptop that takes a few minutes; watch it with `docker logs -f classifyre`.
+The first boot initialises the database, applies the migrations, sets up sign-in and creates a workspace called `default`. On a laptop that takes a minute or two — opening **http://localhost:3000** early shows a setup screen that refreshes automatically when ready, or watch progress with `docker logs -f classifyre`.
 
-Nothing leaves your machine. There is no account, no signup, and no telemetry you have not opted into.
+Nothing leaves your machine. Accounts live in the local identity server inside the container, there is no external signup, and no telemetry you have not opted into.
 
 **What to do next:** add a source (*Sources → New*), turn on detectors, run a scan, then work the findings into cases. See [How it works](https://docs.classifyre.com/how-it-works/) and [Flow](https://docs.classifyre.com/flow/).
 
