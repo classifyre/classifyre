@@ -1,1 +1,0 @@
-TLS and certificate usage on the SQL gateway is now optional (`sqlGateway.tls.enabled` in Helm, `SQL_GATEWAY_TLS_ENABLED` in the environment). It stays enabled by default in Helm and general deployments, while the all-in-one Docker image now disables SQL gateway TLS by default so BI tools and ODBC clients can connect without downloading a certificate.

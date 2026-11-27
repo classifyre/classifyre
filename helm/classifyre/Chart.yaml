@@ -2,8 +2,8 @@ apiVersion: v2
 name: classifyre-core
 description: Production-ready Helm chart for Classifyre, the sovereign data governance platform — web, api, SQL gateway, and Kubernetes CLI jobs
 type: application
-version: 0.9.5-SNAPSHOT
-appVersion: "0.9.5-SNAPSHOT"
+version: 0.9.6-SNAPSHOT
+appVersion: "0.9.6-SNAPSHOT"
 keywords:
   - classifyre
   - nestjs
