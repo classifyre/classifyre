@@ -14,7 +14,7 @@ from ...models.generated_input import (
 from ...utils.sql_lineage import upstream_tables_from_sql
 from ..dependencies import require_module
 from ..tabular_base import BaseTabularSource
-from ..tabular_utils import TableRef, ViewLineage
+from ..tabular_utils import ForeignKeyDetail, TableRef, ViewLineage
 
 logger = logging.getLogger(__name__)
 
@@ -329,6 +329,78 @@ class MySQLSource(BaseTabularSource):
                 if upstreams:
                     results.append(ViewLineage(view_key, tuple(upstreams), definition))
         return results
+
+    def _collect_foreign_key_details(
+        self,
+        tables: list[TableRef],
+    ) -> list[ForeignKeyDetail]:
+        all_keys = {t.table_key for t in tables}
+        by_database: dict[str, set[tuple[str, ...]]] = {}
+        for t in tables:
+            by_database.setdefault(t.database, set()).add(t.table_key)
+
+        details: list[ForeignKeyDetail] = []
+        for database, scoped_keys in by_database.items():
+            try:
+                conn = self._get_cached_connection(database)
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        SELECT
+                            CONSTRAINT_NAME         AS constraint_name,
+                            TABLE_SCHEMA            AS source_database,
+                            TABLE_NAME              AS source_table,
+                            COLUMN_NAME             AS source_column,
+                            REFERENCED_TABLE_SCHEMA AS target_database,
+                            REFERENCED_TABLE_NAME   AS target_table,
+                            REFERENCED_COLUMN_NAME  AS target_column
+                        FROM information_schema.KEY_COLUMN_USAGE
+                        WHERE TABLE_SCHEMA = %s
+                          AND REFERENCED_TABLE_SCHEMA IS NOT NULL
+                          AND REFERENCED_TABLE_NAME IS NOT NULL
+                          AND REFERENCED_COLUMN_NAME IS NOT NULL
+                        ORDER BY CONSTRAINT_NAME, ORDINAL_POSITION
+                        """,
+                        (database,),
+                    )
+                    for row in cursor.fetchall():
+                        if not isinstance(row, tuple) or len(row) < 7:
+                            continue
+                        (
+                            constraint_name,
+                            src_db,
+                            src_table,
+                            src_col,
+                            tgt_db,
+                            tgt_table,
+                            tgt_col,
+                        ) = row[:7]
+                        if not all(
+                            isinstance(v, str)
+                            for v in (src_db, src_table, src_col, tgt_db, tgt_table, tgt_col)
+                        ):
+                            continue
+                        source_key = (src_db, src_table)
+                        target_key = (tgt_db, tgt_table)
+                        if source_key in scoped_keys and target_key in all_keys:
+                            details.append(
+                                ForeignKeyDetail(
+                                    source_key=source_key,
+                                    target_key=target_key,
+                                    source_column=src_col,
+                                    target_column=tgt_col,
+                                    constraint_name=constraint_name
+                                    if isinstance(constraint_name, str) and constraint_name
+                                    else None,
+                                )
+                            )
+            except Exception as exc:
+                logger.warning(
+                    "Could not resolve MySQL foreign key details for database %s: %s",
+                    database,
+                    exc,
+                )
+        return details
 
     def _collect_foreign_key_links(
         self,

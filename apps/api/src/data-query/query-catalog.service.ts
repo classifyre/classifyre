@@ -816,6 +816,7 @@ export class QueryCatalogService {
         fromId: true,
         toId: true,
         metadata: true,
+        evidence: true,
         fieldMappings: true,
       },
     });
@@ -972,13 +973,20 @@ function parseForeignKeyEdge(edge: {
   fromId: string;
   toId: string;
   metadata: unknown;
+  evidence?: unknown;
   fieldMappings: unknown;
 }): CatalogRelation[] {
   const meta =
     edge.metadata && typeof edge.metadata === 'object'
       ? (edge.metadata as Record<string, unknown>)
       : null;
+  const ev =
+    edge.evidence && typeof edge.evidence === 'object'
+      ? (edge.evidence as Record<string, unknown>)
+      : null;
   const rawLists: unknown[] = [];
+  if (ev && Array.isArray(ev.foreign_keys)) rawLists.push(ev.foreign_keys);
+  if (ev && Array.isArray(ev.columns)) rawLists.push(ev.columns);
   if (meta && Array.isArray(meta.foreign_keys)) rawLists.push(meta.foreign_keys);
   if (meta && Array.isArray(meta.columns)) rawLists.push(meta.columns);
   if (Array.isArray(edge.fieldMappings)) rawLists.push(edge.fieldMappings);
@@ -999,7 +1007,10 @@ function parseForeignKeyEdge(edge: {
     {
       fromAssetId: edge.fromId,
       toAssetId: edge.toId,
-      cardinality: parseCardinality(meta?.cardinality) ?? 'N-1',
+      cardinality:
+        parseCardinality(ev?.cardinality) ??
+        parseCardinality(meta?.cardinality) ??
+        'N-1',
     },
   ];
 }

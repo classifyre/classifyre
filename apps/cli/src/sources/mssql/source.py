@@ -16,7 +16,7 @@ from ...models.generated_single_asset_scan_results import (
 )
 from ..dependencies import require_module
 from ..tabular_base import BaseTabularSource
-from ..tabular_utils import TableRef, ViewLineage
+from ..tabular_utils import ForeignKeyDetail, TableRef, ViewLineage
 
 logger = logging.getLogger(__name__)
 
@@ -513,6 +513,90 @@ class MSSQLSource(BaseTabularSource):
                 for key, sources in upstreams.items()
             )
         return results
+
+    def _collect_foreign_key_details(
+        self,
+        tables: list[TableRef],
+    ) -> list[ForeignKeyDetail]:
+        if not self._include_table_lineage_enabled():
+            return []
+        table_keys = {t.table_key for t in tables if t.object_type == "TABLE"}
+        by_database: dict[str, set[tuple[str, ...]]] = {}
+        for t in tables:
+            if t.object_type == "TABLE":
+                by_database.setdefault(t.database, set()).add(t.table_key)
+
+        details: list[ForeignKeyDetail] = []
+        for database, scoped_keys in by_database.items():
+            try:
+                conn = self._get_cached_connection(database)
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        SELECT
+                            fk.name                                      AS constraint_name,
+                            OBJECT_SCHEMA_NAME(fkc.parent_object_id)     AS source_schema,
+                            OBJECT_NAME(fkc.parent_object_id)            AS source_table,
+                            pc.name                                      AS source_column,
+                            OBJECT_SCHEMA_NAME(fkc.referenced_object_id) AS target_schema,
+                            OBJECT_NAME(fkc.referenced_object_id)        AS target_table,
+                            rc.name                                      AS target_column
+                        FROM sys.foreign_keys fk
+                        JOIN sys.foreign_key_columns fkc ON fkc.constraint_object_id = fk.object_id
+                        JOIN sys.columns pc
+                          ON pc.object_id = fkc.parent_object_id
+                         AND pc.column_id = fkc.parent_column_id
+                        JOIN sys.columns rc
+                          ON rc.object_id = fkc.referenced_object_id
+                         AND rc.column_id = fkc.referenced_column_id
+                        ORDER BY fk.name, fkc.constraint_column_id
+                        """
+                    )
+                    for row in cursor.fetchall():
+                        if not isinstance(row, tuple) or len(row) < 7:
+                            continue
+                        (
+                            constraint_name,
+                            source_schema,
+                            source_table,
+                            source_col,
+                            target_schema,
+                            target_table,
+                            target_col,
+                        ) = row[:7]
+                        if not all(
+                            isinstance(v, str)
+                            for v in (
+                                source_schema,
+                                source_table,
+                                source_col,
+                                target_schema,
+                                target_table,
+                                target_col,
+                            )
+                        ):
+                            continue
+                        source_key = (database, source_schema, source_table)
+                        target_key = (database, target_schema, target_table)
+                        if source_key in scoped_keys and target_key in table_keys:
+                            details.append(
+                                ForeignKeyDetail(
+                                    source_key=source_key,
+                                    target_key=target_key,
+                                    source_column=source_col,
+                                    target_column=target_col,
+                                    constraint_name=constraint_name
+                                    if isinstance(constraint_name, str) and constraint_name
+                                    else None,
+                                )
+                            )
+            except Exception as exc:
+                logger.warning(
+                    "Could not resolve MSSQL foreign key details for database %s: %s",
+                    database,
+                    exc,
+                )
+        return details
 
     def _collect_foreign_key_links(
         self,

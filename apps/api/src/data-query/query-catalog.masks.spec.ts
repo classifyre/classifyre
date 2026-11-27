@@ -576,4 +576,99 @@ describe('QueryCatalogService visual schema metadata & governance-filtered relat
     expect(customers.rowCount).toBeUndefined();
     expect(orders.rowCount).toBe(1500);
   });
+
+  it('unpacks multi-FK Edge.evidence.foreign_keys and strips FKs touching hidden/restricted columns', async () => {
+    const { svc, prisma } = multiTableService({});
+    // Wire prisma.edge.findMany to return the exact shape CLI writes to Edge.evidence
+    (prisma as Record<string, unknown>).edge = {
+      findMany: jest.fn().mockResolvedValue([
+        {
+          fromId: 'a-2',
+          toId: 'a-1',
+          metadata: null,
+          fieldMappings: null,
+          evidence: {
+            foreign_keys: [
+              {
+                fromColumn: 'customer_id',
+                toColumn: 'id',
+                constraintName: 'fk_orders_customer',
+              },
+              {
+                fromColumn: 'secret_ref',
+                toColumn: 'api_key',
+                constraintName: 'fk_orders_secret_api_key',
+              },
+              {
+                fromColumn: 'restricted_ref',
+                toColumn: 'id',
+                constraintName: 'fk_orders_restricted',
+              },
+            ],
+          },
+        },
+      ]),
+    };
+
+    const raw = await (
+      svc as unknown as {
+        loadForeignKeyRelations: (ids: string[]) => Promise<unknown[]>;
+      }
+    ).loadForeignKeyRelations(['a-1', 'a-2']);
+    expect(raw).toEqual([
+      {
+        fromAssetId: 'a-2',
+        fromColumn: 'customer_id',
+        toAssetId: 'a-1',
+        toColumn: 'id',
+        constraintName: 'fk_orders_customer',
+        cardinality: 'N-1',
+      },
+      {
+        fromAssetId: 'a-2',
+        fromColumn: 'secret_ref',
+        toAssetId: 'a-1',
+        toColumn: 'api_key',
+        constraintName: 'fk_orders_secret_api_key',
+        cardinality: 'N-1',
+      },
+      {
+        fromAssetId: 'a-2',
+        fromColumn: 'restricted_ref',
+        toAssetId: 'a-1',
+        toColumn: 'id',
+        constraintName: 'fk_orders_restricted',
+        cardinality: 'N-1',
+      },
+    ]);
+
+    // Feed unpacked relations through publicCatalog() governance filter
+    jest.spyOn(svc, 'tables').mockResolvedValue({
+      at: Date.now(),
+      sources: [
+        {
+          id: 's-1',
+          name: 'Lake',
+          type: 'S3',
+          sqlName: 'lake',
+          queryable: true,
+        },
+      ],
+      tables: [CUSTOMERS_RICH as never, ORDERS as never],
+      relations: raw as never,
+    });
+    const cat = await svc.publicCatalog();
+    expect(cat.relations).toEqual([
+      {
+        fromAssetId: 'a-2',
+        fromColumn: 'customer_id',
+        toAssetId: 'a-1',
+        toColumn: 'id',
+        constraintName: 'fk_orders_customer',
+        cardinality: 'N-1',
+      },
+    ]);
+    expect(JSON.stringify(cat)).not.toContain('fk_orders_secret_api_key');
+    expect(JSON.stringify(cat)).not.toContain('fk_orders_restricted');
+  });
 });

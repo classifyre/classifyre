@@ -174,13 +174,31 @@ def _pdf_metadata(file_bytes: bytes) -> dict[str, Any]:
         return {"page_count": len(pdf.pages)}
 
 
-def build_columns(names: list[str], types: dict[str, str] | None = None) -> list[dict[str, str]]:
-    """Build the normalized ``columns`` list of ``{name, type}`` objects.
+def build_columns(
+    names: list[str],
+    types: dict[str, str] | None = None,
+    *,
+    primary_keys: set[str] | list[str] | None = None,
+    nullable: dict[str, bool] | None = None,
+) -> list[dict[str, Any]]:
+    """Build the normalized ``columns`` list of ``{name, type, ...}`` objects.
 
     ``type`` is "" when the format does not expose column types (csv/xlsx).
+    ``is_primary_key`` is emitted only when True, and ``nullable`` only when known.
     """
     type_map = types or {}
-    return [{"name": name, "type": type_map.get(name, "")} for name in names]
+    pk_lower = {k.lower() for k in primary_keys} if primary_keys else set()
+    null_map = {k.lower(): v for k, v in nullable.items()} if nullable else {}
+    out: list[dict[str, Any]] = []
+    for name in names:
+        entry: dict[str, Any] = {"name": name, "type": type_map.get(name, "")}
+        lower = name.lower()
+        if lower in pk_lower:
+            entry["is_primary_key"] = True
+        if lower in null_map:
+            entry["nullable"] = null_map[lower]
+        out.append(entry)
+    return out
 
 
 def _parquet_metadata(file_bytes: bytes) -> dict[str, Any]:

@@ -25,7 +25,7 @@ from ...utils.file_parser import render_bytes_cell
 from ...utils.sql_lineage import upstream_tables_from_sql
 from ..dependencies import require_module
 from ..tabular_base import BaseTabularSource
-from ..tabular_utils import TableRef, ViewLineage, table_format_from
+from ..tabular_utils import ForeignKeyDetail, TableRef, ViewLineage, table_format_from
 
 logger = logging.getLogger(__name__)
 
@@ -654,6 +654,59 @@ class SnowflakeSource(BaseTabularSource):
         ]
 
     # ── Foreign keys ─────────────────────────────────────────────────────
+
+    def _collect_foreign_key_details(
+        self,
+        tables: list[TableRef],
+    ) -> list[ForeignKeyDetail]:
+        if not self._include_table_lineage_enabled():
+            return []
+
+        by_database: dict[str, set[tuple[str, ...]]] = {}
+        for t in tables:
+            if t.object_type == "TABLE":
+                by_database.setdefault(t.database, set()).add(t.table_key)
+
+        details: list[ForeignKeyDetail] = []
+        for database, table_keys in by_database.items():
+            try:
+                conn = self._get_cached_connection(database)
+                cursor = conn.cursor()
+                try:
+                    cursor.execute(f'SHOW IMPORTED KEYS IN DATABASE "{database}"')
+                    rows = self._fetch_dict_rows(cursor)
+                finally:
+                    cursor.close()
+            except Exception as exc:
+                logger.warning("Could not resolve Snowflake foreign key details for %s: %s", database, exc)
+                continue
+
+            for row in rows:
+                fk_schema = row.get("fk_schema_name") or row.get("FK_SCHEMA_NAME")
+                fk_table = row.get("fk_table_name") or row.get("FK_TABLE_NAME")
+                fk_col = row.get("fk_column_name") or row.get("FK_COLUMN_NAME")
+                pk_schema = row.get("pk_schema_name") or row.get("PK_SCHEMA_NAME")
+                pk_table = row.get("pk_table_name") or row.get("PK_TABLE_NAME")
+                pk_col = row.get("pk_column_name") or row.get("PK_COLUMN_NAME")
+                fk_name = row.get("fk_name") or row.get("FK_NAME")
+                if not all(
+                    isinstance(v, str) and v
+                    for v in (fk_schema, fk_table, fk_col, pk_schema, pk_table, pk_col)
+                ):
+                    continue
+                source_key = (database, str(fk_schema), str(fk_table))
+                target_key = (database, str(pk_schema), str(pk_table))
+                if source_key in table_keys and target_key in table_keys:
+                    details.append(
+                        ForeignKeyDetail(
+                            source_key=source_key,
+                            target_key=target_key,
+                            source_column=str(fk_col),
+                            target_column=str(pk_col),
+                            constraint_name=str(fk_name) if isinstance(fk_name, str) and fk_name else None,
+                        )
+                    )
+        return details
 
     def _collect_foreign_key_links(
         self,

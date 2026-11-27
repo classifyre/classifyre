@@ -23,6 +23,7 @@ import {
 } from "@workspace/ui/components/tabs";
 import { useTranslation } from "@/hooks/use-translation";
 import type { QueryCatalogSource } from "@/lib/data-query";
+import { exportDiagramDbml } from "./lib/dbml";
 import { findLinks } from "./lib/find-links";
 import { layoutConnectedGroups, layoutGrid } from "./lib/layout";
 import { SchemaPropertiesPanel } from "./panels/schema-properties-panel";
@@ -268,6 +269,14 @@ function VisualSchemaWorkspaceInner({
     />
   );
 
+  const handleExportDbml = React.useCallback(() => {
+    if (onExportDbml) {
+      onExportDbml();
+      return;
+    }
+    exportDiagramDbml(adapter.spec, adapter.catalog);
+  }, [adapter.catalog, adapter.spec, onExportDbml]);
+
   return (
     <div
       className="relative flex h-full w-full min-h-0 overflow-hidden bg-background"
@@ -353,7 +362,7 @@ function VisualSchemaWorkspaceInner({
               onFindLinks={handleFindLinks}
               onArrangeConnected={() => void handleArrangeConnected()}
               onArrangeGrid={handleArrangeGrid}
-              onExportDbml={onExportDbml}
+              onExportDbml={handleExportDbml}
             />
           </div>
         </ResizablePanel>
