@@ -573,7 +573,8 @@ describe('AutoScheduleService', () => {
       await service.tick();
 
       const where = prisma.source.count.mock.calls[0]![0].where;
-      expect(where.runnerStatus).toEqual({ in: ['PENDING', 'RUNNING'] });
+      // A source that never ran is PENDING and takes no capacity.
+      expect(where.runnerStatus).toBe('RUNNING');
       // No scheduleMode filter: a cron or manual run counts too.
       expect(where.scheduleMode).toBeUndefined();
     });
@@ -609,6 +610,18 @@ describe('AutoScheduleService', () => {
       await service.tick();
 
       expect(cliRunner.promotePendingRunners).toHaveBeenCalledTimes(1);
+    });
+
+    // A source that never ran is PENDING. Excluding PENDING meant a new source
+    // set to AUTO was due at once and never started.
+    it('starts a source that has never run', async () => {
+      prisma.source.count.mockResolvedValue(0);
+      prisma.source.findMany.mockResolvedValue([]);
+
+      await service.tick();
+
+      const { where } = prisma.source.findMany.mock.calls[0]![0];
+      expect(where.runnerStatus).toEqual({ not: 'RUNNING' });
     });
 
     // Fair rotation among adaptive sources: longest-overdue first, so a source

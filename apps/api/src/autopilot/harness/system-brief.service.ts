@@ -18,6 +18,7 @@ import {
   MAX_GLOSSARY_ENTRIES,
 } from '../autopilot.constants';
 import type { RecalledMemory } from '../autopilot.types';
+import { CONNECTED_SOURCES, SOURCES_IN_FLIGHT } from '../../source-filters';
 
 const BRIEF_ID = 1;
 const INSTANCE_SETTINGS_ID = 1;
@@ -320,7 +321,7 @@ export class SystemBriefService {
       assetSourceGroups,
       findingSourceGroups,
     ] = await Promise.all([
-      this.prisma.source.count(),
+      this.prisma.source.count({ where: CONNECTED_SOURCES }),
       this.prisma.asset.count(),
       this.prisma.customDetector.count({ where: { isActive: true } }),
       this.prisma.inquiry.count({ where: { status: 'ACTIVE' } }),
@@ -387,19 +388,17 @@ export class SystemBriefService {
       findingsOpen,
       findingsAnalyzed,
     ] = await Promise.all([
-      this.prisma.source.count(),
+      this.prisma.source.count({ where: CONNECTED_SOURCES }),
       this.prisma.runner.groupBy({
         by: ['sourceId'],
         where: {
           status: { in: [RunnerStatus.COMPLETED, RunnerStatus.WARNING] },
         },
       }),
-      this.prisma.source.count({ where: { lastRunAt: null } }),
       this.prisma.source.count({
-        where: {
-          runnerStatus: { in: [RunnerStatus.PENDING, RunnerStatus.RUNNING] },
-        },
+        where: { ...CONNECTED_SOURCES, lastRunAt: null },
       }),
+      this.prisma.source.count({ where: SOURCES_IN_FLIGHT }),
       this.prisma.source.count({
         where: { lastRunStatus: RunnerStatus.ERROR },
       }),
@@ -420,6 +419,7 @@ export class SystemBriefService {
     // this set however broken it has become since.
     const unavailableCandidates = await this.prisma.source.findMany({
       where: {
+        ...CONNECTED_SOURCES,
         OR: [
           { consecutiveFailures: { gte: COVERAGE_UNAVAILABLE_FAILURE_STREAK } },
           { scheduleMode: SourceScheduleMode.OFF },

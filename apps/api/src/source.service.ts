@@ -32,6 +32,7 @@ import {
   SearchSourceItemDto,
   SearchSourcesResponseDto,
 } from './dto/search-sources-response.dto';
+import { CONNECTED_SOURCES, SOURCES_IN_FLIGHT } from './source-filters';
 
 /**
  * Round-trip the config through JSON serialization to:
@@ -782,6 +783,7 @@ export class SourceService {
       this.prisma.source.count({ where }),
       this.prisma.source.groupBy({
         by: ['runnerStatus'],
+        where: CONNECTED_SOURCES,
         _count: { id: true },
       }),
     ]);
@@ -797,10 +799,7 @@ export class SourceService {
         healthy += group._count.id;
       } else if (group.runnerStatus === RunnerStatus.ERROR) {
         errors += group._count.id;
-      } else if (
-        group.runnerStatus === RunnerStatus.RUNNING ||
-        group.runnerStatus === RunnerStatus.PENDING
-      ) {
+      } else if (group.runnerStatus === SOURCES_IN_FLIGHT.runnerStatus) {
         running += group._count.id;
       }
     }

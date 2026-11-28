@@ -31,6 +31,7 @@ import {
 import { CorrelationService } from './correlation.service';
 import { EntitySwitchService } from '../entities/entity-switch.service';
 import { EntityResolutionService } from '../entities/entity-resolution.service';
+import { SOURCES_IN_FLIGHT } from '../source-filters';
 
 /**
  * Consumes CORRELATION_QUEUE jobs (enqueued by the cli-runner when a scan
@@ -439,9 +440,7 @@ export class CorrelationWorker {
       // nothing to batch with, so it keeps the original short delay rather than
       // sitting idle for ten minutes.
       const inFlight = await this.prisma.source.count({
-        where: {
-          runnerStatus: { in: [RunnerStatus.PENDING, RunnerStatus.RUNNING] },
-        },
+        where: SOURCES_IN_FLIGHT,
       });
       await this.enqueue(
         { corpus: true, cycleKey: `corpus:${new Date().toISOString()}` },

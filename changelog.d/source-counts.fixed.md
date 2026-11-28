@@ -1,0 +1,1 @@
+A new workspace no longer reports one source that is running: the built-in Shared datasets source is left out of source counts, and a source that has never been scanned no longer counts as running. It also no longer takes up a slot of the automatic scan limit or keeps an idle workspace awake.

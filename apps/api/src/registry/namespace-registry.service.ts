@@ -48,6 +48,7 @@ import type {
   UpdateNamespaceCategoryInput,
   UpdateNamespaceInput,
 } from './namespace.types';
+import { CONNECTED_SOURCES } from '../source-filters';
 
 /** One source's contribution to the directory-card rollup, with its latest run. */
 export interface NamespaceStatsSourceRow {
@@ -68,7 +69,6 @@ export function classifyStatsSource(
   if (row.runnerStatus === 'RUNNING') {
     return row.latestRunnerStatus === 'PENDING' ? 'pending' : 'running';
   }
-  if (row.runnerStatus === 'PENDING') return 'pending';
   return null;
 }
 
@@ -467,7 +467,8 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
                     (SELECT r.status FROM "${ns.schemaName}".runners r
                      WHERE r.source_id = s.id
                      ORDER BY r.triggered_at DESC LIMIT 1) AS "latestRunnerStatus"
-             FROM "${ns.schemaName}".sources s`,
+             FROM "${ns.schemaName}".sources s
+             WHERE s.type::text <> '${CONNECTED_SOURCES.type.not}'`,
           );
           const counts = { ...zero };
           counts.totalSources = rows.length;

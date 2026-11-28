@@ -357,14 +357,36 @@ describe('SchedulerService cron catch-up', () => {
   });
 
   it('leaves a source that is already running or queued alone', async () => {
+    // A queued run claims its source as RUNNING too.
     mockPrisma.source.findMany.mockResolvedValue([
       source({ runnerStatus: 'RUNNING' }),
-      source({ id: 's2', runnerStatus: 'PENDING' }),
     ]);
 
     await expect(service.catchUpMissedCronRuns()).resolves.toEqual({
       started: 0,
     });
+  });
+
+  it('catches up a source that never ran, once a window has passed since its setup', async () => {
+    mockPrisma.source.findMany.mockResolvedValue([
+      source({ runnerStatus: 'PENDING', lastRunAt: null }),
+      // Set up after this morning's window: nothing was missed.
+      source({
+        id: 's2',
+        runnerStatus: 'PENDING',
+        lastRunAt: null,
+        updatedAt: new Date('2026-09-20T08:00:00Z'),
+      }),
+    ]);
+
+    await expect(service.catchUpMissedCronRuns()).resolves.toEqual({
+      started: 1,
+    });
+    expect(mockCliRunnerService.startRun).toHaveBeenCalledWith(
+      's1',
+      TriggerType.SCHEDULED,
+      'Scheduler (catch-up)',
+    );
   });
 
   it('never starts a run for a window that has not come round yet', async () => {

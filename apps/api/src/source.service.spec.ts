@@ -432,6 +432,37 @@ describe('SourceService', () => {
     });
   });
 
+  describe('searchSources totals', () => {
+    it('counts only connected sources, and only claimed ones as running', async () => {
+      const groupBy = jest.fn().mockResolvedValue([
+        { runnerStatus: 'PENDING', _count: { id: 2 } },
+        { runnerStatus: 'RUNNING', _count: { id: 1 } },
+        { runnerStatus: 'COMPLETED', _count: { id: 3 } },
+      ]);
+      const { service } = createService({
+        source: {
+          findMany: jest.fn().mockResolvedValue([]),
+          count: jest.fn().mockResolvedValue(0),
+          groupBy,
+        },
+      });
+
+      const response = await service.searchSources({});
+
+      expect(groupBy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { type: { not: 'SHARED_DATASET' } },
+        }),
+      );
+      expect(response.totals).toMatchObject({
+        total: 6,
+        healthy: 3,
+        errors: 0,
+        running: 1,
+      });
+    });
+  });
+
   describe('purgeFindings', () => {
     it('deletes every finding of the source and schedules a correlation recompute', async () => {
       const deleteMany = jest.fn().mockResolvedValue({ count: 42 });

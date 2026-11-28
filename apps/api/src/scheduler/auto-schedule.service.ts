@@ -41,6 +41,7 @@ import {
   STEADY_MIN_SECONDS,
   maxConcurrentAutoScans,
 } from './auto-schedule.constants';
+import { SOURCES_IN_FLIGHT } from '../source-filters';
 
 const INSTANCE_SETTINGS_ID = 1;
 
@@ -523,11 +524,7 @@ export class AutoScheduleService {
     // yields to explicit intent. A busy instance simply gets fewer catch-up
     // runs, which is the correct trade — a source sweeping itself faster is
     // never worth delaying the schedule someone chose.
-    let inFlight = await this.prisma.source.count({
-      where: {
-        runnerStatus: { in: [RunnerStatus.PENDING, RunnerStatus.RUNNING] },
-      },
-    });
+    let inFlight = await this.prisma.source.count({ where: SOURCES_IN_FLIGHT });
     let budget = limit - inFlight;
 
     if (budget <= 0) {
@@ -539,11 +536,7 @@ export class AutoScheduleService {
       // tick keeps its single count query.
       const retired = await this.cliRunner.reconcileStaleInFlight();
       if (retired > 0) {
-        inFlight = await this.prisma.source.count({
-          where: {
-            runnerStatus: { in: [RunnerStatus.PENDING, RunnerStatus.RUNNING] },
-          },
-        });
+        inFlight = await this.prisma.source.count({ where: SOURCES_IN_FLIGHT });
         budget = limit - inFlight;
       }
     }
@@ -570,7 +563,8 @@ export class AutoScheduleService {
         scheduleMode: SourceScheduleMode.AUTO,
         autoPhase: { not: AutoSchedulePhase.PAUSED },
         scheduleNextAt: { lte: new Date() },
-        runnerStatus: { notIn: [RunnerStatus.PENDING, RunnerStatus.RUNNING] },
+        // PENDING is a source that has no run yet, which is what AUTO is for.
+        runnerStatus: { not: SOURCES_IN_FLIGHT.runnerStatus },
       },
       // Longest-overdue first, so a busy instance degrades into fair rotation
       // rather than starving whichever source sorts last.

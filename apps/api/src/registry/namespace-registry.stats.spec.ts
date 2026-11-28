@@ -60,7 +60,8 @@ describe('classifyStatsSource', () => {
     [{ runnerStatus: 'RUNNING', latestRunnerStatus: 'RUNNING' }, 'running'],
     // Claimed without a run row yet (repair has not caught up).
     [{ runnerStatus: 'RUNNING', latestRunnerStatus: null }, 'running'],
-    [{ runnerStatus: 'PENDING', latestRunnerStatus: null }, 'pending'],
+    // Never scanned: nothing is queued or running.
+    [{ runnerStatus: 'PENDING', latestRunnerStatus: null }, null],
     [{ runnerStatus: 'ERROR', latestRunnerStatus: 'ERROR' }, 'failing'],
     [{ runnerStatus: 'ERROR', latestRunnerStatus: null }, 'failing'],
     [{ runnerStatus: 'COMPLETED', latestRunnerStatus: 'COMPLETED' }, null],
@@ -100,7 +101,8 @@ describe('NamespaceRegistryService stats', () => {
       totalSources: 5,
       failingSources: 1,
       runningSources: 1,
-      pendingSources: 2,
+      // The queued scan only: the never-scanned source waits for nothing.
+      pendingSources: 1,
     });
   });
 

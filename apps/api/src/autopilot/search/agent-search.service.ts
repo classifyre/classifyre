@@ -72,6 +72,7 @@ import type {
   RankedList,
   UnmonitoredFindings,
 } from '../autopilot.types';
+import { CONNECTED_SOURCES, SOURCES_IN_FLIGHT } from '../../source-filters';
 
 const OPEN_CASE_INCLUDE = {
   inquiryLinks: { select: { inquiryId: true } },
@@ -597,6 +598,7 @@ export class AgentSearchService {
   async corpusCoverage(): Promise<CorpusCoverage> {
     const [sources, findingsOpen, findingsAnalyzed] = await Promise.all([
       this.prisma.source.findMany({
+        where: CONNECTED_SOURCES,
         select: {
           id: true,
           name: true,
@@ -669,9 +671,7 @@ export class AgentSearchService {
       reachableSources: reachable,
       neverScanned: rows.filter((r) => r.lastRunAt == null).length,
       inFlight: rows.filter(
-        (r) =>
-          r.runnerStatus === RunnerStatus.PENDING ||
-          r.runnerStatus === RunnerStatus.RUNNING,
+        (r) => r.runnerStatus === SOURCES_IN_FLIGHT.runnerStatus,
       ).length,
       failing: rows.filter((r) => r.lastRunStatus === RunnerStatus.ERROR)
         .length,

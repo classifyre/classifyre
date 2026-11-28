@@ -49,6 +49,7 @@ import {
   type NamespaceActivitySnapshot,
 } from './namespace-idle-policy';
 import type { NamespaceLifecycleEvent } from '../registry/namespace.types';
+import { SOURCES_IN_FLIGHT } from '../source-filters';
 
 /** How often a worker process checks the embeddings switch per namespace. */
 const EMBEDDING_SWITCH_RECONCILE_MS = 10_000;
@@ -487,11 +488,7 @@ export class NamespaceWorkerManager
       this.prisma.runner.count({
         where: { status: { in: [RunnerStatus.PENDING, RunnerStatus.RUNNING] } },
       }),
-      this.prisma.source.count({
-        where: {
-          runnerStatus: { in: [RunnerStatus.PENDING, RunnerStatus.RUNNING] },
-        },
-      }),
+      this.prisma.source.count({ where: SOURCES_IN_FLIGHT }),
       this.prisma.source.count({
         where: { autopilotDirtyAt: { not: null } },
       }),

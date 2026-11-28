@@ -1,12 +1,13 @@
 import { ConflictException, Injectable, Logger } from '@nestjs/common';
 import type { Job } from 'pg-boss';
-import { RunnerStatus, SourceScheduleMode, TriggerType } from '@prisma/client';
+import { SourceScheduleMode, TriggerType } from '@prisma/client';
 import { ClsService } from 'nestjs-cls';
 import { PrismaService } from '../prisma.service';
 import { PgBossService } from './pg-boss.service';
 import { CliRunnerService } from '../cli-runner/cli-runner.service';
 import { CLS_SCHEMA } from '../namespace/namespace.constants';
 import { previousCronOccurrence } from './cron-window';
+import { SOURCES_IN_FLIGHT } from '../source-filters';
 
 const JOB_NAME_PREFIX = 'ingest-source-';
 /** Queue and cadence of the missed-window sweep (see catchUpMissedCronRuns). */
@@ -145,18 +146,15 @@ export class SchedulerService {
     for (const source of sources) {
       // In flight already: the window is being served, or is queued behind the
       // scan slot. Either way this pass has nothing to add.
-      if (
-        source.runnerStatus === RunnerStatus.RUNNING ||
-        source.runnerStatus === RunnerStatus.PENDING
-      ) {
-        continue;
-      }
+      if (source.runnerStatus === SOURCES_IN_FLIGHT.runnerStatus) continue;
       const missedAt = previousCronOccurrence(
         source.scheduleCron as string,
         source.scheduleTimezone ?? 'UTC',
       );
       if (!missedAt) continue;
       if (source.lastRunAt && source.lastRunAt >= missedAt) continue;
+      // A source that never ran missed only windows since it was last set up.
+      if (!source.lastRunAt && source.updatedAt > missedAt) continue;
 
       // A source that keeps failing to start must not occupy a slot this pass,
       // so this filter runs before the cap below rather than after it.
