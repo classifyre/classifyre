@@ -34,9 +34,10 @@ cp -r packages/api-client/src/generated/. "${CODEGEN}/"
 #  - node_modules/.bun/ → global bun install cache (absent on CI / in Docker)
 #  - apps/web/node_modules/next → not present; bun hoists it to root
 #  - node_modules/typescript → dev-only dep, absent at runtime
-# Prune every dangling symlink (-xtype l = symlink whose target doesn't exist)
-# so cp -rL only sees real files and valid symlinks it can dereference.
-find apps/web/.next/standalone -xtype l -delete
+# Prune every dangling symlink (a link whose target doesn't exist) so cp -rL
+# only sees real files and valid symlinks it can dereference. `-xtype l` would
+# say this in one word, but BSD find on macOS does not have it.
+find apps/web/.next/standalone -type l ! -exec test -e {} \; -delete
 cp -rL apps/web/.next/standalone/. "${WEB_DIST}/standalone/"
 cp -r apps/web/.next/static/. "${WEB_DIST}/static/"
 
