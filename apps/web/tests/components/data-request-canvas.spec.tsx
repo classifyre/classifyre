@@ -53,7 +53,16 @@ test("adds two tables (one locked), joins them, ticks columns, updates SQL live,
   await expect(component.getByTestId("tab-preview")).toHaveCount(0);
   await expect(component.getByTestId("sql-save-btn")).toHaveCount(0);
 
-  // Verify generated SQL text (textarea fallback or Monaco lines)
+  // Component tests load no stylesheet, so give the editor's wrapper the height
+  // the panel's flex layout gives it. Monaco only renders the lines that fit.
+  await page.addStyleTag({
+    content: '[data-testid="request-sql-editor-wrap"] { height: 400px; }',
+  });
+  await expect(sqlEditor.locator(".monaco-editor")).toBeVisible({
+    timeout: 15_000,
+  });
+
+  // Verify generated SQL text
   await expect(sqlEditor).toContainText("shop.public.orders");
   await expect(sqlEditor).toContainText("INNER JOIN crm.public.customers");
 

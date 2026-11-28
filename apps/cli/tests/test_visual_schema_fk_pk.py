@@ -90,8 +90,16 @@ class TestTabularBasePkNullabilityAndMultiFk:
     ) -> None:
         src = self._pg_source(monkeypatch)
         ref = TableRef("shop", "public", "orders")
-        src._cached_column_types = lambda _r: {"id": "bigint", "customer_id": "bigint", "note": "text"}  # type: ignore[method-assign]
-        src._cached_column_nullability = lambda _r: {"id": False, "customer_id": False, "note": True}  # type: ignore[method-assign]
+        src._cached_column_types = lambda _r: {
+            "id": "bigint",
+            "customer_id": "bigint",
+            "note": "text",
+        }  # type: ignore[method-assign]
+        src._cached_column_nullability = lambda _r: {
+            "id": False,
+            "customer_id": False,
+            "note": True,
+        }  # type: ignore[method-assign]
         src._get_primary_key_columns = lambda _r: ["id"]  # type: ignore[method-assign]
         src._estimate_row_count = lambda _r: 42  # type: ignore[method-assign]
 
@@ -166,9 +174,7 @@ class TestTabularBasePkNullabilityAndMultiFk:
 
 
 class TestSqlConnectorForeignKeyDetails:
-    def test_postgresql_collect_foreign_key_details(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_postgresql_collect_foreign_key_details(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(
             "src.sources.postgresql.source.require_module",
             lambda **_kwargs: object(),
@@ -186,8 +192,24 @@ class TestSqlConnectorForeignKeyDetails:
         addresses = TableRef("shop", "public", "addresses")
         cursor = _FakeCursor(
             [
-                ("fk_orders_billing", "public", "orders", "billing_address_id", "public", "addresses", "id"),
-                ("fk_orders_shipping", "public", "orders", "shipping_address_id", "public", "addresses", "id"),
+                (
+                    "fk_orders_billing",
+                    "public",
+                    "orders",
+                    "billing_address_id",
+                    "public",
+                    "addresses",
+                    "id",
+                ),
+                (
+                    "fk_orders_shipping",
+                    "public",
+                    "orders",
+                    "shipping_address_id",
+                    "public",
+                    "addresses",
+                    "id",
+                ),
             ]
         )
         src._get_cached_connection = lambda _db: _FakeConn(cursor)  # type: ignore[method-assign]
@@ -195,10 +217,18 @@ class TestSqlConnectorForeignKeyDetails:
         details = src._collect_foreign_key_details([orders, addresses])
         assert details == [
             ForeignKeyDetail(
-                orders.table_key, addresses.table_key, "billing_address_id", "id", "fk_orders_billing"
+                orders.table_key,
+                addresses.table_key,
+                "billing_address_id",
+                "id",
+                "fk_orders_billing",
             ),
             ForeignKeyDetail(
-                orders.table_key, addresses.table_key, "shipping_address_id", "id", "fk_orders_shipping"
+                orders.table_key,
+                addresses.table_key,
+                "shipping_address_id",
+                "id",
+                "fk_orders_shipping",
             ),
         ]
 
@@ -304,9 +334,18 @@ class TestSqlConnectorForeignKeyDetails:
         customers = TableRef("shop", "public", "customers")
         # ODBC SQLForeignKeys row: (pkcat, pkschem, pktable, pkcol, fkcat, fkschem, fktable, fkcol, key_seq, upd, del, fkname)
         odbc_row = (
-            "shop", "public", "customers", "id",
-            "shop", "public", "orders", "customer_id",
-            1, 0, 0, "fk_orders_customer",
+            "shop",
+            "public",
+            "customers",
+            "id",
+            "shop",
+            "public",
+            "orders",
+            "customer_id",
+            1,
+            0,
+            0,
+            "fk_orders_customer",
         )
         cursor = _FakeCursor([odbc_row])
         src._get_cached_connection = lambda _db: _FakeConn(cursor)  # type: ignore[method-assign]
@@ -318,9 +357,7 @@ class TestSqlConnectorForeignKeyDetails:
             )
         ]
 
-    def test_snowflake_collect_foreign_key_details(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_snowflake_collect_foreign_key_details(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(
             "src.sources.snowflake.source.require_module",
             lambda **_kwargs: object(),
@@ -344,7 +381,17 @@ class TestSqlConnectorForeignKeyDetails:
         customers = TableRef("PROD", "PUBLIC", "CUSTOMERS")
         cursor = _FakeCursor(
             [
-                ("PROD", "PUBLIC", "CUSTOMERS", "ID", "PROD", "PUBLIC", "ORDERS", "CUSTOMER_ID", "FK_ORD_CUST")
+                (
+                    "PROD",
+                    "PUBLIC",
+                    "CUSTOMERS",
+                    "ID",
+                    "PROD",
+                    "PUBLIC",
+                    "ORDERS",
+                    "CUSTOMER_ID",
+                    "FK_ORD_CUST",
+                )
             ],
             description=[
                 ("pk_database_name",),

@@ -140,7 +140,8 @@ export class QueryCatalogTableDto {
   reason?: string;
 
   @ApiPropertyOptional({
-    description: 'Estimated row count from the last scan, when known and unfiltered.',
+    description:
+      'Estimated row count from the last scan, when known and unfiltered.',
   })
   rowCount?: number;
 

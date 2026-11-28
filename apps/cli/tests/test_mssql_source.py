@@ -319,9 +319,7 @@ def test_mssql_is_aws_rds_explicit_override() -> None:
     assert source._is_aws_rds() is True
 
 
-def test_mssql_collect_foreign_key_links_respects_table_lineage_toggle(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_mssql_collect_foreign_key_links_respects_table_lineage_toggle() -> None:
     source = MSSQLSource(
         _recipe(
             optional={

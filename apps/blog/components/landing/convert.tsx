@@ -16,6 +16,7 @@ import {
   softwareVersion,
 } from "@/lib/site";
 import { ClosingBoard } from "@/components/closing-board";
+import { DockerTrialHint } from "@/components/docker-trial-hint";
 import {
   LandingHead,
   Micro,
@@ -71,6 +72,7 @@ export function Convert({ locale }: { locale: Locale }) {
                 className="mt-3"
                 showNotes={false}
               />
+              <DockerTrialHint copy={copy.install.dockerHint} tone="dark" />
             </div>
 
             <div className="border-2 border-white/20 bg-white/[0.04] p-5 sm:p-6">

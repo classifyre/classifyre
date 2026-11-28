@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import de from "@/i18n/de.json";
 import en from "@/i18n/en.json";
+import { escapeHtml } from "@/lib/iam/html";
 import { ID_COOKIE } from "@/lib/iam/session";
 
 /**
@@ -37,7 +38,7 @@ export function GET(request: NextRequest) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escape(title)} · Classifyre</title>
+<title>${escapeHtml(title)} · Classifyre</title>
 <style>
   :root { color-scheme: light dark; --bg: #f6f5f2; --fg: #1a1a1a; --muted: #5f5f5f; --line: #d8d6d0; --button: #1a1a1a; --button-fg: #fff; }
   @media (prefers-color-scheme: dark) { :root { --bg: #161616; --fg: #eeeeec; --muted: #a3a3a0; --line: #333; --button: #eeeeec; --button-fg: #161616; } }
@@ -54,13 +55,13 @@ export function GET(request: NextRequest) {
 </head>
 <body>
 <main>
-  <h1>${escape(title)}</h1>
-  <p>${escape(text)}</p>
-  <p>${escape(fix)}</p>
-  ${who ? `<p class="muted">${escape(t.signedInAs)} ${escape(who)}</p>` : ""}
+  <h1>${escapeHtml(title)}</h1>
+  <p>${escapeHtml(text)}</p>
+  <p>${escapeHtml(fix)}</p>
+  ${who ? `<p class="muted">${escapeHtml(t.signedInAs)} ${escapeHtml(who)}</p>` : ""}
   <div class="actions">
-    <a class="primary" href="/auth/login/?returnTo=%2F">${escape(t.retry)}</a>
-    <form method="post" action="/auth/logout/"><button type="submit">${escape(t.signOut)}</button></form>
+    <a class="primary" href="/auth/login/?returnTo=%2F">${escapeHtml(t.retry)}</a>
+    <form method="post" action="/auth/logout/"><button type="submit">${escapeHtml(t.signOut)}</button></form>
   </div>
 </main>
 </body>
@@ -81,12 +82,4 @@ function signedInName(idToken: string | undefined): string | null {
   } catch {
     return null;
   }
-}
-
-function escape(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }

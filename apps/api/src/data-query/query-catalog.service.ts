@@ -987,7 +987,8 @@ function parseForeignKeyEdge(edge: {
   const rawLists: unknown[] = [];
   if (ev && Array.isArray(ev.foreign_keys)) rawLists.push(ev.foreign_keys);
   if (ev && Array.isArray(ev.columns)) rawLists.push(ev.columns);
-  if (meta && Array.isArray(meta.foreign_keys)) rawLists.push(meta.foreign_keys);
+  if (meta && Array.isArray(meta.foreign_keys))
+    rawLists.push(meta.foreign_keys);
   if (meta && Array.isArray(meta.columns)) rawLists.push(meta.columns);
   if (Array.isArray(edge.fieldMappings)) rawLists.push(edge.fieldMappings);
 
@@ -1063,7 +1064,9 @@ function filterRelationsForCatalog(
             fromColumn: rel.fromColumn,
             toAssetId: rel.toAssetId,
             toColumn: rel.toColumn,
-            ...(rel.constraintName ? { constraintName: rel.constraintName } : {}),
+            ...(rel.constraintName
+              ? { constraintName: rel.constraintName }
+              : {}),
             ...(rel.cardinality ? { cardinality: rel.cardinality } : {}),
           }
         : {

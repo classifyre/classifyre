@@ -10,6 +10,7 @@ import {
   unseal,
   type TokenSet,
 } from "@/lib/iam/session";
+import { redirectToStarting } from "@/lib/iam/starting";
 
 /** Where the identity server sends people back with a code to exchange. */
 export async function GET(request: NextRequest) {
@@ -39,10 +40,9 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     if (!(error instanceof IdentityUnavailableError)) throw error;
-    return new NextResponse(
-      "Sign-in is unavailable for a moment. Try again in a minute.",
-      { status: 503, headers: { "Content-Type": "text/plain; charset=utf-8", "Retry-After": "30" } },
-    );
+    return redirectToStarting(flow.returnTo, config.appUrl, {
+      reason: "unavailable",
+    });
   }
   if (!tokens) {
     return NextResponse.redirect(new URL("/auth/login", config.appUrl));

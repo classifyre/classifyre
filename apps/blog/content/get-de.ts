@@ -26,8 +26,12 @@ const deDocker = {
   footnote: {
     beforeHost: "Anschließend ",
     host: "localhost:3000",
-    afterHost:
-      " öffnen. Benötigt Docker und 4 GB RAM. Die Volumes erhalten Ihre Konfiguration über Upgrades hinweg – der ",
+    afterHost: " öffnen und mit ",
+    credentials: "admin / admin",
+    afterCredentials:
+      " anmelden (temporäres Passwort – beim ersten Anmelden werden Sie aufgefordert, ein neues zu vergeben). Benötigt Docker und 4 GB RAM. Die Volumes erhalten Ihre Konfiguration über Upgrades hinweg – der ",
+    closingAfterCredentials:
+      " anmelden (temporäres Passwort – beim ersten Anmelden vergeben Sie ein neues).",
     linkLabel: "Docker-Leitfaden",
     afterLink:
       " beschreibt Umgebungsvariablen, externe Datenbanken und Object Storage.",
@@ -60,8 +64,8 @@ const deFirstRun = {
   steps: [
     {
       step: "01",
-      title: "Container starten",
-      body: "Docker-Befehl ausführen und localhost:3000 öffnen. Beim ersten Start richtet Classifyre Datenbank, Identity-Service und Standard-Workspace automatisch ein.",
+      title: "Container starten & anmelden",
+      body: "Docker-Befehl ausführen und localhost:3000 öffnen. Beim ersten Start richtet Classifyre Datenbank, Identity-Service und Standard-Workspace automatisch ein; melden Sie sich danach mit admin / admin an (temporäres Passwort – beim ersten Anmelden vergeben Sie ein neues).",
     },
     {
       step: "02",

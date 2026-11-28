@@ -1,4 +1,8 @@
-import { resilientFetch, setUnauthorizedHandler } from "./http";
+import {
+  resilientFetch,
+  setUnauthorizedHandler,
+  setUnavailableHandler,
+} from "./http";
 
 type FetchMock = jest.Mock<
   Promise<Response>,
@@ -203,5 +207,62 @@ describe("resilientFetch after a 401", () => {
   it("leaves 401s alone before a handler is installed", async () => {
     mockFetch(jsonResponse(401, {}));
     expect((await resilientFetch("/acme/sources")).status).toBe(401);
+  });
+});
+
+describe("resilientFetch when the API is unavailable", () => {
+  const realFetch = global.fetch;
+  afterEach(() => {
+    global.fetch = realFetch;
+    setUnavailableHandler(null);
+  });
+
+  it("notifies the unavailable handler after 502/503 retries are exhausted", async () => {
+    mockFetch(jsonResponse(502, {}));
+    const handler = jest.fn(() => Promise.resolve(true));
+    setUnavailableHandler(handler);
+
+    const response = await resilientFetch("/acme/sources", undefined, {
+      attempts: 1,
+    });
+    expect(response.status).toBe(502);
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it("notifies the unavailable handler on network failures but not on aborts", async () => {
+    const handler = jest.fn(() => Promise.resolve(true));
+    setUnavailableHandler(handler);
+
+    mockFetch(new TypeError("Failed to fetch"));
+    await expect(
+      resilientFetch("/acme/sources", undefined, { attempts: 1 }),
+    ).rejects.toThrow("Failed to fetch");
+    expect(handler).toHaveBeenCalledTimes(1);
+
+    const abortError = new Error("Aborted");
+    abortError.name = "AbortError";
+    mockFetch(abortError);
+    await expect(
+      resilientFetch("/acme/sources", undefined, { attempts: 1 }),
+    ).rejects.toThrow("Aborted");
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it("deduplicates concurrent unavailable notifications", async () => {
+    mockFetch(jsonResponse(503, {}), jsonResponse(503, {}));
+    let release: () => void = () => undefined;
+    const handler = jest.fn(
+      () => new Promise<boolean>((resolve) => (release = () => resolve(true))),
+    );
+    setUnavailableHandler(handler);
+
+    const both = Promise.all([
+      resilientFetch("/acme/a", undefined, { attempts: 1 }),
+      resilientFetch("/acme/b", undefined, { attempts: 1 }),
+    ]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    release();
+    await both;
+    expect(handler).toHaveBeenCalledTimes(1);
   });
 });

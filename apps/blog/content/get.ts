@@ -1,3 +1,4 @@
+import type { DockerTrialHintCopy } from "@/components/docker-trial-hint";
 import type { Locale } from "@/lib/locale";
 
 import de from "./get-de";
@@ -40,11 +41,9 @@ export type GetCopy = {
     title: string;
     lede: string;
     cardLabel: string;
-    /** The localhost footnote: `beforeHost` + mono `host` + `afterHost` + link + `afterLink`. */
-    footnote: {
-      beforeHost: string;
-      host: string;
-      afterHost: string;
+    /** The localhost footnote: `DockerTrialHintCopy` + closing suffix + Docker guide link. */
+    footnote: DockerTrialHintCopy & {
+      closingAfterCredentials: string;
       linkLabel: string;
       afterLink: string;
     };
@@ -126,8 +125,12 @@ const enDocker = {
   footnote: {
     beforeHost: "Then open ",
     host: "localhost:3000",
-    afterHost:
-      ". Requires Docker and 4 GB RAM. Mounted volumes preserve your configuration across upgrades — see the ",
+    afterHost: " and sign in with ",
+    credentials: "admin / admin",
+    afterCredentials:
+      " (temporary password — you will be prompted to set a new one on first sign-in). Requires Docker and 4 GB RAM. Mounted volumes preserve your configuration across upgrades — see the ",
+    closingAfterCredentials:
+      " (temporary password — you will be asked to choose a new one on first sign-in).",
     linkLabel: "Docker guide",
     afterLink:
       " for environment variables, external databases, and object storage.",
@@ -160,8 +163,8 @@ const enFirstRun = {
   steps: [
     {
       step: "01",
-      title: "Start the container",
-      body: "Run the Docker command and open localhost:3000. On first boot, Classifyre initialises the database, identity service, and default workspace.",
+      title: "Start the container & sign in",
+      body: "Run the Docker command and open localhost:3000. On first boot, Classifyre initialises the database, identity service, and default workspace automatically, then sign in with admin / admin (temporary password — you will be asked to change it on first sign-in).",
     },
     {
       step: "02",

@@ -678,7 +678,9 @@ class SnowflakeSource(BaseTabularSource):
                 finally:
                     cursor.close()
             except Exception as exc:
-                logger.warning("Could not resolve Snowflake foreign key details for %s: %s", database, exc)
+                logger.warning(
+                    "Could not resolve Snowflake foreign key details for %s: %s", database, exc
+                )
                 continue
 
             for row in rows:
@@ -703,7 +705,9 @@ class SnowflakeSource(BaseTabularSource):
                             target_key=target_key,
                             source_column=str(fk_col),
                             target_column=str(pk_col),
-                            constraint_name=str(fk_name) if isinstance(fk_name, str) and fk_name else None,
+                            constraint_name=str(fk_name)
+                            if isinstance(fk_name, str) and fk_name
+                            else None,
                         )
                     )
         return details

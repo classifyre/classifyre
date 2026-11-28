@@ -215,7 +215,14 @@ class PostgreSQLSource(BaseTabularSource):
                         ) = row[:7]
                         if not all(
                             isinstance(v, str)
-                            for v in (src_schema, src_table, src_col, tgt_schema, tgt_table, tgt_col)
+                            for v in (
+                                src_schema,
+                                src_table,
+                                src_col,
+                                tgt_schema,
+                                tgt_table,
+                                tgt_col,
+                            )
                         ):
                             continue
                         source_key = (database, src_schema, src_table)

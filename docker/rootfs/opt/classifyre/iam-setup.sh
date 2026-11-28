@@ -4,9 +4,9 @@
 # all-in-one's simple settings. It waits for the identity server itself.
 #
 # The first tenant admin is $CLASSIFYRE_ADMIN_USER with the documented
-# password, not a temporary one: this image is for trying Classifyre out.
-# People change it under Your account (account menu), and the realm setup
-# never resets it once the account exists.
+# password (admin / admin by default), marked temporary so Keycloak asks for a
+# new password on first sign-in. The realm setup never resets it once the
+# account exists.
 set -euo pipefail
 
 exec s6-setuidgid classifyre env \
@@ -26,7 +26,7 @@ exec s6-setuidgid classifyre env \
   IAM_WEB_CLIENT_SECRET="${IAM_WEB_CLIENT_SECRET}" \
   IAM_BOOTSTRAP_ADMIN="${CLASSIFYRE_ADMIN_USER}" \
   IAM_BOOTSTRAP_ADMIN_PASSWORD="${CLASSIFYRE_ADMIN_PASSWORD}" \
-  IAM_BOOTSTRAP_ADMIN_TEMPORARY=false \
+  IAM_BOOTSTRAP_ADMIN_TEMPORARY=true \
   IAM_BOOTSTRAP_ADMIN_EMAIL="${CLASSIFYRE_ADMIN_EMAIL:-admin@classifyre.example}" \
   IAM_BOOTSTRAP_ADMIN_FIRST_NAME=Classifyre \
   IAM_BOOTSTRAP_ADMIN_LAST_NAME=Admin \

@@ -8,6 +8,7 @@ import {
   KubernetesLogo,
 } from "@workspace/ui/components";
 
+import { DockerTrialHint } from "@/components/docker-trial-hint";
 import { getGetCopy } from "@/content/get";
 import { getDockerNotes, getTranslationsForLocale } from "@/i18n";
 import type { Locale } from "@/lib/locale";
@@ -191,12 +192,7 @@ export function GetPage({ locale }: { locale: Locale }) {
                   </Micro>
                 </div>
                 <DockerRunBlock lines={dockerLines} copy={dockerCopy} />
-                <p className="mt-auto text-sm leading-6 text-muted-foreground">
-                  {copy.docker.footnote.beforeHost}
-                  <span className="font-mono text-foreground">
-                    {copy.docker.footnote.host}
-                  </span>
-                  {copy.docker.footnote.afterHost}
+                <DockerTrialHint copy={copy.docker.footnote}>
                   <a
                     href={docs.docker}
                     target="_blank"
@@ -206,7 +202,7 @@ export function GetPage({ locale }: { locale: Locale }) {
                     {copy.docker.footnote.linkLabel}
                   </a>
                   {copy.docker.footnote.afterLink}
-                </p>
+                </DockerTrialHint>
               </div>
 
               {/* Helm: the same core, on your cluster. */}
@@ -521,6 +517,15 @@ export function GetPage({ locale }: { locale: Locale }) {
                     tone="dark"
                     lines={dockerLines}
                     copy={dockerCopy}
+                  />
+                  <DockerTrialHint
+                    copy={{
+                      ...copy.docker.footnote,
+                      afterCredentials:
+                        copy.docker.footnote.closingAfterCredentials,
+                    }}
+                    tone="dark"
+                    className="mt-3 text-left text-xs leading-6 text-white/70"
                   />
                 </div>
                 <a

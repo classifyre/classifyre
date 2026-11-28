@@ -105,6 +105,8 @@ docker run -d --name classifyre \
   classifyre/all-in-one:latest
 ```
 
+Then open [http://localhost:3000](http://localhost:3000) and sign in with **`admin` / `admin`** (temporary password — you will be asked to choose a new one on first sign-in). While the first boot initialises the database and sign-in service, the page shows a setup screen and refreshes automatically when ready.
+
 `-p 5433:5433` publishes SQL connections (Power BI, Excel, DBeaver and `psql`
 over the PostgreSQL protocol), on 5433 because the container's own PostgreSQL
 holds 5432; it is on by default and `-e SQL_GATEWAY_ENABLED=false` turns it off.

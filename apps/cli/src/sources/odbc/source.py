@@ -415,9 +415,7 @@ class OdbcSource(BaseTabularSource):
         matching.sort(key=lambda r: r[4] if len(r) > 4 and isinstance(r[4], int) else 0)
         return [str(row[3]) for row in matching if row[3]]
 
-    def _collect_foreign_key_details(
-        self, tables: list[TableRef]
-    ) -> list[ForeignKeyDetail]:
+    def _collect_foreign_key_details(self, tables: list[TableRef]) -> list[ForeignKeyDetail]:
         if self._option("extraction", "include_foreign_keys", True) is False:
             return []
         details: list[ForeignKeyDetail] = []

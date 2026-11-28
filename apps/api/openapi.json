@@ -18,6 +18,10 @@
                       "type": "string",
                       "example": "ok"
                     },
+                    "tenantReady": {
+                      "type": "boolean",
+                      "example": true
+                    },
                     "timestamp": {
                       "type": "string",
                       "example": "2026-01-31T10:00:00.000Z"

@@ -22,7 +22,7 @@ from ...models.generated_single_asset_scan_results import AssetType as OutputAss
 from ...utils.sql_lineage import table_paths_from_sql
 from ...utils.urn import Urn, UrnError
 from ..tabular_base import BaseTabularSource
-from ..tabular_utils import TableRef, ViewLineage, table_format_from
+from ..tabular_utils import ForeignKeyDetail, TableRef, ViewLineage, table_format_from
 from .client import (
     JOB_ROW_WINDOW,
     DremioApiError,
@@ -624,8 +624,9 @@ class DremioSource(BaseTabularSource):
         tables: list[TableRef],
         table_hash_by_key: dict[tuple[str, ...], str],
         fk_links: dict[tuple[str, ...], set[tuple[str, ...]]],
+        fk_details: list[ForeignKeyDetail] | None = None,
     ) -> None:
-        super()._emit_relationship_edges(tables, table_hash_by_key, fk_links)
+        super()._emit_relationship_edges(tables, table_hash_by_key, fk_links, fk_details=fk_details)
         if not self._extraction_options().include_source_lineage:
             return
         for table_ref in tables:

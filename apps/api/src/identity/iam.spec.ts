@@ -640,6 +640,68 @@ describe('IdentityService', () => {
         ),
       ).rejects.toMatchObject({ code: 'SIGN_IN_REQUIRED' });
     });
+
+    it('clears a cached missing-tenant visitor miss as soon as bootstrap() completes', async () => {
+      let tenantCreated = false;
+      const membership = {
+        organizationByAlias: () =>
+          Promise.resolve({
+            id: 'org-acme',
+            alias: 'acme',
+            name: 'Acme',
+            enabled: true,
+          }),
+        groups: () =>
+          Promise.resolve([
+            {
+              id: 'admins',
+              name: 'admins',
+              path: '/admins',
+              parentId: null,
+            },
+          ]),
+      } as unknown as MembershipService;
+      const tenancy = {
+        tenantByAlias: () =>
+          Promise.resolve(
+            tenantCreated
+              ? {
+                  id: 't-acme',
+                  alias: 'acme',
+                  name: 'Acme',
+                  orgId: 'org-acme',
+                  status: 'active',
+                }
+              : null,
+          ),
+        ensureTenant: () => {
+          tenantCreated = true;
+          return Promise.resolve({
+            id: 't-acme',
+            alias: 'acme',
+            name: 'Acme',
+            orgId: 'org-acme',
+            status: 'active',
+          });
+        },
+        grantAdminsOnce: () => Promise.resolve(true),
+      } as unknown as TenancyService;
+      const identity = new IdentityService(firstAcme, membership, tenancy);
+
+      // Early anonymous request before bootstrap caches a null visitor miss.
+      await expect(identity.authenticate(anonymous())).rejects.toMatchObject({
+        code: 'SIGN_IN_REQUIRED',
+      });
+
+      await identity.bootstrap();
+
+      // Immediately after bootstrap, the cached miss must be cleared.
+      const visitor = await identity.authenticate(anonymous());
+      expect(visitor).toMatchObject({
+        visitor: true,
+        tenant: { alias: 'acme' },
+      });
+    });
   });
 
   it('refuses the people of a suspended or deleted tenant (TEN §4.7)', async () => {

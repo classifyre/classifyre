@@ -4,7 +4,9 @@ import * as React from "react";
 import {
   namespaceSlugFromPath,
   setUnauthorizedHandler,
+  setUnavailableHandler,
 } from "@workspace/api-client";
+import { redirectIfStarting } from "@/lib/iam/client-readiness";
 
 const IamConsoleContext = React.createContext(false);
 
@@ -81,6 +83,7 @@ export function IamProvider({
   children: React.ReactNode;
 }) {
   React.useEffect(() => {
+    setUnavailableHandler(() => redirectIfStarting());
     setUnauthorizedHandler(async ({ code }) => {
       // Signed in, but in no tenant, in several or in a suspended one: a new
       // session would be refused the same way, so say so instead of retrying.
@@ -105,6 +108,7 @@ export function IamProvider({
       // workspace the refused request just fails — never an automatic trip
       // to the sign-in page; **Sign in** is in the header for that.
       if (code === "SIGN_IN_REQUIRED" && (await readsPublicWorkspace())) {
+        if (await redirectIfStarting()) return false;
         return false;
       }
       const response = await fetch("/auth/refresh/", {
@@ -112,16 +116,23 @@ export function IamProvider({
         credentials: "same-origin",
       });
       if (response.status === 204) return true;
-      // The identity server is away for a moment: the request fails, the
-      // session stays, and the next one tries again.
-      if (response.status === 503) return false;
+      // The identity server is away for a moment: if the deployment is still
+      // preparing, show the auto-refreshing setup screen; otherwise keep the
+      // session and let the next request try again.
+      if (response.status === 503) {
+        await redirectIfStarting();
+        return false;
+      }
       const returnTo = `${window.location.pathname}${window.location.search}`;
       window.location.assign(
         `/auth/login/?returnTo=${encodeURIComponent(returnTo)}`,
       );
       return false;
     });
-    return () => setUnauthorizedHandler(null);
+    return () => {
+      setUnauthorizedHandler(null);
+      setUnavailableHandler(null);
+    };
   }, []);
 
   return (

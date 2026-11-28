@@ -118,6 +118,14 @@ const enInstall = {
   lede: "Inspect the code, test on real data locally in minutes, and deploy the exact same open-source core on your cluster with zero feature gates.",
   dockerLabel: "All-in-one container · no signup",
   dockerTitle: "Local evaluation with Docker",
+  dockerHint: {
+    beforeHost: "Then open ",
+    host: "localhost:3000",
+    afterHost: " and sign in with ",
+    credentials: "admin / admin",
+    afterCredentials:
+      " (temporary password — you will be asked to choose a new one on first sign-in).",
+  },
   dockerCta: "Deployment guide",
   helmLabel: "Production Helm chart · Kubernetes & OpenShift",
   helmTitle: "Scale on your cluster",

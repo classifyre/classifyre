@@ -125,6 +125,32 @@ export function setUnauthorizedHandler(
   unauthorizedHandler = handler;
 }
 
+/**
+ * Called when an API request still fails with 502/503/504 or a network error
+ * after retries are exhausted (e.g. API or IAM is still starting up).
+ */
+type UnavailableHandler = () => Promise<boolean> | void;
+let unavailableHandler: UnavailableHandler | null = null;
+let handlingUnavailable: Promise<void> | null = null;
+
+export function setUnavailableHandler(
+  handler: UnavailableHandler | null,
+): void {
+  unavailableHandler = handler;
+}
+
+function notifyUnavailable(): Promise<void> {
+  const handler = unavailableHandler;
+  if (!handler) return Promise.resolve();
+  handlingUnavailable ??= Promise.resolve(handler())
+    .then(() => undefined)
+    .catch(() => undefined)
+    .finally(() => {
+      handlingUnavailable = null;
+    });
+  return handlingUnavailable;
+}
+
 /** One renewal for every request that hit the same expiry at once. */
 async function renew(response: Response): Promise<boolean> {
   const handler = unauthorizedHandler;
@@ -151,7 +177,19 @@ export async function resilientFetch(
   init?: RequestInit,
   policy: RetryPolicy = {},
 ): Promise<Response> {
-  const response = await fetchWithRetries(input, init, policy);
+  let response: Response;
+  try {
+    response = await fetchWithRetries(input, init, policy);
+  } catch (error) {
+    if (!isAbortError(error) && unavailableHandler) {
+      await notifyUnavailable();
+    }
+    throw error;
+  }
+  if (RETRYABLE_STATUSES.has(response.status) && unavailableHandler) {
+    await notifyUnavailable();
+    return response;
+  }
   if (response.status === 401 && unauthorizedHandler && (await renew(response))) {
     return fetchWithRetries(input, init, policy);
   }

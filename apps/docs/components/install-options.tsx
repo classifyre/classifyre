@@ -34,9 +34,13 @@ export function DockerQuickstart() {
       <DockerRunBlock />
       <p className="text-sm leading-6 text-muted-foreground">
         Then open{" "}
-        <span className="font-mono text-foreground">localhost:3000</span>. The
-        first boot initialises the database and creates a workspace, which takes
-        a few minutes on a laptop.
+        <span className="font-mono text-foreground">localhost:3000</span> and
+        sign in as <span className="font-mono text-foreground">admin</span> /{" "}
+        <span className="font-mono text-foreground">admin</span> (temporary
+        password — you will be asked to choose a new one on first sign-in).
+        While the first boot initialises the database, sign-in service and
+        default workspace, the page shows a setup screen and refreshes
+        automatically when ready.
       </p>
     </div>
   );
@@ -81,6 +85,15 @@ export function InstallOptions() {
           </p>
 
           <DockerRunBlock />
+
+          <p className="text-xs leading-5 text-muted-foreground">
+            Then open{" "}
+            <span className="font-mono text-foreground">localhost:3000</span>{" "}
+            and sign in as{" "}
+            <span className="font-mono text-foreground">admin</span> /{" "}
+            <span className="font-mono text-foreground">admin</span> (temporary
+            password, changed on first sign-in).
+          </p>
 
           <Link
             href="/deployment/docker/"

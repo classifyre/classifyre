@@ -7,6 +7,7 @@ export * from "./client";
 export {
   resilientFetch,
   setUnauthorizedHandler,
+  setUnavailableHandler,
   type UnauthorizedReason,
 } from "./http";
 export type { RetryPolicy } from "./http";
