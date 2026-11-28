@@ -5,6 +5,12 @@ compiled at release time from per-PR fragments in `changelog.d/` (see
 `changelog.d/README.md`). Commit messages and PR titles are never used as
 release notes.
 
+## [0.9.8] - 2026-11-28
+
+### Fixed
+
+- Upgrading the all-in-one Docker image no longer leaves it stuck on the setup screen: the default first sign-in is `classifyre` / `classifyre` (a temporary password) again. Volumes first created with 0.9.6 need `-e CLASSIFYRE_ADMIN_USER=admin -e CLASSIFYRE_ADMIN_PASSWORD=admin`.
+
 ## [0.9.7] - 2026-11-28
 
 ### Added

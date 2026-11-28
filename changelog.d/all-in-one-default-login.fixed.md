@@ -1,1 +1,0 @@
-Upgrading the all-in-one Docker image no longer leaves it stuck on the setup screen: the default first sign-in is `classifyre` / `classifyre` (a temporary password) again. Volumes first created with 0.9.6 need `-e CLASSIFYRE_ADMIN_USER=admin -e CLASSIFYRE_ADMIN_PASSWORD=admin`.

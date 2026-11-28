@@ -3,10 +3,10 @@ revision = 5
 requires-python = ">=3.12, <3.15"
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'linux'",
-    "python_full_version == '3.13.*' and sys_platform == 'linux'",
-    "python_full_version < '3.13' and sys_platform == 'linux'",
     "python_full_version >= '3.14' and sys_platform != 'linux'",
+    "python_full_version == '3.13.*' and sys_platform == 'linux'",
     "python_full_version == '3.13.*' and sys_platform != 'linux'",
+    "python_full_version < '3.13' and sys_platform == 'linux'",
     "python_full_version < '3.13' and sys_platform != 'linux'",
 ]
 required-markers = [
@@ -853,7 +853,7 @@ wheels = [
 
 [[package]]
 name = "classifyre-cli"
-version = "0.9.8.dev0"
+version = "0.9.8"
 source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },
@@ -1410,7 +1410,7 @@ youtube = [
 
 [[package]]
 name = "classifyre-schemas"
-version = "0.9.8.dev0"
+version = "0.9.8"
 source = { editable = "../../packages/schemas" }
 dependencies = [
     { name = "fastjsonschema" },
