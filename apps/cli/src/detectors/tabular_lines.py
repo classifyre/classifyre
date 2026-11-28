@@ -20,8 +20,10 @@ from dataclasses import dataclass
 
 _ROW_RE = re.compile(r"^row_(\d+):$")
 # Two spaces then a name that does not start with a space: a deeper line
-# (``    password: x``) is a continuation of the cell above, not a column.
-_CELL_RE = re.compile(r"^  ([^\s:][^:]*):(?: ?(.*))?$")
+# (``    password: x``) is a continuation of the cell above, not a column. The
+# name ends at the first colon followed by a space or nothing, so a column
+# called ``aws:token`` keeps its whole name.
+_CELL_RE = re.compile(r"^  ([^\s:].*?):(?: (.*))?$")
 _CONTINUATION_RE = re.compile(r"^    ")
 
 

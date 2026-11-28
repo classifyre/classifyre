@@ -51,7 +51,9 @@ function assertColumnCount(actual: number, expected: number): void {
   if (actual !== expected) {
     throw new DataError(
       'XX000',
-      `The result has ${actual} columns, the catalog says ${expected}: rescan the source.`,
+      expected === 0
+        ? 'The scan recorded no columns for this table: scan the source again.'
+        : `The result has ${actual} columns, the catalog says ${expected}: rescan the source.`,
     );
   }
 }

@@ -995,9 +995,10 @@ def _js_safe(table: Any) -> Any:
             or pa.types.is_decimal256(kind)
         )
         if unsafe:
+            text = _interval_text if pa.types.is_interval(kind) else str
             columns.append(
                 pa.array(
-                    [None if v is None else str(v) for v in column.to_pylist()],
+                    [None if v is None else text(v) for v in column.to_pylist()],
                     type=pa.string(),
                 )
             )
@@ -1005,6 +1006,29 @@ def _js_safe(table: Any) -> Any:
             columns.append(column)
         names.append(name)
     return pa.table(columns, names=_unique(names))
+
+
+def _interval_text(value: Any) -> str:
+    """An interval as PostgreSQL writes it: ``1 year 2 mons 3 days 04:05:06.5``.
+
+    Arrow's value is (months, days, nanoseconds), whose ``str`` is the name of a
+    Python tuple. The SQL gateway reads this form back for the binary protocol.
+    """
+    months, days, nanoseconds = value
+    parts = []
+    sign = -1 if months < 0 else 1
+    years, months = (sign * part for part in divmod(abs(months), 12))
+    for amount, unit in ((years, "year"), (months, "mon"), (days, "day")):
+        if amount:
+            parts.append(f"{amount} {unit}{'' if amount == 1 else 's'}")
+    if nanoseconds or not parts:
+        minus = "-" if nanoseconds < 0 else ""
+        seconds, micros = divmod(abs(nanoseconds) // 1000, 1_000_000)
+        minutes, seconds = divmod(seconds, 60)
+        hours, minutes = divmod(minutes, 60)
+        fraction = f".{micros:06d}".rstrip("0") if micros else ""
+        parts.append(f"{minus}{hours:02d}:{minutes:02d}:{seconds:02d}{fraction}")
+    return " ".join(parts)
 
 
 def _unique(names: list[str]) -> list[str]:

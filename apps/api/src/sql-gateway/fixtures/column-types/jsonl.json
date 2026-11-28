@@ -1,0 +1,94 @@
+{
+  "recorded": [
+    {
+      "name": "i",
+      "type": "BIGINT"
+    },
+    {
+      "name": "big",
+      "type": "BIGINT"
+    },
+    {
+      "name": "f",
+      "type": "DOUBLE"
+    },
+    {
+      "name": "flag",
+      "type": "BOOLEAN"
+    },
+    {
+      "name": "name",
+      "type": "VARCHAR"
+    },
+    {
+      "name": "day",
+      "type": "DATE"
+    },
+    {
+      "name": "at",
+      "type": "TIMESTAMP"
+    },
+    {
+      "name": "id",
+      "type": "UUID"
+    },
+    {
+      "name": "tags",
+      "type": "VARCHAR[]"
+    },
+    {
+      "name": "nested",
+      "type": "STRUCT(a BIGINT)"
+    },
+    {
+      "name": "clock",
+      "type": "TIME"
+    }
+  ],
+  "returned": [
+    [
+      "i",
+      "int64"
+    ],
+    [
+      "big",
+      "int64"
+    ],
+    [
+      "f",
+      "double"
+    ],
+    [
+      "flag",
+      "bool"
+    ],
+    [
+      "name",
+      "string"
+    ],
+    [
+      "day",
+      "date32[day]"
+    ],
+    [
+      "at",
+      "timestamp[us]"
+    ],
+    [
+      "id",
+      "string"
+    ],
+    [
+      "tags",
+      "list<l: string>"
+    ],
+    [
+      "nested",
+      "struct<a: int64>"
+    ],
+    [
+      "clock",
+      "string"
+    ]
+  ]
+}

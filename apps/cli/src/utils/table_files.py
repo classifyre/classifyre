@@ -87,6 +87,11 @@ SPATIAL_DRIVERS = {
 DELIMITED_MIME_TYPES = frozenset({CSV_MIME_TYPE, TSV_MIME_TYPE})
 DATABASE_MIME_TYPES = frozenset({SQLITE_MIME_TYPE, GEOPACKAGE_MIME_TYPE, DUCKDB_MIME_TYPE})
 
+# A JSON file SQL reads as a table (``utils.sql_files``). Not a MIME type any
+# file declares: a source passes it to have the file scanned row by row with the
+# query's own columns, so a finding names the column it is in and can be masked.
+JSON_TABLE_MIME_TYPE = "application/vnd.classifyre.json-table"
+
 # Formats read by this module (Parquet and Arrow IPC stay in file_parser, where
 # their range-reading paths live).
 TABLE_FILE_MIME_TYPES = frozenset(
@@ -100,12 +105,15 @@ TABLE_FILE_MIME_TYPES = frozenset(
         *DATABASE_MIME_TYPES,
         *SPATIAL_DRIVERS,
         LAKEHOUSE_TABLE_MIME_TYPE,
+        JSON_TABLE_MIME_TYPE,
     }
 )
 
 # Formats whose text a detector can still read when the table reader fails on
 # them — a malformed CSV is better scanned as text than not at all.
-TEXT_FALLBACK_MIME_TYPES = frozenset({*DELIMITED_MIME_TYPES, NDJSON_MIME_TYPE, GEOJSON_MIME_TYPE})
+TEXT_FALLBACK_MIME_TYPES = frozenset(
+    {*DELIMITED_MIME_TYPES, NDJSON_MIME_TYPE, GEOJSON_MIME_TYPE, JSON_TABLE_MIME_TYPE}
+)
 
 # The SQLite file header, and DuckDB's magic at byte 8 of its file header.
 SQLITE_MAGIC = b"SQLite format 3\x00"
@@ -175,6 +183,8 @@ def iter_table_batches(
         yield from _iter_database(source, mime_type, begin, max_rows, batch_rows)
     elif mime_type in SPATIAL_DRIVERS:
         yield from _iter_spatial(source, mime_type, begin, max_rows, batch_rows)
+    elif mime_type == JSON_TABLE_MIME_TYPE:
+        yield from _iter_json_table(source, begin, max_rows, batch_rows)
     elif mime_type == LAKEHOUSE_TABLE_MIME_TYPE:
         from .lakehouse_tables import iter_lakehouse_batches
 
@@ -332,6 +342,15 @@ def _iter_ndjson(
             f"SELECT * FROM read_json({sql_literal(path)}, "
             "format = 'newline_delimited', sample_size = -1)"
         )
+        yield from _duckdb_batches(query, begin, max_rows, batch_rows)
+
+
+def _iter_json_table(
+    source: BinarySource, begin: int, max_rows: int | None, batch_rows: int
+) -> Iterator[TableBatch]:
+    """A ``.json`` file as the query engine reads it: same relation, same columns."""
+    with materialized_path(source, suffix=".json", transcode_from=_text_encoding(source)) as path:
+        query = f"SELECT * FROM read_json_auto({sql_literal(path)})"
         yield from _duckdb_batches(query, begin, max_rows, batch_rows)
 
 

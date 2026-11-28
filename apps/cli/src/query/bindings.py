@@ -23,9 +23,10 @@ from __future__ import annotations
 import math
 from typing import Any
 
+from ..utils.sql_files import FILE_FORMATS, SPATIAL_FORMATS
 from .connectors import BindingError, QueryBinding, TableLocation, binding_class, declared_sources
 from .connectors.arrow import ConnectorError, ScanStats
-from .connectors.object_storage import FILE_FORMATS, LAKEHOUSE_FORMATS, SPATIAL_FORMATS
+from .connectors.object_storage import LAKEHOUSE_FORMATS
 
 __all__ = [
     "ATTACHED_CATALOG_TYPES",

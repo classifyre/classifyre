@@ -1,0 +1,1 @@
+Personal data and secrets in `.json` files were not masked for people who read data masked. JSON files are now scanned row by row like other tables (the source's sampling strategy picks the rows), and a file whose sensitive values cannot be matched to a column is closed to masked readers. Run a scan after upgrading.

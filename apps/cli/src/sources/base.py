@@ -528,6 +528,14 @@ class BaseSource(ABC):
         """Return the safe default verification mode for this source instance."""
         return self.SCAN_CACHE_VERIFY
 
+    async def prepare_asset(self, asset: Any) -> None:
+        """Called once per asset before its content is read for detection.
+
+        For what only the content tells and the asset's metadata should carry,
+        like a table file's columns. Override in subclasses.
+        """
+        return None
+
     def evict_asset_cache(self, asset_hash: str) -> None:
         """Free cached content for a processed asset. Override in subclasses."""
         pass

@@ -44,6 +44,7 @@ from ..detectors.engine_version import (
     pipeline_engine_version,
 )
 from ..utils.hashing import calculate_checksum
+from ..utils.sql_files import scan_reader_state
 
 logger = logging.getLogger(__name__)
 
@@ -388,12 +389,16 @@ class ScanCache:
         self._embedding_plan = plan
 
     def media_state_for(self, asset: Any) -> dict[str, str]:
-        """What to record once this asset's media has been sent, if it has any."""
+        """What to record beside the detectors once this asset has been read.
+
+        How its content was read, and its media once sent, if it has any.
+        """
         plan = self._embedding_plan
         entry = (
             plan.cache_entry_for(getattr(asset, "asset_type", None)) if plan is not None else None
         )
-        return {entry[0]: entry[1]} if entry else {}
+        media = {entry[0]: entry[1]} if entry else {}
+        return {**scan_reader_state(getattr(asset, "metadata", None)), **media}
 
     @staticmethod
     def _force_full_rescan() -> bool:
@@ -523,6 +528,10 @@ class ScanCache:
             if digest != prior.content_hash:
                 return ScanPlan.full("content hash changed")
             content_hash = digest
+
+        reader_state = scan_reader_state(getattr(asset, "metadata", None))
+        if any(prior.detectors.get(key) != value for key, value in reader_state.items()):
+            return ScanPlan.full("the file is now read differently")
 
         stale = {
             key

@@ -1,0 +1,214 @@
+{
+  "recorded": [
+    {
+      "name": "c_bool",
+      "type": "bool"
+    },
+    {
+      "name": "c_tinyint",
+      "type": "int8"
+    },
+    {
+      "name": "c_smallint",
+      "type": "int16"
+    },
+    {
+      "name": "c_int",
+      "type": "int32"
+    },
+    {
+      "name": "c_bigint",
+      "type": "int64"
+    },
+    {
+      "name": "c_utinyint",
+      "type": "uint8"
+    },
+    {
+      "name": "c_usmallint",
+      "type": "uint16"
+    },
+    {
+      "name": "c_uinteger",
+      "type": "uint32"
+    },
+    {
+      "name": "c_ubigint",
+      "type": "uint64"
+    },
+    {
+      "name": "c_float",
+      "type": "float"
+    },
+    {
+      "name": "c_double",
+      "type": "double"
+    },
+    {
+      "name": "c_decimal",
+      "type": "decimal128(5, 2)"
+    },
+    {
+      "name": "c_decimal18",
+      "type": "decimal128(18, 3)"
+    },
+    {
+      "name": "c_decimal38",
+      "type": "decimal128(38, 6)"
+    },
+    {
+      "name": "c_text",
+      "type": "string"
+    },
+    {
+      "name": "c_blob",
+      "type": "binary"
+    },
+    {
+      "name": "c_date",
+      "type": "date32[day]"
+    },
+    {
+      "name": "c_time",
+      "type": "time64[us]"
+    },
+    {
+      "name": "c_timestamp",
+      "type": "timestamp[us]"
+    },
+    {
+      "name": "c_timestamptz",
+      "type": "timestamp[us, tz=UTC]"
+    },
+    {
+      "name": "c_uuid",
+      "type": "extension<arrow.uuid>"
+    },
+    {
+      "name": "c_ints",
+      "type": "list<element: int32>"
+    },
+    {
+      "name": "c_texts",
+      "type": "list<element: string>"
+    },
+    {
+      "name": "c_struct",
+      "type": "struct<a: int32, b: string>"
+    },
+    {
+      "name": "c_map",
+      "type": "map<string, int32 ('c_map')>"
+    },
+    {
+      "name": "c_structs",
+      "type": "list<element: struct<a: int32>>"
+    }
+  ],
+  "returned": [
+    [
+      "c_bool",
+      "bool"
+    ],
+    [
+      "c_tinyint",
+      "int8"
+    ],
+    [
+      "c_smallint",
+      "int16"
+    ],
+    [
+      "c_int",
+      "int32"
+    ],
+    [
+      "c_bigint",
+      "int64"
+    ],
+    [
+      "c_utinyint",
+      "uint8"
+    ],
+    [
+      "c_usmallint",
+      "uint16"
+    ],
+    [
+      "c_uinteger",
+      "uint32"
+    ],
+    [
+      "c_ubigint",
+      "uint64"
+    ],
+    [
+      "c_float",
+      "float"
+    ],
+    [
+      "c_double",
+      "double"
+    ],
+    [
+      "c_decimal",
+      "decimal128(5, 2)"
+    ],
+    [
+      "c_decimal18",
+      "decimal128(18, 3)"
+    ],
+    [
+      "c_decimal38",
+      "decimal128(38, 6)"
+    ],
+    [
+      "c_text",
+      "string"
+    ],
+    [
+      "c_blob",
+      "binary"
+    ],
+    [
+      "c_date",
+      "date32[day]"
+    ],
+    [
+      "c_time",
+      "string"
+    ],
+    [
+      "c_timestamp",
+      "timestamp[us]"
+    ],
+    [
+      "c_timestamptz",
+      "timestamp[us, tz=local]"
+    ],
+    [
+      "c_uuid",
+      "string"
+    ],
+    [
+      "c_ints",
+      "list<l: int32>"
+    ],
+    [
+      "c_texts",
+      "list<l: string>"
+    ],
+    [
+      "c_struct",
+      "struct<a: int32, b: string>"
+    ],
+    [
+      "c_map",
+      "map<string, int32>"
+    ],
+    [
+      "c_structs",
+      "list<l: struct<a: int32>>"
+    ]
+  ]
+}

@@ -84,6 +84,7 @@ import {
 } from './assets/asset-metadata-predicate';
 import { GraphService } from './graph.service';
 import { tryNormalizeUrn } from './graph/urn';
+import { keepFileColumns } from './assets/keep-file-columns';
 
 /**
  * Maps a run's per-asset change_type onto the asset-level status enum so a
@@ -3272,7 +3273,10 @@ export class AssetService {
             changeTypeByHash.set(assetHash, RunnerAssetChangeType.UNCHANGED);
             assetsUnchanged.push(existingAsset.id);
             if (metadata !== undefined) {
-              unchangedMetadataUpdates.push({ id: existingAsset.id, metadata });
+              unchangedMetadataUpdates.push({
+                id: existingAsset.id,
+                metadata: keepFileColumns(metadata, existingAsset.metadata),
+              });
             }
             if (urn && existingAsset.urn !== urn) {
               unchangedUrnUpdates.push({ id: existingAsset.id, urn });

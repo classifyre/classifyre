@@ -38,6 +38,10 @@ function service(input: {
   rowRules?: { principalRef: string; conditions: unknown }[];
   /** Assets whose notebook declares what its columns hold (QC §5.8). */
   declared?: { id: string; metadata: unknown }[];
+  /** The columns a-1's findings name; null: a finding naming none. */
+  findingColumns?: (string | null)[];
+  /** The table, when not the file table. */
+  table?: unknown;
 }) {
   const derived = [
     {
@@ -54,7 +58,15 @@ function service(input: {
     },
   ];
   const prisma = {
-    $queryRaw: jest.fn().mockResolvedValue(derived),
+    // Two reads of the findings: what they classify, and which columns the
+    // findings of file tables name.
+    $queryRaw: jest.fn((sql: TemplateStringsArray) =>
+      Promise.resolve(
+        sql.join('?').includes('ANY(') && input.findingColumns
+          ? input.findingColumns.map((column) => ({ asset_id: 'a-1', column }))
+          : derived,
+      ),
+    ),
     assetColumnAnnotation: {
       findMany: jest.fn().mockResolvedValue(input.notes ?? []),
     },
@@ -116,7 +128,7 @@ function service(input: {
     sources: [
       { id: 's-1', name: 'Lake', type: 'S3', sqlName: 'lake', queryable: true },
     ],
-    tables: [TABLE as never],
+    tables: [(input.table ?? TABLE) as never],
   });
   return { svc, prisma };
 }
@@ -670,5 +682,46 @@ describe('QueryCatalogService visual schema metadata & governance-filtered relat
     ]);
     expect(JSON.stringify(cat)).not.toContain('fk_orders_secret_api_key');
     expect(JSON.stringify(cat)).not.toContain('fk_orders_restricted');
+  });
+});
+
+/**
+ * A mask is keyed on a column's name, so a finding that names none, or one the
+ * table does not have, can be covered by no mask (a JSON file once scanned as
+ * one text; a title line read as the header). Such a file is not queried by
+ * anyone who would read it masked.
+ */
+describe('QueryCatalogService file tables no mask can cover', () => {
+  it.each([
+    ['a finding names no column', [null]],
+    ['a finding names a column the table does not have', ['email', 'Report']],
+  ])('is closed to a masked reader when %s', async (_why, findingColumns) => {
+    const { svc } = service({ findingColumns });
+    const t = await table(svc);
+    expect(t.canQuery).toBe(false);
+    expect(t.reason).toContain('cannot be matched to a column');
+  });
+
+  it('stays open to someone who reads it in clear', async () => {
+    const { svc } = service({
+      findingColumns: [null],
+      unmaskAssets: ['a-1'],
+    });
+    const t = await table(svc);
+    expect(t.canQuery).toBe(true);
+    expect(t.reason).toBeUndefined();
+  });
+
+  it('matches column names whatever their case', async () => {
+    const { svc } = service({ findingColumns: ['Email', 'API_KEY'] });
+    expect((await table(svc)).canQuery).toBe(true);
+  });
+
+  it("leaves database tables to their own columns' names", async () => {
+    const { svc } = service({
+      findingColumns: [null],
+      table: { ...TABLE, location: { kind: 'catalog' } },
+    });
+    expect((await table(svc)).canQuery).toBe(true);
   });
 });

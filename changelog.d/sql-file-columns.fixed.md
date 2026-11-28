@@ -1,0 +1,1 @@
+CSV, TSV, JSON, JSON Lines and geospatial files in a bucket or folder can now be queried over SQL connections (Power BI, Excel, DBeaver, `psql`), with their columns and types. Run a scan after upgrading: files are read once more to record their columns.

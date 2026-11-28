@@ -1,0 +1,1 @@
+Over SQL connections, Parquet decimal, date and list columns and MySQL unsigned integers now arrive with their types instead of as text or as a smaller number type, and time columns no longer fail the query.

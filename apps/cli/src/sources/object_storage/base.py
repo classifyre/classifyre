@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import io
 import itertools
 import logging
 import random
@@ -36,7 +37,7 @@ from ...utils.embedded_files import (
     has_embedded_files,
     iter_embedded_files,
 )
-from ...utils.file_metadata import extract_file_metadata
+from ...utils.file_metadata import build_columns, extract_file_metadata
 from ...utils.file_parser import (
     ARROW_FILE_MIME_TYPE,
     TABULAR_FILE_EXTENSIONS,
@@ -52,7 +53,8 @@ from ...utils.lakehouse_layout import table_root_of, table_roots
 from ...utils.lakehouse_tables import LakehouseTable, TableStorage, describe_table
 from ...utils.payload import spool
 from ...utils.sampling_frontier import time_rank
-from ...utils.table_files import LAKEHOUSE_TABLE_MIME_TYPE
+from ...utils.sql_files import LINE_FORMATS, describe_file, sql_file_format, suffix_for
+from ...utils.table_files import JSON_TABLE_MIME_TYPE, LAKEHOUSE_TABLE_MIME_TYPE
 from ...utils.urn import Urn, UrnError
 from ..base import BaseSource
 from ..dependencies import require_module
@@ -229,6 +231,8 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         self._content_cache: dict[str, tuple[str, str]] = {}
         self._hash_to_uri: dict[str, str] = {}
         self._object_ref_by_hash: dict[str, ObjectRef] = {}
+        # Objects opened by prepare_asset, for the page reader to take over.
+        self._prepared: dict[str, tuple[Any, str]] = {}
         # Object key per asset hash for the whole run. Unlike the ref map it is
         # never evicted: the AUTOMATIC sweeping list is written at the end of
         # the run, after every asset's cache has been released.
@@ -830,6 +834,94 @@ class ObjectStorageSourceBase(BaseSource, ABC):
             downloaded_bytes=len(file_bytes),
             raw_bytes=None if is_non_extractable else file_bytes,
         )
+
+    #: How much of a file is read to learn its columns: for a line-based file the
+    #: rows DuckDB samples to type them; others (a JSON array, a geo file) only
+    #: parse whole, up to the larger limit.
+    SCHEMA_HEAD_BYTES = 4 * 1024 * 1024
+    SCHEMA_MAX_FILE_BYTES = 64 * 1024 * 1024
+
+    async def prepare_asset(self, asset: SingleAssetScanResults) -> None:
+        """Record the columns a SQL query of this file returns, before it is read.
+
+        Without them the catalog, a SQL connection and column masks know the
+        file as a table with no columns. The object opened here is the one the
+        pages are then read from, so a scan still downloads it once.
+        """
+        asset_hash = str(asset.hash)
+        ref = self._object_ref_by_hash.get(asset_hash)
+        metadata = asset.metadata
+        if ref is None or ref.table is not None or not isinstance(metadata, dict):
+            return
+        mime = metadata.get("mime_type")
+        fmt = sql_file_format(mime if isinstance(mime, str) else None, ref.key)
+        if fmt is None or not self._include_content_preview():
+            return
+        # Parquet and Avro are read for their metadata during discovery.
+        if fmt in ("parquet", "avro") and metadata.get("columns"):
+            return
+        try:
+            held = self._bytes_cache.get(asset_hash)
+            if held is not None:
+                columns = self._columns_of(io.BytesIO(held), fmt)
+            else:
+                handle, stream_mime = self._open_object(ref)
+                self._prepared[asset_hash] = (handle, stream_mime)
+                columns = self._columns_of(handle, fmt)
+                handle.seek(0)
+        except Exception as exc:
+            logger.warning(
+                "No columns recorded for %s, so SQL connections cannot serve it: %s", ref.key, exc
+            )
+            return
+        if columns:
+            asset.metadata = {**metadata, "columns": columns}
+
+    def _columns_of(self, handle: Any, fmt: str) -> list[dict[str, Any]] | None:
+        """The columns of an open file; None when it is too large to describe."""
+        handle.seek(0)
+        if fmt == "parquet":
+            import pyarrow.parquet as pq  # type: ignore[import-untyped]
+
+            schema = pq.ParquetFile(handle).schema_arrow
+            return build_columns(
+                list(schema.names), {field.name: str(field.type) for field in schema}
+            )
+        by_line = fmt in LINE_FORMATS
+        limit = self.SCHEMA_HEAD_BYTES if by_line else self.SCHEMA_MAX_FILE_BYTES
+        data = handle.read(limit + 1)
+        if len(data) > limit:
+            if not by_line:
+                return None
+            # Whole lines only: half a row would change what the columns look like.
+            data = data[: data.rfind(b"\n", 0, limit) + 1]
+            if not data:
+                return None
+        with tempfile.NamedTemporaryFile(suffix=suffix_for(fmt)) as copy:
+            copy.write(data)
+            copy.flush()
+            columns = describe_file(copy.name, fmt)
+        return build_columns([name for name, _ in columns], dict(columns))
+
+    def _drop_prepared(self, asset_hash: str) -> None:
+        prepared = self._prepared.pop(asset_hash, None)
+        if prepared is not None:
+            try:
+                prepared[0].close()
+            except Exception:  # pragma: no cover - close is best effort
+                pass
+
+    def _content_mime(self, asset_id: str, mime: str) -> str:
+        """A ``.json`` file SQL reads as a table is scanned as one, row by row.
+
+        Its findings then name the column they are in, which is what column
+        masks go by; scanned as one text they would mask nothing.
+        """
+        asset_hash, _ = self._object_identity(asset_id)
+        ref = self._object_ref_by_hash.get(asset_hash)
+        if ref is None or ref.table is not None:
+            return mime
+        return JSON_TABLE_MIME_TYPE if sql_file_format(mime, ref.key) == "json" else mime
 
     def _to_asset(self, ref: ObjectRef) -> SingleAssetScanResults:
         if ref.table is not None:
@@ -1484,14 +1576,17 @@ class ObjectStorageSourceBase(BaseSource, ABC):
             if ref is not None:
                 handle: Any = None
                 try:
-                    handle, stream_mime = self._open_object(ref)
+                    prepared = self._prepared.pop(asset_hash, None)
+                    handle, stream_mime = prepared or self._open_object(ref)
                     logger.info(
                         "fetch_content_pages(%s): streaming %s as %s",
                         asset_id,
                         ref.key,
                         stream_mime or "unknown",
                     )
-                    async for page in self._pump_pages(asset_id, handle, stream_mime):
+                    async for page in self._pump_pages(
+                        asset_id, handle, self._content_mime(asset_id, stream_mime)
+                    ):
                         yield "", page
                 finally:
                     if handle is not None:
@@ -1511,7 +1606,9 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         )
 
         if raw_bytes is not None:
-            async for page in self._pump_pages(asset_id, raw_bytes, mime):
+            async for page in self._pump_pages(
+                asset_id, raw_bytes, self._content_mime(asset_id, mime)
+            ):
                 yield "", page
             self._content_pages_processed.add(asset_id)
             return
@@ -1669,6 +1766,7 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         self._bytes_cache.pop(asset_hash, None)
         self._mime_cache.pop(asset_hash, None)
         self._object_ref_by_hash.pop(asset_hash, None)
+        self._drop_prepared(asset_hash)
         if external_url:
             archive_path = self._member_bytes_cache.pop(external_url, archive_path)
             self._content_cache.pop(external_url, None)
@@ -1688,6 +1786,8 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         super().abort()
 
     def cleanup(self) -> None:
+        for asset_hash in list(self._prepared):
+            self._drop_prepared(asset_hash)
         self._reset_member_cache()
         client = self._cached_client
         if client is None:

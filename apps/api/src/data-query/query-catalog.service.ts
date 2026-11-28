@@ -143,6 +143,14 @@ interface CachedClassifications {
   byAsset: Map<string, Map<string, Classification>>;
 }
 
+interface CachedUnmatched {
+  at: number;
+  assetIds: Set<string>;
+}
+
+const UNMASKABLE_REASON =
+  'Personal data or secrets in this file cannot be matched to a column, so they cannot be masked. Scan the source again, or ask to read it in clear.';
+
 /**
  * What a person can query in the current workspace (docs/prd/DQ-data-query.md §4).
  *
@@ -156,6 +164,7 @@ export class QueryCatalogService {
   private readonly logger = new Logger(QueryCatalogService.name);
   private readonly cache = new Map<string, CachedTables>();
   private readonly classified = new Map<string, CachedClassifications>();
+  private readonly unmatched = new Map<string, CachedUnmatched>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -218,6 +227,7 @@ export class QueryCatalogService {
     if (schema) {
       this.cache.delete(schema);
       this.classified.delete(schema);
+      this.unmatched.delete(schema);
     }
   }
 
@@ -569,6 +579,50 @@ export class QueryCatalogService {
   }
 
   /**
+   * File tables holding personal data or secrets no column can be named for:
+   * a finding without a column, or naming one the table does not have (a
+   * title line read as the header). No mask can cover it, so only someone who
+   * reads the table in clear may query it. A database's columns are its own,
+   * so only files, whose header a scan has to work out, are checked.
+   */
+  private async unmatchedSensitive(
+    tables: CachedTables['tables'],
+  ): Promise<Set<string>> {
+    const key = this.schema() ?? '';
+    const hit = this.unmatched.get(key);
+    if (hit && Date.now() - hit.at < CACHE_MS) return hit.assetIds;
+    const columnsOfFile = new Map(
+      tables
+        .filter((t) => t.location?.kind === 'file')
+        .map((t) => [
+          t.assetId,
+          new Set(t.columns.map((c) => c.name.toLowerCase())),
+        ]),
+    );
+    const assetIds = new Set<string>();
+    if (columnsOfFile.size) {
+      const rows = await this.prisma.$queryRaw<
+        { asset_id: string; column: string | null }[]
+      >`
+        SELECT asset_id, metadata->>'tabular_column_name' AS column
+          FROM findings
+         WHERE status = 'OPEN'
+           AND detector_type::text IN ('PII', 'SECRETS')
+           AND asset_id = ANY(${[...columnsOfFile.keys()]})
+         GROUP BY 1, 2`;
+      for (const row of rows) {
+        const columns = columnsOfFile.get(row.asset_id);
+        if (!columns) continue;
+        if (!row.column || !columns.has(row.column.toLowerCase())) {
+          assetIds.add(row.asset_id);
+        }
+      }
+    }
+    this.unmatched.set(key, { at: Date.now(), assetIds });
+    return assetIds;
+  }
+
+  /**
    * What a principal may query, as they see it. Without one, the request's
    * person (through their SQL connection's scope, if any); with one — a
    * shared dataset's owning group — exactly that principal's rights.
@@ -586,6 +640,7 @@ export class QueryCatalogService {
         // Owners and stewards also read restricted columns (DQ §5.8).
         governedDataScope(this.prisma, p.person),
       ]);
+    const unmatched = await this.unmatchedSensitive(cached.tables);
     const governs = (table: { sourceId: string; assetId: string }) =>
       governed.sourceIds.includes(table.sourceId) ||
       governed.assetIds.includes(table.assetId);
@@ -607,17 +662,22 @@ export class QueryCatalogService {
         scope.sourceIds.has(table.sourceId) ||
         scope.assetIds.has(table.assetId);
       if (!granted && (connection || !scope.seeLocked)) continue;
+      const inClear = readsInClear(clear, table);
+      const unmaskable = !inClear && unmatched.has(table.assetId);
       // R4: say why a visible table cannot be queried — unreadable by the
-      // engine, or locked for lack of a grant.
+      // engine, locked for lack of a grant, or impossible to mask.
       const reason = table.queryable
         ? granted
-          ? undefined
+          ? unmaskable
+            ? UNMASKABLE_REASON
+            : undefined
           : 'You need the Data reader role on this table or its source to query it.'
         : table.reason;
+      // Through a SQL connection only what can be queried is listed.
+      if (connection && unmaskable) continue;
       // DQ §5.8: hidden columns leave the list, masked ones say so; the
       // job gets the same masks, so what the list shows is what runs.
       const tableMasks = masks.get(table.assetId) ?? [];
-      const inClear = readsInClear(clear, table);
       const governsTable = inClear && governs(table);
       const seen = columnsAsSeen(
         table.columns,
@@ -631,7 +691,7 @@ export class QueryCatalogService {
       const entry: CatalogTable = {
         ...tableBase,
         columns: seen.columns,
-        canQuery: table.queryable && granted,
+        canQuery: table.queryable && granted && !unmaskable,
         // Never leak unfiltered total row counts when a row filter applies to this caller.
         ...(!hasRowFilter && rawRowCount !== undefined
           ? { rowCount: rawRowCount }

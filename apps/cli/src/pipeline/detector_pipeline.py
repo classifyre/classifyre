@@ -301,6 +301,12 @@ class DetectorPipeline:
             text_content_type = None
         link_content = self._build_links_payload(asset.links)
 
+        # What only the content tells (a table file's columns) is added to the
+        # asset before it is read, whether or not any detector covers it.
+        prepare = getattr(self.source, "prepare_asset", None)
+        if prepare is not None and not records_only:
+            await prepare(asset)
+
         active_detectors = self.detectors
         if only is not None:
             active_detectors = [

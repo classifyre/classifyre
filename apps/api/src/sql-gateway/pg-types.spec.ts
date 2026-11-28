@@ -30,6 +30,67 @@ describe('ddlType', () => {
     ['UUID', 'uuid'],
     ['', 'text'],
     ['GEOMETRY', 'text'],
+    // Arrow, as Parquet scans record it.
+    ['decimal128(5, 2)', 'numeric(5,2)'],
+    ['decimal256(50, 4)', 'numeric(50,4)'],
+    ['date32[day]', 'date'],
+    ['date64[ms]', 'date'],
+    ['time64[us]', 'time'],
+    ['time32[ms]', 'time'],
+    ['timestamp[us]', 'timestamp'],
+    ['timestamp[us, tz=UTC]', 'timestamp with time zone'],
+    ['halffloat', 'real'],
+    ['large_binary', 'bytea'],
+    ['fixed_size_binary[16]', 'bytea'],
+    ['list<element: int32>', 'integer[]'],
+    ['list<item: string>', 'text[]'],
+    ['large_list<item: int64>', 'bigint[]'],
+    ['fixed_size_list<item: double>[3]', 'double precision[]'],
+    ['list<element: struct<a: int32>>', 'json'],
+    ['struct<a: int32, b: list<item: string>>', 'json'],
+    ['map<string, int32>', 'json'],
+    ['dictionary<values=int32, indices=int8, ordered=0>', 'integer'],
+    ['duration[us]', 'text'],
+    // DuckDB, as CSV, JSON, Avro and geo files record it.
+    ['VARCHAR[]', 'text[]'],
+    ['INTEGER[3]', 'integer[]'],
+    ['STRUCT(email VARCHAR)[]', 'json'],
+    ['MAP(VARCHAR, INTEGER)', 'json'],
+    ['TIME WITH TIME ZONE', 'text'],
+    ['TIMESTAMP_NS', 'timestamp'],
+    ['UTINYINT', 'smallint'],
+    ['UBIGINT', 'numeric'],
+    // Delta and Iceberg.
+    ['long', 'bigint'],
+    ['byte', 'smallint'],
+    ['fixed[16]', 'bytea'],
+    ['timestamptz', 'timestamp with time zone'],
+    ['timestamp_ntz', 'timestamp'],
+    // MySQL.
+    ['int unsigned', 'bigint'],
+    ['int(10) unsigned', 'bigint'],
+    ['bigint unsigned', 'numeric'],
+    ['smallint unsigned', 'integer'],
+    ['tinyint unsigned', 'smallint'],
+    ['decimal(10,2) unsigned', 'numeric(10,2)'],
+    ['float(10,2)', 'real'],
+    ['mediumblob', 'bytea'],
+    // PostgreSQL's information_schema.
+    ['time without time zone', 'time'],
+    ['time with time zone', 'text'],
+    ['ARRAY', 'text'],
+    // As the PostgreSQL scan records arrays, bit strings and money.
+    ['int4[]', 'integer[]'],
+    ['int2[]', 'smallint[]'],
+    ['int8[]', 'bigint[]'],
+    ['float8[]', 'double precision[]'],
+    ['text[]', 'text[]'],
+    ['timestamptz[]', 'timestamp with time zone[]'],
+    ['mood[]', 'text[]'],
+    ['bit', 'boolean'],
+    ['bit(4)', 'text'],
+    ['text (money)', 'text'],
+    ['USER-DEFINED', 'text'],
   ])('%s → %s', (raw, expected) => {
     expect(ddlType(raw)).toBe(expected);
   });
@@ -43,6 +104,27 @@ describe('values', () => {
     expect(textOf(plainValue(1794528000000, { typeId: 8 }), OID.date)).toBe(
       '2026-11-13',
     );
+  });
+
+  // Seen over a SQL connection: every TIME column failed with "Cannot show
+  // 05:06:07 as a date or time".
+  it('writes a time of day the job answered as text', () => {
+    expect(textOf('05:06:07', OID.time)).toBe('05:06:07');
+    expect(textOf('05:06:07.500000', OID.time)).toBe('05:06:07.5');
+    expect(binaryOf('00:00:01.000002', OID.time).readBigInt64BE()).toBe(
+      1_000_002n,
+    );
+    expect(() => textOf('half past', OID.time)).toThrow('Cannot show');
+  });
+
+  // Seen over a SQL connection: the value read `MonthDayNano(months=0, …)`.
+  it('writes an interval in the binary format', () => {
+    const bytes = binaryOf('1 year 2 mons -3 days -04:05:06.5', OID.interval);
+    expect(bytes.readBigInt64BE(0)).toBe(-14_706_500_000n);
+    expect(bytes.readInt32BE(8)).toBe(-3);
+    expect(bytes.readInt32BE(12)).toBe(14);
+    expect(binaryOf('00:00:00', OID.interval)).toEqual(Buffer.alloc(16));
+    expect(() => binaryOf('soon', OID.interval)).toThrow('interval');
   });
 
   it('scales decimals', () => {

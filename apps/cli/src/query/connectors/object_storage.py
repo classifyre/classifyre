@@ -11,17 +11,12 @@ from __future__ import annotations
 from typing import Any
 
 from ...utils.duckdb_engine import quote_identifier, sql_literal
+from ...utils.sql_files import FILE_FORMATS, file_relation
 from .base import BindingError, QueryBinding, SourceContext, TableLocation
 
 #: Formats DuckDB reads natively, by the ``format`` of a location.
 #: Keep in sync with ``LAKEHOUSE_FORMATS`` in apps/api/src/data-query/sql-names.ts.
 LAKEHOUSE_FORMATS = frozenset({"delta", "iceberg"})
-#: Geospatial files, read with the ``spatial`` extension (``ST_Read``); geometries
-#: come out as WKT text, so no spatial function has to be allowed in SQL.
-SPATIAL_FORMATS = frozenset({"geojson", "fgb", "dbf"})
-#: Keep in sync with ``FILE_FORMATS`` in apps/api/src/data-query/sql-names.ts
-#: (``json`` here is read via ``read_json_auto``).
-FILE_FORMATS = frozenset({"parquet", "csv", "tsv", "jsonl", "json", "avro", *SPATIAL_FORMATS})
 
 
 class ObjectStorageBinding(QueryBinding):
@@ -69,22 +64,9 @@ class ObjectStorageBinding(QueryBinding):
                 self._iceberg_version_guessing = True
             return f"iceberg_scan({uri}, allow_moved_paths = true)"
         if location.kind == "file":
-            if fmt == "parquet":
-                return f"read_parquet({uri})"
-            if fmt == "csv":
-                return f"read_csv({uri}, auto_detect = true)"
-            if fmt == "tsv":
-                return f"read_csv({uri}, auto_detect = true, delim = '\\t')"
-            if fmt == "jsonl":
-                return f"read_json({uri}, format = 'newline_delimited')"
-            if fmt == "json":
-                return f"read_json_auto({uri})"
-            if fmt == "avro":
-                self.load(conn, "avro")
-                return f"read_avro({uri})"
-            if fmt in SPATIAL_FORMATS:
-                return self._spatial(conn, uri)
-            raise BindingError(f"{fmt or 'These'} files cannot be queried with SQL yet.")
+            if fmt not in FILE_FORMATS:
+                raise BindingError(f"{fmt or 'These'} files cannot be queried with SQL yet.")
+            return file_relation(conn, fmt, uri)
         raise BindingError(f"Unknown table location kind '{location.kind}'.")
 
     def local_paths(self) -> list[str]:
@@ -93,23 +75,3 @@ class ObjectStorageBinding(QueryBinding):
             return []
         root = str(self._storage.uri(""))
         return [] if "://" in root else [root]
-
-    def _spatial(self, conn: Any, uri: str) -> str:
-        """``ST_Read`` with every geometry column turned into WKT text.
-
-        The raw column is a binary geometry only spatial functions can read;
-        as text it shows in a result and compares like any string.
-        """
-        self.load(conn, "spatial")
-        source = f"ST_Read({uri})"
-        columns = conn.execute(f"DESCRIBE SELECT * FROM {source}").fetchall()
-        geometries = [
-            name for name, kind, *_ in columns if str(kind).upper().startswith("GEOMETRY")
-        ]
-        if not geometries:
-            return source
-        replaced = ", ".join(
-            f"ST_AsText({quote_identifier(name)}) AS {quote_identifier(name)}"
-            for name in geometries
-        )
-        return f"(SELECT * REPLACE ({replaced}) FROM {source})"

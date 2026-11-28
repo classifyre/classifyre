@@ -56,22 +56,57 @@ export const ARRAY_ELEMENT: Record<number, number> = {
 };
 
 /**
- * A scan's column type (DuckDB, the source's own, pandas-ish) as a
- * PostgreSQL type. Unknown and empty types are `text`: always encodable.
+ * A scan's column type as a PostgreSQL type. The scans record what their reader
+ * calls it: DuckDB (`DECIMAL(8,2)`, `VARCHAR[]`), Arrow for Parquet
+ * (`decimal128(8, 2)`, `date32[day]`, `list<element: int32>`), Delta and Iceberg
+ * (`long`, `fixed[16]`) and each database's own names (`int unsigned`,
+ * `character varying`). Unknown and empty types are `text`: always encodable.
+ * A type must be at least as wide as the values it names, since the binary
+ * format cannot hold a larger one.
  */
 export function ddlType(raw: string | null | undefined): string {
-  const type = (raw ?? '').trim().toLowerCase();
+  const type = (raw ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+not null$/, '');
   if (!type) return 'text';
+
+  // Wrappers around another type.
+  const dictionary = /^dictionary<values=([^,]+),/.exec(type);
+  if (dictionary) return ddlType(dictionary[1]);
+  const extension = /^extension<arrow\.(uuid|json)/.exec(type);
+  if (extension) return extension[1];
+
+  // Nested first: `struct<a: int32>[]` is a list, `struct<a: int32[]>` is not.
   const list =
-    /^(.*)\[\]$/.exec(type) ?? /^(?:list|array)\s*<\s*(.*)\s*>$/.exec(type);
-  if (list) {
-    const inner = ddlType(list[1]);
-    return /\[\]$/.test(inner) || inner === 'json' ? 'json' : `${inner}[]`;
-  }
-  if (/^(struct|map|union|row)\b|^\{/.test(type)) return 'json';
+    /^(?:large_|fixed_size_)?(?:list|array)(?:_view)?\s*<\s*(?:(?:item|element)\s*:\s*)?(.*?)\s*>(?:\[\d+\])?$/.exec(
+      type,
+    );
+  if (list) return arrayOf(list[1]);
+  // A list of objects is JSON too, so one test covers `STRUCT(…)[]` as well.
+  if (/^(struct|map|union|row|object|variant)\b|^\{/.test(type)) return 'json';
+  // Iceberg's `fixed[16]` is bytes, not a list of "fixed".
+  if (/^fixed\[\d+\]$|^fixed_size_binary/.test(type)) return 'bytea';
+  const array = /^(.+?)\[\d*\]$/.exec(type);
+  // Arrow's `date32[day]`, `timestamp[us]` carry a unit, not a length.
+  if (array) return arrayOf(array[1]);
+
   if (/^(bool|boolean|bit)$|^tinyint\(1\)$/.test(type)) return 'boolean';
+
+  // MySQL's unsigned integers need the next size up.
+  if (/\bunsigned\b/.test(type)) {
+    if (/^tinyint\b/.test(type)) return 'smallint';
+    if (/^(smallint|mediumint)\b/.test(type)) return 'integer';
+    if (/^(int|integer)\b/.test(type)) return 'bigint';
+    if (/^bigint\b/.test(type)) return 'numeric';
+  }
+  if (/^(hugeint|uhugeint|uint64|ubigint|int128|bignum)\b/.test(type)) {
+    return 'numeric';
+  }
   if (
-    /^(tinyint|smallint|int2|int16|uint8|utinyint|int8_t|short)\b/.test(type)
+    /^(tinyint|smallint|int2|int16|uint8|utinyint|int8_t|short|byte)\b/.test(
+      type,
+    )
   ) {
     return 'smallint';
   }
@@ -80,19 +115,19 @@ export function ddlType(raw: string | null | undefined): string {
   ) {
     return 'bigint';
   }
-  if (/^(hugeint|uhugeint|uint64|ubigint|int128)\b/.test(type))
-    return 'numeric';
   if (
     /^(int|integer|int4|int32|mediumint|serial|usmallint|uint16)\b/.test(type)
   ) {
     return 'integer';
   }
-  if (/^(real|float4|float32|float)$/.test(type)) return 'real';
+  if (/^(real|float4|float32|float16|halffloat|float)\b/.test(type)) {
+    return 'real';
+  }
   if (/^(double|float8|float64|double precision|binary_double)\b/.test(type)) {
     return 'double precision';
   }
   const decimal =
-    /^(?:decimal|numeric|number|dec)\s*\(\s*(\d+)\s*(?:,\s*(-?\d+)\s*)?\)/.exec(
+    /^(?:decimal|numeric|number|dec)(?:32|64|128|256)?\s*\(\s*(\d+)\s*(?:,\s*(-?\d+)\s*)?\)/.exec(
       type,
     );
   if (decimal) {
@@ -105,9 +140,13 @@ export function ddlType(raw: string | null | undefined): string {
       ? `numeric(${precision},${scale})`
       : 'numeric';
   }
-  if (/^(decimal|numeric|number|money|bignumeric)\b/.test(type))
+  if (/^(decimal|numeric|number|money|bignumeric)\b/.test(type)) {
     return 'numeric';
-  if (/^date$/.test(type)) return 'date';
+  }
+  if (/^date(32|64)?(\[[a-z]+\])?$/.test(type)) return 'date';
+  // A time with a zone has no encoding here: shown as it reads.
+  if (/^timetz\b|^time\s+with time zone/.test(type)) return 'text';
+  if (/^time(32|64)(\[[a-z]+\])?$|^time_ns$|^time\b/.test(type)) return 'time';
   if (
     /with time zone|^timestamptz|^timestamp_tz|^datetimeoffset|tz=|datetime64\[.*,/.test(
       type,
@@ -122,19 +161,24 @@ export function ddlType(raw: string | null | undefined): string {
   ) {
     return 'timestamp';
   }
-  if (/^time\b/.test(type)) return 'time';
   if (/^interval/.test(type)) return 'interval';
   if (/^uuid|^uniqueidentifier/.test(type)) return 'uuid';
   if (/^jsonb$/.test(type)) return 'jsonb';
   if (/^json/.test(type)) return 'json';
   if (
-    /^(blob|bytea|binary|varbinary|bytes|image|longblob|mediumblob)\b/.test(
+    /^(blob|bytea|binary|binary_view|large_binary|varbinary|bytes|image|tinyblob|mediumblob|longblob)\b/.test(
       type,
     )
   ) {
     return 'bytea';
   }
   return 'text';
+}
+
+/** The array of a column's elements; arrays of arrays and of objects are JSON. */
+function arrayOf(element: string): string {
+  const inner = ddlType(element);
+  return /\[\]$/.test(inner) || inner === 'json' ? 'json' : `${inner}[]`;
 }
 
 /** Arrow type ids (apache-arrow `Type`) the encoder looks at. */
@@ -339,6 +383,18 @@ function micros(value: PlainValue, oid: number): bigint {
   if (value && typeof value === 'object' && 'micros' in value) {
     return value.micros;
   }
+  // The query job answers times of day as text: `05:06:07.500000`.
+  if (oid === OID.time && typeof value === 'string') {
+    const time = /^(\d{1,2}):(\d{2})(?::(\d{2})(?:\.(\d{1,9}))?)?$/.exec(value);
+    if (time) {
+      const [, hours, minutes, seconds = '0', fraction = ''] = time;
+      return (
+        (BigInt(hours) * 3600n + BigInt(minutes) * 60n + BigInt(seconds)) *
+          1_000_000n +
+        BigInt(fraction.padEnd(6, '0').slice(0, 6))
+      );
+    }
+  }
   if (typeof value === 'string') {
     const parsed = Date.parse(
       oid === OID.date
@@ -495,6 +551,31 @@ function arrayBinary(items: PlainValue[], element: number): Buffer {
   return Buffer.concat(parts);
 }
 
+/** PostgreSQL's binary interval: microseconds, days, months. */
+function intervalBinary(text: string): Buffer {
+  const match =
+    /^\s*(?:(-?\d+) years?)?\s*(?:(-?\d+) mons?)?\s*(?:(-?\d+) days?)?\s*(?:(-)?(\d+):(\d\d):(\d\d)(?:\.(\d{1,6}))?)?\s*$/.exec(
+      text,
+    );
+  if (!match || !text.trim()) {
+    throw new EncodeError(`Cannot show ${text} as an interval.`);
+  }
+  const [, years, months, days, sign, hours, minutes, seconds, fraction] =
+    match;
+  let micros =
+    (BigInt(hours ?? 0) * 3600n +
+      BigInt(minutes ?? 0) * 60n +
+      BigInt(seconds ?? 0)) *
+      1_000_000n +
+    BigInt((fraction ?? '').padEnd(6, '0'));
+  if (sign) micros = -micros;
+  const out = Buffer.alloc(16);
+  out.writeBigInt64BE(micros, 0);
+  out.writeInt32BE(Number(days ?? 0), 8);
+  out.writeInt32BE(Number(years ?? 0) * 12 + Number(months ?? 0), 12);
+  return out;
+}
+
 /** The binary format of a value as the PostgreSQL type `oid`. */
 export function binaryOf(value: PlainValue, oid: number): Buffer {
   switch (oid) {
@@ -506,6 +587,8 @@ export function binaryOf(value: PlainValue, oid: number): Buffer {
       return int(4, value);
     case OID.int8:
       return int(8, value);
+    case OID.interval:
+      return intervalBinary(asText(value));
     case OID.oid: {
       const b = Buffer.alloc(4);
       b.writeUInt32BE(Number(asText(value)));

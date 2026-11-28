@@ -437,6 +437,10 @@ class BaseTabularSource(BaseSource):
         """Return cached ``{column_name: nullable}`` map when populated by metadata queries."""
         return self._column_nullability_cache.get(table_ref.table_key, {})
 
+    #: The expression of ``information_schema.columns`` recorded as a column's
+    #: type. A dialect overrides it where ``data_type`` says too little.
+    _COLUMN_TYPE_SQL = "data_type"
+
     def _available_column_types(self, table_ref: TableRef) -> dict[str, str]:
         """Return ordered ``{column_name: data_type}`` via ``information_schema``.
 
@@ -450,7 +454,7 @@ class BaseTabularSource(BaseSource):
         with conn.cursor() as cursor:
             cursor.execute(
                 f"""
-                SELECT column_name, data_type, is_nullable
+                SELECT column_name, {self._COLUMN_TYPE_SQL}, is_nullable
                 FROM information_schema.columns
                 WHERE table_schema = {ph} AND table_name = {ph}
                 ORDER BY ordinal_position

@@ -25,6 +25,19 @@ def _quote_identifier(identifier: str) -> str:
 class PostgreSQLSource(BaseTabularSource):
     source_type = "postgresql"
 
+    # ``data_type`` calls every array "ARRAY" and a four-bit string "bit": a SQL
+    # connection would show the first as text and the second as a boolean. A
+    # query answers money as formatted text ("$12.34"), so it is recorded as such.
+    _COLUMN_TYPE_SQL = """
+        CASE
+            WHEN data_type = 'ARRAY' THEN substr(udt_name, 2) || '[]'
+            WHEN data_type = 'bit' AND character_maximum_length > 1
+                THEN 'bit(' || character_maximum_length || ')'
+            WHEN data_type = 'money' THEN 'text (money)'
+            ELSE data_type
+        END
+    """
+
     def __init__(
         self,
         recipe: dict[str, Any],
