@@ -5,6 +5,12 @@ compiled at release time from per-PR fragments in `changelog.d/` (see
 `changelog.d/README.md`). Commit messages and PR titles are never used as
 release notes.
 
+## [0.9.7] - 2026-11-28
+
+### Added
+
+- You can now explore database tables and foreign-key relationships interactively on the Visual Schema canvas in Data Query, source data tabs, and Data Requests, with live SQL generation, auto-layout, and PNG, SVG, JSON, and DBML export. All column masking, hidden or restricted column policies, row-level filters, and access grants are enforced across the visual catalog, link discovery, and exports.
+
 ## [0.9.5] - 2026-11-27
 
 ### Changed

@@ -530,30 +530,30 @@ wheels = [
 
 [[package]]
 name = "boto3"
-version = "1.44.12"
+version = "1.44.13"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "botocore" },
     { name = "jmespath" },
     { name = "s3transfer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/00/96/e538b78f081041395c531cff509e505be16f1003fb4e4e87b33a2573dbec/boto3-1.44.12.tar.gz", hash = "sha256:7459cd7a476eef9a5a8044f5cd6b2dfa47cef0fcb74aefa951e154c5102b1199", size = 112746, upload-time = "2026-11-25T20:18:18.198Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/fd/64/0753b9d533f66bbedf49d19e53292010c5e6a3bb9a9cf0aadeea3e6b04aa/boto3-1.44.13.tar.gz", hash = "sha256:879de3341ade5abc796bb5835130882f97a041f24f2bc4ee9bc1febd57cb2552", size = 112746, upload-time = "2026-11-27T20:23:52.264Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d7/7a/251809e37bf31f726f710424979f5b22ac8c2a4ce5f53fb4b70997ef398e/boto3-1.44.12-py3-none-any.whl", hash = "sha256:9f1cf241303edb523af912ebdc001e0563301d9ba8eef076d25fe9a8bfb6efaf", size = 140171, upload-time = "2026-11-25T20:18:15.769Z" },
+    { url = "https://files.pythonhosted.org/packages/c4/97/e5d4a734518c75fdede6c45a54612e73377a04f80888f362652b2c74434e/boto3-1.44.13-py3-none-any.whl", hash = "sha256:c3080e768d338da01228bdb937708a856a1f01d1a31d2ceaf5286a8f647e0624", size = 140173, upload-time = "2026-11-27T20:23:50.784Z" },
 ]
 
 [[package]]
 name = "botocore"
-version = "1.44.12"
+version = "1.44.13"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jmespath" },
     { name = "python-dateutil" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c2/c1/8a229eab793d4ad48bdc5a04d6a2e6edd861c45c22e90d45c0337fcbf83a/botocore-1.44.12.tar.gz", hash = "sha256:5806bb66bf167fa3172f4ddf78b088db9b22653702537b19969d02d2c3301ee5", size = 17227950, upload-time = "2026-11-25T20:18:12.626Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ca/34/8525d2d4e72bbd7987882f22b5a9579ce914970ce1656f18e77f29cc52ae/botocore-1.44.13.tar.gz", hash = "sha256:9e5684e0cccc012ac2eb6db0bbf89617af3f369251aa89b02193789007c043d3", size = 17231105, upload-time = "2026-11-27T20:23:47.645Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/eb/34/62d784f432cd59f23b5ee2022d371f12a1907c101998d771975f484c8d7f/botocore-1.44.12-py3-none-any.whl", hash = "sha256:d5df4cf868f2c4050999a0e6bc94e0a039017e719f4e27b2a8e87053856787b9", size = 16930223, upload-time = "2026-11-25T20:18:09.433Z" },
+    { url = "https://files.pythonhosted.org/packages/2e/3e/28446680b3f373c705d188b3070d761d8ec1bd17eaa57614a1cb6eb4ab0e/botocore-1.44.13-py3-none-any.whl", hash = "sha256:9d7944b8c7f66c775756ae2ec26a4b903fa5c6f0aad1b58bf0d89e0a85913425", size = 16934031, upload-time = "2026-11-27T20:23:45.091Z" },
 ]
 
 [[package]]
@@ -853,7 +853,7 @@ wheels = [
 
 [[package]]
 name = "classifyre-cli"
-version = "0.9.7.dev0"
+version = "0.9.7"
 source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },
@@ -1410,7 +1410,7 @@ youtube = [
 
 [[package]]
 name = "classifyre-schemas"
-version = "0.9.7.dev0"
+version = "0.9.7"
 source = { editable = "../../packages/schemas" }
 dependencies = [
     { name = "fastjsonschema" },
@@ -1743,7 +1743,7 @@ wheels = [
 
 [[package]]
 name = "datamodel-code-generator"
-version = "0.103.0"
+version = "0.104.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "argcomplete" },
@@ -1756,9 +1756,9 @@ dependencies = [
     { name = "pyyaml" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/9c/f6/df9116cf33e58e80dc5fda27397b49caa2041b030e614a8ec83881d2f804/datamodel_code_generator-0.103.0.tar.gz", hash = "sha256:d1610b2601b7b82283cfe6a80704966c1d53e61817c956c7a5b6466f30cb8871", size = 13504396, upload-time = "2026-11-26T10:50:36.542Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ea/91/d3504871b7fdbb7e5be2c1701e97f209cd18ab3fb2f0f10e70461ca4a009/datamodel_code_generator-0.104.0.tar.gz", hash = "sha256:74616eb1a6625c90ec1f6830f9a7a711706e9349c57c3955a8c26ad43d8643b2", size = 13865036, upload-time = "2026-11-27T19:17:32.509Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f3/1f/7b61f5355efa714738914afa9c2f97c06e0cbf97e80fc66d426cf13a4287/datamodel_code_generator-0.103.0-py3-none-any.whl", hash = "sha256:d246070b2ab01f31fad3642b839c685f55f16a39450514e4a6eefca652f2cf6e", size = 2636677, upload-time = "2026-11-26T10:50:34.101Z" },
+    { url = "https://files.pythonhosted.org/packages/50/b4/327d24246fd1405a5b8ce590d57a9f3abe45a40ba0c67742f5cbca15c45b/datamodel_code_generator-0.104.0-py3-none-any.whl", hash = "sha256:380809c4a5e031ab9a1acfa886cfc4177caba3309f18350f4cf5ea1e0939981c", size = 2657506, upload-time = "2026-11-27T19:17:30.198Z" },
 ]
 
 [[package]]
@@ -2203,11 +2203,11 @@ wheels = [
 
 [[package]]
 name = "filelock"
-version = "4.3.1"
+version = "4.3.2"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/e6/86/a5b9ec254b90efb180e390e31a4fa50a93b714d6e4174fa9a4ee25607159/filelock-4.3.1.tar.gz", hash = "sha256:4c5ee627c401f1863ac6a0de9a14a28d3bb5f8c730b45e2fd6e5dbc79cf34b9e", size = 742330, upload-time = "2026-11-23T18:01:13.656Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b2/de/99f4266dc2b97503fe35af46d4bf54ea4d434bc322992103145c9de7da95/filelock-4.3.2.tar.gz", hash = "sha256:4f0a21c70447782453c06bb20a9863ee385ead1abaef22049af79289496851b3", size = 744182, upload-time = "2026-11-27T22:58:32.45Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/53/7b/678c8fbd372ff96375ac0bbdd20b78f20ef8ba6ca5966c49548fa5886557/filelock-4.3.1-py3-none-any.whl", hash = "sha256:79e43df8e9fe509cd83a3899a7c186c8077cbbe4d200a1ed3705c2f3bb6bc487", size = 244559, upload-time = "2026-11-23T18:01:12.261Z" },
+    { url = "https://files.pythonhosted.org/packages/d7/4f/6429bb372197194e65bb33885cd112c7008c2b9cf7496285874aa274e506/filelock-4.3.2-py3-none-any.whl", hash = "sha256:02a8801bc6b2a80921bf3d7895c63084d53bae2a3c86783adce5ae2b89a1825b", size = 244905, upload-time = "2026-11-27T22:58:31.01Z" },
 ]
 
 [[package]]
@@ -4612,11 +4612,11 @@ wheels = [
 
 [[package]]
 name = "platformdirs"
-version = "4.14.8"
+version = "4.14.9"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/71/18/0b0d99f5bf164f04a7a9534c3dbdbe4d5fd2b382667685ad40c192c4d3d1/platformdirs-4.14.8.tar.gz", hash = "sha256:96893d686e84e9e6f358a9ea41a8de544df66dbf2ba6cda250e7dc73acf85b9b", size = 87203, upload-time = "2026-11-20T08:14:52.63Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d6/96/549558270586699a271a18b1111482dc3fc39baa0ef61d183e230d2c961d/platformdirs-4.14.9.tar.gz", hash = "sha256:c6b188e03ffd4dfe1bf8c4bcb47cd94711af244a9852dbff60297bd753684d5d", size = 87729, upload-time = "2026-11-27T20:53:44.721Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5b/be/373cc7341f53bfd3acba3e5db62433fd960a45fcf73ad64a5f4d27e74910/platformdirs-4.14.8-py3-none-any.whl", hash = "sha256:1e34af590de4d978631b751eb2202f2fee4497537a17c1720b12fcf57b331392", size = 94267, upload-time = "2026-11-20T08:14:51.306Z" },
+    { url = "https://files.pythonhosted.org/packages/3b/e7/fc53dfd2f9469cce9be9c58385bdcdb5087e790c135c9dadd4cc8401bb3d/platformdirs-4.14.9-py3-none-any.whl", hash = "sha256:d0d3a23e7ff282cfa94b77f5a22b81030dcb68ba0430f90c74f4bd8d090782ea", size = 94272, upload-time = "2026-11-27T20:53:43.511Z" },
 ]
 
 [[package]]
@@ -6519,14 +6519,14 @@ wheels = [
 
 [[package]]
 name = "smart-open"
-version = "10.0.0"
+version = "10.0.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "wrapt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f7/83/f0aec11110c68a260797924075d599ce98443a74dbb882832605cad5ac5c/smart_open-10.0.0.tar.gz", hash = "sha256:1a543272c61395ccb9a731b9674a919b69de7de8a121274a6f65b2e8f69bd3a2", size = 65611, upload-time = "2026-11-20T20:07:06.018Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/96/55/d6c6c83dfad860a2ff682bbdc04721c9ba68904c54d403c7430c128ee980/smart_open-10.0.1.tar.gz", hash = "sha256:4fb97bb0428672e549698fa2613ef53a06278ae36615abe56a85a61005b04a1d", size = 66167, upload-time = "2026-11-27T22:38:27.926Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ef/14/5fe58800378e93d1dd1ad3c8868a5fad9430b5aadef8e6cb63b4a82eb9b2/smart_open-10.0.0-py3-none-any.whl", hash = "sha256:be6bcc7b7fe6e0c108a7b8c764ee31c01eae568a128355355120b051efff6dd7", size = 76590, upload-time = "2026-11-20T20:07:04.418Z" },
+    { url = "https://files.pythonhosted.org/packages/1c/c0/dbf2a0666e7a0403f2254af59970b6621c127e7ad0db62428a262138564b/smart_open-10.0.1-py3-none-any.whl", hash = "sha256:5ef2d1b2326dd798eb5d95d5746efeec6f57f52d883caf9edd7edea0c8a0279b", size = 77071, upload-time = "2026-11-27T22:38:26.498Z" },
 ]
 
 [package.optional-dependencies]
@@ -6827,11 +6827,11 @@ wheels = [
 
 [[package]]
 name = "texttable"
-version = "1.7.3"
+version = "1.7.4"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/92/f2/2d43e9505895dc66929a26a46d89c7e96835aff72a28ec5ef54d6e96ee24/texttable-1.7.3.tar.gz", hash = "sha256:ff99aa7562c6cbcd0982cb6fae9145126b19878182496cdc46b8d6816721c5da", size = 15694, upload-time = "2026-11-12T18:52:51.531Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/2b/5d/63c69882e131661495d393de1f004cbc84859eeed22b8c4bf4c9461429f5/texttable-1.7.4.tar.gz", hash = "sha256:b5191c88819aa3a6ef1ffdc22cf80cec773692aee9368a8f44f3471902cab9a0", size = 15923, upload-time = "2026-11-27T19:39:25.363Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9e/16/428cc7df8670f407c7810882cf736dbc04163ec60589f3bd8ebb6a2c263a/texttable-1.7.3-py2.py3-none-any.whl", hash = "sha256:b8eaebd6d32565ce85b79b17e2aa52815889249b37bb6dd0894d3eca67c329f8", size = 10876, upload-time = "2026-11-12T18:52:50.483Z" },
+    { url = "https://files.pythonhosted.org/packages/47/71/753e2d02df9ec8f141eaae78b02f3d442cbd50aa41cefafdf44248474613/texttable-1.7.4-py2.py3-none-any.whl", hash = "sha256:3ec756f1e7ecec163cbe17ccae24de1f39f3078c0bef6d331b709f42b543e23a", size = 10919, upload-time = "2026-11-27T19:39:24.3Z" },
 ]
 
 [[package]]
