@@ -1373,7 +1373,7 @@ iam:
     # -- Identity server image repository.
     repository: quay.io/keycloak/keycloak
     # -- Identity server image tag. Keep it a quoted string so Dependabot can bump it.
-    tag: "26.8.1"
+    tag: "26.8.2-3"
     # -- Image pull policy.
     pullPolicy: IfNotPresent
   # -- Development only: derive the identity server's public host from each request instead of `appUrl`, so the app can be opened by LAN IP. Tokens then carry whatever host the browser used; never enable in production.
