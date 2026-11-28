@@ -247,8 +247,7 @@ echo "first tenant admin $IAM_BOOTSTRAP_ADMIN"
 # Created once. Afterwards the person owns their account: the job never
 # resets the password or re-adds them to a group they were taken out of.
 # The password is temporary (changed at first sign-in) unless
-# IAM_BOOTSTRAP_ADMIN_TEMPORARY=false, as in the all-in-one image, whose
-# documented password people change themselves under Your account.
+# IAM_BOOTSTRAP_ADMIN_TEMPORARY=false.
 if [ "${IAM_BOOTSTRAP_ADMIN_TEMPORARY:-true}" = "true" ]; then
   REQUIRED='["UPDATE_PASSWORD"]'
   TEMPORARY=--temporary

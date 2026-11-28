@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-/** Structured copy for the Docker trial login footnote (`localhost:3000`, `admin / admin`). */
+/** Structured copy for the Docker trial login footnote (`localhost:3000`, `classifyre / classifyre`). */
 export interface DockerTrialHintCopy {
   readonly beforeHost: string;
   readonly host: string;

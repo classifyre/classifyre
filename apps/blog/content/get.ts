@@ -126,7 +126,7 @@ const enDocker = {
     beforeHost: "Then open ",
     host: "localhost:3000",
     afterHost: " and sign in with ",
-    credentials: "admin / admin",
+    credentials: "classifyre / classifyre",
     afterCredentials:
       " (temporary password — you will be prompted to set a new one on first sign-in). Requires Docker and 4 GB RAM. Mounted volumes preserve your configuration across upgrades — see the ",
     closingAfterCredentials:
@@ -164,7 +164,7 @@ const enFirstRun = {
     {
       step: "01",
       title: "Start the container & sign in",
-      body: "Run the Docker command and open localhost:3000. On first boot, Classifyre initialises the database, identity service, and default workspace automatically, then sign in with admin / admin (temporary password — you will be asked to change it on first sign-in).",
+      body: "Run the Docker command and open localhost:3000. On first boot, Classifyre initialises the database, identity service, and default workspace automatically, then sign in with classifyre / classifyre (temporary password — you will be asked to change it on first sign-in).",
     },
     {
       step: "02",

@@ -30,8 +30,8 @@ docker run -d --name classifyre \
   classifyre/all-in-one:latest
 ```
 
-Then open **http://localhost:3000** and sign in as **`admin`**, temporary
-password **`admin`** — no need to look up a bootstrap secret. On first sign-in
+Then open **http://localhost:3000** and sign in as **`classifyre`**, temporary
+password **`classifyre`** — no need to look up a bootstrap secret. On first sign-in
 you will be asked to choose a new password. On another port or host, tell the
 container its address with `-e CLASSIFYRE_URL=http://localhost:8080`: sign-in
 only sends people back to that address.

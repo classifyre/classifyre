@@ -122,7 +122,7 @@ const enInstall = {
     beforeHost: "Then open ",
     host: "localhost:3000",
     afterHost: " and sign in with ",
-    credentials: "admin / admin",
+    credentials: "classifyre / classifyre",
     afterCredentials:
       " (temporary password — you will be asked to choose a new one on first sign-in).",
   },

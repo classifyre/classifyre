@@ -27,7 +27,7 @@ ready() {
   touch "${READY_FILE}"
   chmod 644 "${READY_FILE}"
   local password="the one you set in CLASSIFYRE_ADMIN_PASSWORD"
-  [ "${CLASSIFYRE_ADMIN_PASSWORD}" = "admin" ] && password="admin"
+  [ "${CLASSIFYRE_ADMIN_PASSWORD}" = "classifyre" ] && password="classifyre"
   cat >&2 <<MSG
 
 [classifyre] ─────────────────────────────────────────────────────────────

@@ -203,7 +203,7 @@ const de: LandingCopy = {
       beforeHost: "Anschließend ",
       host: "localhost:3000",
       afterHost: " öffnen und mit ",
-      credentials: "admin / admin",
+      credentials: "classifyre / classifyre",
       afterCredentials:
         " anmelden (temporäres Passwort – beim ersten Anmelden vergeben Sie ein eigenes).",
     },

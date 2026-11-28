@@ -303,8 +303,8 @@ CLASSIFYRE_URL="${CLASSIFYRE_URL%/}"
 # One login for trying it out: the first tenant admin of Classifyre (with a
 # temporary password, prompted to change on first sign-in) and the identity
 # server's own administrator.
-default CLASSIFYRE_ADMIN_USER     "admin"
-default CLASSIFYRE_ADMIN_PASSWORD "admin"
+default CLASSIFYRE_ADMIN_USER     "classifyre"
+default CLASSIFYRE_ADMIN_PASSWORD "classifyre"
 
 # Machine secrets nobody types: generated once and kept beside the data, like
 # the credential key. The tenant database key derives every tenant database's

@@ -174,9 +174,9 @@ export function DockerRunHint({ className }: { className?: string }) {
       >
         localhost:3000
       </a>{" "}
-      and sign in as <span className="font-mono">admin</span> /{" "}
-      <span className="font-mono">admin</span> (temporary password, changed on
-      first sign-in). Needs Docker and 4 GB of memory.
+      and sign in as <span className="font-mono">classifyre</span> /{" "}
+      <span className="font-mono">classifyre</span> (temporary password, changed
+      on first sign-in). Needs Docker and 4 GB of memory.
     </p>
   );
 }

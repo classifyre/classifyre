@@ -211,8 +211,9 @@ Kubernetes Jobs.
 Sign-in (IAM, Keycloak) is always on, in both: there is no `iam.enabled` and no
 `IAM_ENABLED`. The all-in-one image also runs Keycloak (stock distribution plus
 a Temurin JRE, realm setup and theme from `helm/classifyre/files/iam` as the
-`iam` build context) and signs in as `admin`/`admin` (temporary password,
-prompted to change on first sign-in). Keep its
+`iam` build context) and signs in as `classifyre`/`classifyre` (temporary password,
+prompted to change on first sign-in). Never change that default: existing
+volumes keep the account they were created with, and setup signs in with it. Keep its
 Keycloak `FROM` tag equal to `iam.image.tag` (`scripts/check-keycloak-version.sh`).
 One Playwright smoke test (`apps/e2e`) covers the chart and the image
 (`scripts/smoke/seed.sh` with `SMOKE_TARGET=k8s|docker`).

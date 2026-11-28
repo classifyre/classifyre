@@ -4,7 +4,7 @@
 # all-in-one's simple settings. It waits for the identity server itself.
 #
 # The first tenant admin is $CLASSIFYRE_ADMIN_USER with the documented
-# password (admin / admin by default), marked temporary so Keycloak asks for a
+# password (classifyre / classifyre by default), marked temporary so Keycloak asks for a
 # new password on first sign-in. The realm setup never resets it once the
 # account exists.
 set -euo pipefail
