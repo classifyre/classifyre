@@ -5,11 +5,11 @@
  * the server never reads it.
  */
 
-export type SavedQueryTab = { kind: "source" | "asset"; id: string };
+export type SavedQueryTab = { kind: "source" | "asset" | "schema"; id: string };
 
 export interface QueryTabsState {
   tabs: SavedQueryTab[];
-  /** `query`, `source:<id>` or `asset:<id>`. */
+  /** `query`, `source:<id>`, `asset:<id>`, or `schema:<id>`. */
   active: string;
   /** Asset ids, most recent first. */
   recent: string[];
@@ -33,6 +33,18 @@ export function queryTabsCookieName(userId: string, workspace: string): string {
   return `classifyre-query-tabs.${safe(workspace)}.${safe(userId)}`;
 }
 
+const TAB_KIND_TO_CODE: Readonly<Record<SavedQueryTab["kind"], string>> = {
+  source: "s",
+  schema: "v",
+  asset: "a",
+};
+
+const CODE_TO_TAB_KIND: Readonly<Record<string, SavedQueryTab["kind"]>> = {
+  s: "source",
+  v: "schema",
+  a: "asset",
+};
+
 /** The cookie value; tab kinds are one letter to save space. */
 export function encodeQueryTabs(state: QueryTabsState): string {
   return encodeURIComponent(
@@ -40,7 +52,7 @@ export function encodeQueryTabs(state: QueryTabsState): string {
       v: VERSION,
       t: state.tabs
         .slice(-MAX_SAVED_TABS)
-        .map((tab) => `${tab.kind === "source" ? "s" : "a"}:${tab.id}`),
+        .map((tab) => `${TAB_KIND_TO_CODE[tab.kind]}:${tab.id}`),
       a: state.active,
       r: state.recent.slice(0, MAX_RECENT_ASSETS),
     }),
@@ -63,10 +75,11 @@ export function decodeQueryTabs(
     const tabs = (Array.isArray(parsed.t) ? parsed.t : [])
       .filter((entry): entry is string => typeof entry === "string")
       .map((entry): SavedQueryTab | null => {
-        const [kind, ...rest] = entry.split(":");
+        const [code, ...rest] = entry.split(":");
         const id = rest.join(":");
-        if (!id || (kind !== "s" && kind !== "a")) return null;
-        return { kind: kind === "s" ? "source" : "asset", id };
+        const kind = code ? CODE_TO_TAB_KIND[code] : undefined;
+        if (!id || !kind) return null;
+        return { kind, id };
       })
       .filter((tab): tab is SavedQueryTab => tab !== null)
       .slice(-MAX_SAVED_TABS);

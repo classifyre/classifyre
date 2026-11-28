@@ -441,6 +441,7 @@ export * from './QualityRuleDto';
 export * from './QualityRuleDtoThreshold';
 export * from './QualityTestResultDto';
 export * from './QueryCatalogDto';
+export * from './QueryCatalogRelationDto';
 export * from './QueryCatalogSourceDto';
 export * from './QueryCatalogTableDto';
 export * from './QueryColumnDto';

@@ -8,6 +8,8 @@ Name | Type
 ------------ | -------------
 `name` | string
 `type` | string
+`isPrimaryKey` | boolean
+`nullable` | boolean
 `access` | string
 `mask` | string
 `inClear` | boolean
@@ -21,6 +23,8 @@ import type { QueryColumnDto } from '@workspace/api-client'
 const example = {
   "name": null,
   "type": null,
+  "isPrimaryKey": null,
+  "nullable": null,
   "access": null,
   "mask": null,
   "inClear": null,

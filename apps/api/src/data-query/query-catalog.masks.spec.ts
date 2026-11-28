@@ -360,3 +360,315 @@ describe('QueryCatalogService shared dataset floors (DQ §5.12)', () => {
     ]);
   });
 });
+
+describe('QueryCatalogService visual schema metadata & governance-filtered relations', () => {
+  const ORDERS = {
+    assetId: 'a-2',
+    sourceId: 's-1',
+    name: 'orders',
+    schema: 'crm',
+    table: 'orders',
+    sqlName: 'lake.crm.orders',
+    rowCount: 1500,
+    columns: [
+      { name: 'id', type: 'BIGINT', isPrimaryKey: true, nullable: false },
+      { name: 'customer_id', type: 'BIGINT', nullable: false },
+      { name: 'secret_ref', type: 'VARCHAR', nullable: true },
+      { name: 'restricted_ref', type: 'VARCHAR', nullable: true },
+    ],
+    queryable: true,
+    location: { kind: 'file' },
+  };
+
+  const CUSTOMERS_RICH = {
+    ...TABLE,
+    rowCount: 420,
+    columns: [
+      { name: 'id', type: 'BIGINT', isPrimaryKey: true, nullable: false },
+      { name: 'email', type: 'VARCHAR', nullable: false },
+      { name: 'api_key', type: 'VARCHAR', nullable: true },
+      { name: 'country', type: 'VARCHAR', nullable: true },
+    ],
+  };
+
+  function multiTableService(input: {
+    capabilities?: string[];
+    governs?: { scopeType: 'ASSET' | 'SOURCE'; scopeId: string }[];
+    grantAssets?: string[];
+    connection?: { sourceIds: string[]; assetIds: string[] };
+    rowRules?: { principalRef: string; conditions: unknown }[];
+    relations?: {
+      fromAssetId: string;
+      fromColumn?: string;
+      toAssetId: string;
+      toColumn?: string;
+      constraintName?: string;
+      cardinality?: '1-1' | '1-N' | 'N-1' | 'N-N';
+    }[];
+  }) {
+    const { svc, prisma } = service({
+      capabilities: input.capabilities,
+      governs: input.governs,
+      rowRules: input.rowRules,
+      notes: [
+        {
+          assetId: 'a-2',
+          columnName: 'secret_ref',
+          access: 'hide',
+          maskKind: null,
+          classification: null,
+        },
+        {
+          assetId: 'a-2',
+          columnName: 'restricted_ref',
+          access: 'restrict',
+          maskKind: null,
+          classification: null,
+        },
+      ],
+    });
+    // Override policy resourceGrants & CLS connection if provided
+    const anySvc = svc as unknown as {
+      policy: {
+        resourceGrants: (cap: string) => {
+          sourceIds: string[];
+          assetIds: string[];
+        };
+      };
+      cls: { isActive: () => boolean; get: (k: string) => unknown };
+    };
+    if (input.grantAssets) {
+      anySvc.policy.resourceGrants = (cap: string) =>
+        cap === 'data.query'
+          ? { sourceIds: [], assetIds: input.grantAssets ?? [] }
+          : { sourceIds: [], assetIds: [] };
+    }
+    if (input.connection) {
+      const origGet = anySvc.cls.get.bind(anySvc.cls);
+      anySvc.cls.get = (key: string) =>
+        key === CLS_CONNECTION_SCOPE
+          ? {
+              mode: 'allow',
+              sourceIds: new Set(input.connection!.sourceIds),
+              assetIds: new Set(input.connection!.assetIds),
+            }
+          : origGet(key);
+    }
+    jest.spyOn(svc, 'tables').mockResolvedValue({
+      at: Date.now(),
+      sources: [
+        {
+          id: 's-1',
+          name: 'Lake',
+          type: 'S3',
+          sqlName: 'lake',
+          queryable: true,
+        },
+      ],
+      tables: [CUSTOMERS_RICH as never, ORDERS as never],
+      relations: input.relations ?? [
+        {
+          fromAssetId: 'a-2',
+          fromColumn: 'customer_id',
+          toAssetId: 'a-1',
+          toColumn: 'id',
+          constraintName: 'fk_orders_customer',
+          cardinality: 'N-1',
+        },
+        {
+          fromAssetId: 'a-2',
+          fromColumn: 'secret_ref',
+          toAssetId: 'a-1',
+          toColumn: 'api_key',
+          constraintName: 'fk_orders_secret_api_key',
+          cardinality: 'N-1',
+        },
+        {
+          fromAssetId: 'a-2',
+          fromColumn: 'restricted_ref',
+          toAssetId: 'a-1',
+          toColumn: 'id',
+          constraintName: 'fk_orders_restricted',
+          cardinality: 'N-1',
+        },
+      ],
+    });
+    return { svc, prisma };
+  }
+
+  it('returns rowCount, isPrimaryKey, nullable and drops hidden/restricted FK relations for regular callers', async () => {
+    const { svc } = multiTableService({});
+    const cat = await svc.publicCatalog();
+    const customers = cat.sources[0].tables.find((t) => t.assetId === 'a-1')!;
+    const orders = cat.sources[0].tables.find((t) => t.assetId === 'a-2')!;
+
+    expect(customers.rowCount).toBe(420);
+    expect(orders.rowCount).toBe(1500);
+    expect(customers.columns.find((c) => c.name === 'id')).toMatchObject({
+      isPrimaryKey: true,
+      nullable: false,
+    });
+    // Only the visible customer_id -> id FK survives; hidden & restricted FKs (and their constraintNames) are dropped.
+    expect(cat.relations).toEqual([
+      {
+        fromAssetId: 'a-2',
+        fromColumn: 'customer_id',
+        toAssetId: 'a-1',
+        toColumn: 'id',
+        constraintName: 'fk_orders_customer',
+        cardinality: 'N-1',
+      },
+    ]);
+    expect(JSON.stringify(cat)).not.toContain('secret_ref');
+    expect(JSON.stringify(cat)).not.toContain('restricted_ref');
+    expect(JSON.stringify(cat)).not.toContain('api_key');
+  });
+
+  it('reveals hidden FK to data.unmask holders while STILL hiding restricted FK', async () => {
+    const { svc } = multiTableService({
+      capabilities: ['data.query', 'data.unmask', 'asset.view'],
+    });
+    const cat = await svc.publicCatalog();
+    expect(cat.relations).toEqual([
+      expect.objectContaining({
+        fromColumn: 'customer_id',
+        toColumn: 'id',
+      }),
+      expect.objectContaining({
+        fromColumn: 'secret_ref',
+        toColumn: 'api_key',
+      }),
+    ]);
+    expect(JSON.stringify(cat)).not.toContain('restricted_ref');
+  });
+
+  it('reveals restricted FK only to owners/stewards', async () => {
+    const { svc } = multiTableService({
+      governs: [{ scopeType: 'SOURCE', scopeId: 's-1' }],
+    });
+    const cat = await svc.publicCatalog();
+    expect(cat.relations).toHaveLength(3);
+  });
+
+  it('drops relations touching tables invisible to a data-consumer (seeLocked: false)', async () => {
+    const { svc } = multiTableService({
+      capabilities: [],
+      grantAssets: ['a-2'],
+    });
+    const cat = await svc.publicCatalog();
+    expect(cat.sources[0].tables.map((t) => t.assetId)).toEqual(['a-2']);
+    expect(cat.relations).toEqual([]);
+  });
+
+  it('omits rowCount on row-filtered tables so unfiltered cardinality is never leaked', async () => {
+    const { svc } = multiTableService({
+      rowRules: [
+        {
+          principalRef: 'group:g-1',
+          conditions: [{ column: 'country', op: 'in', values: ['AT'] }],
+        },
+      ],
+    });
+    const cat = await svc.publicCatalog();
+    const customers = cat.sources[0].tables.find((t) => t.assetId === 'a-1')!;
+    const orders = cat.sources[0].tables.find((t) => t.assetId === 'a-2')!;
+    expect(customers.rowFilter).toBeDefined();
+    expect(customers.rowCount).toBeUndefined();
+    expect(orders.rowCount).toBe(1500);
+  });
+
+  it('unpacks multi-FK Edge.evidence.foreign_keys and strips FKs touching hidden/restricted columns', async () => {
+    const { svc, prisma } = multiTableService({});
+    // Wire prisma.edge.findMany to return the exact shape CLI writes to Edge.evidence
+    (prisma as Record<string, unknown>).edge = {
+      findMany: jest.fn().mockResolvedValue([
+        {
+          fromId: 'a-2',
+          toId: 'a-1',
+          metadata: null,
+          fieldMappings: null,
+          evidence: {
+            foreign_keys: [
+              {
+                fromColumn: 'customer_id',
+                toColumn: 'id',
+                constraintName: 'fk_orders_customer',
+              },
+              {
+                fromColumn: 'secret_ref',
+                toColumn: 'api_key',
+                constraintName: 'fk_orders_secret_api_key',
+              },
+              {
+                fromColumn: 'restricted_ref',
+                toColumn: 'id',
+                constraintName: 'fk_orders_restricted',
+              },
+            ],
+          },
+        },
+      ]),
+    };
+
+    const raw = await (
+      svc as unknown as {
+        loadForeignKeyRelations: (ids: string[]) => Promise<unknown[]>;
+      }
+    ).loadForeignKeyRelations(['a-1', 'a-2']);
+    expect(raw).toEqual([
+      {
+        fromAssetId: 'a-2',
+        fromColumn: 'customer_id',
+        toAssetId: 'a-1',
+        toColumn: 'id',
+        constraintName: 'fk_orders_customer',
+        cardinality: 'N-1',
+      },
+      {
+        fromAssetId: 'a-2',
+        fromColumn: 'secret_ref',
+        toAssetId: 'a-1',
+        toColumn: 'api_key',
+        constraintName: 'fk_orders_secret_api_key',
+        cardinality: 'N-1',
+      },
+      {
+        fromAssetId: 'a-2',
+        fromColumn: 'restricted_ref',
+        toAssetId: 'a-1',
+        toColumn: 'id',
+        constraintName: 'fk_orders_restricted',
+        cardinality: 'N-1',
+      },
+    ]);
+
+    // Feed unpacked relations through publicCatalog() governance filter
+    jest.spyOn(svc, 'tables').mockResolvedValue({
+      at: Date.now(),
+      sources: [
+        {
+          id: 's-1',
+          name: 'Lake',
+          type: 'S3',
+          sqlName: 'lake',
+          queryable: true,
+        },
+      ],
+      tables: [CUSTOMERS_RICH as never, ORDERS as never],
+      relations: raw as never,
+    });
+    const cat = await svc.publicCatalog();
+    expect(cat.relations).toEqual([
+      {
+        fromAssetId: 'a-2',
+        fromColumn: 'customer_id',
+        toAssetId: 'a-1',
+        toColumn: 'id',
+        constraintName: 'fk_orders_customer',
+        cardinality: 'N-1',
+      },
+    ]);
+    expect(JSON.stringify(cat)).not.toContain('fk_orders_secret_api_key');
+    expect(JSON.stringify(cat)).not.toContain('fk_orders_restricted');
+  });
+});

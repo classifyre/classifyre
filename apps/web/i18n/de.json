@@ -7614,9 +7614,21 @@
       "closeLeft": "Tabs links schließen",
       "closeRight": "Tabs rechts schließen"
     },
+    "schema": {
+      "tabTitle": "Visuelles Schema",
+      "shortTitle": "Schema",
+      "viewSql": "SQL",
+      "openSourceSchemaHint": "Visuelles Schema für {{name}} öffnen",
+      "openInSql": "In SQL öffnen",
+      "requestDataset": "Als Dataset anfragen",
+      "emptySqlHint": "Tabellen auf dem Canvas platzieren und verbinden, um SQL zu erzeugen.",
+      "lockedTablesWarning": "{{count}} Tabelle(n) auf dem Canvas sind für direkte Abfragen gesperrt. Fragen Sie diese Auswahl stattdessen als verwaltetes geteiltes Dataset an.",
+      "placeFirstN": "Erste {{count}} von {{total}} platzieren"
+    },
     "objectView": {
       "subtabs": {
         "tables": "Tabellen",
+        "visualSchema": "Visuelles Schema",
         "data": "Daten",
         "overview": "Übersicht",
         "governance": "Governance",
@@ -8626,7 +8638,8 @@
       "audienceGroupPlaceholder": "Eigene Gruppe wählen",
       "noAudienceGroups": "Sie sind Mitglied keiner Gruppe in diesem Mandanten.",
       "submit": "Entwurf erstellen",
-      "created": "Entwurf der Datenanfrage erstellt."
+      "created": "Entwurf der Datenanfrage erstellt.",
+      "preloadedFromSchema": "{{tables}} Tabellen, {{joins}} Joins aus dem Visuellen Schema übernommen"
     },
     "rail": {
       "title": "Katalog",
@@ -8756,6 +8769,122 @@
       "declined": "Datenanfrage abgelehnt.",
       "changesRequested": "Änderungen angefragt.",
       "conflictReloaded": "Anderweitig geändert — neueste Version geladen."
+    }
+  },
+  "visualSchema": {
+    "color": {
+      "label": "Kartenfarbe",
+      "reset": "Farbe zurücksetzen"
+    },
+    "node": {
+      "collapse": "Spalten einklappen",
+      "expand": "Spalten ausklappen",
+      "openData": "Tabellendaten öffnen",
+      "estimatedRows": "Geschätzte Zeilenanzahl vom letzten Scan",
+      "rowFilterActive": "Für Ihre Ansicht gilt ein Zeilenfilter",
+      "hiddenColumns": "+{{count}} durch Governance ausgeblendet"
+    },
+    "context": {
+      "color": "Farbe",
+      "findLinks": "Verknüpfungen suchen",
+      "removeLinks": "Verknüpfungen entfernen",
+      "hide": "Auf Canvas ausblenden",
+      "unhide": "Auf Canvas einblenden",
+      "remove": "Vom Canvas entfernen"
+    },
+    "dock": {
+      "zoomIn": "Vergrößern",
+      "zoomOut": "Verkleinern",
+      "fitView": "Ansicht einpassen",
+      "panMode": "Schwenkmodus",
+      "selectMode": "Auswahlmodus",
+      "minimap": "Minimap umschalten",
+      "resetZoom": "Zoom auf 100 % zurücksetzen"
+    },
+    "toolbar": {
+      "hiddenTables": "Ausgeblendete Tabellen",
+      "revealHidden": "Ausgeblendete Tabellen anzeigen",
+      "hideRevealed": "Ausgeblendete Tabellen wieder verbergen",
+      "unhideAll": "Alle Tabellen einblenden",
+      "grid": "Raster umschalten",
+      "arrange": "Automatisch anordnen",
+      "arrangeConnected": "Verbundene Gruppen (ELK)",
+      "arrangeGrid": "Raster-Layout",
+      "findLinks": "Verknüpfungen suchen",
+      "clear": "Canvas leeren",
+      "export": "Exportieren / Importieren"
+    },
+    "export": {
+      "png1x": "PNG exportieren (1×)",
+      "png2x": "PNG exportieren (2× Retina)",
+      "pngBw": "S/W-PNG exportieren (Druck)",
+      "svg": "SVG exportieren",
+      "json": "Spec-JSON exportieren",
+      "dbml": "DBML exportieren",
+      "importJson": "Spec-JSON importieren",
+      "imported": "{{tables}} Tabellen importiert.",
+      "failed": "Diagramm konnte nicht exportiert oder importiert werden."
+    },
+    "clearDialog": {
+      "title": "Schema-Canvas leeren?",
+      "body": "Alle {{count}} Tabellen und ihre Joins vom Canvas entfernen? Diese Aktion kann rückgängig gemacht werden."
+    },
+    "rail": {
+      "refresh": "Katalog aktualisieren",
+      "collapse": "Katalog einklappen",
+      "expand": "Katalog anzeigen",
+      "generateSource": "Alle Tabellen aus {{name}} platzieren",
+      "onCanvas": "Auf Canvas platziert",
+      "tableCount": "{{count}} Tabellen",
+      "addSelected": "{{count}} hinzufügen",
+      "multiSelectHint": "Cmd/Strg+Klick für Mehrfachauswahl"
+    },
+    "inspector": {
+      "properties": "Eigenschaften",
+      "relations": "Beziehungen",
+      "collapse": "Inspektor einklappen",
+      "expand": "Inspektor anzeigen"
+    },
+    "properties": {
+      "alias": "SQL-Alias",
+      "aliasInvalid": "Alias muss eindeutig sein und aus Kleinbuchstaben, Ziffern oder Unterstrichen bestehen.",
+      "columns": "Spalten",
+      "relation": "Join-Beziehung",
+      "joinType": "Join-Typ",
+      "cardinality": "Kardinalität",
+      "cardinalityNone": "Keine",
+      "deleteJoin": "Join entfernen",
+      "summary": "Canvas-Übersicht",
+      "tablesCount": "Tabellen",
+      "joinsCount": "Joins",
+      "sourcesCount": "Quellen",
+      "selectHint": "Wählen Sie eine Tabelle oder einen Join auf dem Canvas aus, um Eigenschaften zu prüfen und zu bearbeiten."
+    },
+    "relations": {
+      "filterPlaceholder": "Beziehungen filtern…",
+      "add": "Hinzufügen",
+      "active": "Aktive Joins",
+      "empty": "Noch keine Joins. Ziehen Sie zwischen Spalten oder klicken Sie auf Verknüpfungen suchen.",
+      "suggested": "Vorgeschlagene Verknüpfungen",
+      "addAll": "Alle hinzufügen",
+      "addOne": "Hinzufügen",
+      "dialogTitle": "Beziehung hinzufügen",
+      "leftTable": "Linke Tabelle",
+      "leftColumn": "Linke Spalte",
+      "rightTable": "Rechte Tabelle",
+      "rightColumn": "Rechte Spalte"
+    },
+    "origin": {
+      "fk": "Deklarierter FK",
+      "inferred": "Abgeleitet",
+      "manual": "Manuell"
+    },
+    "toast": {
+      "linksFound": "{{count}} Verknüpfungen hinzugefügt.",
+      "noLinksFound": "Keine neuen Verknüpfungen für platzierte Tabellen gefunden.",
+      "sourceAlreadyPlaced": "Alle zulässigen Tabellen dieser Quelle sind bereits auf dem Canvas.",
+      "maxTablesReached": "Canvas-Limit von {{max}} Tabellen erreicht.",
+      "truncatedTables": "{{added}} von {{total}} Tabellen platziert (Canvas-Limit erreicht)."
     }
   }
 }

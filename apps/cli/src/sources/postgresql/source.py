@@ -11,7 +11,7 @@ from ...models.generated_input import (
 )
 from ..dependencies import require_module
 from ..tabular_base import BaseTabularSource
-from ..tabular_utils import TableRef, ViewLineage
+from ..tabular_utils import ForeignKeyDetail, TableRef, ViewLineage
 
 logger = logging.getLogger(__name__)
 
@@ -162,15 +162,15 @@ class PostgreSQLSource(BaseTabularSource):
     def _urn_authority(self) -> str:
         return f"{self.config.required.host}:{self.config.required.port}"
 
-    def _collect_foreign_key_links(
+    def _collect_foreign_key_details(
         self,
         tables: list[TableRef],
-    ) -> dict[tuple[str, ...], set[tuple[str, ...]]]:
+    ) -> list[ForeignKeyDetail]:
         by_database: dict[str, set[tuple[str, ...]]] = {}
         for t in tables:
             by_database.setdefault(t.database, set()).add(t.table_key)
 
-        links: dict[tuple[str, ...], set[tuple[str, ...]]] = {}
+        details: list[ForeignKeyDetail] = []
         for database, scoped_keys in by_database.items():
             try:
                 conn = self._get_cached_connection(database)
@@ -178,30 +178,74 @@ class PostgreSQLSource(BaseTabularSource):
                     cursor.execute(
                         """
                         SELECT
+                            fk.conname         AS constraint_name,
                             source_ns.nspname  AS source_schema,
                             source_tbl.relname AS source_table,
+                            src_att.attname    AS source_column,
                             target_ns.nspname  AS target_schema,
-                            target_tbl.relname AS target_table
+                            target_tbl.relname AS target_table,
+                            tgt_att.attname    AS target_column
                         FROM pg_constraint AS fk
                         JOIN pg_class     AS source_tbl ON source_tbl.oid = fk.conrelid
                         JOIN pg_namespace AS source_ns  ON source_ns.oid  = source_tbl.relnamespace
                         JOIN pg_class     AS target_tbl ON target_tbl.oid = fk.confrelid
                         JOIN pg_namespace AS target_ns  ON target_ns.oid  = target_tbl.relnamespace
+                        JOIN LATERAL unnest(fk.conkey) WITH ORDINALITY AS src_k(attnum, ord) ON TRUE
+                        JOIN LATERAL unnest(fk.confkey) WITH ORDINALITY AS tgt_k(attnum, ord)
+                          ON tgt_k.ord = src_k.ord
+                        JOIN pg_attribute AS src_att
+                          ON src_att.attrelid = fk.conrelid AND src_att.attnum = src_k.attnum
+                        JOIN pg_attribute AS tgt_att
+                          ON tgt_att.attrelid = fk.confrelid AND tgt_att.attnum = tgt_k.attnum
                         WHERE fk.contype = 'f'
+                        ORDER BY fk.conname, src_k.ord
                         """
                     )
-                    for src_schema, src_table, tgt_schema, tgt_table in cursor.fetchall():
+                    for row in cursor.fetchall():
+                        if not isinstance(row, tuple) or len(row) < 7:
+                            continue
+                        (
+                            constraint_name,
+                            src_schema,
+                            src_table,
+                            src_col,
+                            tgt_schema,
+                            tgt_table,
+                            tgt_col,
+                        ) = row[:7]
+                        if not all(
+                            isinstance(v, str)
+                            for v in (
+                                src_schema,
+                                src_table,
+                                src_col,
+                                tgt_schema,
+                                tgt_table,
+                                tgt_col,
+                            )
+                        ):
+                            continue
                         source_key = (database, src_schema, src_table)
                         target_key = (database, tgt_schema, tgt_table)
                         if source_key in scoped_keys and target_key in scoped_keys:
-                            links.setdefault(source_key, set()).add(target_key)
+                            details.append(
+                                ForeignKeyDetail(
+                                    source_key=source_key,
+                                    target_key=target_key,
+                                    source_column=src_col,
+                                    target_column=tgt_col,
+                                    constraint_name=constraint_name
+                                    if isinstance(constraint_name, str) and constraint_name
+                                    else None,
+                                )
+                            )
             except Exception as exc:
                 logger.warning(
-                    "Could not resolve foreign key links for database %s: %s",
+                    "Could not resolve foreign key column details for database %s: %s",
                     database,
                     exc,
                 )
-        return links
+        return details
 
     # ── View lineage (pg_depend / pg_rewrite) ────────────────────────────
 

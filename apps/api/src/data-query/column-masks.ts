@@ -274,6 +274,10 @@ export function maskedType(type: string, mask: MaskKind | undefined): string {
 export interface MaskedColumn {
   name: string;
   type: string;
+  /** Part of the table primary key, when scanned. */
+  isPrimaryKey?: boolean;
+  /** Whether the column allows NULL values, when known. */
+  nullable?: boolean;
   /** Set when governance masks or hides it. */
   access?: ColumnMaskAction;
   mask?: MaskKind;
@@ -288,7 +292,12 @@ export interface MaskedColumn {
  * Column names match exactly, then case-insensitively (DuckDB's rule).
  */
 export function columnsAsSeen(
-  columns: readonly { name: string; type: string }[],
+  columns: readonly {
+    name: string;
+    type: string;
+    isPrimaryKey?: boolean;
+    nullable?: boolean;
+  }[],
   masks: readonly ColumnMask[],
   inClear: boolean,
   /** Owns or stewards it: reads restricted columns too. */
@@ -319,6 +328,10 @@ export function columnsAsSeen(
       out.push({
         name: column.name,
         type: maskedType(column.type, mask.mask),
+        ...(column.isPrimaryKey !== undefined
+          ? { isPrimaryKey: column.isPrimaryKey }
+          : {}),
+        ...(column.nullable !== undefined ? { nullable: column.nullable } : {}),
         access: 'mask',
         mask: mask.mask ?? DEFAULT_MASK,
       });

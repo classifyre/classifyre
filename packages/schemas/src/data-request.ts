@@ -13,9 +13,28 @@ export const DATA_REQUEST_MAX_SOURCES = 8;
 export const DATA_REQUEST_MAX_JOINS = 48;
 export const DATA_REQUEST_MAX_FILTERS_PER_TABLE = 32;
 export const DATA_REQUEST_MAX_PINS = 64;
+export const DATA_REQUEST_MAX_GROUPS = 24;
 
-export const DATA_REQUEST_JOIN_TYPES = ["INNER", "LEFT"] as const;
+export const SCHEMA_TABLE_COLORS = [
+  "gray",
+  "green",
+  "amber",
+  "blue",
+  "violet",
+  "pink",
+  "yellow",
+  "red",
+] as const;
+export type SchemaTableColor = (typeof SCHEMA_TABLE_COLORS)[number];
+
+export const DATA_REQUEST_JOIN_TYPES = ["INNER", "LEFT", "RIGHT", "FULL"] as const;
 export type DataRequestJoinType = (typeof DATA_REQUEST_JOIN_TYPES)[number];
+
+export const DATA_REQUEST_CARDINALITIES = ["1-1", "1-N", "N-1", "N-N"] as const;
+export type DataRequestCardinality = (typeof DATA_REQUEST_CARDINALITIES)[number];
+
+export const DATA_REQUEST_JOIN_ORIGINS = ["manual", "fk", "inferred"] as const;
+export type DataRequestJoinOrigin = (typeof DATA_REQUEST_JOIN_ORIGINS)[number];
 
 export const DATA_REQUEST_FILTER_OPS = [
   "=",
@@ -53,6 +72,10 @@ export const DataRequestTableSchema = z.strictObject({
   y: z.number().finite(),
   keep: z.array(z.string().min(1).max(255)).max(500),
   filters: z.array(DataRequestFilterSchema).max(DATA_REQUEST_MAX_FILTERS_PER_TABLE).default([]),
+  color: z.enum(SCHEMA_TABLE_COLORS).optional(),
+  height: z.number().finite().min(120).max(960).optional(),
+  collapsed: z.boolean().optional(),
+  hidden: z.boolean().optional(),
 });
 export type DataRequestTable = z.infer<typeof DataRequestTableSchema>;
 
@@ -67,8 +90,22 @@ export const DataRequestJoinSchema = z.strictObject({
   left: DataRequestJoinEndpointSchema,
   right: DataRequestJoinEndpointSchema,
   type: z.enum(DATA_REQUEST_JOIN_TYPES).default("INNER"),
+  cardinality: z.enum(DATA_REQUEST_CARDINALITIES).optional(),
+  constraintName: z.string().min(1).max(255).optional(),
+  origin: z.enum(DATA_REQUEST_JOIN_ORIGINS).optional(),
 });
 export type DataRequestJoin = z.infer<typeof DataRequestJoinSchema>;
+
+export const DataRequestGroupSchema = z.strictObject({
+  id: z.string().min(1).max(64),
+  label: z.string().max(120),
+  x: z.number().finite(),
+  y: z.number().finite(),
+  w: z.number().finite().min(80).max(4000),
+  h: z.number().finite().min(60).max(4000),
+  color: z.enum(SCHEMA_TABLE_COLORS).optional(),
+});
+export type DataRequestGroup = z.infer<typeof DataRequestGroupSchema>;
 
 export const DataRequestPinAnchorSchema = z.strictObject({
   tableId: z.string().min(1).max(64),
@@ -88,6 +125,7 @@ export const DataRequestSpecSchema = z.strictObject({
   tables: z.array(DataRequestTableSchema).max(DATA_REQUEST_MAX_TABLES + 4).default([]),
   joins: z.array(DataRequestJoinSchema).max(DATA_REQUEST_MAX_JOINS).default([]),
   pins: z.array(DataRequestPinSchema).max(DATA_REQUEST_MAX_PINS).default([]),
+  groups: z.array(DataRequestGroupSchema).max(DATA_REQUEST_MAX_GROUPS).default([]),
 });
 export type DataRequestSpec = z.infer<typeof DataRequestSpecSchema>;
 
@@ -95,6 +133,7 @@ export const EMPTY_DATA_REQUEST_SPEC: DataRequestSpec = {
   tables: [],
   joins: [],
   pins: [],
+  groups: [],
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -353,11 +392,18 @@ function formatSqlLiteral(
   return { literal: `'${text.replace(/'/g, "''")}'` };
 }
 
+export interface GenerateRequestSqlOptions {
+  /** Override max table limit (e.g. for Data Query explore mode). Defaults to DATA_REQUEST_MAX_TABLES. */
+  maxTables?: number;
+}
+
 export function generateRequestSql(
   spec: DataRequestSpec,
   lookup?: RequestTableLookup,
+  options?: GenerateRequestSqlOptions,
 ): GenerateRequestSqlResult {
   const diagnostics: RequestSqlDiagnostic[] = [];
+  const maxTables = options?.maxTables ?? DATA_REQUEST_MAX_TABLES;
 
   if (!spec.tables.length) {
     diagnostics.push({
@@ -368,11 +414,11 @@ export function generateRequestSql(
     return { sql: "", diagnostics };
   }
 
-  if (spec.tables.length > DATA_REQUEST_MAX_TABLES) {
+  if (spec.tables.length > maxTables) {
     diagnostics.push({
       level: "error",
       code: "too_many_tables",
-      message: `A data request can include at most ${DATA_REQUEST_MAX_TABLES} tables.`,
+      message: `A data request can include at most ${maxTables} tables.`,
     });
   }
 
@@ -713,7 +759,8 @@ export function generateRequestSql(
   for (const step of joinSteps) {
     const targetSqlName = resolvedSqlName.get(step.table.id)!;
     const targetAlias = step.table.alias.trim().toLowerCase();
-    lines.push(`${step.type} JOIN ${targetSqlName} ${targetAlias}`);
+    const joinClause = step.type === "FULL" ? "FULL OUTER JOIN" : `${step.type} JOIN`;
+    lines.push(`${joinClause} ${targetSqlName} ${targetAlias}`);
     step.conditions.forEach((cond, idx) => {
       const prefix = idx === 0 ? "  ON" : "  AND";
       lines.push(
@@ -762,7 +809,18 @@ const TABLE_CARD_BASE_HEIGHT = 84;
 const TABLE_CARD_ROW_HEIGHT = 18;
 const TABLE_CARD_MAX_HEIGHT = 210;
 const SKETCH_PAD = 32;
-const TABLE_ACCENT_HEX = "#0284c7";
+const DEFAULT_TABLE_ACCENT_HEX = "#0a0a0a";
+
+export const SCHEMA_TABLE_COLOR_HEX: Readonly<Record<SchemaTableColor, string>> = {
+  gray: "#737373",
+  green: "#16a34a",
+  amber: "#d97706",
+  blue: "#2563eb",
+  violet: "#7c3aed",
+  pink: "#db2777",
+  yellow: "#eab308",
+  red: "#dc2626",
+};
 
 function tableCardHeight(table: DataRequestTable): number {
   const rows = Math.max(2, Math.min(7, table.keep.length || 3));
@@ -771,17 +829,18 @@ function tableCardHeight(table: DataRequestTable): number {
 
 /**
  * Turn a data-request canvas spec into a v1 BoardSketch for `BoardSketchCanvas`
- * thumbnails on case cards. Returns null when the canvas has no tables or pins.
+ * thumbnails on case cards. Returns null when the canvas has no visible tables or pins.
  */
 export function specToSketch(spec: DataRequestSpec): DataRequestSketch | null {
-  if (!spec.tables.length && !spec.pins.length) return null;
+  const visibleTables = spec.tables.filter((t) => !t.hidden);
+  if (!visibleTables.length && !spec.pins.length) return null;
 
   let minX = Number.POSITIVE_INFINITY;
   let minY = Number.POSITIVE_INFINITY;
   let maxX = Number.NEGATIVE_INFINITY;
   let maxY = Number.NEGATIVE_INFINITY;
 
-  for (const table of spec.tables) {
+  for (const table of visibleTables) {
     const h = tableCardHeight(table);
     minX = Math.min(minX, table.x);
     minY = Math.min(minY, table.y);
@@ -803,17 +862,18 @@ export function specToSketch(spec: DataRequestSpec): DataRequestSketch | null {
   const nodes: DataRequestSketchNode[] = [];
   const indexByTableId = new Map<string, number>();
 
-  for (const table of spec.tables) {
+  for (const table of visibleTables) {
     const idx = nodes.length;
     indexByTableId.set(table.id, idx);
     const label = (table.sqlName.split(".").pop() ?? table.sqlName).slice(0, 80);
+    const colorHex = table.color ? SCHEMA_TABLE_COLOR_HEX[table.color] : DEFAULT_TABLE_ACCENT_HEX;
     nodes.push({
       t: "h",
       x: Math.max(0, Math.round(table.x + offsetX)),
       y: Math.max(0, Math.round(table.y + offsetY)),
       w: TABLE_CARD_WIDTH,
       h: tableCardHeight(table),
-      c: TABLE_ACCENT_HEX,
+      c: colorHex,
       l: label,
     });
   }
@@ -838,7 +898,7 @@ export function specToSketch(spec: DataRequestSpec): DataRequestSketch | null {
     edges.push({
       a,
       b,
-      t: join.type === "LEFT" ? "s" : "l",
+      t: join.type === "INNER" ? "l" : "s",
     });
   }
 

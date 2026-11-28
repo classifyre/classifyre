@@ -255,4 +255,56 @@ describe("request-store", () => {
 
     store.getState().dispose();
   });
+
+  it("supports bulk visual mutations and importSpec preserves pins while stripping hidden columns", () => {
+    const { deps } = makeDeps();
+    const store = createRequestStore("case-1", deps);
+    store.getState().hydrate(
+      makeDetail({
+        spec: {
+          tables: [],
+          joins: [],
+          pins: [{ threadId: "th-keep", anchor: null, x: 100, y: 120 }],
+        },
+      }),
+      CATALOG,
+    );
+
+    const orders = CATALOG.sources[0]!.tables[0]!;
+    const customers = CATALOG.sources[0]!.tables[1]!;
+
+    const added = store.getState().addTables([orders, customers]);
+    expect(added).toHaveLength(2);
+    store.getState().setTableColor([added[0]!.id], "amber");
+    expect(store.getState().spec.tables[0]!.color).toBe("amber");
+    expect(store.getState().renameTableAlias(added[0]!.id, "ord")).toBe(true);
+    expect(store.getState().renameTableAlias(added[1]!.id, "ord")).toBe(false);
+
+    // Import spec with a hidden column that is NOT in CATALOG -> stripped, pins preserved
+    store.getState().importSpec({
+      tables: [
+        {
+          id: "imp1",
+          assetId: "a-orders",
+          sqlName: "shop.public.orders",
+          alias: "o",
+          x: 40,
+          y: 40,
+          keep: ["id", "secret_hidden_col"],
+          filters: [{ column: "secret_hidden_col", op: "=", value: "x" }],
+        },
+      ],
+      joins: [],
+      pins: [],
+      groups: [],
+    });
+
+    expect(store.getState().spec.tables[0]!.keep).toEqual(["id"]);
+    expect(store.getState().spec.tables[0]!.filters).toEqual([]);
+    expect(store.getState().spec.pins).toEqual([
+      { threadId: "th-keep", anchor: null, x: 100, y: 120 },
+    ]);
+
+    store.getState().dispose();
+  });
 });

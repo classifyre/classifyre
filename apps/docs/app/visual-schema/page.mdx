@@ -1,0 +1,171 @@
+---
+title: Visual Schema
+sidebarTitle: Visual Schema
+description: Explore table relationships, discover primary and foreign keys, and build cross-source SQL joins or Data Requests on an interactive ER canvas.
+---
+
+import { Callout, Steps } from "nextra/components"
+import { VisualSchemaDemo } from "@/components/visual-schema/visual-schema-demo"
+import {
+  VisualSchemaBadgeKey,
+  VisualSchemaControlsKey,
+  VisualSchemaEdgeKey,
+} from "@/components/visual-schema/visual-schema-key"
+
+# Visual Schema
+
+**Visual Schema** is Classifyre's interactive entity-relationship (ER) canvas. Place catalog tables from one or many sources on a sheet, inspect their columns and scanned primary/foreign keys, connect joins manually or with **Find links**, and watch valid DuckDB SQL (and DBML) generate live as you work.
+
+Try it directly below — drag cards, tick or untick columns, click **Find links** to connect `order_items`, drag from a column handle to draw a join, click `INNER` on an edge to change the join type, or switch between **Live SQL** and **DBML**.
+
+<VisualSchemaDemo
+  scene="overview"
+  height={480}
+  caption="Interactive demo: drag cards, tick columns to update SQL, click Find links to connect order_items.order_id → orders.id, or click INNER on an edge to cycle join types."
+/>
+
+---
+
+## Where to open Visual Schema
+
+Classifyre uses the same shared Visual Schema engine in three places, each tuned to the task you are doing:
+
+| Place | How to open | Table limit | Where your layout is saved | Best for |
+| --- | --- | --- | --- | --- |
+| **Query data** (`/query`) | Switch to **Visual Schema** in the top switcher beside **SQL** | Up to **40** tables (up to 8 sources) | Your browser (scoped per person and workspace) | Exploring relationships across sources and generating a starter `SELECT` query |
+| **Source → Data tab** | Open a source, click **Data**, and switch to **Visual Schema** | Up to **40** tables (auto-places ≤ 25 tables, or offers **Place first 25**) | Your browser (scoped per person and workspace) | Inspecting the ER diagram of a single database or bucket source |
+| **Data Requests** (`/cases/:id`) | Create or open a [Data Request](/data-requests/) case | Up to **12** tables (up to 8 sources) | Saved on the server with the case | Specifying a governed shared dataset with filters, comment pins, and team review |
+
+<Callout type="info">
+You do not need query permission on a table to inspect its schema. Anyone with `asset.view` (included in the **Viewer** role) can place locked tables onto the canvas, explore their visible columns and relationships, and hand the diagram to a data team with **Request as dataset**.
+</Callout>
+
+---
+
+## Building a diagram
+
+<Steps>
+
+### Add tables from the catalog rail
+
+The left rail lists every scanned source and its tables. Expand any table to preview its columns, types, PK/FK icons, and masking chips before placing it.
+
+- Click **+** on a table, or **drag** one or multiple selected tables onto the canvas.
+- On a source row, click **Generate** to place its tables and automatically wire up known links in one step.
+- On a source's **Data** tab, sources with up to **25** tables auto-place on first visit; larger sources show a **Place first 25** shortcut so the canvas stays fast.
+
+### Connect tables with joins
+
+There are two ways to connect columns:
+
+- **Draw a join manually** — hover over any column row and drag from its side handle to a column on another table card.
+- **Run Find links** — click **Find links** in the top-right toolbar (or on a card's right-click menu) to automatically wire joins between the tables currently on the canvas.
+
+### Pick columns and refine SQL
+
+Tick the columns you want in the output on each card (or right-click cards to **Select All Columns** / **Deselect All Columns**). As you tick columns and adjust joins, the right-hand **SQL** panel updates live.
+
+### Move from diagram to SQL or a Data Request
+
+- **Open in SQL** — copies the generated query into the [SQL editor](/data-query/) so you can add aggregations, window functions, or `LIMIT` and run it.
+- **Copy SQL** — copies the query straight to your clipboard.
+- **Request as dataset** — opens a new [Data Request](/data-requests/) pre-filled with your current canvas tables, joins, and selected columns. This is the fastest path whenever your diagram includes **locked** tables you cannot query directly.
+
+</Steps>
+
+---
+
+## Reading cards and governance badges
+
+Each table card displays the source and table name, an editable SQL alias (used in the generated query), its visible columns, types, and governance marks:
+
+<VisualSchemaBadgeKey />
+
+- **Source color bands** — tables from the same source share a deterministic color stripe; you can override individual or multi-selected cards from the right-click menu or Properties panel.
+- **Semantic zoom** — when you zoom out below **45%**, cards automatically collapse into compact overview chips showing the table name, column count, and lock/filter status so large 30–40 table diagrams stay readable.
+- **Resizable cards** — drag the edge of a table card to widen or narrow long column names and types.
+
+---
+
+## Joins, cardinality, and Find Links
+
+Edges connect exact column rows (`from.column` → `to.column`) and stay legible even when cards move:
+
+<VisualSchemaEdgeKey />
+
+### How **Find links** works
+
+**Find links** checks three tiers in priority order and skips any column pair that is already connected:
+
+1. **Scanned column-level foreign keys** — exact `from_column → to_column` constraints extracted during source scans (PostgreSQL, MySQL, MSSQL, Oracle, ODBC, and Snowflake). Shown as solid `INNER` joins with cardinality markers.
+2. **Table-level foreign-key hints** — when a catalog records a table-to-table relationship without column names, Classifyre pairs the child foreign-key column with the parent table's primary key.
+3. **Naming and type heuristic (inferred)** — when no database FK constraint exists (common in Parquet, CSV, Delta, or Iceberg buckets), Classifyre matches `<parent_singular>_id` or `<parent>_id` against the target table's primary key (`id`) when the column types are compatible. Inferred edges render with a dotted stroke so you can review or remove them at a glance.
+
+### Editing joins in **Properties** and **Relations**
+
+- Click any edge pill (such as `INNER`) on the canvas to cycle the join type quickly, or open the **Properties** tab in the right panel to pick **INNER**, **LEFT**, **RIGHT**, or **FULL OUTER**, set cardinality (`1-1`, `1-N`, `N-1`, `N-N`), or inspect column details.
+- Open the **Relations** tab to see every join on the canvas in one list, jump straight to any join (framing both cards), or accept/dismiss suggested links between tables on the canvas.
+
+---
+
+## Toolbar, navigation, and shortcuts
+
+<VisualSchemaControlsKey />
+
+- **Grid** — toggle the background dot grid on or off.
+- **Arrange** — run hierarchical **ELK Auto-Arrange** to untangle overlapping cards into a clean left-to-right flow.
+- **Find links** — discover and wire missing relationships across all tables on the canvas.
+- **Clear** — empty the canvas (with undo support).
+- **Export / Import** — export the diagram or load a previously saved JSON spec.
+- **Pan / Select dock** — switch between dragging the viewport (**Pan**) and marquee-selecting multiple cards (**Select**), plus zoom controls, fit view, and a collapsible **Minimap**.
+
+### Right-click context menu
+
+Right-click a single card — or marquee-select several cards and right-click any of them — to apply actions to the whole selection at once:
+
+- **Color swatch** — tint selected cards for visual grouping.
+- **Find links / Remove links** — wire or clear edges touching the selected cards.
+- **Select all columns / Deselect all columns** — bulk-toggle output columns across all selected cards.
+- **Collapse / Expand** — shrink cards to headers or restore full column lists.
+- **Hide / Unhide** — temporarily tuck helper cards out of the way (re-show them from the catalog rail or Relations panel).
+- **Open data** — jump to the table's Data tab.
+- **Remove from canvas** — delete selected cards and their incident edges.
+
+### Keyboard shortcuts
+
+| Shortcut | Action |
+| --- | --- |
+| `P` | Switch to **Pan** mode |
+| `S` | Switch to **Select** (marquee) mode |
+| `⌘A` / `Ctrl+A` | Select all tables on the canvas |
+| `⌘Z` / `Ctrl+Z` | Undo last canvas change |
+| `⇧⌘Z` / `Ctrl+Y` | Redo |
+| `⇧1` | Fit all tables in view |
+| `⇧2` | Zoom to the current selection |
+| `Esc` | Clear selection (and exit the Comment Pin tool in Data Requests) |
+| `Delete` / `Backspace` | Remove selected tables or join |
+
+---
+
+## Export and import
+
+Open the **Export / Import** menu in the top-right toolbar to take diagrams out of Classifyre or bring a saved layout back in:
+
+| Format | What it produces |
+| --- | --- |
+| **PNG** (1x, 2x, B&W) | Raster image of the current canvas — crisp 2x for slides and docs, or monochrome B&W for print. |
+| **SVG** | Scalable vector graphic that stays sharp at any zoom level. |
+| **JSON (Export & Import)** | Portable diagram spec (tables, positions, colors, joins, selected columns, filters). Importing validates the schema strictly, strips any table or column you do not have catalog access to, and respects the surface limit (up to 40 tables in Data Query, capped to 12 tables with a warning when imported into a Data Request). |
+| **DBML (`.dbml`)** | Standard Database Markup Language file with `Table` blocks, column types, `[pk]` markers, and `Ref:` lines for tools like dbdiagram.io or Docs-as-Code pipelines. |
+
+---
+
+## Governance guarantees
+
+Visual Schema enforces the exact same fail-closed governance rules as [SQL & Masking](/data-query/#masked-and-hidden-columns):
+
+- **Hidden and restricted columns never leak.** Cards only display a count (for example, `2 hidden`). Hidden columns are never listed by name, never included in foreign-key relations or **Find links**, and never emitted in SQL or DBML exports.
+- **Masked columns stay visibly marked.** Columns classified as personal or sensitive show their masking chip (`Redacted`, `Hashed`, `Last 4`, `Empty`, `Identifiers removed`) right on the card and in the catalog preview.
+- **Row-filtered tables protect row counts.** Tables with active [row filters](/data-query/#filtered-rows) show a shield badge and omit estimated row counts so counts cannot reveal filtered-out rows.
+- **Locked tables never expose rows.** You can design joins involving locked tables and hand them off via **Request as dataset**, but running a query still requires a grant or a published [shared dataset](/data-query/#shared-datasets).
+- **PK/FK metadata comes from scans.** PostgreSQL, MySQL, MSSQL, Oracle, ODBC, and Snowflake scans extract primary keys and column-level foreign keys automatically; sources without declared constraints still work via manual joins and **Find links** heuristics.

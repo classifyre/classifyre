@@ -9,6 +9,7 @@ export default {
   flow: "Scans",
   access: "Access & Sign-in",
   "data-query": "SQL & Masking",
+  "visual-schema": "Visual Schema",
   "sql-connections": "SQL Connections",
   "data-export": "Data Export",
   "data-requests": "Data Requests",

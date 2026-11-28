@@ -14,7 +14,7 @@ from ...models.generated_input import (
 from ...utils.file_parser import render_bytes_cell
 from ..dependencies import require_module
 from ..tabular_base import BaseTabularSource
-from ..tabular_utils import TableRef, ViewLineage
+from ..tabular_utils import ForeignKeyDetail, TableRef, ViewLineage
 
 logger = logging.getLogger(__name__)
 
@@ -560,58 +560,84 @@ class OracleSource(BaseTabularSource):
             logger.debug("Could not read definition of view %s.%s: %s", owner, name, exc)
             return None
 
-    def _collect_foreign_key_links(
+    def _collect_foreign_key_details(
         self,
         tables: list[TableRef],
-    ) -> dict[tuple[str, ...], set[tuple[str, ...]]]:
-        # Only declared constraints: a view's dependencies are lineage, and
-        # _collect_view_lineage already emits them as FLOW.
+    ) -> list[ForeignKeyDetail]:
         table_keys = {t.table_key for t in tables if t.object_type == "TABLE"}
         if not table_keys:
-            return {}
+            return []
 
-        links: dict[tuple[str, ...], set[tuple[str, ...]]] = {}
+        details: list[ForeignKeyDetail] = []
         try:
             conn = self._get_cached_connection(self._service_name)
             with conn.cursor() as cursor:
                 cursor.execute(
                     """
                     SELECT
-                        src.owner AS source_owner,
-                        src.table_name AS source_table,
-                        tgt.owner AS target_owner,
-                        tgt.table_name AS target_table
+                        src.constraint_name AS constraint_name,
+                        src.owner           AS source_owner,
+                        src.table_name      AS source_table,
+                        src_col.column_name AS source_column,
+                        tgt.owner           AS target_owner,
+                        tgt.table_name      AS target_table,
+                        tgt_col.column_name AS target_column
                     FROM all_constraints src
                     JOIN all_constraints tgt
                       ON src.r_owner = tgt.owner
                      AND src.r_constraint_name = tgt.constraint_name
+                    JOIN all_cons_columns src_col
+                      ON src_col.owner = src.owner
+                     AND src_col.constraint_name = src.constraint_name
+                    JOIN all_cons_columns tgt_col
+                      ON tgt_col.owner = tgt.owner
+                     AND tgt_col.constraint_name = tgt.constraint_name
+                     AND tgt_col.position = src_col.position
                     WHERE src.constraint_type = 'R'
+                    ORDER BY src.constraint_name, src_col.position
                     """
                 )
                 for row in cursor.fetchall():
-                    if not isinstance(row, tuple) or len(row) < 4:
+                    if not isinstance(row, tuple) or len(row) < 7:
                         continue
-                    source_schema, source_name, target_schema, target_name = (
-                        row[0],
-                        row[1],
-                        row[2],
-                        row[3],
-                    )
+                    (
+                        constraint_name,
+                        source_schema,
+                        source_name,
+                        source_col,
+                        target_schema,
+                        target_name,
+                        target_col,
+                    ) = row[:7]
                     if not all(
                         isinstance(v, str)
-                        for v in (source_schema, source_name, target_schema, target_name)
+                        for v in (
+                            source_schema,
+                            source_name,
+                            source_col,
+                            target_schema,
+                            target_name,
+                            target_col,
+                        )
                     ):
                         continue
-
-                    source_key = (self._service_name, str(source_schema).upper(), str(source_name))
-                    target_key = (self._service_name, str(target_schema).upper(), str(target_name))
-                    if source_key not in table_keys or target_key not in table_keys:
-                        continue
-                    links.setdefault(source_key, set()).add(target_key)
+                    source_key = (self._service_name, source_schema.upper(), source_name)
+                    target_key = (self._service_name, target_schema.upper(), target_name)
+                    if source_key in table_keys and target_key in table_keys:
+                        details.append(
+                            ForeignKeyDetail(
+                                source_key=source_key,
+                                target_key=target_key,
+                                source_column=source_col,
+                                target_column=target_col,
+                                constraint_name=constraint_name
+                                if isinstance(constraint_name, str) and constraint_name
+                                else None,
+                            )
+                        )
         except Exception as exc:
-            logger.warning("Could not resolve Oracle foreign key links: %s", exc)
-
-        return links
+            logger.warning("Could not resolve Oracle foreign key details: %s", exc)
+        return details
 
     # ── External URL ─────────────────────────────────────────────────────
 

@@ -24,7 +24,7 @@ import {
 import { cn } from "@workspace/ui/lib/utils";
 import { useTranslation } from "@/hooks/use-translation";
 
-export interface FilterPopoverProps {
+export interface SchemaFilterPopoverProps {
   tableId: string;
   columns: ReadonlyArray<{ name: string; type?: string | null }>;
   filters: readonly DataRequestFilter[];
@@ -33,14 +33,14 @@ export interface FilterPopoverProps {
   onRemove: (indexOrId: number | string) => void;
 }
 
-export function FilterPopover({
+export function SchemaFilterPopover({
   tableId,
   columns,
   filters,
   canEdit,
   onAdd,
   onRemove,
-}: FilterPopoverProps) {
+}: SchemaFilterPopoverProps) {
   const { t } = useTranslation();
   const [open, setOpen] = React.useState(false);
   const [column, setColumn] = React.useState(columns[0]?.name ?? "");
@@ -80,10 +80,10 @@ export function FilterPopover({
           type="button"
           onClick={(e) => e.stopPropagation()}
           className={cn(
-            "inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[10px] transition-colors",
+            "inline-flex items-center gap-1 rounded-xs px-1.5 py-0.5 font-mono text-[10px] transition-colors",
             filters.length > 0
-              ? "bg-sky-500/15 text-sky-700 dark:text-sky-300"
-              : "text-muted-foreground hover:bg-muted",
+              ? "bg-accent text-accent-foreground font-semibold"
+              : "text-muted-foreground hover:bg-muted hover:text-foreground",
           )}
           title={t("dataRequest.filters.title")}
           data-testid={`table-filters-${tableId}`}
@@ -111,10 +111,12 @@ export function FilterPopover({
             {filters.map((f, idx) => (
               <li
                 key={f.id ?? idx}
-                className="flex items-center gap-1.5 rounded border bg-muted/40 px-2 py-1 font-mono text-[11px]"
+                className="flex items-center gap-1.5 rounded-xs border border-border/60 bg-muted/40 px-2 py-1 font-mono text-[11px]"
               >
                 <span className="truncate font-medium">{f.column}</span>
-                <span className="text-sky-600 dark:text-sky-400">{f.op}</span>
+                <span className="font-semibold text-[var(--accent-ink)]">
+                  {f.op}
+                </span>
                 <span className="min-w-0 flex-1 truncate text-muted-foreground">
                   {f.values
                     ? `(${f.values.join(", ")})`
@@ -126,7 +128,7 @@ export function FilterPopover({
                   <button
                     type="button"
                     onClick={() => onRemove(f.id ?? idx)}
-                    className="rounded p-0.5 text-muted-foreground hover:text-destructive"
+                    className="rounded-xs p-0.5 text-muted-foreground hover:text-destructive"
                     aria-label={t("common.delete")}
                   >
                     <Trash2 className="h-3 w-3" />

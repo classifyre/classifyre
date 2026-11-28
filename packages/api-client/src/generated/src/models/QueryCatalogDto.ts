@@ -27,6 +27,13 @@ import {
     QueryCatalogSourceDtoToJSON,
     QueryCatalogSourceDtoToJSONTyped,
 } from './QueryCatalogSourceDto';
+import type { QueryCatalogRelationDto } from './QueryCatalogRelationDto';
+import {
+    QueryCatalogRelationDtoFromJSON,
+    QueryCatalogRelationDtoFromJSONTyped,
+    QueryCatalogRelationDtoToJSON,
+    QueryCatalogRelationDtoToJSONTyped,
+} from './QueryCatalogRelationDto';
 
 /**
  * 
@@ -52,6 +59,12 @@ export interface QueryCatalogDto {
      * @memberof QueryCatalogDto
      */
     sources: Array<QueryCatalogSourceDto>;
+    /**
+     * 
+     * @type {Array<QueryCatalogRelationDto>}
+     * @memberof QueryCatalogDto
+     */
+    relations?: Array<QueryCatalogRelationDto>;
 }
 
 /**
@@ -77,6 +90,7 @@ export function QueryCatalogDtoFromJSONTyped(json: any, ignoreDiscriminator: boo
         'canQueryAll': json['canQueryAll'],
         'limits': QueryLimitsDtoFromJSON(json['limits']),
         'sources': ((json['sources'] as Array<any>).map(QueryCatalogSourceDtoFromJSON)),
+        'relations': json['relations'] == null ? undefined : ((json['relations'] as Array<any>).map(QueryCatalogRelationDtoFromJSON)),
     };
 }
 
@@ -94,6 +108,7 @@ export function QueryCatalogDtoToJSONTyped(value?: QueryCatalogDto | null, ignor
         'canQueryAll': value['canQueryAll'],
         'limits': QueryLimitsDtoToJSON(value['limits']),
         'sources': ((value['sources'] as Array<any>).map(QueryCatalogSourceDtoToJSON)),
+        'relations': value['relations'] == null ? undefined : ((value['relations'] as Array<any>).map(QueryCatalogRelationDtoToJSON)),
     };
 }
 

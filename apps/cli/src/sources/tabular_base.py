@@ -41,6 +41,7 @@ from ..utils.sql_lineage import (
 from ..utils.urn import Urn, UrnError
 from .base import BaseSource
 from .tabular_utils import (
+    ForeignKeyDetail,
     TableRef,
     ViewLineage,
     build_tabular_location,
@@ -59,6 +60,7 @@ TABULAR_METADATA_KEYS: frozenset[str] = frozenset(
         "table_type",
         "schema",
         "columns",
+        "primary_keys",
         "row_count",
         "table_format",
     }
@@ -131,6 +133,7 @@ class BaseTabularSource(BaseSource):
         self._pk_columns_cache: dict[tuple[str, ...], list[str]] = {}
         self._columns_meta_cache: dict[tuple[str, ...], list[str]] = {}
         self._column_types_cache: dict[tuple[str, ...], dict[str, str]] = {}
+        self._column_nullability_cache: dict[tuple[str, ...], dict[str, bool]] = {}
         # AUTOMATIC sampling: serialise cursor mutation across the concurrent
         # per-table content tasks, and advance each table's cursor at most once
         # per run (fetch_content and fetch_content_pages may both touch a table).
@@ -380,9 +383,25 @@ class BaseTabularSource(BaseSource):
     ) -> dict[tuple[str, ...], set[tuple[str, ...]]]:
         """Return a mapping from table-key to set of linked table-keys.
 
-        Default returns an empty dict.  Override to query FK metadata.
+        Derived from ``_collect_foreign_key_details`` so connectors only query
+        database FK catalogs once. Subclasses without column-level FK metadata
+        may still override this method directly as a fallback.
         """
-        return {}
+        links: dict[tuple[str, ...], set[tuple[str, ...]]] = {}
+        for detail in self._collect_foreign_key_details(tables):
+            links.setdefault(detail.source_key, set()).add(detail.target_key)
+        return links
+
+    def _collect_foreign_key_details(
+        self,
+        tables: list[TableRef],
+    ) -> list[ForeignKeyDetail]:
+        """Return column-level FK details between tables in this scan.
+
+        Default returns an empty list; dialects that expose FK columns and
+        constraint names override this so ER diagrams render exact links.
+        """
+        return []
 
     # ── Column metadata ──────────────────────────────────────────────────
 
@@ -414,11 +433,16 @@ class BaseTabularSource(BaseSource):
         self._column_types_cache[key] = types
         return types
 
+    def _cached_column_nullability(self, table_ref: TableRef) -> dict[str, bool]:
+        """Return cached ``{column_name: nullable}`` map when populated by metadata queries."""
+        return self._column_nullability_cache.get(table_ref.table_key, {})
+
     def _available_column_types(self, table_ref: TableRef) -> dict[str, str]:
         """Return ordered ``{column_name: data_type}`` via ``information_schema``.
 
         Default works for dialects exposing ``information_schema.columns`` keyed
-        by ``table_schema``/``table_name`` (PostgreSQL, MSSQL). Dialects with a
+        by ``table_schema``/``table_name`` (PostgreSQL, MSSQL). Also populates
+        column nullability when ``is_nullable`` is returned. Dialects with a
         different catalog override this; failures degrade to names-only.
         """
         ph = self._param_placeholder()
@@ -426,7 +450,7 @@ class BaseTabularSource(BaseSource):
         with conn.cursor() as cursor:
             cursor.execute(
                 f"""
-                SELECT column_name, data_type
+                SELECT column_name, data_type, is_nullable
                 FROM information_schema.columns
                 WHERE table_schema = {ph} AND table_name = {ph}
                 ORDER BY ordinal_position
@@ -434,10 +458,20 @@ class BaseTabularSource(BaseSource):
                 (table_ref.schema, table_ref.table),
             )
             result: dict[str, str] = {}
+            nullability: dict[str, bool] = {}
             for row in cursor.fetchall():
                 if not row or not isinstance(row[0], str):
                     continue
-                result[row[0]] = str(row[1]) if row[1] is not None else ""
+                col_name = row[0]
+                result[col_name] = str(row[1]) if len(row) > 1 and row[1] is not None else ""
+                if len(row) > 2 and row[2] is not None:
+                    raw_null = str(row[2]).strip().upper()
+                    if raw_null in ("YES", "TRUE", "1", "Y"):
+                        nullability[col_name] = True
+                    elif raw_null in ("NO", "FALSE", "0", "N"):
+                        nullability[col_name] = False
+            if nullability:
+                self._column_nullability_cache[table_ref.table_key] = nullability
             return result
 
     def _estimate_row_count(self, table_ref: TableRef) -> int | None:
@@ -980,12 +1014,25 @@ class BaseTabularSource(BaseSource):
         # Prefer the name→type map (one catalog query gives both); fall back to
         # names-only (empty types) for dialects without a column-types query.
         column_types = self._cached_column_types(table_ref)
+        pk_columns = self._get_primary_key_columns(table_ref)
+        nullability = self._cached_column_nullability(table_ref)
         if column_types:
-            columns = build_columns(list(column_types.keys()), column_types)
+            columns = build_columns(
+                list(column_types.keys()),
+                column_types,
+                primary_keys=pk_columns or None,
+                nullable=nullability or None,
+            )
         else:
-            columns = build_columns(self._cached_columns(table_ref))
+            columns = build_columns(
+                self._cached_columns(table_ref),
+                primary_keys=pk_columns or None,
+                nullable=nullability or None,
+            )
         if columns:
             asset_metadata["columns"] = columns
+        if pk_columns:
+            asset_metadata["primary_keys"] = pk_columns
         row_count = self._estimate_row_count(table_ref)
         if row_count is not None and row_count >= 0:
             asset_metadata["row_count"] = row_count
@@ -1022,6 +1069,7 @@ class BaseTabularSource(BaseSource):
         tables: list[TableRef],
         table_hash_by_key: dict[tuple[str, ...], str],
         fk_links: dict[tuple[str, ...], set[tuple[str, ...]]],
+        fk_details: list[ForeignKeyDetail] | None = None,
     ) -> None:
         """Turn what the catalog knows into typed, classified edges.
 
@@ -1036,14 +1084,52 @@ class BaseTabularSource(BaseSource):
         never be a hop in a lineage path, so it is emitted as REFERENCE. These
         used to be indistinguishable from every other kind of link.
         """
+        grouped_fks: dict[tuple[str, str], list[dict[str, str]]] = {}
+        seen_fk_items: dict[tuple[str, str], set[tuple[str, str, str]]] = {}
+        for detail in fk_details or []:
+            source_hash = table_hash_by_key.get(detail.source_key)
+            target_hash = table_hash_by_key.get(detail.target_key)
+            if not source_hash or not target_hash or source_hash == target_hash:
+                continue
+            pair = (source_hash, target_hash)
+            dedupe_key = (
+                detail.source_column.lower(),
+                detail.target_column.lower(),
+                detail.constraint_name or "",
+            )
+            seen = seen_fk_items.setdefault(pair, set())
+            if dedupe_key in seen:
+                continue
+            seen.add(dedupe_key)
+            item: dict[str, str] = {
+                "fromColumn": detail.source_column,
+                "toColumn": detail.target_column,
+            }
+            if detail.constraint_name:
+                item["constraintName"] = detail.constraint_name
+            grouped_fks.setdefault(pair, []).append(item)
+
+        emitted_pairs: set[tuple[str, str]] = set()
+        for (source_hash, target_hash), items in sorted(grouped_fks.items()):
+            emitted_pairs.add((source_hash, target_hash))
+            self.add_edge(
+                references(
+                    Ref.asset(source_hash),
+                    Ref.asset(target_hash),
+                    type=ReferenceType.FOREIGN_KEY,
+                    evidence={"foreign_keys": items},
+                )
+            )
+
         for source_key, target_keys in fk_links.items():
             source_hash = table_hash_by_key.get(source_key)
             if not source_hash:
                 continue
             for target_key in sorted(target_keys):
                 target_hash = table_hash_by_key.get(target_key)
-                if not target_hash:
+                if not target_hash or (source_hash, target_hash) in emitted_pairs:
                     continue
+                emitted_pairs.add((source_hash, target_hash))
                 self.add_edge(
                     references(
                         Ref.asset(source_hash),
@@ -1131,8 +1217,20 @@ class BaseTabularSource(BaseSource):
             t.table_key: self.generate_hash_id(t.raw_id) for t in tables
         }
         self._declare_listing_if_whole()
-        fk_links = self._collect_foreign_key_links(tables)
-        self._emit_relationship_edges(tables, table_hash_by_key, fk_links)
+        fk_details = self._collect_foreign_key_details(tables)
+        fk_links: dict[tuple[str, ...], set[tuple[str, ...]]] = {}
+        if fk_details:
+            for detail in fk_details:
+                fk_links.setdefault(detail.source_key, set()).add(detail.target_key)
+        elif (
+            type(self)._collect_foreign_key_links
+            is not BaseTabularSource._collect_foreign_key_links
+            or "_collect_foreign_key_links" in self.__dict__
+        ):
+            # Fallback only when a subclass or test monkeypatch supplies
+            # table-level FK links without column-level details.
+            fk_links = self._collect_foreign_key_links(tables)
+        self._emit_relationship_edges(tables, table_hash_by_key, fk_links, fk_details=fk_details)
 
         batch: list[SingleAssetScanResults] = []
         for table_ref in tables:

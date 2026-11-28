@@ -494,7 +494,11 @@ function EditorShell({
 }) {
   return (
     <div
-      className="relative overflow-hidden rounded-md border bg-background"
+      className={
+        height === "100%"
+          ? "relative h-full overflow-hidden rounded-md border bg-background"
+          : "relative overflow-hidden rounded-md border bg-background"
+      }
       data-testid="sql-editor"
       data-readonly={readOnly ? "true" : "false"}
       // A percentage height resolves against this box: without its own it

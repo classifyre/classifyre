@@ -67,6 +67,17 @@ class ViewLineage:
 
 
 @dataclass(frozen=True)
+class ForeignKeyDetail:
+    """One column-level foreign key mapping between two scanned tables."""
+
+    source_key: tuple[str, ...]
+    target_key: tuple[str, ...]
+    source_column: str
+    target_column: str
+    constraint_name: str | None = None
+
+
+@dataclass(frozen=True)
 class TabularCellMatch:
     row_index: int
     column_name: str

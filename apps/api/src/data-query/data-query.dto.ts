@@ -56,6 +56,16 @@ export class QueryColumnDto {
   type: string;
 
   @ApiPropertyOptional({
+    description: 'Part of the table primary key, when scanned.',
+  })
+  isPrimaryKey?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Whether the column allows NULL values, when known.',
+  })
+  nullable?: boolean;
+
+  @ApiPropertyOptional({
     enum: COLUMN_MASK_ACTIONS,
     description:
       'Governance masks or hides this column (DQ §5.8). Hidden columns are left out unless you read them in clear.',
@@ -130,6 +140,12 @@ export class QueryCatalogTableDto {
   reason?: string;
 
   @ApiPropertyOptional({
+    description:
+      'Estimated row count from the last scan, when known and unfiltered.',
+  })
+  rowCount?: number;
+
+  @ApiPropertyOptional({
     description: 'How many columns governance hides from you (DQ §5.8).',
   })
   hiddenColumns?: number;
@@ -140,6 +156,32 @@ export class QueryCatalogTableDto {
       'The rows you read of this table (DQ §5.10); absent when you read every row.',
   })
   rowFilter?: RowFilterDto;
+}
+
+export class QueryCatalogRelationDto {
+  @ApiProperty()
+  fromAssetId: string;
+
+  @ApiPropertyOptional({
+    description: 'FK column on the source table, when scanned.',
+  })
+  fromColumn?: string;
+
+  @ApiProperty()
+  toAssetId: string;
+
+  @ApiPropertyOptional({
+    description: 'Referenced column on the target table, when scanned.',
+  })
+  toColumn?: string;
+
+  @ApiPropertyOptional({
+    description: 'Database constraint name, when scanned.',
+  })
+  constraintName?: string;
+
+  @ApiPropertyOptional({ enum: ['1-1', '1-N', 'N-1', 'N-N'] })
+  cardinality?: '1-1' | '1-N' | 'N-1' | 'N-N';
 }
 
 export class QueryCatalogSourceDto {
@@ -185,6 +227,9 @@ export class QueryCatalogDto {
 
   @ApiProperty({ type: [QueryCatalogSourceDto] })
   sources: QueryCatalogSourceDto[];
+
+  @ApiPropertyOptional({ type: [QueryCatalogRelationDto] })
+  relations?: QueryCatalogRelationDto[];
 }
 
 export class DataQuerySettingsDto {

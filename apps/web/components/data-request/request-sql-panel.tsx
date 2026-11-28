@@ -59,9 +59,16 @@ import { useRequest, useRequestStore } from "./store/request-context";
 export interface RequestSqlPanelProps {
   request: DataRequestDetailDto;
   catalog: QueryCatalog | null;
+  propertiesPanel?: React.ReactNode;
+  relationsPanel?: React.ReactNode;
 }
 
-export function RequestSqlPanel({ request, catalog }: RequestSqlPanelProps) {
+export function RequestSqlPanel({
+  request,
+  catalog,
+  propertiesPanel,
+  relationsPanel,
+}: RequestSqlPanelProps) {
   const { t } = useTranslation();
   const nsPath = useNsPath();
   const store = useRequestStore();
@@ -127,14 +134,32 @@ export function RequestSqlPanel({ request, catalog }: RequestSqlPanelProps) {
       data-testid="request-sql-panel"
     >
       <Tabs defaultValue="sql" className="flex min-h-0 flex-1 flex-col">
-        <div className="flex items-center justify-between border-b px-3 py-1.5">
+        <div className="flex items-center justify-between overflow-x-auto border-b px-2 py-1.5">
           <TabsList className="h-8">
-            <TabsTrigger value="sql" className="text-xs" data-testid="tab-sql">
+            <TabsTrigger value="sql" className="px-2 text-xs" data-testid="tab-sql">
               {t("dataRequest.panel.tabSql")}
             </TabsTrigger>
+            {propertiesPanel && (
+              <TabsTrigger
+                value="properties"
+                className="px-2 text-xs"
+                data-testid="vs-tab-properties"
+              >
+                {t("visualSchema.inspector.properties")}
+              </TabsTrigger>
+            )}
+            {relationsPanel && (
+              <TabsTrigger
+                value="relations"
+                className="px-2 text-xs"
+                data-testid="vs-tab-relations"
+              >
+                {t("visualSchema.inspector.relations")}
+              </TabsTrigger>
+            )}
             <TabsTrigger
               value="checks"
-              className="gap-1 text-xs"
+              className="gap-1 px-2 text-xs"
               data-testid="tab-checks"
             >
               {t("dataRequest.panel.tabChecks")}
@@ -169,6 +194,24 @@ export function RequestSqlPanel({ request, catalog }: RequestSqlPanelProps) {
           </TabsList>
         </div>
 
+        {/* ── PROPERTIES & RELATIONS TABS (shared visual-schema) ─────── */}
+        {propertiesPanel && (
+          <TabsContent
+            value="properties"
+            className="mt-0 min-h-0 flex-1 overflow-hidden"
+          >
+            {propertiesPanel}
+          </TabsContent>
+        )}
+        {relationsPanel && (
+          <TabsContent
+            value="relations"
+            className="mt-0 min-h-0 flex-1 overflow-hidden"
+          >
+            {relationsPanel}
+          </TabsContent>
+        )}
+
         {/* ── SQL TAB ─────────────────────────────────────────────────── */}
         <TabsContent
           value="sql"
@@ -198,7 +241,11 @@ export function RequestSqlPanel({ request, catalog }: RequestSqlPanelProps) {
             </div>
           )}
 
-          <div className="min-h-[220px] flex-1" data-testid="request-sql-editor-wrap">
+          <div
+            className="grid min-h-[260px] flex-1"
+            style={{ display: "grid", minHeight: 260 }}
+            data-testid="request-sql-editor-wrap"
+          >
             <SqlEditor
               value={localSql}
               onChange={(val) => {
@@ -362,7 +409,7 @@ export function RequestSqlPanel({ request, catalog }: RequestSqlPanelProps) {
                             request.permissions.isTeam && (
                               <Link
                                 href={nsPath(`/assets/${tbl.assetId}?tab=data`)}
-                                className="inline-flex items-center gap-1 text-[11px] text-sky-600 hover:underline dark:text-sky-400"
+                                className="inline-flex items-center gap-1 text-[11px] text-foreground underline underline-offset-2 hover:text-[var(--accent-ink)]"
                               >
                                 {t("dataRequest.checks.requestAccessForGroup", {
                                   group: request.routeGroup.name,
@@ -547,7 +594,7 @@ export function RequestSqlPanel({ request, catalog }: RequestSqlPanelProps) {
                     request.dataset.status === "ok" && (
                       <Link
                         href={nsPath(`/assets/${request.dataset.assetId}?tab=data`)}
-                        className="mt-1.5 inline-flex items-center gap-1 text-sky-600 hover:underline dark:text-sky-400"
+                        className="mt-1.5 inline-flex items-center gap-1 text-foreground underline underline-offset-2 hover:text-[var(--accent-ink)]"
                       >
                         {t("dataRequest.history.openDataset")}
                         <ExternalLink className="h-3 w-3" />

@@ -36,7 +36,7 @@ from ...utils.odbc_connection import (
 from ...utils.urn import Urn, UrnError
 from ..dependencies import require_module
 from ..tabular_base import BaseTabularSource
-from ..tabular_utils import TableRef
+from ..tabular_utils import ForeignKeyDetail, TableRef
 
 logger = logging.getLogger(__name__)
 
@@ -415,12 +415,10 @@ class OdbcSource(BaseTabularSource):
         matching.sort(key=lambda r: r[4] if len(r) > 4 and isinstance(r[4], int) else 0)
         return [str(row[3]) for row in matching if row[3]]
 
-    def _collect_foreign_key_links(
-        self, tables: list[TableRef]
-    ) -> dict[tuple[str, ...], set[tuple[str, ...]]]:
+    def _collect_foreign_key_details(self, tables: list[TableRef]) -> list[ForeignKeyDetail]:
         if self._option("extraction", "include_foreign_keys", True) is False:
-            return {}
-        links: dict[tuple[str, ...], set[tuple[str, ...]]] = {}
+            return []
+        details: list[ForeignKeyDetail] = []
         for table_ref in tables:
             if self._aborted:
                 break
@@ -441,16 +439,20 @@ class OdbcSource(BaseTabularSource):
                 finally:
                     cursor.close()
             except Exception as exc:
-                # A driver without SQLForeignKeys: no links, not a failed scan.
                 logger.debug("No foreign keys for %s: %s", table_ref.display_name, exc)
                 if "optional feature not implemented" in str(exc).lower():
-                    break  # the driver has no SQLForeignKeys at all
+                    break
                 continue
             for row in rows:
-                # (pk catalog, schema, table, column, fk catalog, schema, table, column, …)
+                # ODBC SQLForeignKeys:
+                # (0:pkcat, 1:pkschem, 2:pktable, 3:pkcol, 4:fkcat, 5:fkschem, 6:fktable, 7:fkcol, ..., 11:fkname)
                 if len(row) < 8 or not self._same(row[6], table_ref.table):
                     continue
                 if not self._same(row[5], table_ref.schema):
+                    continue
+                pk_col = str(row[3]) if row[3] else ""
+                fk_col = str(row[7]) if row[7] else ""
+                if not pk_col or not fk_col:
                     continue
                 target_schema = str(row[1]) if row[1] else None
                 target_db = str(row[0]) if row[0] else _NO_CATALOG_LABEL
@@ -459,9 +461,18 @@ class OdbcSource(BaseTabularSource):
                     if target_schema is not None
                     else (target_db, str(row[2]))
                 )
+                fk_name = str(row[11]) if len(row) > 11 and row[11] else None
                 if target != table_ref.table_key:
-                    links.setdefault(table_ref.table_key, set()).add(target)
-        return links
+                    details.append(
+                        ForeignKeyDetail(
+                            source_key=table_ref.table_key,
+                            target_key=target,
+                            source_column=fk_col,
+                            target_column=pk_col,
+                            constraint_name=fk_name,
+                        )
+                    )
+        return details
 
     # ── Dialect ──────────────────────────────────────────────────────────
 

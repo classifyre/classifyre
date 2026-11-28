@@ -9,6 +9,7 @@ Name | Type
 `canQueryAll` | boolean
 `limits` | [QueryLimitsDto](QueryLimitsDto.md)
 `sources` | [Array&lt;QueryCatalogSourceDto&gt;](QueryCatalogSourceDto.md)
+`relations` | [Array&lt;QueryCatalogRelationDto&gt;](QueryCatalogRelationDto.md)
 
 ## Example
 
@@ -20,6 +21,7 @@ const example = {
   "canQueryAll": null,
   "limits": null,
   "sources": null,
+  "relations": null,
 } satisfies QueryCatalogDto
 
 console.log(example)

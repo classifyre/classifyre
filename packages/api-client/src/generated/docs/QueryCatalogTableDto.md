@@ -16,6 +16,7 @@ Name | Type
 `queryable` | boolean
 `canQuery` | boolean
 `reason` | string
+`rowCount` | number
 `hiddenColumns` | number
 `rowFilter` | [RowFilterDto](RowFilterDto.md)
 
@@ -36,6 +37,7 @@ const example = {
   "queryable": null,
   "canQuery": null,
   "reason": null,
+  "rowCount": null,
   "hiddenColumns": null,
   "rowFilter": null,
 } satisfies QueryCatalogTableDto

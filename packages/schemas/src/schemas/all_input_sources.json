@@ -416,7 +416,7 @@
           },
           "columns": {
             "type": "array",
-            "description": "Columns as {name, type} objects",
+            "description": "Columns as {name, type, is_primary_key?, nullable?} objects",
             "items": {
               "type": "object",
               "properties": {
@@ -427,8 +427,23 @@
                 "type": {
                   "type": "string",
                   "description": "Column data type"
+                },
+                "is_primary_key": {
+                  "type": "boolean",
+                  "description": "True when the column is part of the table primary key"
+                },
+                "nullable": {
+                  "type": "boolean",
+                  "description": "Whether the column allows NULL values"
                 }
               }
+            }
+          },
+          "primary_keys": {
+            "type": "array",
+            "description": "Primary key column names in ordinal order",
+            "items": {
+              "type": "string"
             }
           },
           "row_count": {

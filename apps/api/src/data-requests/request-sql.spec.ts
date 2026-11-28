@@ -33,6 +33,7 @@ function spec(partial: Partial<DataRequestSpec>): DataRequestSpec {
     tables: [],
     joins: [],
     pins: [],
+    groups: [],
     ...partial,
   };
 }
@@ -518,7 +519,7 @@ describe('generateRequestSql', () => {
     expect(precheckSql(sql, allowed, sources)).toBeNull();
   });
 
-  it('rejects unknown keys in DataRequestSpecSchema', () => {
+  it('rejects unknown keys in DataRequestSpecSchema and defaults groups to []', () => {
     expect(
       DataRequestSpecSchema.safeParse({
         tables: [],
@@ -527,6 +528,153 @@ describe('generateRequestSql', () => {
         unexpected: true,
       }).success,
     ).toBe(false);
+
+    const parsed = DataRequestSpecSchema.parse({
+      tables: [],
+      joins: [],
+      pins: [],
+    });
+    expect(parsed.groups).toEqual([]);
+  });
+
+  it('parses v1 specs without visual fields and ignores visual fields in generated SQL', () => {
+    const baseSpec = DataRequestSpecSchema.parse({
+      tables: [
+        {
+          id: 'c',
+          assetId: 'asset-c',
+          sqlName: 'lake.crm.customers',
+          alias: 'c',
+          x: 0,
+          y: 0,
+          keep: ['id', 'email'],
+        },
+        {
+          id: 'o',
+          assetId: 'asset-o',
+          sqlName: 'lake.crm.orders',
+          alias: 'o',
+          x: 320,
+          y: 0,
+          keep: ['total'],
+        },
+      ],
+      joins: [
+        {
+          id: 'j1',
+          left: { tableId: 'c', column: 'id' },
+          right: { tableId: 'o', column: 'customer_id' },
+        },
+      ],
+      pins: [],
+    });
+
+    const visualSpec = DataRequestSpecSchema.parse({
+      ...baseSpec,
+      tables: [
+        {
+          ...baseSpec.tables[0],
+          color: 'amber',
+          height: 360,
+          collapsed: true,
+          hidden: true,
+        },
+        {
+          ...baseSpec.tables[1],
+          color: 'violet',
+          height: 240,
+        },
+      ],
+      joins: [
+        {
+          ...baseSpec.joins[0],
+          cardinality: '1-N',
+          constraintName: 'fk_orders_customer',
+          origin: 'fk',
+        },
+      ],
+      groups: [
+        {
+          id: 'g1',
+          label: 'Billing',
+          x: -20,
+          y: -40,
+          w: 680,
+          h: 420,
+          color: 'green',
+        },
+      ],
+    });
+
+    expect(generateRequestSql(visualSpec)).toEqual(
+      generateRequestSql(baseSpec),
+    );
+  });
+
+  it('emits RIGHT JOIN and FULL OUTER JOIN deterministically and passes precheckSql', () => {
+    const s = spec({
+      tables: [
+        table({
+          id: 'a',
+          sqlName: 'lake.crm.accounts',
+          alias: 'a',
+          keep: ['id'],
+        }),
+        table({
+          id: 'b',
+          sqlName: 'lake.crm.orders',
+          alias: 'b',
+          keep: ['total'],
+        }),
+        table({
+          id: 'c',
+          sqlName: 'lake.crm.invoices',
+          alias: 'c',
+          keep: ['amount'],
+        }),
+      ],
+      joins: [
+        {
+          id: 'j1',
+          left: { tableId: 'a', column: 'id' },
+          right: { tableId: 'b', column: 'account_id' },
+          type: 'RIGHT',
+          cardinality: '1-N',
+          origin: 'fk',
+        },
+        {
+          id: 'j2',
+          left: { tableId: 'b', column: 'id' },
+          right: { tableId: 'c', column: 'order_id' },
+          type: 'FULL',
+          cardinality: '1-1',
+          origin: 'manual',
+        },
+      ],
+    });
+
+    const result = generateRequestSql(s);
+    expect(result.diagnostics).toEqual([]);
+    expect(result.sql).toBe(
+      [
+        'SELECT',
+        '  a.id,',
+        '  b.total,',
+        '  c.amount',
+        'FROM lake.crm.accounts a',
+        'RIGHT JOIN lake.crm.orders b',
+        '  ON a.id = b.account_id',
+        'FULL OUTER JOIN lake.crm.invoices c',
+        '  ON b.id = c.order_id',
+      ].join('\n'),
+    );
+    expect(
+      precheckSql(
+        result.sql,
+        new Set(['lake.crm.accounts', 'lake.crm.orders', 'lake.crm.invoices']),
+        new Set(['lake']),
+      ),
+    ).toBeNull();
   });
 });
 
@@ -625,5 +773,77 @@ describe('specToSketch', () => {
     expect(sketch).not.toBeNull();
     expect(sketch!.edges).toEqual([{ a: 0, b: 1, t: 's' }]);
     expect(BoardSketchSchema.safeParse(sketch).success).toBe(true);
+  });
+
+  it('uses neutral or swatch colors (never #0284c7) and omits hidden tables', () => {
+    const s = spec({
+      tables: [
+        table({
+          id: 'a',
+          sqlName: 'lake.crm.customers',
+          alias: 'a',
+          x: 0,
+          y: 0,
+          keep: ['id'],
+        }),
+        table({
+          id: 'b',
+          sqlName: 'lake.crm.orders',
+          alias: 'b',
+          x: 260,
+          y: 0,
+          keep: ['id'],
+          color: 'amber',
+        }),
+        table({
+          id: 'c',
+          sqlName: 'lake.crm.hidden_tbl',
+          alias: 'c',
+          x: 520,
+          y: 0,
+          keep: ['id'],
+          hidden: true,
+        }),
+      ],
+      joins: [
+        {
+          id: 'j1',
+          left: { tableId: 'a', column: 'id' },
+          right: { tableId: 'b', column: 'customer_id' },
+          type: 'RIGHT',
+        },
+        {
+          id: 'j2',
+          left: { tableId: 'b', column: 'id' },
+          right: { tableId: 'c', column: 'order_id' },
+          type: 'INNER',
+        },
+      ],
+    });
+
+    const sketch = specToSketch(s);
+    expect(sketch).not.toBeNull();
+    expect(sketch!.nodes).toHaveLength(2);
+    expect(sketch!.nodes[0]).toMatchObject({ t: 'h', c: '#0a0a0a' });
+    expect(sketch!.nodes[1]).toMatchObject({ t: 'h', c: '#d97706' });
+    expect(JSON.stringify(sketch)).not.toContain('#0284c7');
+    expect(sketch!.edges).toEqual([{ a: 0, b: 1, t: 's' }]);
+    expect(BoardSketchSchema.safeParse(sketch).success).toBe(true);
+
+    // All tables hidden and no pins → null
+    expect(
+      specToSketch(
+        spec({
+          tables: [
+            table({
+              id: 'only',
+              sqlName: 'lake.crm.only',
+              alias: 'o',
+              hidden: true,
+            }),
+          ],
+        }),
+      ),
+    ).toBeNull();
   });
 });
