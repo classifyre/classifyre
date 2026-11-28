@@ -14,7 +14,7 @@ Classifyre already knows every table in a workspace — database tables, Delta a
 - a source's **Data** tab, with the source's tables listed beside the editor;
 - the **Query data** page, to query and join tables of every source at once (who may query is managed in **Settings → Access** and on the Data tabs).
 
-The **Query data** page (in the sidebar) works like a small IDE: the editor fills the space, and the **Tables**, **History** and **Saved** tabs sit beside it. A query can join tables of different sources. **Connect a tool**, at the top right, connects Power BI, Excel, DBeaver and the like over a [SQL connection](/sql-connections).
+The **Query data** page (in the sidebar) works like a small IDE: the editor fills the space, and the **Tables**, **History** and **Saved** tabs sit beside it. Switch the top toggle from **SQL** to **[Visual Schema](/visual-schema/)** whenever you prefer to explore tables and build cross-source joins visually. A query can join tables of different sources. **Connect a tool**, at the top right, connects Power BI, Excel, DBeaver and the like over a [SQL connection](/sql-connections).
 
 Each query runs in its own short-lived worker, next to your scans, and only ever sees the tables you are allowed to read.
 
@@ -131,6 +131,17 @@ ORDER BY revenue DESC
 ```
 
 That query joins a PostgreSQL table with a Delta table in a bucket. Any two tables you may read can be joined, from up to eight sources in one query.
+
+## Visual Schema
+
+If you want to see how tables connect before writing SQL — or build a multi-table join by dragging columns instead of typing `JOIN ... ON` clauses — switch to **Visual Schema** at the top of the **Query data** page or on any source's **Data** tab.
+
+- **Workspace-wide or per-source** — on **Query data**, place up to **40** tables from up to **8** sources; your layout is saved automatically in your browser per workspace. On a source's **Data** tab, sources with up to 25 tables auto-place on first open (larger sources offer **Place first 25**).
+- **PK/FK awareness & Find Links** — cards show primary keys, foreign keys, masking chips, hidden-column counts, and row-filter shields. Click **Find links** to auto-wire scanned database foreign keys or inferred `<table_singular>_id` relationships, and **Arrange** to tidy the layout.
+- **Live SQL handoff** — tick columns on the cards to generate DuckDB SQL live, then click **Open in SQL** to load the query into the editor, **Copy SQL**, or **Request as dataset** if your diagram includes locked tables you cannot query directly.
+- **Export & import** — export the canvas as PNG, SVG, DBML, or JSON (and re-import JSON later).
+
+See the full **[Visual Schema guide](/visual-schema/)** for an interactive demo, keyboard shortcuts, and governance details.
 
 ## Running a query
 

@@ -1,0 +1,62 @@
+/* Visual Schema interactive docs demo styling — matches apps/web visual-schema.css */
+
+.visual-schema .react-flow {
+  --xy-background-color: var(--background);
+  --xy-background-pattern-color: color-mix(in oklab, var(--foreground) 18%, transparent);
+  --xy-edge-stroke: var(--cb-edge);
+  --xy-edge-stroke-selected: var(--cb-select);
+  --xy-connectionline-stroke: var(--foreground);
+  --xy-connectionline-stroke-width: 2;
+  --xy-selection-background-color: color-mix(in oklab, var(--accent) 16%, transparent);
+  --xy-selection-border: 1px dashed var(--foreground);
+  --xy-minimap-background-color: var(--card);
+  --xy-minimap-mask-background-color: color-mix(in oklab, var(--background) 72%, transparent);
+  --xy-attribution-background-color: transparent;
+  --xy-handle-background-color: var(--card);
+}
+
+.visual-schema .react-flow__node {
+  border-radius: var(--radius);
+}
+
+.visual-schema .react-flow__panel {
+  z-index: 20;
+}
+
+.visual-schema .vs-tool-pan .react-flow__pane {
+  cursor: grab;
+}
+
+.visual-schema .vs-tool-pan .react-flow__pane.dragging {
+  cursor: grabbing;
+}
+
+.visual-schema .vs-tool-select .react-flow__pane {
+  cursor: crosshair;
+}
+
+.visual-schema .vs-halo {
+  paint-order: stroke;
+  stroke: var(--background);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+.visual-schema .vs-col-handle {
+  width: 9px;
+  height: 9px;
+  min-width: 9px;
+  min-height: 9px;
+  border-radius: 9999px;
+  border: 1.5px solid var(--border);
+  background: var(--card);
+  transition: transform 0.1s, background-color 0.1s, border-color 0.1s;
+}
+
+.visual-schema .vs-col-handle:hover,
+.visual-schema .vs-col-handle.connectingfrom,
+.visual-schema .vs-col-handle.connectingto,
+.visual-schema .vs-col-handle-joined {
+  border-color: var(--cb-select);
+  background: var(--cb-select);
+}

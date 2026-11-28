@@ -5,6 +5,7 @@ description: Ask a data team for a governed shared dataset on a visual join canv
 ---
 
 import { Callout, Steps } from "nextra/components"
+import { VisualSchemaDemo } from "@/components/visual-schema/visual-schema-demo"
 
 # Data Requests
 
@@ -28,7 +29,7 @@ In Classifyre, **Cases** cover two kinds of work: **[Investigations](/investigat
 
 ### Open a new Data Request case
 
-Go to **Cases → New case** and choose **Data request**. Give the request a title, an optional description, and a priority (*Low*, *Medium*, *High*, or *Critical*).
+Go to **Cases → New case** and choose **Data request** — or start directly from **[Visual Schema](/visual-schema/)** on the **Query data** page by clicking **Request as dataset**, which carries your current tables, joins, and selected columns into the new request draft. Give the request a title, an optional description, and a priority (*Low*, *Medium*, *High*, or *Critical*).
 
 ### Pick the data team and audience group
 
@@ -49,14 +50,22 @@ Drafts stay private to you until you click **Submit**. Submitting notifies the r
 
 ## The visual join canvas
 
-The request workspace combines the catalog rail, a visual join canvas, and a live SQL / checks / delivery panel.
+Data Requests use Classifyre's shared **[Visual Schema](/visual-schema/)** engine paired with the catalog rail, live SQL / checks / delivery panel, and pinned case comments.
 
-- **Tables** — drag or add up to **12** catalog tables across up to **8** sources onto the canvas. Already-published `shared.*` datasets are excluded; requests are built from governed source tables.
-- **Column-to-column joins** — drag a column on one table card onto a column on another to create an **INNER** or **LEFT** join. Multiple joins between the same pair of tables combine into one `ON … AND …` clause. Every table on the canvas must connect to the rest; disconnected tables are flagged as an error rather than turned into an implicit `CROSS JOIN`.
-- **Columns** — tick the columns you want in the output. When two kept columns share a name, the generator disambiguates them deterministically as `<alias>_<column>`.
-- **Filters** — attach filters on any column using `=`, `!=`, `<`, `<=`, `>`, `>=`, `LIKE`, `ILIKE`, `IN`, `NOT IN`, `IS NULL`, or `IS NOT NULL`. Literal values are validated and formatted according to the column's type.
-- **Pinned comments** — drop discussion threads directly onto the canvas (anchored to a table, a specific column, or free-form on the sheet) to ask questions, clarify edge cases, or resolve open points with the data team.
-- **Live SQL** — the canvas continuously produces deterministic DuckDB SQL with unquoted three-part table names (`source.schema.table`), minimal identifier quoting, and BFS-ordered joins.
+<VisualSchemaDemo
+  scene="data-request"
+  height={430}
+  caption="Interactive demo: a Data Request combining a queryable table (orders) with a locked, row-filtered table (customers), a masked column (email), a filter, and a pinned comment."
+/>
+
+- **Tables** — drag one or multiple selected tables (or click **Generate** on a source) to place up to **12** catalog tables across up to **8** sources. Already-published `shared.*` datasets are excluded; requests are built from governed source tables. Cards show PK/FK icons, masking chips, hidden-column counts, and row-filter shields, and can be color-coded, collapsed, hidden, or resized.
+- **Column-to-column joins & Find Links** — drag from a column handle on one card to a column on another, or click **Find links** to wire scanned database foreign keys and inferred `<table_singular>_id` relationships automatically. Choose **INNER**, **LEFT**, **RIGHT**, or **FULL OUTER** joins and cardinality (`1-1`, `1-N`, `N-1`, `N-N`) directly on the edge pill or in the **Properties** and **Relations** tabs. Multiple joins between the same pair of tables combine into one `ON … AND …` clause; disconnected tables are flagged as an error rather than turned into an implicit `CROSS JOIN`.
+- **Layout, multi-select & navigation** — use **Arrange** (ELK Auto-Arrange), marquee **Select** (`S`) and **Pan** (`P`), the collapsible **Minimap**, and right-click context menus that act on a single card or all selected cards at once.
+- **Columns & filters** — tick the columns you want in the output (duplicate names disambiguate deterministically as `<alias>_<column>`), and attach filters on any column using `=`, `!=`, `<`, `<=`, `>`, `>=`, `LIKE`, `ILIKE`, `IN`, `NOT IN`, `IS NULL`, or `IS NOT NULL`. Literal values are validated and formatted according to the column's type.
+- **Pinned comments** — drop discussion threads directly onto the canvas (anchored to a table, a specific column, or free-form on the sheet) to ask questions or clarify edge cases with the data team. Press `Esc` to exit the comment pin tool at any time.
+- **Live SQL & export/import** — the canvas continuously produces deterministic DuckDB SQL with unquoted three-part table names (`source.schema.table`), minimal identifier quoting, and BFS-ordered joins. You can also export diagrams to PNG, SVG, DBML, or JSON (and import JSON specs — up to 12 tables, with a warning if a larger Data Query export is capped).
+
+For the full shortcut reference and canvas guide, see **[Visual Schema](/visual-schema/)**.
 
 ---
 
